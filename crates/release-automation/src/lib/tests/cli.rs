@@ -149,7 +149,7 @@ fn bump_versions_on_selection() {
     // ensure dependants were updated
     // todo: ensure *all* dependants were updated
     assert_eq!(
-        "0.0.0",
+        "=0.0.0",
         crate::common::get_dependency_version(
             &workspace
                 .root()

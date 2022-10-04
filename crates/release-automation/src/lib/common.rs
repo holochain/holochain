@@ -39,9 +39,14 @@ pub(crate) fn set_version<'a>(
         "setting version to {} in manifest at {:?}",
         release_version, cargo_toml_path
     );
+
+    let version = release_version.to_string();
+
     if !dry_run {
-        cargo_next::set_version(&cargo_toml_path, release_version.to_string())?;
+        cargo_next::set_version(&cargo_toml_path, version.as_str())?;
     }
+
+    let version_req = format!("={}", release_version);
 
     let dependants = crt
         .dependants_in_workspace_filtered(|(_dep_name, deps)| {
@@ -54,19 +59,15 @@ pub(crate) fn set_version<'a>(
         let target_manifest = dependant.manifest_path();
 
         debug!(
-            "[{}] updating dependency version from dependant {} to version {} in manifest {:?}",
+            "[{}] updating dependency version from dependant {} to version requirement {} in manifest {:?}",
             crt.name(),
             dependant.name(),
-            release_version.to_string().as_str(),
+            &version_req,
             &target_manifest,
         );
 
         if !dry_run {
-            set_dependency_version(
-                target_manifest,
-                &crt.name(),
-                release_version.to_string().as_str(),
-            )?;
+            set_dependency_version(target_manifest, &crt.name(), &version_req)?;
         }
     }
 
