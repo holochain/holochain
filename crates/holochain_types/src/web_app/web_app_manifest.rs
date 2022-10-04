@@ -6,7 +6,7 @@ use mr_bundle::{Location, Manifest};
 use std::path::PathBuf;
 
 mod current;
-pub(crate) mod web_app_manifest_v1;
+pub mod web_app_manifest_v1;
 
 pub use current::*;
 

@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - Exposed `AppManifestV1` to be used from downstream dependencies.
+- Exposed `WebAppManifestV1` to be used from downstream dependencies.
 
 ## 0.0.59
 
