@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.0.165
 
+- Revert requiring DNA modifiers when registering a DNA. These modifiers were optional before and were made mandatory by accident.
+
 ## 0.0.164
 
 - Add App API call to archive an existing clone cell. [\#1578](https://github.com/holochain/holochain/pull/1578)
