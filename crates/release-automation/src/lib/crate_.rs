@@ -123,6 +123,28 @@ pub(crate) struct EnsureCrateOwnersArgs {
 }
 
 #[derive(Debug, StructOpt)]
+pub(crate) struct CratePinDepsArgs {
+    #[structopt(long)]
+    dry_run: bool,
+
+    #[structopt(long, default_value = "=")]
+    version_prefix: String,
+
+    crt: String,
+}
+
+#[derive(Debug, StructOpt)]
+pub(crate) struct CrateMakePinnedArgs {
+    #[structopt(long)]
+    dry_run: bool,
+
+    #[structopt(long, default_value = "=")]
+    version_prefix: String,
+
+    crt: String,
+}
+
+#[derive(Debug, StructOpt)]
 pub(crate) enum CrateCommands {
     SetVersion(CrateSetVersionArgs),
     ApplyDevVersions(CrateApplyDevVersionsArgs),
@@ -135,6 +157,12 @@ pub(crate) enum CrateCommands {
 
     Check(CrateCheckArgs),
     EnsureCrateOwners(EnsureCrateOwnersArgs),
+
+    /// Pins all dependencies of a given crate and its path dependencies recursively
+    PinDeps(CratePinDepsArgs),
+
+    /// Makes a given crate a pinned dependency in the entire workspace
+    MakePinnedDep(CrateMakePinnedArgs),
 }
 
 pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResult {
@@ -188,7 +216,40 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
         CrateCommands::DetectMissingReleaseheadings(subcmd_args) => {
             cmd_detect_missing_releaseheadings(&ws, subcmd_args)
         }
+        CrateCommands::PinDeps(subcmd_args) => pin_deps(&ws, subcmd_args),
+        CrateCommands::MakePinnedDep(subcmd_args) => make_pinned_dep(&ws, subcmd_args),
     }
+}
+
+fn pin_deps<'a>(
+    ws: &'a ReleaseWorkspace<'a>,
+    subcmd_args: &CratePinDepsArgs,
+) -> Result<(), anyhow::Error> {
+    todo!()
+}
+
+fn make_pinned_dep<'a>(
+    ws: &'a ReleaseWorkspace<'a>,
+    subcmd_args: &CrateMakePinnedArgs,
+) -> Result<(), anyhow::Error> {
+    let crt = ws
+        .members()?
+        .into_iter()
+        .find(|member| member.name() == subcmd_args.crt)
+        .ok_or(anyhow::anyhow!(
+            "looking for crate {} in workspace",
+            subcmd_args.crt
+        ))?;
+
+    for dependant in crt.dependants_in_workspace()? {
+        dependant.set_dependency_version(
+            &crt.name(),
+            &format!("{}{}", subcmd_args.version_prefix, crt.version()),
+            subcmd_args.dry_run,
+        )?;
+    }
+
+    Ok(())
 }
 
 fn cmd_detect_missing_releaseheadings<'a>(

@@ -19,6 +19,7 @@ use semver::Version;
 use std::cell::Cell;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
+use std::io::Write;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -78,6 +79,61 @@ impl<'a> Crate<'a> {
     /// Return the path of the package's manifest.
     pub(crate) fn manifest_path(&self) -> &Path {
         self.package.manifest_path()
+    }
+
+    /// Set a dependency to a specific version
+    // Adapted from https://github.com/sunng87/cargo-release/blob/f94938c3f20ef20bc8f971d59de75574a0b18931/src/cargo.rs#L122-L154
+    pub(crate) fn set_dependency_version(
+        &self,
+        name: &str,
+        version: &str,
+        dry_run: bool,
+    ) -> Fallible<()> {
+        debug!(
+            "[{}] updating dependency version from dependant {} to version requirement {} in manifest {:?}",
+            &self.name(),
+            &name,
+            &version,
+            self.manifest_path(),
+        );
+
+        let temp_manifest_path = self
+            .manifest_path()
+            .parent()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "couldn't get parent of path {}",
+                    self.manifest_path().display()
+                )
+            })?
+            .join("Cargo.toml.work");
+
+        {
+            let manifest = crate::common::load_from_file(self.manifest_path())?;
+            let mut manifest: toml_edit::Document = manifest.parse()?;
+            for key in &["dependencies", "dev-dependencies", "build-dependencies"] {
+                if manifest.as_table().contains_key(key)
+                    && manifest[key]
+                        .as_table()
+                        .expect("manifest is already verified")
+                        .contains_key(name)
+                {
+                    let existing_version = manifest[key][name]["version"].as_str().unwrap_or("*");
+
+                    if *key == "dependencies" || !existing_version.contains("*") {
+                        manifest[key][name]["version"] = toml_edit::value(version);
+                    }
+                }
+            }
+
+            let mut file_out = std::fs::File::create(&temp_manifest_path)?;
+            file_out.write_all(manifest.to_string_in_original_order().as_bytes())?;
+        }
+        if !dry_run {
+            std::fs::rename(temp_manifest_path, self.manifest_path())?;
+        }
+
+        Ok(())
     }
 
     /// Return a reference to the package.
@@ -1082,8 +1138,15 @@ impl<'a> ReleaseWorkspace<'a> {
                     vec![
                         vec!["fetch", "--verbose", "--manifest-path", mp],
                         vec![
-                            vec!["update", "--workspace", "--offline", "--verbose", "--manifest-path", mp],
-                            if dry_run { vec!["--dry-run"] } else { vec![] }
+                            vec![
+                                "update",
+                                "--workspace",
+                                "--offline",
+                                "--verbose",
+                                "--manifest-path",
+                                mp,
+                            ],
+                            if dry_run { vec!["--dry-run"] } else { vec![] },
                         ]
                         .concat(),
                     ]
