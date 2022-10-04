@@ -10,7 +10,7 @@ pub fn tui_crossterm_setup<
     F: FnOnce(&mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<T>,
 >(
     run: F,
-) -> io::Result<T> {
+) -> anyhow::Result<T> {
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -33,5 +33,5 @@ pub fn tui_crossterm_setup<
         println!("{:?}", err)
     }
 
-    res
+    Ok(res?)
 }

@@ -42,5 +42,5 @@ async fn sys_validation_agent_activity_test() {
     assert_eq!(changed, 2);
 
     conductors.exchange_peer_info().await;
-    consistency_10s(&[&cell_1, &cell_2]).await;
+    consistency_10s([&cell_1, &cell_2]).await;
 }

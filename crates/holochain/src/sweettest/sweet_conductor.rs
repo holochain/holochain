@@ -178,7 +178,7 @@ impl SweetConductor {
         &self,
         id: InstalledAppId,
     ) -> ConductorResult<(InstalledApp, Vec<(CellId, CellError)>)> {
-        self.handle().0.enable_app(id).await
+        self.raw_handle().enable_app(id).await
     }
 
     /// Convenience function that uses the internal handle to disable an app
@@ -187,12 +187,12 @@ impl SweetConductor {
         id: InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp> {
-        self.handle().0.disable_app(id, reason).await
+        self.raw_handle().disable_app(id, reason).await
     }
 
     /// Convenience function that uses the internal handle to start an app
     pub async fn start_app(&self, id: InstalledAppId) -> ConductorResult<InstalledApp> {
-        self.handle().0.start_app(id).await
+        self.raw_handle().start_app(id).await
     }
 
     /// Convenience function that uses the internal handle to pause an app
@@ -201,7 +201,7 @@ impl SweetConductor {
         id: InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
-        self.handle().0.pause_app(id, reason).await
+        self.raw_handle().pause_app(id, reason).await
     }
 
     /// Install the dna first.
@@ -233,13 +233,11 @@ impl SweetConductor {
                 (InstalledCell::new(cell_id, r.role.clone()), None)
             })
             .collect();
-        self.handle()
-            .0
-            .clone()
+        self.raw_handle()
             .install_app(installed_app_id.clone(), installed_cells)
             .await?;
 
-        self.handle().0.clone().enable_app(installed_app_id).await?;
+        self.raw_handle().enable_app(installed_app_id).await?;
         Ok(())
     }
 
@@ -269,8 +267,8 @@ impl SweetConductor {
     /// Construct a SweetCell for a cell which has already been created
     pub fn get_sweet_cell(&self, cell_id: CellId) -> ConductorApiResult<SweetCell> {
         let (dna_hash, agent) = cell_id.into_dna_and_agent();
-        let cell_authored_db = self.handle().0.get_authored_db(&dna_hash)?;
-        let cell_dht_db = self.handle().0.get_dht_db(&dna_hash)?;
+        let cell_authored_db = self.raw_handle().get_authored_db(&dna_hash)?;
+        let cell_dht_db = self.raw_handle().get_dht_db(&dna_hash)?;
         let cell_id = CellId::new(dna_hash, agent);
         Ok(SweetCell {
             cell_id,
@@ -297,9 +295,7 @@ impl SweetConductor {
         self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), roles.as_slice())
             .await?;
 
-        self.handle()
-            .0
-            .clone()
+        self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
 
@@ -359,9 +355,7 @@ impl SweetConductor {
             .await?;
         }
 
-        self.handle()
-            .0
-            .clone()
+        self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
 
@@ -386,7 +380,7 @@ impl SweetConductor {
     /// This is designed to crash if called more than once, because as currently
     /// implemented, creating multiple signal streams would simply cause multiple
     /// consumers of the same underlying streams, not a fresh subscription
-    pub fn signals(&mut self) -> impl tokio_stream::Stream<Item = Signal> {
+    pub fn signals(&mut self) -> SignalStream {
         self.signal_stream
             .take()
             .expect("Can't take the SweetConductor signal stream twice")
@@ -438,7 +432,8 @@ impl SweetConductor {
     }
 
     // NB: keep this private to prevent leaking out owned references
-    fn handle(&self) -> SweetConductorHandle {
+    #[allow(dead_code)]
+    fn sweet_handle(&self) -> SweetConductorHandle {
         self.handle
             .as_ref()
             .map(|h| h.clone_privately())
@@ -448,7 +443,7 @@ impl SweetConductor {
     /// Get the ConductorHandle within this Conductor.
     /// Be careful when using this, because this leaks out handles, which may
     /// make it harder to shut down the conductor during tests.
-    pub fn inner_handle(&self) -> ConductorHandle {
+    pub fn raw_handle(&self) -> ConductorHandle {
         self.handle
             .as_ref()
             .map(|h| h.0.clone())

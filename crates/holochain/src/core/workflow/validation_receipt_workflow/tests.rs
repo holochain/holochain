@@ -30,7 +30,7 @@ async fn test_validation_receipt() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    consistency_10s(&[&alice, &bobbo, &carol]).await;
+    consistency_10s([&alice, &bobbo, &carol]).await;
 
     // Get op hashes
     let vault = alice.dht_db().clone().into();

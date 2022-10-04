@@ -6,8 +6,8 @@ use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::handle::DevSettingsDelta;
 use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes};
+use holochain::test_utils::inline_zomes::simple_create_read_zome;
 use holochain::test_utils::inline_zomes::{batch_create_zome, simple_crud_zome};
-use holochain::test_utils::inline_zomes::{simple_create_read_zome, AppString};
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
 use holochain::test_utils::{consistency_10s, consistency_60s, consistency_60s_advanced};
 use holochain::{
@@ -73,10 +73,9 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
-    let all_cells = vec![&alice, &bobbo];
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s(&all_cells).await;
+    consistency_10s([&alice, &bobbo]).await;
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
@@ -128,10 +127,9 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     let hashes: Vec<ActionHash> = conductors[0]
         .call(&alice.zome("zome"), "create_batch", NUM_OPS)
         .await;
-    let all_cells = vec![&alice, &bobbo, &carol];
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s(&all_cells).await;
+    consistency_10s([&alice, &bobbo, &carol]).await;
 
     let mut all_op_hashes = vec![];
 
@@ -213,7 +211,7 @@ async fn test_gossip_shutdown() {
     // Ensure that gossip loops resume upon startup
     conductors[0].startup().await;
 
-    consistency_10s(&[&cell_0, &cell_1]).await;
+    consistency_10s([&cell_0, &cell_1]).await;
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
@@ -274,7 +272,7 @@ async fn three_way_gossip(config: ConductorConfig) {
     }
 
     conductors.exchange_peer_info().await;
-    consistency_60s(&[&cells[0], &cells[1]]).await;
+    consistency_60s([&cells[0], &cells[1]]).await;
 
     tracing::info!(
         "CONSISTENCY REACHED between first two nodes in {:?}",
@@ -314,7 +312,7 @@ async fn three_way_gossip(config: ConductorConfig) {
     conductors.add_conductor(conductor);
     conductors.exchange_peer_info().await;
 
-    consistency_60s_advanced(&[(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
+    consistency_60s_advanced([(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
 
     dbg!(start.elapsed());
 
@@ -353,10 +351,9 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductor.call(&alice.zome("simple"), "create", ()).await;
-    let all_cells = vec![&alice, &bobbo];
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s(&all_cells).await;
+    consistency_10s([&alice, &bobbo]).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductor.call(&bobbo.zome("simple"), "read", hash).await;
@@ -866,7 +863,7 @@ async fn mock_network_sharded_gossip() {
 
     // Wait for consistency to be reached.
     local_machine_session_with_hashes(
-        vec![&conductor.handle()],
+        vec![&conductor.raw_handle()],
         hashes_to_be_held.iter().map(|(l, h)| (*l, (**h).clone())),
         dna_file.dna_hash(),
         std::time::Duration::from_secs(60 * 60),

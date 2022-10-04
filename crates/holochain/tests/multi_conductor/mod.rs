@@ -50,7 +50,7 @@ async fn test_publish() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s(&[&alice, &bobbo, &carol]).await;
+    consistency_10s([&alice, &bobbo, &carol]).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -168,7 +168,7 @@ async fn sharded_consistency() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    let conductor_handles: Vec<_> = conductors.iter().map(|c| c.handle()).collect();
+    let conductor_handles: Vec<_> = conductors.iter().map(|c| c.raw_handle()).collect();
     local_machine_session(&conductor_handles, std::time::Duration::from_secs(60)).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
@@ -234,7 +234,7 @@ async fn private_entries_dont_leak() {
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    consistency_10s(&[&alice, &bobbo]).await;
+    consistency_10s([&alice, &bobbo]).await;
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -258,7 +258,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    consistency_10s(&[&alice, &bobbo]).await;
+    consistency_10s([&alice, &bobbo]).await;
 
     check_all_gets_for_private_entry(
         &conductors[0],

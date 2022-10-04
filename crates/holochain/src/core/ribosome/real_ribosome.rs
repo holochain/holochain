@@ -978,7 +978,7 @@ pub mod wasm_test {
         assert_eq!("foobar", &bar_result);
 
         let infallible_result = conductor
-            .handle()
+            .raw_handle()
             .call_zome(ZomeCall {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),

@@ -32,7 +32,7 @@ async fn gossip_test() {
         .call(&cell_1.zome(TestWasm::Anchor), "anchor", anchor)
         .await;
 
-    consistency_10s(&[&cell_1, &cell_2]).await;
+    consistency_10s([&cell_1, &cell_2]).await;
 
     let hashes: EntryHashes = conductors[1]
         .call(
@@ -86,7 +86,7 @@ async fn agent_info_test() {
         })
         .collect();
 
-    consistency_10s(&[&cell_1, &cell_2]).await;
+    consistency_10s([&cell_1, &cell_2]).await;
     for p2p_agents_db in p2p_agents_dbs {
         let len = fresh_reader_test(p2p_agents_db.clone(), |txn| {
             txn.p2p_list_agents().unwrap().len()

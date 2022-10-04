@@ -231,7 +231,7 @@ mod tests {
 
         // Check that a sync picks up the new action
         conductor
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();
@@ -293,12 +293,12 @@ mod tests {
 
         // TODO: sync conductors 1 and 2 to match conductor 0
         conductors[1]
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();
         conductors[2]
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();
@@ -356,13 +356,13 @@ mod tests {
         assert_eq!(format!("{:?}", hash1), format!("{:?}", hash2));
 
         conductors[1]
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();
 
         conductors[2]
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();

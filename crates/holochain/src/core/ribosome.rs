@@ -664,7 +664,7 @@ pub mod wasm_test {
 
             let alice_host_fn_caller = HostFnCaller::create_for_zome(
                 alice_cell.cell_id(),
-                &conductor.handle(),
+                &conductor.raw_handle(),
                 &dna_file,
                 0,
             )
@@ -672,7 +672,7 @@ pub mod wasm_test {
 
             let bob_host_fn_caller = HostFnCaller::create_for_zome(
                 bob_cell.cell_id(),
-                &conductor.handle(),
+                &conductor.raw_handle(),
                 &dna_file,
                 0,
             )

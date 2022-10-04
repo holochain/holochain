@@ -261,7 +261,7 @@ async fn test_uninstall_app() {
     );
 
     conductor
-        .inner_handle()
+        .raw_handle()
         .uninstall_app(&"app".to_string())
         .await
         .unwrap();
@@ -286,12 +286,12 @@ async fn test_reconciliation_idempotency() {
         .unwrap();
 
     conductor
-        .inner_handle()
+        .raw_handle()
         .reconcile_cell_status_with_app_status()
         .await
         .unwrap();
     conductor
-        .inner_handle()
+        .raw_handle()
         .reconcile_cell_status_with_app_status()
         .await
         .unwrap();
@@ -394,7 +394,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     let (cell1,) = app1.into_tuple();
     let (cell2,) = app2.into_tuple();
 
-    let app_port = conductor.inner_handle().add_app_interface(0).await.unwrap();
+    let app_port = conductor.raw_handle().add_app_interface(0).await.unwrap();
     let (mut app_client, _) = websocket_client_by_port(app_port).await.unwrap();
     let (mut admin_client, _) = conductor.admin_ws_client().await;
 
@@ -496,7 +496,7 @@ async fn test_reenable_app() {
 
     conductor.enable_app("app".to_string()).await.unwrap();
     conductor
-        .inner_handle()
+        .raw_handle()
         .reconcile_cell_status_with_app_status()
         .await
         .unwrap();

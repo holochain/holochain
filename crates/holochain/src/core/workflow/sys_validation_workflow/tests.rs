@@ -55,7 +55,7 @@ async fn run_test(
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 
-    bob_links_in_a_legit_way(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
+    bob_links_in_a_legit_way(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
     // Integration should have 9 ops in it.
     // Plus another 14 for genesis.
@@ -99,7 +99,7 @@ async fn run_test(
     });
 
     let (bad_update_action, bad_update_entry_hash, link_add_hash) =
-        bob_makes_a_large_link(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
+        bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
     // Integration should have 14 ops in it + the running tally
     let expected_count = 14 + expected_count;
@@ -164,7 +164,7 @@ async fn run_test(
         assert_eq!(valid_ops, expected_count);
     });
 
-    dodgy_bob(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
+    dodgy_bob(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
     // Integration should have new 5 ops in it
     let expected_count = 5 + expected_count;
