@@ -32,7 +32,7 @@ use url2::prelude::*;
 use crate::test_utils::*;
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "slow_tests")]
+#[cfg(feature = "glacial_tests")]
 async fn call_admin() {
     observability::test_run().ok();
     // NOTE: This is a full integration test that
@@ -81,14 +81,14 @@ how_many: 42
         fake_dna_path,
         Some(properties.clone()),
         "role_id".into(),
-        6000,
+        10000,
     )
     .await;
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(response, 6000).await;
+    let response = check_timeout(response, 10000).await;
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna_def().clone();
@@ -104,7 +104,7 @@ how_many: 42
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "slow_tests")]
+#[cfg(feature = "glacial_tests")]
 async fn call_zome() {
     observability::test_run().ok();
     // NOTE: This is a full integration test that
@@ -140,7 +140,7 @@ async fn call_zome() {
         fake_dna_path,
         None,
         "".into(),
-        6000,
+        10000,
     )
     .await;
 
@@ -297,7 +297,7 @@ async fn emit_signals() {
         fake_dna_path,
         None,
         "".into(),
-        6000,
+        10000,
     )
     .await;
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
