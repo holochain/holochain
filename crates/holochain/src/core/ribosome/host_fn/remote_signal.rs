@@ -65,12 +65,12 @@ mod tests {
     use crate::sweettest::*;
     use futures::future;
     use hdk::prelude::*;
-    use holochain_types::inline_zome::InlineZomeSet;
+    use tokio_stream::StreamExt;
 
-    fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZomeSet {
+    fn test_zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineIntegrityZome {
         let entry_def = EntryDef::from_id("entrydef");
 
-        SweetInlineZomes::new(vec![entry_def.clone()], 0)
+        InlineIntegrityZome::new_unique(vec![entry_def.clone()], 0)
             .function("signal_others", move |api, ()| {
                 let signal = ExternIO::encode("Hey").unwrap();
                 let signal = RemoteSignal {
@@ -105,7 +105,6 @@ mod tests {
 
                 Ok(InitCallbackResult::Pass)
             })
-            .into()
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -121,8 +120,8 @@ mod tests {
         let agents =
             future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
-        let (dna_file, _, _) =
-            SweetDnaFile::unique_from_inline_zomes(zome(agents.clone(), num_signals.clone())).await;
+        let zome = test_zome(agents.clone(), num_signals.clone());
+        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
 
         let apps = conductors
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
@@ -134,23 +133,18 @@ mod tests {
         let cells: Vec<_> = apps.cells_flattened();
 
         let mut signals = Vec::new();
-        for h in conductors.iter() {
-            signals.push(h.signal_broadcaster().await.subscribe_separately())
+        for c in conductors.iter_mut() {
+            signals.push(c.signals())
         }
-        let signals = signals.into_iter().flatten().collect::<Vec<_>>();
 
         let _: () = conductors[0]
-            .call(
-                &cells[0].zome(SweetInlineZomes::COORDINATOR),
-                "signal_others",
-                (),
-            )
+            .call(&cells[0].zome("zome"), "signal_others", ())
             .await;
 
         crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
 
         for mut signal in signals {
-            signal.try_recv().expect("Failed to recv signal");
+            signal.next().await.expect("Failed to recv signal");
         }
 
         Ok(())

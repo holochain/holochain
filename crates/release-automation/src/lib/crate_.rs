@@ -400,7 +400,7 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
             continue;
         }
 
-        increment_semver(&mut version, SemverIncrementMode::Patch);
+        increment_semver(&mut version, SemverIncrementMode::Patch)?;
         version = semver::Version::parse(&format!("{}-{}", version, dev_suffix))?;
 
         debug!(

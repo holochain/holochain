@@ -56,32 +56,42 @@ pub fn basic_zome() -> InlineIntegrityZome {
 
 pub fn syn_zome() -> InlineIntegrityZome {
     InlineIntegrityZome::new_unique([EntryDef::from_id("a")], 0)
+        // .function("commit", |api, bytes: Vec<u8>| {
+        //     let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
+        //     api.create(CreateInput::new(
+        //         InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+        //         EntryVisibility::Public,
+        //         Entry::App(AppEntryBytes(entry)),
+        //         ChainTopOrdering::default(),
+        //     ))?;
+        //     Ok(())
+        // })
+        //
         .function(
             "send_message",
             |api, (msg, agents): (Vec<u8>, Vec<AgentPubKey>)| {
-                // api.emit_signal(AppSignal::new(ExternIO::from(msg.clone())))?;
-                // dbg!(&agents);
-                api.remote_signal(RemoteSignal {
-                    agents,
-                    signal: msg.into(),
-                })?;
+                // api.remote_signal(RemoteSignal {
+                //     agents,
+                //     signal: msg.into(),
+                // })?;
+
+                let res = api.call(vec![Call {
+                    target: CallTarget::NetworkAgent(agents[1].clone()),
+                    zome_name: "zome".into(),
+                    fn_name: "recv_remote_signal".into(),
+                    cap_secret: None,
+                    payload: msg.into(),
+                }])?;
+                dbg!(res);
                 Ok(())
             },
         )
-        .function("commit", |api, bytes: Vec<u8>| {
-            let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
-            api.create(CreateInput::new(
-                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
-                EntryVisibility::Public,
-                Entry::App(AppEntryBytes(entry)),
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(())
-        })
-        .function("recv_remote_signal", |api, signal| {
+        //
+        .function("recv_remote_signal", |api, signal: ExternIO| {
             println!("recv_remote_signal");
-            Ok(api.emit_signal(signal)?)
+            Ok(api.emit_signal(AppSignal::new(signal))?)
         })
+        //
         .function("init", move |api, ()| {
             let mut functions: GrantedFunctions = BTreeSet::new();
             functions.insert((api.zome_info(()).unwrap().name, "recv_remote_signal".into()));

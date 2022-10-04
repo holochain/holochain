@@ -16,7 +16,7 @@ use holochain_serialized_bytes::prelude::*;
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(transparent)]
 #[repr(transparent)]
-pub struct ExternIO(#[serde(with = "serde_bytes")] pub Vec<u8>);
+pub struct ExternIO(#[serde(with = "serde_bytes")] Vec<u8>);
 
 impl ExternIO {
     pub fn encode<I>(input: I) -> Result<Self, SerializedBytesError>

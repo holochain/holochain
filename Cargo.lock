@@ -2008,7 +2008,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.164"
+version = "0.0.165"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2103,7 +2103,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.63"
+version = "0.0.64"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2138,7 +2138,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.59"
+version = "0.0.60"
 dependencies = [
  "anyhow",
  "futures",
@@ -2151,7 +2151,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.54"
+version = "0.0.55"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
@@ -2172,7 +2172,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.55"
+version = "0.0.56"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2201,7 +2201,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.61"
+version = "0.0.62"
 dependencies = [
  "derive_more",
  "directories",
@@ -2252,7 +2252,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.57"
+version = "0.0.58"
 dependencies = [
  "assert_cmd 2.0.4",
  "base64",
@@ -2287,7 +2287,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2341,7 +2341,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.56"
+version = "0.0.57"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2390,7 +2390,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.61"
+version = "0.0.62"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2444,7 +2444,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.58"
+version = "0.0.59"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2480,7 +2480,7 @@ dependencies = [
  "nanoid 0.3.0",
  "observability",
  "parking_lot 0.10.2",
- "pretty_assertions 0.7.2",
+ "pretty_assertions 0.6.1",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -2518,7 +2518,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.60"
+version = "0.0.61"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -2933,7 +2933,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.47"
+version = "0.0.48"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -3114,7 +3114,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.0.35"
+version = "0.0.36"
 dependencies = [
  "base64",
  "blake2b_simd 0.5.11",
@@ -3152,7 +3152,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.0.35"
+version = "0.0.36"
 dependencies = [
  "blake2b_simd 1.0.0",
  "futures",
@@ -3170,7 +3170,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.0.35"
+version = "0.0.36"
 dependencies = [
  "arbitrary",
  "base64",

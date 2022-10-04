@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 anyhow = "*"
 arbitrary = { version = "=1.0.0" }
-holochain = { path = "../holochain", version = "0.0.164" }
+holochain = { path = "../holochain" }
 rand = "0.8"
 tracing = "0.1"
 

@@ -35,7 +35,9 @@ impl App {
     async fn setup() -> (Self, Vec<SignalStream>) {
         let config = standard_config();
         let (mut conductors, zomes) = setup_conductors_single_zome(NODES, config, syn_zome()).await;
+
         conductors.exchange_peer_info().await;
+
         let signal_rxs = conductors.iter_mut().map(|c| c.signals()).collect();
         let nodes = std::iter::zip(conductors.into_iter().map(Arc::new), zomes.into_iter())
             .map(|(conductor, zome)| Node { conductor, zome })
@@ -57,7 +59,8 @@ fn task_signal_sender(app: App) -> tokio::task::JoinHandle<()> {
                 .into_iter()
                 .map(|p| app.nodes[p].zome.cell_id().agent_pubkey().clone())
                 .collect();
-            println!("sending message");
+            println!("sending message to {} agents", ps.len());
+
             let _: () = n
                 .conductor
                 .call(&n.zome, "send_message", (vec![123], ps))

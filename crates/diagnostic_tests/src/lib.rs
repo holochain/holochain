@@ -21,6 +21,10 @@ pub async fn setup_conductors_single_zome(
     let apps = conductors.setup_app("basic", &[dna]).await.unwrap();
     let cells = apps.cells_flattened().clone();
     println!("Apps setup (t={:3.1?}).", start.elapsed());
+    println!(
+        "agents: {:#?}",
+        cells.iter().map(|c| c.agent_pubkey()).collect::<Vec<_>>()
+    );
 
     let zomes = cells.iter().map(|c| c.zome("zome")).collect::<Vec<_>>();
 

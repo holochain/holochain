@@ -862,7 +862,7 @@ impl Conductor {
                 let clone_cell_id = clone_cell_id.to_owned();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    let clone_id = app.get_clone_id(&clone_cell_id)?;
+                    let clone_id = app.get_archived_clone_id(&clone_cell_id)?;
                     let restored_cell = app.restore_clone_cell(&clone_id)?;
                     Ok((state, restored_cell))
                 }

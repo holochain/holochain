@@ -89,10 +89,10 @@ impl SweetConductorHandle {
         }
     }
 
-    // /// Get a stream of all Signals emitted since the time of this function call.
-    // pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
-    //     self.0.signal_broadcaster().await.subscribe_merged()
-    // }
+    /// Get a stream of all Signals emitted since the time of this function call.
+    pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
+        self.0.signal_broadcaster().await.subscribe_merged()
+    }
 
     /// Manually await shutting down the conductor.
     /// Conductors are already cleaned up on drop but this
