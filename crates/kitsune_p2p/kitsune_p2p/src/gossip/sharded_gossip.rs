@@ -1340,3 +1340,9 @@ impl TryFrom<u8> for MissingOpsStatus {
         Ok(r)
     }
 }
+
+/// Data and handlers for diagnostic info, to be used by the host.
+pub struct GossipDiagnostics {
+    /// Access to metrics info
+    pub metrics: MetricsSync,
+}

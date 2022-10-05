@@ -4,6 +4,7 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
+use kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics;
 
 /// Request a validation package.
 #[derive(Clone, Debug)]
@@ -305,6 +306,8 @@ ghost_actor::ghost_chan! {
             dna_hash: Option<DnaHash>,
         ) -> String;
 
+        /// Get struct for diagnostic data
+        fn get_diagnostics(dna_hash: DnaHash) -> GossipDiagnostics;
     }
 }
 
