@@ -1062,6 +1062,16 @@ impl KitsuneP2pHandler for Space {
         .boxed()
         .into())
     }
+
+    fn handle_get_diagnostics(
+        &mut self,
+        _space: KSpace,
+    ) -> KitsuneP2pHandlerResult<GossipDiagnostics> {
+        let diagnostics = GossipDiagnostics {
+            metrics: self.ro_inner.metrics.clone(),
+        };
+        Ok(async move { Ok(diagnostics) }.boxed().into())
+    }
 }
 
 pub(crate) struct SpaceReadOnlyInner {
