@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.0.62"
+version = "0.0.63-dev.0"
 description = "TODO minimize deps"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,16 +14,16 @@ cfg-if = "0.1"
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_more = "0.99.3"
 either = "1.5"
-holochain_sqlite = { version = "0.0.57", path = "../holochain_sqlite" }
-holo_hash = { version = "0.0.33", path = "../holo_hash", features = ["full"] }
+holochain_sqlite = { version = "0.0.58-dev.0", path = "../holochain_sqlite" }
+holo_hash = { version = "0.0.34-dev.0", path = "../holo_hash", features = ["full"] }
 fallible-iterator = "0.2.0"
 futures = "0.3"
-holochain_keystore = { version = "0.0.58", path = "../holochain_keystore" }
+holochain_keystore = { version = "0.0.59-dev.0", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_p2p = { version = "0.0.59", path = "../holochain_p2p" }
-holochain_types = { version = "0.0.59", path = "../holochain_types" }
+holochain_p2p = { version = "0.0.60-dev.0", path = "../holochain_p2p" }
+holochain_types = { version = "0.0.60-dev.0", path = "../holochain_types" }
 holochain_util = { version = "0.0.12", path = "../holochain_util" }
-holochain_zome_types = { version = "0.0.50", path = "../holochain_zome_types", features = [
+holochain_zome_types = { version = "0.0.51-dev.0", path = "../holochain_zome_types", features = [
     "full",
 ] }
 kitsune_p2p = { version = "0.0.48", path = "../kitsune_p2p/kitsune_p2p" }
