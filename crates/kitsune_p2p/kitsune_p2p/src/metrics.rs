@@ -103,7 +103,7 @@ const MAX_HISTORY: usize = 10;
 
 #[derive(Debug, Clone, Default)]
 /// Information about a remote node.
-struct NodeInfo {
+pub struct NodeInfo {
     /// Sucessful and unsuccessful messages from the remote
     /// can be combined to estimate a "reachability quotient"
     /// between 1 (or 0 if empty) and 100. Errors are weighted
@@ -468,6 +468,11 @@ impl Metrics {
         } else {
             sum / cnt
         }
+    }
+
+    /// Getter
+    pub fn node_info(&self) -> &HashMap<Arc<KitsuneAgent>, NodeInfo> {
+        &self.map
     }
 }
 

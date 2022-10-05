@@ -25,7 +25,7 @@ pub fn tui_crossterm_setup<
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
-        LeaveAlternateScreen // DisableMouseCapture
+        LeaveAlternateScreen, // DisableMouseCapture
     )?;
     terminal.show_cursor()?;
 

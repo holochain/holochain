@@ -528,3 +528,13 @@ impl std::borrow::Borrow<SweetConductorHandle> for SweetConductor {
             .expect("Tried to use a conductor that is offline")
     }
 }
+
+impl std::fmt::Debug for SweetConductor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SweetConductor")
+            .field("db_dir", &self.db_dir)
+            .field("config", &self.config)
+            .field("dnas", &self.dnas)
+            .finish()
+    }
+}

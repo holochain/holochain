@@ -20,7 +20,7 @@ const COMMIT_SIZE: usize = 1_000_000;
 const SEND_RATE: Duration = Duration::from_millis(2000);
 const COMMIT_RATE: Duration = Duration::from_millis(2000);
 
-static signals_sent: AtomicUsize = AtomicUsize::new(0);
+static SIGNALS_SENT: AtomicUsize = AtomicUsize::new(0);
 
 #[tokio::main]
 async fn main() {
@@ -72,7 +72,7 @@ fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
 
             println!(
                 "\ncommitted. signals so far: {}",
-                signals_sent.load(Ordering::Relaxed)
+                SIGNALS_SENT.load(Ordering::Relaxed)
             );
 
             n += 1;
@@ -98,7 +98,7 @@ fn task_signal_sender(app: App) -> tokio::task::JoinHandle<()> {
                 .map(|(_, p)| p.clone())
                 .collect();
 
-            signals_sent.fetch_add(ps.len(), Ordering::Relaxed);
+            SIGNALS_SENT.fetch_add(ps.len(), Ordering::Relaxed);
 
             let _: () = node
                 .conductor
@@ -111,14 +111,14 @@ fn task_signal_sender(app: App) -> tokio::task::JoinHandle<()> {
     })
 }
 
-fn task_signal_handler(app: App, signal_rxs: Vec<SignalStream>) -> tokio::task::JoinHandle<()> {
+fn task_signal_handler(_app: App, signal_rxs: Vec<SignalStream>) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut streams = StreamMap::new();
         for (i, s) in signal_rxs.into_iter().enumerate() {
             streams.insert(i, s);
         }
         loop {
-            if let Some((i, signal)) = streams.next().await {
+            if let Some((_i, _signal)) = streams.next().await {
                 print!(".");
                 std::io::stdout().flush().ok();
             } else {
