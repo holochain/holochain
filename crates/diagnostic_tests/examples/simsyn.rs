@@ -1,17 +1,26 @@
 //! Simulate behavior of a typical Syn app
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    io::Write,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use diagnostic_tests::{setup_conductors_single_zome, syn_zome};
 use holo_hash::AgentPubKey;
-use holochain_diagnostics::{holochain::sweettest::*, random_vec, seeded_rng, Signal};
-use tokio_stream::{Stream, StreamExt, StreamMap};
+use holochain_diagnostics::{holochain::sweettest::*, random_vec, seeded_rng};
+use tokio_stream::{StreamExt, StreamMap};
 
-const NODES: usize = 5;
+const NODES: usize = 10;
 const COMMIT_SIZE: usize = 1_000_000;
 
 const SEND_RATE: Duration = Duration::from_millis(2000);
 const COMMIT_RATE: Duration = Duration::from_millis(2000);
+
+static signals_sent: AtomicUsize = AtomicUsize::new(0);
 
 #[tokio::main]
 async fn main() {
@@ -61,7 +70,10 @@ fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
             let data = random_vec::<u8>(&mut rng, COMMIT_SIZE);
             let _: () = node.conductor.call(&node.zome, "commit", data).await;
 
-            println!("committed.");
+            println!(
+                "\ncommitted. signals so far: {}",
+                signals_sent.load(Ordering::Relaxed)
+            );
 
             n += 1;
             tokio::time::sleep(COMMIT_RATE).await;
@@ -86,6 +98,8 @@ fn task_signal_sender(app: App) -> tokio::task::JoinHandle<()> {
                 .map(|(_, p)| p.clone())
                 .collect();
 
+            signals_sent.fetch_add(ps.len(), Ordering::Relaxed);
+
             let _: () = node
                 .conductor
                 .call(&node.zome, "send_message", (vec![123], ps))
@@ -105,7 +119,8 @@ fn task_signal_handler(app: App, signal_rxs: Vec<SignalStream>) -> tokio::task::
         }
         loop {
             if let Some((i, signal)) = streams.next().await {
-                println!("got signal from {}", i);
+                print!(".");
+                std::io::stdout().flush().ok();
             } else {
                 println!("No signal. Closing handler loop.");
                 break;

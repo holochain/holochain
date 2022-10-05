@@ -304,6 +304,7 @@ ghost_actor::ghost_chan! {
         fn dump_network_metrics(
             dna_hash: Option<DnaHash>,
         ) -> String;
+
     }
 }
 

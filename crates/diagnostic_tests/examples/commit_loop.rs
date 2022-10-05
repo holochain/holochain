@@ -21,7 +21,7 @@ async fn main() {
     let start = Instant::now();
 
     // let config = config_no_networking();
-    let config = standard_config();
+    let config = config_standard();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
     conductors.exchange_peer_info().await;
     let conductor = &mut conductors[0];

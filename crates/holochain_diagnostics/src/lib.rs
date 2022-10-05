@@ -32,12 +32,12 @@ where
     random_iter(rng).take(num).collect()
 }
 
-pub fn standard_config() -> ConductorConfig {
+pub fn config_standard() -> ConductorConfig {
     holochain::sweettest::standard_config()
 }
 
 pub fn config_no_networking() -> ConductorConfig {
-    let mut config = standard_config();
+    let mut config = config_standard();
     config.network.as_mut().map(|c| {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;
@@ -49,7 +49,7 @@ pub fn config_no_networking() -> ConductorConfig {
     config
 }
 pub fn config_no_publish() -> ConductorConfig {
-    let mut config = standard_config();
+    let mut config = config_standard();
     config.network.as_mut().map(|c| {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;
@@ -60,7 +60,7 @@ pub fn config_no_publish() -> ConductorConfig {
 }
 
 pub fn config_historical_only() -> ConductorConfig {
-    let mut config = standard_config();
+    let mut config = config_standard();
     config.network.as_mut().map(|c| {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;
@@ -72,7 +72,7 @@ pub fn config_historical_only() -> ConductorConfig {
 }
 
 pub fn config_historical_and_agent_gossip_only() -> ConductorConfig {
-    let mut config = standard_config();
+    let mut config = config_standard();
     config.network.as_mut().map(|c| {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;
@@ -85,7 +85,7 @@ pub fn config_historical_and_agent_gossip_only() -> ConductorConfig {
 }
 
 pub fn config_recent_only() -> ConductorConfig {
-    let mut config = standard_config();
+    let mut config = config_standard();
     config.network.as_mut().map(|c| {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;

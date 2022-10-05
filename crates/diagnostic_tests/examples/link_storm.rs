@@ -2,7 +2,7 @@ use crossterm::event::{self, Event, KeyCode};
 use holochain_diagnostics::{
     holo_hash::ActionHash,
     holochain::{conductor::conductor::RwShare, sweettest::SweetConductorBatch, sweettest::*},
-    seeded_rng, standard_config, tui_crossterm_setup, Rng, *,
+    *,
 };
 use std::{
     error::Error,
@@ -14,7 +14,7 @@ use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Cell, List, ListItem, Row, Table},
+    widgets::*,
     Frame, Terminal,
 };
 
@@ -30,15 +30,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-const NODES: usize = 30;
+const NODES: usize = 10;
 const BASES: usize = 4;
 
-const ENTRY_SIZE: usize = 1_000_000;
+const ENTRY_SIZE: usize = 10_000_000;
 const MAX_COMMITS: usize = 100;
 
 const APP_REFRESH_RATE: Duration = Duration::from_millis(50);
-const COMMIT_RATE: Duration = Duration::from_millis(100);
-const GET_RATE: Duration = Duration::from_millis(5);
+const COMMIT_RATE: Duration = Duration::from_millis(1000);
+const GET_RATE: Duration = Duration::from_millis(10);
+
+const YELLOW_THRESHOLD: usize = 5;
+const RED_THRESHOLD: usize = 15;
 
 #[derive(Clone)]
 struct App {
@@ -73,7 +76,7 @@ impl State {
 
 async fn setup_app() -> App {
     assert!(BASES <= NODES);
-    let config = standard_config();
+    let config = config_historical_and_agent_gossip_only();
 
     let (conductors, zomes) = diagnostic_tests::setup_conductors_single_zome(
         NODES,
@@ -196,26 +199,26 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         .constraints([Constraint::Length(table_len), Constraint::Min(20)].as_ref())
         .split(f.size());
 
-    // let header = Row::new(
-    //     ["exp:".to_string()]
-    //         .into_iter()
-    //         .chain(state.commits.iter().map(|c| c.to_string())),
-    // )
-    // .style(
-    //     Style::default()
-    //         .fg(Color::Cyan)
-    //         .add_modifier(Modifier::UNDERLINED),
-    // );
-
     app.state.share_ref(|state| {
+        let header = Row::new(
+            ["base".to_string()]
+                .into_iter()
+                .chain(state.commits.iter().enumerate().map(|(i, _)| i.to_string())),
+        )
+        .style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::UNDERLINED),
+        );
+
         let rows = state.counts.iter().enumerate().map(|(i, r)| {
             let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
                 let val = (*c).min(15);
                 let mut style = if val == 0 {
                     Style::default().fg(Color::Green)
-                } else if val < 3 {
+                } else if val < YELLOW_THRESHOLD {
                     Style::default().fg(Color::Yellow)
-                } else if val < 15 {
+                } else if val < RED_THRESHOLD {
                     Style::default().fg(Color::Red)
                 } else {
                     Style::default().fg(Color::Magenta)
@@ -234,7 +237,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
             .chain([Constraint::Min(1); NODES].into_iter())
             .collect();
         let table = Table::new(rows)
-            // .header(header)
+            .header(header)
             // .block(Block::default().borders(Borders::ALL).title("Table"))
             .widths(&widths);
 
