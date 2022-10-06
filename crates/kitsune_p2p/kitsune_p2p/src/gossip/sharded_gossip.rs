@@ -468,7 +468,12 @@ impl ShardedGossipLocalState {
         }
     }
 
-    fn remove_state(&mut self, state_key: &StateKey, error: bool) -> Option<RoundState> {
+    fn remove_state(
+        &mut self,
+        state_key: &StateKey,
+        gossip_type: GossipType,
+        error: bool,
+    ) -> Option<RoundState> {
         // Check if the round to be removed matches the current initiate_tgt
         let init_tgt = self
             .initiate_tgt
@@ -484,17 +489,27 @@ impl ShardedGossipLocalState {
         let r = self.round_map.remove(state_key);
         if let Some(r) = &r {
             if error {
-                self.metrics.write().record_error(&r.remote_agent_list);
+                self.metrics.write().record_error(
+                    &r.remote_agent_list,
+                    Some(r.start_time.elapsed()),
+                    gossip_type.into(),
+                );
             } else {
-                self.metrics.write().record_success(&r.remote_agent_list);
+                self.metrics.write().record_success(
+                    &r.remote_agent_list,
+                    Some(r.start_time.elapsed()),
+                    gossip_type.into(),
+                );
             }
         } else if init_tgt && error {
-            self.metrics.write().record_error(&remote_agent_list);
+            self.metrics
+                .write()
+                .record_error(&remote_agent_list, None, gossip_type.into());
         }
         r
     }
 
-    fn check_tgt_expired(&mut self) {
+    fn check_tgt_expired(&mut self, gossip_type: GossipType) {
         if let Some((remote_agent_list, cert, when_initiated)) = self
             .initiate_tgt
             .as_ref()
@@ -507,7 +522,9 @@ impl ShardedGossipLocalState {
                     if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
                 {
                     tracing::error!("Tgt expired {:?}", cert);
-                    self.metrics.write().record_error(remote_agent_list);
+                    self.metrics
+                        .write()
+                        .record_error(remote_agent_list, None, gossip_type.into());
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
@@ -617,6 +634,8 @@ pub struct RoundState {
     /// Missing op hashes that have been batched for
     /// future processing.
     ops_batch_queue: OpsBatchQueue,
+    /// When this round began
+    start_time: Instant,
     /// Last moment we had any contact for this round.
     last_touch: Instant,
     /// Amount of time before a round is considered expired.
@@ -671,6 +690,7 @@ impl ShardedGossipLocal {
             has_pending_historical_op_data: false,
             bloom_batch_cursor: None,
             ops_batch_queue: OpsBatchQueue::new(),
+            start_time: Instant::now(),
             last_touch: Instant::now(),
             round_timeout: ROUND_TIMEOUT,
             region_set_sent: region_set_sent.map(Arc::new),
@@ -683,7 +703,8 @@ impl ShardedGossipLocal {
     }
 
     fn remove_state(&self, id: &StateKey, error: bool) -> KitsuneResult<Option<RoundState>> {
-        self.inner.share_mut(|i, _| Ok(i.remove_state(id, error)))
+        self.inner
+            .share_mut(|i, _| Ok(i.remove_state(id, self.gossip_type, error)))
     }
 
     fn remove_target(&self, id: &StateKey, error: bool) -> KitsuneResult<()> {
@@ -695,13 +716,17 @@ impl ShardedGossipLocal {
             {
                 let initiate_tgt = i.initiate_tgt.take().unwrap();
                 if error {
-                    i.metrics
-                        .write()
-                        .record_error(&initiate_tgt.remote_agent_list);
+                    i.metrics.write().record_error(
+                        &initiate_tgt.remote_agent_list,
+                        None,
+                        self.gossip_type.into(),
+                    );
                 } else {
-                    i.metrics
-                        .write()
-                        .record_success(&initiate_tgt.remote_agent_list);
+                    i.metrics.write().record_success(
+                        &initiate_tgt.remote_agent_list,
+                        None,
+                        self.gossip_type.into(),
+                    );
                 }
             }
             Ok(())
@@ -713,7 +738,7 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             if i.round_map.round_exists(&key) {
                 if state.is_finished() {
-                    i.remove_state(&key, false);
+                    i.remove_state(&key, self.gossip_type.into(), false);
                 } else {
                     i.round_map.insert(key, state);
                 }
@@ -736,7 +761,7 @@ impl ShardedGossipLocal {
                 })
                 .unwrap_or(true);
             if finished {
-                Ok(i.remove_state(state_id, false))
+                Ok(i.remove_state(state_id, self.gossip_type.into(), false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
             }
@@ -757,7 +782,7 @@ impl ShardedGossipLocal {
                 .map(update_state)
                 .unwrap_or(true)
             {
-                Ok(i.remove_state(state_id, false))
+                Ok(i.remove_state(state_id, self.gossip_type.into(), false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
             }
@@ -960,7 +985,11 @@ impl ShardedGossipLocal {
             .share_mut(|i, _| {
                 for (cert, r) in i.round_map.take_timed_out_rounds() {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
-                    i.metrics.write().record_error(&r.remote_agent_list);
+                    i.metrics.write().record_error(
+                        &r.remote_agent_list,
+                        Some(r.start_time.elapsed()),
+                        self.gossip_type.into(),
+                    );
                 }
                 Ok(())
             })

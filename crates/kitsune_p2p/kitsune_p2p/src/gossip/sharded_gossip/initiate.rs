@@ -9,7 +9,7 @@ impl ShardedGossipLocal {
     pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
-            i.check_tgt_expired();
+            i.check_tgt_expired(self.gossip_type.into());
             let has_target = i.initiate_tgt.is_some();
             // Clear any expired rounds.
             i.round_map.current_rounds();
