@@ -142,7 +142,7 @@ async fn partial_missing_doesnt_finish() {
                 cert.clone() => RoundState {
                     remote_agent_list:vec![],
                     common_arc_set:Arc::new(DhtArcSet::Full),
-                    num_sent_op_blooms:1,
+                    num_expected_op_blooms:1,
                     received_all_incoming_op_blooms:true,
                     has_pending_historical_op_data:false,
                     start_time:Instant::now(),
@@ -151,10 +151,7 @@ async fn partial_missing_doesnt_finish() {
                     bloom_batch_cursor:None,
                     ops_batch_queue:OpsBatchQueue::new(),
                     region_set_sent:None,
-                    bloom_bytes_sent: 0,
-                    region_bytes_sent: 0,
-                    num_sent_ops: 0,
-                    op_bytes_sent: 0
+                    throughput: Default::default()
                 }
             }
             .into(),
@@ -197,7 +194,7 @@ async fn missing_ops_finishes() {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_op_blooms: 1,
+                    num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: true,
                     has_pending_historical_op_data: false,
                     start_time: Instant::now(),
@@ -206,10 +203,7 @@ async fn missing_ops_finishes() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    bloom_bytes_sent: 0,
-                    region_bytes_sent: 0,
-                    num_sent_ops: 0,
-                    op_bytes_sent: 0
+                    throughput: Default::default()
                 }
             }
             .into(),
@@ -253,7 +247,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_op_blooms: 1,
+                    num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: false,
                     has_pending_historical_op_data: false,
                     start_time: Instant::now(),
@@ -262,10 +256,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    bloom_bytes_sent: 0,
-                    region_bytes_sent: 0,
-                    num_sent_ops: 0,
-                    op_bytes_sent: 0
+                    throughput: Default::default()
                 }
             }
             .into(),
@@ -309,7 +300,7 @@ async fn bloom_response_finishes() {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_op_blooms: 0,
+                    num_expected_op_blooms: 0,
                     received_all_incoming_op_blooms: false,
                     has_pending_historical_op_data: false,
                     start_time: Instant::now(),
@@ -318,10 +309,7 @@ async fn bloom_response_finishes() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    bloom_bytes_sent: 0,
-                    region_bytes_sent: 0,
-                    num_sent_ops: 0,
-                    op_bytes_sent: 0
+                    throughput: Default::default()
                 }
             }
             .into(),
@@ -365,7 +353,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_op_blooms: 1,
+                    num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: false,
                     has_pending_historical_op_data: false,
                     start_time: Instant::now(),
@@ -374,10 +362,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    bloom_bytes_sent: 0,
-                    region_bytes_sent: 0,
-                    num_sent_ops: 0,
-                    op_bytes_sent: 0
+                    throughput: Default::default()
                 }
             }
             .into(),
@@ -424,7 +409,7 @@ async fn no_data_still_finishes() {
                 bob_cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_op_blooms: 0,
+                    num_expected_op_blooms: 0,
                     received_all_incoming_op_blooms: false,
                     has_pending_historical_op_data: false,
                     start_time: Instant::now(),
@@ -433,10 +418,7 @@ async fn no_data_still_finishes() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    bloom_bytes_sent: 0,
-                    region_bytes_sent: 0,
-                    num_sent_ops: 0,
-                    op_bytes_sent: 0
+                    throughput: Default::default()
                 }
             }
             .into(),
@@ -454,7 +436,7 @@ async fn no_data_still_finishes() {
                 alice_cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_sent_op_blooms: 1,
+                    num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: true,
                     has_pending_historical_op_data: false,
                     start_time: Instant::now(),
@@ -463,10 +445,7 @@ async fn no_data_still_finishes() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    bloom_bytes_sent: 0,
-                    region_bytes_sent: 0,
-                    num_sent_ops: 0,
-                    op_bytes_sent: 0
+                    throughput: Default::default()
                 }
             }
             .into(),

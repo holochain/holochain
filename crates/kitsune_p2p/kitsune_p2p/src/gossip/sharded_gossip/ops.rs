@@ -164,7 +164,7 @@ impl ShardedGossipLocal {
             .collect();
         // TODO: make region set diffing more robust to different times (arc power differences are already handled)
 
-        let ops = self
+        let ops: Vec<KOp> = self
             .evt_sender
             .fetch_op_data(FetchOpDataEvt {
                 space: self.space.clone(),

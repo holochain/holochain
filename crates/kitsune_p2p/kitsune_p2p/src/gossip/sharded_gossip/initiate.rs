@@ -291,7 +291,7 @@ impl ShardedGossipLocal {
                 // that hold the arc so request all the ops the remote holds.
                 None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
             };
-            state.increment_sent_op_blooms();
+            state.increment_expected_op_blooms();
 
             // Check if this is the final time window and the final bloom for this window.
             if i == len - 1 && state.bloom_batch_cursor.is_none() {

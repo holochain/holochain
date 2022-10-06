@@ -7,6 +7,8 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
+use crate::gossip::sharded_gossip::RoundState;
+use crate::gossip::sharded_gossip::RoundThroughput;
 use crate::types::event::*;
 use crate::types::*;
 use kitsune_p2p_timestamp::Timestamp;
@@ -114,43 +116,64 @@ struct NodeInfo {
     /// request/response calls to remote agent.
     pub latency_micros: RunAvg,
     /// Times we recorded errors for this node.
-    pub errors: VecDeque<CompleteRound>,
+    pub errors: VecDeque<RoundMetric>,
     /// Times we recorded initiates to this node.
     pub initiates: VecDeque<Instant>,
     /// Times we recorded remote rounds from this node.
     pub remote_rounds: VecDeque<Instant>,
     /// Times we recorded complete rounds for this node.
-    pub complete_rounds: VecDeque<CompleteRound>,
+    pub complete_rounds: VecDeque<RoundMetric>,
     /// Is this node currently in an active round?
     pub current_round: bool,
 }
 
 /// Info about a completed gossip round
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct CompleteRound {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoundMetric {
     instant: Instant,
-    duration: Option<Duration>,
     gossip_type: GossipModuleType,
+    round: Option<CompleteRound>,
 }
 
-impl CompleteRound {
+/// Minimal metrics about a completed round
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompleteRound {
+    start_time: Instant,
+    throughput: RoundThroughput,
+}
+
+impl RoundMetric {
     /// Time elapsed since this round was recorded
     pub fn elapsed(&self) -> Duration {
         self.instant.elapsed()
     }
+
+    /// Total duration of this round, from start to end
+    pub fn duration(&self) -> Duration {
+        match &self.round {
+            Some(round) => self.instant - round.start_time,
+            None => Duration::from_nanos(0),
+        }
+    }
 }
 
-impl PartialOrd for CompleteRound {
+impl PartialOrd for RoundMetric {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for CompleteRound {
+impl Ord for RoundMetric {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.instant.cmp(&other.instant) {
-            core::cmp::Ordering::Equal => self.duration.cmp(&other.duration),
-            ord => return ord,
+        self.instant.cmp(&other.instant)
+    }
+}
+
+impl From<&RoundState> for CompleteRound {
+    fn from(r: &RoundState) -> Self {
+        Self {
+            start_time: r.start_time,
+            throughput: r.throughput.clone(),
         }
     }
 }
@@ -174,9 +197,9 @@ pub struct Metrics {
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum RoundOutcome {
     /// Success outcome
-    Success(CompleteRound),
+    Success(RoundMetric),
     /// Error outcome
-    Error(CompleteRound),
+    Error(RoundMetric),
 }
 
 /// Accept differing key types
@@ -356,7 +379,7 @@ impl Metrics {
     pub fn record_success<'a, T, I>(
         &mut self,
         remote_agent_list: I,
-        duration: Option<Duration>,
+        complete_round: Option<CompleteRound>,
         gossip_type: GossipModuleType,
     ) where
         T: Into<AgentLike<'a>>,
@@ -370,9 +393,9 @@ impl Metrics {
                 .entry(agent_info.into().agent().clone())
                 .or_default();
             info.reachability_quotient.push(100);
-            let round = CompleteRound {
+            let round = RoundMetric {
                 instant: Instant::now(),
-                duration,
+                round: complete_round.clone(),
                 gossip_type,
             };
             record_item(&mut info.complete_rounds, round);
@@ -396,7 +419,7 @@ impl Metrics {
     pub fn record_error<'a, T, I>(
         &mut self,
         remote_agent_list: I,
-        duration: Option<Duration>,
+        complete_round: Option<CompleteRound>,
         gossip_type: GossipModuleType,
     ) where
         T: Into<AgentLike<'a>>,
@@ -408,9 +431,9 @@ impl Metrics {
                 .entry(agent_info.into().agent().clone())
                 .or_default();
             info.reachability_quotient.push_n(1, 5);
-            let round = CompleteRound {
+            let round = RoundMetric {
                 instant: Instant::now(),
-                duration,
+                round: complete_round.clone(),
                 gossip_type,
             };
             record_item(&mut info.errors, round);
@@ -428,7 +451,7 @@ impl Metrics {
     }
 
     /// Get the last successful round time.
-    pub fn last_success<'a, T, I>(&self, remote_agent_list: I) -> Option<&CompleteRound>
+    pub fn last_success<'a, T, I>(&self, remote_agent_list: I) -> Option<&RoundMetric>
     where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
@@ -465,10 +488,10 @@ impl Metrics {
             .filter_map(|agent_info| self.nodes.get(agent_info.into().agent()))
             .map(|info| {
                 [
-                    info.errors.back().map(|x| RoundOutcome::Error(*x)),
+                    info.errors.back().map(|x| RoundOutcome::Error(x.clone())),
                     info.complete_rounds
                         .back()
-                        .map(|x| RoundOutcome::Success(*x)),
+                        .map(|x| RoundOutcome::Success(x.clone())),
                 ]
             })
             .flatten()
