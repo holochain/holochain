@@ -10,8 +10,7 @@ use std::{
 };
 
 use diagnostic_tests::{setup_conductors_single_zome, syn_zome};
-use holo_hash::AgentPubKey;
-use holochain_diagnostics::{holochain::sweettest::*, random_vec, seeded_rng};
+use holochain_diagnostics::{holochain::sweettest::*, random_vec, seeded_rng, AgentPubKey};
 use tokio_stream::{StreamExt, StreamMap};
 
 const NODES: usize = 10;

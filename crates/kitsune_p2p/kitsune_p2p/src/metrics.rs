@@ -108,20 +108,20 @@ pub struct NodeInfo {
     /// can be combined to estimate a "reachability quotient"
     /// between 1 (or 0 if empty) and 100. Errors are weighted
     /// heavier because we retry less frequently.
-    reachability_quotient: RunAvg,
+    pub reachability_quotient: RunAvg,
     /// Running average for latency microseconds for any direct
     /// request/response calls to remote agent.
-    latency_micros: RunAvg,
+    pub latency_micros: RunAvg,
     /// Times we recorded errors for this node.
-    errors: VecDeque<Instant>,
+    pub errors: VecDeque<Instant>,
     /// Times we recorded initiates to this node.
-    initiates: VecDeque<Instant>,
+    pub initiates: VecDeque<Instant>,
     /// Times we recorded remote rounds from this node.
-    remote_rounds: VecDeque<Instant>,
+    pub remote_rounds: VecDeque<Instant>,
     /// Times we recorded complete rounds for this node.
-    complete_rounds: VecDeque<Instant>,
+    pub complete_rounds: VecDeque<Instant>,
     /// Is this node currently in an active round?
-    current_round: bool,
+    pub current_round: bool,
 }
 
 #[derive(Debug, Default)]

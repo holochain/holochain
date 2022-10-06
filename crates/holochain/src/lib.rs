@@ -37,6 +37,7 @@ mod local_network_tests;
 
 pub mod prelude {
     pub use holo_hash;
+    pub use holochain_p2p::AgentPubKeyExt;
     pub use holochain_p2p::*;
     pub use holochain_types::inline_zome::*;
     pub use holochain_types::prelude::*;

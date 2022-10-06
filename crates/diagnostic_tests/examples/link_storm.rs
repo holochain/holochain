@@ -1,10 +1,11 @@
 use crossterm::event::{self, Event, KeyCode};
 use holochain_diagnostics::{
-    holo_hash::ActionHash,
     holochain::{conductor::conductor::RwShare, prelude::*, sweettest::*},
+    metrics::*,
     *,
 };
 use std::{
+    collections::HashMap,
     error::Error,
     io::{self},
     sync::Arc,
@@ -12,7 +13,7 @@ use std::{
 };
 use tui::{
     backend::Backend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     widgets::*,
     Frame, Terminal,
@@ -49,6 +50,8 @@ struct App {
     start_time: Instant,
     nodes: [Node; NODES],
     bases: [AnyLinkableHash; BASES],
+
+    agent_node_index: HashMap<AgentPubKey, usize>,
 }
 
 struct State {
@@ -88,6 +91,12 @@ struct Node {
     diagnostics: GossipDiagnostics,
 }
 
+impl Node {
+    pub fn agent(&self) -> AgentPubKey {
+        self.zome.cell_id().agent_pubkey().clone()
+    }
+}
+
 async fn setup_app() -> App {
     assert!(BASES <= NODES);
     let config = config_historical_and_agent_gossip_only();
@@ -98,17 +107,6 @@ async fn setup_app() -> App {
         diagnostic_tests::basic_zome(),
     )
     .await;
-
-    let now = Instant::now();
-    let commits = [0; BASES];
-    let counts = [[(0, now); BASES]; NODES];
-    let bases = zomes
-        .iter()
-        .take(BASES)
-        .map(|z| z.cell_id().agent_pubkey().clone().into())
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
 
     conductors.exchange_peer_info().await;
     println!("Peer info exchanged. Starting UI.");
@@ -129,7 +127,23 @@ async fn setup_app() -> App {
             diagnostics,
         });
     }
+    let agent_node_index = nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.agent(), i))
+        .collect();
+    let bases = nodes
+        .iter()
+        .take(BASES)
+        .map(|n| n.agent().into())
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
     let nodes = nodes.try_into().unwrap();
+
+    let now = Instant::now();
+    let commits = [0; BASES];
+    let counts = [[(0, now); BASES]; NODES];
 
     let mut list_state: ListState = Default::default();
     list_state.select(Some(0));
@@ -137,12 +151,13 @@ async fn setup_app() -> App {
     App {
         nodes,
         bases,
-        start_time: Instant::now(),
+        start_time: now,
         state: RwShare::new(State {
             commits,
             counts,
             list_state,
         }),
+        agent_node_index,
     }
 }
 
@@ -241,99 +256,164 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> io::Result<()> {
 }
 
 fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
-    let table_len = BASES as u16 * 2 + 5 + 2;
-    let mut chunks = Layout::default()
+    let [rect_list, rect_table, rect_gossip, rect_stats] = ui_layout(f);
+
+    let selected = app.state.share_mut(|state| {
+        f.render_stateful_widget(ui_node_list(app), rect_list, &mut state.list_state);
+        f.render_widget(ui_basis_table(state), rect_table);
+        f.render_widget(ui_global_stats(app, state), rect_stats);
+        state.list_state.selected()
+    });
+    f.render_widget(ui_gossip_info_table(&app, selected.unwrap()), rect_gossip);
+}
+
+fn ui_node_list(app: &App) -> List<'static> {
+    List::new(
+        app.nodes
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("C{:<2}", i))
+            .map(ListItem::new)
+            .collect::<Vec<_>>(),
+    )
+    .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+}
+
+fn ui_basis_table(state: &State) -> Table<'static> {
+    let header = Row::new(state.commits.iter().enumerate().map(|(i, _)| i.to_string())).style(
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::UNDERLINED),
+    );
+
+    let rows = state.counts.iter().enumerate().map(|(_i, r)| {
+        let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
+            let val = (*c).min(15);
+            let mut style = if val == 0 {
+                Style::default().fg(Color::Green)
+            } else if val < YELLOW_THRESHOLD {
+                Style::default().fg(Color::Yellow)
+            } else if val < RED_THRESHOLD {
+                Style::default().fg(Color::Red)
+            } else {
+                Style::default().fg(Color::Magenta)
+            };
+            if t.elapsed() < GET_RATE * BASES as u32 {
+                style = style.add_modifier(Modifier::UNDERLINED);
+            }
+            Cell::from(format!("{:1x}", val)).style(style)
+        });
+        Row::new(cells)
+    });
+    Table::new(rows)
+        .header(header)
+        .block(Block::default().borders(Borders::union(Borders::LEFT, Borders::RIGHT)))
+        .widths(&[Constraint::Min(1); NODES])
+}
+
+fn ui_global_stats(app: &App, state: &State) -> List<'static> {
+    List::new(
+        [
+            format!("T:           {:<.2?}", app.start_time.elapsed()),
+            format!("Commits:     {}", state.total_commits()),
+            format!("Discrepancy: {}", state.total_discrepancy()),
+        ]
+        .into_iter()
+        .map(ListItem::new)
+        .collect::<Vec<_>>(),
+    )
+    .block(Block::default().borders(Borders::TOP).title("Stats"))
+}
+
+fn ui_gossip_info_table(app: &App, n: usize) -> Table<'static> {
+    let node = &app.nodes[n];
+    let metrics = node.diagnostics.metrics.read();
+    let mut rows: Vec<_> = metrics
+        .node_info()
+        .iter()
+        .map(|(agent, info)| {
+            (
+                *app.agent_node_index
+                    .get(&AgentPubKey::from_kitsune(agent))
+                    .unwrap(),
+                info,
+            )
+        })
+        .collect();
+    rows.sort_unstable_by_key(|(i, _)| *i);
+
+    let header = Row::new(["A", "ini", "rmt", "cmp", "err", "lat"])
+        .style(Style::default().add_modifier(Modifier::UNDERLINED));
+
+    Table::new(
+        rows.into_iter()
+            .map(|(i, info)| ui_gossip_info_row(info, n == i))
+            .collect::<Vec<_>>(),
+    )
+    .header(header)
+    .widths(&[
+        Constraint::Min(1),
+        Constraint::Min(3),
+        Constraint::Min(3),
+        Constraint::Min(3),
+        Constraint::Min(3),
+        Constraint::Min(5),
+    ])
+}
+
+fn ui_gossip_info_row(info: &NodeInfo, own: bool) -> Row<'static> {
+    let active = if info.current_round { "*" } else { " " }.to_string();
+    if own {
+        Row::new(vec![
+            active,
+            "-".to_string(),
+            "-".to_string(),
+            "-".to_string(),
+            "-".to_string(),
+            format!("{:3}", *info.latency_micros / 1000.0),
+        ])
+    } else {
+        Row::new(vec![
+            active,
+            info.initiates.len().to_string(),
+            info.remote_rounds.len().to_string(),
+            info.complete_rounds.len().to_string(),
+            info.errors.len().to_string(),
+            format!("{:3}", *info.latency_micros / 1000.0),
+        ])
+    }
+}
+
+fn ui_layout<B: Backend>(f: &mut Frame<B>) -> [Rect; 4] {
+    let list_len = 3;
+    let table_len = BASES as u16 * 2 + 2;
+    let stats_height = 5;
+    let mut vsplit = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length((NODES + 1) as u16),
+            Constraint::Length(stats_height),
+        ])
+        .vertical_margin(1)
+        .split(f.size());
+
+    let mut top_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Length(4),
+                Constraint::Length(list_len),
                 Constraint::Length(table_len),
                 Constraint::Min(20),
             ]
             .as_ref(),
         )
-        .split(f.size());
-    chunks[0].y += 1;
-    chunks[0].height -= 1;
+        .split(vsplit[0]);
 
-    let chunks2 = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(4), Constraint::Max(50)])
-        .split(chunks[2]);
+    top_chunks[0].y += 1;
+    top_chunks[0].height -= 1;
 
-    let selected = app.state.share_mut(|state| {
-        let header = Row::new(state.commits.iter().enumerate().map(|(i, _)| i.to_string())).style(
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::UNDERLINED),
-        );
+    vsplit[1].y += 1;
+    vsplit[1].height -= 1;
 
-        let rows = state.counts.iter().enumerate().map(|(_i, r)| {
-            let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
-                let val = (*c).min(15);
-                let mut style = if val == 0 {
-                    Style::default().fg(Color::Green)
-                } else if val < YELLOW_THRESHOLD {
-                    Style::default().fg(Color::Yellow)
-                } else if val < RED_THRESHOLD {
-                    Style::default().fg(Color::Red)
-                } else {
-                    Style::default().fg(Color::Magenta)
-                };
-                if t.elapsed() < GET_RATE * BASES as u32 {
-                    style = style.add_modifier(Modifier::UNDERLINED);
-                }
-                Cell::from(format!("{:1x}", val)).style(style)
-            });
-            Row::new(cells)
-        });
-        let table = Table::new(rows)
-            .header(header)
-            // .block(Block::default().borders(Borders::ALL).title("Table"))
-            .widths(&[Constraint::Min(1); NODES]);
-
-        let node_list = List::new(
-            app.nodes
-                .iter()
-                .enumerate()
-                .map(|(i, _)| format!("C{:<2}", i))
-                .map(ListItem::new)
-                .collect::<Vec<_>>(),
-        )
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
-
-        let global_stats = List::new(
-            [
-                format!("T:           {:<.2?}", app.start_time.elapsed()),
-                format!("Commits:     {}", state.total_commits()),
-                format!("Discrepancy: {}", state.total_discrepancy()),
-            ]
-            .into_iter()
-            .map(ListItem::new)
-            .collect::<Vec<_>>(),
-        );
-
-        f.render_stateful_widget(node_list, chunks[0], &mut state.list_state);
-        f.render_widget(table, chunks[1]);
-        f.render_widget(global_stats, chunks2[0]);
-        state.list_state.selected()
-    });
-    let gossip_info = ui_gossip_info(&app.nodes[selected.unwrap()]);
-    f.render_widget(gossip_info, chunks2[1]);
-}
-
-fn ui_gossip_info(node: &Node) -> List {
-    let metrics = node.diagnostics.metrics.read();
-    let rows: Vec<_> = metrics
-        .node_info()
-        .iter()
-        .map(|(agent, info)| format!("{:?}", info))
-        .map(ListItem::new)
-        .collect();
-    // let rows: Vec<_> = metrics
-    //     .dump_historical()
-    //     .into_iter()
-    //     .map(|r| format!("{:?}", r))
-    //     .collect();
-    List::new(rows)
+    [top_chunks[0], top_chunks[1], top_chunks[2], vsplit[1]]
 }
