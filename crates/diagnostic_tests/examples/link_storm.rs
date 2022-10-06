@@ -1,7 +1,5 @@
-use crossterm::event::{self, Event, KeyCode};
 use holochain_diagnostics::{
     holochain::{conductor::conductor::RwShare, prelude::*, sweettest::*},
-    metrics::*,
     ui::*,
     *,
 };
@@ -12,13 +10,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tui::{
-    backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    widgets::*,
-    Frame, Terminal,
-};
+use tui::{backend::Backend, widgets::*, Terminal};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -35,7 +27,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 const NODES: usize = 10;
 const BASES: usize = 4;
 
-const ENTRY_SIZE: usize = 10_000_000;
+const ENTRY_SIZE: usize = 10_000;
 const MAX_COMMITS: usize = 100;
 
 const APP_REFRESH_RATE: Duration = Duration::from_millis(50);
@@ -187,22 +179,10 @@ fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> io::Result<()> {
     loop {
-        terminal.draw(|f| app.ui.ui(f)).unwrap();
-        if event::poll(APP_REFRESH_RATE)? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => {
-                        return Ok(());
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        app.state.share_mut(|s| s.node_selector(-1))
-                    }
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        app.state.share_mut(|s| s.node_selector(1))
-                    }
-                    _ => {}
-                }
-            }
+        terminal.draw(|f| app.ui.render(f)).unwrap();
+        if app.ui.input() {
+            break;
         }
     }
+    Ok(())
 }

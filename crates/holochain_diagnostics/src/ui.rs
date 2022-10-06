@@ -7,10 +7,12 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crossterm::event::{self, Event, KeyCode};
 use holochain::{
     conductor::conductor::RwShare,
     prelude::{metrics::NodeInfo, *},
     sweettest::*,
+    test_utils::itertools::Itertools,
 };
 use tui::{
     backend::Backend,
@@ -61,7 +63,7 @@ impl<const N: usize, const B: usize> State<N, B> {
 
 #[derive(Clone)]
 pub struct Ui<const N: usize, const B: usize> {
-    pub get_rate: Duration,
+    pub refresh_rate: Duration,
     pub start_time: Instant,
     pub nodes: [Node; N],
     pub state: RwShare<State<N, B>>,
@@ -72,7 +74,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
     pub fn new(
         nodes: [Node; N],
         start_time: Instant,
-        get_rate: Duration,
+        refresh_rate: Duration,
         state: RwShare<State<N, B>>,
     ) -> Self {
         let agent_node_index = nodes
@@ -84,13 +86,33 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         Self {
             nodes,
             start_time,
-            get_rate,
+            refresh_rate,
             state,
             agent_node_index,
         }
     }
 
-    pub fn ui<K: Backend>(&self, f: &mut Frame<K>) {
+    pub fn input(&self) -> bool {
+        if event::poll(self.refresh_rate).unwrap() {
+            if let Event::Key(key) = event::read().unwrap() {
+                match key.code {
+                    KeyCode::Char('q') => {
+                        return true;
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        self.state.share_mut(|s| s.node_selector(-1))
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        self.state.share_mut(|s| s.node_selector(1))
+                    }
+                    _ => {}
+                }
+            }
+        };
+        false
+    }
+
+    pub fn render<K: Backend>(&self, f: &mut Frame<K>) {
         let [rect_list, rect_table, rect_gossip, rect_stats] = self.ui_layout(f);
 
         let selected = self.state.share_mut(|state| {
@@ -133,7 +155,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                 } else {
                     Style::default().fg(Color::Magenta)
                 };
-                if t.elapsed() < self.get_rate * B as u32 {
+                if t.elapsed() < self.refresh_rate * B as u32 {
                     style = style.add_modifier(Modifier::UNDERLINED);
                 }
                 Cell::from(format!("{:1x}", val)).style(style)
@@ -188,17 +210,25 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         )
         .header(header)
         .widths(&[
-            Constraint::Min(1),
-            Constraint::Min(3),
-            Constraint::Min(3),
-            Constraint::Min(3),
-            Constraint::Min(3),
-            Constraint::Min(5),
+            Constraint::Length(1),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            // Constraint::Length(5),
+            Constraint::Percentage(100),
         ])
     }
 
     fn ui_gossip_info_row(&self, info: &NodeInfo, own: bool) -> Row<'static> {
         let active = if info.current_round { "*" } else { " " }.to_string();
+        let rounds = info
+            .complete_rounds
+            .iter()
+            .map(|i| format!("{}", i.duration_since(holochain::prelude::kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant::from(self.start_time)).as_secs()))
+            .rev()
+            .join(" ");
+        // let latency = format!("{:3}", *info.latency_micros / 1000.0);
         if own {
             Row::new(vec![
                 active,
@@ -206,7 +236,8 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                 "-".to_string(),
                 "-".to_string(),
                 "-".to_string(),
-                format!("{:3}", *info.latency_micros / 1000.0),
+                // latency,
+                rounds,
             ])
         } else {
             Row::new(vec![
@@ -215,7 +246,8 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                 info.remote_rounds.len().to_string(),
                 info.complete_rounds.len().to_string(),
                 info.errors.len().to_string(),
-                format!("{:3}", *info.latency_micros / 1000.0),
+                // latency,
+                rounds,
             ])
         }
     }
