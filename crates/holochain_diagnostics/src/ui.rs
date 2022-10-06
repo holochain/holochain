@@ -10,7 +10,10 @@ use std::{
 use crossterm::event::{self, Event, KeyCode};
 use holochain::{
     conductor::conductor::RwShare,
-    prelude::{metrics::NodeInfo, *},
+    prelude::{
+        metrics::{Metrics, NodeInfo},
+        *,
+    },
     sweettest::*,
     test_utils::itertools::Itertools,
 };
@@ -185,26 +188,14 @@ impl<const N: usize, const B: usize> Ui<N, B> {
     fn ui_gossip_info_table(&self, n: usize) -> Table<'static> {
         let node = &self.nodes[n];
         let metrics = node.diagnostics.metrics.read();
-        let mut rows: Vec<_> = metrics
-            .node_info()
-            .iter()
-            .map(|(agent, info)| {
-                (
-                    *self
-                        .agent_node_index
-                        .get(&AgentPubKey::from_kitsune(agent))
-                        .unwrap(),
-                    info,
-                )
-            })
-            .collect();
-        rows.sort_unstable_by_key(|(i, _)| *i);
+        let infos = self.node_infos(&metrics);
 
-        let header = Row::new(["A", "ini", "rmt", "cmp", "err", "lat"])
+        let header = Row::new(["A", "ini", "rmt", "cmp", "err"])
             .style(Style::default().add_modifier(Modifier::UNDERLINED));
 
         Table::new(
-            rows.into_iter()
+            infos
+                .into_iter()
                 .map(|(i, info)| self.ui_gossip_info_row(info, n == i))
                 .collect::<Vec<_>>(),
         )
@@ -220,12 +211,23 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         ])
     }
 
+    fn ui_gossip_detail(&self, n: usize) {
+        let node = &self.nodes[n];
+        let metrics = node.diagnostics.metrics.read();
+        let mut infos: Vec<_> = self
+            .node_infos(&metrics)
+            .into_iter()
+            .flat_map(|(_, i)| i.complete_rounds.clone())
+            .collect();
+        infos.sort_unstable_by(|a, b| b.cmp(a));
+    }
+
     fn ui_gossip_info_row(&self, info: &NodeInfo, own: bool) -> Row<'static> {
         let active = if info.current_round { "*" } else { " " }.to_string();
         let rounds = info
             .complete_rounds
             .iter()
-            .map(|i| format!("{}", i.duration_since(holochain::prelude::kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant::from(self.start_time)).as_secs()))
+            .map(|i| format!("{}", i.duration().as_millis()))
             .rev()
             .join(" ");
         // let latency = format!("{:3}", *info.latency_micros / 1000.0);
@@ -284,5 +286,23 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         vsplit[1].height -= 1;
 
         [top_chunks[0], top_chunks[1], top_chunks[2], vsplit[1]]
+    }
+
+    fn node_infos<'a>(&self, metrics: &'a Metrics) -> Vec<(usize, &'a NodeInfo)> {
+        let mut infos: Vec<_> = metrics
+            .node_info()
+            .iter()
+            .map(|(agent, info)| {
+                (
+                    *self
+                        .agent_node_index
+                        .get(&AgentPubKey::from_kitsune(agent))
+                        .unwrap(),
+                    info,
+                )
+            })
+            .collect();
+        infos.sort_unstable_by_key(|(i, _)| *i);
+        infos
     }
 }

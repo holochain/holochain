@@ -30,8 +30,8 @@ const BASES: usize = 4;
 const ENTRY_SIZE: usize = 10_000;
 const MAX_COMMITS: usize = 100;
 
-const APP_REFRESH_RATE: Duration = Duration::from_millis(50);
-const COMMIT_RATE: Duration = Duration::from_millis(1000);
+const REFRESH_RATE: Duration = Duration::from_millis(50);
+const COMMIT_RATE: Duration = Duration::from_millis(100);
 const GET_RATE: Duration = Duration::from_millis(10);
 
 #[derive(Clone)]
@@ -95,7 +95,7 @@ async fn setup_app() -> App {
         counts,
         list_state,
     });
-    let ui = Ui::new(nodes.clone(), now, GET_RATE, state.clone());
+    let ui = Ui::new(nodes.clone(), now, REFRESH_RATE, state.clone());
 
     App {
         bases,

@@ -130,16 +130,21 @@ pub struct NodeInfo {
 /// Info about a completed gossip round
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoundMetric {
-    instant: Instant,
-    gossip_type: GossipModuleType,
-    round: Option<CompleteRound>,
+    /// The time this metric was recorded
+    pub instant: Instant,
+    /// The type of gossip module
+    pub gossip_type: GossipModuleType,
+    /// If the round completed, include info about that
+    pub round: Option<CompleteRound>,
 }
 
 /// Minimal metrics about a completed round
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompleteRound {
-    start_time: Instant,
-    throughput: RoundThroughput,
+    /// The start time of the round
+    pub start_time: Instant,
+    /// Throughput stats
+    pub throughput: RoundThroughput,
 }
 
 impl RoundMetric {
