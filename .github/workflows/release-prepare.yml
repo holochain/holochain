@@ -74,7 +74,7 @@ jobs:
       - name: Install nix
         uses: cachix/install-nix-action@v17
       - name: Setup cachix
-        uses: cachix/cachix-action@v10
+        uses: cachix/cachix-action@v11
         continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           name: holochain-ci

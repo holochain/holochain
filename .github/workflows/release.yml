@@ -145,7 +145,7 @@ jobs:
 
           echo "::set-output name=HOLOCHAIN_REPO::/tmp/holochain_repo"
           echo "::set-output name=HOLOCHAIN_RELEASE_SH::/tmp/holochain_release.sh"
-          echo "::set-output name=CACHIX_REV::v0.8.1"
+          echo "::set-output name=CACHIX_REV::v1.0.1"
   prepare:
     needs: [vars]
     uses: ./.github/workflows/release-prepare.yml
