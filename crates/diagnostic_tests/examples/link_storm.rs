@@ -2,6 +2,7 @@ use crossterm::event::{self, Event, KeyCode};
 use holochain_diagnostics::{
     holochain::{conductor::conductor::RwShare, prelude::*, sweettest::*},
     metrics::*,
+    ui::*,
     *,
 };
 use std::{
@@ -41,60 +42,14 @@ const APP_REFRESH_RATE: Duration = Duration::from_millis(50);
 const COMMIT_RATE: Duration = Duration::from_millis(1000);
 const GET_RATE: Duration = Duration::from_millis(10);
 
-const YELLOW_THRESHOLD: usize = 5;
-const RED_THRESHOLD: usize = 15;
-
 #[derive(Clone)]
 struct App {
-    state: RwShare<State>,
+    state: RwShare<State<NODES, BASES>>,
     start_time: Instant,
-    nodes: [Node; NODES],
+    ui: Ui<NODES, BASES>,
     bases: [AnyLinkableHash; BASES],
-
-    agent_node_index: HashMap<AgentPubKey, usize>,
-}
-
-struct State {
-    commits: [usize; BASES],
-    counts: [[(usize, Instant); BASES]; NODES],
-    list_state: ListState,
-}
-
-impl State {
-    fn done_committing(&self) -> bool {
-        self.commits.iter().sum::<usize>() >= MAX_COMMITS
-    }
-
-    fn total_commits(&self) -> usize {
-        self.commits.iter().sum()
-    }
-
-    fn total_discrepancy(&self) -> usize {
-        self.counts
-            .iter()
-            .map(|r| r.iter().map(|(c, _)| c).copied().sum::<usize>())
-            .sum()
-    }
-
-    fn node_selector(&mut self, i: isize) {
-        if let Some(s) = self.list_state.selected() {
-            let n = (s as isize + i).min(NODES as isize - 1).max(0);
-            self.list_state.select(Some(n as usize));
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-struct Node {
-    conductor: Arc<SweetConductor>,
-    zome: SweetZome,
-    diagnostics: GossipDiagnostics,
-}
-
-impl Node {
-    pub fn agent(&self) -> AgentPubKey {
-        self.zome.cell_id().agent_pubkey().clone()
-    }
+    // nodes: [Node; NODES],
+    // agent_node_index: HashMap<AgentPubKey, usize>,
 }
 
 async fn setup_app() -> App {
@@ -127,11 +82,6 @@ async fn setup_app() -> App {
             diagnostics,
         });
     }
-    let agent_node_index = nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.agent(), i))
-        .collect();
     let bases = nodes
         .iter()
         .take(BASES)
@@ -139,7 +89,7 @@ async fn setup_app() -> App {
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
-    let nodes = nodes.try_into().unwrap();
+    let nodes: [Node; NODES] = nodes.try_into().unwrap();
 
     let now = Instant::now();
     let commits = [0; BASES];
@@ -148,16 +98,18 @@ async fn setup_app() -> App {
     let mut list_state: ListState = Default::default();
     list_state.select(Some(0));
 
+    let state = RwShare::new(State {
+        commits,
+        counts,
+        list_state,
+    });
+    let ui = Ui::new(nodes.clone(), now, GET_RATE, state.clone());
+
     App {
-        nodes,
         bases,
         start_time: now,
-        state: RwShare::new(State {
-            commits,
-            counts,
-            list_state,
-        }),
-        agent_node_index,
+        state,
+        ui,
     }
 }
 
@@ -171,9 +123,9 @@ fn task_get(app: App) -> tokio::task::JoinHandle<()> {
             let b = i % BASES;
 
             let base = app.bases[b].clone();
-            let links: usize = app.nodes[n]
+            let links: usize = app.ui.nodes[n]
                 .conductor
-                .call(&app.nodes[n].zome, "link_count", base)
+                .call(&app.ui.nodes[n].zome, "link_count", base)
                 .await;
 
             let is_zero = app.state.share_mut(|state| {
@@ -212,10 +164,10 @@ fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
             let b = rng.gen_range(0..BASES);
 
             let base = app.bases[b].clone();
-            let _: ActionHash = app.nodes[n]
+            let _: ActionHash = app.ui.nodes[n]
                 .conductor
                 .call(
-                    &app.nodes[n].zome,
+                    &app.ui.nodes[n].zome,
                     "create",
                     (base, random_vec::<u8>(&mut rng, ENTRY_SIZE)),
                 )
@@ -223,7 +175,7 @@ fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
 
             let done = app.state.share_mut(|state| {
                 state.commits[b] += 1;
-                state.done_committing()
+                state.total_commits() >= MAX_COMMITS
             });
             if done {
                 break;
@@ -235,7 +187,7 @@ fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> io::Result<()> {
     loop {
-        terminal.draw(|f| ui(f, &app)).unwrap();
+        terminal.draw(|f| app.ui.ui(f)).unwrap();
         if event::poll(APP_REFRESH_RATE)? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
@@ -253,167 +205,4 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> io::Result<()> {
             }
         }
     }
-}
-
-fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
-    let [rect_list, rect_table, rect_gossip, rect_stats] = ui_layout(f);
-
-    let selected = app.state.share_mut(|state| {
-        f.render_stateful_widget(ui_node_list(app), rect_list, &mut state.list_state);
-        f.render_widget(ui_basis_table(state), rect_table);
-        f.render_widget(ui_global_stats(app, state), rect_stats);
-        state.list_state.selected()
-    });
-    f.render_widget(ui_gossip_info_table(&app, selected.unwrap()), rect_gossip);
-}
-
-fn ui_node_list(app: &App) -> List<'static> {
-    List::new(
-        app.nodes
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("C{:<2}", i))
-            .map(ListItem::new)
-            .collect::<Vec<_>>(),
-    )
-    .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-}
-
-fn ui_basis_table(state: &State) -> Table<'static> {
-    let header = Row::new(state.commits.iter().enumerate().map(|(i, _)| i.to_string())).style(
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::UNDERLINED),
-    );
-
-    let rows = state.counts.iter().enumerate().map(|(_i, r)| {
-        let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
-            let val = (*c).min(15);
-            let mut style = if val == 0 {
-                Style::default().fg(Color::Green)
-            } else if val < YELLOW_THRESHOLD {
-                Style::default().fg(Color::Yellow)
-            } else if val < RED_THRESHOLD {
-                Style::default().fg(Color::Red)
-            } else {
-                Style::default().fg(Color::Magenta)
-            };
-            if t.elapsed() < GET_RATE * BASES as u32 {
-                style = style.add_modifier(Modifier::UNDERLINED);
-            }
-            Cell::from(format!("{:1x}", val)).style(style)
-        });
-        Row::new(cells)
-    });
-    Table::new(rows)
-        .header(header)
-        .block(Block::default().borders(Borders::union(Borders::LEFT, Borders::RIGHT)))
-        .widths(&[Constraint::Min(1); NODES])
-}
-
-fn ui_global_stats(app: &App, state: &State) -> List<'static> {
-    List::new(
-        [
-            format!("T:           {:<.2?}", app.start_time.elapsed()),
-            format!("Commits:     {}", state.total_commits()),
-            format!("Discrepancy: {}", state.total_discrepancy()),
-        ]
-        .into_iter()
-        .map(ListItem::new)
-        .collect::<Vec<_>>(),
-    )
-    .block(Block::default().borders(Borders::TOP).title("Stats"))
-}
-
-fn ui_gossip_info_table(app: &App, n: usize) -> Table<'static> {
-    let node = &app.nodes[n];
-    let metrics = node.diagnostics.metrics.read();
-    let mut rows: Vec<_> = metrics
-        .node_info()
-        .iter()
-        .map(|(agent, info)| {
-            (
-                *app.agent_node_index
-                    .get(&AgentPubKey::from_kitsune(agent))
-                    .unwrap(),
-                info,
-            )
-        })
-        .collect();
-    rows.sort_unstable_by_key(|(i, _)| *i);
-
-    let header = Row::new(["A", "ini", "rmt", "cmp", "err", "lat"])
-        .style(Style::default().add_modifier(Modifier::UNDERLINED));
-
-    Table::new(
-        rows.into_iter()
-            .map(|(i, info)| ui_gossip_info_row(info, n == i))
-            .collect::<Vec<_>>(),
-    )
-    .header(header)
-    .widths(&[
-        Constraint::Min(1),
-        Constraint::Min(3),
-        Constraint::Min(3),
-        Constraint::Min(3),
-        Constraint::Min(3),
-        Constraint::Min(5),
-    ])
-}
-
-fn ui_gossip_info_row(info: &NodeInfo, own: bool) -> Row<'static> {
-    let active = if info.current_round { "*" } else { " " }.to_string();
-    if own {
-        Row::new(vec![
-            active,
-            "-".to_string(),
-            "-".to_string(),
-            "-".to_string(),
-            "-".to_string(),
-            format!("{:3}", *info.latency_micros / 1000.0),
-        ])
-    } else {
-        Row::new(vec![
-            active,
-            info.initiates.len().to_string(),
-            info.remote_rounds.len().to_string(),
-            info.complete_rounds.len().to_string(),
-            info.errors.len().to_string(),
-            format!("{:3}", *info.latency_micros / 1000.0),
-        ])
-    }
-}
-
-fn ui_layout<B: Backend>(f: &mut Frame<B>) -> [Rect; 4] {
-    let list_len = 3;
-    let table_len = BASES as u16 * 2 + 2;
-    let stats_height = 5;
-    let mut vsplit = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length((NODES + 1) as u16),
-            Constraint::Length(stats_height),
-        ])
-        .vertical_margin(1)
-        .split(f.size());
-
-    let mut top_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Length(list_len),
-                Constraint::Length(table_len),
-                Constraint::Min(20),
-            ]
-            .as_ref(),
-        )
-        .split(vsplit[0]);
-
-    top_chunks[0].y += 1;
-    top_chunks[0].height -= 1;
-
-    vsplit[1].y += 1;
-    vsplit[1].height -= 1;
-
-    [top_chunks[0], top_chunks[1], top_chunks[2], vsplit[1]]
 }
