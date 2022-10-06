@@ -41,7 +41,7 @@ on:
         default: "true"
         type: string
       debug:
-        description: "start an ssh session via upterm on failure"
+        description: "start an ssh session on failure"
         required: false
         default: "true"
         type: string
@@ -143,8 +143,8 @@ jobs:
             echo "::set-output name=skip_test::false"
           fi
 
-          echo "::set-output name=HOLOCHAIN_REPO::/tmp/holochain_repo"
-          echo "::set-output name=HOLOCHAIN_RELEASE_SH::/tmp/holochain_release.sh"
+          echo "::set-output name=HOLOCHAIN_REPO::/var/tmp/holochain_repo"
+          echo "::set-output name=HOLOCHAIN_RELEASE_SH::/var/tmp/holochain_release.sh"
           echo "::set-output name=CACHIX_REV::v1.0.1"
   prepare:
     needs: [vars]
@@ -172,7 +172,7 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - ubuntu-latest
+          - self-hosted
           - macos-latest
         testCommand:
           - name: cargo-test-standard
@@ -182,7 +182,7 @@ jobs:
             maxBuildSpace: true
             timeout_minutes: 30
             max_attempts:
-              ubuntu-latest: 2
+              self-hosted: 2
               macos-latest: 2
             run: |
               nix-shell \
@@ -198,7 +198,7 @@ jobs:
             ignoreErrorOnNonUbuntu: false
             timeout_minutes: 5
             max_attempts:
-              ubuntu-latest: 1
+              self-hosted: 1
               macos-latest: 1
             run: |
               nix-shell \
@@ -213,7 +213,7 @@ jobs:
             ignoreErrorOnNonUbuntu: false
             timeout_minutes: 5
             max_attempts:
-              ubuntu-latest: 6
+              self-hosted: 6
               macos-latest: 1
             run: |
               nix-shell \
@@ -228,7 +228,7 @@ jobs:
             ignoreErrorOnNonUbuntu: false
             timeout_minutes: 90
             max_attempts:
-              ubuntu-latest: 1
+              self-hosted: 1
               macos-latest: 1
             run: |
               set -x
@@ -271,7 +271,7 @@ jobs:
               git clone "${HOLONIX_URL}" "${HOLONIX_REPO}" -b ${HOLONIX_SOURCE_BRANCH} --depth=1
               cd "${HOLONIX_REPO}"
 
-              nix-shell
+              nix-shell \
                 --pure \
                 --keep HOLOCHAIN_NIXPKGS_REPO \
                 --run '
@@ -305,19 +305,26 @@ jobs:
 
       - name: Install nix
         uses: cachix/install-nix-action@v17
+      - name: Use cachix
+        id: cachix_use
+        continue-on-error: true
+        env:
+          CACHIX_AUTH_TOKEN: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+          CACHIX_SIGNING_KEY: "${{ secrets.CACHIX_SIGNING_KEY }}"
+        run: |
+          cachix use holochain-ci
       - name: Setup cachix
-        uses: cachix/cachix-action@v10
+        uses: cachix/cachix-action@v11
+        if: ${{ steps.cachix_use.outcome != 'success'  }}
         continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           name: holochain-ci
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
           installCommand: |
-            if ! type -f cachix; then
-              nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV} \
-                --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
-                --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
-            fi
+            nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV} \
+              --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
+              --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
           pushFilter: "(rust-overlay|bqfq4db6nwycmkdrql9igsbrayqsw3g2)"
           # skipPush: ${{ matrix.platform == 'macos-latest' }}
       - name: Set NIX_PATH (FIXME)
@@ -327,11 +334,11 @@ jobs:
         uses: steveeJ-forks/actions-cache/restore@main
         with:
           path: |
-            /tmp/holochain_release.sh
+            /var/tmp/holochain_release.sh
             # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /tmp/holochain_repo/*
-            !/tmp/holochain_repo/.cargo/
-            !/tmp/holochain_repo/target/
+            /var/tmp/holochain_repo/*
+            !/var/tmp/holochain_repo/.cargo/
+            !/var/tmp/holochain_repo/target/
           key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
           required: true
 
@@ -340,23 +347,24 @@ jobs:
         if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
         with:
           path: |
-            /tmp/holochain_repo/.cargo/bin/
-            /tmp/holochain_repo/.cargo/registry/index/
-            /tmp/holochain_repo/.cargo/registry/cache/
-            /tmp/holochain_repo/.cargo/git/db/
-            /tmp/holochain_repo/target/
+            /var/tmp/holochain_repo/.cargo/bin/
+            /var/tmp/holochain_repo/.cargo/registry/index/
+            /var/tmp/holochain_repo/.cargo/registry/cache/
+            /var/tmp/holochain_repo/.cargo/git/db/
+            /var/tmp/holochain_repo/target/
           key: ${{ runner.os }}-test-${{ matrix.testCommand.name }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-test-${{ matrix.testCommand.name }}
             ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
             ${{ runner.os }}-prepare-${{ github.run_id }}
             ${{ runner.os }}-prepare
-          required: ${{ matrix.platform == 'ubuntu-latest' }}
+          required: ${{ matrix.platform == 'self-hosted' }}
 
       - name: Set cache timestamp
         if: ${{ matrix.testCommand.savesCargoCache == true }}
         run: |
-          set -e
+          set -ex
+          cat "${HOLOCHAIN_RELEASE_SH}"
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
@@ -378,12 +386,12 @@ jobs:
           nix-shell --pure --run "cargo fetch --locked"
 
           ${{ matrix.testCommand.run }}
-        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
+        continue-on-error: ${{ matrix.platform != 'self-hosted' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
         timeout-minutes: 720
 
       - name: ${{ matrix.testCommand.name }} (run)
         if: ${{ needs.vars.outputs.skip_test != 'true' }}
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v2.8.1
         env:
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
           HOLONIX_SOURCE_BRANCH: ${{ needs.vars.outputs.holonix_source_branch }}
@@ -396,7 +404,7 @@ jobs:
             cd "${HOLOCHAIN_REPO}"
 
             ${{ matrix.testCommand.run }}
-        continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
+        continue-on-error: ${{ matrix.platform != 'self-hosted' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: Garbage-collect cache
         if: ${{ always() && matrix.testCommand.savesCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
@@ -415,15 +423,15 @@ jobs:
         if: ${{ always() && matrix.testCommand.savesCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
         with:
           path: |
-            /tmp/holochain_repo/.cargo/bin/
-            /tmp/holochain_repo/.cargo/registry/index/
-            /tmp/holochain_repo/.cargo/registry/cache/
-            /tmp/holochain_repo/.cargo/git/db/
-            /tmp/holochain_repo/target/
+            /var/tmp/holochain_repo/.cargo/bin/
+            /var/tmp/holochain_repo/.cargo/registry/index/
+            /var/tmp/holochain_repo/.cargo/registry/cache/
+            /var/tmp/holochain_repo/.cargo/git/db/
+            /var/tmp/holochain_repo/target/
           key: ${{ runner.os }}-test-${{ matrix.testCommand.name }}-${{ github.run_id }}-${{ github.run_number }}
 
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
+      - name: Setup SSH session
+        uses: steveeJ-forks/action-upterm@main
         if: ${{ failure() && needs.vars.outputs.debug == 'true' }}
         with:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow
@@ -447,7 +455,7 @@ jobs:
       - name: Install nix
         uses: cachix/install-nix-action@v17
       - name: Setup cachix
-        uses: cachix/cachix-action@v10
+        uses: cachix/cachix-action@v11
         with:
           name: holochain-ci
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
@@ -461,11 +469,11 @@ jobs:
         uses: steveeJ-forks/actions-cache/restore@main
         with:
           path: |
-            /tmp/holochain_release.sh
+            /var/tmp/holochain_release.sh
             # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /tmp/holochain_repo/*
-            !/tmp/holochain_repo/.cargo/
-            !/tmp/holochain_repo/target/
+            /var/tmp/holochain_repo/*
+            !/var/tmp/holochain_repo/.cargo/
+            !/var/tmp/holochain_repo/target/
           key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
           required: true
 
@@ -479,11 +487,11 @@ jobs:
         uses: steveeJ-forks/actions-cache/restore@main
         with:
           path: |
-            /tmp/holochain_repo/.cargo/bin/
-            /tmp/holochain_repo/.cargo/registry/index/
-            /tmp/holochain_repo/.cargo/registry/cache/
-            /tmp/holochain_repo/.cargo/git/db/
-            /tmp/holochain_repo/target/
+            /var/tmp/holochain_repo/.cargo/bin/
+            /var/tmp/holochain_repo/.cargo/registry/index/
+            /var/tmp/holochain_repo/.cargo/registry/cache/
+            /var/tmp/holochain_repo/.cargo/git/db/
+            /var/tmp/holochain_repo/target/
           key: ${{ runner.os }}-prepare-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-test-
@@ -585,8 +593,8 @@ jobs:
             --title "holochain ${VERSION:?}" \
             --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/main/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH:?}")) to see the full list of crates that were released together.***"
 
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
+      - name: Setup SSH session
+        uses: steveeJ-forks/action-upterm@main
         if: ${{ failure() && needs.vars.outputs.debug == 'true' }}
         env:
           GITHUB_ACTION_TOKEN: ${{ secrets.GITHUB_TOKEN }}
