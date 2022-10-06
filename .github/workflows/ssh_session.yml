@@ -15,6 +15,11 @@ jobs:
     steps:
       - name: Install nix
         uses: cachix/install-nix-action@v16
+      - name: Check if cachix is installed
+        id: cachix_exists
+        run: |
+          cachix --version
+        continue-on-error: false
       - name: Setup cachix
         uses: cachix/cachix-action@v10
         with:
@@ -22,9 +27,11 @@ jobs:
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
           installCommand: |
-            nix-env -if https://github.com/cachix/cachix/tarball/master \
-              --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
-              --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
+            if [[ ${{ steps.cachix_exists.outcome}} != "success" ]]; then
+              nix-env -if https://github.com/cachix/cachix/tarball/master \
+                --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
+                --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
+            fi
       - name: Fetch cargo related state and build files
         uses: steveeJ-forks/actions-cache/restore@main
         with:
