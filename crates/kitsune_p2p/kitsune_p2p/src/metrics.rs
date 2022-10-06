@@ -3,9 +3,12 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::time::Instant;
 
+use crate::gossip::sharded_gossip::RoundState;
+use crate::gossip::sharded_gossip::RoundThroughput;
 use crate::types::event::*;
 use crate::types::*;
 use kitsune_p2p_timestamp::Timestamp;
@@ -113,15 +116,66 @@ pub struct NodeInfo {
     /// request/response calls to remote agent.
     pub latency_micros: RunAvg,
     /// Times we recorded errors for this node.
-    pub errors: VecDeque<Instant>,
+    pub errors: VecDeque<RoundMetric>,
     /// Times we recorded initiates to this node.
     pub initiates: VecDeque<Instant>,
     /// Times we recorded remote rounds from this node.
     pub remote_rounds: VecDeque<Instant>,
     /// Times we recorded complete rounds for this node.
-    pub complete_rounds: VecDeque<Instant>,
+    pub complete_rounds: VecDeque<RoundMetric>,
     /// Is this node currently in an active round?
     pub current_round: bool,
+}
+
+/// Info about a completed gossip round
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoundMetric {
+    instant: Instant,
+    gossip_type: GossipModuleType,
+    round: Option<CompleteRound>,
+}
+
+/// Minimal metrics about a completed round
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompleteRound {
+    start_time: Instant,
+    throughput: RoundThroughput,
+}
+
+impl RoundMetric {
+    /// Time elapsed since this round was recorded
+    pub fn elapsed(&self) -> Duration {
+        self.instant.elapsed()
+    }
+
+    /// Total duration of this round, from start to end
+    pub fn duration(&self) -> Duration {
+        match &self.round {
+            Some(round) => self.instant - round.start_time,
+            None => Duration::from_nanos(0),
+        }
+    }
+}
+
+impl PartialOrd for RoundMetric {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for RoundMetric {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.instant.cmp(&other.instant)
+    }
+}
+
+impl From<&RoundState> for CompleteRound {
+    fn from(r: &RoundState) -> Self {
+        Self {
+            start_time: r.start_time,
+            throughput: r.throughput.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -129,7 +183,7 @@ pub struct NodeInfo {
 /// choose which remote node to initiate the next round with.
 pub struct Metrics {
     /// Map of remote agents.
-    map: HashMap<Arc<KitsuneAgent>, NodeInfo>,
+    nodes: HashMap<Arc<KitsuneAgent>, NodeInfo>,
 
     /// Aggregate Extrapolated Dht Coverage
     agg_extrap_cov: RunAvg,
@@ -143,9 +197,9 @@ pub struct Metrics {
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum RoundOutcome {
     /// Success outcome
-    Success(Instant),
+    Success(RoundMetric),
     /// Error outcome
-    Error(Instant),
+    Error(RoundMetric),
 }
 
 /// Accept differing key types
@@ -188,7 +242,7 @@ impl Metrics {
 
         let mut out = Vec::new();
 
-        for (agent, node) in self.map.iter() {
+        for (agent, node) in self.nodes.iter() {
             out.push(MetricRecord {
                 kind: MetricRecordKind::ReachabilityQuotient,
                 agent: Some(agent.clone()),
@@ -220,7 +274,7 @@ impl Metrics {
     /// Dump json encoded metrics
     pub fn dump(&self) -> serde_json::Value {
         let agents: serde_json::Value = self
-            .map
+            .nodes
             .iter()
             .map(|(a, i)| {
                 (
@@ -261,7 +315,7 @@ impl Metrics {
     {
         for agent_info in remote_agent_list {
             let info = self
-                .map
+                .nodes
                 .entry(agent_info.into().agent().clone())
                 .or_default();
             if success {
@@ -282,7 +336,7 @@ impl Metrics {
     {
         for agent_info in remote_agent_list {
             let info = self
-                .map
+                .nodes
                 .entry(agent_info.into().agent().clone())
                 .or_default();
             info.latency_micros.push(micros);
@@ -297,10 +351,10 @@ impl Metrics {
     {
         for agent_info in remote_agent_list {
             let info = self
-                .map
+                .nodes
                 .entry(agent_info.into().agent().clone())
                 .or_default();
-            record_instant(&mut info.initiates);
+            record_item(&mut info.initiates, Instant::now());
             info.current_round = true;
         }
     }
@@ -313,17 +367,21 @@ impl Metrics {
     {
         for agent_info in remote_agent_list {
             let info = self
-                .map
+                .nodes
                 .entry(agent_info.into().agent().clone())
                 .or_default();
-            record_instant(&mut info.remote_rounds);
+            record_item(&mut info.remote_rounds, Instant::now());
             info.current_round = true;
         }
     }
 
     /// Record a gossip round has completed successfully.
-    pub fn record_success<'a, T, I>(&mut self, remote_agent_list: I)
-    where
+    pub fn record_success<'a, T, I>(
+        &mut self,
+        remote_agent_list: I,
+        complete_round: Option<CompleteRound>,
+        gossip_type: GossipModuleType,
+    ) where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
     {
@@ -331,11 +389,16 @@ impl Metrics {
 
         for agent_info in remote_agent_list {
             let info = self
-                .map
+                .nodes
                 .entry(agent_info.into().agent().clone())
                 .or_default();
             info.reachability_quotient.push(100);
-            record_instant(&mut info.complete_rounds);
+            let round = RoundMetric {
+                instant: Instant::now(),
+                round: complete_round.clone(),
+                gossip_type,
+            };
+            record_item(&mut info.complete_rounds, round);
             info.current_round = false;
             if info.is_initiate_round() {
                 should_dec_force_initiates = true;
@@ -353,18 +416,27 @@ impl Metrics {
     }
 
     /// Record a gossip round has finished with an error.
-    pub fn record_error<'a, T, I>(&mut self, remote_agent_list: I)
-    where
+    pub fn record_error<'a, T, I>(
+        &mut self,
+        remote_agent_list: I,
+        complete_round: Option<CompleteRound>,
+        gossip_type: GossipModuleType,
+    ) where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
     {
         for agent_info in remote_agent_list {
             let info = self
-                .map
+                .nodes
                 .entry(agent_info.into().agent().clone())
                 .or_default();
             info.reachability_quotient.push_n(1, 5);
-            record_instant(&mut info.errors);
+            let round = RoundMetric {
+                instant: Instant::now(),
+                round: complete_round.clone(),
+                gossip_type,
+            };
+            record_item(&mut info.errors, round);
             info.current_round = false;
         }
         tracing::debug!(
@@ -379,16 +451,16 @@ impl Metrics {
     }
 
     /// Get the last successful round time.
-    pub fn last_success<'a, T, I>(&self, remote_agent_list: I) -> Option<&Instant>
+    pub fn last_success<'a, T, I>(&self, remote_agent_list: I) -> Option<&RoundMetric>
     where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
     {
         remote_agent_list
             .into_iter()
-            .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
+            .filter_map(|agent_info| self.nodes.get(agent_info.into().agent()))
             .filter_map(|info| info.complete_rounds.back())
-            .min()
+            .min_by_key(|r| r.instant)
     }
 
     /// Is this node currently in an active round?
@@ -399,7 +471,7 @@ impl Metrics {
     {
         remote_agent_list
             .into_iter()
-            .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
+            .filter_map(|agent_info| self.nodes.get(agent_info.into().agent()))
             .map(|info| info.current_round)
             .any(|x| x)
     }
@@ -413,13 +485,13 @@ impl Metrics {
         #[allow(clippy::map_flatten)]
         remote_agent_list
             .into_iter()
-            .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
+            .filter_map(|agent_info| self.nodes.get(agent_info.into().agent()))
             .map(|info| {
                 [
-                    info.errors.back().map(|x| RoundOutcome::Error(*x)),
+                    info.errors.back().map(|x| RoundOutcome::Error(x.clone())),
                     info.complete_rounds
                         .back()
-                        .map(|x| RoundOutcome::Success(*x)),
+                        .map(|x| RoundOutcome::Success(x.clone())),
                 ]
             })
             .flatten()
@@ -441,7 +513,7 @@ impl Metrics {
     {
         let (sum, cnt) = remote_agent_list
             .into_iter()
-            .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
+            .filter_map(|agent_info| self.nodes.get(agent_info.into().agent()))
             .map(|info| *info.reachability_quotient)
             .fold((0.0, 0.0), |acc, x| (acc.0 + x, acc.1 + 1.0));
         if cnt <= 0.0 {
@@ -460,7 +532,7 @@ impl Metrics {
     {
         let (sum, cnt) = remote_agent_list
             .into_iter()
-            .filter_map(|agent_info| self.map.get(agent_info.into().agent()))
+            .filter_map(|agent_info| self.nodes.get(agent_info.into().agent()))
             .map(|info| *info.latency_micros)
             .fold((0.0, 0.0), |acc, x| (acc.0 + x, acc.1 + 1.0));
         if cnt <= 0.0 {
@@ -472,7 +544,7 @@ impl Metrics {
 
     /// Getter
     pub fn node_info(&self) -> &HashMap<Arc<KitsuneAgent>, NodeInfo> {
-        &self.map
+        &self.nodes
     }
 }
 
@@ -487,11 +559,11 @@ impl NodeInfo {
     }
 }
 
-fn record_instant(buffer: &mut VecDeque<Instant>) {
+fn record_item<T>(buffer: &mut VecDeque<T>, item: T) {
     if buffer.len() > MAX_HISTORY {
         buffer.pop_front();
     }
-    buffer.push_back(Instant::now());
+    buffer.push_back(item);
 }
 
 impl std::fmt::Display for Metrics {
@@ -506,7 +578,7 @@ impl std::fmt::Display for Metrics {
         let mut average_completion_frequency = std::time::Duration::default();
         let mut complete_rounds = 0;
         let mut min_complete_rounds = usize::MAX;
-        for (key, info) in &self.map {
+        for (key, info) in &self.nodes {
             let completion_frequency: std::time::Duration =
                 info.complete_rounds.iter().map(|i| i.elapsed()).sum();
             let completion_frequency = completion_frequency
@@ -564,14 +636,14 @@ impl std::fmt::Display for Metrics {
             f,
             "\n\tNumber of remote nodes complete {} out of {}. Min per node: {}.",
             complete_rounds,
-            self.map.len(),
+            self.nodes.len(),
             min_complete_rounds
         )?;
         write!(
             f,
             "\n\tAverage time since last completion: {:?}",
             average_last_completion
-                .checked_div(self.map.len() as u32)
+                .checked_div(self.nodes.len() as u32)
                 .unwrap_or_default()
         )?;
         write!(
@@ -583,7 +655,7 @@ impl std::fmt::Display for Metrics {
             f,
             "\n\tAverage completion frequency: {:?}",
             average_completion_frequency
-                .checked_div(self.map.len() as u32)
+                .checked_div(self.nodes.len() as u32)
                 .unwrap_or_default()
         )?;
         write!(f, "\n\tForce Initiate: {}", self.force_initiates)?;

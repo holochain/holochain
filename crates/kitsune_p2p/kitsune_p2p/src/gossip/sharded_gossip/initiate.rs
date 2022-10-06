@@ -9,7 +9,7 @@ impl ShardedGossipLocal {
     pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
-            i.check_tgt_expired();
+            i.check_tgt_expired(self.gossip_type.into());
             let has_target = i.initiate_tgt.is_some();
             // Clear any expired rounds.
             i.round_map.current_rounds();
@@ -291,7 +291,7 @@ impl ShardedGossipLocal {
                 // that hold the arc so request all the ops the remote holds.
                 None => EncodedTimedBloomFilter::MissingAllHashes { time_window },
             };
-            state.increment_sent_op_blooms();
+            state.increment_expected_op_blooms();
 
             // Check if this is the final time window and the final bloom for this window.
             if i == len - 1 && state.bloom_batch_cursor.is_none() {
