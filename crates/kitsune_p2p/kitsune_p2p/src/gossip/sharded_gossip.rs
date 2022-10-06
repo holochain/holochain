@@ -14,6 +14,7 @@ use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::dht::region::RegionData;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
@@ -619,9 +620,6 @@ pub struct RoundState {
     remote_agent_list: Vec<AgentInfoSigned>,
     /// The common ground with our gossip partner for the purposes of this round
     common_arc_set: Arc<DhtArcSet>,
-    /// Number of ops blooms we have sent for this round, which is also the
-    /// number of MissingOps sets we expect in response
-    num_sent_op_blooms: u8,
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
     received_all_incoming_op_blooms: bool,
@@ -643,6 +641,46 @@ pub struct RoundState {
     /// The RegionSet we will send to our gossip partner during Historical
     /// gossip (will be None for Recent).
     region_set_sent: Option<Arc<RegionSetLtcs>>,
+
+    /// Number of ops blooms we have sent for this round, which is also the
+    /// number of MissingOps sets we expect in response
+    num_sent_op_blooms: u8,
+    /// Total number of bytes sent for bloom filters
+    bloom_bytes_sent: u32,
+    /// Total number of bytes sent for region data (historical only)
+    region_bytes_sent: u32,
+    /// Total number of ops sent
+    num_sent_ops: u32,
+    /// Total number of bytes sent for op data
+    op_bytes_sent: u32,
+}
+
+impl RoundState {
+    /// Constructor
+    pub fn new(
+        remote_agent_list: Vec<AgentInfoSigned>,
+        common_arc_set: Arc<DhtArcSet>,
+        region_set_sent: Option<Arc<RegionSetLtcs<RegionData>>>,
+        round_timeout: Duration,
+    ) -> Self {
+        RoundState {
+            remote_agent_list,
+            common_arc_set,
+            received_all_incoming_op_blooms: false,
+            has_pending_historical_op_data: false,
+            bloom_batch_cursor: None,
+            ops_batch_queue: OpsBatchQueue::new(),
+            start_time: Instant::now(),
+            last_touch: Instant::now(),
+            round_timeout,
+            region_set_sent,
+            num_sent_op_blooms: 0,
+            bloom_bytes_sent: 0,
+            region_bytes_sent: 0,
+            num_sent_ops: 0,
+            op_bytes_sent: 0,
+        }
+    }
 }
 
 impl ShardedGossipLocal {
@@ -682,19 +720,12 @@ impl ShardedGossipLocal {
         common_arc_set: Arc<DhtArcSet>,
         region_set_sent: Option<RegionSetLtcs>,
     ) -> KitsuneResult<RoundState> {
-        Ok(RoundState {
+        Ok(RoundState::new(
             remote_agent_list,
             common_arc_set,
-            num_sent_op_blooms: 0,
-            received_all_incoming_op_blooms: false,
-            has_pending_historical_op_data: false,
-            bloom_batch_cursor: None,
-            ops_batch_queue: OpsBatchQueue::new(),
-            start_time: Instant::now(),
-            last_touch: Instant::now(),
-            round_timeout: ROUND_TIMEOUT,
-            region_set_sent: region_set_sent.map(Arc::new),
-        })
+            region_set_sent.map(Arc::new),
+            ROUND_TIMEOUT,
+        ))
     }
 
     fn get_state(&self, id: &StateKey) -> KitsuneResult<Option<RoundState>> {
