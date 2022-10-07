@@ -4,7 +4,9 @@
 //! the spec and leave this one alone to maintain backwards compatibility.
 
 /// Version 1 of the App manifest schema
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
+)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct WebAppManifestV1 {
