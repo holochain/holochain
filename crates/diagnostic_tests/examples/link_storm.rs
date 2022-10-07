@@ -26,20 +26,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-const NODES: usize = 10;
-const BASES: usize = 4;
+const NODES: usize = 3;
+const BASES: usize = 3;
 
-const ENTRY_SIZE: usize = 1_0_000;
+const ENTRY_SIZE: usize = 1_00_000;
 const MAX_COMMITS: usize = 100;
 
 const REFRESH_RATE: Duration = Duration::from_millis(50);
-const COMMIT_RATE: Duration = Duration::from_millis(1000);
-const GET_RATE: Duration = Duration::from_millis(10);
+const COMMIT_RATE: Duration = Duration::from_millis(5000);
+const GET_RATE: Duration = Duration::from_millis(100);
 
 #[derive(Clone)]
 struct App {
     state: RwShare<State<NODES, BASES>>,
-    start_time: Instant,
+    // start_time: Instant,
     ui: Ui<NODES, BASES>,
     bases: [AnyLinkableHash; BASES],
     // nodes: [Node; NODES],
@@ -50,6 +50,7 @@ async fn setup_app() -> App {
     assert!(BASES <= NODES);
     // let config = config_historical_and_agent_gossip_only();
     let config = config_historical_only();
+    // let config = config_standard();
 
     let (conductors, zomes) = diagnostic_tests::setup_conductors_single_zome(
         NODES,
@@ -102,7 +103,7 @@ async fn setup_app() -> App {
 
     App {
         bases,
-        start_time: now,
+        // start_time: now,
         state,
         ui,
     }

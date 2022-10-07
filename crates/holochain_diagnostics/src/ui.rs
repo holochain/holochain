@@ -282,10 +282,10 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                     };
                     cells.extend([
                         dur,
+                        Cell::from(format!("{}", round.throughput.op_count.incoming)),
                         Cell::from(format!("{}", round.throughput.op_count.outgoing)),
                         Cell::from(format!("{}", round.throughput.op_bytes.incoming)),
                         Cell::from(format!("{}", round.throughput.op_bytes.outgoing)),
-                        Cell::from(format!("{}", round.throughput.op_count.incoming)),
                     ])
                 }
                 Row::new(cells)
