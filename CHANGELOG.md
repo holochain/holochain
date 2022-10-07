@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221005.164304
+
+## [holochain\_cli-0.0.61](crates/holochain_cli/CHANGELOG.md#0.0.61)
+
+## [holochain\_cli\_sandbox-0.0.57](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.57)
+
+## [holochain\_cli\_bundle-0.0.56](crates/holochain_cli_bundle/CHANGELOG.md#0.0.56)
+
+## [holochain-0.0.166](crates/holochain/CHANGELOG.md#0.0.166)
+
+- Fix restore clone cell by cell id. This used to fail with a “CloneCellNotFound” error. [\#1603](https://github.com/holochain/holochain/pull/1603)
+
+## [holochain\_test\_wasm\_common-0.0.56](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.56)
+
+## [holochain\_conductor\_api-0.0.63](crates/holochain_conductor_api/CHANGELOG.md#0.0.63)
+
+## [holochain\_wasm\_test\_utils-0.0.62](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.62)
+
+## [holochain\_cascade-0.0.65](crates/holochain_cascade/CHANGELOG.md#0.0.65)
+
+## [holochain\_state-0.0.63](crates/holochain_state/CHANGELOG.md#0.0.63)
+
+## [holochain\_p2p-0.0.60](crates/holochain_p2p/CHANGELOG.md#0.0.60)
+
+## [holochain\_types-0.0.60](crates/holochain_types/CHANGELOG.md#0.0.60)
+
+## [holochain\_keystore-0.0.59](crates/holochain_keystore/CHANGELOG.md#0.0.59)
+
+## [holochain\_sqlite-0.0.58](crates/holochain_sqlite/CHANGELOG.md#0.0.58)
+
+## [hdk-0.0.155](crates/hdk/CHANGELOG.md#0.0.155)
+
+## [holochain\_zome\_types-0.0.51](crates/holochain_zome_types/CHANGELOG.md#0.0.51)
+
+## [hdi-0.1.4](crates/hdi/CHANGELOG.md#0.1.4)
+
+## [hdk\_derive-0.0.51](crates/hdk_derive/CHANGELOG.md#0.0.51)
+
+## [holochain\_integrity\_types-0.0.21](crates/holochain_integrity_types/CHANGELOG.md#0.0.21)
+
+## [holo\_hash-0.0.34](crates/holo_hash/CHANGELOG.md#0.0.34)
+
 # 20220930.014733
 
 ## [holochain\_cli-0.0.60](crates/holochain_cli/CHANGELOG.md#0.0.60)
