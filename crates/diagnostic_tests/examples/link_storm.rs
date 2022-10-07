@@ -14,12 +14,14 @@ use tui::{backend::Backend, widgets::*, Terminal};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    observability::test_run().ok();
     let app = setup_app().await;
 
     task_commit(app.clone());
     task_get(app.clone());
 
-    tui_crossterm_setup(|t| run_app(t, app))?;
+    // tui_crossterm_setup(|t| run_app(t, app))?;
+    loop {}
 
     Ok(())
 }
@@ -27,7 +29,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 const NODES: usize = 10;
 const BASES: usize = 4;
 
-const ENTRY_SIZE: usize = 10_000;
+const ENTRY_SIZE: usize = 1_000_000;
 const MAX_COMMITS: usize = 100;
 
 const REFRESH_RATE: Duration = Duration::from_millis(50);
