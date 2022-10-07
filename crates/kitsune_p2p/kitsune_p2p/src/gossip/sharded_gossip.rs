@@ -711,22 +711,24 @@ impl RoundState {
 pub struct RoundThroughput {
     /// Number of ops blooms we have sent for this round, which is also the
     /// number of MissingOps sets we expect in response
-    op_bloom_count: ThroughputItem,
+    pub op_bloom_count: ThroughputItem,
     /// Total number of bytes sent for bloom filters
-    op_bloom_bytes: ThroughputItem,
+    pub op_bloom_bytes: ThroughputItem,
     /// Total number of bytes sent for region data (historical only)
-    region_bytes: ThroughputItem,
+    pub region_bytes: ThroughputItem,
     /// Total number of ops sent
-    op_count: ThroughputItem,
+    pub op_count: ThroughputItem,
     /// Total number of bytes sent for op data
-    op_bytes: ThroughputItem,
+    pub op_bytes: ThroughputItem,
 }
 
 /// Incoming and outgoing throughput
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ThroughputItem {
-    incoming: u32,
-    outgoing: u32,
+    /// Incoming throughput
+    pub incoming: u32,
+    /// Outgoing throughput
+    pub outgoing: u32,
 }
 
 impl ShardedGossipLocal {

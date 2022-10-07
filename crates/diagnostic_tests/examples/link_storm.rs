@@ -20,8 +20,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     task_commit(app.clone());
     task_get(app.clone());
 
-    // tui_crossterm_setup(|t| run_app(t, app))?;
-    loop {}
+    tui_crossterm_setup(|t| run_app(t, app))?;
+    // loop {}
 
     Ok(())
 }
@@ -29,11 +29,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 const NODES: usize = 10;
 const BASES: usize = 4;
 
-const ENTRY_SIZE: usize = 1_000_000;
+const ENTRY_SIZE: usize = 1_0_000;
 const MAX_COMMITS: usize = 100;
 
 const REFRESH_RATE: Duration = Duration::from_millis(50);
-const COMMIT_RATE: Duration = Duration::from_millis(100);
+const COMMIT_RATE: Duration = Duration::from_millis(1000);
 const GET_RATE: Duration = Duration::from_millis(10);
 
 #[derive(Clone)]
@@ -48,7 +48,8 @@ struct App {
 
 async fn setup_app() -> App {
     assert!(BASES <= NODES);
-    let config = config_historical_and_agent_gossip_only();
+    // let config = config_historical_and_agent_gossip_only();
+    let config = config_historical_only();
 
     let (conductors, zomes) = diagnostic_tests::setup_conductors_single_zome(
         NODES,
@@ -90,7 +91,7 @@ async fn setup_app() -> App {
     let counts = [[(0, now); BASES]; NODES];
 
     let mut list_state: ListState = Default::default();
-    list_state.select(Some(0));
+    list_state.select(Some(1));
 
     let state = RwShare::new(State {
         commits,
