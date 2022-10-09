@@ -186,10 +186,11 @@ jobs:
               macos-latest: 2
             run: |
               nix-shell \
+                --pure \
                 --keep CARGO_NEXTEST_ARGS \
                 --keep CARGO_TEST_ARGS \
                 --keep CARGO_BUILD_JOBS \
-                --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
+                --fallback --argstr flavor "coreDev" --run hc-test-standard-nextest
 
           - name: cargo-test-static
             restoresCargoCache: true
@@ -201,9 +202,10 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
+                --pure \
                 --keep CARGO_TEST_ARGS \
                 --keep CARGO_BUILD_JOBS \
-                --fallback --pure --argstr flavor "coreDev" --run hc-static-checks
+                --fallback --argstr flavor "coreDev" --run hc-static-checks
 
           - name: cargo-test-wasm
             restoresCargoCache: true
@@ -215,9 +217,10 @@ jobs:
               macos-latest: 1
             run: |
               nix-shell \
+                --pure \
                 --keep CARGO_TEST_ARGS \
                 --keep CARGO_BUILD_JOBS \
-                --fallback --pure --argstr flavor "coreDev" --run hc-test-wasm
+                --fallback --argstr flavor "coreDev" --run hc-test-wasm
 
           - name: nix-test
             restoresCargoCache: false
@@ -258,18 +261,29 @@ jobs:
               # regenerate the nix sources
               git config --global user.email "devcore@holochain.org"
               git config --global user.name "Holochain Core Dev Team"
-              nix-shell --arg flavors '["release"]' --pure --run "hnixpkgs-update-single ${VERSION_COMPAT}"
+              nix-shell \
+                --pure \
+                --keep VERSION_COMPAT \
+                --arg flavors '["release"]' \
+                --run 'hnixpkgs-update-single ${VERSION_COMPAT}'
               nix-build . -A packages.holochain.holochainAllBinariesWithDeps.${VERSION_COMPAT} --no-link
 
               git clone "${HOLONIX_URL}" "${HOLONIX_REPO}" -b ${HOLONIX_SOURCE_BRANCH} --depth=1
               cd "${HOLONIX_REPO}"
 
-              nix-shell --run '
+              nix-shell
+                --pure \
+                --keep HOLOCHAIN_NIXPKGS_REPO \
+                --run '
                   niv drop holochain-nixpkgs
                   niv add local --path ${HOLOCHAIN_NIXPKGS_REPO} --name holochain-nixpkgs
                 '
 
-              nix-shell --argstr holochainVersionId "${VERSION_COMPAT}" --arg include '{ test = true; }' --run '
+              nix-shell \
+                --pure \
+                --argstr holochainVersionId "${VERSION_COMPAT}" \
+                --arg include '{ test = true; }' \
+                --run '
                   holochain --version
                   hn-test
                 '
@@ -359,7 +373,7 @@ jobs:
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
-          nix-shell --run "cargo fetch --locked"
+          nix-shell --pure --run "cargo fetch --locked"
 
           ${{ matrix.testCommand.run }}
         continue-on-error: ${{ matrix.platform != 'ubuntu-latest' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
@@ -388,7 +402,9 @@ jobs:
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
-          nix-shell --pure --run '
+          nix-shell \
+            --pure \
+            --run '
               cargo sweep -f
             '
 
@@ -533,12 +549,15 @@ jobs:
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
-          nix-shell --argstr flavor release --keep CARGO_REGISTRY_TOKEN --pure --run '
-            release-automation \
-              --workspace-path=$PWD \
-              --log-level=trace \
-              release \
-                --steps=PublishToCratesIo,AddOwnersToCratesIo
+          nix-shell \
+            --pure \
+            --keep CARGO_REGISTRY_TOKEN \
+            --argstr flavor release  --run '
+              release-automation \
+                --workspace-path=$PWD \
+                --log-level=trace \
+                release \
+                  --steps=PublishToCratesIo,AddOwnersToCratesIo
             '
 
       - name: Push the tags
