@@ -77,7 +77,7 @@ impl CellConductorApiT for CellConductorApi {
     }
 
     async fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_handle.signal_broadcaster().await
+        self.conductor_handle.signal_broadcaster()
     }
 
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
@@ -166,6 +166,7 @@ pub trait CellConductorApiT: Send + Sync + Sized {
 }
 
 #[async_trait]
+#[mockall::automock]
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
 pub trait CellConductorReadHandleT: Send + Sync {

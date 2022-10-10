@@ -137,7 +137,7 @@ mod tests {
 
         let mut signals = Vec::new();
         for h in conductors.iter() {
-            signals.push(h.signal_broadcaster().await.subscribe_separately())
+            signals.push(h.signal_broadcaster().subscribe_separately())
         }
         let signals = signals.into_iter().flatten().collect::<Vec<_>>();
 

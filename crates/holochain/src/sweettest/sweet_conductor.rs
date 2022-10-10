@@ -4,9 +4,11 @@
 use super::{
     SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig, SweetConductorHandle,
 };
+use crate::conductor::ConductorHandle;
+use crate::conductor::state::AppInterfaceId;
 use crate::conductor::{
-    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
-    handle::ConductorHandle, space::Spaces, CellError, Conductor, ConductorBuilder,
+    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
+    CellError, Conductor, ConductorBuilder,
 };
 use hdk::prelude::*;
 use holo_hash::DnaHash;
@@ -77,12 +79,12 @@ impl SweetConductor {
     ) -> SweetConductor {
         // Automatically add a test app interface
         handle
-            .add_test_app_interface(Default::default())
+            .add_test_app_interface(AppInterfaceId::default())
             .await
             .expect("Couldn't set up test app interface");
 
         // Get a stream of all signals since conductor startup
-        let signal_stream = handle.signal_broadcaster().await.subscribe_merged();
+        let signal_stream = handle.signal_broadcaster().subscribe_merged();
 
         // XXX: this is a bit wonky.
         // We create a Spaces instance here purely because it's easier to initialize

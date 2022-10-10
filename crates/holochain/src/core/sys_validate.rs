@@ -6,8 +6,8 @@ use super::ribosome::RibosomeT;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::entry_def_store::get_entry_def;
-use crate::conductor::handle::ConductorHandleT;
 use crate::conductor::space::Space;
+use crate::conductor::Conductor;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pDna;
 use holochain_types::prelude::*;
@@ -271,7 +271,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 pub async fn check_app_entry_type(
     dna_hash: &DnaHash,
     entry_type: &AppEntryType,
-    conductor: &dyn ConductorHandleT,
+    conductor: &Conductor,
 ) -> SysValidationResult<EntryDef> {
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks

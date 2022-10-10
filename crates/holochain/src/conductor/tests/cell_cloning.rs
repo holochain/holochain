@@ -204,7 +204,7 @@ async fn clone_cell_deletion() {
     // archive clone cell
     conductor
         .inner_handle()
-        .archive_clone_cell(ArchiveCloneCellPayload {
+        .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -234,7 +234,7 @@ async fn clone_cell_deletion() {
     // restore the archived clone cell by clone id
     let restored_cell = conductor
         .inner_handle()
-        .restore_archived_clone_cell(ArchiveCloneCellPayload {
+        .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -263,7 +263,7 @@ async fn clone_cell_deletion() {
     // archive clone cell again
     conductor
         .inner_handle()
-        .archive_clone_cell(ArchiveCloneCellPayload {
+        .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -275,7 +275,7 @@ async fn clone_cell_deletion() {
     // restore clone cell by cell id
     let restored_cell = conductor
         .inner_handle()
-        .restore_archived_clone_cell(ArchiveCloneCellPayload {
+        .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CellId(installed_clone_cell.as_id().clone()),
         })
@@ -288,7 +288,7 @@ async fn clone_cell_deletion() {
     // archive and delete clone cell
     conductor
         .inner_handle()
-        .archive_clone_cell(ArchiveCloneCellPayload {
+        .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -298,7 +298,7 @@ async fn clone_cell_deletion() {
         .unwrap();
     conductor
         .inner_handle()
-        .delete_archived_clone_cells(DeleteArchivedCloneCellsPayload {
+        .delete_archived_clone_cells(&DeleteArchivedCloneCellsPayload {
             app_id: app_id.into(),
             role_id: role_id.clone(),
         })
@@ -307,7 +307,7 @@ async fn clone_cell_deletion() {
     // assert the deleted cell cannot be restored
     let restore_result = conductor
         .inner_handle()
-        .restore_archived_clone_cell(ArchiveCloneCellPayload {
+        .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),

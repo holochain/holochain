@@ -206,7 +206,7 @@ async fn run(
                 },
                 Some(TaskOutcome::StopApps(cell_id, error, context)) => {
                     tracing::error!("About to automatically stop apps");
-                    let app_ids = conductor.list_running_apps_for_required_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor.list_running_apps_for_dependent_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
                         conductor.remove_cells(&[cell_id]).await;
 
@@ -244,7 +244,7 @@ async fn run(
                 },
                 Some(TaskOutcome::StopAppsWithDna(dna_hash, error, context)) => {
                     tracing::error!("About to automatically stop apps with dna {}", dna_hash);
-                    let app_ids = conductor.list_running_apps_for_required_dna_hash(dna_hash.as_ref()).await.map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor.list_running_apps_for_dependent_dna_hash(dna_hash.as_ref()).await.map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
                         let cells_with_same_dna: Vec<_> = conductor.list_cell_ids(None).into_iter().filter(|id| id.dna_hash() == dna_hash.as_ref()).collect();
                         conductor.remove_cells(&cells_with_same_dna).await;
@@ -383,17 +383,17 @@ impl TaskManagerClient {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::error::ConductorError;
-    use crate::conductor::handle::MockConductorHandleT;
+    use crate::conductor::{error::ConductorError, Conductor};
     use anyhow::Result;
+    use holochain_state::test_utils::test_db_dir;
     use observability;
-    use std::sync::Arc;
 
     #[tokio::test]
     async fn spawn_and_handle_dying_task() -> Result<()> {
         observability::test_run().ok();
-        let mock_handle = MockConductorHandleT::new();
-        let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
+        let db_dir = test_db_dir();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let (send_task_handle, main_task) = spawn_task_manager(handle);
         let handle = tokio::spawn(async {
             Err(Box::new(ConductorError::Other(
                 anyhow::anyhow!("This task gotta die").into(),
@@ -430,8 +430,9 @@ mod test {
     async fn unrecoverable_error() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
-        let mock_handle = MockConductorHandleT::new();
-        let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
+        let db_dir = test_db_dir();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let (send_task_handle, main_task) = spawn_task_manager(handle);
         send_task_handle
             .send(ManagedTaskAdd::ignore(
                 tokio::spawn(keep_alive_task(rx)),
@@ -465,8 +466,9 @@ mod test {
     async fn unrecoverable_panic() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
-        let mock_handle = MockConductorHandleT::new();
-        let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
+        let db_dir = test_db_dir();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let (send_task_handle, main_task) = spawn_task_manager(handle);
         send_task_handle
             .send(ManagedTaskAdd::ignore(
                 tokio::spawn(keep_alive_task(rx)),

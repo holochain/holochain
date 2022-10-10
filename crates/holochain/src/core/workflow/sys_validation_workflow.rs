@@ -1,8 +1,8 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::conductor::handle::ConductorHandleT;
 use crate::conductor::space::Space;
+use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
@@ -232,7 +232,7 @@ async fn validate_op(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(
@@ -306,7 +306,7 @@ async fn validate_op_inner(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     match op {
@@ -448,7 +448,7 @@ pub async fn sys_validate_record(
     record: &Record,
     call_zome_workspace: &HostFnWorkspace,
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
 ) -> SysValidationOutcome<()> {
     trace!(?record);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
@@ -473,7 +473,7 @@ async fn sys_validate_record_inner(
     record: &Record,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
 ) -> SysValidationResult<()> {
     let signature = record.signature();
     let action = record.action();
@@ -485,7 +485,7 @@ async fn sys_validate_record_inner(
         maybe_entry: Option<&Entry>,
         workspace: &SysValidationWorkspace,
         network: HolochainP2pDna,
-        conductor_handle: &dyn ConductorHandleT,
+        conductor_handle: &Conductor,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
         store_record(action, workspace, network.clone()).await?;
@@ -606,7 +606,7 @@ async fn store_record(
 async fn store_entry(
     action: NewEntryActionRef<'_>,
     entry: &Entry,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
 ) -> SysValidationResult<()> {
