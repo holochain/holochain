@@ -12,19 +12,16 @@ use std::{
 };
 use tui::{backend::Backend, widgets::*, Terminal};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    observability::test_run().ok();
-    let app = setup_app().await;
-
-    task_commit(app.clone());
-    task_get(app.clone());
-
-    tui_crossterm_setup(|t| run_app(t, app))?;
-    // loop {}
-
-    Ok(())
-}
+//                                        █████
+//                                       ░░███
+//   ██████   ██████  ████████    █████  ███████    █████
+//  ███░░███ ███░░███░░███░░███  ███░░  ░░░███░    ███░░
+// ░███ ░░░ ░███ ░███ ░███ ░███ ░░█████   ░███    ░░█████
+// ░███  ███░███ ░███ ░███ ░███  ░░░░███  ░███ ███ ░░░░███
+// ░░██████ ░░██████  ████ █████ ██████   ░░█████  ██████
+//  ░░░░░░   ░░░░░░  ░░░░ ░░░░░ ░░░░░░     ░░░░░  ░░░░░░
+//
+//
 
 const NODES: usize = 3;
 const BASES: usize = 3;
@@ -35,6 +32,39 @@ const MAX_COMMITS: usize = 100;
 const REFRESH_RATE: Duration = Duration::from_millis(50);
 const COMMIT_RATE: Duration = Duration::from_millis(5000);
 const GET_RATE: Duration = Duration::from_millis(100);
+
+const UI: bool = false;
+
+//                             ███
+//                            ░░░
+//  █████████████    ██████   ████  ████████
+// ░░███░░███░░███  ░░░░░███ ░░███ ░░███░░███
+//  ░███ ░███ ░███   ███████  ░███  ░███ ░███
+//  ░███ ░███ ░███  ███░░███  ░███  ░███ ░███
+//  █████░███ █████░░████████ █████ ████ █████
+// ░░░░░ ░░░ ░░░░░  ░░░░░░░░ ░░░░░ ░░░░ ░░░░░
+//
+//
+//
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    observability::test_run().ok();
+    let app = setup_app().await;
+
+    task_commit(app.clone());
+    task_get(app.clone());
+
+    if UI {
+        tui_crossterm_setup(|t| run_app(t, app))?;
+    } else {
+        loop {
+            tokio::time::sleep(Duration::from_secs(10)).await
+        }
+    }
+
+    Ok(())
+}
 
 #[derive(Clone)]
 struct App {

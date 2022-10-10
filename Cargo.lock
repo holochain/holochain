@@ -698,9 +698,9 @@ dependencies = [
 
 [[package]]
 name = "colored"
-version = "2.0.0"
+version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
+checksum = "f4ffc801dacf156c5854b9df4f425a626539c3a6ef7893cc0c5084a23f0b6c59"
 dependencies = [
  "atty",
  "lazy_static",
@@ -2229,7 +2229,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "arbitrary",
- "crossterm 0.19.0",
+ "crossterm 0.25.0",
  "holochain",
  "rand 0.8.5",
  "tracing",
@@ -2480,7 +2480,7 @@ dependencies = [
  "nanoid 0.3.0",
  "observability",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
