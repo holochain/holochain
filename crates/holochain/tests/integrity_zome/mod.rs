@@ -30,7 +30,7 @@ use serde::Serialize;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_coordinator_zome_update() {
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let (dna, _, _) = SweetDnaFile::unique_from_zomes(
         vec![TestIntegrityWasm::IntegrityZome],
         vec![TestCoordinatorWasm::CoordinatorZome],
@@ -95,7 +95,7 @@ async fn test_coordinator_zome_update() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_coordinator_zome_update_multi_integrity() {
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let mut second_integrity = IntegrityZome::from(TestIntegrityWasm::IntegrityZome);
     second_integrity.zome_name_mut().0 = "2".into();
     let (_, second_coordinator) =
@@ -217,7 +217,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_update_admin_interface() {
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let (dna, _, _) = SweetDnaFile::unique_from_zomes(
         vec![TestIntegrityWasm::IntegrityZome],
         vec![TestCoordinatorWasm::CoordinatorZome],
@@ -291,7 +291,7 @@ async fn test_update_admin_interface() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_wasm_memory() {
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
         .await
         .unwrap();

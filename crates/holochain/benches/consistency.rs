@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::BenchmarkId;
@@ -8,13 +6,9 @@ use criterion::Criterion;
 use holo_hash::EntryHash;
 use holo_hash::EntryHashes;
 use holochain::sweettest::*;
-use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::AdminInterfaceConfig;
-use holochain_conductor_api::InterfaceDriver;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_test_wasm_common::ManyAnchorInput;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneP2pConfig;
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
 
@@ -171,12 +165,6 @@ async fn setup() -> (Producer, Consumer, Others) {
     let config = SweetConductorConfig::standard().no_publish();
     let configs = vec![config; 5];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let mut cells = apps
         .into_inner()

@@ -204,7 +204,7 @@ async fn get_deleted() -> anyhow::Result<()> {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     // Install DNA and install and enable apps in conductor
     let alice = conductor
@@ -277,7 +277,7 @@ async fn signal_subscription() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
         .await
         .unwrap();
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
     let zome = &app.cells()[0].zome(SweetInlineZomes::COORDINATOR);
 

@@ -373,7 +373,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .unwrap();
 
     let db_dir = test_db_dir();
-    let config = SweetConductorConfig::standard();
+    let config = standard_config();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(db_dir.path(), keystore.clone(), &config, &[]).await,
         db_dir,
