@@ -4,7 +4,9 @@ use std::time::Instant;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
-use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes};
+use holochain::sweettest::{
+    standard_config, SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes,
+};
 use holochain::test_utils::inline_zomes::{batch_create_zome, simple_crud_zome};
 use holochain::test_utils::inline_zomes::{simple_create_read_zome, AppString};
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
@@ -41,7 +43,7 @@ fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) ->
         override_port: None,
     }];
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
+    let mut config = standard_config();
     config.network = Some(network);
     config
 }
@@ -183,13 +185,14 @@ async fn test_gossip_shutdown() {
     let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
     let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
 
+    // Create an entry before the conductors know about each other
     let hash: ActionHash = conductors[0]
         .call(&zome_0, "create_string", "hi".to_string())
         .await;
 
-    // Test that gossip doesn't happen within 3 seconds (assuming it will never happen)
+    // After shutting down conductor 0, test that gossip doesn't happen within 3 seconds
+    // of peer discovery (assuming it will never happen)
     conductors[0].shutdown().await;
-
     conductors.exchange_peer_info().await;
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
@@ -199,7 +202,7 @@ async fn test_gossip_shutdown() {
     // Ensure that gossip loops resume upon startup
     conductors[0].startup().await;
 
-    consistency_10s(&[&cell_0, &cell_1]).await;
+    consistency_60s(&[&cell_0, &cell_1]).await;
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }
