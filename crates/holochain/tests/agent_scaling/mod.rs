@@ -51,7 +51,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
         .unwrap();
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
@@ -102,7 +102,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
         .unwrap();
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor

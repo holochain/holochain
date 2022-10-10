@@ -34,13 +34,6 @@ pub fn spawn_publish_dht_ops_consumer(
                 break;
             }
 
-            #[cfg(any(test, feature = "test_utils"))]
-            {
-                if !conductor_handle.dev_settings().publish {
-                    continue;
-                }
-            }
-
             if conductor_handle
                 .get_config()
                 .network
