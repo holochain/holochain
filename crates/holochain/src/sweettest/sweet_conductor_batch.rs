@@ -27,8 +27,7 @@ impl SweetConductorBatch {
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
     pub async fn from_standard_config(num: usize) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat_with(|| SweetConductorConfig::standard()).take(num))
-            .await
+        Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num)).await
     }
 
     /// Iterate over the SweetConductors

@@ -42,62 +42,62 @@ impl SweetConductorConfig {
 
     /// Completely disable networking
     pub fn no_networking(mut self) -> Self {
-        self.network.as_mut().map(|c| {
+        if let Some(c) = self.network.as_mut() {
             *c = c.clone().tune(|mut tp| {
                 tp.disable_publish = true;
                 tp.disable_recent_gossip = true;
                 tp.disable_historical_gossip = true;
                 tp
             });
-        });
+        }
         self
     }
 
     /// Disable publishing
     pub fn no_publish(mut self) -> Self {
-        self.network.as_mut().map(|c| {
+        if let Some(c) = self.network.as_mut() {
             *c = c.clone().tune(|mut tp| {
                 tp.disable_publish = true;
                 tp
             });
-        });
+        }
         self
     }
 
     /// Disable publishing and recent gossip
     pub fn historical_only(mut self) -> Self {
-        self.network.as_mut().map(|c| {
+        if let Some(c) = self.network.as_mut() {
             *c = c.clone().tune(|mut tp| {
                 tp.disable_publish = true;
                 tp.disable_recent_gossip = true;
                 tp
             });
-        });
+        }
         self
     }
 
     /// Disable recent op gossip, but keep agent gossip
     pub fn historical_and_agent_gossip_only(mut self) -> Self {
-        self.network.as_mut().map(|c| {
+        if let Some(c) = self.network.as_mut() {
             *c = c.clone().tune(|mut tp| {
                 tp.disable_publish = true;
                 // keep recent gossip for agent gossip, but gossip no ops.
                 tp.danger_gossip_recent_threshold_secs = 0;
                 tp
             });
-        });
+        }
         self
     }
 
     /// Disable publishing and historical gossip
     pub fn recent_only(mut self) -> Self {
-        self.network.as_mut().map(|c| {
+        if let Some(c) = self.network.as_mut() {
             *c = c.clone().tune(|mut tp| {
                 tp.disable_publish = true;
                 tp.disable_historical_gossip = true;
                 tp
             });
-        });
+        }
         self
     }
 }
