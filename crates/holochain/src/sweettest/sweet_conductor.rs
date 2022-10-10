@@ -40,7 +40,7 @@ pub struct SweetConductor {
 
 /// Standard config for SweetConductors
 pub fn standard_config() -> ConductorConfig {
-    SweetConductorConfig::standard()
+    SweetConductorConfig::standard().into()
 }
 
 /// A DnaFile with a role name assigned
@@ -110,7 +110,8 @@ impl SweetConductor {
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config(config: ConductorConfig) -> SweetConductor {
+    pub async fn from_config<C: Into<ConductorConfig>>(config: C) -> SweetConductor {
+        let config = config.into();
         let dir = test_db_dir();
         let handle = Self::handle_from_existing(dir.path(), test_keystore(), &config, &[]).await;
         Self::new(handle, dir, config).await

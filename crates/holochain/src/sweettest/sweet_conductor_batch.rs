@@ -9,10 +9,10 @@ pub struct SweetConductorBatch(Vec<SweetConductor>);
 
 impl SweetConductorBatch {
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
-    pub async fn from_configs<I: IntoIterator<Item = ConductorConfig>>(
+    pub async fn from_configs<C: Into<ConductorConfig>, I: IntoIterator<Item = C>>(
         configs: I,
     ) -> SweetConductorBatch {
-        future::join_all(configs.into_iter().map(SweetConductor::from_config))
+        future::join_all(configs.into_iter().map(SweetConductor::from_config::<C>))
             .await
             .into()
     }

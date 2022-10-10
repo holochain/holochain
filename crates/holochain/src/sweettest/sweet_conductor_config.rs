@@ -4,18 +4,20 @@ use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, 
 use kitsune_p2p::KitsuneP2pConfig;
 
 /// Wrapper around ConductorConfig with some helpful builder methods
-#[derive(Clone, Debug, PartialEq, derive_more::Deref, derive_more::DerefMut)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    derive_more::From,
+    derive_more::Into,
+)]
 pub struct SweetConductorConfig(ConductorConfig);
-
-impl From<SweetConductorConfig> for ConductorConfig {
-    fn from(scc: SweetConductorConfig) -> ConductorConfig {
-        scc.0
-    }
-}
 
 impl SweetConductorConfig {
     /// Standard config for SweetConductors
-    pub fn standard() -> ConductorConfig {
+    pub fn standard() -> Self {
         let mut tuning_params =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         // note, even with this tuning param, the `SSLKEYLOGFILE` env var
@@ -31,11 +33,11 @@ impl SweetConductorConfig {
         let admin_interface = AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port: 0 },
         };
-        ConductorConfig {
+        Self(ConductorConfig {
             network: Some(network),
             admin_interfaces: Some(vec![admin_interface]),
             ..Default::default()
-        }
+        })
     }
 
     /// Completely disable networking
