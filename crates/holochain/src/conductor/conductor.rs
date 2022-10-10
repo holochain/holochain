@@ -655,8 +655,8 @@ impl Conductor {
     pub(crate) async fn remove_cells(&self, cell_ids: &[CellId]) {
         let to_cleanup: Vec<_> = self.cells.share_mut(|cells| {
             cell_ids
-                .into_iter()
-                .filter_map(|cell_id| cells.remove(&cell_id).map(|c| (cell_id, c)))
+                .iter()
+                .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
                 .collect()
         });
         for (cell_id, item) in to_cleanup {
@@ -1932,12 +1932,10 @@ impl Conductor {
         validate: bool,
         records: Vec<Record>,
     ) -> ConductorApiResult<()> {
-        Ok(
-            graft_records_onto_source_chain::graft_records_onto_source_chain(
-                self, cell_id, validate, records,
-            )
-            .await?,
+        graft_records_onto_source_chain::graft_records_onto_source_chain(
+            self, cell_id, validate, records,
         )
+        .await
     }
 
     /// Update coordinator zomes on an existing dna.
