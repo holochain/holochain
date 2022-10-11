@@ -11,3 +11,4 @@ mod sharded_gossip;
 mod speed_tests;
 mod test_cli;
 mod test_utils;
+mod websocket;
