@@ -20,7 +20,7 @@ fn get_entry_multiple(n: u32) -> ExternResult<hdk::prelude::Bytes> {
                 match record
                     .entry()
                     .to_app_option::<Val>()
-                    .map_err(|e| wasm_error!(e.into()))?
+                    .map_err(|e| wasm_error!(e))?
                 {
                     Some(v) => bytes.append(&mut v.0.to_le_bytes().to_vec()),
                     // couldn't succeed to get so let's return what we have and let the test

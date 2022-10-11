@@ -277,7 +277,7 @@ impl Path {
     /// What is the hash for the current [ `Path` ]?
     pub fn path_entry_hash(&self) -> ExternResult<holo_hash::EntryHash> {
         hash_entry(Entry::App(AppEntryBytes(
-            SerializedBytes::try_from(self).map_err(|e| wasm_error!(e.into()))?,
+            SerializedBytes::try_from(self).map_err(|e| wasm_error!(e))?,
         )))
     }
 
@@ -298,7 +298,7 @@ impl Path {
         Ok(LinkTag::new(match self.leaf() {
             None => <Vec<u8>>::with_capacity(0),
             Some(component) => UnsafeBytes::from(
-                SerializedBytes::try_from(component).map_err(|e| wasm_error!(e.into()))?,
+                SerializedBytes::try_from(component).map_err(|e| wasm_error!(e))?,
             )
             .into(),
         }))
@@ -416,7 +416,7 @@ impl TypedPath {
                     Ok(Some(
                         SerializedBytes::from(UnsafeBytes::from(component_bytes.to_vec()))
                             .try_into()
-                            .map_err(|e: SerializedBytesError| wasm_error!(e.into()))?,
+                            .map_err(|e: SerializedBytesError| wasm_error!(e))?,
                     ))
                 }
             })

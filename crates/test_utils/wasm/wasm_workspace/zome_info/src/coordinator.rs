@@ -40,7 +40,7 @@ fn remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
         &(),
     )? {
         ZomeCallResponse::Ok(extern_io) => {
-            Ok(extern_io.decode().map_err(|e| wasm_error!(e.into()))?)
+            Ok(extern_io.decode().map_err(|e| wasm_error!(e))?)
         }
         not_ok => {
             tracing::warn!(?not_ok);
@@ -59,7 +59,7 @@ fn remote_remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
         agent_info()?.agent_initial_pubkey,
     )? {
         ZomeCallResponse::Ok(extern_io) => {
-            Ok(extern_io.decode().map_err(|e| wasm_error!(e.into()))?)
+            Ok(extern_io.decode().map_err(|e| wasm_error!(e))?)
         }
         not_ok => {
             tracing::warn!(?not_ok);
@@ -112,7 +112,7 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
 fn dna_info_value(k: String) -> ExternResult<serde_yaml::Value> {
     Ok(
         YamlProperties::try_from(hdk::prelude::dna_info()?.properties)
-            .map_err(|e| wasm_error!(e.into()))?
+            .map_err(|e| wasm_error!(e))?
             .into_inner()[k]
             .clone(),
     )
@@ -159,7 +159,7 @@ struct MaybePropertiesDirect(Option<PropertiesDirect>);
 fn dna_info_foo_direct(_: ()) -> ExternResult<Option<Foo>> {
     Ok(
         MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)
-            .map_err(|e| wasm_error!(e.into()))?
+            .map_err(|e| wasm_error!(e))?
             .0
             .and_then(|properties| properties.foo),
     )
@@ -169,7 +169,7 @@ fn dna_info_foo_direct(_: ()) -> ExternResult<Option<Foo>> {
 fn dna_info_bar_direct(_: ()) -> ExternResult<Option<String>> {
     Ok(
         MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)
-            .map_err(|e| wasm_error!(e.into()))?
+            .map_err(|e| wasm_error!(e))?
             .0
             .and_then(|properties| properties.bar),
     )
@@ -179,7 +179,7 @@ fn dna_info_bar_direct(_: ()) -> ExternResult<Option<String>> {
 fn dna_info_nested(_: ()) -> ExternResult<Option<i64>> {
     Ok(
         MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)
-            .map_err(|e| wasm_error!(e.into()))?
+            .map_err(|e| wasm_error!(e))?
             .0
             .and_then(|properties| properties.baz["foo"]["bar"].as_i64()),
     )

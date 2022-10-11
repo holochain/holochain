@@ -17,7 +17,7 @@ where
     HDI.with(|h| {
         h.borrow().verify_signature(
             VerifySignature::new(key.into(), signature.into(), data)
-                .map_err(|e| wasm_error!(e.into()))?,
+                .map_err(|e| wasm_error!(e))?,
         )
     })
 }

@@ -62,7 +62,7 @@ pub fn accept_countersigning_preflight_request<'a>(
                             &input,
                             &countersigning_agent_state,
                         )
-                        .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                        .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                         .into(),
                     )
                     .await

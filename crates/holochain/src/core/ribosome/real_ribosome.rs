@@ -619,7 +619,7 @@ macro_rules! do_callback {
                         zome.into(),
                         extern_io
                             .decode()
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                     ),
                     Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => (
                         zome.into(),
