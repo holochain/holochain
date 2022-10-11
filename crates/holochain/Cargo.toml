@@ -141,7 +141,7 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "test_utils", "no-deps"]
+default = ["slow_tests", "glacial_tests", "test_utils", "no-deps"]
 
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
@@ -162,6 +162,9 @@ test_utils = [
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI
 slow_tests = []
+
+# What's slower than slow? We may choose to not run these tests in CI to speed things up.
+glacial_tests = []
 
 # Includes the wasm build script, which we don't need when not building wasms
 build_wasms = ['holochain_wasm_test_utils/build']
