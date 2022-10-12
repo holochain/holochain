@@ -253,6 +253,7 @@ impl Cell {
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
+        println!("dispatch_scheduled_fns");
         let now = Timestamp::now();
         let author = self.id.agent_pubkey().clone();
         let lives = self
@@ -263,6 +264,7 @@ impl Cell {
                 // should be valid schedules only.
                 reschedule_expired(txn, now, &author)?;
                 let lives = live_scheduled_fns(txn, now, &author);
+                println!("lives {:?}", &lives);
                 // We know what to run so we can delete the ephemerals.
                 if lives.is_ok() {
                     // Failing to delete should rollback this attempt.

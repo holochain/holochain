@@ -279,6 +279,8 @@ impl SourceChain {
             SourceChainResult::Ok((scheduled_fns, actions, ops, entries))
         })?;
 
+        println!("flush {:?}", &scheduled_fns);
+
         // Sync with CHC, if CHC is present
         if let Some(chc) = network.chc() {
             chc.add_entries(entries.clone())

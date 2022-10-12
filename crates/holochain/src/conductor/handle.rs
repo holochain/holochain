@@ -1123,6 +1123,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
     /// The scheduler wants to dispatch any functions that are due.
     async fn dispatch_scheduled_fns(self: Arc<Self>) {
+        println!("scheduler dispatch scheduled fns");
         tracing::warn!("dispatch_scheduled_fns");
         let cell_arcs = {
             let mut cell_arcs = vec![];

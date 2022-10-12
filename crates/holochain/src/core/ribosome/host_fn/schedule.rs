@@ -10,11 +10,13 @@ pub fn schedule(
     call_context: Arc<CallContext>,
     input: String,
 ) -> Result<(), RuntimeError> {
+    println!("foooo");
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
             ..
         } => {
+            println!("allow");
             call_context
                 .host_context()
                 .workspace_write()
@@ -31,7 +33,9 @@ pub fn schedule(
                 .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
             Ok(())
         }
-        _ => Err(wasm_error!(WasmErrorInner::Host(
+        _ => {
+            println!("deny");
+            Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
@@ -39,7 +43,8 @@ pub fn schedule(
             )
             .to_string(),
         ))
-        .into()),
+        .into())
+    },
     }
 }
 
@@ -197,7 +202,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     // #[ignore = "flakey. Sometimes fails the last assert with 3 instead of 5"]
     #[cfg(feature = "test_utils")]
-    async fn schedule_test() -> anyhow::Result<()> {
+    async fn schedule_test_wasm() -> anyhow::Result<()> {
         observability::test_run().ok();
         let RibosomeTestFixture {
             conductor,
@@ -207,7 +212,10 @@ pub mod tests {
         } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
         // Let's just drive alice to exhaust all ticks.
-        let _schedule: () = conductor.call(&alice, "schedule", ()).await;
+        // let _schedule: () = conductor.call(&alice, "schedule", ()).await;
+        tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
+        conductor.handle().dispatch_scheduled_fns().await;
+
         let mut i: usize = 0;
         while i < 10 {
             tokio::time::sleep(std::time::Duration::from_millis(2)).await;
@@ -219,6 +227,7 @@ pub mod tests {
 
         // The persistent schedule should run once in second.
         let query_tock: Vec<Record> = conductor.call(&alice, "query_tock", ()).await;
+        assert!(query_tock.len() > 0);
         assert!(query_tock.len() < 3);
 
         // If Bob does a few ticks and then calls `start_scheduler` the
