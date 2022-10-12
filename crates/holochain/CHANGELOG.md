@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.167
+
 - Adds `SweetConductorConfig`, which adds a few builder methods for constructing variations of the standard ConductorConfig
 
 ## 0.0.166
