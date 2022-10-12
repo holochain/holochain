@@ -45,8 +45,7 @@ use super::interface::AppInterfaceRuntime;
 use super::interface::SignalBroadcaster;
 use super::manager::keep_alive_task;
 use super::manager::spawn_task_manager;
-use super::manager::ManagedTaskAdd;
-use super::manager::ManagedTaskHandle;
+use super::manager::TaskAdder;
 use super::manager::TaskManagerRunHandle;
 use super::p2p_agent_store;
 use super::p2p_agent_store::P2pBatch;
@@ -208,6 +207,10 @@ pub struct Conductor {
     holochain_p2p: holochain_p2p::HolochainP2pRef,
 
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
+
+    /// A tag that gets added to trace logs, to differentiate this from other
+    /// conductors which may be running in the same process
+    tracing_scope: String,
 }
 
 impl Conductor {
@@ -250,6 +253,7 @@ impl Conductor {
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         spaces: Spaces,
         post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
+        tracing_scope: String,
     ) -> Self {
         Self {
             spaces,
@@ -263,6 +267,7 @@ impl Conductor {
             keystore,
             holochain_p2p,
             post_commit,
+            tracing_scope,
         }
     }
 
@@ -380,13 +385,13 @@ impl Conductor {
                     InterfaceDriver::Websocket { port } => {
                         let (listener_handle, listener) = spawn_websocket_listener(port).await?;
                         let port = listener_handle.local_addr().port().unwrap_or(port);
-                        let handle: ManagedTaskHandle = spawn_admin_interface_task(
+                        let task = spawn_admin_interface_task(
                             listener_handle,
                             listener,
                             admin_api.clone(),
                             stop_tx.subscribe(),
-                        )?;
-                        InterfaceResult::Ok((port, handle))
+                        );
+                        InterfaceResult::Ok((port, task))
                     }
                 }
             }
@@ -407,20 +412,16 @@ impl Conductor {
 
             // First, register the keepalive task, to ensure the conductor doesn't shut down
             // in the absence of other "real" tasks
-            self.manage_task(ManagedTaskAdd::ignore(
-                tokio::spawn(keep_alive_task(stop_tx.subscribe())),
-                "keepalive task",
-            ))
-            .await?;
+            self.task_adder()
+                .ignore("keepalive task", keep_alive_task(stop_tx.subscribe()))
+                .await?;
 
             // Now that tasks are spawned, register them with the TaskManager
             for (port, handle) in handles {
                 ports.push(port);
-                self.manage_task(ManagedTaskAdd::ignore(
-                    handle,
-                    &format!("admin interface, port {}", port),
-                ))
-                .await?
+                self.task_adder()
+                    .ignore(&format!("admin interface, port {}", port), handle)
+                    .await?
             }
             for p in ports {
                 self.add_admin_port(p);
@@ -453,11 +454,9 @@ impl Conductor {
             .await
             .map_err(Box::new)?;
         // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
-        self.manage_task(ManagedTaskAdd::ignore(
-            task,
-            &format!("app interface, port {}", port),
-        ))
-        .await?;
+        self.task_adder()
+            .ignore(&format!("app interface, port {}", port), task)
+            .await?;
         let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
         self.app_interfaces.share_mut(|app_interfaces| {
@@ -1747,17 +1746,22 @@ impl Conductor {
     }
 
     /// Sends a JoinHandle to the TaskManager task to be managed
-    pub(crate) async fn manage_task(&self, handle: ManagedTaskAdd) -> ConductorResult<()> {
-        self.task_manager
-            .share_ref(|tm| {
-                tm.as_ref()
-                    .expect("Task manager not initialized")
-                    .task_add_sender()
-                    .clone()
-            })
-            .send(handle)
-            .await
-            .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
+    pub(crate) fn task_adder(&self) -> Arc<TaskAdder> {
+        self.task_manager.share_ref(|tm| {
+            tm.as_ref()
+                .expect("Task manager not initialized")
+                .task_adder()
+        })
+    }
+
+    /// Channel for stopping all managed tasks
+    pub(crate) fn task_stopper(&self) -> StopBroadcaster {
+        self.task_manager.share_ref(|tm| {
+            tm.as_ref()
+                .expect("Task manager not initialized")
+                .task_stop_broadcaster()
+                .clone()
+        })
     }
 }
 
@@ -2058,6 +2062,11 @@ impl Conductor {
     pub fn get_config(&self) -> &ConductorConfig {
         &self.config
     }
+
+    /// Get the tracing_scope
+    pub(crate) fn tracing_scope(&self) -> &str {
+        self.tracing_scope.as_ref()
+    }
 }
 
 //                       ███                         █████
@@ -2222,16 +2231,6 @@ impl Conductor {
         self: Arc<Self>,
         app_id: Option<&InstalledAppId>,
     ) -> ConductorResult<Vec<Result<(Cell, InitialQueueTriggers), (CellId, CellError)>>> {
-        // Data required to create apps
-        let (managed_task_add_sender, managed_task_stop_broadcaster) =
-            self.task_manager.share_ref(|tm| {
-                let tm = tm.as_ref().expect("Task manager not initialized");
-                (
-                    tm.task_add_sender().clone(),
-                    tm.task_stop_broadcaster().clone(),
-                )
-            });
-
         // Closure for creating all cells in an app
         let state = self.get_state().await?;
 
@@ -2263,8 +2262,6 @@ impl Conductor {
 
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             let handle = self.clone();
-            let managed_task_add_sender = managed_task_add_sender.clone();
-            let managed_task_stop_broadcaster = managed_task_stop_broadcaster.clone();
             let chc = handle.chc(cell_id);
             async move {
                 let holochain_p2p_cell =
@@ -2275,16 +2272,9 @@ impl Conductor {
                     .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()))
                     .map_err(|err| (cell_id.clone(), err))?;
 
-                Cell::create(
-                    cell_id.clone(),
-                    handle,
-                    space,
-                    holochain_p2p_cell,
-                    managed_task_add_sender,
-                    managed_task_stop_broadcaster,
-                )
-                .await
-                .map_err(|err| (cell_id.clone(), err))
+                Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell)
+                    .await
+                    .map_err(|err| (cell_id.clone(), err))
             }
         });
 

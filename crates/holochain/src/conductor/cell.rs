@@ -7,7 +7,6 @@
 use super::api::CellConductorHandle;
 use super::api::ZomeCall;
 use super::interface::SignalBroadcaster;
-use super::manager::ManagedTaskAdd;
 use super::space::Space;
 use super::ConductorHandle;
 use crate::conductor::api::CellConductorApi;
@@ -49,7 +48,6 @@ use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -117,8 +115,6 @@ impl Cell {
         conductor_handle: ConductorHandle,
         space: Space,
         holochain_p2p_cell: holochain_p2p::HolochainP2pDna,
-        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
-        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
 
@@ -136,8 +132,6 @@ impl Cell {
                 holochain_p2p_cell.clone(),
                 &space,
                 conductor_handle.clone(),
-                managed_task_add_sender,
-                managed_task_stop_broadcaster,
             )
             .await;
 

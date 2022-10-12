@@ -1,19 +1,16 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
 use holochain_p2p::*;
 use holochain_types::db_cache::DhtDbQueryCache;
-use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
 #[instrument(skip(
     workspace,
     conductor_handle,
-    stop,
     trigger_integration,
     network,
     dht_query_cache
@@ -22,15 +19,15 @@ pub fn spawn_app_validation_consumer(
     dna_hash: Arc<DnaHash>,
     workspace: AppValidationWorkspace,
     conductor_handle: ConductorHandle,
-    mut stop: sync::broadcast::Receiver<()>,
     trigger_integration: TriggerSender,
     network: HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
-) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
+) -> (TriggerSender, impl ManagedTaskFut) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
     let workspace = Arc::new(workspace);
-    let handle = tokio::spawn(async move {
+    let mut stop = conductor_handle.task_stopper().subscribe();
+    let task = async move {
         loop {
             // Wait for next job
             if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
@@ -60,6 +57,6 @@ pub fn spawn_app_validation_consumer(
             };
         }
         Ok(())
-    });
-    (tx, handle)
+    };
+    (tx, task)
 }

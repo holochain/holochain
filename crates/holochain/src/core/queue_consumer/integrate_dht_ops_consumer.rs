@@ -1,10 +1,8 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
 use holochain_types::db_cache::DhtDbQueryCache;
-use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
@@ -16,10 +14,10 @@ pub fn spawn_integrate_dht_ops_consumer(
     mut stop: sync::broadcast::Receiver<()>,
     trigger_receipt: TriggerSender,
     network: HolochainP2pDna,
-) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
+) -> (TriggerSender, impl ManagedTaskFut) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
-    let handle = tokio::spawn(async move {
+    let handle = async move {
         loop {
             // Wait for next job
             if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
@@ -47,6 +45,6 @@ pub fn spawn_integrate_dht_ops_consumer(
             };
         }
         Ok(())
-    });
+    };
     (tx, handle)
 }

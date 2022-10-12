@@ -1,34 +1,25 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::sys_validation_workflow::sys_validation_workflow;
 use crate::core::workflow::sys_validation_workflow::SysValidationWorkspace;
-use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
-#[instrument(skip(
-    workspace,
-    space,
-    conductor_handle,
-    stop,
-    trigger_app_validation,
-    network,
-))]
+#[instrument(skip(workspace, space, conductor_handle, trigger_app_validation, network,))]
 pub fn spawn_sys_validation_consumer(
     workspace: SysValidationWorkspace,
     space: Space,
     conductor_handle: ConductorHandle,
-    mut stop: sync::broadcast::Receiver<()>,
     trigger_app_validation: TriggerSender,
     network: HolochainP2pDna,
-) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
+) -> (TriggerSender, impl ManagedTaskFut) {
     let (tx, mut rx) = TriggerSender::new();
     let trigger_self = tx.clone();
     let workspace = Arc::new(workspace);
     let space = Arc::new(space);
-    let handle = tokio::spawn(async move {
+    let mut stop = conductor_handle.task_stopper().subscribe();
+    let handle = async move {
         loop {
             // Wait for next job
             if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
@@ -58,6 +49,6 @@ pub fn spawn_sys_validation_consumer(
             };
         }
         Ok(())
-    });
+    };
     (tx, handle)
 }

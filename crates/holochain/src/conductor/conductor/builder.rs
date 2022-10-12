@@ -98,8 +98,9 @@ impl ConductorBuilder {
         let tag = spaces.get_state().await?.tag().clone();
 
         let network_config = config.network.clone().unwrap_or_default();
-        let (cert_digest, cert, cert_priv_key) =
-            keystore.get_or_create_tls_cert_by_tag(tag.0).await?;
+        let (cert_digest, cert, cert_priv_key) = keystore
+            .get_or_create_tls_cert_by_tag(tag.0.clone())
+            .await?;
         let tls_config =
             holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
                 cert,
@@ -128,6 +129,7 @@ impl ConductorBuilder {
             holochain_p2p,
             spaces,
             post_commit_sender,
+            format!("scope-{}", tag.0),
         );
 
         let shutting_down = conductor.shutting_down.clone();
@@ -278,6 +280,7 @@ impl ConductorBuilder {
             holochain_p2p,
             spaces,
             post_commit_sender,
+            nanoid::nanoid!(),
         );
 
         let conductor = Self::update_fake_state(self.state, conductor).await?;

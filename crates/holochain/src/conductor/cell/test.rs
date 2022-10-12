@@ -50,7 +50,7 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let (add_task_sender, shutdown) = spawn_task_manager(handle.clone());
+    let (_, shutdown) = spawn_task_manager(handle.clone());
     let (stop_tx, _) = sync::broadcast::channel(1);
 
     let (_cell, _) = super::Cell::create(
@@ -58,8 +58,6 @@ async fn test_cell_handle_publish() {
         handle,
         spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,
-        add_task_sender,
-        stop_tx.clone(),
     )
     .await
     .unwrap();

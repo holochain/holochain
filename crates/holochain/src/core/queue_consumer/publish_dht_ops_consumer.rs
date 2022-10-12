@@ -2,20 +2,18 @@
 
 use super::*;
 
-use crate::conductor::manager::ManagedTaskResult;
+use crate::conductor::manager::ManagedTaskFut;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
-#[instrument(skip(env, conductor_handle, stop, network))]
+#[instrument(skip(env, conductor_handle, network))]
 pub fn spawn_publish_dht_ops_consumer(
     agent: AgentPubKey,
     env: DbWrite<DbKindAuthored>,
     conductor_handle: ConductorHandle,
-    mut stop: sync::broadcast::Receiver<()>,
     network: Box<dyn HolochainP2pDnaT + Send + Sync>,
-) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
+) -> (TriggerSender, impl ManagedTaskFut) {
     // Create a trigger with an exponential back off starting at 1 minute
     // and maxing out at 5 minutes.
     // The back off is reset any time the trigger is called (when new data is committed)
@@ -23,7 +21,8 @@ pub fn spawn_publish_dht_ops_consumer(
     let (tx, mut rx) =
         TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
     let trigger_self = tx.clone();
-    let handle = tokio::spawn(async move {
+    let mut stop = conductor_handle.task_stopper().subscribe();
+    let task = async move {
         let network = network;
         loop {
             // Wait for next job
@@ -62,6 +61,6 @@ pub fn spawn_publish_dht_ops_consumer(
             };
         }
         Ok(())
-    });
-    (tx, handle)
+    };
+    (tx, task)
 }
