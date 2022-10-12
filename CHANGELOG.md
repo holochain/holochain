@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221012.015828
+
+## [holochain\_cli-0.0.62](crates/holochain_cli/CHANGELOG.md#0.0.62)
+
+## [holochain\_cli\_sandbox-0.0.58](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.58)
+
+## [holochain\_cli\_bundle-0.0.57](crates/holochain_cli_bundle/CHANGELOG.md#0.0.57)
+
+## [holochain-0.0.167](crates/holochain/CHANGELOG.md#0.0.167)
+
+- Adds `SweetConductorConfig`, which adds a few builder methods for constructing variations of the standard ConductorConfig
+
+## [holochain\_conductor\_api-0.0.64](crates/holochain_conductor_api/CHANGELOG.md#0.0.64)
+
+## [holochain\_wasm\_test\_utils-0.0.63](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.63)
+
+## [holochain\_cascade-0.0.66](crates/holochain_cascade/CHANGELOG.md#0.0.66)
+
+## [holochain\_state-0.0.64](crates/holochain_state/CHANGELOG.md#0.0.64)
+
+## [holochain\_p2p-0.0.61](crates/holochain_p2p/CHANGELOG.md#0.0.61)
+
+## [holochain\_types-0.0.61](crates/holochain_types/CHANGELOG.md#0.0.61)
+
+- Added `WebAppManifestCurrentBuilder` and exposed it.
+
+## [holochain\_keystore-0.0.60](crates/holochain_keystore/CHANGELOG.md#0.0.60)
+
+## [holochain\_sqlite-0.0.59](crates/holochain_sqlite/CHANGELOG.md#0.0.59)
+
+## [kitsune\_p2p-0.0.49](crates/kitsune_p2p/CHANGELOG.md#0.0.49)
+
 # 20221005.164304
 
 ## [holochain\_cli-0.0.61](crates/holochain_cli/CHANGELOG.md#0.0.61)
