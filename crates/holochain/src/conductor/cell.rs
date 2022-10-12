@@ -234,8 +234,8 @@ impl Cell {
         &self.holochain_p2p_cell
     }
 
-    async fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_api.signal_broadcaster().await
+    fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.conductor_api.signal_broadcaster()
     }
 
     pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
@@ -557,7 +557,7 @@ impl Cell {
                     self.id.agent_pubkey().clone(),
                     signed_actions,
                     self.queue_triggers.clone(),
-                    self.conductor_api.signal_broadcaster().await,
+                    self.conductor_api.signal_broadcaster(),
                 )
                 .await
                 .map_err(Box::new)?)
@@ -797,7 +797,7 @@ impl Cell {
         let keystore = self.conductor_api.keystore().clone();
 
         let conductor_handle = self.conductor_handle.clone();
-        let signal_tx = self.signal_broadcaster().await;
+        let signal_tx = self.signal_broadcaster();
         let ribosome = self.get_ribosome()?;
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
@@ -881,7 +881,7 @@ impl Cell {
         }
         trace!("running init");
 
-        let signal_tx = self.signal_broadcaster().await;
+        let signal_tx = self.signal_broadcaster();
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs {

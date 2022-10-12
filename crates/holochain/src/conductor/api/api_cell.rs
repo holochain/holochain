@@ -79,7 +79,7 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.keystore()
     }
 
-    async fn signal_broadcaster(&self) -> SignalBroadcaster {
+    fn signal_broadcaster(&self) -> SignalBroadcaster {
         self.conductor_handle.signal_broadcaster()
     }
 
@@ -144,7 +144,7 @@ pub trait CellConductorApiT: Send + Sync {
 
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
-    async fn signal_broadcaster(&self) -> SignalBroadcaster;
+    fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
