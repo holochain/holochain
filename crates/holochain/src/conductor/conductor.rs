@@ -268,7 +268,7 @@ impl Conductor {
 
     /// A gate to put at the top of public functions to ensure that work is not
     /// attempted after a shutdown has been issued
-    pub(super) fn check_running(&self) -> ConductorResult<()> {
+    pub fn check_running(&self) -> ConductorResult<()> {
         if self
             .shutting_down
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -1992,7 +1992,9 @@ impl Conductor {
         self.spaces.queue_consumer_map.clone()
     }
 
-    pub(crate) fn signal_broadcaster(&self) -> SignalBroadcaster {
+    /// Access to the signal broadcast channel, to create
+    /// new subscriptions
+    pub fn signal_broadcaster(&self) -> SignalBroadcaster {
         let senders = self
             .app_interfaces
             .share_ref(|ai| ai.values().map(|i| i.signal_tx()).cloned().collect());
