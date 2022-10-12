@@ -98,12 +98,6 @@ jobs:
           nix-shell --version
           nix --version
           pwd
-          cat /proc/mounts
-          mkdir -p ~/.ssh/
-          cat <<EOF > ~/.ssh/config
-          Host uptermd.upterm.dev
-            StrictHostKeyChecking yes
-          EOF
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
