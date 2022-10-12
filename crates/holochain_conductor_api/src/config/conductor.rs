@@ -62,6 +62,10 @@ pub struct ConductorConfig {
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
     #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
+
+    /// All logs coming from this conductor will get scoped by this value
+    #[serde(default)]
+    pub tracing_scope: String,
     //
     //
     // Which signals to emit
@@ -134,6 +138,7 @@ pub mod tests {
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
                 chc_namespace: None,
+                tracing_scope: "".to_string(),
             }
         );
     }
@@ -183,6 +188,8 @@ pub mod tests {
       network_type: quic_bootstrap
 
     db_sync_strategy: Fast
+
+    tracing_scope: "scope"
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
@@ -225,6 +232,7 @@ pub mod tests {
                 network: Some(network_config),
                 db_sync_strategy: DbSyncStrategy::Fast,
                 chc_namespace: None,
+                tracing_scope: "scope".to_string()
             }
         );
     }
@@ -252,6 +260,7 @@ pub mod tests {
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::Fast,
                 chc_namespace: None,
+                tracing_scope: "".to_string()
             }
         );
     }

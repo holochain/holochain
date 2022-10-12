@@ -34,7 +34,7 @@ pub fn spawn_publish_dht_ops_consumer(
             }
 
             if conductor_handle
-                .get_config()
+                .config()
                 .network
                 .as_ref()
                 .map(|c| c.tuning_params.disable_publish)

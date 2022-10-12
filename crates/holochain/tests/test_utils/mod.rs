@@ -281,6 +281,7 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         keystore: KeystoreConfig::DangerTestKeystore,
         db_sync_strategy: DbSyncStrategy::default(),
         chc_namespace: None,
+        tracing_scope: "".to_string(),
     }
 }
 

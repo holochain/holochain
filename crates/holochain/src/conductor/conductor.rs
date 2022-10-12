@@ -207,10 +207,6 @@ pub struct Conductor {
     holochain_p2p: holochain_p2p::HolochainP2pRef,
 
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
-
-    /// A tag that gets added to trace logs, to differentiate this from other
-    /// conductors which may be running in the same process
-    tracing_scope: String,
 }
 
 impl Conductor {
@@ -253,7 +249,6 @@ impl Conductor {
         holochain_p2p: holochain_p2p::HolochainP2pRef,
         spaces: Spaces,
         post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
-        tracing_scope: String,
     ) -> Self {
         Self {
             spaces,
@@ -267,7 +262,6 @@ impl Conductor {
             keystore,
             holochain_p2p,
             post_commit,
-            tracing_scope,
         }
     }
 
@@ -904,7 +898,7 @@ impl Conductor {
                 ..
             } => {
                 let cutoff = self
-                    .get_config()
+                    .config()
                     .network
                     .clone()
                     .unwrap_or_default()
@@ -2059,13 +2053,13 @@ impl Conductor {
     }
 
     /// Get the conductor config
-    pub fn get_config(&self) -> &ConductorConfig {
+    pub fn config(&self) -> &ConductorConfig {
         &self.config
     }
 
     /// Get the tracing_scope
     pub(crate) fn tracing_scope(&self) -> &str {
-        self.tracing_scope.as_ref()
+        self.config.tracing_scope.as_ref()
     }
 }
 

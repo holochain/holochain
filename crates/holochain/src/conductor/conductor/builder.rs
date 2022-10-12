@@ -129,7 +129,6 @@ impl ConductorBuilder {
             holochain_p2p,
             spaces,
             post_commit_sender,
-            format!("scope-{}", tag.0),
         );
 
         let shutting_down = conductor.shutting_down.clone();
@@ -280,7 +279,6 @@ impl ConductorBuilder {
             holochain_p2p,
             spaces,
             post_commit_sender,
-            nanoid::nanoid!(),
         );
 
         let conductor = Self::update_fake_state(self.state, conductor).await?;

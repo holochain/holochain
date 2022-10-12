@@ -43,7 +43,6 @@ async fn can_update_state() {
         holochain_p2p,
         spaces,
         post_commit_sender,
-        "".to_string(),
     );
     let state = conductor.get_state().await.unwrap();
     let mut expect_state = ConductorState::default();
@@ -92,7 +91,6 @@ async fn app_ids_are_unique() {
         holochain_p2p,
         spaces,
         post_commit_sender,
-        "".to_string(),
     );
 
     let cell_id = fake_cell_id(1);
