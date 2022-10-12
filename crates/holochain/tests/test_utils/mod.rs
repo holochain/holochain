@@ -304,6 +304,8 @@ async fn check_timeout_named<T>(
     response: impl Future<Output = Result<T, WebsocketError>>,
     timeout_millis: u64,
 ) -> T {
+    // FIXME(stefan): remove this multiplier once it's faster on self-hosted CI
+    let timeout_millis = timeout_millis * 4;
     match tokio::time::timeout(std::time::Duration::from_millis(timeout_millis), response).await {
         Ok(response) => response.unwrap(),
         Err(e) => {
