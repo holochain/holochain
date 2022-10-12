@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.51
+
 ## 0.0.50
 
 - Revised the changelog for 0.0.48 to note that changes to `ChainQueryFilter` in that version were breaking changes, please read the log for that version for more detail.

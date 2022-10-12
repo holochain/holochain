@@ -13,25 +13,20 @@ use holochain_zome_types::inline_zome::BoxApi;
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 struct BaseTarget(AnyLinkableHash, AnyLinkableHash);
 
-fn links_zome() -> InlineZomeSet {
-    InlineZomeSet::new_unique([("integrity_links", vec![], 1)], ["links"])
+fn links_zome() -> InlineIntegrityZome {
+    InlineIntegrityZome::new_unique(vec![], 1)
+        .function("create_link", move |api, base_target: BaseTarget| {
+            let hash = api.create_link(CreateLinkInput::new(
+                base_target.0,
+                base_target.1,
+                ZomeId(0),
+                LinkType::new(0),
+                ().into(),
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
         .function(
-            "links",
-            "create_link",
-            move |api, base_target: BaseTarget| {
-                let hash = api.create_link(CreateLinkInput::new(
-                    base_target.0,
-                    base_target.1,
-                    ZomeId(0),
-                    LinkType::new(0),
-                    ().into(),
-                    ChainTopOrdering::default(),
-                ))?;
-                Ok(hash)
-            },
-        )
-        .function(
-            "links",
             "get_links",
             move |api: BoxApi, base: AnyLinkableHash| -> InlineZomeResult<Vec<Vec<Link>>> {
                 Ok(api.get_links(vec![GetLinksInput::new(
@@ -51,12 +46,12 @@ async fn many_agents_can_reach_consistency_agent_links() {
     observability::test_run().ok();
     const NUM_AGENTS: usize = 20;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(links_zome())
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("links", links_zome()))
         .await
         .unwrap();
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
@@ -107,7 +102,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
         .unwrap();
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor

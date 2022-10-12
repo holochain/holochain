@@ -25,20 +25,18 @@ pub struct CoordinatorZomeMarker;
 pub type InlineIntegrityZome = InlineZome<IntegrityZomeMarker>;
 pub type InlineCoordinatorZome = InlineZome<CoordinatorZomeMarker>;
 
-/// An InlineZome, which consists
-pub struct InlineZome<T> {
+/// An "inline" zome definition in pure Rust, as opposed to a zome defined in Wasm.
+pub struct InlineZome<T = IntegrityZomeMarker> {
     /// Inline zome type marker.
     _t: PhantomData<T>,
-    /// Since closures cannot be serialized, we include a network seed which
+
+    /// Since closures cannot be serialized, we include a UUID which
     /// is the only part of an InlineZome that gets serialized.
-    /// This uuid becomes part of the determination of the DnaHash
+    /// This UUID becomes part of the determination of the DnaHash
     /// that it is a part of.
     /// Think of it as a stand-in for the WasmHash of a WasmZome.
     pub(super) uuid: String,
 
-    // /// The EntryDefs returned by the `entry_defs` callback function,
-    // /// which will be automatically provided
-    // pub(super) entry_defs: EntryDefs,
     /// The collection of closures which define this zome.
     /// These functions are directly called by the Ribosome.
     pub(super) functions: HashMap<FunctionName, InlineZomeFn>,

@@ -452,14 +452,6 @@ pub trait ConductorHandleT: Send + Sync {
     async fn add_test_app_interface(&self, id: super::state::AppInterfaceId)
         -> ConductorResult<()>;
 
-    /// Get the current dev settings
-    #[cfg(any(test, feature = "test_utils"))]
-    fn dev_settings(&self) -> DevSettings;
-
-    /// Update the current dev settings
-    #[cfg(any(test, feature = "test_utils"))]
-    fn update_dev_settings(&self, delta: DevSettingsDelta);
-
     /// Manually coerce cells to a given CellStatus. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
     fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus);
@@ -498,46 +490,6 @@ pub trait ConductorHandleT: Send + Sync {
     // }
 }
 
-/// Special switches for features to be used during development and testing
-#[derive(Clone)]
-pub struct DevSettings {
-    /// Determines whether publishing should be enabled
-    pub publish: bool,
-    /// Determines whether storage arc resizing should be enabled
-    pub _arc_resizing: bool,
-}
-
-/// Specify changes to be made to the Devsettings.
-/// None means no change, Some means make the specified change.
-#[derive(Default)]
-pub struct DevSettingsDelta {
-    /// Determines whether publishing should be enabled
-    pub publish: Option<bool>,
-    /// Determines whether storage arc resizing should be enabled
-    pub arc_resizing: Option<bool>,
-}
-
-impl Default for DevSettings {
-    fn default() -> Self {
-        Self {
-            publish: true,
-            _arc_resizing: true,
-        }
-    }
-}
-
-impl DevSettings {
-    fn apply(&mut self, delta: DevSettingsDelta) {
-        if let Some(v) = delta.publish {
-            self.publish = v;
-        }
-        if let Some(v) = delta.arc_resizing {
-            self._arc_resizing = v;
-            tracing::warn!("Arc resizing is not yet implemented, and can't be enabled/disabled.");
-        }
-    }
-}
-
 /// The current "production" implementation of a ConductorHandle.
 /// The implementation specifies how read/write access to the Conductor
 /// should be synchronized across multiple concurrent Handles.
@@ -548,12 +500,6 @@ impl DevSettings {
 #[derive(From)]
 pub struct ConductorHandleImpl {
     pub(super) conductor: Conductor,
-
-    // This is only available in tests currently, but could be extended to
-    // normal usage.
-    #[cfg(any(test, feature = "test_utils"))]
-    /// Selectively enable/disable certain functionalities
-    pub dev_settings: parking_lot::RwLock<DevSettings>,
 }
 
 #[async_trait::async_trait]
@@ -1530,16 +1476,6 @@ impl ConductorHandleT for ConductorHandleImpl {
         id: super::state::AppInterfaceId,
     ) -> ConductorResult<()> {
         self.conductor.add_test_app_interface(id).await
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    fn dev_settings(&self) -> DevSettings {
-        self.dev_settings.read().clone()
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    fn update_dev_settings(&self, delta: DevSettingsDelta) {
-        self.dev_settings.write().apply(delta);
     }
 
     #[cfg(any(test, feature = "test_utils"))]

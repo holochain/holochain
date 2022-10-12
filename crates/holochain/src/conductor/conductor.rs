@@ -862,7 +862,7 @@ impl Conductor {
                 let clone_cell_id = clone_cell_id.to_owned();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    let clone_id = app.get_clone_id(&clone_cell_id)?;
+                    let clone_id = app.get_archived_clone_id(&clone_cell_id)?;
                     let restored_cell = app.restore_clone_cell(&clone_id)?;
                     Ok((state, restored_cell))
                 }
@@ -1470,7 +1470,6 @@ mod builder {
     use holochain_p2p::dht::ArqStrat;
 
     use super::*;
-    use crate::conductor::handle::DevSettings;
     use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
     use crate::conductor::ribosome_store::RibosomeStore;
     use crate::conductor::ConductorHandle;
@@ -1623,12 +1622,7 @@ mod builder {
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             // Create handle
-            let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
-                conductor,
-
-                #[cfg(any(test, feature = "test_utils"))]
-                dev_settings: parking_lot::RwLock::new(DevSettings::default()),
-            });
+            let handle: ConductorHandle = Arc::new(ConductorHandleImpl { conductor });
 
             {
                 let handle = handle.clone();
@@ -1787,12 +1781,7 @@ mod builder {
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             // Create handle
-            let handle: ConductorHandle = Arc::new(ConductorHandleImpl {
-                conductor,
-
-                #[cfg(any(test, feature = "test_utils"))]
-                dev_settings: parking_lot::RwLock::new(DevSettings::default()),
-            });
+            let handle: ConductorHandle = Arc::new(ConductorHandleImpl { conductor });
 
             // Install extra DNAs, in particular:
             // the ones with InlineZomes will not be registered in the Wasm DB

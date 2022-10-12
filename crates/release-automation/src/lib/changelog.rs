@@ -16,6 +16,9 @@ use std::path::{Path, PathBuf};
 use std::{cell::RefCell, convert::TryFrom};
 use std::{collections::HashSet, convert::TryInto};
 
+/// This data structure helps implement the YAML-type frontmatter for `ChangelogT`.
+/// Please see the [serde_yaml docs](https://docs.rs/serde_yaml/0.9.11/serde_yaml/index.html#using-serde-derive)
+/// for several syntax examples.
 #[derive(Clone, Default, Debug, PartialEq, Deserialize, Serialize)]
 pub(crate) struct Frontmatter {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -343,10 +346,8 @@ where
 
             // we're only interested in the frontmatter here
             if let NodeValue::FrontMatter(ref fm) = &mut node.data.borrow_mut().value {
-                let fm_str = String::from_utf8(fm.to_vec())?
-                    .replace("---", "")
-                    .trim()
-                    .to_owned();
+                let fm_str_raw = String::from_utf8(fm.to_vec())?;
+                let fm_str = fm_str_raw.replace("---", "").trim().to_owned();
 
                 let fm: Frontmatter = if fm_str.is_empty() {
                     Frontmatter::default()
@@ -358,7 +359,7 @@ where
                     "[{}] found a YAML front matter: {:#?}\nsource string: \n'{}'",
                     i,
                     fm,
-                    fm_str
+                    fm_str_raw
                 );
 
                 return Ok(Some(fm));
@@ -463,7 +464,7 @@ impl<'a> ChangelogT<'a, CrateChangelog> {
         Ok(())
     }
 
-    fn erase_front_matter(&'a self, write_file: bool) -> Fallible<String> {
+    pub(crate) fn erase_front_matter(&'a self, write_file: bool) -> Fallible<String> {
         let frontmatter_re = regex::Regex::new(r"(?ms)^---$.*^---$\w*").unwrap();
         let cl = sanitize(std::fs::read_to_string(self.path())?);
 
@@ -479,7 +480,7 @@ impl<'a> ChangelogT<'a, CrateChangelog> {
     }
 
     /// Writes the given Frontmatter back to the changelog file
-    fn set_front_matter(&'a self, fm: &Frontmatter) -> Fallible<()> {
+    pub(crate) fn set_front_matter(&'a self, fm: &Frontmatter) -> Fallible<()> {
         let cl_str = if self.front_matter()?.is_some() {
             self.erase_front_matter(false)?
         } else {
@@ -1403,12 +1404,7 @@ mod tests {
             (
                 "crate_b",
                 workspace_mocker.root().join("crates/crate_b/CHANGELOG.md"),
-                vec![
-                    ChangeT::Unreleased,
-                    ChangeT::Release(ReleaseChange::CrateReleaseChange(
-                        "0.0.0-alpha.1".to_string(),
-                    )),
-                ],
+                vec![ChangeT::Unreleased],
             ),
             (
                 "crate_c",
