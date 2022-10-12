@@ -70,7 +70,7 @@ pub trait HolochainP2pDnaT {
         &self,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize>;
@@ -121,7 +121,7 @@ pub trait HolochainP2pDnaT {
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(
         &self,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool>;
 
     /// Messages between agents driving a countersigning session.
@@ -227,7 +227,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         &self,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize> {
@@ -236,7 +236,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 (*self.dna_hash).clone(),
                 request_validation_receipt,
                 countersigning_session,
-                dht_hash,
+                basis_hash,
                 ops,
                 timeout_ms,
             )
@@ -313,7 +313,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(
         &self,
-        dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool> {
         self.sender
             .authority_for_hash((*self.dna_hash).clone(), dht_hash)

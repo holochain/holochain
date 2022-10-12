@@ -4,9 +4,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.167
+
+- Adds `SweetConductorConfig`, which adds a few builder methods for constructing variations of the standard ConductorConfig
+
+## 0.0.166
+
+- Fix restore clone cell by cell id. This used to fail with a “CloneCellNotFound” error. [\#1603](https://github.com/holochain/holochain/pull/1603)
+
+## 0.0.165
+
+- Revert requiring DNA modifiers when registering a DNA. These modifiers were optional before and were made mandatory by accident.
+
+## 0.0.164
+
 - Add App API call to archive an existing clone cell. [\#1578](https://github.com/holochain/holochain/pull/1578)
 - Add Admin API call to restore an archived clone cell. [\#1578](https://github.com/holochain/holochain/pull/1578)
-- Add Admin API call to delete all archived clone cells of an app's role. For example, there is a base cell with role `document` and clones `document.0`, `document.1` etc.; this call deletes all clones permanently that have been archived before. This is not reversable; clones cannot be restored afterwards. [\#1578](https://github.com/holochain/holochain/pull/1578)
+- Add Admin API call to delete all archived clone cells of an app’s role. For example, there is a base cell with role `document` and clones `document.0`, `document.1` etc.; this call deletes all clones permanently that have been archived before. This is not reversable; clones cannot be restored afterwards. [\#1578](https://github.com/holochain/holochain/pull/1578)
 
 ## 0.0.163
 

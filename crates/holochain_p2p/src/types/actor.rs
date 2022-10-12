@@ -243,7 +243,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             request_validation_receipt: bool,
             countersigning_session: bool,
-            dht_hash: holo_hash::AnyDhtHash,
+            basis_hash: holo_hash::OpBasis,
             ops: Vec<holochain_types::dht_op::DhtOp>,
             timeout_ms: Option<u64>,
         ) -> usize;
@@ -291,7 +291,7 @@ ghost_actor::ghost_chan! {
         fn new_integrated_data(dna_hash: DnaHash) -> ();
 
         /// Check if any local agent in this space is an authority for a hash.
-        fn authority_for_hash(dna_hash: DnaHash, dht_hash: AnyDhtHash) -> bool;
+        fn authority_for_hash(dna_hash: DnaHash, basis: OpBasis) -> bool;
 
         /// Messages between agents negotiation a countersigning session.
         fn countersigning_session_negotiation(

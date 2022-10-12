@@ -231,7 +231,7 @@ async fn clone_cell_deletion() {
         .await;
     assert!(zome_call_response.is_err());
 
-    // restore the archived clone cell
+    // restore the archived clone cell by clone id
     let restored_cell = conductor
         .inner_handle()
         .restore_archived_clone_cell(ArchiveCloneCellPayload {
@@ -259,6 +259,31 @@ async fn clone_cell_deletion() {
         .call_fallible(&zome, "call_create_entry", ())
         .await;
     assert!(zome_call_response.is_ok());
+
+    // archive clone cell again
+    conductor
+        .inner_handle()
+        .archive_clone_cell(ArchiveCloneCellPayload {
+            app_id: app_id.to_string(),
+            clone_cell_id: CloneCellId::CloneId(
+                CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
+            ),
+        })
+        .await
+        .unwrap();
+
+    // restore clone cell by cell id
+    let restored_cell = conductor
+        .inner_handle()
+        .restore_archived_clone_cell(ArchiveCloneCellPayload {
+            app_id: app_id.into(),
+            clone_cell_id: CloneCellId::CellId(installed_clone_cell.as_id().clone()),
+        })
+        .await
+        .unwrap();
+
+    // assert the restored clone cell is the previously created clone cell
+    assert_eq!(restored_cell, installed_clone_cell);
 
     // archive and delete clone cell
     conductor

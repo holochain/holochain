@@ -146,6 +146,7 @@ pub mod tests {
     use holochain_state::prelude::test_dht_db;
     use holochain_state::prelude::SourceChain;
     use holochain_types::db_cache::DhtDbQueryCache;
+    use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fake_agent_pubkey_1;
@@ -303,8 +304,11 @@ pub mod tests {
             ))?;
             Ok(InitCallbackResult::Fail("reason".into()))
         });
-        let zomes =
-            crate::conductor::conductor::tests::simple_create_entry_zome().merge(zome_fail.0);
+        let zomes = InlineZomeSet::from((
+            "create_entry",
+            crate::conductor::conductor::tests::simple_create_entry_zome(),
+        ))
+        .merge(zome_fail.0);
 
         let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await.unwrap();
 

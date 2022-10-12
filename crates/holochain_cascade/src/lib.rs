@@ -842,7 +842,7 @@ where
         key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<Link>> {
-        let authority = self.am_i_an_authority(key.base.clone().into()).await?;
+        let authority = self.am_i_an_authority(key.base.clone()).await?;
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
@@ -859,7 +859,7 @@ where
         key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
-        let authority = self.am_i_an_authority(key.base.clone().into()).await?;
+        let authority = self.am_i_an_authority(key.base.clone()).await?;
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
@@ -1057,7 +1057,7 @@ where
         Ok(scratch.apply_and_then(|scratch| scratch.contains_hash(hash))?)
     }
 
-    async fn am_i_an_authority(&mut self, hash: AnyDhtHash) -> CascadeResult<bool> {
+    async fn am_i_an_authority(&mut self, hash: OpBasis) -> CascadeResult<bool> {
         let network = some_or_return!(self.network.as_mut(), false);
 
         Ok(network.authority_for_hash(hash).await?)

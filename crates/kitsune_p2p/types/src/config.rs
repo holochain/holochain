@@ -226,6 +226,13 @@ pub mod tuning_params_struct {
 
         /// Don't publish ops, only rely on gossip. Useful for testing the efficacy of gossip.
         disable_publish: bool = false,
+
+        /// Disable recent gossip. Useful for testing Historical gossip in isolation.
+        disable_recent_gossip: bool = false,
+
+        /// Disable historical gossip. Useful for testing Recent gossip in isolation.
+        disable_historical_gossip: bool = false,
+
     }
 
     impl KitsuneP2pTuningParams {

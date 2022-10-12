@@ -1,4 +1,4 @@
-use super::{standard_config, SweetAgents, SweetAppBatch, SweetConductor};
+use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
 use futures::future;
 use hdk::prelude::*;
@@ -9,22 +9,25 @@ pub struct SweetConductorBatch(Vec<SweetConductor>);
 
 impl SweetConductorBatch {
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
-    pub async fn from_configs<I: IntoIterator<Item = ConductorConfig>>(
+    pub async fn from_configs<C: Into<ConductorConfig>, I: IntoIterator<Item = C>>(
         configs: I,
     ) -> SweetConductorBatch {
-        future::join_all(configs.into_iter().map(SweetConductor::from_config))
+        future::join_all(configs.into_iter().map(SweetConductor::from_config::<C>))
             .await
             .into()
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_config(num: usize, config: ConductorConfig) -> SweetConductorBatch {
+    pub async fn from_config<C: Clone + Into<ConductorConfig>>(
+        num: usize,
+        config: C,
+    ) -> SweetConductorBatch {
         Self::from_configs(std::iter::repeat(config).take(num)).await
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
     pub async fn from_standard_config(num: usize) -> SweetConductorBatch {
-        Self::from_configs(std::iter::repeat_with(standard_config).take(num)).await
+        Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num)).await
     }
 
     /// Iterate over the SweetConductors
@@ -42,9 +45,14 @@ impl SweetConductorBatch {
         self.0
     }
 
-    /// Get on inner.
+    /// Get the conductor at an index.
     pub fn get(&self, i: usize) -> Option<&SweetConductor> {
         self.0.get(i)
+    }
+
+    /// Add an existing conductor to this batch
+    pub fn add_conductor(&mut self, c: SweetConductor) {
+        self.0.push(c);
     }
 
     /// Opinionated app setup.

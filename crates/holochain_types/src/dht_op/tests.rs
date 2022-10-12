@@ -19,6 +19,8 @@ use holochain_zome_types::Entry;
 use observability;
 use tracing::*;
 
+use super::OpBasis;
+
 struct RecordTest {
     entry_type: EntryType,
     entry_hash: EntryHash,
@@ -239,7 +241,7 @@ async fn test_all_ops() {
 async fn test_dht_basis() {
     // Create an action that points to an entry
     let original_action = fixt!(Create);
-    let expected_entry_hash: AnyDhtHash = original_action.entry_hash.clone().into();
+    let expected_entry_hash: OpBasis = original_action.entry_hash.clone().into();
 
     let original_action_hash =
         ActionHashed::from_content_sync(Action::Create(original_action.clone()));
@@ -367,21 +369,27 @@ fn test_all_ops_basis() {
         let ops = produce_ops_from_record(&record).unwrap();
         let check_basis = |op: DhtOp| match (op.get_type(), op.dht_basis()) {
             (DhtOpType::StoreRecord, basis) => {
-                assert_eq!(basis, AnyDhtHash::from(record.action_address().clone()))
+                assert_eq!(
+                    basis,
+                    AnyLinkableHash::from(record.action_address().clone())
+                )
             }
             (DhtOpType::StoreEntry, basis) => {
                 assert_eq!(
                     basis,
-                    AnyDhtHash::from(record.action().entry_hash().unwrap().clone())
+                    AnyLinkableHash::from(record.action().entry_hash().unwrap().clone())
                 )
             }
             (DhtOpType::RegisterAgentActivity, basis) => {
-                assert_eq!(basis, AnyDhtHash::from(record.action().author().clone()))
+                assert_eq!(
+                    basis,
+                    AnyLinkableHash::from(record.action().author().clone())
+                )
             }
             (DhtOpType::RegisterUpdatedContent, basis) => {
                 assert_eq!(
                     basis,
-                    AnyDhtHash::from(
+                    AnyLinkableHash::from(
                         Update::try_from(record.action().clone())
                             .unwrap()
                             .original_entry_address
@@ -392,7 +400,7 @@ fn test_all_ops_basis() {
             (DhtOpType::RegisterUpdatedRecord, basis) => {
                 assert_eq!(
                     basis,
-                    AnyDhtHash::from(
+                    AnyLinkableHash::from(
                         Update::try_from(record.action().clone())
                             .unwrap()
                             .original_action_address
@@ -403,7 +411,7 @@ fn test_all_ops_basis() {
             (DhtOpType::RegisterDeletedBy, basis) => {
                 assert_eq!(
                     basis,
-                    AnyDhtHash::from(
+                    AnyLinkableHash::from(
                         Delete::try_from(record.action().clone())
                             .unwrap()
                             .deletes_address
@@ -414,7 +422,7 @@ fn test_all_ops_basis() {
             (DhtOpType::RegisterDeletedEntryAction, basis) => {
                 assert_eq!(
                     basis,
-                    AnyDhtHash::from(
+                    AnyLinkableHash::from(
                         Delete::try_from(record.action().clone())
                             .unwrap()
                             .deletes_entry_address
@@ -425,7 +433,7 @@ fn test_all_ops_basis() {
             (DhtOpType::RegisterAddLink, basis) => {
                 assert_eq!(
                     basis,
-                    AnyDhtHash::from(
+                    AnyLinkableHash::from(
                         CreateLink::try_from(record.action().clone())
                             .unwrap()
                             .base_address
@@ -436,7 +444,7 @@ fn test_all_ops_basis() {
             (DhtOpType::RegisterRemoveLink, basis) => {
                 assert_eq!(
                     basis,
-                    AnyDhtHash::from(
+                    AnyLinkableHash::from(
                         DeleteLink::try_from(record.action().clone())
                             .unwrap()
                             .base_address
