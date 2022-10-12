@@ -35,10 +35,10 @@ impl DnaBundle {
     }
 
     /// Convert to a DnaFile, and return what the hash of the Dna *would* have
-    /// been without the provided phenotype overrides
-    pub async fn into_dna_file(self, phenotype: DnaPhenotypeOpt) -> DnaResult<(DnaFile, DnaHash)> {
+    /// been without the provided modifier overrides
+    pub async fn into_dna_file(self, modifiers: DnaModifiersOpt) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
-        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, phenotype)?;
+        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, modifiers)?;
 
         Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
     }
@@ -112,13 +112,13 @@ impl DnaBundle {
         &self,
         integrity_zomes: IntegrityZomes,
         coordinator_zomes: CoordinatorZomes,
-        phenotype: DnaPhenotypeOpt,
+        modifiers: DnaModifiersOpt,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
                 let dna_def = DnaDef {
                     name: manifest.name.clone(),
-                    phenotype: DnaPhenotype {
+                    modifiers: DnaModifiers {
                         network_seed: manifest.integrity.network_seed.clone().unwrap_or_default(),
                         properties: SerializedBytes::try_from(
                             manifest.integrity.properties.clone().unwrap_or_default(),
@@ -130,7 +130,7 @@ impl DnaBundle {
                 };
 
                 let original_hash = DnaHash::with_data_sync(&dna_def);
-                let ddh = DnaDefHashed::from_content_sync(dna_def.modify_phenotype(phenotype));
+                let ddh = DnaDefHashed::from_content_sync(dna_def.update_modifiers(modifiers));
                 Ok((ddh, original_hash))
             }
         }
@@ -199,14 +199,14 @@ impl DnaBundle {
         Ok(DnaManifestCurrent {
             name: dna_def.name,
             integrity: IntegrityManifest {
-                network_seed: Some(dna_def.phenotype.network_seed),
-                properties: Some(dna_def.phenotype.properties.try_into().map_err(|e| {
+                network_seed: Some(dna_def.modifiers.network_seed),
+                properties: Some(dna_def.modifiers.properties.try_into().map_err(|e| {
                     DnaError::DnaFileToBundleConversionError(format!(
                         "DnaDef properties were not YAML-deserializable: {}",
                         e
                     ))
                 })?),
-                origin_time: dna_def.phenotype.origin_time.into(),
+                origin_time: dna_def.modifiers.origin_time.into(),
                 zomes: integrity,
             },
             coordinator: CoordinatorManifest { zomes: coordinator },
@@ -295,7 +295,7 @@ mod tests {
         .unwrap()
         .into();
         matches::assert_matches!(
-            bad_bundle.into_dna_file(DnaPhenotypeOpt::none()).await,
+            bad_bundle.into_dna_file(DnaModifiersOpt::none()).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
             if h1 == hash1 && h2 == hash2
         );
@@ -309,7 +309,7 @@ mod tests {
         .unwrap()
         .into();
         let dna_file: DnaFile = bundle
-            .into_dna_file(DnaPhenotypeOpt::none())
+            .into_dna_file(DnaModifiersOpt::none())
             .await
             .unwrap()
             .0;
@@ -324,7 +324,7 @@ mod tests {
                 .into();
         let dna_file: DnaFile = bundle
             .into_dna_file(
-                DnaPhenotypeOpt::none()
+                DnaModifiersOpt::none()
                     .with_network_seed("network_seed".into())
                     .with_properties(properties.clone())
                     .serialized()
@@ -334,11 +334,11 @@ mod tests {
             .unwrap()
             .0;
         assert_eq!(
-            dna_file.dna.phenotype.network_seed,
+            dna_file.dna.modifiers.network_seed,
             "network_seed".to_string()
         );
         assert_eq!(
-            dna_file.dna.phenotype.properties,
+            dna_file.dna.modifiers.properties,
             SerializedBytes::try_from(properties).unwrap()
         );
     }

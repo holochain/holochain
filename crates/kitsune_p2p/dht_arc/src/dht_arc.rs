@@ -212,11 +212,6 @@ impl<T> DhtArcRange<T> {
             Self::Bounded(lo, hi) => DhtArcRange::Bounded(f(lo), f(hi)),
         }
     }
-
-    #[deprecated = "left over from refactor"]
-    pub fn interval(self) -> Self {
-        self
-    }
 }
 
 impl<T: num_traits::AsPrimitive<u32>> DhtArcRange<T> {

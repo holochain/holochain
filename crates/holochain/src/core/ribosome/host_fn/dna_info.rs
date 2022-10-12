@@ -20,7 +20,7 @@ pub fn dna_info(
         } => Ok(DnaInfo {
             name: ribosome.dna_def().name.clone(),
             hash: ribosome.dna_def().as_hash().clone(),
-            properties: ribosome.dna_def().phenotype.properties.clone(),
+            properties: ribosome.dna_def().modifiers.properties.clone(),
             zome_names: ribosome
                 .dna_def()
                 .integrity_zomes

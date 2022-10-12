@@ -59,7 +59,7 @@ impl From<CounterSigningError> for SysValidationError {
     }
 }
 
-#[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
+// #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
 
 /// Return either:
@@ -164,8 +164,8 @@ pub enum PrevActionError {
     InvalidSeq(u32, u32),
     #[error("Previous action was missing from the metadata store")]
     MissingMeta(ActionHash),
-    #[error("Action is not Dna so needs previous action")]
+    #[error("Action is not the first, so needs previous action")]
     MissingPrev,
-    #[error("The previous action's timestamp is not before the current action's timestamp")]
-    Timestamp,
+    #[error("The previous action's timestamp is not before the current action's timestamp: {0:?} >= {1:?}")]
+    Timestamp(Timestamp, Timestamp),
 }

@@ -334,7 +334,7 @@ async fn test_signing_error_during_genesis() {
     };
 
     if let ConductorApiError::ConductorError(inner) = err {
-        assert_matches!(*inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+        assert_matches!(inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
     } else {
         panic!("this should have been an error too");
     }
@@ -552,7 +552,7 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
     };
 
     if let ConductorApiError::ConductorError(inner) = err {
-        assert_matches!(*inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+        assert_matches!(inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
     } else {
         panic!("this should have been an error too");
     }

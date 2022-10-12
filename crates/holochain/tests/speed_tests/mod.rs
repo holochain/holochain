@@ -15,8 +15,6 @@
 //! hard to automate piping from tests stderr.
 //!
 
-#![allow(deprecated)]
-
 use std::sync::Arc;
 
 use ::fixt::prelude::*;
@@ -125,7 +123,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "need_for_speed_test".to_string(),
-            phenotype: DnaPhenotype {
+            modifiers: DnaModifiers {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,

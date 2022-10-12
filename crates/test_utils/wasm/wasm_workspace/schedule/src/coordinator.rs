@@ -60,9 +60,16 @@ fn cron_scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
 }
 
 #[hdk_extern]
-fn schedule(_: ()) -> ExternResult<()> {
-    hdk::prelude::schedule("scheduled_fn")?;
+fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    // hdk::prelude::schedule("scheduled_fn")?;
     hdk::prelude::schedule("cron_scheduled_fn")?;
+    Ok(InitCallbackResult::Pass)
+}
+
+#[hdk_extern]
+fn schedule(_: ()) -> ExternResult<()> {
+    // hdk::prelude::schedule("scheduled_fn")?;
+    // hdk::prelude::schedule("cron_scheduled_fn")?;
     Ok(())
 }
 

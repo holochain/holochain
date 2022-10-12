@@ -189,7 +189,7 @@ pub async fn check_valid_if_dna(
         Action::Dna(_) => {
             if !workspace.is_chain_empty(action.author()).await? {
                 Err(PrevActionError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-            } else if action.timestamp() < workspace.dna_def().phenotype.origin_time {
+            } else if action.timestamp() < workspace.dna_def().modifiers.origin_time {
                 // If the Dna timestamp is ahead of the origin time, every other action
                 // will be inductively so also due to the prev_action check
                 Err(PrevActionError::InvalidRootOriginTime)
@@ -233,10 +233,12 @@ pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
 
 /// Check previous action timestamp is before this action
 pub fn check_prev_timestamp(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
-    if action.timestamp() > prev_action.timestamp() {
+    let t1 = prev_action.timestamp();
+    let t2 = action.timestamp();
+    if t2 > t1 {
         Ok(())
     } else {
-        Err(PrevActionError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
+        Err(PrevActionError::Timestamp(t1, t2)).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 

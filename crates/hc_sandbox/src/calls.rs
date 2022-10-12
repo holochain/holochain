@@ -17,7 +17,7 @@ use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
-use holochain_types::prelude::DnaPhenotypeOpt;
+use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::RegisterDnaPayload;
@@ -439,7 +439,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         _ => unreachable!("Can't have hash and path for dna source"),
     };
     let dna = RegisterDnaPayload {
-        phenotype: DnaPhenotypeOpt {
+        modifiers: DnaModifiersOpt {
             properties,
             network_seed,
             origin_time,
@@ -579,8 +579,8 @@ pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
 
 /// Calls [`AdminRequest::ListActiveApps`].
 pub async fn list_running_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
-    let resp = cmd.command(AdminRequest::ListActiveApps).await?;
-    Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
+    let resp = cmd.command(AdminRequest::ListEnabledApps).await?;
+    Ok(expect_match!(resp => AdminResponse::EnabledAppsListed, "Failed to list active apps"))
 }
 
 /// Calls [`AdminRequest::ListApps`].
