@@ -2823,7 +2823,8 @@ mod builder {
     }
 }
 
-#[instrument(skip(p2p_evt, handle))]
+// This attr causes the compiler to overflow its recursion limit!
+// #[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
     p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
