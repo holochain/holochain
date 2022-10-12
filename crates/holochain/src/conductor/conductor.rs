@@ -30,6 +30,7 @@
 //!
 
 pub use self::share::RwShare;
+use super::api::CellConductorHandle;
 use super::api::RealAppInterfaceApi;
 use super::api::ZomeCall;
 use super::config::AdminInterfaceConfig;
@@ -153,18 +154,12 @@ pub enum CellStatus {
 pub type CellStatusFilter = CellStatus;
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
-struct CellItem<CA>
-where
-    CA: CellConductorApiT,
-{
-    cell: Arc<Cell<CA>>,
+struct CellItem {
+    cell: Arc<Cell>,
     status: CellStatus,
 }
 
-impl<CA> CellItem<CA>
-where
-    CA: CellConductorApiT,
-{
+impl CellItem {
     pub fn is_running(&self) -> bool {
         self.status == CellStatus::Joined
     }
@@ -178,12 +173,9 @@ pub(crate) type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
 pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
 /// A Conductor is a group of [Cell]s
-pub struct Conductor<CA = CellConductorApi>
-where
-    CA: CellConductorApiT,
-{
+pub struct Conductor {
     /// The collection of cells associated with this Conductor
-    cells: RwShare<HashMap<CellId, CellItem<CA>>>,
+    cells: RwShare<HashMap<CellId, CellItem>>,
 
     /// The config used to create this Conductor
     pub config: ConductorConfig,
@@ -2635,7 +2627,7 @@ fn query_dht_ops_from_statement(
     Ok(r)
 }
 
-#[instrument(skip(p2p_evt, handle))]
+// #[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
     p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
