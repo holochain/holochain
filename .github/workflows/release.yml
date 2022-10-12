@@ -162,7 +162,6 @@ jobs:
       HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
 
   test:
-    if: ${{ github.event_name != 'pull_request' }}
     needs: [vars, prepare]
     env:
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
@@ -172,18 +171,17 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - self-hosted
-          - macos-latest
+          - arch: linux-x86_64
+            runs-on: self-hosted
+          - arch: macos-x86_64
+            runs-on: macos-latest
         testCommand:
           - name: cargo-test-standard
             restoresCargoCache: true
             savesCargoCache: true
-            ignoreErrorOnNonUbuntu: true
             maxBuildSpace: true
             timeout_minutes: 30
-            max_attempts:
-              self-hosted: 2
-              macos-latest: 2
+            max_attempts: 2
             run: |
               nix-shell \
                 --pure \
@@ -195,11 +193,8 @@ jobs:
           - name: cargo-test-static
             restoresCargoCache: true
             savesCargoCache: true
-            ignoreErrorOnNonUbuntu: false
             timeout_minutes: 5
-            max_attempts:
-              self-hosted: 1
-              macos-latest: 1
+            max_attempts: 1
             run: |
               nix-shell \
                 --pure \
@@ -210,11 +205,8 @@ jobs:
           - name: cargo-test-wasm
             restoresCargoCache: true
             savesCargoCache: true
-            ignoreErrorOnNonUbuntu: false
             timeout_minutes: 5
-            max_attempts:
-              self-hosted: 6
-              macos-latest: 1
+            max_attempts: 6
             run: |
               nix-shell \
                 --pure \
@@ -225,11 +217,8 @@ jobs:
           - name: nix-test
             restoresCargoCache: false
             savesCargoCache: false
-            ignoreErrorOnNonUbuntu: false
             timeout_minutes: 90
-            max_attempts:
-              self-hosted: 1
-              macos-latest: 1
+            max_attempts: 1
             run: |
               set -x
 
@@ -288,26 +277,36 @@ jobs:
                   hn-test
                 '
         exclude:
+          # dont run tests on pull request
           - event_name: pull_request
-            platform: macos-latest
-          - event_name: pull_request
+
+          # exclude all cargo test jobs on macos
+          - platform:
+              arch: macos-x86_64
             testCommand:
-              name: nix-test
+              name: cargo-test-standard
+          - platform:
+              arch: macos-x86_64
+            testCommand:
+              name: cargo-test-wasm
+          - platform:
+              arch: macos-x86_64
+            testCommand:
+              name: cargo-test-static
         event_name:
           - ${{ github.event_name }}
-    runs-on: ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform.runs-on }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Extend space
         uses: ./.github/actions/extend-space
-        if: ${{ matrix.platform == 'ubuntu-latest' && matrix.testCommand.maxBuildSpace == true && needs.vars.outputs.skip_test != 'true' }}
+        if: ${{ matrix.platform.runs-on == 'ubuntu-latest' && matrix.testCommand.maxBuildSpace == true && needs.vars.outputs.skip_test != 'true' }}
 
       - name: Install nix
         uses: cachix/install-nix-action@v17
       - name: Setup cachix
         uses: cachix/cachix-action@v11
-        continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           name: holochain-ci
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
@@ -317,7 +316,6 @@ jobs:
               --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
               --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
           pushFilter: "(rust-overlay|bqfq4db6nwycmkdrql9igsbrayqsw3g2)"
-          # skipPush: ${{ matrix.platform == 'macos-latest' }}
       - name: Set NIX_PATH (FIXME)
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
@@ -349,7 +347,7 @@ jobs:
             ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
             ${{ runner.os }}-prepare-${{ github.run_id }}
             ${{ runner.os }}-prepare
-          required: ${{ matrix.platform == 'self-hosted' }}
+          required: ${{ matrix.platform.arch == 'linux-x86_64' }}
 
       - name: Set cache timestamp
         if: ${{ matrix.testCommand.savesCargoCache == true }}
@@ -377,7 +375,6 @@ jobs:
           nix-shell --pure --run "cargo fetch --locked"
 
           ${{ matrix.testCommand.run }}
-        continue-on-error: ${{ matrix.platform != 'self-hosted' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
         timeout-minutes: 720
 
       - name: ${{ matrix.testCommand.name }} (run)
@@ -388,14 +385,13 @@ jobs:
           HOLONIX_SOURCE_BRANCH: ${{ needs.vars.outputs.holonix_source_branch }}
         with:
           timeout_minutes: ${{ matrix.testCommand.timeout_minutes }}
-          max_attempts: ${{ matrix.testCommand.max_attempts[matrix.platform] }}
+          max_attempts: ${{ matrix.testCommand.max_attempts }}
           command: |
             set -e
             source "${HOLOCHAIN_RELEASE_SH}"
             cd "${HOLOCHAIN_REPO}"
 
             ${{ matrix.testCommand.run }}
-        continue-on-error: ${{ matrix.platform != 'self-hosted' && matrix.testCommand.ignoreErrorOnNonUbuntu == true }}
 
       - name: Garbage-collect cache
         if: ${{ always() && matrix.testCommand.savesCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
