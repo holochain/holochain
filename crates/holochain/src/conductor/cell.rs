@@ -11,7 +11,6 @@ use super::manager::ManagedTaskAdd;
 use super::space::Space;
 use super::ConductorHandle;
 use crate::conductor::api::CellConductorApi;
-use crate::conductor::api::CellConductorApiT;
 use crate::conductor::cell::error::CellResult;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
