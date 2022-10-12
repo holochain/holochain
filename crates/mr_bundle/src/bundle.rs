@@ -204,7 +204,7 @@ where
 
 /// A manifest bundled together, optionally, with the Resources that it describes.
 /// The manifest may be of any format. This is useful for deserializing a bundle of
-/// an outdated format, so that it may be modified to fit the a supported format.
+/// an outdated format, so that it may be modified to fit the supported format.
 #[derive(Debug, PartialEq, Eq, Deserialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct RawBundle<M> {
