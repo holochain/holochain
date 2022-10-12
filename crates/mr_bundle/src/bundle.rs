@@ -202,6 +202,29 @@ where
     }
 }
 
+/// A manifest bundled together, optionally, with the Resources that it describes.
+/// The manifest may be of any format. This is useful for deserializing a bundle of
+/// an outdated format, so that it may be modified to fit the supported format.
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct RawBundle<M> {
+    /// The manifest describing the resources that compose this bundle.
+    #[serde(bound(deserialize = "M: DeserializeOwned"))]
+    pub manifest: M,
+
+    /// The full or partial resource data. Each entry must correspond to one
+    /// of the Bundled Locations specified by the Manifest. Bundled Locations
+    /// are always relative paths (relative to the root_dir).
+    pub resources: ResourceMap,
+}
+
+impl<M: serde::de::DeserializeOwned> RawBundle<M> {
+    /// Load a Bundle into memory from a file
+    pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
+        crate::decode(&ffs::read(path).await?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::error::MrBundleError;
