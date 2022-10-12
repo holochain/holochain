@@ -305,17 +305,8 @@ jobs:
 
       - name: Install nix
         uses: cachix/install-nix-action@v17
-      - name: Use cachix
-        id: cachix_use
-        continue-on-error: true
-        env:
-          CACHIX_AUTH_TOKEN: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-          CACHIX_SIGNING_KEY: "${{ secrets.CACHIX_SIGNING_KEY }}"
-        run: |
-          cachix use holochain-ci
       - name: Setup cachix
         uses: cachix/cachix-action@v11
-        if: ${{ steps.cachix_use.outcome != 'success'  }}
         continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           name: holochain-ci
