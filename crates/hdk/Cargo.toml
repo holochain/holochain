@@ -10,10 +10,6 @@ keywords = [ "holochain", "holo", "hdk" ]
 categories = [ "cryptography" ]
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-path = "src/lib.rs"
-
 [features]
 default = []
 mock = ["hdk_derive/mock", "mockall"]

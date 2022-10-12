@@ -10,10 +10,6 @@ keywords = ["holochain", "holo", "integrity"]
 categories = ["cryptography"]
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-path = "src/lib.rs"
-
 [features]
 default = []
 trace = ["tracing", "tracing-core", "holochain_integrity_types/tracing"]
