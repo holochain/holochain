@@ -28,9 +28,12 @@ pub struct CellConductorApi {
     cell_id: CellId,
 }
 
+/// Alias
+pub type CellConductorHandle = Arc<dyn CellConductorApiT + Send + 'static>;
+
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
-pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT>;
+pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT + Send + 'static>;
 
 impl CellConductorApi {
     /// Instantiate from a Conductor reference and a CellId to identify which Cell
@@ -120,7 +123,7 @@ impl CellConductorApiT for CellConductorApi {
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
 #[mockall::automock]
-pub trait CellConductorApiT: Send + Sync + Sized {
+pub trait CellConductorApiT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
 

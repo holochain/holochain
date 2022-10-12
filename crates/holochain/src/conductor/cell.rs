@@ -4,6 +4,7 @@
 //! Records can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
+use super::api::CellConductorHandle;
 use super::api::ZomeCall;
 use super::interface::SignalBroadcaster;
 use super::manager::ManagedTaskAdd;
@@ -36,6 +37,7 @@ use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::ChcImpl;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -92,16 +94,12 @@ impl PartialEq for Cell {
 /// The [`Conductor`](super::Conductor) manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [`CellConductorApi`](super::api::CellConductorApi) or an [`AppInterfaceApi`](super::api::AppInterfaceApi))
-pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pDna>
-where
-    Api: CellConductorApiT,
-    P2pCell: holochain_p2p::HolochainP2pDnaT,
-{
+pub struct Cell {
     id: CellId,
-    conductor_api: Api,
+    conductor_api: CellConductorHandle,
     conductor_handle: ConductorHandle,
     space: Space,
-    holochain_p2p_cell: P2pCell,
+    holochain_p2p_cell: HolochainP2pDna,
     queue_triggers: QueueTriggers,
     init_mutex: tokio::sync::Mutex<()>,
 }
@@ -123,7 +121,7 @@ impl Cell {
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
-        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
+        let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
 
         // check if genesis has been run
         let has_genesis = {
@@ -781,7 +779,7 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    #[instrument(skip(self, call, workspace_lock))]
+    // #[instrument(skip(self, call, workspace_lock))]
     pub async fn call_zome(
         &self,
         call: ZomeCall,

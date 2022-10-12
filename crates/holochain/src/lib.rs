@@ -2,7 +2,7 @@
 
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
-#![recursion_limit = "256"]
+#![recursion_limit = "128"]
 
 #[cfg(feature = "hdk")]
 pub use hdk::HDI_VERSION;

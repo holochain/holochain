@@ -14,6 +14,7 @@ pub mod host_fn;
 pub mod real_ribosome;
 
 use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
 use crate::conductor::interface::SignalBroadcaster;
@@ -389,7 +390,7 @@ impl Invocation for ZomeCallInvocation {
 
 impl ZomeCallInvocation {
     pub async fn try_from_interface_call(
-        conductor_api: CellConductorApi,
+        conductor_api: CellConductorHandle,
         call: ZomeCall,
     ) -> RibosomeResult<Self> {
         use crate::conductor::api::CellConductorApiT;
