@@ -49,6 +49,10 @@ jobs:
               --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
               --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
 
+      - name: Create /var/tmp
+        run: |
+          mkdir -p /var/tmp
+
       - name: Restore the holochain release repository
         uses: steveeJ-forks/actions-cache/restore@main
         with:
@@ -77,17 +81,8 @@ jobs:
             ${{ runner.os }}-prepare
           required: false
 
-      - name: Move cargo related state and build files
-        run: |
-          if [[ -e /var/tmp/holochain_repo/.cargo ]]; then
-            mv -f /var/tmp/holochain_repo/.cargo ./
-          fi
-          if [[ -e /var/tmp/holochain_repo/target ]]; then
-            mv -f /var/tmp/holochain_repo/target/ ./
-          fi
-
-      - name: Set NIX_PATH (FIXME)
-        run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
+      # - name: Set NIX_PATH (FIXME)
+      #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
       - name: debug
         env:
