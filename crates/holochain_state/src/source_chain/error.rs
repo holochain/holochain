@@ -27,6 +27,13 @@ pub enum SourceChainError {
         Option<(ActionHash, u32, Timestamp)>,
     ),
 
+    #[error(
+        "Attempted to commit a bundle to the source chain, but the CHC's head has moved since the bundle began. \
+        The source chain needs to be synced with the CHC before proceeding. \
+        Context: {0}, Original error: {1:?}"
+    )]
+    ChcHeadMoved(String, ChcError),
+
     #[error(transparent)]
     TimestampError(#[from] holochain_zome_types::TimestampError),
 

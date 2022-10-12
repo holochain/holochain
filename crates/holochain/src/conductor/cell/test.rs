@@ -59,6 +59,7 @@ async fn test_cell_handle_publish() {
         dht_db_cache.clone(),
         mock_ribosome,
         None,
+        None,
     )
     .await
     .unwrap();

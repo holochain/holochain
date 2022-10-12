@@ -11,8 +11,10 @@ use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_types::chc::ChcError;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
 use holochain_types::db_cache::DhtDbQueryCache;
@@ -24,6 +26,7 @@ use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::sql::AsSql;
+use holochain_types::EntryHashed;
 use holochain_zome_types::action;
 use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::Action;
@@ -84,13 +87,13 @@ pub type SourceChainRead = SourceChain<DbRead<DbKindAuthored>, DbRead<DbKindDht>
 
 // TODO fix this.  We shouldn't really have nil values but this would
 // show if the database is corrupted and doesn't have a record
-#[derive(Serialize, Debug, Clone, Deserialize)]
+#[derive(Serialize, Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct SourceChainJsonDump {
     pub records: Vec<SourceChainJsonRecord>,
     pub published_ops_count: usize,
 }
 
-#[derive(Serialize, Debug, Clone, Deserialize)]
+#[derive(Serialize, Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct SourceChainJsonRecord {
     pub signature: Signature,
     pub action_address: ActionHash,
@@ -262,6 +265,7 @@ impl SourceChain {
         network: &(dyn HolochainP2pDnaT + Send + Sync),
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
+
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
@@ -274,6 +278,20 @@ impl SourceChain {
             let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
             SourceChainResult::Ok((scheduled_fns, actions, ops, entries))
         })?;
+
+        // Sync with CHC, if CHC is present
+        if let Some(chc) = network.chc() {
+            chc.add_entries(entries.clone())
+                .await
+                .map_err(SourceChainError::other)?;
+            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_actions(actions.clone()).await
+            {
+                return Err(SourceChainError::ChcHeadMoved(
+                    "SourceChain::flush".into(),
+                    err,
+                ));
+            }
+        }
 
         let maybe_countersigned_entry = entries
             .iter()
@@ -305,18 +323,19 @@ impl SourceChain {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
                 }
                 // As at check.
-                let (new_persisted_head, new_head_seq, new_timestamp) =
+                let (latest_head, latest_head_seq, new_timestamp) =
                     chain_head_db_nonempty(txn, author.clone())?;
                 if actions.last().is_none() {
                     // Nothing to write
                     return Ok(Vec::new());
                 }
-                if persisted_head != new_persisted_head {
+
+                if persisted_head != latest_head {
                     return Err(SourceChainError::HeadMoved(
                         actions,
                         entries,
                         Some(persisted_head),
-                        Some((new_persisted_head, new_head_seq, new_timestamp)),
+                        Some((latest_head, latest_head_seq, new_timestamp)),
                     ));
                 }
 
@@ -355,7 +374,7 @@ impl SourceChain {
                 actions,
                 entries,
                 old_head,
-                Some((new_persisted_head, new_head_seq, new_timestamp)),
+                Some((new_persisted_head, latest_head_seq, new_timestamp)),
             )) => {
                 let is_relaxed =
                     self.scratch
@@ -378,7 +397,7 @@ impl SourceChain {
                         &keystore,
                         actions,
                         new_persisted_head,
-                        new_head_seq,
+                        latest_head_seq,
                         new_timestamp,
                     )
                     .await?;
@@ -396,7 +415,7 @@ impl SourceChain {
                         actions,
                         entries,
                         old_head,
-                        Some((new_persisted_head, new_head_seq, new_timestamp)),
+                        Some((new_persisted_head, latest_head_seq, new_timestamp)),
                     ))
                 }
             }
@@ -563,6 +582,10 @@ where
         })?)
     }
 
+    // FIXME: the SourceChain was originally designed to only be initializable if genesis has been run,
+    //   i.e. it can't be empty. However, now we have a `raw_empty` function which initializes an empty
+    //   chain with a persisted_seq of 0, which is wrong. That will lead to a len() of 1 even for an empty
+    //   chain. This needs to be fixed.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> SourceChainResult<u32> {
         Ok(self.scratch.apply(|scratch| {
@@ -965,6 +988,7 @@ async fn rebase_actions_on(
     Ok(actions)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
@@ -973,6 +997,7 @@ pub async fn genesis(
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
+    chc: Option<ChcImpl>,
 ) -> SourceChainResult<()> {
     let dna_action = Action::Dna(action::Dna {
         author: agent_pubkey.clone(),
@@ -1015,12 +1040,33 @@ pub async fn genesis(
     });
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
-    let record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey)));
+    let record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
     let agent_ops = produce_op_lights_from_records(vec![&record])?;
     let (agent_action, agent_entry) = record.into_inner();
     let agent_entry = agent_entry.into_option();
 
     let mut ops_to_integrate = Vec::new();
+
+    if let Some(chc) = chc {
+        chc.add_entries(vec![EntryHashed::from_content_sync(Entry::Agent(
+            agent_pubkey,
+        ))])
+        .await
+        .map_err(SourceChainError::other)?;
+        match chc
+            .add_actions(vec![
+                dna_action.clone(),
+                agent_validation_action.clone(),
+                agent_action.clone(),
+            ])
+            .await
+        {
+            Err(e @ ChcError::InvalidChain(_, _)) => {
+                Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
+            }
+            e => e.map_err(SourceChainError::other),
+        }?;
+    }
 
     let ops_to_integrate = authored
         .async_commit(move |txn| {
@@ -1285,6 +1331,7 @@ pub mod tests {
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
 
         source_chain::genesis(
@@ -1294,6 +1341,7 @@ pub mod tests {
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
+            None,
             None,
         )
         .await
@@ -1373,6 +1421,7 @@ pub mod tests {
 
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
 
         source_chain::genesis(
@@ -1382,6 +1431,7 @@ pub mod tests {
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
+            None,
             None,
         )
         .await
@@ -1507,6 +1557,7 @@ pub mod tests {
         let access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -1524,6 +1575,7 @@ pub mod tests {
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
+            None,
             None,
         )
         .await
@@ -1792,6 +1844,7 @@ pub mod tests {
         let vault = test_db.to_db();
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
@@ -1805,6 +1858,7 @@ pub mod tests {
             keystore.clone(),
             fixt!(DnaHash),
             (*author).clone(),
+            None,
             None,
         )
         .await
@@ -1889,6 +1943,7 @@ pub mod tests {
             fixt!(DnaHash),
             author.clone(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1930,6 +1985,7 @@ pub mod tests {
             dna_hash.clone(),
             alice.clone(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1941,6 +1997,7 @@ pub mod tests {
             keystore.clone(),
             dna_hash.clone(),
             bob.clone(),
+            None,
             None,
         )
         .await
@@ -2052,6 +2109,7 @@ pub mod tests {
             keystore.clone(),
             dna_hash.clone(),
             alice.clone(),
+            None,
             None,
         )
         .await

@@ -48,6 +48,8 @@ async fn conductors_call_remote(num_conductors: usize) {
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 
     let iter = cells.into_iter().zip(conductors.into_inner().into_iter());
+    let keep = std::sync::Mutex::new(Vec::new());
+    let keep = &keep;
     futures::stream::iter(iter)
         .for_each_concurrent(20, |(cell, conductor)| {
             let agents = agents.clone();
@@ -64,9 +66,11 @@ async fn conductors_call_remote(num_conductors: usize) {
                         )
                         .await;
                 }
+                keep.lock().unwrap().push(conductor);
             }
         })
         .await;
+    drop(keep);
 }
 
 #[test_case(2, 1, 1)]
@@ -456,7 +460,7 @@ async fn setup(
     let dna_file = DnaFile::new(
         DnaDef {
             name: "conductor_test".to_string(),
-            phenotype: DnaPhenotype {
+            modifiers: DnaModifiers {
                 network_seed,
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,

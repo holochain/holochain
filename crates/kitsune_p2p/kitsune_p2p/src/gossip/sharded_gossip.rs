@@ -273,19 +273,53 @@ impl ShardedGossip {
 
     async fn process_incoming_outgoing(&self) -> KitsuneResult<()> {
         let (incoming, outgoing) = self.pop_queues()?;
+        let gossip_type_char = match self.gossip.gossip_type {
+            GossipType::Recent => 'R',
+            GossipType::Historical => 'H',
+        };
 
-        if outgoing.is_some() {
+        if let Some(msg) = outgoing.as_ref() {
             tracing::debug!(
-                "OUTGOING GOSSIP {:?} {:#?}",
-                self.ep_hnd.uniq(),
-                outgoing.as_ref().map(|o| (&o.1, &o.2)),
+                "OUTGOING GOSSIP [{}]  => {:16} ({:10}) : {:?} -> {:?} [{}]",
+                gossip_type_char,
+                msg.2
+                    .variant_type()
+                    .to_string()
+                    .replace("ShardedGossipWire::", ""),
+                msg.2.encode_vec().expect("can't encode msg").len(),
+                self.ep_hnd.local_cert(),
+                &msg.0,
+                self.gossip
+                    .inner
+                    .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))
+                    .unwrap(),
             );
+            tracing::debug!("url + message: {:?} {:#?}", &msg.1, &msg.2);
         }
 
         if let Some((con, remote_url, msg, bytes)) = incoming {
             self.bandwidth.incoming_bytes(bytes).await;
+            let variant_type = msg
+                .variant_type()
+                .to_string()
+                .replace("ShardedGossipWire::", "");
+            let len = msg.encode_vec().expect("can't encode msg").len();
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
-                Ok(r) => r,
+                Ok(r) => {
+                    tracing::debug!(
+                        "INCOMING GOSSIP [{}] <=  {:16} ({:10}) : {:?} -> {:?} [{}]",
+                        gossip_type_char,
+                        variant_type,
+                        len,
+                        con.peer_cert(),
+                        self.ep_hnd.local_cert(),
+                        self.gossip
+                            .inner
+                            .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))
+                            .unwrap(),
+                    );
+                    r
+                }
                 Err(e) => {
                     tracing::error!("FAILED to process incoming gossip {:?}", e);
                     self.gossip.remove_state(&con.peer_cert(), true)?;
@@ -1028,7 +1062,7 @@ pub enum MissingOpsStatus {
 }
 
 kitsune_p2p_types::write_codec_enum! {
-    /// SimpleBloom Gossip Wire Protocol Codec
+    /// ShardedGossip Wire Protocol Codec
     codec ShardedGossipWire {
         /// Initiate a round of gossip with a remote node
         Initiate(0x10) {

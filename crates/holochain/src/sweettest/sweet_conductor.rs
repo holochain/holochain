@@ -1,19 +1,19 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
+use super::{
+    SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig, SweetConductorHandle,
+};
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
     handle::ConductorHandle, space::Spaces, CellError, Conductor, ConductorBuilder,
 };
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
-use kitsune_p2p::KitsuneP2pConfig;
 use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -40,26 +40,7 @@ pub struct SweetConductor {
 
 /// Standard config for SweetConductors
 pub fn standard_config() -> ConductorConfig {
-    let mut tuning_params =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    // note, even with this tuning param, the `SSLKEYLOGFILE` env var
-    // still must be set in order to enable session keylogging
-    tuning_params.danger_tls_keylog = "env_keylog".to_string();
-    let mut network = KitsuneP2pConfig::default();
-    network.tuning_params = Arc::new(tuning_params);
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    let admin_interface = AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port: 0 },
-    };
-    ConductorConfig {
-        network: Some(network),
-        admin_interfaces: Some(vec![admin_interface]),
-        ..Default::default()
-    }
+    SweetConductorConfig::standard().into()
 }
 
 /// A DnaFile with a role name assigned
@@ -129,7 +110,8 @@ impl SweetConductor {
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config(config: ConductorConfig) -> SweetConductor {
+    pub async fn from_config<C: Into<ConductorConfig>>(config: C) -> SweetConductor {
+        let config = config.into();
         let dir = test_db_dir();
         let handle = Self::handle_from_existing(dir.path(), test_keystore(), &config, &[]).await;
         Self::new(handle, dir, config).await
@@ -259,19 +241,24 @@ impl SweetConductor {
             // Initialize per-space databases
             let _space = self.spaces.get_or_create_space(&dna_hash)?;
 
-            // Create the SweetCell
-            let cell_authored_db = self.handle().0.get_authored_db(&dna_hash)?;
-            let cell_dht_db = self.handle().0.get_dht_db(&dna_hash)?;
-            let cell_id = CellId::new(dna_hash, agent.clone());
-            let cell = SweetCell {
-                cell_id,
-                cell_authored_db,
-                cell_dht_db,
-            };
-            sweet_cells.push(cell);
+            // Create and add the SweetCell
+            sweet_cells.push(self.get_sweet_cell(CellId::new(dna_hash, agent.clone()))?);
         }
 
         Ok(SweetApp::new(installed_app_id.into(), sweet_cells))
+    }
+
+    /// Construct a SweetCell for a cell which has already been created
+    pub fn get_sweet_cell(&self, cell_id: CellId) -> ConductorApiResult<SweetCell> {
+        let (dna_hash, agent) = cell_id.into_dna_and_agent();
+        let cell_authored_db = self.handle().0.get_authored_db(&dna_hash)?;
+        let cell_dht_db = self.handle().0.get_dht_db(&dna_hash)?;
+        let cell_id = CellId::new(dna_hash, agent);
+        Ok(SweetCell {
+            cell_id,
+            cell_authored_db,
+            cell_dht_db,
+        })
     }
 
     /// Opinionated app setup.

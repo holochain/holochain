@@ -10,14 +10,14 @@ pub struct SweetDnaFile(DnaFile);
 impl SweetDnaFile {
     /// Create a DnaFile from a path to a *.dna bundle
     pub async fn from_bundle(path: &Path) -> DnaResult<DnaFile> {
-        Self::from_bundle_with_overrides(path, DnaPhenotypeOpt::<SerializedBytes>::none()).await
+        Self::from_bundle_with_overrides(path, DnaModifiersOpt::<SerializedBytes>::none()).await
     }
 
     /// Create a DnaFile from a path to a *.dna bundle, applying the specified
-    /// "phenotype" overrides
+    /// modifier overrides
     pub async fn from_bundle_with_overrides<P, E>(
         path: &Path,
-        phenotype: DnaPhenotypeOpt<P>,
+        modifiers: DnaModifiersOpt<P>,
     ) -> DnaResult<DnaFile>
     where
         P: TryInto<SerializedBytes, Error = E>,
@@ -25,7 +25,7 @@ impl SweetDnaFile {
     {
         Ok(DnaBundle::read_from_file(path)
             .await?
-            .into_dna_file(phenotype.serialized().map_err(SerializedBytesError::from)?)
+            .into_dna_file(modifiers.serialized().map_err(SerializedBytesError::from)?)
             .await?
             .0)
     }
@@ -58,7 +58,7 @@ impl SweetDnaFile {
             .map(CoordinatorZome::into_inner)
             .collect();
         let dna_def = DnaDefBuilder::default()
-            .phenotype(DnaPhenotype {
+            .modifiers(DnaModifiers {
                 network_seed,
                 properties: properties.clone(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
@@ -160,8 +160,9 @@ impl SweetDnaFile {
     /// Create a DnaFile from a collection of InlineZomes (no Wasm)
     pub async fn from_inline_zomes(
         network_seed: String,
-        mut zomes: InlineZomeSet,
+        zomes: impl Into<InlineZomeSet>,
     ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
+        let mut zomes = zomes.into();
         let coordinator_zomes: Vec<CoordinatorZome> = zomes
             .coordinator_zomes
             .into_iter()
@@ -193,7 +194,7 @@ impl SweetDnaFile {
     /// Create a DnaFile from a collection of InlineZomes (no Wasm),
     /// with a random network seed
     pub async fn unique_from_inline_zomes(
-        zomes: InlineZomeSet,
+        zomes: impl Into<InlineZomeSet>,
     ) -> DnaResult<(DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>)> {
         Self::from_inline_zomes(random_network_seed(), zomes).await
     }

@@ -81,6 +81,9 @@ pub enum CloneIdError {
     /// The clone index could not be parsed into a u32.
     #[error("Malformed clone index in app role id: {0}")]
     MalformedCloneIndex(AppRoleId),
+    /// The role id is not composed of two parts separated by the clone id delimiter.
+    #[error("The role id is not composed of two parts separated by the clone id delimiter: {0}")]
+    MalformedCloneId(AppRoleId),
 }
 
 impl TryFrom<AppRoleId> for CloneId {
@@ -89,6 +92,9 @@ impl TryFrom<AppRoleId> for CloneId {
         let parts: Vec<&str> = value.split(CLONE_ID_DELIMITER).collect();
         if parts.len() > 2 {
             return Err(CloneIdError::MultipleDelimiters(value));
+        }
+        if parts.len() < 2 {
+            return Err(CloneIdError::MalformedCloneId(value));
         }
         let role_id = parts[0];
         let clone_index = parts[1]

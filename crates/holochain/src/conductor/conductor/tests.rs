@@ -159,7 +159,7 @@ async fn test_list_running_apps_for_cell_id() {
 
     let mk_dna = |name: &'static str| async move {
         let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
-        SweetDnaFile::unique_from_inline_zomes((name, zome).into())
+        SweetDnaFile::unique_from_inline_zomes((name, zome))
             .await
             .unwrap()
     };
@@ -334,7 +334,7 @@ async fn test_signing_error_during_genesis() {
     };
 
     if let ConductorApiError::ConductorError(inner) = err {
-        assert_matches!(*inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+        assert_matches!(inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
     } else {
         panic!("this should have been an error too");
     }
@@ -435,24 +435,21 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     assert_matches!(response, AppResponse::ZomeCall(_));
 }
 
-pub(crate) fn simple_create_entry_zome() -> InlineZomeSet {
+pub(crate) fn simple_create_entry_zome() -> InlineIntegrityZome {
     let unit_entry_def = EntryDef::default_with_id("unit");
-    InlineZomeSet::new_unique_single(
-        "integrity_create_entry",
-        "create_entry",
-        vec![unit_entry_def.clone()],
-        0,
+    InlineIntegrityZome::new_unique(vec![unit_entry_def.clone()], 0).function(
+        "create",
+        move |api, ()| {
+            let entry = Entry::app(().try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        },
     )
-    .function("create_entry", "create", move |api, ()| {
-        let entry = Entry::app(().try_into().unwrap()).unwrap();
-        let hash = api.create(CreateInput::new(
-            InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
-            EntryVisibility::Public,
-            entry,
-            ChainTopOrdering::default(),
-        ))?;
-        Ok(hash)
-    })
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -460,7 +457,9 @@ async fn test_reenable_app() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = common_genesis_test_app(&mut conductor, zome).await.unwrap();
+    let app = common_genesis_test_app(&mut conductor, ("zome", zome))
+        .await
+        .unwrap();
 
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
@@ -512,7 +511,7 @@ async fn test_reenable_app() {
 
     // - We can still make a zome call after reactivation
     let _: ActionHash = conductor
-        .call_fallible(&cell.zome("create_entry"), "create", ())
+        .call_fallible(&cell.zome("zome"), "create", ())
         .await
         .unwrap();
 
@@ -552,7 +551,7 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
     };
 
     if let ConductorApiError::ConductorError(inner) = err {
-        assert_matches!(*inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+        assert_matches!(inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
     } else {
         panic!("this should have been an error too");
     }
@@ -673,7 +672,9 @@ async fn test_app_status_states() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
-    common_genesis_test_app(&mut conductor, zome).await.unwrap();
+    common_genesis_test_app(&mut conductor, ("zome", zome))
+        .await
+        .unwrap();
 
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
