@@ -271,7 +271,7 @@ jobs:
               git clone "${HOLONIX_URL}" "${HOLONIX_REPO}" -b ${HOLONIX_SOURCE_BRANCH} --depth=1
               cd "${HOLONIX_REPO}"
 
-              nix-shell
+              nix-shell \
                 --pure \
                 --keep HOLOCHAIN_NIXPKGS_REPO \
                 --run '
@@ -314,7 +314,7 @@ jobs:
         run: |
           cachix use holochain-ci
       - name: Setup cachix
-        uses: cachix/cachix-action@v10
+        uses: cachix/cachix-action@v11
         if: ${{ steps.cachix_use.outcome != 'success'  }}
         continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
@@ -391,7 +391,7 @@ jobs:
 
       - name: ${{ matrix.testCommand.name }} (run)
         if: ${{ needs.vars.outputs.skip_test != 'true' }}
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v2.8.1
         env:
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
           HOLONIX_SOURCE_BRANCH: ${{ needs.vars.outputs.holonix_source_branch }}
@@ -455,7 +455,7 @@ jobs:
       - name: Install nix
         uses: cachix/install-nix-action@v17
       - name: Setup cachix
-        uses: cachix/cachix-action@v10
+        uses: cachix/cachix-action@v11
         with:
           name: holochain-ci
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
