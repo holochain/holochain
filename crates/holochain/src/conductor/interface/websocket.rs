@@ -5,8 +5,9 @@ use super::error::InterfaceError;
 use super::error::InterfaceResult;
 use crate::conductor::conductor::StopReceiver;
 use crate::conductor::interface::*;
-use crate::conductor::manager::ManagedTaskFut;
 use crate::conductor::manager::ManagedTaskResult;
+use crate::conductor::manager::TaskAddResult;
+use crate::conductor::manager::TaskAdder;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
 use holochain_websocket::ListenerHandle;
@@ -56,41 +57,58 @@ pub async fn spawn_admin_interface_task<A: InterfaceApi>(
     listener: impl futures::stream::Stream<Item = ListenerItem> + Send + 'static,
     api: A,
     mut stop_rx: StopReceiver,
-) -> ManagedTaskResult {
+    port: u16,
+    tm: TaskAdder,
+) -> TaskAddResult {
     // Task that will kill the listener and all child connections.
-    tokio::task::spawn(
-        handle.close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) }),
-    );
+    tm.ignored_task(&format!("kill admin listener, port {}", port), async move {
+        handle
+            .close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) })
+            .await;
+        Ok(())
+    })
+    .await?;
 
-    let num_connections = Arc::new(AtomicIsize::new(0));
-    futures::pin_mut!(listener);
-    let mut tasks = vec![];
-    // establish a new connection to a client
-    while let Some(connection) = listener.next().await {
-        match connection {
-            Ok((_, rx_from_iface)) => {
-                if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
-                    // Max connections so drop this connection
-                    // which will close it.
-                    continue;
-                };
-                let api = api.clone();
-                let num_connections = num_connections.clone();
-                tasks.push(async move {
-                    recv_incoming_admin_msgs(api, rx_from_iface, num_connections).await;
-                    ManagedTaskResult::Ok(())
-                });
-            }
-            Err(err) => {
-                warn!("Admin socket connection failed: {}", err);
+    let tm2 = tm.clone();
+
+    let listener_task = async move {
+        let num_connections = Arc::new(AtomicIsize::new(0));
+        futures::pin_mut!(listener);
+        // establish a new connection to a client
+        while let Some(connection) = listener.next().await {
+            match connection {
+                Ok((_, rx_from_iface)) => {
+                    if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
+                        // Max connections so drop this connection
+                        // which will close it.
+                        continue;
+                    };
+                    let api = api.clone();
+                    let num_connections = num_connections.clone();
+                    tm.ignored_task(
+                        &format!("recv_incoming_admin_msgs, port {}", port),
+                        async move {
+                            recv_incoming_admin_msgs(api, rx_from_iface, num_connections).await;
+                            ManagedTaskResult::Ok(())
+                        },
+                    )
+                    .await?;
+                }
+                Err(err) => {
+                    warn!("Admin socket connection failed: {}", err);
+                }
             }
         }
-    }
-    futures::future::join_all(tasks)
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .map(|_| ())
+        Ok(())
+    };
+
+    tm2.persistent_task(
+        &format!("admin websocket connection listener, port {}", port),
+        listener_task,
+    )
+    .await?;
+
+    Ok(())
 }
 
 /// Create an App Interface, which includes the ability to receive signals
@@ -100,7 +118,8 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
     mut stop_rx: StopReceiver,
-) -> InterfaceResult<(u16, impl ManagedTaskFut)> {
+    tm: TaskAdder,
+) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
     let (handle, mut listener) = WebsocketListener::bind_with_handle(
         url2!("ws://127.0.0.1:{}", port),
@@ -112,11 +131,19 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
         .local_addr()
         .port()
         .ok_or(InterfaceError::PortError)?;
+
     // Task that will kill the listener and all child connections.
-    tokio::task::spawn(
-        handle.close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) }),
-    );
-    let task = async move {
+    tm.ignored_task("kill_app_interface", async move {
+        handle
+            .close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) })
+            .await;
+        Ok(())
+    })
+    .await?;
+
+    let tm2 = tm.clone();
+
+    tm.persistent_task("app websocket connection listener", async move {
         // establish a new connection to a client
         while let Some(connection) = listener.next().await {
             match connection {
@@ -127,17 +154,19 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
                         rx_from_iface,
                         rx_from_cell,
                         tx_to_iface,
-                    );
+                        tm2.clone(),
+                    )
+                    .await?;
                 }
                 Err(err) => {
                     warn!("Admin socket connection failed: {}", err);
                 }
             }
         }
-
         ManagedTaskResult::Ok(())
-    };
-    Ok((port, task))
+    })
+    .await?;
+    Ok(port)
 }
 
 /// Polls for messages coming in from the external client.
@@ -165,12 +194,13 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
 /// Polls for messages coming in from the external client while simultaneously
 /// polling for signals being broadcast from the Cells associated with this
 /// App interface.
-fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
+async fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     api: A,
     rx_from_iface: WebsocketReceiver,
     rx_from_cell: broadcast::Receiver<Signal>,
     tx_to_iface: WebsocketSender,
-) {
+    tm: TaskAdder,
+) -> TaskAddResult {
     use futures::stream::StreamExt;
 
     trace!("CONNECTION: {}", rx_from_iface.remote_addr());
@@ -183,30 +213,44 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
         }
     });
 
-    tokio::task::spawn(rx_from_cell.for_each_concurrent(4096, move |signal| {
-        let mut tx_to_iface = tx_to_iface.clone();
-        async move {
-            trace!(msg = "Sending signal!", ?signal);
-            if let Err(err) = async move {
-                let bytes = SerializedBytes::try_from(signal)?;
-                tx_to_iface.signal(bytes).await?;
-                InterfaceResult::Ok(())
-            }
-            .await
-            {
-                error!(?err, "error emitting signal");
-            }
-        }
-    }));
+    tm.ignored_task("app interface signal sender", async move {
+        rx_from_cell
+            .for_each_concurrent(4096, move |signal| {
+                let mut tx_to_iface = tx_to_iface.clone();
+                async move {
+                    trace!(msg = "Sending signal!", ?signal);
+                    if let Err(err) = async move {
+                        let bytes = SerializedBytes::try_from(signal)?;
+                        tx_to_iface.signal(bytes).await?;
+                        InterfaceResult::Ok(())
+                    }
+                    .await
+                    {
+                        error!(?err, "error emitting signal");
+                    }
+                }
+            })
+            .await;
+        Ok(())
+    })
+    .await?;
 
-    tokio::task::spawn(rx_from_iface.for_each_concurrent(4096, move |msg| {
-        let api = api.clone();
-        async move {
-            if let Err(err) = handle_incoming_message(msg, api).await {
-                error!(?err, "error handling websocket message");
-            }
-        }
-    }));
+    tm.ignored_task("app interface incoming handler", async move {
+        rx_from_iface
+            .for_each_concurrent(4096, move |msg| {
+                let api = api.clone();
+                async move {
+                    if let Err(err) = handle_incoming_message(msg, api).await {
+                        error!(?err, "error handling websocket message");
+                    }
+                }
+            })
+            .await;
+        Ok(())
+    })
+    .await?;
+
+    Ok(())
 }
 
 /// Handles messages on all interfaces

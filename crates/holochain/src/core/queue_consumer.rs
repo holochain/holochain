@@ -100,7 +100,7 @@ pub async fn spawn_queue_consumer_tasks(
         Box::new(network.clone()),
     );
     task_adder
-        .cell_critical("publish_dht_ops_consumer", cell_id.clone(), task)
+        .cell_critical_task("publish_dht_ops_consumer", cell_id.clone(), task)
         .await
         .expect("Failed to manage workflow task");
 
@@ -118,7 +118,7 @@ pub async fn spawn_queue_consumer_tasks(
 
     if let Some(task) = task {
         task_adder
-            .cell_critical("validation_receipt_consumer", cell_id.clone(), task)
+            .cell_critical_task("validation_receipt_consumer", cell_id.clone(), task)
             .await
             .expect("Failed to manage workflow task");
     }
@@ -139,7 +139,7 @@ pub async fn spawn_queue_consumer_tasks(
 
     if let Some(task) = task {
         task_adder
-            .cell_critical("integrate_dht_ops_consumer", cell_id.clone(), task)
+            .cell_critical_task("integrate_dht_ops_consumer", cell_id.clone(), task)
             .await
             .expect("Failed to manage workflow task");
     }
@@ -169,7 +169,7 @@ pub async fn spawn_queue_consumer_tasks(
     });
     if let Some(task) = task {
         task_adder
-            .cell_critical("app_validation_consumer", cell_id.clone(), task)
+            .cell_critical_task("app_validation_consumer", cell_id.clone(), task)
             .await
             .expect("Failed to manage workflow task");
     }
@@ -198,7 +198,7 @@ pub async fn spawn_queue_consumer_tasks(
 
     if let Some(task) = task {
         task_adder
-            .cell_critical("sys_validation_consumer", cell_id.clone(), task)
+            .cell_critical_task("sys_validation_consumer", cell_id.clone(), task)
             .await
             .expect("Failed to manage workflow task");
     }
@@ -213,7 +213,7 @@ pub async fn spawn_queue_consumer_tasks(
     });
     if let Some(task) = task {
         task_adder
-            .cell_critical("countersigning_consumer", cell_id.clone(), task)
+            .cell_critical_task("countersigning_consumer", cell_id.clone(), task)
             .await
             .expect("Failed to manage workflow task");
     }

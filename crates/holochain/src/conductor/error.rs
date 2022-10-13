@@ -125,6 +125,9 @@ pub enum ConductorError {
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
 
+    #[error(transparent)]
+    TaskAddError(#[from] super::manager::TaskAddError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

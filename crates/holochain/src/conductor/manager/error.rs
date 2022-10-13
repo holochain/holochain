@@ -35,6 +35,9 @@ pub enum ManagedTaskError {
     Conductor(#[from] Box<ConductorError>),
 
     #[error(transparent)]
+    TaskAdd(#[from] super::TaskAddError),
+
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 
     #[error(transparent)]
@@ -52,7 +55,7 @@ impl ManagedTaskError {
         use ManagedTaskError::*;
         #[allow(clippy::match_like_matches_macro)]
         match self {
-            Io(_) | Join(_) | Recv(_) => false,
+            Io(_) | Join(_) | Recv(_) | TaskAdd(_) => false,
             Conductor(err) => match **err {
                 C::ShuttingDown => true,
                 // TODO: identify all recoverable cases

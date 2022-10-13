@@ -371,52 +371,52 @@ impl Conductor {
         });
 
         // Closure to process each admin config item
-        let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {
-            let admin_api = admin_api.clone();
-            let stop_tx = stop_tx.clone();
-            async move {
-                match driver {
-                    InterfaceDriver::Websocket { port } => {
-                        let (listener_handle, listener) = spawn_websocket_listener(port).await?;
-                        let port = listener_handle.local_addr().port().unwrap_or(port);
-                        let task = spawn_admin_interface_task(
-                            listener_handle,
-                            listener,
-                            admin_api.clone(),
-                            stop_tx.subscribe(),
-                        );
-                        InterfaceResult::Ok((port, task))
-                    }
+        async fn spawn_from_config(
+            AdminInterfaceConfig { driver, .. }: AdminInterfaceConfig,
+            admin_api: RealAdminInterfaceApi,
+            stop_tx: StopBroadcaster,
+            tm: TaskAdder,
+        ) -> InterfaceResult<u16> {
+            match driver {
+                InterfaceDriver::Websocket { port } => {
+                    let (listener_handle, listener) = spawn_websocket_listener(port).await?;
+                    let port = listener_handle.local_addr().port().unwrap_or(port);
+                    spawn_admin_interface_task(
+                        listener_handle,
+                        listener,
+                        admin_api,
+                        stop_tx.subscribe(),
+                        port,
+                        tm,
+                    )
+                    .await?;
+                    InterfaceResult::Ok(port)
                 }
             }
-        };
+        }
+
+        let tm = self.task_adder();
 
         // spawn interface tasks, collect their JoinHandles,
         // panic on errors.
-        let handles: Result<Vec<_>, _> =
-            future::join_all(configs.into_iter().map(spawn_from_config))
-                .await
+        let ports: Result<Vec<_>, _> = future::join_all(
+            configs
                 .into_iter()
-                .collect();
+                .map(|c| spawn_from_config(c, admin_api.clone(), stop_tx.clone(), tm.clone())),
+        )
+        .await
+        .into_iter()
+        .collect();
         // Exit if the admin interfaces fail to be created
-        let handles = handles.map_err(Box::new)?;
+        let ports = ports.map_err(Box::new)?;
 
         {
-            let mut ports = Vec::new();
-
             // First, register the keepalive task, to ensure the conductor doesn't shut down
             // in the absence of other "real" tasks
             self.task_adder()
-                .ignore("keepalive task", keep_alive_task(stop_tx.subscribe()))
+                .ignored_task("keepalive task", keep_alive_task(stop_tx.subscribe()))
                 .await?;
 
-            // Now that tasks are spawned, register them with the TaskManager
-            for (port, handle) in handles {
-                ports.push(port);
-                self.task_adder()
-                    .ignore(&format!("admin interface, port {}", port), handle)
-                    .await?
-            }
             for p in ports {
                 self.add_admin_port(p);
             }
@@ -444,13 +444,11 @@ impl Conductor {
                 .task_stop_broadcaster()
                 .subscribe()
         });
-        let (port, task) = spawn_app_interface_task(port, app_api, signal_tx.clone(), stop_rx)
+        let tm = self.task_adder();
+        // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
+        let port = spawn_app_interface_task(port, app_api, signal_tx.clone(), stop_rx, tm.clone())
             .await
             .map_err(Box::new)?;
-        // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
-        self.task_adder()
-            .ignore(&format!("app interface, port {}", port), task)
-            .await?;
         let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
         self.app_interfaces.share_mut(|app_interfaces| {
@@ -1740,7 +1738,7 @@ impl Conductor {
     }
 
     /// Sends a JoinHandle to the TaskManager task to be managed
-    pub(crate) fn task_adder(&self) -> Arc<TaskAdder> {
+    pub(crate) fn task_adder(&self) -> TaskAdder {
         self.task_manager.share_ref(|tm| {
             tm.as_ref()
                 .expect("Task manager not initialized")

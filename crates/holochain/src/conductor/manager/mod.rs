@@ -17,12 +17,11 @@ use std::task::Context;
 use std::task::Poll;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::*;
 
-use super::error::ConductorError;
-use super::error::ConductorResult;
 use super::{conductor::StopBroadcaster, ConductorHandle};
 
 const CHANNEL_SIZE: usize = 1000;
@@ -40,6 +39,8 @@ pub type OnDeath = Box<dyn Fn(ManagedTaskResult) -> TaskOutcome + Send + Sync + 
 pub enum TaskKind {
     /// Log an error if there is one, but otherwise do nothing.
     Ignore,
+    /// Log an error if there is one, then restart the task.
+    Persistent,
     /// If the task returns an error, shut down the conductor.
     Unrecoverable,
     /// If the task returns an error, "freeze" the cell which caused the error,
@@ -54,13 +55,14 @@ pub enum TaskKind {
 }
 
 /// An actual managed task.
-pub(crate) struct ManagedTask {
+pub struct ManagedTask {
     name: String,
     kind: TaskKind,
     handle: ManagedTaskHandle,
 }
 
 impl ManagedTask {
+    /// Constructor
     pub fn new(name: &str, kind: TaskKind, handle: ManagedTaskHandle) -> Self {
         ManagedTask {
             name: name.to_string(),
@@ -121,11 +123,11 @@ impl TaskManager {
 
 pub(crate) fn spawn_task_manager(handle: ConductorHandle) -> (TaskAdder, TaskManagerRunHandle) {
     let (tx, rx) = mpsc::channel(CHANNEL_SIZE);
-    let adder = TaskAdder {
+    let adder = TaskAdderImpl {
         tx,
         tag: handle.tracing_scope().to_string(),
     };
-    (adder, tokio::spawn(run(handle, rx)))
+    (TaskAdder(Arc::new(adder)), tokio::spawn(run(handle, rx)))
 }
 
 /// Trait bounds for a managed task
@@ -133,72 +135,84 @@ pub trait ManagedTaskFut: Future<Output = ManagedTaskResult> + Send + 'static {}
 impl<F: Future<Output = ManagedTaskResult> + Send + 'static> ManagedTaskFut for F {}
 
 /// Adds tasks to be managed, instrumented/scoped by a tag for identifiability
-pub struct TaskAdder {
+pub struct TaskAdderImpl {
     tag: String,
     tx: mpsc::Sender<ManagedTask>,
 }
 
-// type SendResult = Result<(), mpsc::error::SendError<ManagedTask>>;
+/// Cloneable signal sender for adding tasks to the task manager.
+/// Contains a "tag" which is used to instrument each task added, so that logs from
+/// different task managers in the same process are distinguishable from each other
+#[derive(Clone, derive_more::Deref)]
+pub struct TaskAdder(Arc<TaskAdderImpl>);
 
-impl TaskAdder {
+impl TaskAdderImpl {
     /// Add a task of a certain kind
     pub async fn add_task(
         &self,
         name: &str,
         kind: TaskKind,
         fut: impl ManagedTaskFut,
-    ) -> ConductorResult<()> {
+    ) -> TaskAddResult {
         let span = tracing::error_span!("conductor", scope = self.tag);
         let handle = tokio::spawn(fut.instrument(span));
-        self.tx
-            .send(ManagedTask::new(name, kind, handle))
-            .await
-            .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
+        self.tx.send(ManagedTask::new(name, kind, handle)).await
     }
 
     /// You just want the task in the task manager but don't want
     /// to react to an error
-    pub async fn ignore(&self, name: &str, fut: impl ManagedTaskFut) -> ConductorResult<()> {
+    pub async fn ignored_task(&self, name: &str, fut: impl ManagedTaskFut) -> TaskAddResult {
+        self.add_task(name, TaskKind::Ignore, fut).await
+    }
+
+    /// You just want the task in the task manager but don't want
+    /// to react to an error
+    pub async fn persistent_task(&self, name: &str, fut: impl ManagedTaskFut) -> TaskAddResult {
         self.add_task(name, TaskKind::Ignore, fut).await
     }
 
     /// If this task fails, the entire conductor must be shut down
-    pub async fn unrecoverable(&self, name: &str, fut: impl ManagedTaskFut) -> ConductorResult<()> {
+    pub async fn unrecoverable_task(&self, name: &str, fut: impl ManagedTaskFut) -> TaskAddResult {
         self.add_task(name, TaskKind::Unrecoverable, fut).await
     }
 
     /// If this task fails, only the Cell which it runs under must be stopped
-    pub async fn cell_critical(
+    pub async fn cell_critical_task(
         &self,
         name: &str,
         cell_id: CellId,
         fut: impl ManagedTaskFut,
-    ) -> ConductorResult<()> {
+    ) -> TaskAddResult {
         self.add_task(name, TaskKind::CellCritical(cell_id), fut)
             .await
     }
 
     /// If this task fails, only the Cells with this DnaHash must be stopped
-    pub async fn dna_critical(
+    pub async fn dna_critical_task(
         &self,
         name: &str,
         dna_hash: Arc<DnaHash>,
         fut: impl ManagedTaskFut,
-    ) -> ConductorResult<()> {
+    ) -> TaskAddResult {
         self.add_task(name, TaskKind::DnaCritical(dna_hash), fut)
             .await
     }
 
     /// Handle a task's completion with a generic callback
-    pub async fn generic(
+    pub async fn generic_task(
         &self,
         name: &str,
         f: OnDeath,
         fut: impl ManagedTaskFut,
-    ) -> ConductorResult<()> {
+    ) -> TaskAddResult {
         self.add_task(name, TaskKind::Generic(f), fut).await
     }
 }
+
+/// Alias
+pub type TaskAddError = SendError<ManagedTask>;
+/// Alias
+pub type TaskAddResult = Result<(), TaskAddError>;
 
 /// A super pessimistic task that is just waiting to die
 /// but gets to live as long as the process
@@ -342,6 +356,13 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
             Ok(_) => LogInfo(name),
             Err(err) => MinorError(Box::new(err), name),
         },
+        TaskKind::Persistent => match result {
+            Ok(_) => LogInfo(name),
+            Err(err) => {
+                tracing::warn!("Restarting persistent tasks is not yet implemented.");
+                MinorError(Box::new(err), name)
+            }
+        },
         TaskKind::Unrecoverable => match result {
             Ok(_) => LogInfo(name),
             Err(err) => ShutdownConductor(Box::new(err), name),
@@ -383,7 +404,7 @@ pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>
 /// TaskManager task
 pub struct TaskManagerClient {
     /// Channel on which to send info about tasks we want to manage
-    task_adder: Arc<TaskAdder>,
+    task_adder: TaskAdder,
 
     /// Sending a message on this channel will broadcast to all managed tasks,
     /// telling them to shut down
@@ -404,14 +425,14 @@ impl TaskManagerClient {
         run_handle: TaskManagerRunHandle,
     ) -> Self {
         Self {
-            task_adder: Arc::new(task_adder),
+            task_adder,
             task_stop_broadcaster,
             run_handle: Some(run_handle),
         }
     }
 
     /// Accessor
-    pub fn task_adder(&self) -> Arc<TaskAdder> {
+    pub fn task_adder(&self) -> TaskAdder {
         self.task_adder.clone()
     }
 
@@ -459,7 +480,11 @@ mod test {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         // Now send the handle
-        if let Err(_) = conductor.task_adder().generic("", on_death, handle).await {
+        if let Err(_) = conductor
+            .task_adder()
+            .generic_task("", on_death, handle)
+            .await
+        {
             panic!("Failed to send the handle");
         }
         main_handle.await???;
@@ -474,9 +499,12 @@ mod test {
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let (task_adder, main_task) = spawn_task_manager(handle);
 
-        task_adder.ignore("", keep_alive_task(rx)).await.unwrap();
         task_adder
-            .unrecoverable("", async {
+            .ignored_task("", keep_alive_task(rx))
+            .await
+            .unwrap();
+        task_adder
+            .unrecoverable_task("", async {
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 Err(Box::new(ConductorError::Other(
                     anyhow::anyhow!("Unrecoverable task failed").into(),
@@ -501,9 +529,12 @@ mod test {
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let (task_adder, main_task) = spawn_task_manager(handle);
 
-        task_adder.ignore("", keep_alive_task(rx)).await.unwrap();
         task_adder
-            .unrecoverable("", async {
+            .ignored_task("", keep_alive_task(rx))
+            .await
+            .unwrap();
+        task_adder
+            .unrecoverable_task("", async {
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 panic!("Task has panicked")
             })

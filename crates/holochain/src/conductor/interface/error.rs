@@ -25,6 +25,8 @@ pub enum InterfaceError {
     Closed,
     #[error(transparent)]
     WebsocketError(#[from] holochain_websocket::WebsocketError),
+    #[error(transparent)]
+    TaskAddError(#[from] crate::conductor::manager::TaskAddError),
     #[error("Failed to find free port")]
     PortError,
 }
