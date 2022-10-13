@@ -320,7 +320,7 @@ jobs:
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
       - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@main
+        uses: steveeJ-forks/actions-cache/restore@retry
         with:
           path: |
             /var/tmp/holochain_release.sh
@@ -333,7 +333,7 @@ jobs:
 
       - name: Restore cargo related state and build files
         uses: steveeJ-forks/actions-cache/restore@main
-        if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
+        if: ${{ matrix.platform.runs-on != 'self-hosted' && matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
         with:
           path: |
             /var/tmp/holochain_repo/.cargo/bin/
@@ -347,7 +347,8 @@ jobs:
             ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
             ${{ runner.os }}-prepare-${{ github.run_id }}
             ${{ runner.os }}-prepare
-          required: ${{ matrix.platform.arch == 'linux-x86_64' }}
+          # required: ${{ matrix.platform.arch == 'linux-x86_64' }}
+          required: false
 
       - name: Set cache timestamp
         if: ${{ matrix.testCommand.savesCargoCache == true }}
