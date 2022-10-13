@@ -84,6 +84,20 @@ impl DnaManifest {
             DnaManifest::V1(manifest) => manifest.name.clone(),
         }
     }
+
+    /// Getter for the integrity manifest
+    pub fn integrity_manifest(&self) -> IntegrityManifest {
+        match self {
+            DnaManifest::V1(manifest) => manifest.integrity.clone(),
+        }
+    }
+
+    /// Getter for the coordinator manifest
+    pub fn coordinator_manifest(&self) -> CoordinatorManifest {
+        match self {
+            DnaManifest::V1(manifest) => manifest.coordinator.clone(),
+        }
+    }
 }
 
 impl TryFrom<DnaManifest> for ValidatedDnaManifest {
