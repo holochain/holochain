@@ -448,16 +448,10 @@ pub enum AdminResponse {
     /// It means the app was enabled successfully. If it was possible to
     /// put the app in a running state, it will be running, otherwise it will
     /// be paused.
-    AppEnabled {
-        app: InstalledAppInfo,
-        errors: Vec<(CellId, String)>,
-    },
+    AppEnabled(AppEnabledResponse),
 
     #[deprecated = "alias for AppEnabled"]
-    AppActivated {
-        app: InstalledAppInfo,
-        errors: Vec<(CellId, String)>,
-    },
+    AppActivated(AppEnabledResponse),
 
     /// The successful response to an [`AdminRequest::DisableApp`].
     ///
@@ -511,6 +505,13 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::DeleteArchivedCloneCells`].
     ArchivedCloneCellsDeleted,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(test, derive(Clone))]
+pub struct AppEnabledResponse {
+    pub app: InstalledAppInfo,
+    pub errors: Vec<(CellId, String)>,
 }
 
 /// Error type that goes over the websocket wire.

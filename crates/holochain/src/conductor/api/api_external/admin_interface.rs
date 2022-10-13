@@ -257,10 +257,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .map(|(cell_id, error)| (cell_id, error.to_string()))
                     .collect();
 
-                Ok(AdminResponse::AppEnabled {
+                Ok(AdminResponse::AppEnabled(AppEnabledResponse {
                     app: app_info,
                     errors,
-                })
+                }))
             }
             DisableApp { installed_app_id } => {
                 // Disable app
@@ -620,7 +620,7 @@ mod test {
             })
             .await;
         assert_matches!(res,
-            AdminResponse::AppEnabled {app, ..} if app == expected_enabled_app_info
+            AdminResponse::AppEnabled(AppEnabledResponse {app, ..}) if app == expected_enabled_app_info
         );
 
         let res = admin_api

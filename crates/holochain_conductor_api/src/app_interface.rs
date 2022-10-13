@@ -4,6 +4,55 @@ use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_types::prelude::*;
 
+mod app_impl {
+
+    use holochain_types::prelude::{
+        ArchiveCloneCellPayload, CreateCloneCellPayload, InstalledAppId, InstalledCell,
+    };
+    use holochain_zome_types::ZomeCallResponse;
+
+    use crate::{ExternalApiWireError, ZomeCall};
+
+    pub type Res<T> = Result<T, ExternalApiWireError>;
+
+    pub trait AppInterface {
+        fn app_info(installed_app_id: InstalledAppId) -> Res<Option<InstalledAppId>>;
+
+        fn zome_call(call: ZomeCall) -> Res<ZomeCallResponse>;
+
+        fn create_clone_cell(payload: CreateCloneCellPayload) -> Res<InstalledCell>;
+
+        fn archive_clone_cell(payload: ArchiveCloneCellPayload) -> Res<()>;
+    }
+}
+
+mod admin_impl {
+
+    use holochain_types::prelude::{
+        InstallAppBundlePayload, InstallAppPayload, InstalledAppId, UpdateCoordinatorsPayload,
+    };
+
+    use crate::{AppEnabledResponse, ExternalApiWireError, InstalledAppInfo};
+
+    pub type Res<T> = Result<T, ExternalApiWireError>;
+
+    pub trait AdminInterface {
+        fn update_coordinators(payload: UpdateCoordinatorsPayload) -> Res<()>;
+
+        fn install_app(payload: InstallAppPayload) -> Res<InstalledAppInfo>;
+
+        fn install_app_bundle(payload: InstallAppBundlePayload) -> Res<InstalledAppInfo>;
+
+        fn uninstall_app(id: InstalledAppId) -> Res<()>;
+
+        fn enable_app(id: InstalledAppId) -> Res<AppEnabledResponse>;
+
+        fn disable_app(id: InstalledAppId) -> Res<()>;
+
+        fn start_app(id: InstalledAppId) -> Res<bool>;
+    }
+}
+
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
 /// interface connection.

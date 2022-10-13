@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- **BREAKING CHANGE:** Admin api method EnableApp has a slightly different serialized output 
+
 ## 0.0.64
 
 ## 0.0.63
