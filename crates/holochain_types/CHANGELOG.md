@@ -4,6 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Exposed the integrity manifest getter from `DnaManifest`.
+- Exposed the coordinator manifest getter from `DnaManifest`.
+
 ## 0.0.61
 
 - Added `WebAppManifestCurrentBuilder` and exposed it.
