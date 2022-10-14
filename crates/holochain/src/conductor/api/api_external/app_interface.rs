@@ -6,10 +6,6 @@ use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
 
-use holochain_serialized_bytes::prelude::*;
-
-use holochain_types::prelude::*;
-
 pub use holochain_conductor_api::*;
 
 /// The interface that a Conductor exposes to the outside world.
@@ -140,36 +136,5 @@ impl InterfaceApi for RealAppInterfaceApi {
             Ok(request) => Ok(AppInterfaceApi::handle_app_request(self, request).await),
             Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl AppInterface for RealAppInterfaceApi {
-    async fn app_info(&self, installed_app_id: InstalledAppId) -> Res<Option<InstalledAppInfo>> {
-        crate::impl_handler!(
-            AppResponse.AppInfo(_)
-                <= self.handle_request(Ok(AppRequest::AppInfo { installed_app_id }))
-        )
-    }
-
-    async fn zome_call(&self, call: ZomeCall) -> Res<ZomeCallResponse> {
-        crate::impl_handler!(
-            AppResponse.ZomeCall(Box)
-                <= self.handle_request(Ok(AppRequest::ZomeCall(Box::new(call))))
-        )
-    }
-
-    async fn create_clone_cell(&self, payload: CreateCloneCellPayload) -> Res<InstalledCell> {
-        crate::impl_handler!(
-            AppResponse.CloneCellCreated(_)
-                <= self.handle_request(Ok(AppRequest::CreateCloneCell(Box::new(payload))))
-        )
-    }
-
-    async fn archive_clone_cell(&self, payload: ArchiveCloneCellPayload) -> Res<()> {
-        crate::impl_handler!(
-            AppResponse.CloneCellArchived
-                <= self.handle_request(Ok(AppRequest::ArchiveCloneCell(Box::new(payload))))
-        )
     }
 }

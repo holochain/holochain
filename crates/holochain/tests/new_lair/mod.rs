@@ -3,6 +3,7 @@ use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
+use holochain_websocket::local_websocket_client;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::*;
 use lair_keystore_api::ipc_keystore::*;
@@ -82,7 +83,7 @@ async fn test_new_lair_conductor_integration() {
         panic!("failed to start holochain: {:?}", status);
     }
 
-    let (mut client, _) = websocket_client_by_port(ADMIN_PORT).await.unwrap();
+    let (mut client, _) = local_websocket_client(ADMIN_PORT).await.unwrap();
 
     let agent_key = generate_agent_pubkey(&mut client, 15000).await;
     println!("GENERATED AGENT KEY: {}", agent_key);

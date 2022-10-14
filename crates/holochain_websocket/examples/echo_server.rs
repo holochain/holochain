@@ -25,7 +25,7 @@ async fn main() {
     let (send_b, _) = tokio::sync::broadcast::channel(10);
 
     tokio::task::spawn(async move {
-        while let Some(Ok((mut send_socket, mut recv_socket))) = listener_stream.next().await {
+        while let Some(Ok((send_socket, mut recv_socket))) = listener_stream.next().await {
             let loc_send_b = send_b.clone();
             let mut loc_recv_b = send_b.subscribe();
 

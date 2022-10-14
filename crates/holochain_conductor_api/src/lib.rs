@@ -8,3 +8,5 @@ pub use admin_interface::*;
 pub use app_interface::*;
 pub use config::*;
 pub use state_dump::*;
+
+pub use holochain_types::prelude::*;

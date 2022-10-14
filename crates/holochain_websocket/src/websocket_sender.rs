@@ -117,7 +117,7 @@ impl WebsocketSender {
     #[tracing::instrument(skip(self))]
     /// Make a request to for the other side to respond to.
     pub async fn request_timeout<I, O>(
-        &mut self,
+        &self,
         msg: I,
         timeout: std::time::Duration,
     ) -> WebsocketResult<O>
@@ -140,7 +140,7 @@ impl WebsocketSender {
     /// Note:
     /// There is no timeouts in this code. You either need to wrap
     /// this future in a timeout or use [`WebsocketSender::request_timeout`].
-    pub async fn request<I, O>(&mut self, msg: I) -> WebsocketResult<O>
+    pub async fn request<I, O>(&self, msg: I) -> WebsocketResult<O>
     where
         I: std::fmt::Debug,
         O: std::fmt::Debug,
@@ -185,7 +185,7 @@ impl WebsocketSender {
     /// Send a message to the other side that doesn't require a response.
     /// There is no guarantee this message will arrive. If you need confirmation
     /// of receipt use [`WebsocketSender::request`].
-    pub async fn signal<I, E>(&mut self, msg: I) -> WebsocketResult<()>
+    pub async fn signal<I, E>(&self, msg: I) -> WebsocketResult<()>
     where
         I: std::fmt::Debug,
         WebsocketError: From<E>,
@@ -204,7 +204,7 @@ impl WebsocketSender {
     }
 
     #[cfg(test)]
-    pub(crate) async fn debug(&mut self) -> WebsocketResult<(Vec<u64>, u64)> {
+    pub(crate) async fn debug(&self) -> WebsocketResult<(Vec<u64>, u64)> {
         let (tx_resp, rx_resp) = tokio::sync::oneshot::channel();
         let msg = OutgoingMessage::Debug(tx_resp);
         self.tx_to_websocket

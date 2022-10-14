@@ -18,6 +18,7 @@ use holochain_state::prelude::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_websocket::local_websocket_client;
 use holochain_websocket::WebsocketSender;
 use holochain_zome_types::op::Op;
 use maplit::hashset;
@@ -401,8 +402,8 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
         .add_app_interface(either::Either::Left(0))
         .await
         .unwrap();
-    let (mut app_client, _) = websocket_client_by_port(app_port).await.unwrap();
-    let (mut admin_client, _) = conductor.admin_ws_client().await;
+    let (mut app_client, _) = local_websocket_client(app_port).await.unwrap();
+    let (admin_client, _) = conductor.admin_ws_client().await;
 
     // Now use the bad keystore to cause a signing error on the next zome call
     keystore_control.use_mock();

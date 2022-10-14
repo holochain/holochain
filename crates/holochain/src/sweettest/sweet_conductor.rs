@@ -17,7 +17,6 @@ use holochain_state::prelude::test_db_dir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use std::path::Path;
-use std::sync::Arc;
 use tempfile::TempDir;
 
 /// A stream of signals.
@@ -383,7 +382,7 @@ impl SweetConductor {
         let port = self
             .get_arbitrary_admin_websocket_port()
             .expect("No admin port open on conductor");
-        websocket_client_by_port(port).await.unwrap()
+        local_websocket_client(port).await.unwrap()
     }
 
     /// Shutdown this conductor.
@@ -463,17 +462,6 @@ impl SweetConductor {
                 .await;
         }
     }
-}
-
-/// Get a websocket client on localhost at the specified port
-pub async fn websocket_client_by_port(
-    port: u16,
-) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
-    holochain_websocket::connect(
-        url2::url2!("ws://127.0.0.1:{}", port),
-        Arc::new(WebsocketConfig::default()),
-    )
-    .await
 }
 
 impl Drop for SweetConductor {

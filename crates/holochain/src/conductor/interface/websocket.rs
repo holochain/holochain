@@ -180,7 +180,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     });
 
     tokio::task::spawn(rx_from_cell.for_each_concurrent(4096, move |signal| {
-        let mut tx_to_iface = tx_to_iface.clone();
+        let tx_to_iface = tx_to_iface.clone();
         async move {
             trace!(msg = "Sending signal!", ?signal);
             if let Err(err) = async move {
@@ -236,10 +236,7 @@ pub mod test {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_sqlite::prelude::*;
     use holochain_state::prelude::test_db_dir;
-    use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_types::test_utils::fake_dna_zomes;

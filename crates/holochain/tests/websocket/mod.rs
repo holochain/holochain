@@ -55,7 +55,9 @@ async fn call_admin() {
     let (_holochain, port) = start_holochain(config_path.clone()).await;
     let port = port.await.unwrap();
 
-    let (mut client, _) = websocket_client_by_port(port).await.unwrap();
+    let (mut client, _) = holochain_websocket::local_websocket_client(port)
+        .await
+        .unwrap();
 
     let original_dna_hash = dna.dna_hash().clone();
 
@@ -121,8 +123,12 @@ async fn call_zome() {
     let (holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
-    let (_, receiver2) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut client, _) = holochain_websocket::local_websocket_client(admin_port)
+        .await
+        .unwrap();
+    let (_, receiver2) = holochain_websocket::local_websocket_client(admin_port)
+        .await
+        .unwrap();
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -186,7 +192,7 @@ async fn call_zome() {
     let (_holochain, admin_port) = start_holochain(config_path).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (client, _) = local_websocket_client(admin_port).await.unwrap();
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
@@ -278,7 +284,7 @@ async fn emit_signals() {
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut admin_tx, _) = local_websocket_client(admin_port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -316,8 +322,8 @@ async fn emit_signals() {
     ///////////////////////////////////////////////////////
     // Emit signals (the real test!)
 
-    let (mut app_tx_1, app_rx_1) = websocket_client_by_port(app_port).await.unwrap();
-    let (_, app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
+    let (mut app_tx_1, app_rx_1) = local_websocket_client(app_port).await.unwrap();
+    let (_, app_rx_2) = local_websocket_client(app_port).await.unwrap();
 
     call_zome_fn(
         &mut app_tx_1,
@@ -358,7 +364,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await?;
-    let (mut client, _) = websocket_client(&conductor_handle).await?;
+    let (client, _) = websocket_client(&conductor_handle).await?;
 
     let dna = fake_dna_zomes(
         "".into(),
@@ -389,7 +395,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (mut client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
+    let (client, mut _rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig {
             default_request_timeout_s: 1,
@@ -428,7 +434,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
-    let (mut client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
+    let (client, mut rx): (WebsocketSender, WebsocketReceiver) = holochain_websocket::connect(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig {
             default_request_timeout_s: 1,
@@ -526,7 +532,7 @@ async fn concurrent_install_dna() {
     let (_holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (client, _) = local_websocket_client(admin_port).await.unwrap();
 
     let before = std::time::Instant::now();
 

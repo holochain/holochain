@@ -21,6 +21,7 @@ members = [
   "crates/holochain_state",
   "crates/holochain_sqlite",
   "crates/holochain_websocket",
+  "crates/holochain_websocket_client",
   "crates/holochain_util",
 
   "crates/hc",

@@ -88,7 +88,7 @@ async fn setup() -> (ListenerHandle, Url2, JoinHandle<()>) {
     let jh = tokio::task::spawn(async move {
         let mut jhs = Vec::new();
         // Handle new connections
-        while let Some(Ok((mut send, mut recv))) = listener.next().await {
+        while let Some(Ok((send, mut recv))) = listener.next().await {
             let jh = tokio::task::spawn(async move {
                 // Receive a message and echo it back
                 while let Some((msg, resp)) = recv.next().await {

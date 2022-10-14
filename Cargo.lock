@@ -2015,6 +2015,7 @@ dependencies = [
  "holochain_wasm_test_utils",
  "holochain_wasmer_host",
  "holochain_websocket",
+ "holochain_websocket_client",
  "holochain_zome_types",
  "hostname",
  "human-panic",
@@ -2562,6 +2563,16 @@ dependencies = [
  "tracing-futures",
  "tungstenite 0.12.0",
  "unwrap_to",
+ "url2",
+]
+
+[[package]]
+name = "holochain_websocket_client"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "holochain_conductor_api",
+ "holochain_websocket",
  "url2",
 ]
 

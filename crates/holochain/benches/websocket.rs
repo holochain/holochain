@@ -10,6 +10,7 @@ use holochain_types::prelude::fake_dna_zomes_named;
 use holochain_types::prelude::write_fake_dna_file;
 use holochain_util::tokio_helper;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_websocket::local_websocket_client;
 use std::time::Duration;
 use tempfile::TempDir;
 
@@ -49,7 +50,7 @@ pub fn websocket_concurrent_install(c: &mut Criterion) {
                         let config_path = write_config(path, &config);
                         let holochain = start_holochain(config_path.clone()).await;
 
-                        let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
+                        let (client, _) = local_websocket_client(admin_port).await.unwrap();
 
                         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
 

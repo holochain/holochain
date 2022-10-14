@@ -12,7 +12,7 @@ struct ResponseMessage(pub String);
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    let (mut send_socket, mut recv_socket) = connect(
+    let (send_socket, mut recv_socket) = connect(
         url2!("ws://127.0.0.1:12345"),
         std::sync::Arc::new(WebsocketConfig::default()),
     )

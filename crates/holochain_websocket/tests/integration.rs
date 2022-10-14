@@ -31,7 +31,7 @@ fn server_wait(
     mut listener: impl futures::stream::Stream<Item = ListenerItem> + Unpin + Send + 'static,
 ) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn(async move {
-        let (mut sender, mut receiver) = listener
+        let (sender, mut receiver) = listener
             .next()
             .instrument(tracing::debug_span!("next_server_connection"))
             .await
@@ -86,7 +86,7 @@ fn server_signal(
     n: usize,
 ) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn(async move {
-        let (mut sender, _) = listener
+        let (sender, _) = listener
             .next()
             .instrument(tracing::debug_span!("next_server_connection"))
             .await
@@ -126,7 +126,7 @@ async fn can_send_signal() {
     observability::test_run().ok();
     let (handle, mut listener) = server().await;
     let jh = tokio::task::spawn(async move {
-        let (mut sender, mut receiver) = listener
+        let (sender, mut receiver) = listener
             .next()
             .instrument(tracing::debug_span!("next_server_connection"))
             .await
@@ -153,7 +153,7 @@ async fn can_send_signal() {
 
     // - Connect client
     let binding = handle.local_addr().clone();
-    let (mut sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+    let (sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
         .instrument(tracing::debug_span!("client"))
         .await
         .unwrap();
@@ -184,7 +184,7 @@ async fn can_send_request() {
     observability::test_run().ok();
     let (handle, mut listener) = server().await;
     let jh = tokio::task::spawn(async move {
-        let (mut sender, mut receiver) = listener
+        let (sender, mut receiver) = listener
             .next()
             .instrument(tracing::debug_span!("next_server_connection"))
             .await
@@ -218,7 +218,7 @@ async fn can_send_request() {
 
     // - Connect client
     let binding = handle.local_addr().clone();
-    let (mut sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
+    let (sender, mut receiver) = connect(binding, Arc::new(WebsocketConfig::default()))
         .instrument(tracing::debug_span!("client"))
         .await
         .unwrap();
@@ -394,7 +394,7 @@ async fn drop_receiver() {
     let (handle, listener) = server().await;
     let s_jh = server_recv(listener);
     let binding = handle.local_addr().clone();
-    let (mut sender, _) = connect(binding, Arc::new(WebsocketConfig::default()))
+    let (sender, _) = connect(binding, Arc::new(WebsocketConfig::default()))
         .instrument(tracing::debug_span!("client"))
         .await
         .unwrap();
@@ -417,7 +417,7 @@ async fn cancel_response() {
     observability::test_run().ok();
     let (handle, mut listener) = server().await;
     let s_jh = tokio::task::spawn(async move {
-        let (mut sender, _receiver) = listener
+        let (sender, _receiver) = listener
             .next()
             .instrument(tracing::debug_span!(
                 "next_server_connection:cancel_response"

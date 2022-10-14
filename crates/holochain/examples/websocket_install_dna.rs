@@ -6,6 +6,7 @@ use holochain_wasm_test_utils::TestWasm;
 #[path = "../tests/test_utils/mod.rs"]
 mod test_utils;
 
+use holochain_websocket::local_websocket_client;
 use test_utils::*;
 
 #[tokio::main]
@@ -21,7 +22,7 @@ pub async fn main() {
     let admin_port = 9211;
 
     let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
-    let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (client, _) = local_websocket_client(admin_port).await.unwrap();
 
     let install_tasks_stream = futures::stream::iter((0..NUM_DNA).into_iter().map(|i| {
         let mut client = client.clone();

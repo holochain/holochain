@@ -45,10 +45,10 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
 
 pub(crate) async fn get_admin_api(port: u16) -> WebsocketResult<WebsocketSender> {
     tracing::debug!(port);
-    websocket_client_by_port(port).await.map(|p| p.0)
+    local_websocket_client(port).await.map(|p| p.0)
 }
 
-async fn websocket_client_by_port(
+async fn local_websocket_client(
     port: u16,
 ) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
     ws::connect(

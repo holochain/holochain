@@ -1,0 +1,15 @@
+[package]
+name = "holochain_websocket_client"
+version = "0.0.1"
+description = "Client for connecting to Holochain websocket servers"
+license-file = "LICENSE_CAL-1.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_websocket_client"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1"
+holochain_conductor_api = { version = "0.0.64", path = "../holochain_conductor_api" }
+holochain_websocket = { version = "0.0.39", path = "../holochain_websocket" }
+url2 = "0.0.6"

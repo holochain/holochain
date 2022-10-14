@@ -9,9 +9,8 @@ use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
-use holochain_serialized_bytes::prelude::*;
+
 use holochain_types::dna::DnaBundle;
-use holochain_types::prelude::*;
 use mr_bundle::Bundle;
 
 use holochain_zome_types::cell::CellId;
@@ -650,57 +649,5 @@ mod test {
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
             .await
             .ok();
-    }
-}
-
-#[async_trait::async_trait]
-impl AdminInterface for RealAdminInterfaceApi {
-    async fn update_coordinators(&self, payload: UpdateCoordinatorsPayload) -> Res<()> {
-        crate::impl_handler!(
-            AdminResponse.CoordinatorsUpdated
-                <= self.handle_request(Ok(AdminRequest::UpdateCoordinators(Box::new(payload))))
-        )
-    }
-
-    async fn install_app(&self, payload: InstallAppPayload) -> Res<InstalledAppInfo> {
-        crate::impl_handler!(
-            AdminResponse.AppInstalled(_)
-                <= self.handle_request(Ok(AdminRequest::InstallApp(Box::new(payload))))
-        )
-    }
-
-    async fn install_app_bundle(&self, payload: InstallAppBundlePayload) -> Res<InstalledAppInfo> {
-        crate::impl_handler!(
-            AdminResponse.AppBundleInstalled(_)
-                <= self.handle_request(Ok(AdminRequest::InstallAppBundle(Box::new(payload))))
-        )
-    }
-
-    async fn uninstall_app(&self, installed_app_id: InstalledAppId) -> Res<()> {
-        crate::impl_handler!(
-            AdminResponse.AppUninstalled
-                <= self.handle_request(Ok(AdminRequest::UninstallApp { installed_app_id }))
-        )
-    }
-
-    async fn enable_app(&self, installed_app_id: InstalledAppId) -> Res<AppEnabledResponse> {
-        crate::impl_handler!(
-            AdminResponse.AppEnabled(_)
-                <= self.handle_request(Ok(AdminRequest::EnableApp { installed_app_id }))
-        )
-    }
-
-    async fn disable_app(&self, installed_app_id: InstalledAppId) -> Res<()> {
-        crate::impl_handler!(
-            AdminResponse.AppDisabled
-                <= self.handle_request(Ok(AdminRequest::DisableApp { installed_app_id }))
-        )
-    }
-
-    async fn start_app(&self, installed_app_id: InstalledAppId) -> Res<bool> {
-        crate::impl_handler!(
-            AdminResponse.AppStarted(_)
-                <= self.handle_request(Ok(AdminRequest::StartApp { installed_app_id }))
-        )
     }
 }

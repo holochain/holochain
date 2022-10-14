@@ -135,6 +135,17 @@ pub async fn connect(
     Websocket::create_ends(config, socket, valve)
 }
 
+/// Get a websocket client on localhost at the specified port, with default settings
+pub async fn local_websocket_client(
+    port: u16,
+) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
+    connect(
+        url2::url2!("ws://127.0.0.1:{}", port),
+        Arc::new(WebsocketConfig::default()),
+    )
+    .await
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type")]
 /// The messages actually sent over the wire by this library.

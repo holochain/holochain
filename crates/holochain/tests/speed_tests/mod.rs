@@ -26,10 +26,10 @@ use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
 use holochain::test_utils::setup_app;
 use holochain_wasm_test_utils::TestZomes;
+use holochain_websocket::local_websocket_client;
 use tempfile::TempDir;
 
 use super::test_utils::*;
-use holochain::sweettest::*;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -175,7 +175,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     .await;
 
     // Setup websocket handle and app interface
-    let (mut client, _) = websocket_client(&handle).await.unwrap();
+    let (client, _) = websocket_client(&handle).await.unwrap();
     let request = AdminRequest::AttachAppInterface { port: None };
     let response = client.request(request);
     let response = response.await.unwrap();
@@ -183,7 +183,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         AdminResponse::AppInterfaceAttached { port } => port,
         _ => panic!("Attach app interface failed: {:?}", response),
     };
-    let (mut app_interface, _) = websocket_client_by_port(app_port).await.unwrap();
+    let (mut app_interface, _) = local_websocket_client(app_port).await.unwrap();
 
     // /////////////
     // END CONDUCTOR

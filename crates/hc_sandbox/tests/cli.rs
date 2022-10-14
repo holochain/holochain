@@ -17,9 +17,7 @@ use url2::url2;
 
 const WEBSOCKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
-async fn websocket_client_by_port(
-    port: u16,
-) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
+async fn local_websocket_client(port: u16) -> anyhow::Result<(WebsocketSender, WebsocketReceiver)> {
     Ok(ws::connect(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
@@ -29,7 +27,7 @@ async fn websocket_client_by_port(
 
 async fn call_app_interface(port: u16) {
     tracing::debug!(calling_app_interface = ?port);
-    let (mut app_tx, _) = websocket_client_by_port(port)
+    let (app_tx, _) = local_websocket_client(port)
         .await
         .expect(&format!("Failed to get port {}", port));
     let request = AppRequest::AppInfo {

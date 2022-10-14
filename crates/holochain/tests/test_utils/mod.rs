@@ -1,10 +1,37 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
+use assert_cmd::prelude::*;
+use futures::Future;
+use hdk::prelude::*;
 use holochain::conductor::ConductorHandle;
+use holochain::fixt::NamedInvocation;
+use holochain::fixt::ZomeCallInvocationFixturator;
+use holochain::{
+    conductor::api::ZomeCall,
+    conductor::api::{AdminRequest, AdminResponse, AppRequest},
+};
+use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::AdminInterfaceConfig;
+use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::FullStateDump;
+use holochain_conductor_api::InterfaceDriver;
+use holochain_types::prelude::*;
+use holochain_util::tokio_helper;
+use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
+use holochain_websocket::*;
+use matches::assert_matches;
+use serde::Serialize;
+use std::time::Duration;
+use std::{path::PathBuf, process::Stdio};
+use tokio::io::AsyncBufReadExt;
+use tokio::io::BufReader;
+use tokio::process::Child;
+use tokio::process::Command;
+use tracing::instrument;
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
@@ -16,39 +43,8 @@ pub async fn websocket_client(
     conductor: &ConductorHandle,
 ) -> Result<(WebsocketSender, WebsocketReceiver)> {
     let port = admin_port(conductor).await;
-    Ok(websocket_client_by_port(port).await?)
+    Ok(local_websocket_client(port).await?)
 }
-
-pub use holochain::sweettest::websocket_client_by_port;
-
-use assert_cmd::prelude::*;
-use futures::Future;
-use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::conductor::KeystoreConfig;
-use holochain_conductor_api::AdminInterfaceConfig;
-use holochain_conductor_api::InterfaceDriver;
-use matches::assert_matches;
-use serde::Serialize;
-use std::time::Duration;
-use std::{path::PathBuf, process::Stdio};
-use tokio::io::AsyncBufReadExt;
-use tokio::io::BufReader;
-use tokio::process::Child;
-use tokio::process::Command;
-use tracing::instrument;
-
-use hdk::prelude::*;
-use holochain::fixt::NamedInvocation;
-use holochain::fixt::ZomeCallInvocationFixturator;
-use holochain::{
-    conductor::api::ZomeCall,
-    conductor::api::{AdminRequest, AdminResponse, AppRequest},
-};
-use holochain_conductor_api::AppResponse;
-use holochain_types::prelude::*;
-use holochain_util::tokio_helper;
-use holochain_wasm_test_utils::TestWasm;
-use holochain_websocket::*;
 
 /// Wrapper that synchronously waits for the Child to terminate on drop.
 pub struct SupervisedChild(String, Child);
@@ -85,7 +81,7 @@ pub async fn start_holochain(
 
 pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash) {
     // Connect to App Interface
-    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
+    let (mut app_tx, _) = local_websocket_client(app_port).await.unwrap();
     let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
     call_zome_fn(&mut app_tx, cell_id, TestWasm::Foo, "foo".into(), ()).await;
 }
@@ -131,7 +127,7 @@ pub async fn retry_admin_interface(
     delay: Duration,
 ) -> WebsocketSender {
     loop {
-        match websocket_client_by_port(port).await {
+        match local_websocket_client(port).await {
             Ok(c) => return c.0,
             Err(e) => {
                 attempts -= 1;

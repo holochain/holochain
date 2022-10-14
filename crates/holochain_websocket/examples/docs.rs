@@ -8,7 +8,7 @@ struct TestMessage(pub String);
 
 #[tokio::main]
 async fn main() {
-    let (mut send, _) = connect(
+    let (send, _) = connect(
         url2!("ws://127.0.0.1:12345"),
         std::sync::Arc::new(WebsocketConfig::default()),
     )

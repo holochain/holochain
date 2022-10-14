@@ -795,7 +795,7 @@ mod tests {
                 .instrument(tracing::debug_span!("next_server_connection"))
                 .await;
         });
-        let (mut sender, _) = connect(binding.clone(), Arc::new(WebsocketConfig::default()))
+        let (sender, _) = connect(binding.clone(), Arc::new(WebsocketConfig::default()))
             .instrument(tracing::debug_span!("client"))
             .await
             .unwrap();

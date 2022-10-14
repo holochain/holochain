@@ -40,7 +40,7 @@ async fn main() {
     });
 
     // Connect the client to the server
-    let (mut send, _recv) = connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
+    let (send, _recv) = connect(binding, std::sync::Arc::new(WebsocketConfig::default()))
         .await
         .unwrap();
 
