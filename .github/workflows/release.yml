@@ -177,6 +177,7 @@ jobs:
 
   test:
     needs: [vars, prepare]
+    if: ${{ needs.vars.outputs.skip_test != 'true' }}
     env:
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
       HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
@@ -186,51 +187,90 @@ jobs:
       matrix:
         platform:
           - arch: linux-x86_64
-            runs-on: self-hosted
+            runs-on: [self-hosted, release]
+            largeCacheStorage:
+              generic:
+                - local
+              nix:
+                - cachix
           - arch: macos-x86_64
-            runs-on: macos-latest
+            runs-on: [macos-latest]
+            largeCacheStorage:
+              nix:
+                - cachix
+          - arch: linux-x86_64
+            runs-on: [ubuntu-latest]
+            largeCacheStorage:
+              generic:
+                - github
+              nix:
+                - cachix
         testCommand:
-          - name: cargo-test-standard
-            restoresCargoCache: true
-            savesCargoCache: true
+          - name: cargo-test
+            largeCacheStorage:
+              - generic
+              - nix
             maxBuildSpace: true
-            timeout_minutes: 30
+            hasBuildStep: true
+            timeout_minutes: 60
             max_attempts: 2
             run: |
               nix-shell \
                 --pure \
                 --keep CARGO_NEXTEST_ARGS \
                 --keep CARGO_TEST_ARGS \
-                --keep CARGO_BUILD_JOBS \
-                --fallback --argstr flavor "coreDev" --run hc-test-standard-nextest
+                --fallback --argstr flavor "coreDev" --run '
+                  set -e
+                  hc-test-standard-nextest
+                  hc-static-checks
+                  hc-test-wasm
+                '
 
-          - name: cargo-test-static
-            restoresCargoCache: true
-            savesCargoCache: true
-            timeout_minutes: 5
-            max_attempts: 1
-            run: |
-              nix-shell \
-                --pure \
-                --keep CARGO_TEST_ARGS \
-                --keep CARGO_BUILD_JOBS \
-                --fallback --argstr flavor "coreDev" --run hc-static-checks
+          # - name: cargo-test-standard
+          #   largeCacheStorage:
+          #     - generic
+          #     - nix
+          #   maxBuildSpace: true
+          #   hasBuildStep: true
+          #   timeout_minutes: 30
+          #   max_attempts: 2
+          #   run: |
+          #     nix-shell \
+          #       --pure \
+          #       --keep CARGO_NEXTEST_ARGS \
+          #       --keep CARGO_TEST_ARGS \
+          #       --fallback --argstr flavor "coreDev" --run hc-test-standard-nextest
 
-          - name: cargo-test-wasm
-            restoresCargoCache: true
-            savesCargoCache: true
-            timeout_minutes: 5
-            max_attempts: 6
-            run: |
-              nix-shell \
-                --pure \
-                --keep CARGO_TEST_ARGS \
-                --keep CARGO_BUILD_JOBS \
-                --fallback --argstr flavor "coreDev" --run hc-test-wasm
+          # - name: cargo-test-static
+          #   largeCacheStorage:
+          #     - generic
+          #     - nix
+          #   hasBuildStep: true
+          #   timeout_minutes: 5
+          #   max_attempts: 1
+          #   run: |
+          #     nix-shell \
+          #       --pure \
+          #       --keep CARGO_TEST_ARGS \
+          #       --fallback --argstr flavor "coreDev" --run hc-static-checks
+
+          # - name: cargo-test-wasm
+          #   largeCacheStorage:
+          #     - generic
+          #     - nix
+          #   hasBuildStep: true
+          #   timeout_minutes: 5
+          #   max_attempts: 6
+          #   run: |
+          #     nix-shell \
+          #       --pure \
+          #       --keep CARGO_TEST_ARGS \
+          #       --fallback --argstr flavor "coreDev" --run hc-test-wasm
 
           - name: nix-test
-            restoresCargoCache: false
-            savesCargoCache: false
+            largeCacheStorage:
+              - nix
+            hasBuildStep: false
             timeout_minutes: 90
             max_attempts: 1
             run: |
@@ -298,29 +338,49 @@ jobs:
           - platform:
               arch: macos-x86_64
             testCommand:
-              name: cargo-test-standard
+              name: cargo-test
+
+          # exclude all cargo test jobs on github's ubuntu-latest
           - platform:
-              arch: macos-x86_64
+              runs-on: [ubuntu-latest]
             testCommand:
-              name: cargo-test-wasm
+              name: cargo-test
+
+          # we only run the cargo tests on the self-hosted runners
           - platform:
-              arch: macos-x86_64
+              runs-on: [self-hosted, release]
             testCommand:
-              name: cargo-test-static
+              name: nix-test
+
+          # TODO: reenable these if or when we split the cargo tests up again
+          # - platform:
+          #     arch: macos-x86_64
+          #   testCommand:
+          #     name: cargo-test-standard
+          # - platform:
+          #     arch: macos-x86_64
+          #   testCommand:
+          #     name: cargo-test-wasm
+          # - platform:
+          #     arch: macos-x86_64
+          #   testCommand:
+          #     name: cargo-test-static
         event_name:
           - ${{ github.event_name }}
     runs-on: ${{ matrix.platform.runs-on }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Extend space
         uses: ./.github/actions/extend-space
-        if: ${{ matrix.platform.runs-on == 'ubuntu-latest' && matrix.testCommand.maxBuildSpace == true && needs.vars.outputs.skip_test != 'true' }}
+        if: ${{ contains(matrix.platform.runs-on, 'ubuntu-latest') && matrix.testCommand.maxBuildSpace == true }}
 
       - name: Install nix
         uses: cachix/install-nix-action@v17
       - name: Setup cachix
         uses: cachix/cachix-action@v11
+        if: ${{ contains(matrix.platform.largeCacheStorage.nix, 'cachix') && contains(matrix.testCommand.largeCacheStorage, 'nix') }}
         with:
           name: holochain-ci
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
@@ -347,7 +407,7 @@ jobs:
 
       - name: Restore cargo related state and build files
         uses: steveeJ-forks/actions-cache/restore@main
-        if: ${{ matrix.platform.runs-on != 'self-hosted' && matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
+        if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
         with:
           path: |
             /var/tmp/holochain_repo/.cargo/bin/
@@ -361,27 +421,32 @@ jobs:
             ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
             ${{ runner.os }}-prepare-${{ github.run_id }}
             ${{ runner.os }}-prepare
-          # required: ${{ matrix.platform.arch == 'linux-x86_64' }}
           required: false
 
-      - name: Set cache timestamp
-        if: ${{ matrix.testCommand.savesCargoCache == true }}
+      - name: Garbage-collection pre-run procedure
+        if: ${{ contains(matrix.testCommand.largeCacheStorage, 'generic') }}
+        env:
+          MATRIX: ${{ toJSON(matrix) }}
         run: |
           set -ex
           cat "${HOLOCHAIN_RELEASE_SH}"
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
+          # TODO: handle this when we go back to parallel test runs
+          echo ${MATRIX}
+
           nix-shell --pure --run '
+              cargo sweep -i
               cargo sweep -s
             '
 
       - name: ${{ matrix.testCommand.name }} (build only)
-        if: ${{ matrix.testCommand.restoresCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
+        if: ${{ matrix.testCommand.hasBuildStep == true }}
         env:
           CARGO_TEST_ARGS: "--no-run"
-          CARGO_NEXTEST_ARGS: "list --build-jobs=2"
-          CARGO_BUILD_JOBS: "2"
+          CARGO_NEXTEST_ARGS: "list" # --build-jobs=2"
+          # CARGO_BUILD_JOBS: "2"
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
@@ -393,7 +458,6 @@ jobs:
         timeout-minutes: 720
 
       - name: ${{ matrix.testCommand.name }} (run)
-        if: ${{ needs.vars.outputs.skip_test != 'true' }}
         uses: nick-fields/retry@v2.8.1
         env:
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
@@ -408,12 +472,18 @@ jobs:
 
             ${{ matrix.testCommand.run }}
 
-      - name: Garbage-collect cache
-        if: ${{ always() && matrix.testCommand.savesCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
+      - name: Garbage-collection post-run procedure
+        if: ${{ always() && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
+        env:
+          MATRIX: ${{ toJSON(matrix) }}
         run: |
           set -e
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
+
+          # TODO: handle this
+          echo ${MATRIX}
+
           nix-shell \
             --pure \
             --run '
@@ -422,7 +492,7 @@ jobs:
 
       - name: Cache cargo related build files
         uses: steveeJ-forks/actions-cache/save@main
-        if: ${{ always() && matrix.testCommand.savesCargoCache == true && needs.vars.outputs.skip_test != 'true' }}
+        if: ${{ always() && contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
         with:
           path: |
             /var/tmp/holochain_repo/.cargo/bin/
