@@ -50,6 +50,11 @@ on:
         required: false
         default: "false"
         type: string
+      skip_prepare_logic:
+        description: "skip the version bump step"
+        type: string
+        default: "false"
+        required: true
       force_cancel_in_progress:
         description: "force cancelling a running action"
         required: false
@@ -79,6 +84,7 @@ jobs:
       dry_run: ${{ steps.eval.outputs.dry_run }}
       debug: ${{ steps.eval.outputs.debug }}
       skip_test: ${{ steps.eval.outputs.skip_test }}
+      skip_prepare_logic: ${{ steps.eval.outputs.skip_prepare_logic }}
     steps:
       - name: evaluate variables
         id: eval
@@ -92,6 +98,7 @@ jobs:
           input_dry_run: ${{ github.event.inputs.dry_run}}
           input_debug: ${{ github.event.inputs.debug }}
           input_skip_test: ${{ github.event.inputs.skip_test }}
+          input_skip_prepare_logic: ${{ github.event.inputs.skip_prepare_logic }}
         run: |
           set -x
 
@@ -143,6 +150,12 @@ jobs:
             echo "::set-output name=skip_test::false"
           fi
 
+          if [[ ${input_skip_prepare_logic} != "" ]]; then
+            echo "::set-output name=skip_prepare_logic::${input_skip_prepare_logic}"
+          else
+            echo "::set-output name=skip_prepare_logic::false"
+          fi
+
           echo "::set-output name=HOLOCHAIN_REPO::/var/tmp/holochain_repo"
           echo "::set-output name=HOLOCHAIN_RELEASE_SH::/var/tmp/holochain_release.sh"
           echo "::set-output name=CACHIX_REV::v1.0.1"
@@ -152,6 +165,7 @@ jobs:
     with:
       dry_run: ${{ needs.vars.outputs.dry_run }}
       debug: ${{ needs.vars.outputs.debug }}
+      skip_prepare_logic: ${{ needs.vars.outputs.skip_prepare_logic }}
       HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
       HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
