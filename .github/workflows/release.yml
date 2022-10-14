@@ -290,7 +290,7 @@ jobs:
               if grep --quiet ${VERSION_COMPAT} packages/holochain/versions/update_config.toml; then
                 export VERSION_COMPAT="${VERSION_COMPAT}-ci"
                 export TAG="${TAG}-ci"
-                git -C "${HOLOCHAIN_REPO}" tag "${TAG}"
+                git -C "${HOLOCHAIN_REPO}" tag --force "${TAG}"
               fi
 
               # TODO: use a util from the holochain-nixpkgs repo to make this change as this can get out of sync
