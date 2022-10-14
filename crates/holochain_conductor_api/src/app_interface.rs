@@ -1,56 +1,45 @@
 #![allow(deprecated)]
 
+use crate::AppEnabledResponse;
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_types::prelude::*;
+use holochain_types::prelude::{
+    ArchiveCloneCellPayload, CreateCloneCellPayload, InstalledAppId, InstalledCell,
+};
+use holochain_types::prelude::{
+    InstallAppBundlePayload, InstallAppPayload, UpdateCoordinatorsPayload,
+};
+use holochain_zome_types::ZomeCallResponse;
 
-mod app_impl {
+pub type Res<T> = Result<T, ExternalApiWireError>;
 
-    use holochain_types::prelude::{
-        ArchiveCloneCellPayload, CreateCloneCellPayload, InstalledAppId, InstalledCell,
-    };
-    use holochain_zome_types::ZomeCallResponse;
+#[async_trait::async_trait]
+pub trait AppInterface {
+    async fn app_info(&self, installed_app_id: InstalledAppId) -> Res<Option<InstalledAppInfo>>;
 
-    use crate::{ExternalApiWireError, ZomeCall};
+    async fn zome_call(&self, call: ZomeCall) -> Res<ZomeCallResponse>;
 
-    pub type Res<T> = Result<T, ExternalApiWireError>;
+    async fn create_clone_cell(&self, payload: CreateCloneCellPayload) -> Res<InstalledCell>;
 
-    pub trait AppInterface {
-        fn app_info(installed_app_id: InstalledAppId) -> Res<Option<InstalledAppId>>;
-
-        fn zome_call(call: ZomeCall) -> Res<ZomeCallResponse>;
-
-        fn create_clone_cell(payload: CreateCloneCellPayload) -> Res<InstalledCell>;
-
-        fn archive_clone_cell(payload: ArchiveCloneCellPayload) -> Res<()>;
-    }
+    async fn archive_clone_cell(&self, payload: ArchiveCloneCellPayload) -> Res<()>;
 }
 
-mod admin_impl {
+#[async_trait::async_trait]
+pub trait AdminInterface {
+    async fn update_coordinators(&self, payload: UpdateCoordinatorsPayload) -> Res<()>;
 
-    use holochain_types::prelude::{
-        InstallAppBundlePayload, InstallAppPayload, InstalledAppId, UpdateCoordinatorsPayload,
-    };
+    async fn install_app(&self, payload: InstallAppPayload) -> Res<InstalledAppInfo>;
 
-    use crate::{AppEnabledResponse, ExternalApiWireError, InstalledAppInfo};
+    async fn install_app_bundle(&self, payload: InstallAppBundlePayload) -> Res<InstalledAppInfo>;
 
-    pub type Res<T> = Result<T, ExternalApiWireError>;
+    async fn uninstall_app(&self, id: InstalledAppId) -> Res<()>;
 
-    pub trait AdminInterface {
-        fn update_coordinators(payload: UpdateCoordinatorsPayload) -> Res<()>;
+    async fn enable_app(&self, id: InstalledAppId) -> Res<AppEnabledResponse>;
 
-        fn install_app(payload: InstallAppPayload) -> Res<InstalledAppInfo>;
+    async fn disable_app(&self, id: InstalledAppId) -> Res<()>;
 
-        fn install_app_bundle(payload: InstallAppBundlePayload) -> Res<InstalledAppInfo>;
-
-        fn uninstall_app(id: InstalledAppId) -> Res<()>;
-
-        fn enable_app(id: InstalledAppId) -> Res<AppEnabledResponse>;
-
-        fn disable_app(id: InstalledAppId) -> Res<()>;
-
-        fn start_app(id: InstalledAppId) -> Res<bool>;
-    }
+    async fn start_app(&self, id: InstalledAppId) -> Res<bool>;
 }
 
 /// Represents the available conductor functions to call over an app interface

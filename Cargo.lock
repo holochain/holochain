@@ -2172,6 +2172,7 @@ dependencies = [
 name = "holochain_conductor_api"
 version = "0.0.64"
 dependencies = [
+ "async-trait",
  "derive_more",
  "directories",
  "holo_hash",

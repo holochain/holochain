@@ -142,3 +142,34 @@ impl InterfaceApi for RealAppInterfaceApi {
         }
     }
 }
+
+#[async_trait::async_trait]
+impl AppInterface for RealAppInterfaceApi {
+    async fn app_info(&self, installed_app_id: InstalledAppId) -> Res<Option<InstalledAppInfo>> {
+        crate::impl_handler!(
+            AppResponse.AppInfo(_)
+                <= self.handle_request(Ok(AppRequest::AppInfo { installed_app_id }))
+        )
+    }
+
+    async fn zome_call(&self, call: ZomeCall) -> Res<ZomeCallResponse> {
+        crate::impl_handler!(
+            AppResponse.ZomeCall(Box)
+                <= self.handle_request(Ok(AppRequest::ZomeCall(Box::new(call))))
+        )
+    }
+
+    async fn create_clone_cell(&self, payload: CreateCloneCellPayload) -> Res<InstalledCell> {
+        crate::impl_handler!(
+            AppResponse.CloneCellCreated(_)
+                <= self.handle_request(Ok(AppRequest::CreateCloneCell(Box::new(payload))))
+        )
+    }
+
+    async fn archive_clone_cell(&self, payload: ArchiveCloneCellPayload) -> Res<()> {
+        crate::impl_handler!(
+            AppResponse.CloneCellArchived
+                <= self.handle_request(Ok(AppRequest::ArchiveCloneCell(Box::new(payload))))
+        )
+    }
+}

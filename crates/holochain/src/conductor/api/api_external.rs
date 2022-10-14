@@ -19,3 +19,43 @@ pub trait InterfaceApi: 'static + Send + Sync + Clone {
         request: Result<Self::ApiRequest, SerializedBytesError>,
     ) -> InterfaceResult<Self::ApiResponse>;
 }
+
+#[macro_export]
+macro_rules! impl_handler {
+    ($enum: ident . $res: ident (Box) <= $fut: expr) => {
+        match $fut.await.map_err(|e| ExternalApiWireError::internal(e))? {
+            $enum::$res(v) => Ok(*v),
+            $enum::Error(err) => Err(err),
+            r => Err(ExternalApiWireError::internal(format!(
+                "Invalid return value, expected a {}::{} but got: {:?}",
+                stringify!($enum),
+                stringify!($res),
+                r
+            ))),
+        }
+    };
+    ($enum: ident . $res: ident (_) <= $fut: expr) => {
+        match $fut.await.map_err(|e| ExternalApiWireError::internal(e))? {
+            $enum::$res(v) => Ok(v),
+            $enum::Error(err) => Err(err),
+            r => Err(ExternalApiWireError::internal(format!(
+                "Invalid return value, expected a {}::{} but got: {:?}",
+                stringify!($enum),
+                stringify!($res),
+                r
+            ))),
+        }
+    };
+    ($enum: ident . $res: ident <= $fut: expr) => {
+        match $fut.await.map_err(|e| ExternalApiWireError::internal(e))? {
+            $enum::$res => Ok(()),
+            $enum::Error(err) => Err(err),
+            r => Err(ExternalApiWireError::internal(format!(
+                "Invalid return value, expected a {}::{} but got: {:?}",
+                stringify!($enum),
+                stringify!($res),
+                r
+            ))),
+        }
+    };
+}
