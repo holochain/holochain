@@ -213,8 +213,10 @@ pub mod tests {
 
         // Let's just drive alice to exhaust all ticks.
         // let _schedule: () = conductor.call(&alice, "schedule", ()).await;
-        tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         conductor.handle().dispatch_scheduled_fns().await;
+
+        let _query_tick: Vec<Record> = conductor.call(&alice, "query_tick", ()).await;
 
         let mut i: usize = 0;
         while i < 10 {
