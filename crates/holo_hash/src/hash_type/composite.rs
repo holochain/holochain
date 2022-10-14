@@ -160,3 +160,12 @@ impl From<AnyLinkableSerial> for AnyLinkable {
         }
     }
 }
+
+impl From<AnyDht> for AnyLinkable {
+    fn from(t: AnyDht) -> Self {
+        match t {
+            AnyDht::Entry => AnyLinkable::Entry,
+            AnyDht::Action => AnyLinkable::Action,
+        }
+    }
+}

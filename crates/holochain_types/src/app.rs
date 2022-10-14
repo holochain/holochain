@@ -56,6 +56,7 @@ pub enum CoordinatorSource {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
     /// Modifier overrides
+    #[serde(default)]
     pub modifiers: DnaModifiersOpt<YamlProperties>,
     /// Where to find the DNA
     #[serde(flatten)]
@@ -570,6 +571,22 @@ impl InstalledAppCommon {
             }
         };
         Ok(clone_id.clone())
+    }
+
+    /// Get the clone id from either clone or cell id.
+    pub fn get_archived_clone_id(&self, clone_cell_id: &CloneCellId) -> AppResult<CloneId> {
+        let clone_id = match clone_cell_id {
+            CloneCellId::CloneId(id) => id.clone(),
+            CloneCellId::CellId(id) => {
+                self.role_assignments
+                    .iter()
+                    .flat_map(|(_, role_assignment)| role_assignment.archived_clones.clone())
+                    .find(|(_, cell_id)| cell_id == id)
+                    .ok_or_else(|| AppError::CloneCellNotFound(CloneCellId::CellId(id.clone())))?
+                    .0
+            }
+        };
+        Ok(clone_id)
     }
 
     /// Archive a clone cell.

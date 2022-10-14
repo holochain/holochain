@@ -75,6 +75,7 @@ pub struct AppRoleDnaManifest {
     pub location: Option<mr_bundle::Location>,
 
     /// Optional default modifier values. May be overridden during installation.
+    #[serde(default)]
     pub modifiers: DnaModifiersOpt<YamlProperties>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
@@ -195,7 +196,8 @@ impl AppManifestV1 {
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for mut role in self.roles.iter_mut() {
             if matches!(role.provisioning, Some(CellProvisioning::Create { .. })) {
-                role.dna.modifiers.network_seed = Some(network_seed.clone());
+                role.dna.modifiers =
+                    DnaModifiersOpt::none().with_network_seed(network_seed.clone());
             }
         }
     }

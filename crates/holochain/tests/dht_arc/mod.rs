@@ -30,7 +30,7 @@ async fn get_peers(num: usize, half_lens: &[u32], keystore: MetaLairClient) -> V
 // we can't actually maintain the [`MIN_REDUNDANCY`] and will need raise the [`REDUNDANCY_TARGET`].
 // Please @freesig if you see this fail.
 async fn test_arc_redundancy() {
-    let conductor = SweetConductor::from_config(Default::default()).await;
+    let conductor = SweetConductor::from_standard_config().await;
     let keystore = conductor.keystore();
     fn converge(peers: &mut Vec<DhtArc>) {
         let mut mature = false;
@@ -79,7 +79,7 @@ async fn test_arc_redundancy() {
 // Can survive 50% of the nodes changing per update without
 // dropping below [`MIN_REDUNDANCY`]
 async fn test_join_leave() {
-    let conductor = SweetConductor::from_config(Default::default()).await;
+    let conductor = SweetConductor::from_standard_config().await;
     let keystore = conductor.keystore();
 
     let num_peers = DEFAULT_MIN_PEERS;

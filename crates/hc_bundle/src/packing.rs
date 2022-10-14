@@ -4,6 +4,7 @@
 
 use crate::error::{HcBundleError, HcBundleResult};
 use holochain_util::ffs;
+use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
@@ -25,6 +26,30 @@ pub async fn unpack<M: Manifest>(
     };
 
     bundle.unpack_yaml(&target_dir, force).await?;
+
+    Ok(target_dir)
+}
+
+/// Unpack a DNA bundle into a working directory, returning the directory path used.
+pub async fn unpack_raw(
+    extension: &'static str,
+    bundle_path: &std::path::Path,
+    target_dir: Option<PathBuf>,
+    manifest_path: &Path,
+    force: bool,
+) -> HcBundleResult<PathBuf> {
+    let bundle_path = ffs::canonicalize(bundle_path).await?;
+    let bundle: RawBundle<serde_yaml::Value> = RawBundle::read_from_file(&bundle_path).await?;
+
+    let target_dir = if let Some(d) = target_dir {
+        d
+    } else {
+        bundle_path_to_dir(&bundle_path, extension)?
+    };
+
+    bundle
+        .unpack_yaml(&target_dir, manifest_path, force)
+        .await?;
 
     Ok(target_dir)
 }

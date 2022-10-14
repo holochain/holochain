@@ -136,7 +136,7 @@ pub struct Metrics {
 
     // Number of times we need to force initiate
     // the next round.
-    force_initiates: u8,
+    pub(crate) force_initiates: u8,
 }
 
 /// Outcome of a gossip round.
@@ -345,6 +345,11 @@ impl Metrics {
         if should_dec_force_initiates {
             self.force_initiates = self.force_initiates.saturating_sub(1);
         }
+
+        tracing::debug!(
+            "recorded success in metrics. force_initiates={}",
+            self.force_initiates
+        );
     }
 
     /// Record a gossip round has finished with an error.
@@ -362,6 +367,10 @@ impl Metrics {
             record_instant(&mut info.errors);
             info.current_round = false;
         }
+        tracing::debug!(
+            "recorded error in metrics. force_initiates={}",
+            self.force_initiates
+        );
     }
 
     /// Record that we should force initiate the next few rounds.
