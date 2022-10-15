@@ -1,7 +1,10 @@
 const YELLOW_THRESHOLD: usize = 5;
 const RED_THRESHOLD: usize = 15;
 
-use holochain::prelude::kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant;
+use holochain::prelude::{
+    kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant,
+    metrics::RoundMetric,
+};
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -43,6 +46,7 @@ pub struct State<const N: usize, const B: usize> {
     pub commits: [usize; B],
     pub counts: [[(usize, Instant); B]; N],
     pub list_state: ListState,
+    pub filter_zero_rounds: bool,
 }
 
 impl<const N: usize, const B: usize> State<N, B> {
@@ -69,6 +73,14 @@ impl<const N: usize, const B: usize> State<N, B> {
             .selected()
             .and_then(|s| (s > 0).then(|| s - 1))
     }
+}
+
+struct UiLayout {
+    node_list: Rect,
+    get_table: Rect,
+    gossip_table: Rect,
+    stats: Rect,
+    time: Rect,
 }
 
 #[derive(Clone)]
@@ -115,6 +127,9 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                     KeyCode::Down | KeyCode::Char('j') => {
                         self.state.share_mut(|s| s.node_selector(1))
                     }
+                    KeyCode::Char('0') => self
+                        .state
+                        .share_mut(|s| s.filter_zero_rounds = !s.filter_zero_rounds),
                     _ => {}
                 }
             }
@@ -123,24 +138,26 @@ impl<const N: usize, const B: usize> Ui<N, B> {
     }
 
     pub fn render<K: Backend>(&self, f: &mut Frame<K>) {
-        let [rect_list, rect_table, rect_gossip, rect_stats, rect_time] = self.ui_layout(f);
+        let layout = self.ui_layout(f);
 
-        let selected = self.state.share_mut(|state| {
-            f.render_stateful_widget(self.ui_node_list(), rect_list, &mut state.list_state);
-            f.render_widget(self.ui_basis_table(state), rect_table);
+        let (selected, filter_zeroes) = self.state.share_mut(|state| {
+            f.render_stateful_widget(self.ui_node_list(), layout.node_list, &mut state.list_state);
+            f.render_widget(self.ui_basis_table(state), layout.get_table);
             let selected = state.selected_node();
             if selected.is_none() {
-                f.render_widget(self.ui_global_stats(state), rect_gossip);
+                f.render_widget(self.ui_keymap(), layout.gossip_table);
+                f.render_widget(self.ui_global_stats(state), layout.stats);
             }
-            selected
+            (selected, state.filter_zero_rounds)
         });
         if let Some(selected) = selected {
-            f.render_widget(self.ui_gossip_info_table(selected), rect_gossip);
-            f.render_widget(self.ui_gossip_detail(selected), rect_stats);
+            f.render_widget(self.ui_gossip_info_table(selected), layout.gossip_table);
+            f.render_widget(self.ui_gossip_detail(selected, filter_zeroes), layout.stats);
         }
 
-        let t = Paragraph::new(format!("T={:<.2?}", self.start_time.elapsed()));
-        f.render_widget(t, rect_time);
+        let z = if filter_zeroes { "(0)" } else { "   " };
+        let t = Paragraph::new(format!("{}  T={:<.2?}", z, self.start_time.elapsed()));
+        f.render_widget(t, layout.time);
     }
 
     fn ui_node_list(&self) -> List<'static> {
@@ -205,6 +222,20 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         .block(Block::default().borders(Borders::TOP).title("Stats"))
     }
 
+    fn ui_keymap(&self) -> List<'static> {
+        List::new(
+            [
+                format!("up/down/j/k : select node"),
+                format!("          0 : toggle empty gossip rounds"),
+                format!("          q : Quit"),
+            ]
+            .into_iter()
+            .map(ListItem::new)
+            .collect::<Vec<_>>(),
+        )
+        .block(Block::default().borders(Borders::TOP).title("Keymap"))
+    }
+
     fn ui_gossip_info_table(&self, n: usize) -> Table<'static> {
         let node = &self.nodes[n];
         let metrics = node.diagnostics.metrics.read();
@@ -231,12 +262,17 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         ])
     }
 
-    fn ui_gossip_detail(&self, n: usize) -> Table<'static> {
+    fn ui_gossip_detail(&self, n: usize, filter_zeroes: bool) -> Table<'static> {
         let node = &self.nodes[n];
         let metrics = node.diagnostics.metrics.read();
-        let mut infos: Vec<_> = self
-            .node_infos(&metrics)
-            .into_iter()
+        let infos = self.node_infos(&metrics);
+        let mut currents: Vec<_> = infos
+            .iter()
+            .filter_map(|(n, i)| i.current_round.clone().map(|r| (*n, r)))
+            .collect();
+
+        let mut metrics: Vec<_> = infos
+            .iter()
             .flat_map(|(n, info)| {
                 info.complete_rounds
                     .clone()
@@ -244,53 +280,44 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                     .map(move |r| (n, r))
             })
             .collect();
-        infos.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+
+        currents.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        metrics.sort_unstable_by(|a, b| b.1.cmp(&a.1));
 
         let header = Row::new(["n", "time", "t", "dur", "#in", "#out", "in", "out"])
             .style(Style::default().add_modifier(Modifier::UNDERLINED));
-        let rows: Vec<_> = infos
-            .into_iter()
-            .map(|(n, info)| {
-                let gt = match info.gossip_type {
-                    GossipModuleType::ShardedRecent => {
-                        Cell::from("R".to_string()).style(Style::default().fg(Color::Blue))
-                    }
-                    GossipModuleType::ShardedHistorical => {
-                        Cell::from("H".to_string()).style(Style::default().fg(Color::Yellow))
-                    }
-                };
-                let mut cells = vec![
-                    Cell::from(n.to_string()),
-                    Cell::from(format!(
-                        "{:?}",
-                        info.instant
-                            .duration_since(TokioInstant::from(self.start_time))
-                    )),
-                    gt,
-                ];
-                if let Some(round) = info.round {
-                    let dur = {
-                        let val = info.instant.duration_since(round.start_time);
-                        let style = if val.as_millis() >= 1000 {
-                            Style::default().fg(Color::Red)
-                        } else if val.as_millis() >= 100 {
-                            Style::default().fg(Color::Yellow)
-                        } else {
-                            Style::default()
-                        };
-                        Cell::from(format!("{:3.1?}", val)).style(style)
-                    };
-                    cells.extend([
-                        dur,
-                        Cell::from(format!("{}", round.throughput.op_count.incoming)),
-                        Cell::from(format!("{}", round.throughput.op_count.outgoing)),
-                        Cell::from(format!("{}", round.throughput.op_bytes.incoming)),
-                        Cell::from(format!("{}", round.throughput.op_bytes.outgoing)),
-                    ])
-                }
-                Row::new(cells)
-            })
-            .collect();
+
+        let mut rows = vec![];
+
+        // Add current round info
+
+        rows.extend(
+            currents
+                .into_iter()
+                .map(|(n, metric)| render_gossip_metric_row(n, metric, self.start_time, true)),
+        );
+
+        // Add past round info
+
+        rows.extend(metrics.into_iter().filter_map(|(n, info)| {
+            let zero = info
+                .round
+                .as_ref()
+                .map(|r| {
+                    r.throughput.op_count.incoming
+                        + r.throughput.op_count.outgoing
+                        + r.throughput.op_bytes.incoming
+                        + r.throughput.op_bytes.outgoing
+                        == 0
+                })
+                .unwrap_or(false);
+            if filter_zeroes && zero {
+                None
+            } else {
+                Some(render_gossip_metric_row(*n, info, self.start_time, false))
+            }
+        }));
+
         Table::new(rows).header(header).widths(&[
             Constraint::Percentage(100 / 8),
             Constraint::Percentage(100 / 8),
@@ -304,7 +331,12 @@ impl<const N: usize, const B: usize> Ui<N, B> {
     }
 
     fn ui_gossip_info_row(&self, info: &NodeInfo, own: bool) -> Row<'static> {
-        let active = if info.current_round { "*" } else { " " }.to_string();
+        let active = if info.current_round.is_some() {
+            "*"
+        } else {
+            " "
+        }
+        .to_string();
         let rounds = info
             .complete_rounds
             .iter()
@@ -335,7 +367,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         }
     }
 
-    fn ui_layout<K: Backend>(&self, f: &mut Frame<K>) -> [Rect; 5] {
+    fn ui_layout<K: Backend>(&self, f: &mut Frame<K>) -> UiLayout {
         let list_len = 3;
         let table_len = B as u16 * 2 + 2;
         let stats_height = 5;
@@ -364,7 +396,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         vsplit[1].height -= 1;
 
         let w = f.size().width;
-        let tw = 8;
+        let tw = 16;
         let time = Rect {
             x: w - tw,
             y: 0,
@@ -372,7 +404,13 @@ impl<const N: usize, const B: usize> Ui<N, B> {
             height: 1,
         };
 
-        [top_chunks[0], top_chunks[1], top_chunks[2], vsplit[1], time]
+        UiLayout {
+            node_list: top_chunks[0],
+            get_table: top_chunks[1],
+            gossip_table: top_chunks[2],
+            stats: vsplit[1],
+            time,
+        }
     }
 
     fn node_infos<'a>(&self, metrics: &'a Metrics) -> Vec<(usize, &'a NodeInfo)> {
@@ -392,4 +430,74 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         infos.sort_unstable_by_key(|(i, _)| *i);
         infos
     }
+}
+
+fn render_gossip_metric_row(
+    n: usize,
+    metric: RoundMetric,
+    start_time: Instant,
+    current: bool,
+) -> Row<'static> {
+    let number_cell = |v| {
+        let cell = Cell::from(format!("{}", v));
+        if v == 0 {
+            cell.style(Style::default().fg(Color::DarkGray))
+        } else {
+            cell
+        }
+    };
+
+    let (gt, style) = match metric.gossip_type {
+        GossipModuleType::ShardedRecent => (
+            Cell::from("R".to_string()),
+            Style::default().fg(Color::Green),
+        ),
+        GossipModuleType::ShardedHistorical => (
+            Cell::from("H".to_string()),
+            Style::default().fg(Color::Blue),
+        ),
+    };
+    let mut cells = vec![
+        Cell::from(n.to_string()),
+        Cell::from(format!(
+            "{:.1?}",
+            metric
+                .instant
+                .duration_since(TokioInstant::from(start_time))
+        )),
+        gt,
+    ];
+
+    cells.push({
+        let dur = if current {
+            metric.instant.elapsed()
+        } else if let Some(round) = &metric.round {
+            metric.instant.duration_since(round.start_time)
+        } else {
+            Duration::ZERO
+        };
+        let style = if dur.as_millis() >= 1000 {
+            Style::default().fg(Color::Red)
+        } else if dur.as_millis() >= 100 {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default()
+        };
+        Cell::from(format!("{:3.1?}", dur)).style(style)
+    });
+
+    if let Some(round) = metric.round {
+        cells.extend([
+            number_cell(round.throughput.op_count.incoming),
+            number_cell(round.throughput.op_count.outgoing),
+            number_cell(round.throughput.op_bytes.incoming),
+            number_cell(round.throughput.op_bytes.outgoing),
+        ])
+    }
+    let style = if current {
+        style.add_modifier(Modifier::REVERSED)
+    } else {
+        style
+    };
+    Row::new(cells).style(style)
 }

@@ -124,7 +124,7 @@ pub struct NodeInfo {
     /// Times we recorded complete rounds for this node.
     pub complete_rounds: VecDeque<RoundMetric>,
     /// Is this node currently in an active round?
-    pub current_round: bool,
+    pub current_round: Option<RoundMetric>,
 }
 
 /// Info about a completed gossip round
@@ -349,7 +349,7 @@ impl Metrics {
     }
 
     /// Record a gossip round has been initiated by us.
-    pub fn record_initiate<'a, T, I>(&mut self, remote_agent_list: I)
+    pub fn record_initiate<'a, T, I>(&mut self, remote_agent_list: I, gossip_type: GossipModuleType)
     where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
@@ -360,13 +360,20 @@ impl Metrics {
                 .entry(agent_info.into().agent().clone())
                 .or_default();
             record_item(&mut info.initiates, Instant::now());
-            info.current_round = true;
+            info.current_round = Some(RoundMetric {
+                instant: Instant::now(),
+                round: None,
+                gossip_type,
+            });
         }
     }
 
     /// Record a remote gossip round has started.
-    pub fn record_remote_round<'a, T, I>(&mut self, remote_agent_list: I)
-    where
+    pub fn record_remote_round<'a, T, I>(
+        &mut self,
+        remote_agent_list: I,
+        gossip_type: GossipModuleType,
+    ) where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
     {
@@ -376,7 +383,11 @@ impl Metrics {
                 .entry(agent_info.into().agent().clone())
                 .or_default();
             record_item(&mut info.remote_rounds, Instant::now());
-            info.current_round = true;
+            info.current_round = Some(RoundMetric {
+                instant: Instant::now(),
+                round: None,
+                gossip_type,
+            });
         }
     }
 
@@ -404,7 +415,7 @@ impl Metrics {
                 gossip_type,
             };
             record_item(&mut info.complete_rounds, round);
-            info.current_round = false;
+            info.current_round = None;
             if info.is_initiate_round() {
                 should_dec_force_initiates = true;
             }
@@ -442,7 +453,7 @@ impl Metrics {
                 gossip_type,
             };
             record_item(&mut info.errors, round);
-            info.current_round = false;
+            info.current_round = None;
         }
         tracing::debug!(
             "recorded error in metrics. force_initiates={}",
@@ -477,8 +488,7 @@ impl Metrics {
         remote_agent_list
             .into_iter()
             .filter_map(|agent_info| self.nodes.get(agent_info.into().agent()))
-            .map(|info| info.current_round)
-            .any(|x| x)
+            .any(|info| info.current_round.is_some())
     }
 
     /// What was the last outcome for this node's gossip round?
@@ -634,7 +644,7 @@ impl std::fmt::Display for Metrics {
                     last_completion,
                     completion_frequency
                 )?;
-                write!(f, "\n\t\tCurrent Round: {}", info.current_round)?;
+                write!(f, "\n\t\tCurrent Round: {:?}", info.current_round)?;
             }
         }
         write!(

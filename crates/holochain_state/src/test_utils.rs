@@ -1,6 +1,5 @@
 //! Helpers for unit tests
 
-use either::Either;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
@@ -208,9 +207,61 @@ pub struct TestDbs {
     /// A test p2p environment
     p2p_metrics: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
     /// The shared root temp dir for these environments
-    dir: Either<TempDir, PathBuf>,
+    dir: TestDir,
     /// The keystore sender for these environments
     keystore: MetaLairClient,
+}
+
+#[derive(Debug)]
+pub enum TestDir {
+    Temp(TempDir),
+    Perm(PathBuf),
+    Blank,
+}
+
+impl AsRef<Path> for TestDir {
+    fn as_ref(&self) -> &Path {
+        match self {
+            Self::Temp(d) => d.path(),
+            Self::Perm(d) => d.as_path(),
+            Self::Blank => unreachable!(),
+        }
+    }
+}
+
+impl std::ops::Deref for TestDir {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        match self {
+            Self::Temp(d) => d.path(),
+            Self::Perm(d) => d.as_path(),
+            Self::Blank => unreachable!(),
+        }
+    }
+}
+
+impl From<TempDir> for TestDir {
+    fn from(d: TempDir) -> Self {
+        Self::new(d)
+    }
+}
+
+impl TestDir {
+    pub fn new(d: TempDir) -> Self {
+        Self::Temp(d)
+    }
+
+    pub fn persist(&mut self) {
+        let old = std::mem::replace(self, Self::Blank);
+        match old {
+            Self::Temp(d) => {
+                tracing::info!("Made temp dir permanent at {:?}", d);
+                *self = Self::Perm(d.into_path());
+            }
+            old => *self = old,
+        }
+    }
 }
 
 #[allow(missing_docs)]
@@ -226,7 +277,7 @@ impl TestDbs {
             wasm,
             p2p,
             p2p_metrics,
-            dir: Either::Left(tempdir),
+            dir: TestDir::new(tempdir),
             keystore,
         }
     }
@@ -257,42 +308,14 @@ impl TestDbs {
     }
 
     /// Consume the TempDir so that it will not be cleaned up after the test is over.
-    #[deprecated = "solidified() should only be used during debugging"]
-    pub fn solidified(self) -> Self {
-        let Self {
-            conductor,
-            wasm,
-            p2p,
-            p2p_metrics,
-            dir,
-            keystore,
-        } = self;
-        let dir = dir.left_and_then(|tempdir| {
-            let pathbuf = tempdir.into_path();
-            println!("Solidified TestEnvs at {:?}", pathbuf);
-            Either::Right(pathbuf)
-        });
-        Self {
-            conductor,
-            wasm,
-            p2p,
-            p2p_metrics,
-            dir,
-            keystore,
-        }
-    }
-
-    pub fn into_tempdir(self) -> TempDir {
-        self.dir
-            .expect_left("can only use into_tempdir if not already solidified")
+    #[deprecated = "persist() should only be used during debugging"]
+    pub fn persist(&mut self) {
+        self.dir.persist();
     }
 
     /// Get the root path for these environments
     pub fn path(&self) -> &Path {
-        match &self.dir {
-            Either::Left(tempdir) => tempdir.path(),
-            Either::Right(path) => path,
-        }
+        &self.dir
     }
 
     pub fn keystore(&self) -> &MetaLairClient {

@@ -1,10 +1,12 @@
 use holochain_diagnostics::{
-    holochain::{conductor::conductor::RwShare, prelude::*, sweettest::*},
+    holochain::{
+        conductor::{conductor::RwShare, config::ConductorConfig},
+        prelude::*,
+    },
     ui::*,
     *,
 };
 use std::{
-    collections::HashMap,
     error::Error,
     io::{self},
     sync::Arc,
@@ -12,28 +14,37 @@ use std::{
 };
 use tui::{backend::Backend, widgets::*, Terminal};
 
-//                                        █████
-//                                       ░░███
-//   ██████   ██████  ████████    █████  ███████    █████
-//  ███░░███ ███░░███░░███░░███  ███░░  ░░░███░    ███░░
-// ░███ ░░░ ░███ ░███ ░███ ░███ ░░█████   ░███    ░░█████
-// ░███  ███░███ ░███ ░███ ░███  ░░░░███  ░███ ███ ░░░░███
-// ░░██████ ░░██████  ████ █████ ██████   ░░█████  ██████
-//  ░░░░░░   ░░░░░░  ░░░░ ░░░░░ ░░░░░░     ░░░░░  ░░░░░░
-//
-//
-
-const NODES: usize = 3;
+const NODES: usize = 10;
 const BASES: usize = 3;
 
-const ENTRY_SIZE: usize = 1_00_000;
+const ENTRY_SIZE: usize = 10_000_000;
 const MAX_COMMITS: usize = 100;
 
-const REFRESH_RATE: Duration = Duration::from_millis(50);
-const COMMIT_RATE: Duration = Duration::from_millis(5000);
+const COMMIT_RATE: Duration = Duration::from_millis(500);
 const GET_RATE: Duration = Duration::from_millis(100);
 
-const UI: bool = false;
+const REFRESH_RATE: Duration = Duration::from_millis(250);
+
+/// Display the UI if all other conditions are met
+const UI: bool = true;
+
+/// Config for each conductor
+fn config() -> ConductorConfig {
+    // config_historical_and_agent_gossip_only()
+    // config_recent_only()
+    // config_historical_only()
+    // config_standard()
+
+    let mut config = config_standard();
+    config.network.as_mut().map(|c| {
+        *c = c.clone().tune(|mut tp| {
+            tp.disable_publish = true;
+            tp.danger_gossip_recent_threshold_secs = 10;
+            tp
+        });
+    });
+    config
+}
 
 //                             ███
 //                            ░░░
@@ -55,7 +66,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     task_commit(app.clone());
     task_get(app.clone());
 
-    if UI {
+    let show_ui = UI && std::env::var("RUST_LOG").is_err();
+
+    if show_ui {
         tui_crossterm_setup(|t| run_app(t, app))?;
     } else {
         loop {
@@ -76,21 +89,34 @@ struct App {
     // agent_node_index: HashMap<AgentPubKey, usize>,
 }
 
+//                    █████
+//                   ░░███
+//   █████   ██████  ███████   █████ ████ ████████
+//  ███░░   ███░░███░░░███░   ░░███ ░███ ░░███░░███
+// ░░█████ ░███████   ░███     ░███ ░███  ░███ ░███
+//  ░░░░███░███░░░    ░███ ███ ░███ ░███  ░███ ░███
+//  ██████ ░░██████   ░░█████  ░░████████ ░███████
+// ░░░░░░   ░░░░░░     ░░░░░    ░░░░░░░░  ░███░░░
+//                                        ░███
+//                                        █████
+//                                       ░░░░░
+
 async fn setup_app() -> App {
     assert!(BASES <= NODES);
-    // let config = config_historical_and_agent_gossip_only();
-    let config = config_historical_only();
-    // let config = config_standard();
 
-    let (conductors, zomes) = diagnostic_tests::setup_conductors_single_zome(
+    let (mut conductors, zomes) = diagnostic_tests::setup_conductors_single_zome(
         NODES,
-        config,
+        config(),
         diagnostic_tests::basic_zome(),
     )
     .await;
 
     conductors.exchange_peer_info().await;
     println!("Peer info exchanged. Starting UI.");
+
+    // conductors[0].persist();
+    // conductors[1].persist();
+    // conductors[2].persist();
 
     let mut nodes = vec![];
 
@@ -128,6 +154,7 @@ async fn setup_app() -> App {
         commits,
         counts,
         list_state,
+        filter_zero_rounds: false,
     });
     let ui = Ui::new(nodes.clone(), now, REFRESH_RATE, state.clone());
 
@@ -138,6 +165,18 @@ async fn setup_app() -> App {
         ui,
     }
 }
+
+//   █████                      █████
+//  ░░███                      ░░███
+//  ███████    ██████    █████  ░███ █████  █████
+// ░░░███░    ░░░░░███  ███░░   ░███░░███  ███░░
+//   ░███      ███████ ░░█████  ░██████░  ░░█████
+//   ░███ ███ ███░░███  ░░░░███ ░███░░███  ░░░░███
+//   ░░█████ ░░████████ ██████  ████ █████ ██████
+//    ░░░░░   ░░░░░░░░ ░░░░░░  ░░░░ ░░░░░ ░░░░░░
+//
+//
+//
 
 fn task_get(app: App) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {

@@ -168,7 +168,7 @@ impl ShardedGossipLocal {
                 inner
                     .metrics
                     .write()
-                    .record_remote_round(&remote_agent_list);
+                    .record_remote_round(&remote_agent_list, self.gossip_type.into());
             }
             // If this is the target then we should clear the when initiated timeout.
             if let Some(tgt) = inner.initiate_tgt.as_mut() {

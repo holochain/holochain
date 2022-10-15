@@ -11,12 +11,12 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
+use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::path::Path;
 use std::sync::Arc;
-use tempfile::TempDir;
 
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
@@ -30,7 +30,7 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 #[derive(derive_more::From)]
 pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
-    db_dir: TempDir,
+    db_dir: TestDir,
     keystore: MetaLairClient,
     pub(crate) spaces: Spaces,
     config: ConductorConfig,
@@ -91,7 +91,7 @@ impl SweetConductor {
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(
         handle: ConductorHandle,
-        env_dir: TempDir,
+        env_dir: TestDir,
         config: ConductorConfig,
     ) -> SweetConductor {
         // Automatically add a test app interface
@@ -110,7 +110,7 @@ impl SweetConductor {
         // As a TODO, we can remove the need for TestEnvs in sweettest or have
         // some other better integration between the two.
         let spaces = Spaces::new(&ConductorConfig {
-            environment_path: env_dir.path().to_path_buf().into(),
+            environment_path: env_dir.to_path_buf().into(),
             ..Default::default()
         })
         .unwrap();
@@ -130,16 +130,16 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config(config: ConductorConfig) -> SweetConductor {
-        let dir = test_db_dir();
-        let handle = Self::handle_from_existing(dir.path(), test_keystore(), &config, &[]).await;
+        let dir = TestDir::new(test_db_dir());
+        let handle = Self::handle_from_existing(&dir, test_keystore(), &config, &[]).await;
         Self::new(handle, dir, config).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
     pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
-        let db_dir = test_db_dir();
+        let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
-        let handle = builder.test(db_dir.path(), &[]).await.unwrap();
+        let handle = builder.test(&db_dir, &[]).await.unwrap();
         Self::new(handle, db_dir, config).await
     }
 
@@ -165,7 +165,12 @@ impl SweetConductor {
 
     /// Access the database path for this conductor
     pub fn db_path(&self) -> &Path {
-        self.db_dir.path()
+        &self.db_dir
+    }
+
+    /// Make the temp db dir persistent
+    pub fn persist(&mut self) {
+        self.db_dir.persist();
     }
 
     /// Access the MetaLairClient for this conductor
@@ -414,7 +419,7 @@ impl SweetConductor {
         if self.handle.is_none() {
             self.handle = Some(SweetConductorHandle(
                 Self::handle_from_existing(
-                    self.db_dir.path(),
+                    &self.db_dir,
                     self.keystore.clone(),
                     &self.config,
                     self.dnas.as_slice(),

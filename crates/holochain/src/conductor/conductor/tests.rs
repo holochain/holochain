@@ -309,7 +309,7 @@ async fn test_signing_error_during_genesis() {
     let config = ConductorConfig::default();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(db_dir.path(), bad_keystore, &config, &[]).await,
-        db_dir,
+        db_dir.into(),
         config,
     )
     .await;
@@ -372,7 +372,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     let config = standard_config();
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(db_dir.path(), keystore.clone(), &config, &[]).await,
-        db_dir,
+        db_dir.into(),
         config,
     )
     .await;
