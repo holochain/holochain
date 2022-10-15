@@ -1515,6 +1515,7 @@ mod builder {
 
         /// Initialize a "production" Conductor
         pub async fn build(self) -> ConductorResult<ConductorHandle> {
+            println!("build");
             cfg_if::cfg_if! {
                 // if mock_handle is specified, return that instead of
                 // a real handle
@@ -1684,6 +1685,7 @@ mod builder {
             post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         ) -> ConductorResult<ConductorHandle> {
             tracing::warn!("finish");
+            println!("finish");
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
             let _ = handle

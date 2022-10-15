@@ -252,9 +252,8 @@ impl Cell {
             .await?)
     }
 
-    pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
+    pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         println!("dispatch_scheduled_fns");
-        let now = Timestamp::now();
         let author = self.id.agent_pubkey().clone();
         let lives = self
             .space

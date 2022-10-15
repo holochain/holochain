@@ -315,7 +315,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration);
 
     /// Dispatch all due scheduled functions.
-    async fn dispatch_scheduled_fns(self: Arc<Self>);
+    async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp);
 
     /// Get an OwnedPermit to the post commit task.
     async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>>;
@@ -1116,13 +1116,14 @@ impl ConductorHandleT for ConductorHandleImpl {
             let mut interval = tokio::time::interval(interval_period);
             loop {
                 interval.tick().await;
-                scheduler_handle.clone().dispatch_scheduled_fns().await;
+                let now = Timestamp::now();
+                scheduler_handle.clone().dispatch_scheduled_fns(now).await;
             }
         });
     }
 
     /// The scheduler wants to dispatch any functions that are due.
-    async fn dispatch_scheduled_fns(self: Arc<Self>) {
+    async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         println!("scheduler dispatch scheduled fns");
         tracing::warn!("dispatch_scheduled_fns");
         let cell_arcs = {
@@ -1137,7 +1138,7 @@ impl ConductorHandleT for ConductorHandleImpl {
 
         let tasks = cell_arcs
             .into_iter()
-            .map(|cell_arc| cell_arc.dispatch_scheduled_fns());
+            .map(|cell_arc| cell_arc.dispatch_scheduled_fns(now));
         futures::future::join_all(tasks).await;
     }
 
