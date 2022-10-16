@@ -330,7 +330,7 @@ async fn conductor_can_startup_with_cloned_cell() {
         .await
         .unwrap();
 
-    let installed_clone_cell = conductor
+    let _ = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),

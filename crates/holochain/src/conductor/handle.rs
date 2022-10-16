@@ -965,6 +965,7 @@ impl ConductorHandleT for ConductorHandleImpl {
                 role_id.clone(),
                 modifiers.serialized()?,
                 name,
+                self.clone(),
             )
             .await?;
 
