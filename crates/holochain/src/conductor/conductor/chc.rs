@@ -15,6 +15,7 @@ impl Conductor {
     }
 
     #[cfg(any(test))]
+    #[allow(dead_code)]
     pub(crate) async fn chc_sync(
         self: Arc<Self>,
         cell_id: CellId,

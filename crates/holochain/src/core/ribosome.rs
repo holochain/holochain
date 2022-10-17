@@ -13,7 +13,6 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
-use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
@@ -393,7 +392,6 @@ impl ZomeCallInvocation {
         conductor_api: CellConductorHandle,
         call: ZomeCall,
     ) -> RibosomeResult<Self> {
-        use crate::conductor::api::CellConductorApiT;
         let ZomeCall {
             cell_id,
             zome_name,

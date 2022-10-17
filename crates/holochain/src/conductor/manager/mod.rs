@@ -388,7 +388,7 @@ mod test {
     use holochain_state::test_utils::test_db_dir;
     use observability;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn spawn_and_handle_dying_task() -> Result<()> {
         observability::test_run().ok();
         let db_dir = test_db_dir();

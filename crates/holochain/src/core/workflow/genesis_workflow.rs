@@ -20,7 +20,6 @@ use holochain_state::workspace::WorkspaceResult;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
-use tracing::*;
 
 /// The struct which implements the genesis Workflow
 #[derive(Constructor)]
