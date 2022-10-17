@@ -2231,6 +2231,7 @@ dependencies = [
  "arbitrary",
  "crossterm 0.25.0",
  "holochain",
+ "human-repr",
  "rand 0.8.5",
  "tracing",
  "tui",
@@ -2699,6 +2700,12 @@ dependencies = [
  "toml",
  "uuid 0.8.2",
 ]
+
+[[package]]
+name = "human-repr"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0fb489e3108b684bba475a4cb9804260365870e2f60058265e3d0a3b309bdb1"
 
 [[package]]
 name = "hyper"

@@ -16,12 +16,13 @@ use std::{
 use tui::{backend::Backend, widgets::*, Terminal};
 
 const NODES: usize = 10;
-const BASES: usize = 3;
+const BASES: usize = 1;
 
-const ENTRY_SIZE: usize = 5_000_000;
-const MAX_COMMITS: usize = 100;
+const ENTRY_SIZE: usize = 15_000_000;
+const MAX_COMMITS: usize = 50;
+const PRE_COMMITS: usize = 5;
 
-const COMMIT_RATE: Duration = Duration::from_millis(5);
+const COMMIT_RATE: Duration = Duration::from_millis(200);
 const GET_RATE: Duration = Duration::from_millis(100);
 
 const REFRESH_RATE: Duration = Duration::from_millis(50);
@@ -41,7 +42,8 @@ fn config() -> ConductorConfig {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;
             // tp.disable_historical_gossip = true;
-            tp.danger_gossip_recent_threshold_secs = 0;
+            tp.danger_gossip_recent_threshold_secs = 10;
+
             tp.gossip_inbound_target_mbps = 1000000.0;
             tp.gossip_outbound_target_mbps = 1000000.0;
             tp.gossip_historic_outbound_target_mbps = 1000000.0;
@@ -228,7 +230,7 @@ fn task_get(app: App) -> tokio::task::JoinHandle<()> {
     })
 }
 
-async fn commit(app: &App, rng: &mut StdRng) -> bool {
+async fn commit(app: &App, rng: &mut StdRng) -> usize {
     let n = rng.gen_range(0..NODES);
     let b = rng.gen_range(0..BASES);
 
@@ -242,27 +244,34 @@ async fn commit(app: &App, rng: &mut StdRng) -> bool {
         )
         .await;
 
-    let done = app.state.share_mut(|state| {
+    let total = app.state.share_mut(|state| {
         state.commits[b] += 1;
-        state.total_commits() >= MAX_COMMITS
+        state.total_commits()
     });
 
-    done
+    total
 }
 
 fn task_commit(app: App, mut rng: StdRng) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
+        let mut exchanged = false;
         loop {
-            let done = commit(&app, &mut rng).await;
-            if done {
+            let total = commit(&app, &mut rng).await;
+            if total >= MAX_COMMITS {
                 break;
+            } else if !exchanged && total >= PRE_COMMITS {
+                let app = app.clone();
+                tokio::spawn(async move {
+                    SweetConductor::exchange_peer_info(app.ui.nodes.iter().map(|n| &*n.conductor))
+                        .await
+                });
+                exchanged = true;
+            } else {
+                tokio::time::sleep(COMMIT_RATE).await;
             }
-            tokio::time::sleep(COMMIT_RATE).await;
         }
 
         tokio::time::sleep(Duration::from_millis(500)).await;
-
-        SweetConductor::exchange_peer_info(app.ui.nodes.iter().map(|n| &*n.conductor)).await;
     })
 }
 

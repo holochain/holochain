@@ -14,6 +14,7 @@ edition = "2021"
 anyhow = "*"
 arbitrary = { version = "=1.0.0" }
 holochain = { path = "../holochain" }
+human-repr = "1"
 rand = "0.8"
 tracing = "0.1"
 

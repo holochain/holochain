@@ -5,6 +5,7 @@ use holochain::prelude::{
     kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant,
     metrics::RoundMetric,
 };
+use human_repr::HumanCount;
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -452,6 +453,17 @@ fn render_gossip_metric_row(
         }
     };
 
+    let bytes_cell = |v: u32| {
+        let cell = Cell::from(format!("{:.1}", v.human_count_bytes()));
+        if v == 0 {
+            cell.style(Style::default().fg(Color::DarkGray))
+        } else if v >= 1_000_000 {
+            cell.style(Style::default().add_modifier(Modifier::ITALIC))
+        } else {
+            cell
+        }
+    };
+
     let (gt, style) = match metric.gossip_type {
         GossipModuleType::ShardedRecent => (
             Cell::from("R".to_string()),
@@ -495,8 +507,8 @@ fn render_gossip_metric_row(
         cells.extend([
             number_cell(round.throughput.op_count.incoming),
             number_cell(round.throughput.op_count.outgoing),
-            number_cell(round.throughput.op_bytes.incoming),
-            number_cell(round.throughput.op_bytes.outgoing),
+            bytes_cell(round.throughput.op_bytes.incoming),
+            bytes_cell(round.throughput.op_bytes.outgoing),
         ])
     }
     let style = if current {

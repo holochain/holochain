@@ -11,6 +11,8 @@ use rand::*;
 mod terminal;
 pub use terminal::*;
 
+pub use human_repr::*;
+
 pub mod ui;
 
 /// A RNG suitable for testing, if no seed is passed, uses standard random seed.
