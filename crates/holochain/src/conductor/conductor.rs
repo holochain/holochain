@@ -773,6 +773,7 @@ impl Conductor {
         role_id: AppRoleId,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
+        handle: ConductorHandle,
     ) -> ConductorResult<InstalledCell> {
         let ribosome_store = &self.ribosome_store;
         // retrieve base cell DNA hash from conductor
@@ -808,6 +809,7 @@ impl Conductor {
             }
             Ok::<_, DnaError>(dna_file)
         })?;
+
         let clone_dna_hash = clone_dna.dna_hash().to_owned();
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
@@ -821,9 +823,10 @@ impl Conductor {
                 Ok((state, installed_clone_cell))
             })
             .await?;
+
         // register clone cell dna in ribosome store
-        let clone_ribosome = RealRibosome::new(clone_dna)?;
-        self.add_ribosome_to_store(clone_ribosome);
+        handle.register_dna(clone_dna).await?;
+
         Ok(installed_clone_cell)
     }
 

@@ -316,3 +316,34 @@ async fn clone_cell_deletion() {
         .await;
     assert!(restore_result.is_err());
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn conductor_can_startup_with_cloned_cell() {
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+        .await
+        .unwrap();
+    let role_id: AppRoleId = "dna_1".to_string();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let alice = SweetAgents::one(conductor.keystore()).await;
+    let app = conductor
+        .setup_app_for_agent("app", alice.clone(), [&(role_id.clone(), dna)])
+        .await
+        .unwrap();
+
+    let _ = conductor
+        .clone()
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            role_id: role_id.clone(),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
+            membrane_proof: None,
+            name: None,
+        })
+        .await
+        .unwrap();
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    // Simply test that the conductor can startup with a cloned cell present.
+}
