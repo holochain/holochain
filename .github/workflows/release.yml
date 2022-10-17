@@ -687,7 +687,10 @@ jobs:
         id: check-status
         env:
           RESULTS: "${{ toJSON(needs.*.result) }}"
-        run: "[[ $(jq -n 'env.RESULTS | fromjson | unique == [\"success\"]') == \"true\" ]]\n"
+          DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
+        run: |
+          [[ $(jq -n 'env.RESULTS | fromjson | unique == ["success"]') == 'true' ]] || \
+          [[ ${DRY_RUN} == 'true' && $(jq -n 'env.RESULTS | fromjson | unique | sort == ["skipped", "success"]') == 'true' ]]
 
       - name: Post mattermost message
         if: always()
@@ -757,7 +760,10 @@ jobs:
         id: check-status
         env:
           RESULTS: "${{ toJSON(needs.*.result) }}"
-        run: "[[ $(jq -n 'env.RESULTS | fromjson | unique == [\"success\"]') == \"true\" ]]\n"
+          DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
+        run: |
+          [[ $(jq -n 'env.RESULTS | fromjson | unique == ["success"]') == 'true' ]] || \
+          [[ ${DRY_RUN} == 'true' && $(jq -n 'env.RESULTS | fromjson | unique | sort == ["skipped", "success"]') == 'true' ]]
 
       - name: Post mattermost message
         if: always()
