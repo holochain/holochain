@@ -196,7 +196,8 @@ impl AppManifestV1 {
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for mut role in self.roles.iter_mut() {
             if matches!(role.provisioning, Some(CellProvisioning::Create { .. })) {
-                role.dna.modifiers.network_seed = Some(network_seed.clone());
+                role.dna.modifiers =
+                    DnaModifiersOpt::none().with_network_seed(network_seed.clone());
             }
         }
     }
