@@ -2,6 +2,7 @@ use holochain_diagnostics::{
     holochain::{
         conductor::{conductor::RwShare, config::ConductorConfig},
         prelude::*,
+        sweettest::*,
     },
     ui::*,
     *,
@@ -17,13 +18,13 @@ use tui::{backend::Backend, widgets::*, Terminal};
 const NODES: usize = 10;
 const BASES: usize = 3;
 
-const ENTRY_SIZE: usize = 10_000_000;
+const ENTRY_SIZE: usize = 5_000_000;
 const MAX_COMMITS: usize = 100;
 
 const COMMIT_RATE: Duration = Duration::from_millis(500);
 const GET_RATE: Duration = Duration::from_millis(100);
 
-const REFRESH_RATE: Duration = Duration::from_millis(250);
+const REFRESH_RATE: Duration = Duration::from_millis(50);
 
 /// Display the UI if all other conditions are met
 const UI: bool = true;
@@ -39,7 +40,8 @@ fn config() -> ConductorConfig {
     config.network.as_mut().map(|c| {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;
-            tp.danger_gossip_recent_threshold_secs = 10;
+            // tp.disable_historical_gossip = true;
+            // tp.danger_gossip_recent_threshold_secs = 10;
             tp
         });
     });
@@ -61,9 +63,12 @@ fn config() -> ConductorConfig {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     observability::test_run().ok();
+
+    let mut rng = seeded_rng(None);
+
     let app = setup_app().await;
 
-    task_commit(app.clone());
+    task_commit(app.clone(), rng);
     task_get(app.clone());
 
     let show_ui = UI && std::env::var("RUST_LOG").is_err();
@@ -220,28 +225,32 @@ fn task_get(app: App) -> tokio::task::JoinHandle<()> {
     })
 }
 
-fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
+async fn commit(app: App, rng: &mut StdRng) -> bool {
+    let n = rng.gen_range(0..NODES);
+    let b = rng.gen_range(0..BASES);
+
+    let base = app.bases[b].clone();
+    let _: ActionHash = app.ui.nodes[n]
+        .index
+        .call(
+            &app.ui.nodes[n].zome,
+            "create",
+            (base, random_vec::<u8>(&mut rng, ENTRY_SIZE)),
+        )
+        .await;
+
+    let done = app.state.share_mut(|state| {
+        state.commits[b] += 1;
+        state.total_commits() >= MAX_COMMITS
+    });
+
+    done
+}
+
+fn task_commit(app: App, mut rng: StdRng) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        let mut rng = seeded_rng(None);
-
         loop {
-            let n = rng.gen_range(0..NODES);
-            let b = rng.gen_range(0..BASES);
-
-            let base = app.bases[b].clone();
-            let _: ActionHash = app.ui.nodes[n]
-                .conductor
-                .call(
-                    &app.ui.nodes[n].zome,
-                    "create",
-                    (base, random_vec::<u8>(&mut rng, ENTRY_SIZE)),
-                )
-                .await;
-
-            let done = app.state.share_mut(|state| {
-                state.commits[b] += 1;
-                state.total_commits() >= MAX_COMMITS
-            });
+            let done = commit(app, &mut rng);
             if done {
                 break;
             }

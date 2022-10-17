@@ -6,6 +6,7 @@ use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
     handle::ConductorHandle, space::Spaces, CellError, Conductor, ConductorBuilder,
 };
+use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
@@ -479,6 +480,33 @@ impl SweetConductor {
                 .await;
         }
     }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn exchange_peer_info(conductors: impl IntoIterator<Item = &Self>) {
+        let mut all = Vec::new();
+        for c in conductors.into_iter() {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+                all.push(env.clone());
+            }
+        }
+        crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+    }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn exchange_peer_info_sampled(
+        conductors: impl IntoIterator<Item = &Self>,
+        rng: &mut StdRng,
+        s: usize,
+    ) {
+        let mut all = Vec::new();
+        for c in conductors.into_iter() {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+                all.push(env.clone());
+            }
+        }
+        let connectivity = covering(rng, all.len(), s);
+        crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
+    }
 }
 
 /// Get a websocket client on localhost at the specified port
@@ -542,4 +570,34 @@ impl std::fmt::Debug for SweetConductor {
             .field("dnas", &self.dnas)
             .finish()
     }
+}
+
+fn covering(rng: &mut StdRng, n: usize, s: usize) -> Vec<HashSet<usize>> {
+    let nodes: Vec<_> = (0..n)
+        .map(|i| {
+            let peers: HashSet<_> = std::iter::repeat_with(|| rng.gen_range(0..n))
+                .filter(|j| i != *j)
+                .take(s)
+                .collect();
+            peers
+        })
+        .collect();
+    let mut visited = HashSet::<usize>::new();
+    let mut queue = vec![0];
+    while let Some(next) = queue.pop() {
+        let unvisited: Vec<_> = nodes[next]
+            .iter()
+            .filter(|p| !visited.contains(p))
+            .copied()
+            .collect();
+        queue.extend(unvisited.iter());
+        visited.extend(unvisited.iter());
+        if visited.len() == n {
+            break;
+        }
+    }
+    if visited.len() < n {
+        panic!("Covering could not be created. Try a higher s value.");
+    }
+    nodes
 }

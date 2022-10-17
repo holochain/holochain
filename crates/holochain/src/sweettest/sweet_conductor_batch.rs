@@ -119,25 +119,12 @@ impl SweetConductorBatch {
 
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
-        let mut all = Vec::new();
-        for c in self.0.iter() {
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(env.clone());
-            }
-        }
-        crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+        SweetConductor::exchange_peer_info(&self.0).await
     }
 
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info_sampled(&self, rng: &mut StdRng, s: usize) {
-        let mut all = Vec::new();
-        for c in self.0.iter() {
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(env.clone());
-            }
-        }
-        let connectivity = covering(rng, all.len(), s);
-        crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
+        SweetConductor::exchange_peer_info_sampled(&self.0, rng, s).await
     }
 
     /// Let a conductor know about all agents on some other conductor.
@@ -184,34 +171,4 @@ impl std::ops::IndexMut<usize> for SweetConductorBatch {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index]
     }
-}
-
-fn covering(rng: &mut StdRng, n: usize, s: usize) -> Vec<HashSet<usize>> {
-    let nodes: Vec<_> = (0..n)
-        .map(|i| {
-            let peers: HashSet<_> = std::iter::repeat_with(|| rng.gen_range(0..n))
-                .filter(|j| i != *j)
-                .take(s)
-                .collect();
-            peers
-        })
-        .collect();
-    let mut visited = HashSet::<usize>::new();
-    let mut queue = vec![0];
-    while let Some(next) = queue.pop() {
-        let unvisited: Vec<_> = nodes[next]
-            .iter()
-            .filter(|p| !visited.contains(p))
-            .copied()
-            .collect();
-        queue.extend(unvisited.iter());
-        visited.extend(unvisited.iter());
-        if visited.len() == n {
-            break;
-        }
-    }
-    if visited.len() < n {
-        panic!("Covering could not be created. Try a higher s value.");
-    }
-    nodes
 }
