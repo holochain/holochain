@@ -161,11 +161,16 @@ impl<const N: usize, const B: usize> Ui<N, B> {
     }
 
     fn ui_node_list(&self) -> List<'static> {
-        let nodes = self
-            .nodes
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("C{:<2}", i));
+        let nodes = self.nodes.iter().enumerate().map(|(i, n)| {
+            let metrics = n.diagnostics.metrics.read();
+            let infos = self.node_infos(&metrics);
+            let active = if infos.iter().any(|i| i.1.current_round.is_some()) {
+                "*"
+            } else {
+                " "
+            };
+            format!("{}C{}", active, i)
+        });
         List::new(
             ["<G>".to_string()]
                 .into_iter()
@@ -368,7 +373,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
     }
 
     fn ui_layout<K: Backend>(&self, f: &mut Frame<K>) -> UiLayout {
-        let list_len = 3;
+        let list_len = 4;
         let table_len = B as u16 * 2 + 2;
         let stats_height = 5;
         let mut vsplit = Layout::default()

@@ -16,6 +16,7 @@ use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
 use kitsune_p2p::KitsuneP2pConfig;
+use rand::Rng;
 use std::path::Path;
 use std::sync::Arc;
 

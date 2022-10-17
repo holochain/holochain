@@ -21,7 +21,7 @@ const BASES: usize = 3;
 const ENTRY_SIZE: usize = 5_000_000;
 const MAX_COMMITS: usize = 100;
 
-const COMMIT_RATE: Duration = Duration::from_millis(500);
+const COMMIT_RATE: Duration = Duration::from_millis(5);
 const GET_RATE: Duration = Duration::from_millis(100);
 
 const REFRESH_RATE: Duration = Duration::from_millis(50);
@@ -41,7 +41,11 @@ fn config() -> ConductorConfig {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;
             // tp.disable_historical_gossip = true;
-            // tp.danger_gossip_recent_threshold_secs = 10;
+            tp.danger_gossip_recent_threshold_secs = 0;
+            tp.gossip_inbound_target_mbps = 1000000.0;
+            tp.gossip_outbound_target_mbps = 1000000.0;
+            tp.gossip_historic_outbound_target_mbps = 1000000.0;
+            tp.gossip_historic_inbound_target_mbps = 1000000.0;
             tp
         });
     });
@@ -66,7 +70,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut rng = seeded_rng(None);
 
-    let app = setup_app().await;
+    let app = setup_app(&mut rng).await;
 
     task_commit(app.clone(), rng);
     task_get(app.clone());
@@ -106,7 +110,7 @@ struct App {
 //                                        █████
 //                                       ░░░░░
 
-async fn setup_app() -> App {
+async fn setup_app(mut rng: &mut StdRng) -> App {
     assert!(BASES <= NODES);
 
     let (mut conductors, zomes) = diagnostic_tests::setup_conductors_single_zome(
@@ -115,9 +119,6 @@ async fn setup_app() -> App {
         diagnostic_tests::basic_zome(),
     )
     .await;
-
-    conductors.exchange_peer_info().await;
-    println!("Peer info exchanged. Starting UI.");
 
     // conductors[0].persist();
     // conductors[1].persist();
@@ -163,12 +164,14 @@ async fn setup_app() -> App {
     });
     let ui = Ui::new(nodes.clone(), now, REFRESH_RATE, state.clone());
 
-    App {
+    let app = App {
         bases,
         // start_time: now,
         state,
         ui,
-    }
+    };
+
+    app
 }
 
 //   █████                      █████
@@ -225,17 +228,17 @@ fn task_get(app: App) -> tokio::task::JoinHandle<()> {
     })
 }
 
-async fn commit(app: App, rng: &mut StdRng) -> bool {
+async fn commit(app: &App, rng: &mut StdRng) -> bool {
     let n = rng.gen_range(0..NODES);
     let b = rng.gen_range(0..BASES);
 
     let base = app.bases[b].clone();
     let _: ActionHash = app.ui.nodes[n]
-        .index
+        .conductor
         .call(
             &app.ui.nodes[n].zome,
             "create",
-            (base, random_vec::<u8>(&mut rng, ENTRY_SIZE)),
+            (base, random_vec::<u8>(rng, ENTRY_SIZE)),
         )
         .await;
 
@@ -250,12 +253,16 @@ async fn commit(app: App, rng: &mut StdRng) -> bool {
 fn task_commit(app: App, mut rng: StdRng) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
-            let done = commit(app, &mut rng);
+            let done = commit(&app, &mut rng).await;
             if done {
                 break;
             }
             tokio::time::sleep(COMMIT_RATE).await;
         }
+
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        SweetConductor::exchange_peer_info(app.ui.nodes.iter().map(|n| &*n.conductor)).await;
     })
 }
 
