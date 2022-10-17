@@ -1280,6 +1280,7 @@ mod clone_cell_impls {
                     role_id.clone(),
                     modifiers.serialized()?,
                     name,
+                    self.clone(),
                 )
                 .await?;
 
