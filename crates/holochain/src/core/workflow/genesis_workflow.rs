@@ -20,7 +20,6 @@ use holochain_state::workspace::WorkspaceResult;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
-use tracing::*;
 
 /// The struct which implements the genesis Workflow
 #[derive(Constructor)]
@@ -36,7 +35,7 @@ where
     chc: Option<ChcImpl>,
 }
 
-#[instrument(skip(workspace, api, args))]
+// #[instrument(skip(workspace, api, args))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
     mut workspace: GenesisWorkspace,
     api: Api,
