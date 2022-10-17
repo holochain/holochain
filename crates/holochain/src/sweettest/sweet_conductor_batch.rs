@@ -4,7 +4,7 @@ use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
-use rand::Rng;
+
 /// A collection of SweetConductors, with methods for operating on the entire collection
 #[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
 pub struct SweetConductorBatch(Vec<SweetConductor>);

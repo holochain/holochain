@@ -1,11 +1,14 @@
-const YELLOW_THRESHOLD: usize = 5;
-const RED_THRESHOLD: usize = 15;
+// 999, 99, or 9
+const MAX_COUNT: usize = 999;
+
+const YELLOW_THRESHOLD: usize = MAX_COUNT / 5;
+const RED_THRESHOLD: usize = MAX_COUNT / 2;
 
 use holochain::prelude::{
     kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant,
     metrics::RoundMetric,
 };
-use human_repr::HumanCount;
+use human_repr::{HumanCount, HumanThroughput};
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -48,6 +51,7 @@ pub struct State<const N: usize, const B: usize> {
     pub counts: [[(usize, Instant); B]; N],
     pub list_state: ListState,
     pub filter_zero_rounds: bool,
+    pub done_time: Option<Instant>,
 }
 
 impl<const N: usize, const B: usize> State<N, B> {
@@ -141,7 +145,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
     pub fn render<K: Backend>(&self, f: &mut Frame<K>) {
         let layout = self.ui_layout(f);
 
-        let (selected, filter_zeroes) = self.state.share_mut(|state| {
+        let (selected, filter_zeroes, done_time) = self.state.share_mut(|state| {
             f.render_stateful_widget(self.ui_node_list(), layout.node_list, &mut state.list_state);
             f.render_widget(self.ui_basis_table(state), layout.get_table);
             let selected = state.selected_node();
@@ -149,7 +153,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                 f.render_widget(self.ui_keymap(), layout.gossip_table);
                 f.render_widget(self.ui_global_stats(state), layout.stats);
             }
-            (selected, state.filter_zero_rounds)
+            (selected, state.filter_zero_rounds, state.done_time)
         });
         if let Some(selected) = selected {
             f.render_widget(self.ui_gossip_info_table(selected), layout.gossip_table);
@@ -157,8 +161,16 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         }
 
         let z = if filter_zeroes { "(0)" } else { "   " };
-        let t = Paragraph::new(format!("{}  T={:<.2?}", z, self.start_time.elapsed()));
-        f.render_widget(t, layout.time);
+        let (t, style) = done_time
+            .map(|t| {
+                (
+                    t.duration_since(self.start_time),
+                    Style::default().add_modifier(Modifier::REVERSED),
+                )
+            })
+            .unwrap_or_else(|| (self.start_time.elapsed(), Style::default()));
+        let t_widget = Paragraph::new(format!("{}  T={:<.2?}", z, t)).style(style);
+        f.render_widget(t_widget, layout.time);
     }
 
     fn ui_node_list(&self) -> List<'static> {
@@ -183,7 +195,14 @@ impl<const N: usize, const B: usize> Ui<N, B> {
     }
 
     fn ui_basis_table(&self, state: &State<N, B>) -> Table<'static> {
-        let header = Row::new(state.commits.iter().enumerate().map(|(i, _)| i.to_string())).style(
+        let header = Row::new(
+            state
+                .commits
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!(" {}", i)),
+        )
+        .style(
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::UNDERLINED),
@@ -191,7 +210,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
 
         let rows = state.counts.iter().enumerate().map(|(_i, r)| {
             let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
-                let val = (*c).min(15);
+                let val = (*c).min(MAX_COUNT);
                 let mut style = if val == 0 {
                     Style::default().fg(Color::Green)
                 } else if val < YELLOW_THRESHOLD {
@@ -204,14 +223,14 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                 if t.elapsed() < self.refresh_rate * B as u32 {
                     style = style.add_modifier(Modifier::UNDERLINED);
                 }
-                Cell::from(format!("{:1x}", val)).style(style)
+                Cell::from(format!("{:3}", val)).style(style)
             });
             Row::new(cells)
         });
         Table::new(rows)
             .header(header)
             .block(Block::default().borders(Borders::union(Borders::LEFT, Borders::RIGHT)))
-            .widths(&[Constraint::Min(1); N])
+            .widths(&[Constraint::Length(3); B])
     }
 
     fn ui_global_stats(&self, state: &State<N, B>) -> List<'static> {
@@ -290,7 +309,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         currents.sort_unstable_by(|a, b| b.1.cmp(&a.1));
         metrics.sort_unstable_by(|a, b| b.1.cmp(&a.1));
 
-        let header = Row::new(["n", "time", "t", "dur", "#in", "#out", "in", "out"])
+        let header = Row::new(["g", "n", "T", "dur", "#in", "#out", "in", "out", "thru"])
             .style(Style::default().add_modifier(Modifier::UNDERLINED));
 
         let mut rows = vec![];
@@ -325,7 +344,8 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         }));
 
         Table::new(rows).header(header).widths(&[
-            Constraint::Percentage(100 / 8),
+            Constraint::Length(1),
+            Constraint::Length(3),
             Constraint::Percentage(100 / 8),
             Constraint::Percentage(100 / 8),
             Constraint::Percentage(100 / 8),
@@ -375,7 +395,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
 
     fn ui_layout<K: Backend>(&self, f: &mut Frame<K>) -> UiLayout {
         let list_len = 4;
-        let table_len = B as u16 * 2 + 2;
+        let table_len = B as u16 * 4 + 2;
         let stats_height = 5;
         let mut vsplit = Layout::default()
             .direction(Direction::Vertical)
@@ -392,7 +412,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                 [
                     Constraint::Length(list_len),
                     Constraint::Length(table_len),
-                    Constraint::Percentage(100),
+                    Constraint::Length(16),
                 ]
                 .as_ref(),
             )
@@ -444,8 +464,20 @@ fn render_gossip_metric_row(
     start_time: Instant,
     current: bool,
 ) -> Row<'static> {
+    let throughput_cell = |b, d: Duration| {
+        let cell = Cell::from(format!(
+            "{}",
+            (b as f64 * 1000. / d.as_millis() as f64).human_throughput_bytes()
+        ));
+        if b == 0 {
+            cell.style(Style::default().fg(Color::DarkGray))
+        } else {
+            cell
+        }
+    };
+
     let number_cell = |v| {
-        let cell = Cell::from(format!("{}", v));
+        let cell = Cell::from(format!("{:>6}", v));
         if v == 0 {
             cell.style(Style::default().fg(Color::DarkGray))
         } else {
@@ -454,7 +486,7 @@ fn render_gossip_metric_row(
     };
 
     let bytes_cell = |v: u32| {
-        let cell = Cell::from(format!("{:.1}", v.human_count_bytes()));
+        let cell = Cell::from(format!("{:>3.1}", v.human_count_bytes()));
         if v == 0 {
             cell.style(Style::default().fg(Color::DarkGray))
         } else if v >= 1_000_000 {
@@ -475,6 +507,7 @@ fn render_gossip_metric_row(
         ),
     };
     let mut cells = vec![
+        gt,
         Cell::from(n.to_string()),
         Cell::from(format!(
             "{:.1?}",
@@ -482,17 +515,17 @@ fn render_gossip_metric_row(
                 .instant
                 .duration_since(TokioInstant::from(start_time))
         )),
-        gt,
     ];
 
+    let dur = if current {
+        metric.instant.elapsed()
+    } else if let Some(round) = &metric.round {
+        metric.instant.duration_since(round.start_time)
+    } else {
+        Duration::ZERO
+    };
+
     cells.push({
-        let dur = if current {
-            metric.instant.elapsed()
-        } else if let Some(round) = &metric.round {
-            metric.instant.duration_since(round.start_time)
-        } else {
-            Duration::ZERO
-        };
         let style = if dur.as_millis() >= 1000 {
             Style::default().fg(Color::Red)
         } else if dur.as_millis() >= 100 {
@@ -509,6 +542,10 @@ fn render_gossip_metric_row(
             number_cell(round.throughput.op_count.outgoing),
             bytes_cell(round.throughput.op_bytes.incoming),
             bytes_cell(round.throughput.op_bytes.outgoing),
+            throughput_cell(
+                round.throughput.op_bytes.incoming + round.throughput.op_bytes.outgoing,
+                dur,
+            ),
         ])
     }
     let style = if current {

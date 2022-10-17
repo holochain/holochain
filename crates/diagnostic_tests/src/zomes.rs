@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use holochain_diagnostics::holochain::prelude::*;
+use holochain_diagnostics::{dht::test_utils::seeded_rng, holochain::prelude::*, random_vec};
 
 pub fn basic_zome() -> InlineIntegrityZome {
     InlineIntegrityZome::new_unique([EntryDef::from_id("a")], 1)
@@ -25,30 +25,62 @@ pub fn basic_zome() -> InlineIntegrityZome {
                 Ok(hash)
             },
         )
-        .function("link_count", |api, base: AnyLinkableHash| {
-            let links = api
-                .get_links(vec![GetLinksInput::new(
-                    base,
-                    LinkTypeFilter::single_dep(0.into()),
-                    None,
-                )])
-                .unwrap();
-            let links = links.first().unwrap();
-            let gets = links
-                .iter()
-                .map(|l| {
-                    let target = l.target.clone().retype(holo_hash::hash_type::Action);
-                    GetInput::new(target.into(), Default::default())
-                })
-                .collect();
-            let somes = api
-                .get(gets)
-                .unwrap()
-                .into_iter()
-                .filter(|e| e.is_some())
-                .count();
-            Ok(somes)
-        })
+        .function(
+            "create_batch_random",
+            |api, (base, num, size): (AnyLinkableHash, u32, u32)| {
+                let mut rng = seeded_rng(None);
+                for _ in 0..num {
+                    let bytes = random_vec(&mut rng, size as usize);
+                    let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
+                    let hash = api.create(CreateInput::new(
+                        InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                        EntryVisibility::Public,
+                        Entry::App(AppEntryBytes(entry)),
+                        ChainTopOrdering::default(),
+                    ))?;
+                    let _ = api.create_link(CreateLinkInput::new(
+                        base.clone(),
+                        hash.clone().into(),
+                        ZomeId(0),
+                        LinkType::new(0),
+                        ().into(),
+                        ChainTopOrdering::default(),
+                    ))?;
+                }
+                Ok(())
+            },
+        )
+        .function(
+            "link_count",
+            |api, (base, entries): (AnyLinkableHash, bool)| {
+                let links = api
+                    .get_links(vec![GetLinksInput::new(
+                        base,
+                        LinkTypeFilter::single_dep(0.into()),
+                        None,
+                    )])
+                    .unwrap();
+                let links = links.first().unwrap();
+                if entries {
+                    let gets = links
+                        .iter()
+                        .map(|l| {
+                            let target = l.target.clone().retype(holo_hash::hash_type::Action);
+                            GetInput::new(target.into(), Default::default())
+                        })
+                        .collect();
+                    let somes = api
+                        .get(gets)
+                        .unwrap()
+                        .into_iter()
+                        .filter(|e| e.is_some())
+                        .count();
+                    Ok(somes)
+                } else {
+                    Ok(links.len())
+                }
+            },
+        )
         .function("validate", |_api, _op: Op| {
             Ok(ValidateCallbackResult::Valid)
         })

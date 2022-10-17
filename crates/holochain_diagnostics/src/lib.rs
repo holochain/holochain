@@ -2,6 +2,7 @@ pub use holochain;
 pub use holochain::prelude::*;
 
 use holochain::conductor::config::ConductorConfig;
+pub use rand;
 use rand::distributions::Standard;
 use rand::prelude::Distribution;
 pub use rand::rngs::StdRng;
