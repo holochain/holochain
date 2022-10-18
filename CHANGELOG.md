@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221018.185411
+
+## [holochain\_cli-0.0.63](crates/holochain_cli/CHANGELOG.md#0.0.63)
+
+## [holochain\_cli\_sandbox-0.0.59](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.59)
+
+## [holochain\_cli\_bundle-0.0.58](crates/holochain_cli_bundle/CHANGELOG.md#0.0.58)
+
+- Adds experimental `--raw` command to hc unpack commands (e.g. `hc dna unpack`) which allows an invalid manifest to still be unpacked. This can help to “salvage” a bundle which is no longer compatible with the current Holochain version, correcting the manifest so that it can be re-packed into a valid bundle.
+
+## [holochain-0.0.168](crates/holochain/CHANGELOG.md#0.0.168)
+
+- Fixes bug that causes crash when starting a conductor with a clone cell installed
+
+## [holochain\_test\_wasm\_common-0.0.57](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.57)
+
+## [holochain\_conductor\_api-0.0.65](crates/holochain_conductor_api/CHANGELOG.md#0.0.65)
+
+## [holochain\_wasm\_test\_utils-0.0.64](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.64)
+
+## [holochain\_cascade-0.0.67](crates/holochain_cascade/CHANGELOG.md#0.0.67)
+
+## [holochain\_state-0.0.65](crates/holochain_state/CHANGELOG.md#0.0.65)
+
+## [holochain\_p2p-0.0.62](crates/holochain_p2p/CHANGELOG.md#0.0.62)
+
+## [holochain\_types-0.0.62](crates/holochain_types/CHANGELOG.md#0.0.62)
+
+## [mr\_bundle-0.0.17](crates/mr_bundle/CHANGELOG.md#0.0.17)
+
+## [hdk-0.0.156](crates/hdk/CHANGELOG.md#0.0.156)
+
+## [hdi-0.1.5](crates/hdi/CHANGELOG.md#0.1.5)
+
 # 20221012.015828
 
 ## [holochain\_cli-0.0.62](crates/holochain_cli/CHANGELOG.md#0.0.62)
