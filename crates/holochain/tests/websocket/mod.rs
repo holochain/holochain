@@ -231,7 +231,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {
-        rxs.push(h.signal_broadcaster().await.subscribe_separately())
+        rxs.push(h.signal_broadcaster().subscribe_separately())
     }
     let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
