@@ -22,24 +22,22 @@ pub fn ui_node_list(infos: &[NodeInfoList<usize>]) -> List<'static> {
     .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
 }
 
-pub fn ui_basis_table<const N: usize, const B: usize>(
-    underline_duration: Duration,
-    state: &State<N, B>,
-) -> Table<'static> {
-    let header = Row::new(
-        state
-            .commits
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!(" {}", i)),
-    )
-    .style(
+pub fn ui_basis_table(underline_duration: Duration, counts: LinkCounts) -> Table<'static> {
+    let header = Row::new((0..counts.len()).map(|i| format!(" {}", i))).style(
         Style::default()
             .fg(Color::Cyan)
             .add_modifier(Modifier::UNDERLINED),
     );
 
-    let rows = state.counts.iter().enumerate().map(|(_i, r)| {
+    let mut num_bases = 0;
+
+    let rows = counts.iter().enumerate().map(|(_i, r)| {
+        if num_bases > 0 {
+            assert_eq!(r.len(), num_bases);
+        } else {
+            num_bases = r.len();
+        }
+
         let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
             let val = (*c).min(MAX_COUNT);
             let mut style = if val == 0 {
@@ -58,21 +56,14 @@ pub fn ui_basis_table<const N: usize, const B: usize>(
         });
         Row::new(cells)
     });
-    Table::new(rows)
-        .header(header)
-        .block(Block::default().borders(Borders::union(Borders::LEFT, Borders::RIGHT)))
-        .widths(&[Constraint::Length(3); B])
+    Table::new(rows).header(header)
 }
 
-pub fn ui_global_stats<const N: usize, const B: usize>(
-    start_time: Instant,
-    state: &State<N, B>,
-) -> List<'static> {
+pub fn ui_global_stats(start_time: Instant, state: &impl ClientState) -> List<'static> {
     List::new(
         [
             format!("T:           {:<.2?}", start_time.elapsed()),
             format!("Commits:     {}", state.total_commits()),
-            format!("Discrepancy: {}", state.total_discrepancy()),
         ]
         .into_iter()
         .map(ListItem::new)

@@ -63,29 +63,34 @@ impl Node {
     }
 }
 
-pub struct State<const N: usize, const B: usize> {
-    pub commits: [usize; B],
-    pub counts: [[(usize, Instant); B]; N],
+/// State shared with the implementor
+pub trait ClientState {
+    fn num_bases(&self) -> usize;
+    fn nodes(&self) -> &[Node];
+
+    fn total_commits(&self) -> usize;
+
+    fn link_counts(&self) -> LinkCounts;
+}
+
+/// State specific to the UI
+pub struct LocalState {
     pub list_state: ListState,
     pub filter_zero_rounds: bool,
     pub done_time: Option<Instant>,
 }
 
-impl<const N: usize, const B: usize> State<N, B> {
-    pub fn total_commits(&self) -> usize {
-        self.commits.iter().sum()
-    }
+impl LocalState {
+    // pub fn total_discrepancy(&self) -> usize {
+    //     self.counts
+    //         .iter()
+    //         .map(|r| r.iter().map(|(c, _)| c).copied().sum::<usize>())
+    //         .sum()
+    // }
 
-    pub fn total_discrepancy(&self) -> usize {
-        self.counts
-            .iter()
-            .map(|r| r.iter().map(|(c, _)| c).copied().sum::<usize>())
-            .sum()
-    }
-
-    pub fn node_selector(&mut self, i: isize) {
+    pub fn node_selector(&mut self, i: isize, max: usize) {
         if let Some(s) = self.list_state.selected() {
-            let n = (s as isize + i).min(N as isize).max(0);
+            let n = (s as isize + i).min(max as isize).max(0);
             self.list_state.select(Some(n as usize));
         }
     }
@@ -97,23 +102,25 @@ impl<const N: usize, const B: usize> State<N, B> {
     }
 }
 
+/// Outer vec for nodes, inner vec for bases
+pub type LinkCounts<'a> = &'a [&'a [(usize, Instant)]];
 pub type NodeInfoList<'a, Id> = Vec<(Id, &'a NodeInfo)>;
 
 #[derive(Clone)]
-pub struct Ui<const N: usize, const B: usize> {
+pub struct Ui {
     pub refresh_rate: Duration,
     pub start_time: Instant,
-    pub nodes: [Node; N],
-    pub state: RwShare<State<N, B>>,
+    pub nodes: Vec<Node>,
+    pub local_state: RwShare<LocalState>,
     pub agent_node_index: HashMap<AgentPubKey, usize>,
 }
 
-impl<const N: usize, const B: usize> Ui<N, B> {
+impl Ui {
     pub fn new(
-        nodes: [Node; N],
+        nodes: Vec<Node>,
         start_time: Instant,
         refresh_rate: Duration,
-        state: RwShare<State<N, B>>,
+        state: RwShare<LocalState>,
     ) -> Self {
         let agent_node_index = nodes
             .iter()
@@ -125,12 +132,13 @@ impl<const N: usize, const B: usize> Ui<N, B> {
             nodes,
             start_time,
             refresh_rate,
-            state,
+            local_state: state,
             agent_node_index,
         }
     }
 
     pub fn input(&self) -> bool {
+        let n = self.nodes.len();
         if event::poll(self.refresh_rate).unwrap() {
             if let Event::Key(key) = event::read().unwrap() {
                 match key.code {
@@ -138,13 +146,13 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                         return true;
                     }
                     KeyCode::Up | KeyCode::Char('k') => {
-                        self.state.share_mut(|s| s.node_selector(-1))
+                        self.local_state.share_mut(|s| s.node_selector(-1, n))
                     }
                     KeyCode::Down | KeyCode::Char('j') => {
-                        self.state.share_mut(|s| s.node_selector(1))
+                        self.local_state.share_mut(|s| s.node_selector(1, n))
                     }
                     KeyCode::Char('0') => self
-                        .state
+                        .local_state
                         .share_mut(|s| s.filter_zero_rounds = !s.filter_zero_rounds),
                     _ => {}
                 }
@@ -153,10 +161,10 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         false
     }
 
-    pub fn render<K: Backend>(&self, f: &mut Frame<K>) {
-        let layout = layout::layout(N, B, f);
+    pub fn render<K: Backend>(&self, f: &mut Frame<K>, state: &impl ClientState) {
+        let layout = layout::layout(state.nodes().len(), state.num_bases(), f);
 
-        let (selected, filter_zeroes, done_time) = self.state.share_mut(|state| {
+        let (selected, filter_zeroes, done_time) = self.local_state.share_mut(|local| {
             let metrics: Vec<_> = self
                 .nodes
                 .iter()
@@ -166,13 +174,17 @@ impl<const N: usize, const B: usize> Ui<N, B> {
             f.render_stateful_widget(
                 widgets::ui_node_list(infos.as_slice()),
                 layout.node_list,
-                &mut state.list_state,
+                &mut local.list_state,
             );
             f.render_widget(
-                widgets::ui_basis_table(self.refresh_rate * 4, state),
+                widgets::ui_basis_table(self.refresh_rate * 4, state.link_counts())
+                    .block(Block::default().borders(Borders::union(Borders::LEFT, Borders::RIGHT)))
+                    // the widths have to be specified here because they are not const
+                    // and must be borrowed
+                    .widths(&vec![Constraint::Length(3); state.num_bases()]),
                 layout.basis_table,
             );
-            let selected = state.selected_node();
+            let selected = local.selected_node();
             if selected.is_none() {
                 f.render_widget(widgets::ui_keymap(), layout.table_extras);
                 f.render_widget(
@@ -180,7 +192,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
                     layout.bottom,
                 );
             }
-            (selected, state.filter_zero_rounds, state.done_time)
+            (selected, local.filter_zero_rounds, local.done_time)
         });
         if let Some(selected) = selected {
             let node = &self.nodes[selected];
