@@ -33,6 +33,9 @@ use tui::{
     Frame,
 };
 
+mod layout;
+mod widgets;
+
 #[derive(Clone, Debug)]
 pub struct Node {
     pub conductor: Arc<SweetConductor>,
@@ -80,13 +83,7 @@ impl<const N: usize, const B: usize> State<N, B> {
     }
 }
 
-struct UiLayout {
-    node_list: Rect,
-    get_table: Rect,
-    gossip_table: Rect,
-    stats: Rect,
-    time: Rect,
-}
+pub type NodeInfoList<'a> = Vec<(usize, &'a NodeInfo)>;
 
 #[derive(Clone)]
 pub struct Ui<const N: usize, const B: usize> {
@@ -143,21 +140,46 @@ impl<const N: usize, const B: usize> Ui<N, B> {
     }
 
     pub fn render<K: Backend>(&self, f: &mut Frame<K>) {
-        let layout = self.ui_layout(f);
+        let layout = layout::layout(N, B, f);
 
         let (selected, filter_zeroes, done_time) = self.state.share_mut(|state| {
-            f.render_stateful_widget(self.ui_node_list(), layout.node_list, &mut state.list_state);
-            f.render_widget(self.ui_basis_table(state), layout.get_table);
+            let metrics: Vec<_> = self
+                .nodes
+                .iter()
+                .map(|n| n.diagnostics.metrics.read())
+                .collect();
+            let infos: Vec<_> = metrics.iter().map(|m| self.node_infos(&m)).collect();
+            f.render_stateful_widget(
+                widgets::ui_node_list(infos.as_slice()),
+                layout.node_list,
+                &mut state.list_state,
+            );
+            f.render_widget(
+                widgets::ui_basis_table(self.refresh_rate * 4, state),
+                layout.get_table,
+            );
             let selected = state.selected_node();
             if selected.is_none() {
-                f.render_widget(self.ui_keymap(), layout.gossip_table);
-                f.render_widget(self.ui_global_stats(state), layout.stats);
+                f.render_widget(widgets::ui_keymap(), layout.gossip_table);
+                f.render_widget(
+                    widgets::ui_global_stats(self.start_time, state),
+                    layout.stats,
+                );
             }
             (selected, state.filter_zero_rounds, state.done_time)
         });
         if let Some(selected) = selected {
-            f.render_widget(self.ui_gossip_info_table(selected), layout.gossip_table);
-            f.render_widget(self.ui_gossip_detail(selected, filter_zeroes), layout.stats);
+            let node = &self.nodes[selected];
+            let metrics = node.diagnostics.metrics.read();
+            let infos = self.node_infos(&metrics);
+            f.render_widget(
+                widgets::ui_gossip_info_table(&infos, selected),
+                layout.gossip_table,
+            );
+            f.render_widget(
+                widgets::gossip_round_table(&infos, self.start_time, filter_zeroes),
+                layout.stats,
+            );
         }
 
         let z = if filter_zeroes { "(0)" } else { "   " };
@@ -173,273 +195,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         f.render_widget(t_widget, layout.time);
     }
 
-    fn ui_node_list(&self) -> List<'static> {
-        let nodes = self.nodes.iter().enumerate().map(|(i, n)| {
-            let metrics = n.diagnostics.metrics.read();
-            let infos = self.node_infos(&metrics);
-            let active = if infos.iter().any(|i| i.1.current_round.is_some()) {
-                "*"
-            } else {
-                " "
-            };
-            format!("{}C{}", active, i)
-        });
-        List::new(
-            ["<G>".to_string()]
-                .into_iter()
-                .chain(nodes)
-                .map(ListItem::new)
-                .collect::<Vec<_>>(),
-        )
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
-    }
-
-    fn ui_basis_table(&self, state: &State<N, B>) -> Table<'static> {
-        let header = Row::new(
-            state
-                .commits
-                .iter()
-                .enumerate()
-                .map(|(i, _)| format!(" {}", i)),
-        )
-        .style(
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::UNDERLINED),
-        );
-
-        let rows = state.counts.iter().enumerate().map(|(_i, r)| {
-            let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
-                let val = (*c).min(MAX_COUNT);
-                let mut style = if val == 0 {
-                    Style::default().fg(Color::Green)
-                } else if val < YELLOW_THRESHOLD {
-                    Style::default().fg(Color::Yellow)
-                } else if val < RED_THRESHOLD {
-                    Style::default().fg(Color::Red)
-                } else {
-                    Style::default().fg(Color::Magenta)
-                };
-                if t.elapsed() < self.refresh_rate * B as u32 {
-                    style = style.add_modifier(Modifier::UNDERLINED);
-                }
-                Cell::from(format!("{:3}", val)).style(style)
-            });
-            Row::new(cells)
-        });
-        Table::new(rows)
-            .header(header)
-            .block(Block::default().borders(Borders::union(Borders::LEFT, Borders::RIGHT)))
-            .widths(&[Constraint::Length(3); B])
-    }
-
-    fn ui_global_stats(&self, state: &State<N, B>) -> List<'static> {
-        List::new(
-            [
-                format!("T:           {:<.2?}", self.start_time.elapsed()),
-                format!("Commits:     {}", state.total_commits()),
-                format!("Discrepancy: {}", state.total_discrepancy()),
-            ]
-            .into_iter()
-            .map(ListItem::new)
-            .collect::<Vec<_>>(),
-        )
-        .block(Block::default().borders(Borders::TOP).title("Stats"))
-    }
-
-    fn ui_keymap(&self) -> List<'static> {
-        List::new(
-            [
-                format!("up/down/j/k : select node"),
-                format!("          0 : toggle empty gossip rounds"),
-                format!("          q : Quit"),
-            ]
-            .into_iter()
-            .map(ListItem::new)
-            .collect::<Vec<_>>(),
-        )
-        .block(Block::default().borders(Borders::TOP).title("Keymap"))
-    }
-
-    fn ui_gossip_info_table(&self, n: usize) -> Table<'static> {
-        let node = &self.nodes[n];
-        let metrics = node.diagnostics.metrics.read();
-        let infos = self.node_infos(&metrics);
-
-        let header = Row::new(["A", "ini", "rmt", "cmp", "err"])
-            .style(Style::default().add_modifier(Modifier::UNDERLINED));
-
-        Table::new(
-            infos
-                .into_iter()
-                .map(|(i, info)| self.ui_gossip_info_row(info, n == i))
-                .collect::<Vec<_>>(),
-        )
-        .header(header)
-        .widths(&[
-            Constraint::Length(1),
-            Constraint::Length(3),
-            Constraint::Length(3),
-            Constraint::Length(3),
-            Constraint::Length(3),
-            // Constraint::Length(5),
-            Constraint::Percentage(100),
-        ])
-    }
-
-    fn ui_gossip_detail(&self, n: usize, filter_zeroes: bool) -> Table<'static> {
-        let node = &self.nodes[n];
-        let metrics = node.diagnostics.metrics.read();
-        let infos = self.node_infos(&metrics);
-        let mut currents: Vec<_> = infos
-            .iter()
-            .filter_map(|(n, i)| i.current_round.clone().map(|r| (*n, r)))
-            .collect();
-
-        let mut metrics: Vec<_> = infos
-            .iter()
-            .flat_map(|(n, info)| {
-                info.complete_rounds
-                    .clone()
-                    .into_iter()
-                    .map(move |r| (n, r))
-            })
-            .collect();
-
-        currents.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-        metrics.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-
-        let header = Row::new(["g", "n", "T", "dur", "#in", "#out", "in", "out", "thru"])
-            .style(Style::default().add_modifier(Modifier::UNDERLINED));
-
-        let mut rows = vec![];
-
-        // Add current round info
-
-        rows.extend(
-            currents
-                .into_iter()
-                .map(|(n, metric)| render_gossip_metric_row(n, metric, self.start_time, true)),
-        );
-
-        // Add past round info
-
-        rows.extend(metrics.into_iter().filter_map(|(n, info)| {
-            let zero = info
-                .round
-                .as_ref()
-                .map(|r| {
-                    r.throughput.op_count.incoming
-                        + r.throughput.op_count.outgoing
-                        + r.throughput.op_bytes.incoming
-                        + r.throughput.op_bytes.outgoing
-                        == 0
-                })
-                .unwrap_or(false);
-            if filter_zeroes && zero {
-                None
-            } else {
-                Some(render_gossip_metric_row(*n, info, self.start_time, false))
-            }
-        }));
-
-        Table::new(rows).header(header).widths(&[
-            Constraint::Length(1),
-            Constraint::Length(3),
-            Constraint::Percentage(100 / 8),
-            Constraint::Percentage(100 / 8),
-            Constraint::Percentage(100 / 8),
-            Constraint::Percentage(100 / 8),
-            Constraint::Percentage(100 / 8),
-            Constraint::Percentage(100 / 8),
-            Constraint::Percentage(100 / 8),
-        ])
-    }
-
-    fn ui_gossip_info_row(&self, info: &NodeInfo, own: bool) -> Row<'static> {
-        let active = if info.current_round.is_some() {
-            "*"
-        } else {
-            " "
-        }
-        .to_string();
-        let rounds = info
-            .complete_rounds
-            .iter()
-            .map(|i| format!("{}", i.duration().as_millis()))
-            .rev()
-            .join(" ");
-        // let latency = format!("{:3}", *info.latency_micros / 1000.0);
-        if own {
-            Row::new(vec![
-                active,
-                "-".to_string(),
-                "-".to_string(),
-                "-".to_string(),
-                "-".to_string(),
-                // latency,
-                rounds,
-            ])
-        } else {
-            Row::new(vec![
-                active,
-                info.initiates.len().to_string(),
-                info.remote_rounds.len().to_string(),
-                info.complete_rounds.len().to_string(),
-                info.errors.len().to_string(),
-                // latency,
-                rounds,
-            ])
-        }
-    }
-
-    fn ui_layout<K: Backend>(&self, f: &mut Frame<K>) -> UiLayout {
-        let list_len = 4;
-        let table_len = B as u16 * 4 + 2;
-        let stats_height = 5;
-        let mut vsplit = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length((N + 1) as u16),
-                Constraint::Length(stats_height),
-            ])
-            .vertical_margin(1)
-            .split(f.size());
-
-        let top_chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(
-                [
-                    Constraint::Length(list_len),
-                    Constraint::Length(table_len),
-                    Constraint::Length(16),
-                ]
-                .as_ref(),
-            )
-            .split(vsplit[0]);
-
-        vsplit[1].y += 1;
-        vsplit[1].height -= 1;
-
-        let w = f.size().width;
-        let tw = 16;
-        let time = Rect {
-            x: w - tw,
-            y: 0,
-            width: tw,
-            height: 1,
-        };
-
-        UiLayout {
-            node_list: top_chunks[0],
-            get_table: top_chunks[1],
-            gossip_table: top_chunks[2],
-            stats: vsplit[1],
-            time,
-        }
-    }
-
-    fn node_infos<'a>(&self, metrics: &'a Metrics) -> Vec<(usize, &'a NodeInfo)> {
+    fn node_infos<'a>(&self, metrics: &'a Metrics) -> NodeInfoList<'a> {
         let mut infos: Vec<_> = metrics
             .node_info()
             .iter()
@@ -456,102 +212,4 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         infos.sort_unstable_by_key(|(i, _)| *i);
         infos
     }
-}
-
-fn render_gossip_metric_row(
-    n: usize,
-    metric: RoundMetric,
-    start_time: Instant,
-    current: bool,
-) -> Row<'static> {
-    let throughput_cell = |b, d: Duration| {
-        let cell = Cell::from(format!(
-            "{}",
-            (b as f64 * 1000. / d.as_millis() as f64).human_throughput_bytes()
-        ));
-        if b == 0 {
-            cell.style(Style::default().fg(Color::DarkGray))
-        } else {
-            cell
-        }
-    };
-
-    let number_cell = |v| {
-        let cell = Cell::from(format!("{:>6}", v));
-        if v == 0 {
-            cell.style(Style::default().fg(Color::DarkGray))
-        } else {
-            cell
-        }
-    };
-
-    let bytes_cell = |v: u32| {
-        let cell = Cell::from(format!("{:>3.1}", v.human_count_bytes()));
-        if v == 0 {
-            cell.style(Style::default().fg(Color::DarkGray))
-        } else if v >= 1_000_000 {
-            cell.style(Style::default().add_modifier(Modifier::ITALIC))
-        } else {
-            cell
-        }
-    };
-
-    let (gt, style) = match metric.gossip_type {
-        GossipModuleType::ShardedRecent => (
-            Cell::from("R".to_string()),
-            Style::default().fg(Color::Green),
-        ),
-        GossipModuleType::ShardedHistorical => (
-            Cell::from("H".to_string()),
-            Style::default().fg(Color::Blue),
-        ),
-    };
-    let mut cells = vec![
-        gt,
-        Cell::from(n.to_string()),
-        Cell::from(format!(
-            "{:.1?}",
-            metric
-                .instant
-                .duration_since(TokioInstant::from(start_time))
-        )),
-    ];
-
-    let dur = if current {
-        metric.instant.elapsed()
-    } else if let Some(round) = &metric.round {
-        metric.instant.duration_since(round.start_time)
-    } else {
-        Duration::ZERO
-    };
-
-    cells.push({
-        let style = if dur.as_millis() >= 1000 {
-            Style::default().fg(Color::Red)
-        } else if dur.as_millis() >= 100 {
-            Style::default().fg(Color::Yellow)
-        } else {
-            Style::default()
-        };
-        Cell::from(format!("{:3.1?}", dur)).style(style)
-    });
-
-    if let Some(round) = metric.round {
-        cells.extend([
-            number_cell(round.throughput.op_count.incoming),
-            number_cell(round.throughput.op_count.outgoing),
-            bytes_cell(round.throughput.op_bytes.incoming),
-            bytes_cell(round.throughput.op_bytes.outgoing),
-            throughput_cell(
-                round.throughput.op_bytes.incoming + round.throughput.op_bytes.outgoing,
-                dur,
-            ),
-        ])
-    }
-    let style = if current {
-        style.add_modifier(Modifier::REVERSED)
-    } else {
-        style
-    };
-    Row::new(cells).style(style)
 }
