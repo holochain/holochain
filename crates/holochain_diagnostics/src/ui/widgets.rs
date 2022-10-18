@@ -3,7 +3,7 @@ use super::*;
 mod gossip_round_table;
 pub use gossip_round_table::gossip_round_table;
 
-pub fn ui_node_list(infos: &[NodeInfoList]) -> List<'static> {
+pub fn ui_node_list(infos: &[NodeInfoList<usize>]) -> List<'static> {
     let nodes = infos.iter().enumerate().map(|(i, infos)| {
         let active = if infos.iter().any(|i| i.1.current_round.is_some()) {
             "*"
@@ -95,7 +95,7 @@ pub fn ui_keymap() -> List<'static> {
     .block(Block::default().borders(Borders::TOP).title("Keymap"))
 }
 
-pub fn ui_gossip_info_table(infos: &NodeInfoList, n: usize) -> Table<'static> {
+pub fn ui_gossip_info_table(infos: &NodeInfoList<usize>, n: usize) -> Table<'static> {
     let header = Row::new(["A", "ini", "rmt", "cmp", "err"])
         .style(Style::default().add_modifier(Modifier::UNDERLINED));
 

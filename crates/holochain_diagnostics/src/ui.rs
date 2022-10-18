@@ -1,9 +1,3 @@
-// 999, 99, or 9
-const MAX_COUNT: usize = 999;
-
-const YELLOW_THRESHOLD: usize = MAX_COUNT / 5;
-const RED_THRESHOLD: usize = MAX_COUNT / 2;
-
 use holochain::prelude::{
     kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant,
     metrics::RoundMetric,
@@ -27,7 +21,7 @@ use holochain::{
 };
 use tui::{
     backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::Constraint,
     style::{Color, Modifier, Style},
     widgets::*,
     Frame,
@@ -35,6 +29,12 @@ use tui::{
 
 mod layout;
 mod widgets;
+
+// 999, 99, or 9
+const MAX_COUNT: usize = 999;
+
+const YELLOW_THRESHOLD: usize = MAX_COUNT / 5;
+const RED_THRESHOLD: usize = MAX_COUNT / 2;
 
 #[derive(Clone, Debug)]
 pub struct Node {
@@ -44,6 +44,20 @@ pub struct Node {
 }
 
 impl Node {
+    pub async fn new(conductor: Arc<SweetConductor>, zome: SweetZome) -> Self {
+        let dna_hash = zome.cell_id().dna_hash().clone();
+        let diagnostics = conductor
+            .holochain_p2p()
+            .get_diagnostics(dna_hash)
+            .await
+            .unwrap();
+        Self {
+            conductor,
+            zome,
+            diagnostics,
+        }
+    }
+
     pub fn agent(&self) -> AgentPubKey {
         self.zome.cell_id().agent_pubkey().clone()
     }
@@ -83,7 +97,7 @@ impl<const N: usize, const B: usize> State<N, B> {
     }
 }
 
-pub type NodeInfoList<'a> = Vec<(usize, &'a NodeInfo)>;
+pub type NodeInfoList<'a, Id> = Vec<(Id, &'a NodeInfo)>;
 
 #[derive(Clone)]
 pub struct Ui<const N: usize, const B: usize> {
@@ -156,14 +170,14 @@ impl<const N: usize, const B: usize> Ui<N, B> {
             );
             f.render_widget(
                 widgets::ui_basis_table(self.refresh_rate * 4, state),
-                layout.get_table,
+                layout.basis_table,
             );
             let selected = state.selected_node();
             if selected.is_none() {
-                f.render_widget(widgets::ui_keymap(), layout.gossip_table);
+                f.render_widget(widgets::ui_keymap(), layout.table_extras);
                 f.render_widget(
                     widgets::ui_global_stats(self.start_time, state),
-                    layout.stats,
+                    layout.bottom,
                 );
             }
             (selected, state.filter_zero_rounds, state.done_time)
@@ -174,11 +188,11 @@ impl<const N: usize, const B: usize> Ui<N, B> {
             let infos = self.node_infos(&metrics);
             f.render_widget(
                 widgets::ui_gossip_info_table(&infos, selected),
-                layout.gossip_table,
+                layout.table_extras,
             );
             f.render_widget(
                 widgets::gossip_round_table(&infos, self.start_time, filter_zeroes),
-                layout.stats,
+                layout.bottom,
             );
         }
 
@@ -195,7 +209,7 @@ impl<const N: usize, const B: usize> Ui<N, B> {
         f.render_widget(t_widget, layout.time);
     }
 
-    fn node_infos<'a>(&self, metrics: &'a Metrics) -> NodeInfoList<'a> {
+    fn node_infos<'a>(&self, metrics: &'a Metrics) -> NodeInfoList<'a, usize> {
         let mut infos: Vec<_> = metrics
             .node_info()
             .iter()

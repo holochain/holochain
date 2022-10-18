@@ -134,21 +134,11 @@ async fn setup_app(mut rng: &mut StdRng) -> App {
     // conductors[2].persist();
 
     let mut nodes = vec![];
-
     for (conductor, zome) in std::iter::zip(conductors.into_iter().map(Arc::new), zomes.into_iter())
     {
-        let dna_hash = zome.cell_id().dna_hash().clone();
-        let diagnostics = conductor
-            .holochain_p2p()
-            .get_diagnostics(dna_hash)
-            .await
-            .unwrap();
-        nodes.push(Node {
-            conductor,
-            zome,
-            diagnostics,
-        });
+        nodes.push(Node::new(conductor, zome).await);
     }
+
     let bases = (0..BASES)
         .map(|_| ActionHash::from_raw_32(random_vec(rng, 32)).into())
         .collect::<Vec<_>>()

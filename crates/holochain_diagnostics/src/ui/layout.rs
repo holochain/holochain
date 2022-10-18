@@ -6,9 +6,9 @@ use tui::{
 
 pub(super) struct UiLayout {
     pub node_list: Rect,
-    pub get_table: Rect,
-    pub gossip_table: Rect,
-    pub stats: Rect,
+    pub basis_table: Rect,
+    pub table_extras: Rect,
+    pub bottom: Rect,
     pub time: Rect,
 }
 
@@ -51,9 +51,9 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
 
     UiLayout {
         node_list: top_chunks[0],
-        get_table: top_chunks[1],
-        gossip_table: top_chunks[2],
-        stats: vsplit[1],
+        basis_table: top_chunks[1],
+        table_extras: top_chunks[2],
+        bottom: vsplit[1],
         time,
     }
 }

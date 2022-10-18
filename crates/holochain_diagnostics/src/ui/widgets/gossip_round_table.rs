@@ -1,13 +1,15 @@
+use std::fmt::Display;
+
 use super::*;
 
-pub fn gossip_round_table(
-    infos: &NodeInfoList,
+pub fn gossip_round_table<Id: Display>(
+    infos: &NodeInfoList<Id>,
     start_time: Instant,
     filter_zeroes: bool,
 ) -> Table<'static> {
     let mut currents: Vec<_> = infos
         .iter()
-        .filter_map(|(n, i)| i.current_round.clone().map(|r| (*n, r)))
+        .filter_map(|(n, i)| i.current_round.clone().map(|r| (n.clone(), r)))
         .collect();
 
     let mut metrics: Vec<_> = infos
@@ -53,13 +55,13 @@ pub fn gossip_round_table(
         if filter_zeroes && zero {
             None
         } else {
-            Some(render_gossip_metric_row(*n, info, start_time, false))
+            Some(render_gossip_metric_row(n.clone(), info, start_time, false))
         }
     }));
 
     Table::new(rows).header(header).widths(&[
         Constraint::Length(1),
-        Constraint::Length(3),
+        Constraint::Min(3),
         Constraint::Percentage(100 / 8),
         Constraint::Percentage(100 / 8),
         Constraint::Percentage(100 / 8),
@@ -70,8 +72,8 @@ pub fn gossip_round_table(
     ])
 }
 
-fn render_gossip_metric_row(
-    n: usize,
+fn render_gossip_metric_row<Id: Display>(
+    id: Id,
     metric: RoundMetric,
     start_time: Instant,
     current: bool,
@@ -120,7 +122,7 @@ fn render_gossip_metric_row(
     };
     let mut cells = vec![
         gt,
-        Cell::from(n.to_string()),
+        Cell::from(id.to_string()),
         Cell::from(format!(
             "{:.1?}",
             metric
