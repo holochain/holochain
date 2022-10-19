@@ -1096,6 +1096,7 @@ impl ConductorHandleT for ConductorHandleImpl {
     /// So ideally this would be called ONCE per conductor lifecyle ONLY.
     async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
         tracing::warn!("start_scheduler");
+        println!("start_scheduler");
         // Clear all ephemeral cruft in all cells before starting a scheduler.
         let cell_arcs = {
             let mut cell_arcs = vec![];
