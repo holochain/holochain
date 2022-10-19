@@ -35,7 +35,7 @@ async fn main() {
 
     let mut rng = seeded_rng(None);
 
-    let entry_size = 15_000_000;
+    let entry_size = 1_000_000;
     let mut total_committed = 0;
 
     // commit entries for roughly 10x as long as it took to setup the apps

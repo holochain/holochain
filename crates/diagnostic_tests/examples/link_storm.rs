@@ -17,10 +17,10 @@ use std::{
 use tokio::sync::mpsc::{Receiver, Sender};
 use tui::{backend::Backend, Terminal};
 
-const BASES: usize = 16;
+const BASES: usize = 12;
 
-const ENTRY_SIZE: usize = 1_00_000;
-const MAX_COMMITS: usize = 10_000;
+const ENTRY_SIZE: usize = 100_000;
+const MAX_COMMITS: usize = 1_000;
 const ENTRIES_PER_COMMIT: u32 = 100;
 
 const COMMIT_RATE: Duration = Duration::from_millis(0);
@@ -76,34 +76,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         (MAX_COMMITS * ENTRY_SIZE).human_count_bytes()
     );
 
-    let (app, mut rx) = setup_app(seeded_rng(None)).await;
-    assert_eq!(app.state.share_ref(|s| s.nodes.len()), 1);
+    let (app, rx) = setup_app(seeded_rng(None)).await;
 
     let yes_ui = std::env::var("NOUI").is_err();
     let show_ui = UI && std::env::var("RUST_LOG").is_err() && yes_ui;
 
     let commit_task = spawn_commit_task(app.clone());
     let get_task = spawn_get_task(app.clone());
+    let add_node_task = spawn_add_node_task(app.clone(), rx);
 
-    let app2 = app.clone();
-    let add_node_task = tokio::spawn(async move {
-        while let Some(selected_node) = rx.recv().await {
-            // TODO: get actual selected node
-            let node = construct_node().await;
-            let peers: Vec<_> = app2.state.share_ref(|state| {
-                [selected_node]
-                    .iter()
-                    .map(|p| state.nodes[*p].clone())
-                    .collect()
-            });
-
-            introduce_node_to_peers(&node, &peers).await;
-
-            app2.state.share_mut(|state| {
-                state.add_node(node);
-            })
-        }
-    });
     let tasks = futures::future::join_all([commit_task, get_task, add_node_task]);
 
     if show_ui {
@@ -121,6 +102,91 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+//                    █████
+//                   ░░███
+//   █████   ██████  ███████   █████ ████ ████████
+//  ███░░   ███░░███░░░███░   ░░███ ░███ ░░███░░███
+// ░░█████ ░███████   ░███     ░███ ░███  ░███ ░███
+//  ░░░░███░███░░░    ░███ ███ ░███ ░███  ░███ ░███
+//  ██████ ░░██████   ░░█████  ░░████████ ░███████
+// ░░░░░░   ░░░░░░     ░░░░░    ░░░░░░░░  ░███░░░
+//                                        ░███
+//                                        █████
+//                                       ░░░░░
+
+async fn setup_app(mut rng: StdRng) -> (App, AddNodeRx) {
+    let zome = diagnostic_tests::basic_zome();
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
+    let bases = (0..BASES)
+        .map(|_| ActionHash::from_raw_32(random_vec(&mut rng, 32)).into())
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+
+    let commits = [0; BASES];
+
+    let (mut state, rx) = State::new(commits, rng);
+    state.add_node(construct_node(dna.clone()).await);
+    state.add_node(construct_node(dna.clone()).await);
+    let state = RwShare::new(state);
+    let ui = Ui::new(Some(0), Instant::now(), REFRESH_RATE);
+
+    let app = App {
+        bases,
+        state,
+        ui,
+        dna,
+    };
+    exchange_all_peers(app.clone()).await;
+
+    (app, rx)
+}
+
+async fn construct_node(dna: DnaFile) -> Node {
+    let (conductor, zome) = diagnostic_tests::setup_conductor_for_single_dna(config(), dna).await;
+    let conductor = Arc::new(conductor);
+    let node = Node::new(conductor.clone(), zome).await;
+    node
+}
+
+async fn introduce_node_to_peers(node: &Node, peers: &[Node]) {
+    if !peers.is_empty() {
+        futures::future::join_all(peers.iter().map(|peer| async move {
+            SweetConductor::exchange_peer_info([&peer.conductor, &*node.conductor]).await;
+            peer.conductor
+                .holochain_p2p()
+                .new_integrated_data(peer.zome.cell_id().dna_hash().clone())
+                .await
+                .unwrap();
+            dbg!(peer
+                .conductor
+                .get_agent_infos(Some(peer.zome.cell_id().clone()))
+                .await
+                .unwrap());
+        }))
+        .await;
+    }
+}
+
+async fn exchange_all_peers(app: App) {
+    let cs: Vec<_> = app
+        .state
+        .share_ref(|state| state.nodes().iter().map(|n| n.conductor.clone()).collect());
+    SweetConductor::exchange_peer_info(cs.iter().map(|c| &**c)).await;
+}
+
+//   █████
+//  ░░███
+//  ███████   █████ ████ ████████   ██████   █████
+// ░░░███░   ░░███ ░███ ░░███░░███ ███░░███ ███░░
+//   ░███     ░███ ░███  ░███ ░███░███████ ░░█████
+//   ░███ ███ ░███ ░███  ░███ ░███░███░░░   ░░░░███
+//   ░░█████  ░░███████  ░███████ ░░██████  ██████
+//    ░░░░░    ░░░░░███  ░███░░░   ░░░░░░  ░░░░░░
+//             ███ ░███  ░███
+//            ░░██████   █████
+//             ░░░░░░   ░░░░░
+
 pub type Base = AnyLinkableHash;
 
 pub type AddNodeRx = Receiver<usize>;
@@ -130,26 +196,7 @@ struct App {
     state: RwShare<State>,
     ui: Ui,
     bases: [Base; BASES],
-}
-
-async fn construct_node() -> Node {
-    let (conductor, zome) =
-        diagnostic_tests::setup_conductor_for_single_zome(config(), diagnostic_tests::basic_zome())
-            .await;
-    let conductor = Arc::new(conductor);
-    let node = Node::new(conductor.clone(), zome).await;
-    node
-}
-
-async fn introduce_node_to_peers(node: &Node, peers: &[Node]) {
-    if !peers.is_empty() {
-        futures::future::join_all(
-            peers.iter().map(|peer| {
-                SweetConductor::exchange_peer_info([&peer.conductor, &*node.conductor])
-            }),
-        )
-        .await;
-    }
+    dna: DnaFile,
 }
 
 struct State {
@@ -231,38 +278,6 @@ impl State {
     }
 }
 
-//                    █████
-//                   ░░███
-//   █████   ██████  ███████   █████ ████ ████████
-//  ███░░   ███░░███░░░███░   ░░███ ░███ ░░███░░███
-// ░░█████ ░███████   ░███     ░███ ░███  ░███ ░███
-//  ░░░░███░███░░░    ░███ ███ ░███ ░███  ░███ ░███
-//  ██████ ░░██████   ░░█████  ░░████████ ░███████
-// ░░░░░░   ░░░░░░     ░░░░░    ░░░░░░░░  ░███░░░
-//                                        ░███
-//                                        █████
-//                                       ░░░░░
-
-async fn setup_app(mut rng: StdRng) -> (App, AddNodeRx) {
-    let bases = (0..BASES)
-        .map(|_| ActionHash::from_raw_32(random_vec(&mut rng, 32)).into())
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
-
-    let commits = [0; BASES];
-
-    let (mut state, rx) = State::new(commits, rng);
-    state.add_node(construct_node().await);
-    assert_eq!(state.nodes.len(), 1);
-    let state = RwShare::new(state);
-    let ui = Ui::new(Some(0), Instant::now(), REFRESH_RATE);
-
-    let app = App { bases, state, ui };
-
-    (app, rx)
-}
-
 //   █████                      █████
 //  ░░███                      ░░███
 //  ███████    ██████    █████  ░███ █████  █████
@@ -324,6 +339,27 @@ fn spawn_get_task(app: App) -> tokio::task::JoinHandle<()> {
             i += 1;
 
             tokio::time::sleep(GET_RATE).await;
+        }
+    })
+}
+
+fn spawn_add_node_task(app: App, mut rx: Receiver<usize>) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        while let Some(selected_node) = rx.recv().await {
+            // TODO: get actual selected node
+            let node = construct_node(app.dna.clone()).await;
+            let peers: Vec<_> = app.state.share_ref(|state| {
+                [selected_node]
+                    .iter()
+                    .map(|p| state.nodes[*p].clone())
+                    .collect()
+            });
+
+            introduce_node_to_peers(&node, &peers).await;
+
+            app.state.share_mut(|state| {
+                state.add_node(node);
+            })
         }
     })
 }
@@ -392,13 +428,7 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: App) -> io::
                 enter_tui(&mut io::stdout())?;
             }
             Some(InputCmd::Exchange) => {
-                let app = app.clone();
-                tokio::spawn(async move {
-                    let cs: Vec<_> = app.state.share_ref(|state| {
-                        state.nodes().iter().map(|n| n.conductor.clone()).collect()
-                    });
-                    SweetConductor::exchange_peer_info(cs.iter().map(|c| &**c)).await;
-                });
+                tokio::spawn(exchange_all_peers(app.clone()));
             }
             None => (),
         };

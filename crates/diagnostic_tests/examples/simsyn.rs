@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-use diagnostic_tests::{setup_conductors_single_zome, syn_zome};
+use diagnostic_tests::syn_zome;
 use holochain_diagnostics::{holochain::sweettest::*, random_vec, seeded_rng, AgentPubKey};
 use tokio_stream::{StreamExt, StreamMap};
 
@@ -47,7 +47,10 @@ struct App {
 impl App {
     async fn setup() -> (Self, Vec<SignalStream>) {
         let config = standard_config();
-        let (mut conductors, zomes) = setup_conductors_single_zome(NODES, config, syn_zome()).await;
+
+        let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", syn_zome())).await;
+        let (mut conductors, zomes) =
+            diagnostic_tests::setup_conductors_single_dna(NODES, config, dna).await;
 
         conductors.exchange_peer_info().await;
 
