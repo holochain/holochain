@@ -184,10 +184,10 @@ pub enum HcWebAppBundle {
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
-        /// If specified, will also pack the app manifest and all the DNAs manifests
+        /// Also run `app pack` and `dna pack` on all App and DNAs manifests
         /// that have their location bundled
-        #[structopt(long)]
-        pack_all: bool,
+        #[structopt(short, long)]
+        recursive: bool,
     },
 
     /// Unpack parts of the `.webhapp` bundle file into a specific directory.
