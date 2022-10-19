@@ -30,3 +30,15 @@ pub async fn setup_conductors_single_zome(
 
     (conductors, zomes)
 }
+
+pub async fn setup_conductor_for_single_zome(
+    config: ConductorConfig,
+    zome: InlineIntegrityZome,
+) -> (SweetConductor, SweetZome) {
+    let mut conductor = SweetConductor::from_config(config).await;
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
+    let app = conductor.setup_app("basic", &[dna]).await.unwrap();
+    let (cell,) = app.into_tuple();
+    let zome = cell.zome("zome");
+    (conductor, zome)
+}

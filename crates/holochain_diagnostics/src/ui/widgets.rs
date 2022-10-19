@@ -3,13 +3,9 @@ use super::*;
 mod gossip_round_table;
 pub use gossip_round_table::gossip_round_table;
 
-pub fn ui_node_list(infos: &[NodeInfoList<usize>]) -> List<'static> {
-    let nodes = infos.iter().enumerate().map(|(i, infos)| {
-        let active = if infos.iter().any(|i| i.1.current_round.is_some()) {
-            "*"
-        } else {
-            " "
-        };
+pub fn ui_node_list(nodes: impl Iterator<Item = (usize, bool)>) -> List<'static> {
+    let nodes = nodes.map(|(i, active)| {
+        let active = if active { "*" } else { " " };
         format!("{}C{}", active, i)
     });
     List::new(
@@ -22,7 +18,7 @@ pub fn ui_node_list(infos: &[NodeInfoList<usize>]) -> List<'static> {
     .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
 }
 
-pub fn ui_basis_table(underline_duration: Duration, counts: LinkCounts) -> Table<'static> {
+pub fn ui_basis_table(underline_duration: Duration, counts: LinkCountsRef) -> Table<'static> {
     let header = Row::new((0..counts.len()).map(|i| format!(" {}", i))).style(
         Style::default()
             .fg(Color::Cyan)
@@ -75,9 +71,12 @@ pub fn ui_global_stats(start_time: Instant, state: &impl ClientState) -> List<'s
 pub fn ui_keymap() -> List<'static> {
     List::new(
         [
-            format!("up/down/j/k : select node"),
-            format!("          0 : toggle empty gossip rounds"),
-            format!("          q : Quit"),
+            format!("↑/↓/j/k : select node"),
+            format!("      n : add new Node"),
+            format!("      x : eXchange peer info across all nodes"),
+            format!("      c : Clear garbage from background buffer"),
+            format!("      0 : toggle empty gossip rounds"),
+            format!("      q : Quit"),
         ]
         .into_iter()
         .map(ListItem::new)
@@ -87,7 +86,7 @@ pub fn ui_keymap() -> List<'static> {
 }
 
 pub fn ui_gossip_info_table(infos: &NodeInfoList<usize>, n: usize) -> Table<'static> {
-    let header = Row::new(["A", "ini", "rmt", "cmp", "err"])
+    let header = Row::new(["A", "P", "ini", "rmt", "cmp", "err"])
         .style(Style::default().add_modifier(Modifier::UNDERLINED));
 
     Table::new(
@@ -98,6 +97,7 @@ pub fn ui_gossip_info_table(infos: &NodeInfoList<usize>, n: usize) -> Table<'sta
     )
     .header(header)
     .widths(&[
+        Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Length(3),
         Constraint::Length(3),
@@ -124,17 +124,21 @@ fn ui_gossip_info_row(info: &NodeInfo, own: bool) -> Row<'static> {
     // let latency = format!("{:3}", *info.latency_micros / 1000.0);
     if own {
         Row::new(vec![
-            active,
-            "-".to_string(),
-            "-".to_string(),
-            "-".to_string(),
-            "-".to_string(),
+            // "✓".to_string(),
+            "·".to_string(),
+            "·".to_string(),
+            // active,
+            "·".to_string(),
+            "·".to_string(),
+            "·".to_string(),
+            "·".to_string(),
             // latency,
             rounds,
         ])
     } else {
         Row::new(vec![
             active,
+            "?".to_string(),
             info.initiates.len().to_string(),
             info.remote_rounds.len().to_string(),
             info.complete_rounds.len().to_string(),

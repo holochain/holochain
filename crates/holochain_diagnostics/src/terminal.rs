@@ -3,7 +3,10 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use std::io;
-use tui::{backend::CrosstermBackend, Terminal};
+use tui::{
+    backend::{Backend, CrosstermBackend},
+    Terminal,
+};
 
 pub fn tui_crossterm_setup<
     T,
@@ -13,8 +16,9 @@ pub fn tui_crossterm_setup<
 ) -> anyhow::Result<T> {
     // setup terminal
     enable_raw_mode()?;
+
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen /* , EnableMouseCapture */)?;
+    enter_tui(&mut stdout)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -23,10 +27,12 @@ pub fn tui_crossterm_setup<
 
     // restore terminal
     disable_raw_mode()?;
+    exit_tui(terminal.backend_mut())?;
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen, // DisableMouseCapture
     )?;
+
     terminal.show_cursor()?;
 
     if let Err(ref err) = res {
@@ -34,4 +40,13 @@ pub fn tui_crossterm_setup<
     }
 
     Ok(res?)
+}
+
+pub fn enter_tui(stdout: &mut io::Stdout) -> io::Result<()> {
+    execute!(stdout, EnterAlternateScreen /* , EnableMouseCapture */)
+}
+
+// pub fn exit_tui<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
+pub fn exit_tui<B: Backend + io::Write>(backend: &mut B) -> io::Result<()> {
+    execute!(backend, LeaveAlternateScreen)
 }

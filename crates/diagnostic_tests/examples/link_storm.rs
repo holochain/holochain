@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 use holochain_diagnostics::{
     holochain::{
         conductor::{conductor::RwShare, config::ConductorConfig},
@@ -10,19 +8,19 @@ use holochain_diagnostics::{
     *,
 };
 use std::{
+    collections::HashMap,
     error::Error,
     io::{self},
     sync::Arc,
     time::{Duration, Instant},
 };
-use tui::{backend::Backend, widgets::*, Terminal};
+use tokio::sync::mpsc::{Receiver, Sender};
+use tui::{backend::Backend, Terminal};
 
-const NODES: usize = 5;
 const BASES: usize = 16;
 
 const ENTRY_SIZE: usize = 1_00_000;
 const MAX_COMMITS: usize = 10_000;
-const PRE_COMMITS: usize = 10_000;
 const ENTRIES_PER_COMMIT: u32 = 100;
 
 const COMMIT_RATE: Duration = Duration::from_millis(0);
@@ -73,40 +71,164 @@ fn config() -> ConductorConfig {
 async fn main() -> Result<(), Box<dyn Error>> {
     observability::test_run().ok();
 
-    let mut rng = seeded_rng(None);
-
     println!(
         "Total amount of entry data to commit: {}",
         (MAX_COMMITS * ENTRY_SIZE).human_count_bytes()
     );
 
-    let app = setup_app(&mut rng).await;
-
-    task_commit(app.clone(), rng);
-    task_get(app.clone());
+    let (app, mut rx) = setup_app(seeded_rng(None)).await;
+    assert_eq!(app.state.share_ref(|s| s.nodes.len()), 1);
 
     let yes_ui = std::env::var("NOUI").is_err();
     let show_ui = UI && std::env::var("RUST_LOG").is_err() && yes_ui;
 
+    let commit_task = spawn_commit_task(app.clone());
+    let get_task = spawn_get_task(app.clone());
+
+    let app2 = app.clone();
+    let add_node_task = tokio::spawn(async move {
+        while let Some(selected_node) = rx.recv().await {
+            // TODO: get actual selected node
+            let node = construct_node().await;
+            let peers: Vec<_> = app2.state.share_ref(|state| {
+                [selected_node]
+                    .iter()
+                    .map(|p| state.nodes[*p].clone())
+                    .collect()
+            });
+
+            introduce_node_to_peers(&node, &peers).await;
+
+            app2.state.share_mut(|state| {
+                state.add_node(node);
+            })
+        }
+    });
+    let tasks = futures::future::join_all([commit_task, get_task, add_node_task]);
+
     if show_ui {
-        tui_crossterm_setup(|t| run_app(t, app))?;
+        let ui_task = tokio::task::spawn_blocking(|| tui_crossterm_setup(|t| run_app(t, app)));
+        tokio::select! {
+            r = tasks => { r.into_iter().collect::<Result<Vec<_>, _>>().unwrap(); }
+            r = ui_task => { r.unwrap().unwrap() }
+        }
     } else {
-        loop {
-            tokio::time::sleep(Duration::from_secs(10)).await
+        tokio::select! {
+            r = tasks => { r.into_iter().collect::<Result<Vec<_>, _>>().unwrap();  }
         }
     }
 
     Ok(())
 }
 
+pub type Base = AnyLinkableHash;
+
+pub type AddNodeRx = Receiver<usize>;
+
 #[derive(Clone)]
 struct App {
-    state: RwShare<State<NODES, BASES>>,
-    // start_time: Instant,
-    ui: Ui<NODES, BASES>,
-    bases: [AnyLinkableHash; BASES],
-    // nodes: [Node; NODES],
-    // agent_node_index: HashMap<AgentPubKey, usize>,
+    state: RwShare<State>,
+    ui: Ui,
+    bases: [Base; BASES],
+}
+
+async fn construct_node() -> Node {
+    let (conductor, zome) =
+        diagnostic_tests::setup_conductor_for_single_zome(config(), diagnostic_tests::basic_zome())
+            .await;
+    let conductor = Arc::new(conductor);
+    let node = Node::new(conductor.clone(), zome).await;
+    node
+}
+
+async fn introduce_node_to_peers(node: &Node, peers: &[Node]) {
+    if !peers.is_empty() {
+        futures::future::join_all(
+            peers.iter().map(|peer| {
+                SweetConductor::exchange_peer_info([&peer.conductor, &*node.conductor])
+            }),
+        )
+        .await;
+    }
+}
+
+struct State {
+    nodes: Vec<Node>,
+    commits: [usize; BASES],
+    link_counts: LinkCounts,
+    rng: StdRng,
+    done_time: Option<Instant>,
+
+    /// Cached reverse lookup for node index by agent key.
+    /// Must be in sync with `nodes`!
+    agent_node_index: HashMap<AgentPubKey, usize>,
+
+    tx_add_node: Sender<usize>,
+}
+
+impl ClientState for State {
+    fn num_bases(&self) -> usize {
+        BASES
+    }
+
+    fn nodes(&self) -> &[Node] {
+        self.nodes.as_slice()
+    }
+
+    fn total_commits(&self) -> usize {
+        self.commits.iter().sum()
+    }
+
+    fn link_counts(&self) -> LinkCountsRef {
+        self.link_counts.as_ref()
+    }
+
+    fn add_node(&mut self, num_peers: usize) {
+        self.tx_add_node.blocking_send(num_peers).unwrap()
+    }
+
+    fn node_info_sorted<'a>(&self, metrics: &'a metrics::Metrics) -> NodeInfoList<'a, usize> {
+        let mut infos: Vec<_> = metrics
+            .node_info()
+            .iter()
+            .map(|(agent, info)| {
+                (
+                    *self
+                        .agent_node_index
+                        .get(&AgentPubKey::from_kitsune(agent))
+                        .unwrap(),
+                    info,
+                )
+            })
+            .collect();
+        infos.sort_unstable_by_key(|(i, _)| *i);
+        infos
+    }
+}
+
+impl State {
+    fn new(commits: [usize; BASES], rng: StdRng) -> (Self, AddNodeRx) {
+        let (tx_add_node, rx_add_node) = tokio::sync::mpsc::channel(10);
+        let state = Self {
+            commits,
+            rng,
+            tx_add_node,
+            nodes: Default::default(),
+            link_counts: Default::default(),
+            agent_node_index: Default::default(),
+            done_time: Default::default(),
+        };
+        (state, rx_add_node)
+    }
+
+    fn add_node(&mut self, node: Node) {
+        let new_index = self.nodes.len();
+        self.link_counts
+            .push(vec![(0, Instant::now()); self.num_bases()]);
+        self.agent_node_index
+            .insert(node.zome.cell_id().agent_pubkey().clone(), new_index);
+        self.nodes.push(node);
+    }
 }
 
 //                    █████
@@ -121,55 +243,24 @@ struct App {
 //                                        █████
 //                                       ░░░░░
 
-async fn setup_app(mut rng: &mut StdRng) -> App {
-    let (mut conductors, zomes) = diagnostic_tests::setup_conductors_single_zome(
-        NODES,
-        config(),
-        diagnostic_tests::basic_zome(),
-    )
-    .await;
-
-    // conductors[0].persist();
-    // conductors[1].persist();
-    // conductors[2].persist();
-
-    let mut nodes = vec![];
-    for (conductor, zome) in std::iter::zip(conductors.into_iter().map(Arc::new), zomes.into_iter())
-    {
-        nodes.push(Node::new(conductor, zome).await);
-    }
-
+async fn setup_app(mut rng: StdRng) -> (App, AddNodeRx) {
     let bases = (0..BASES)
-        .map(|_| ActionHash::from_raw_32(random_vec(rng, 32)).into())
+        .map(|_| ActionHash::from_raw_32(random_vec(&mut rng, 32)).into())
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
-    let nodes: [Node; NODES] = nodes.try_into().unwrap();
 
-    let now = Instant::now();
     let commits = [0; BASES];
-    let counts = [[(0, now); BASES]; NODES];
 
-    let mut list_state: ListState = Default::default();
-    list_state.select(Some(1));
+    let (mut state, rx) = State::new(commits, rng);
+    state.add_node(construct_node().await);
+    assert_eq!(state.nodes.len(), 1);
+    let state = RwShare::new(state);
+    let ui = Ui::new(Some(0), Instant::now(), REFRESH_RATE);
 
-    let state = RwShare::new(State {
-        commits,
-        counts,
-        list_state,
-        filter_zero_rounds: false,
-        done_time: None,
-    });
-    let ui = Ui::new(nodes.clone(), now, REFRESH_RATE, state.clone());
+    let app = App { bases, state, ui };
 
-    let app = App {
-        bases,
-        // start_time: now,
-        state,
-        ui,
-    };
-
-    app
+    (app, rx)
 }
 
 //   █████                      █████
@@ -184,32 +275,38 @@ async fn setup_app(mut rng: &mut StdRng) -> App {
 //
 //
 
-fn task_get(app: App) -> tokio::task::JoinHandle<()> {
+fn spawn_get_task(app: App) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut i = 0;
         let mut last_zero = None;
-        let mut last_zero_time = Instant::now();
+        // let mut last_zero_time = Instant::now();
 
         loop {
-            let n = (i / BASES) % NODES;
             let b = i % BASES;
-
             let base = app.bases[b].clone();
-            let links: usize = app.ui.nodes[n]
+
+            let (n, node, num_nodes) = app.state.share_ref(|state| {
+                let num_nodes = state.nodes.len();
+                let n = (i / BASES) % num_nodes;
+                let node = state.nodes[n].clone();
+                (n, node, num_nodes)
+            });
+
+            let links: usize = node
                 .conductor
-                .call(&app.ui.nodes[n].zome, "link_count", (base, false))
+                .call(&node.zome, "link_count", (base, false))
                 .await;
 
             let (is_zero, is_done) = app.state.share_mut(|state| {
                 let val = state.commits[b] - links;
-                state.counts[n][b].0 = val;
-                state.counts[n][b].1 = Instant::now();
+                state.link_counts[n][b].0 = val;
+                state.link_counts[n][b].1 = Instant::now();
                 (val == 0, state.total_commits() >= MAX_COMMITS)
             });
 
             if is_zero {
                 if let Some(last) = last_zero {
-                    if is_done && i - last > NODES * BASES * 2 {
+                    if is_done && i - last > num_nodes * BASES * 2 {
                         app.state.share_mut(|state| {
                             state.done_time = Some(Instant::now());
                         });
@@ -218,7 +315,7 @@ fn task_get(app: App) -> tokio::task::JoinHandle<()> {
                     }
                 } else {
                     last_zero = Some(i);
-                    last_zero_time = Instant::now()
+                    // last_zero_time = Instant::now()
                 }
             } else {
                 last_zero = None;
@@ -231,41 +328,49 @@ fn task_get(app: App) -> tokio::task::JoinHandle<()> {
     })
 }
 
-async fn commit(app: &App, rng: &mut StdRng) -> usize {
-    let n = rng.gen_range(0..NODES);
-    let b = rng.gen_range(0..BASES);
+fn random_node(state: &mut State) -> &Node {
+    let num = state.nodes.len();
+    assert!(num > 0);
+    let n = state.rng.gen_range(0..num);
+    &state.nodes[n]
+}
 
-    let base = app.bases[b].clone();
-    let _: () = app.ui.nodes[n]
+// fn random_base(rng: &mut StdRng, app: &App) -> &Base {
+//     let b = rng.gen_range(0..BASES);
+//     &app.bases[b]
+// }
+
+async fn commit_random(app: &App) -> usize {
+    let (node, base_index) = app
+        .state
+        .share_mut(|state| (random_node(state).clone(), state.rng.gen_range(0..BASES)));
+    commit(app, &node, base_index).await
+}
+
+async fn commit(app: &App, node: &Node, base_index: usize) -> usize {
+    let base = app.bases[base_index].clone();
+    let _: () = node
         .conductor
         .call(
-            &app.ui.nodes[n].zome,
+            &node.zome,
             "create_batch_random",
             (base, ENTRIES_PER_COMMIT, ENTRY_SIZE),
         )
         .await;
 
     let total = app.state.share_mut(|state| {
-        state.commits[b] += ENTRIES_PER_COMMIT as usize;
+        state.commits[base_index] += ENTRIES_PER_COMMIT as usize;
         state.total_commits()
     });
 
     total
 }
 
-fn task_commit(app: App, mut rng: StdRng) -> tokio::task::JoinHandle<()> {
+fn spawn_commit_task(app: App) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        let mut exchanged = false;
         loop {
-            let total = commit(&app, &mut rng).await;
-            if !exchanged && total >= PRE_COMMITS {
-                let app = app.clone();
-                tokio::spawn(async move {
-                    SweetConductor::exchange_peer_info(app.ui.nodes.iter().map(|n| &*n.conductor))
-                        .await
-                });
-                exchanged = true;
-            } else if total >= MAX_COMMITS {
+            let total = commit_random(&app).await;
+            if total >= MAX_COMMITS {
                 break;
             } else {
                 tokio::time::sleep(COMMIT_RATE).await;
@@ -276,12 +381,31 @@ fn task_commit(app: App, mut rng: StdRng) -> tokio::task::JoinHandle<()> {
     })
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: App) -> io::Result<()> {
+fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: App) -> io::Result<()> {
     loop {
-        terminal.draw(|f| app.ui.render(f)).unwrap();
-        if app.ui.input() {
-            break;
-        }
+        let cmd = app.ui.input(app.state.clone());
+        match cmd {
+            Some(InputCmd::Done) => break,
+            Some(InputCmd::Clear) => {
+                exit_tui(terminal.backend_mut())?;
+                terminal.draw(|f| app.ui.clear(f))?;
+                enter_tui(&mut io::stdout())?;
+            }
+            Some(InputCmd::Exchange) => {
+                let app = app.clone();
+                tokio::spawn(async move {
+                    let cs: Vec<_> = app.state.share_ref(|state| {
+                        state.nodes().iter().map(|n| n.conductor.clone()).collect()
+                    });
+                    SweetConductor::exchange_peer_info(cs.iter().map(|c| &**c)).await;
+                });
+            }
+            None => (),
+        };
+
+        let _ = app
+            .state
+            .share_ref(|state| terminal.draw(|f| app.ui.render(f, state)).unwrap());
     }
     Ok(())
 }

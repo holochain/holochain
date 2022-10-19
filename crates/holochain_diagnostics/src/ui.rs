@@ -68,8 +68,10 @@ pub trait ClientState {
     fn nodes(&self) -> &[Node];
 
     fn total_commits(&self) -> usize;
-    fn link_counts(&self) -> LinkCounts;
-    fn node_info<'a>(&self, metrics: &'a Metrics) -> NodeInfoList<'a, usize>;
+    fn link_counts(&self) -> LinkCountsRef;
+    fn node_info_sorted<'a>(&self, metrics: &'a Metrics) -> NodeInfoList<'a, usize>;
+
+    fn add_node(&mut self, selected: usize);
 }
 
 /// State specific to the UI
@@ -103,7 +105,8 @@ impl LocalState {
 }
 
 /// Outer vec for nodes, inner vec for bases
-pub type LinkCounts<'a> = &'a [&'a [(usize, Instant)]];
+pub type LinkCounts = Vec<Vec<(usize, Instant)>>;
+pub type LinkCountsRef<'a> = &'a [Vec<(usize, Instant)>];
 pub type NodeInfoList<'a, Id> = Vec<(Id, &'a NodeInfo)>;
 
 #[derive(Clone)]
@@ -113,28 +116,45 @@ pub struct Ui {
     local_state: RwShare<LocalState>,
 }
 
+pub enum InputCmd {
+    Done,
+    Clear,
+    Exchange,
+}
+
 impl Ui {
-    pub fn new(start_time: Instant, refresh_rate: Duration) -> Self {
+    pub fn new(selected_node: Option<usize>, start_time: Instant, refresh_rate: Duration) -> Self {
+        let mut state = LocalState::default();
+        state.list_state.select(selected_node);
         Self {
             start_time,
             refresh_rate,
-            local_state: Default::default(),
+            local_state: RwShare::new(state),
         }
     }
 
-    pub fn input(&self, state: &impl ClientState) -> bool {
+    pub fn input<S: ClientState>(&self, state: RwShare<S>) -> Option<InputCmd> {
         if event::poll(self.refresh_rate).unwrap() {
             if let Event::Key(key) = event::read().unwrap() {
                 match key.code {
                     KeyCode::Char('q') => {
-                        return true;
+                        return Some(InputCmd::Done);
                     }
-                    KeyCode::Up | KeyCode::Char('k') => self
-                        .local_state
-                        .share_mut(|s| s.node_selector(-1, state.nodes().len())),
-                    KeyCode::Down | KeyCode::Char('j') => self
-                        .local_state
-                        .share_mut(|s| s.node_selector(1, state.nodes().len())),
+                    KeyCode::Char('x') => {
+                        return Some(InputCmd::Exchange);
+                    }
+                    KeyCode::Char('c') => {
+                        return Some(InputCmd::Clear);
+                    }
+                    KeyCode::Char('n') => {
+                        state.share_mut(|state| state.add_node(0));
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => self.local_state.share_mut(|s| {
+                        s.node_selector(-1, state.share_ref(|state| state.nodes().len()))
+                    }),
+                    KeyCode::Down | KeyCode::Char('j') => self.local_state.share_mut(|s| {
+                        s.node_selector(1, state.share_ref(|state| state.nodes().len()))
+                    }),
                     KeyCode::Char('0') => self
                         .local_state
                         .share_mut(|s| s.filter_zero_rounds = !s.filter_zero_rounds),
@@ -142,7 +162,11 @@ impl Ui {
                 }
             }
         };
-        false
+        None
+    }
+
+    pub fn clear<K: Backend>(&self, f: &mut Frame<K>) {
+        f.render_widget(tui::widgets::Clear, f.size())
     }
 
     pub fn render<K: Backend>(&self, f: &mut Frame<K>, state: &impl ClientState) {
@@ -154,9 +178,17 @@ impl Ui {
                 .iter()
                 .map(|n| n.diagnostics.metrics.read())
                 .collect();
-            let infos: Vec<_> = metrics.iter().map(|m| state.node_info(&m)).collect();
+            let activity = metrics
+                .iter()
+                .map(|m| {
+                    state
+                        .node_info_sorted(&m)
+                        .iter()
+                        .any(|i| i.1.current_round.is_some())
+                })
+                .enumerate();
             f.render_stateful_widget(
-                widgets::ui_node_list(infos.as_slice()),
+                widgets::ui_node_list(activity),
                 layout.node_list,
                 &mut local.list_state,
             );
@@ -170,17 +202,18 @@ impl Ui {
             );
             let selected = local.selected_node();
             if selected.is_none() {
-                f.render_widget(widgets::ui_keymap(), layout.table_extras);
+                f.render_widget(widgets::ui_keymap(), layout.bottom);
                 f.render_widget(
                     widgets::ui_global_stats(self.start_time, state),
-                    layout.bottom,
+                    layout.table_extras,
                 );
             }
             (selected, local.filter_zero_rounds, local.done_time)
         });
         if let Some(selected) = selected {
+            // node.conductor.get_agent_infos(Some(node.zome.cell_id().clone()))
             let metrics = &state.nodes()[selected].diagnostics.metrics.read();
-            let infos = state.node_info(&metrics);
+            let infos = state.node_info_sorted(&metrics);
             f.render_widget(
                 widgets::ui_gossip_info_table(&infos, selected),
                 layout.table_extras,
