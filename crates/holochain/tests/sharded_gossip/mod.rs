@@ -4,10 +4,12 @@ use std::time::Instant;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
-use holochain::conductor::handle::DevSettingsDelta;
-use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes};
-use holochain::test_utils::inline_zomes::simple_create_read_zome;
-use holochain::test_utils::inline_zomes::{batch_create_zome, simple_crud_zome};
+use holochain::sweettest::{
+    standard_config, SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes,
+};
+use holochain::test_utils::inline_zomes::{
+    batch_create_zome, simple_create_read_zome, simple_crud_zome,
+};
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
 use holochain::test_utils::{consistency_10s, consistency_60s, consistency_60s_advanced};
 use holochain::{
@@ -24,6 +26,7 @@ fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) ->
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.disable_publish = true;
     tuning.disable_recent_gossip = !recent;
     tuning.disable_historical_gossip = !historical;
     tuning.danger_gossip_recent_threshold_secs =
@@ -41,7 +44,7 @@ fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) ->
         override_port: None,
     }];
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
+    let mut config = standard_config();
     config.network = Some(network);
     config
 }
@@ -54,12 +57,6 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
 
     let mut conductors =
         SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(true, true, None)).await;
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -105,12 +102,6 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     let mut conductors =
         SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, true, Some(0))).await;
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome())).await;
@@ -181,13 +172,6 @@ async fn test_gossip_shutdown() {
     observability::test_run().ok();
     let mut conductors = SweetConductorBatch::from_config(2, make_config(true, true, None)).await;
 
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
-
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
@@ -195,13 +179,14 @@ async fn test_gossip_shutdown() {
     let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
     let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
 
+    // Create an entry before the conductors know about each other
     let hash: ActionHash = conductors[0]
         .call(&zome_0, "create_string", "hi".to_string())
         .await;
 
-    // Test that gossip doesn't happen within 3 seconds (assuming it will never happen)
+    // After shutting down conductor 0, test that gossip doesn't happen within 3 seconds
+    // of peer discovery (assuming it will never happen)
     conductors[0].shutdown().await;
-
     conductors.exchange_peer_info().await;
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
@@ -239,13 +224,6 @@ async fn three_way_gossip_historical() {
 async fn three_way_gossip(config: ConductorConfig) {
     let mut conductors = SweetConductorBatch::from_config(2, config.clone()).await;
     let start = Instant::now();
-
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -323,18 +301,11 @@ async fn three_way_gossip(config: ConductorConfig) {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
-    use holochain::{
-        conductor::handle::DevSettingsDelta, sweettest::SweetConductor,
-        test_utils::inline_zomes::simple_create_read_zome,
-    };
+    use holochain::{sweettest::SweetConductor, test_utils::inline_zomes::simple_create_read_zome};
 
     let _g = observability::test_run().ok();
 
     let mut conductor = SweetConductor::from_config(make_config(true, true, None)).await;
-    conductor.update_dev_settings(DevSettingsDelta {
-        publish: Some(false),
-        ..Default::default()
-    });
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;

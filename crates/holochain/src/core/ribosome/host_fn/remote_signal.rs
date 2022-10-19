@@ -133,8 +133,8 @@ mod tests {
         let cells: Vec<_> = apps.cells_flattened();
 
         let mut signals = Vec::new();
-        for c in conductors.iter_mut() {
-            signals.push(c.signals())
+        for h in conductors.iter() {
+            signals.push(h.signal_broadcaster().subscribe_merged())
         }
 
         let _: () = conductors[0]

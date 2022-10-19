@@ -25,7 +25,6 @@ use rand::distributions::Standard;
 use rand::Rng;
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
-use crate::conductor::handle::DevSettingsDelta;
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 
 #[derive(SerializedBytes, serde::Serialize, serde::Deserialize, Debug)]
@@ -382,6 +381,7 @@ async fn create_test_data(
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "none".to_string();
+    tuning.disable_publish = true;
 
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
@@ -390,10 +390,6 @@ async fn create_test_data(
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
-    conductor.update_dev_settings(DevSettingsDelta {
-        publish: Some(false),
-        ..Default::default()
-    });
     let mut agents = Vec::new();
     dbg!("generating agents");
     for i in 0..num_agents {

@@ -1,21 +1,23 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
+use super::{
+    SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig, SweetConductorHandle,
+};
+use crate::conductor::state::AppInterfaceId;
+use crate::conductor::ConductorHandle;
 use crate::conductor::{
-    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
-    handle::ConductorHandle, space::Spaces, CellError, Conductor, ConductorBuilder,
+    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
+    CellError, Conductor, ConductorBuilder,
 };
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
-use kitsune_p2p::KitsuneP2pConfig;
 use rand::Rng;
 use std::path::Path;
 use std::sync::Arc;
@@ -42,26 +44,7 @@ pub struct SweetConductor {
 
 /// Standard config for SweetConductors
 pub fn standard_config() -> ConductorConfig {
-    let mut tuning_params =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    // note, even with this tuning param, the `SSLKEYLOGFILE` env var
-    // still must be set in order to enable session keylogging
-    tuning_params.danger_tls_keylog = "env_keylog".to_string();
-    let mut network = KitsuneP2pConfig::default();
-    network.tuning_params = Arc::new(tuning_params);
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    let admin_interface = AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port: 0 },
-    };
-    ConductorConfig {
-        network: Some(network),
-        admin_interfaces: Some(vec![admin_interface]),
-        ..Default::default()
-    }
+    SweetConductorConfig::standard().into()
 }
 
 /// A DnaFile with a role name assigned
@@ -98,12 +81,12 @@ impl SweetConductor {
     ) -> SweetConductor {
         // Automatically add a test app interface
         handle
-            .add_test_app_interface(Default::default())
+            .add_test_app_interface(AppInterfaceId::default())
             .await
             .expect("Couldn't set up test app interface");
 
         // Get a stream of all signals since conductor startup
-        let signal_stream = handle.signal_broadcaster().await.subscribe_merged();
+        let signal_stream = handle.signal_broadcaster().subscribe_merged();
 
         // XXX: this is a bit wonky.
         // We create a Spaces instance here purely because it's easier to initialize
@@ -131,7 +114,8 @@ impl SweetConductor {
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config(config: ConductorConfig) -> SweetConductor {
+    pub async fn from_config<C: Into<ConductorConfig>>(config: C) -> SweetConductor {
+        let config = config.into();
         let dir = TestDir::new(test_db_dir());
         let handle = Self::handle_from_existing(&dir, test_keystore(), &config, &[]).await;
         Self::new(handle, dir, config).await

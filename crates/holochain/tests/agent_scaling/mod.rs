@@ -49,7 +49,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("links", links_zome())).await;
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor
@@ -98,7 +98,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
 
     // Create a Conductor
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let agents = SweetAgents::get(conductor.keystore(), NUM_AGENTS).await;
     let apps = conductor

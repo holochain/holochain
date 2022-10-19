@@ -73,6 +73,12 @@ pub enum HcDnaBundle {
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
+        /// Don't attempt to parse the manifest. Useful if you have a manifest
+        /// of an outdated format. This command will allow you to unpack the
+        /// manifest so that it may be modified and repacked into a valid bundle.
+        #[structopt(short = "r", long)]
+        raw: bool,
+
         /// Overwrite an existing directory, if one exists
         #[structopt(short = "f", long)]
         force: bool,
@@ -130,6 +136,12 @@ pub enum HcAppBundle {
         /// bundle file, with the same name as the bundle file name.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
+
+        /// Don't attempt to parse the manifest. Useful if you have a manifest
+        /// of an outdated format. This command will allow you to unpack the
+        /// manifest so that it may be modified and repacked into a valid bundle.
+        #[structopt(short = "r", long)]
+        raw: bool,
 
         /// Overwrite an existing directory, if one exists
         #[structopt(short = "f", long)]
@@ -189,6 +201,12 @@ pub enum HcWebAppBundle {
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
+        /// Don't attempt to parse the manifest. Useful if you have a manifest
+        /// of an outdated format. This command will allow you to unpack the
+        /// manifest so that it may be modified and repacked into a valid bundle.
+        #[structopt(short = "r", long)]
+        raw: bool,
+
         /// Overwrite an existing directory, if one exists
         #[structopt(short = "f", long)]
         force: bool,
@@ -211,15 +229,27 @@ impl HcDnaBundle {
             Self::Unpack {
                 path,
                 output,
+                raw,
                 force,
             } => {
-                let dir_path = crate::packing::unpack::<ValidatedDnaManifest>(
-                    DNA_BUNDLE_EXT,
-                    &path,
-                    output,
-                    force,
-                )
-                .await?;
+                let dir_path = if raw {
+                    crate::packing::unpack_raw(
+                        DNA_BUNDLE_EXT,
+                        &path,
+                        output,
+                        ValidatedDnaManifest::path().as_ref(),
+                        force,
+                    )
+                    .await?
+                } else {
+                    crate::packing::unpack::<ValidatedDnaManifest>(
+                        DNA_BUNDLE_EXT,
+                        &path,
+                        output,
+                        force,
+                    )
+                    .await?
+                };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
         }
@@ -243,11 +273,22 @@ impl HcAppBundle {
             Self::Unpack {
                 path,
                 output,
+                raw,
                 force,
             } => {
-                let dir_path =
+                let dir_path = if raw {
+                    crate::packing::unpack_raw(
+                        APP_BUNDLE_EXT,
+                        &path,
+                        output,
+                        AppManifest::path().as_ref(),
+                        force,
+                    )
+                    .await?
+                } else {
                     crate::packing::unpack::<AppManifest>(APP_BUNDLE_EXT, &path, output, force)
-                        .await?;
+                        .await?
+                };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
         }
@@ -271,15 +312,27 @@ impl HcWebAppBundle {
             Self::Unpack {
                 path,
                 output,
+                raw,
                 force,
             } => {
-                let dir_path = crate::packing::unpack::<WebAppManifest>(
-                    WEB_APP_BUNDLE_EXT,
-                    &path,
-                    output,
-                    force,
-                )
-                .await?;
+                let dir_path = if raw {
+                    crate::packing::unpack_raw(
+                        WEB_APP_BUNDLE_EXT,
+                        &path,
+                        output,
+                        WebAppManifest::path().as_ref(),
+                        force,
+                    )
+                    .await?
+                } else {
+                    crate::packing::unpack::<WebAppManifest>(
+                        WEB_APP_BUNDLE_EXT,
+                        &path,
+                        output,
+                        force,
+                    )
+                    .await?
+                };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
         }

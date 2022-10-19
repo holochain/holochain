@@ -14,7 +14,7 @@ use ::fixt::prelude::*;
 use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
 use holochain_keystore::crude_mock_keystore::*;
-use holochain_state::prelude::{test_keystore, *};
+use holochain_state::prelude::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
@@ -43,9 +43,7 @@ async fn can_update_state() {
         holochain_p2p,
         spaces,
         post_commit_sender,
-    )
-    .await
-    .unwrap();
+    );
     let state = conductor.get_state().await.unwrap();
     let mut expect_state = ConductorState::default();
     expect_state.set_tag(state.tag().clone());
@@ -93,9 +91,7 @@ async fn app_ids_are_unique() {
         holochain_p2p,
         spaces,
         post_commit_sender,
-    )
-    .await
-    .unwrap();
+    );
 
     let cell_id = fake_cell_id(1);
 
@@ -154,7 +150,7 @@ async fn can_set_fake_state() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_list_running_apps_for_cell_id() {
+async fn test_list_running_apps_for_dependent_cell_id() {
     observability::test_run().ok();
 
     let mk_dna = |name: &'static str| async move {
@@ -185,7 +181,7 @@ async fn test_list_running_apps_for_cell_id() {
 
     let list_apps = |conductor: ConductorHandle, cell: SweetCell| async move {
         conductor
-            .list_running_apps_for_required_cell_id(cell.cell_id())
+            .list_running_apps_for_dependent_cell_id(cell.cell_id())
             .await
             .unwrap()
     };
@@ -394,7 +390,11 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
     let (cell1,) = app1.into_tuple();
     let (cell2,) = app2.into_tuple();
 
-    let app_port = conductor.raw_handle().add_app_interface(0).await.unwrap();
+    let app_port = conductor
+        .raw_handle()
+        .add_app_interface(either::Either::Left(0))
+        .await
+        .unwrap();
     let (mut app_client, _) = websocket_client_by_port(app_port).await.unwrap();
     let (mut admin_client, _) = conductor.admin_ws_client().await;
 

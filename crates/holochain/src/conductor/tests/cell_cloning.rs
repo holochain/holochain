@@ -194,7 +194,7 @@ async fn clone_cell_deletion() {
     // archive clone cell
     conductor
         .raw_handle()
-        .archive_clone_cell(ArchiveCloneCellPayload {
+        .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -224,7 +224,7 @@ async fn clone_cell_deletion() {
     // restore the archived clone cell by clone id
     let restored_cell = conductor
         .raw_handle()
-        .restore_archived_clone_cell(ArchiveCloneCellPayload {
+        .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -253,7 +253,7 @@ async fn clone_cell_deletion() {
     // archive clone cell again
     conductor
         .raw_handle()
-        .archive_clone_cell(ArchiveCloneCellPayload {
+        .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -265,7 +265,7 @@ async fn clone_cell_deletion() {
     // restore clone cell by cell id
     let restored_cell = conductor
         .raw_handle()
-        .restore_archived_clone_cell(ArchiveCloneCellPayload {
+        .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CellId(installed_clone_cell.as_id().clone()),
         })
@@ -278,7 +278,7 @@ async fn clone_cell_deletion() {
     // archive and delete clone cell
     conductor
         .raw_handle()
-        .archive_clone_cell(ArchiveCloneCellPayload {
+        .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -288,7 +288,7 @@ async fn clone_cell_deletion() {
         .unwrap();
     conductor
         .raw_handle()
-        .delete_archived_clone_cells(DeleteArchivedCloneCellsPayload {
+        .delete_archived_clone_cells(&DeleteArchivedCloneCellsPayload {
             app_id: app_id.into(),
             role_id: role_id.clone(),
         })
@@ -297,7 +297,7 @@ async fn clone_cell_deletion() {
     // assert the deleted cell cannot be restored
     let restore_result = conductor
         .raw_handle()
-        .restore_archived_clone_cell(ArchiveCloneCellPayload {
+        .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CloneId(
                 CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
@@ -305,4 +305,33 @@ async fn clone_cell_deletion() {
         })
         .await;
     assert!(restore_result.is_err());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn conductor_can_startup_with_cloned_cell() {
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let role_id: AppRoleId = "dna_1".to_string();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let alice = SweetAgents::one(conductor.keystore()).await;
+    let app = conductor
+        .setup_app_for_agent("app", alice.clone(), [&(role_id.clone(), dna)])
+        .await
+        .unwrap();
+
+    let _ = conductor
+        .clone()
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            role_id: role_id.clone(),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
+            membrane_proof: None,
+            name: None,
+        })
+        .await
+        .unwrap();
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    // Simply test that the conductor can startup with a cloned cell present.
 }
