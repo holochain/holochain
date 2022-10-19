@@ -684,7 +684,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -699,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.155"
+version = "0.0.156"
 dependencies = [
  "getrandom",
  "hdi",
@@ -823,7 +823,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.56"
+version = "0.0.57"
 dependencies = [
  "hdk",
  "serde",
