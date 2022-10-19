@@ -116,9 +116,10 @@ pub enum HcAppBundle {
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
-        /// If specified, will also pack all the DNAs that have their location bundled
-        #[structopt(long)]
-        pack_all: bool,
+        /// Also run `dna pack` on all DNAs manifests
+        /// that have their location bundled
+        #[structopt(short, long)]
+        recursive: bool,
     },
 
     /// Unpack parts of the `.happ` bundle file into a specific directory.
