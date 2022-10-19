@@ -294,7 +294,6 @@ fn spawn_get_task(app: App) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut i = 0;
         let mut last_zero = None;
-        // let mut last_zero_time = Instant::now();
 
         loop {
             let b = i % BASES;
@@ -319,21 +318,24 @@ fn spawn_get_task(app: App) -> tokio::task::JoinHandle<()> {
                 (val == 0, state.total_commits() >= MAX_COMMITS)
             });
 
+            // Keep track of when we got to all zeros
             if is_zero {
                 if let Some(last) = last_zero {
                     if is_done && i - last > num_nodes * BASES * 2 {
                         app.state.share_mut(|state| {
                             state.done_time = Some(Instant::now());
                         });
-                        // If we've gone through two cycles of consistent zeros, then we can stop running get.
-                        break;
                     }
                 } else {
                     last_zero = Some(i);
-                    // last_zero_time = Instant::now()
                 }
             } else {
-                last_zero = None;
+                if last_zero.is_some() {
+                    app.state.share_mut(|state| {
+                        state.done_time = None;
+                    });
+                    last_zero = None;
+                }
             }
 
             i += 1;
