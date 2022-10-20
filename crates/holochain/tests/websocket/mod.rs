@@ -29,12 +29,10 @@ use tokio_stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
 
-use test_utils::*;
-
-pub mod test_utils;
+use crate::test_utils::*;
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "slow_tests")]
+#[cfg(feature = "glacial_tests")]
 async fn call_admin() {
     observability::test_run().ok();
     // NOTE: This is a full integration test that
@@ -42,7 +40,7 @@ async fn call_admin() {
 
     let port = 0;
 
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let config = create_config(port, environment_path);
@@ -83,18 +81,18 @@ how_many: 42
         fake_dna_path,
         Some(properties.clone()),
         "role_id".into(),
-        6000,
+        10000,
     )
     .await;
 
     // List Dnas
     let request = AdminRequest::ListDnas;
     let response = client.request(request);
-    let response = check_timeout(response, 6000).await;
+    let response = check_timeout(response, 10000).await;
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna_def().clone();
-    tmp_dna.properties = properties.try_into().unwrap();
+    tmp_dna.modifiers.properties = properties.try_into().unwrap();
     let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm)
         .await
         .unwrap();
@@ -106,7 +104,7 @@ how_many: 42
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "slow_tests")]
+#[cfg(feature = "glacial_tests")]
 async fn call_zome() {
     observability::test_run().ok();
     // NOTE: This is a full integration test that
@@ -114,7 +112,7 @@ async fn call_zome() {
 
     let admin_port = 0;
 
-    let tmp_dir = TempDir::new("conductor_cfg_2").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let config = create_config(admin_port, environment_path);
@@ -142,7 +140,7 @@ async fn call_zome() {
         fake_dna_path,
         None,
         "".into(),
-        6000,
+        10000,
     )
     .await;
 
@@ -233,7 +231,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {
-        rxs.push(h.signal_broadcaster().await.subscribe_separately())
+        rxs.push(h.signal_broadcaster().subscribe_separately())
     }
     let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
@@ -271,7 +269,7 @@ async fn emit_signals() {
 
     let admin_port = 0;
 
-    let tmp_dir = TempDir::new("conductor_cfg_emit_signals").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let config = create_config(admin_port, environment_path);
@@ -299,7 +297,7 @@ async fn emit_signals() {
         fake_dna_path,
         None,
         "".into(),
-        6000,
+        10000,
     )
     .await;
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
@@ -356,7 +354,7 @@ async fn emit_signals() {
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     observability::test_run().ok();
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await?;
@@ -368,8 +366,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
-        network_seed: None,
-        properties: None,
+        modifiers: DnaModifiersOpt::none(),
         source: DnaSource::Path(fake_dna_path),
     };
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
@@ -386,7 +383,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     observability::test_run().ok();
 
     info!("creating config");
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await?;
@@ -425,7 +422,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     observability::test_run().ok();
 
     info!("creating config");
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await?;
@@ -461,8 +458,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     );
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
     let register_payload = RegisterDnaPayload {
-        network_seed: None,
-        properties: None,
+        modifiers: DnaModifiersOpt::none(),
         source: DnaSource::Path(fake_dna_path),
     };
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
@@ -485,7 +481,7 @@ async fn too_many_open() {
     observability::test_run().ok();
 
     info!("creating config");
-    let tmp_dir = TempDir::new("conductor_cfg").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
@@ -521,7 +517,7 @@ async fn concurrent_install_dna() {
 
     let admin_port = 0;
 
-    let tmp_dir = TempDir::new("conductor_cfg_concurrent_install_dna").unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_path_buf();
     let environment_path = path.clone();
     let config = create_config(admin_port, environment_path);

@@ -1,4 +1,4 @@
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::config::{tuning_params_struct, KitsuneP2pTuningParams};
 use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
@@ -121,6 +121,18 @@ impl KitsuneP2pConfig {
                 use_proxy: NoProxy,
             }),
         }
+    }
+
+    /// Return a copy with the tuning params altered
+    pub fn tune(
+        mut self,
+        f: impl Fn(
+            tuning_params_struct::KitsuneP2pTuningParams,
+        ) -> tuning_params_struct::KitsuneP2pTuningParams,
+    ) -> Self {
+        let tp = (*self.tuning_params).clone();
+        self.tuning_params = std::sync::Arc::new(f(tp));
+        self
     }
 }
 

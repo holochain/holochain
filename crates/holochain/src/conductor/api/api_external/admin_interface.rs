@@ -284,7 +284,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(port)
+                    .add_app_interface(either::Either::Left(port))
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -333,14 +333,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let restored_cell = self
                     .conductor_handle
                     .clone()
-                    .restore_archived_clone_cell(*payload)
+                    .restore_archived_clone_cell(&*payload)
                     .await?;
                 Ok(AdminResponse::CloneCellRestored(restored_cell))
             }
             DeleteArchivedCloneCells(payload) => {
                 self.conductor_handle
                     .clone()
-                    .delete_archived_clone_cells(*payload)
+                    .delete_archived_clone_cells(&*payload)
                     .await?;
                 Ok(AdminResponse::ArchivedCloneCellsDeleted)
             }

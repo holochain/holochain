@@ -4,6 +4,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.62
+
+## 0.0.61
+
+- Added `WebAppManifestCurrentBuilder` and exposed it.
+
 ## 0.0.60
 
 ## 0.0.59
