@@ -9,7 +9,7 @@ pub fn gossip_round_table<Id: Display>(
 ) -> Table<'static> {
     let mut currents: Vec<_> = infos
         .iter()
-        .filter_map(|(n, i)| i.current_round.clone().map(|r| (n.clone(), r)))
+        .filter_map(|(n, i)| i.current_round.clone().map(|r| (n, r)))
         .collect();
 
     let mut metrics: Vec<_> = infos
@@ -55,7 +55,7 @@ pub fn gossip_round_table<Id: Display>(
         if filter_zeroes && zero {
             None
         } else {
-            Some(render_gossip_metric_row(n.clone(), info, start_time, false))
+            Some(render_gossip_metric_row(n, info, start_time, false))
         }
     }));
 

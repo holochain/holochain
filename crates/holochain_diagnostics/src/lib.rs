@@ -1,3 +1,5 @@
+#![allow(clippy::option_map_unit_fn)]
+
 pub use holochain;
 pub use holochain::prelude::*;
 

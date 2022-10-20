@@ -31,7 +31,7 @@ pub fn ui_basis_table(underline_duration: Duration, counts: LinkCountsRef) -> Ta
                 num_bases = r.len();
             }
 
-            let cells = r.into_iter().enumerate().map(|(_, (c, t))| {
+            let cells = r.iter().enumerate().map(|(_, (c, t))| {
                 let val = (*c).min(MAX_COUNT);
                 let mut style = if val == 0 {
                     Style::default().fg(Color::Green)
@@ -76,12 +76,12 @@ pub fn ui_global_stats(start_time: Instant, state: &impl ClientState) -> List<'s
 pub fn ui_keymap() -> List<'static> {
     List::new(
         [
-            format!("↑/↓/j/k : select node"),
-            format!("      n : add new Node"),
-            format!("      x : eXchange peer info across all nodes"),
-            format!("      c : Clear garbage from background buffer"),
-            format!("      0 : toggle empty gossip rounds"),
-            format!("      q : Quit"),
+            "↑/↓/j/k : select node".to_string(),
+            "      n : add new Node".to_string(),
+            "      x : eXchange peer info across all nodes".to_string(),
+            "      c : Clear garbage from background buffer".to_string(),
+            "      0 : toggle empty gossip rounds".to_string(),
+            "      q : Quit".to_string(),
         ]
         .into_iter()
         .map(ListItem::new)

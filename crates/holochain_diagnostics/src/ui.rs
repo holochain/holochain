@@ -182,7 +182,7 @@ impl Ui {
                 .iter()
                 .map(|m| {
                     state
-                        .node_info_sorted(&m)
+                        .node_info_sorted(m)
                         .iter()
                         .any(|i| i.1.current_round.is_some())
                 })
@@ -213,7 +213,7 @@ impl Ui {
         if let Some(selected) = selected {
             // node.conductor.get_agent_infos(Some(node.zome.cell_id().clone()))
             let metrics = &state.nodes()[selected].diagnostics.metrics.read();
-            let infos = state.node_info_sorted(&metrics);
+            let infos = state.node_info_sorted(metrics);
             f.render_widget(
                 widgets::ui_gossip_info_table(&infos, selected),
                 layout.table_extras,
