@@ -42,11 +42,11 @@ pub fn tui_crossterm_setup<
     Ok(res?)
 }
 
-pub fn enter_tui(stdout: &mut io::Stdout) -> io::Result<()> {
+pub fn enter_tui(stdout: &mut io::Stdout) -> Result<(), crossterm::ErrorKind> {
     execute!(stdout, EnterAlternateScreen /* , EnableMouseCapture */)
 }
 
-// pub fn exit_tui<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
-pub fn exit_tui<B: Backend + io::Write>(backend: &mut B) -> io::Result<()> {
+// pub fn exit_tui<B: Backend>(terminal: &mut Terminal<B>) -> Result<(), crossterm::ErrorKind> {
+pub fn exit_tui<B: Backend + io::Write>(backend: &mut B) -> Result<(), crossterm::ErrorKind> {
     execute!(backend, LeaveAlternateScreen)
 }
