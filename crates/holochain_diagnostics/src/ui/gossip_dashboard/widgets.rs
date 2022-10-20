@@ -63,7 +63,10 @@ pub fn ui_basis_table(underline_duration: Duration, counts: LinkCountsRef) -> Ta
 pub fn ui_global_stats(start_time: Instant, state: &impl ClientState) -> List<'static> {
     List::new(
         [
-            format!("T:           {:<.2?}", start_time.elapsed()),
+            format!(
+                "T:           {:<.2?}",
+                state.time().duration_since(start_time)
+            ),
             format!("Commits:     {}", state.total_commits()),
         ]
         .into_iter()

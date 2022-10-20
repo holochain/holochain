@@ -5,6 +5,7 @@ use super::*;
 pub fn gossip_round_table<Id: Display>(
     infos: &NodeInfoList<Id>,
     start_time: Instant,
+    current_time: Instant,
     filter_zeroes: bool,
 ) -> Table<'static> {
     let mut currents: Vec<_> = infos
@@ -35,7 +36,7 @@ pub fn gossip_round_table<Id: Display>(
     rows.extend(
         currents
             .into_iter()
-            .map(|(n, metric)| render_gossip_metric_row(n, metric, start_time, true)),
+            .map(|(n, metric)| render_gossip_metric_row(n, metric, start_time, current_time, true)),
     );
 
     // Add past round info
@@ -55,7 +56,13 @@ pub fn gossip_round_table<Id: Display>(
         if filter_zeroes && zero {
             None
         } else {
-            Some(render_gossip_metric_row(n, info, start_time, false))
+            Some(render_gossip_metric_row(
+                n,
+                info,
+                start_time,
+                current_time,
+                false,
+            ))
         }
     }));
 
@@ -76,7 +83,8 @@ fn render_gossip_metric_row<Id: Display>(
     id: Id,
     metric: RoundMetric,
     start_time: Instant,
-    current: bool,
+    current_time: Instant,
+    is_current: bool,
 ) -> Row<'static> {
     let throughput_cell = |b, d: Duration| {
         let cell = Cell::from(format!(
@@ -131,8 +139,8 @@ fn render_gossip_metric_row<Id: Display>(
         )),
     ];
 
-    let dur = if current {
-        metric.instant.elapsed()
+    let dur = if is_current {
+        current_time.duration_since(metric.instant.into())
     } else if let Some(round) = &metric.round {
         metric.instant.duration_since(round.start_time)
     } else {
@@ -162,7 +170,7 @@ fn render_gossip_metric_row<Id: Display>(
             ),
         ])
     }
-    let style = if current {
+    let style = if is_current {
         style.add_modifier(Modifier::REVERSED)
     } else {
         style

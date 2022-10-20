@@ -200,6 +200,7 @@ struct App {
 }
 
 struct State {
+    time: Instant,
     nodes: Vec<Node>,
     commits: [usize; BASES],
     link_counts: LinkCounts,
@@ -214,6 +215,10 @@ struct State {
 }
 
 impl ClientState for State {
+    fn time(&self) -> &Instant {
+        &self.time
+    }
+
     fn num_bases(&self) -> usize {
         BASES
     }
@@ -257,6 +262,7 @@ impl State {
     fn new(commits: [usize; BASES], rng: StdRng) -> (Self, AddNodeRx) {
         let (tx_add_node, rx_add_node) = tokio::sync::mpsc::channel(10);
         let state = Self {
+            time: Instant::now(),
             commits,
             rng,
             tx_add_node,
