@@ -1,7 +1,6 @@
 use super::*;
 
-mod gossip_round_table;
-pub use gossip_round_table::gossip_round_table;
+pub mod gossip_round_table;
 
 pub fn ui_node_list(nodes: impl Iterator<Item = (usize, bool)>) -> List<'static> {
     let nodes = nodes.map(|(i, active)| {

@@ -26,6 +26,8 @@ use tui::{
     Frame,
 };
 
+use self::widgets::gossip_round_table::{gossip_round_table, GossipRoundTableState};
+
 mod layout;
 mod state;
 mod widgets;
@@ -72,8 +74,6 @@ pub trait ClientState {
     fn total_commits(&self) -> usize;
     fn link_counts(&self) -> LinkCountsRef;
     fn node_info_sorted<'a>(&self, metrics: &'a Metrics) -> NodeInfoList<'a, usize>;
-
-    fn add_node(&mut self, selected: usize);
 }
 
 /// State specific to the UI
@@ -112,7 +112,7 @@ pub type LinkCountsRef<'a> = &'a [Vec<(usize, Instant)>];
 pub type NodeInfoList<'a, Id> = Vec<(Id, &'a NodeInfo)>;
 
 #[derive(Clone)]
-pub struct Ui {
+pub struct GossipDashboard {
     refresh_rate: Duration,
     start_time: Instant,
     local_state: RwShare<LocalState>,
@@ -122,9 +122,10 @@ pub enum InputCmd {
     Done,
     Clear,
     Exchange,
+    AddNode(usize),
 }
 
-impl Ui {
+impl GossipDashboard {
     pub fn new(selected_node: Option<usize>, start_time: Instant, refresh_rate: Duration) -> Self {
         let mut state = LocalState::default();
         state.list_state.select(selected_node);
@@ -149,7 +150,7 @@ impl Ui {
                         return Some(InputCmd::Clear);
                     }
                     KeyCode::Char('n') => {
-                        state.share_mut(|state| state.add_node(0));
+                        return Some(InputCmd::AddNode(0));
                     }
                     KeyCode::Up | KeyCode::Char('k') => self.local_state.share_mut(|s| {
                         s.node_selector(-1, state.share_ref(|state| state.nodes().len()))
@@ -221,7 +222,12 @@ impl Ui {
                 layout.table_extras,
             );
             f.render_widget(
-                widgets::gossip_round_table(&infos, self.start_time, state.time(), filter_zeroes),
+                gossip_round_table(&GossipRoundTableState {
+                    infos: &infos,
+                    start_time: self.start_time,
+                    current_time: state.time(),
+                    filter_zeroes,
+                }),
                 layout.bottom,
             );
         }

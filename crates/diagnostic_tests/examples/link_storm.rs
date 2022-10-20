@@ -4,7 +4,7 @@ use holochain_diagnostics::{
         prelude::*,
         sweettest::*,
     },
-    ui::*,
+    ui::gossip_dashboard::*,
     *,
 };
 use std::{
@@ -14,7 +14,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc::{Receiver, Sender};
 use tui::{backend::Backend, Terminal};
 
 const BASES: usize = 12;
@@ -76,16 +75,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         (MAX_COMMITS * ENTRY_SIZE).human_count_bytes()
     );
 
-    let (app, rx) = setup_app(seeded_rng(None)).await;
+    let app = setup_app(seeded_rng(None)).await;
 
     let yes_ui = std::env::var("NOUI").is_err();
     let show_ui = UI && std::env::var("RUST_LOG").is_err() && yes_ui;
 
     let commit_task = spawn_commit_task(app.clone());
     let get_task = spawn_get_task(app.clone());
-    let add_node_task = spawn_add_node_task(app.clone(), rx);
 
-    let tasks = futures::future::join_all([commit_task, get_task, add_node_task]);
+    let tasks = futures::future::join_all([commit_task, get_task]);
 
     if show_ui {
         let ui_task = tokio::task::spawn_blocking(|| tui_crossterm_setup(|t| run_app(t, app)));
@@ -114,7 +112,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 //                                        █████
 //                                       ░░░░░
 
-async fn setup_app(mut rng: StdRng) -> (App, AddNodeRx) {
+async fn setup_app(mut rng: StdRng) -> App {
     let zome = diagnostic_tests::basic_zome();
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
     let bases = (0..BASES)
@@ -125,11 +123,11 @@ async fn setup_app(mut rng: StdRng) -> (App, AddNodeRx) {
 
     let commits = [0; BASES];
 
-    let (mut state, rx) = State::new(commits, rng);
+    let mut state = State::new(commits, rng);
     state.add_node(construct_node(dna.clone()).await);
     state.add_node(construct_node(dna.clone()).await);
     let state = RwShare::new(state);
-    let ui = Ui::new(Some(0), Instant::now(), REFRESH_RATE);
+    let ui = GossipDashboard::new(Some(0), Instant::now(), REFRESH_RATE);
 
     let app = App {
         bases,
@@ -139,7 +137,7 @@ async fn setup_app(mut rng: StdRng) -> (App, AddNodeRx) {
     };
     exchange_all_peers(app.clone()).await;
 
-    (app, rx)
+    app
 }
 
 async fn construct_node(dna: DnaFile) -> Node {
@@ -189,12 +187,10 @@ async fn exchange_all_peers(app: App) {
 
 pub type Base = AnyLinkableHash;
 
-pub type AddNodeRx = Receiver<usize>;
-
 #[derive(Clone)]
 struct App {
     state: RwShare<State>,
-    ui: Ui,
+    ui: GossipDashboard,
     bases: [Base; BASES],
     dna: DnaFile,
 }
@@ -210,13 +206,11 @@ struct State {
     /// Cached reverse lookup for node index by agent key.
     /// Must be in sync with `nodes`!
     agent_node_index: HashMap<AgentPubKey, usize>,
-
-    tx_add_node: Sender<usize>,
 }
 
 impl ClientState for State {
-    fn time(&self) -> &Instant {
-        &self.time
+    fn time(&self) -> Instant {
+        self.time
     }
 
     fn num_bases(&self) -> usize {
@@ -233,10 +227,6 @@ impl ClientState for State {
 
     fn link_counts(&self) -> LinkCountsRef {
         self.link_counts.as_ref()
-    }
-
-    fn add_node(&mut self, num_peers: usize) {
-        self.tx_add_node.blocking_send(num_peers).unwrap()
     }
 
     fn node_info_sorted<'a>(&self, metrics: &'a metrics::Metrics) -> NodeInfoList<'a, usize> {
@@ -259,19 +249,17 @@ impl ClientState for State {
 }
 
 impl State {
-    fn new(commits: [usize; BASES], rng: StdRng) -> (Self, AddNodeRx) {
-        let (tx_add_node, rx_add_node) = tokio::sync::mpsc::channel(10);
+    fn new(commits: [usize; BASES], rng: StdRng) -> Self {
         let state = Self {
             time: Instant::now(),
             commits,
             rng,
-            tx_add_node,
             nodes: Default::default(),
             link_counts: Default::default(),
             agent_node_index: Default::default(),
             done_time: Default::default(),
         };
-        (state, rx_add_node)
+        state
     }
 
     fn add_node(&mut self, node: Node) {
@@ -351,24 +339,20 @@ fn spawn_get_task(app: App) -> tokio::task::JoinHandle<()> {
     })
 }
 
-fn spawn_add_node_task(app: App, mut rx: Receiver<usize>) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        while let Some(selected_node) = rx.recv().await {
-            // TODO: get actual selected node
-            let node = construct_node(app.dna.clone()).await;
-            let peers: Vec<_> = app.state.share_ref(|state| {
-                [selected_node]
-                    .iter()
-                    .map(|p| state.nodes[*p].clone())
-                    .collect()
-            });
+async fn create_new_node(app: App, selected_node: usize) {
+    // TODO: get actual selected node
+    let node = construct_node(app.dna.clone()).await;
+    let peers: Vec<_> = app.state.share_ref(|state| {
+        [selected_node]
+            .iter()
+            .map(|p| state.nodes[*p].clone())
+            .collect()
+    });
 
-            introduce_node_to_peers(&node, &peers).await;
+    introduce_node_to_peers(&node, &peers).await;
 
-            app.state.share_mut(|state| {
-                state.add_node(node);
-            })
-        }
+    app.state.share_mut(|state| {
+        state.add_node(node);
     })
 }
 
@@ -437,6 +421,9 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: App) -> io::
             }
             Some(InputCmd::Exchange) => {
                 tokio::spawn(exchange_all_peers(app.clone()));
+            }
+            Some(InputCmd::AddNode(index)) => {
+                tokio::spawn(create_new_node(app.clone(), index));
             }
             None => (),
         };

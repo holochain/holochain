@@ -2,18 +2,22 @@ use std::fmt::Display;
 
 use super::*;
 
-pub fn gossip_round_table<Id: Display>(
-    infos: &NodeInfoList<Id>,
-    start_time: Instant,
-    current_time: Instant,
-    filter_zeroes: bool,
-) -> Table<'static> {
-    let mut currents: Vec<_> = infos
+pub struct GossipRoundTableState<'a, Id: Display> {
+    pub infos: &'a NodeInfoList<'a, Id>,
+    pub start_time: Instant,
+    pub current_time: Instant,
+    pub filter_zeroes: bool,
+}
+
+pub fn gossip_round_table<Id: Display>(state: &GossipRoundTableState<Id>) -> Table<'static> {
+    let mut currents: Vec<_> = state
+        .infos
         .iter()
         .filter_map(|(n, i)| i.current_round.clone().map(|r| (n, r)))
         .collect();
 
-    let mut metrics: Vec<_> = infos
+    let mut metrics: Vec<_> = state
+        .infos
         .iter()
         .flat_map(|(n, info)| {
             info.complete_rounds
@@ -36,7 +40,7 @@ pub fn gossip_round_table<Id: Display>(
     rows.extend(
         currents
             .into_iter()
-            .map(|(n, metric)| render_gossip_metric_row(n, metric, start_time, current_time, true)),
+            .map(|(n, metric)| render_gossip_metric_row(state, n.clone(), metric, true)),
     );
 
     // Add past round info
@@ -53,16 +57,10 @@ pub fn gossip_round_table<Id: Display>(
                     == 0
             })
             .unwrap_or(false);
-        if filter_zeroes && zero {
+        if state.filter_zeroes && zero {
             None
         } else {
-            Some(render_gossip_metric_row(
-                n,
-                info,
-                start_time,
-                current_time,
-                false,
-            ))
+            Some(render_gossip_metric_row(state, n.clone(), info, false))
         }
     }));
 
@@ -80,10 +78,9 @@ pub fn gossip_round_table<Id: Display>(
 }
 
 fn render_gossip_metric_row<Id: Display>(
-    id: Id,
+    state: &GossipRoundTableState<Id>,
+    id: &Id,
     metric: RoundMetric,
-    start_time: Instant,
-    current_time: Instant,
     is_current: bool,
 ) -> Row<'static> {
     let throughput_cell = |b, d: Duration| {
@@ -135,12 +132,12 @@ fn render_gossip_metric_row<Id: Display>(
             "{:.1?}",
             metric
                 .instant
-                .duration_since(TokioInstant::from(start_time))
+                .duration_since(TokioInstant::from(state.start_time))
         )),
     ];
 
     let dur = if is_current {
-        current_time.duration_since(metric.instant.into())
+        state.current_time.duration_since(metric.instant.into())
     } else if let Some(round) = &metric.round {
         metric.instant.duration_since(round.start_time)
     } else {
