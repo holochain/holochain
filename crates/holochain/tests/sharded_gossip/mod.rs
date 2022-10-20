@@ -196,7 +196,7 @@ async fn test_gossip_shutdown() {
     // Ensure that gossip loops resume upon startup
     conductors[0].startup().await;
 
-    consistency_10s([&cell_0, &cell_1]).await;
+    consistency_60s([&cell_0, &cell_1]).await;
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
     assert_eq!(record.unwrap().action_address(), &hash);
 }

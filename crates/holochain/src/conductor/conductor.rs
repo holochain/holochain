@@ -2273,7 +2273,7 @@ impl Conductor {
     }
 
     /// Print the current setup in a machine readable way
-    pub(super) fn print_setup(&self) {
+    fn print_setup(&self) {
         use std::fmt::Write;
         let mut out = String::new();
         self.admin_websocket_ports
