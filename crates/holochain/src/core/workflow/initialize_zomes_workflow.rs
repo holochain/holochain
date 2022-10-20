@@ -57,11 +57,9 @@ where
 
     // only commit if the result was successful
     if result == InitResult::Pass {
-        println!("init flush start)");
         let flushed_actions = HostFnWorkspace::from(workspace.clone())
             .flush(&network)
             .await?;
-        println!("init flush end");
 
         send_post_commit(
             conductor_handle,

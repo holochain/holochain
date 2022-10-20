@@ -197,7 +197,6 @@ pub mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    // #[ignore = "flakey. Sometimes fails the last assert with 3 instead of 5"]
     #[cfg(feature = "test_utils")]
     async fn schedule_test_wasm() -> anyhow::Result<()> {
         observability::test_run().ok();

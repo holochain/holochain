@@ -662,10 +662,8 @@ pub fn schedule_fn(
     maybe_schedule: Option<Schedule>,
     now: Timestamp,
 ) -> StateMutationResult<()> {
-    println!("schedule fn {:?}", &scheduled_fn);
     let (start, end, ephemeral) = match maybe_schedule {
         Some(Schedule::Persisted(ref schedule_string)) => {
-            println!("persisted {}", schedule_string);
             // If this cron doesn't parse cleanly we don't even want to
             // write it to the db.
             let start = if let Some(start) = cron::Schedule::from_str(schedule_string)
@@ -676,10 +674,8 @@ pub fn schedule_fn(
                 )
                 .next()
             {
-                println!("now {:?}, next start {:?}", &now, &start);
                 start
             } else {
-                println!("no further executions");
                 // If there are no further executions then scheduling is a
                 // delete and bail.
                 let _ = txn.execute(
