@@ -25,9 +25,7 @@ async fn create_clone_cell_without_modifiers_fails() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_id: AppRoleId = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
@@ -63,9 +61,7 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_id: AppRoleId = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
@@ -109,9 +105,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_creates_callable_cell() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_id: AppRoleId = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
@@ -143,9 +137,7 @@ async fn create_clone_cell_creates_callable_cell() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_info_includes_cloned_cells() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_id: AppRoleId = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
@@ -178,9 +170,7 @@ async fn app_info_includes_cloned_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_cell_deletion() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_id: AppRoleId = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
@@ -203,7 +193,7 @@ async fn clone_cell_deletion() {
 
     // archive clone cell
     conductor
-        .inner_handle()
+        .raw_handle()
         .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
@@ -233,7 +223,7 @@ async fn clone_cell_deletion() {
 
     // restore the archived clone cell by clone id
     let restored_cell = conductor
-        .inner_handle()
+        .raw_handle()
         .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CloneId(
@@ -262,7 +252,7 @@ async fn clone_cell_deletion() {
 
     // archive clone cell again
     conductor
-        .inner_handle()
+        .raw_handle()
         .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
@@ -274,7 +264,7 @@ async fn clone_cell_deletion() {
 
     // restore clone cell by cell id
     let restored_cell = conductor
-        .inner_handle()
+        .raw_handle()
         .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CellId(installed_clone_cell.as_id().clone()),
@@ -287,7 +277,7 @@ async fn clone_cell_deletion() {
 
     // archive and delete clone cell
     conductor
-        .inner_handle()
+        .raw_handle()
         .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
@@ -297,7 +287,7 @@ async fn clone_cell_deletion() {
         .await
         .unwrap();
     conductor
-        .inner_handle()
+        .raw_handle()
         .delete_archived_clone_cells(&DeleteArchivedCloneCellsPayload {
             app_id: app_id.into(),
             role_id: role_id.clone(),
@@ -306,7 +296,7 @@ async fn clone_cell_deletion() {
         .unwrap();
     // assert the deleted cell cannot be restored
     let restore_result = conductor
-        .inner_handle()
+        .raw_handle()
         .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CloneId(
@@ -319,9 +309,7 @@ async fn clone_cell_deletion() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_can_startup_with_cloned_cell() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_id: AppRoleId = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;

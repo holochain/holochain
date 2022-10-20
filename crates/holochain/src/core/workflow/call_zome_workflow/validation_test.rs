@@ -34,8 +34,7 @@ async fn direct_validation_test() {
         },
         [integrity, coordinator],
     )
-    .await
-    .unwrap();
+    .await;
 
     let alice_agent_id = fake_agent_pubkey_1();
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());

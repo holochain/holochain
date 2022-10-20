@@ -93,9 +93,9 @@ dependencies = [
 
 [[package]]
 name = "arbitrary"
-version = "1.1.2"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25e0a02cf12f1b1f48b14cb7f8217b876d09992b39c816ffb3b1ba64dd979a87"
+checksum = "698b65a961a9d730fb45b6b0327e20207810c9f61ee421b082b27ba003f49e2b"
 dependencies = [
  "derive_arbitrary",
 ]
@@ -572,6 +572,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
 
 [[package]]
+name = "cassowary"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df8670b8c7b9dae1793364eafadf7239c40d669904660c5960d74cfd80b46a53"
+
+[[package]]
 name = "cast"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -692,9 +698,9 @@ dependencies = [
 
 [[package]]
 name = "colored"
-version = "2.0.0"
+version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
+checksum = "f4ffc801dacf156c5854b9df4f425a626539c3a6ef7893cc0c5084a23f0b6c59"
 dependencies = [
  "atty",
  "lazy_static",
@@ -931,7 +937,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c36c10130df424b2f3552fcc2ddcd9b28a27b1e54b358b45874f88d1ca6888c"
 dependencies = [
  "bitflags",
- "crossterm_winapi",
+ "crossterm_winapi 0.7.0",
  "lazy_static",
  "libc",
  "mio 0.7.14",
@@ -941,10 +947,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossterm"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e64e6c0fbe2c17357405f7c758c1ef960fce08bdfb2c03d88d2a18d7e09c4b67"
+dependencies = [
+ "bitflags",
+ "crossterm_winapi 0.9.0",
+ "libc",
+ "mio 0.8.4",
+ "parking_lot 0.12.1",
+ "signal-hook 0.3.14",
+ "signal-hook-mio",
+ "winapi",
+]
+
+[[package]]
 name = "crossterm_winapi"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0da8964ace4d3e4a044fd027919b2237000b24315a37c916f61809f1ff2140b9"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
+name = "crossterm_winapi"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ae1b35a484aa10e07fe0638d02301c5ad24de82d310ccbd2f3693da5f09bf1c"
 dependencies = [
  "winapi",
 ]
@@ -2193,6 +2224,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_diagnostics"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "crossterm 0.25.0",
+ "holochain",
+ "human-repr",
+ "rand 0.8.5",
+ "tracing",
+ "tui",
+]
+
+[[package]]
 name = "holochain_integrity_types"
 version = "0.0.21"
 dependencies = [
@@ -2436,7 +2481,7 @@ dependencies = [
  "nanoid 0.3.0",
  "observability",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -2655,6 +2700,12 @@ dependencies = [
  "toml",
  "uuid 0.8.2",
 ]
+
+[[package]]
+name = "human-repr"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0fb489e3108b684bba475a4cb9804260365870e2f60058265e3d0a3b309bdb1"
 
 [[package]]
 name = "hyper"
@@ -3075,7 +3126,7 @@ dependencies = [
  "base64",
  "blake2b_simd 0.5.11",
  "criterion",
- "crossterm",
+ "crossterm 0.19.0",
  "derive_more",
  "futures",
  "kitsune_p2p_transport_quic",
@@ -5689,6 +5740,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-hook-mio"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29ad2e15f37ec9a6cc544097b78a1ec90001e9f71b81338ca39f430adaca99af"
+dependencies = [
+ "libc",
+ "mio 0.8.4",
+ "signal-hook 0.3.14",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6477,6 +6539,19 @@ dependencies = [
  "serde_json",
  "termcolor",
  "toml",
+]
+
+[[package]]
+name = "tui"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccdd26cbd674007e649a272da4475fb666d3aa0ad0531da7136db6fab0e5bad1"
+dependencies = [
+ "bitflags",
+ "cassowary",
+ "crossterm 0.25.0",
+ "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]

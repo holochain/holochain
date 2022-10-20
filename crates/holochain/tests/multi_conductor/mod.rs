@@ -37,9 +37,7 @@ async fn test_publish() -> anyhow::Result<()> {
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -52,7 +50,7 @@ async fn test_publish() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s(&[&alice, &bobbo, &carol]).await;
+    consistency_10s([&alice, &bobbo, &carol]).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -81,9 +79,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -155,9 +151,7 @@ async fn sharded_consistency() {
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
@@ -174,7 +168,7 @@ async fn sharded_consistency() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    let conductor_handles: Vec<_> = conductors.iter().map(|c| c.handle()).collect();
+    let conductor_handles: Vec<_> = conductors.iter().map(|c| c.raw_handle()).collect();
     local_machine_session(&conductor_handles, std::time::Duration::from_secs(60)).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
@@ -199,7 +193,7 @@ async fn private_entries_dont_leak() {
     use holochain_types::inline_zome::InlineZomeSet;
 
     let _g = observability::test_run().ok();
-    let mut entry_def = EntryDef::default_with_id("entrydef");
+    let mut entry_def = EntryDef::from_id("entrydef");
     entry_def.visibility = EntryVisibility::Private;
 
     #[derive(Serialize, Deserialize, Debug, SerializedBytes)]
@@ -227,9 +221,7 @@ async fn private_entries_dont_leak() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0)
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0).await;
     let dnas = vec![dna_file];
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
@@ -242,7 +234,7 @@ async fn private_entries_dont_leak() {
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    consistency_10s(&[&alice, &bobbo]).await;
+    consistency_10s([&alice, &bobbo]).await;
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -266,7 +258,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    consistency_10s(&[&alice, &bobbo]).await;
+    consistency_10s([&alice, &bobbo]).await;
 
     check_all_gets_for_private_entry(
         &conductors[0],

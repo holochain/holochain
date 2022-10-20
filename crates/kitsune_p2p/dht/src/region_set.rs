@@ -182,7 +182,7 @@ mod tests {
         let coords = RegionCoordSetLtcs::new(times, ArqBoundsSet::single(arq.to_bounds(&topo)));
         let rset = RegionSetLtcs::from_store(&store, coords);
         assert_eq!(
-            rset.data
+            rset.data()
                 .concat()
                 .concat()
                 .iter()
@@ -206,7 +206,7 @@ mod tests {
 
         let mut rset_a = RegionSetLtcs::from_store(&store, coords_a);
         let mut rset_b = RegionSetLtcs::from_store(&store, coords_b);
-        assert_ne!(rset_a.data, rset_b.data);
+        assert_ne!(rset_a.data(), rset_b.data());
 
         rset_a.rectify(&mut rset_b).unwrap();
 
@@ -259,7 +259,7 @@ mod tests {
 
         let rset_a = RegionSetLtcs::from_store(&store1, coords_a);
         let rset_b = RegionSetLtcs::from_store(&store2, coords_b);
-        assert_ne!(rset_a.data, rset_b.data);
+        assert_ne!(rset_a.data(), rset_b.data());
 
         let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
         dbg!(&diff, &extra_ops);
@@ -321,7 +321,7 @@ mod tests {
 
         let rset_a = RegionSetLtcs::from_store(&store1, coords_a);
         let rset_b = RegionSetLtcs::from_store(&store2, coords_b);
-        assert_ne!(rset_a.data, rset_b.data);
+        assert_ne!(rset_a.data(), rset_b.data());
 
         let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
         dbg!(&diff, &extra_ops);
@@ -335,11 +335,11 @@ mod tests {
         // of the store which contains the extra ops over the same region
         // TODO: proptest this
         assert_eq!(
-            diff[0].data.clone() + extra_ops[0].region_data(),
+            (diff[0].data).clone() + extra_ops[0].region_data(),
             store2.query_region_data(&diff[0].coords)
         );
         assert_eq!(
-            diff[1].data.clone() + extra_ops[1].region_data(),
+            (diff[1].data).clone() + extra_ops[1].region_data(),
             store2.query_region_data(&diff[1].coords)
         );
     }

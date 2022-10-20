@@ -211,7 +211,7 @@ pub mod tests {
         let mut i: usize = 0;
         while i < 10 {
             tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-            conductor.handle().dispatch_scheduled_fns().await;
+            conductor.raw_handle().dispatch_scheduled_fns().await;
             i = i + 1;
         }
         let query_tick: Vec<Record> = conductor.call(&alice, "query_tick", ()).await;
@@ -225,10 +225,10 @@ pub mod tests {
         // ephemeral scheduled task will be flushed so the ticks will not be
         // exhaused until the function is rescheduled.
         let _shedule: () = conductor.call(&bob, "schedule", ()).await;
-        conductor.handle().dispatch_scheduled_fns().await;
+        conductor.raw_handle().dispatch_scheduled_fns().await;
         let query1: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
         assert_eq!(query1.len(), 1);
-        conductor.handle().dispatch_scheduled_fns().await;
+        conductor.raw_handle().dispatch_scheduled_fns().await;
         let query2: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
         assert_eq!(query2.len(), query1.len() + 1);
 
