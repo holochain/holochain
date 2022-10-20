@@ -143,7 +143,7 @@ async fn setup_app(mut rng: StdRng) -> (App, AddNodeRx) {
 }
 
 async fn construct_node(dna: DnaFile) -> Node {
-    let (conductor, zome) = diagnostic_tests::setup_conductor_for_single_dna(config(), dna).await;
+    let (conductor, zome) = diagnostic_tests::setup_conductor_with_single_dna(config(), dna).await;
     let conductor = Arc::new(conductor);
     let node = Node::new(conductor.clone(), zome).await;
     node

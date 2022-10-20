@@ -50,7 +50,7 @@ impl App {
 
         let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", syn_zome())).await;
         let (mut conductors, zomes) =
-            diagnostic_tests::setup_conductors_single_dna(NODES, config, dna).await;
+            diagnostic_tests::setup_conductors_with_single_dna(NODES, config, dna).await;
 
         conductors.exchange_peer_info().await;
 

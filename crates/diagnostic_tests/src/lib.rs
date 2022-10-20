@@ -7,7 +7,18 @@ use holochain_diagnostics::holochain::sweettest::*;
 mod zomes;
 pub use zomes::*;
 
-pub async fn setup_conductors_single_dna(
+pub async fn setup_conductor_with_single_dna(
+    config: ConductorConfig,
+    dna: DnaFile,
+) -> (SweetConductor, SweetZome) {
+    let mut conductor = SweetConductor::from_config(config).await;
+    let app = conductor.setup_app("basic", &[dna]).await.unwrap();
+    let (cell,) = app.into_tuple();
+    let zome = cell.zome("zome");
+    (conductor, zome)
+}
+
+pub async fn setup_conductors_with_single_dna(
     nodes: usize,
     config: ConductorConfig,
     dna: DnaFile,
@@ -28,15 +39,4 @@ pub async fn setup_conductors_single_dna(
     let zomes = cells.iter().map(|c| c.zome("zome")).collect::<Vec<_>>();
 
     (conductors, zomes)
-}
-
-pub async fn setup_conductor_for_single_dna(
-    config: ConductorConfig,
-    dna: DnaFile,
-) -> (SweetConductor, SweetZome) {
-    let mut conductor = SweetConductor::from_config(config).await;
-    let app = conductor.setup_app("basic", &[dna]).await.unwrap();
-    let (cell,) = app.into_tuple();
-    let zome = cell.zome("zome");
-    (conductor, zome)
 }
