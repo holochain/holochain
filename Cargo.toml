@@ -15,7 +15,6 @@ members = [
   "crates/holochain",
   "crates/holochain_cascade",
   "crates/holochain_conductor_api",
-  "crates/holochain_diagnostics",
   "crates/holochain_p2p",
   "crates/holochain_keystore",
   "crates/holochain_sqlite",
@@ -27,8 +26,6 @@ members = [
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
-
-  # "crates/diagnostic_tests",
 
   "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/dht",
@@ -47,7 +44,7 @@ members = [
   "crates/test_utils/wasm_common",
 ]
 
-exclude = ["crates/diagnostics", "crates/release-automation"]
+exclude = ["crates/release-automation"]
 
 [profile.fast-test]
 inherits = "dev"
