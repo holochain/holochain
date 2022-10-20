@@ -25,7 +25,7 @@ rec {
 
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,test_utils,build_wasms,db-encryption --lib --tests --profile fast-test -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --profile fast-test -- --nocapture
   '';
 
   hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
@@ -34,7 +34,7 @@ rec {
 
     # run all the cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
@@ -147,7 +147,7 @@ rec {
 
     for i in {0..100}
     do
-      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,glacial_tests,build_wasms -- --nocapture
     done
     for i in {0..100}
     do

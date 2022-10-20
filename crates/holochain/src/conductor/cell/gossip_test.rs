@@ -1,4 +1,3 @@
-use crate::conductor::handle::DevSettingsDelta;
 use crate::sweettest::*;
 use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::consistency_10s;
@@ -13,14 +12,9 @@ use kitsune_p2p::KitsuneP2pConfig;
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
     observability::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let config = SweetConductorConfig::standard().no_publish();
+    let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
         .await
         .unwrap();
@@ -63,14 +57,9 @@ async fn signature_smoke_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
     observability::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let config = SweetConductorConfig::standard().no_publish();
+    let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("zome", simple_create_read_zome()))
             .await
