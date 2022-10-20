@@ -10,13 +10,11 @@ pub fn schedule(
     call_context: Arc<CallContext>,
     input: String,
 ) -> Result<(), RuntimeError> {
-    println!("foooo");
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             write_workspace: Permission::Allow,
             ..
         } => {
-            println!("allow");
             call_context
                 .host_context()
                 .workspace_write()
@@ -34,7 +32,6 @@ pub fn schedule(
             Ok(())
         }
         _ => {
-            println!("deny");
             Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
