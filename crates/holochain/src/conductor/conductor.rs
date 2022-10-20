@@ -1515,7 +1515,6 @@ mod builder {
 
         /// Initialize a "production" Conductor
         pub async fn build(self) -> ConductorResult<ConductorHandle> {
-            println!("build");
             cfg_if::cfg_if! {
                 // if mock_handle is specified, return that instead of
                 // a real handle
@@ -1684,12 +1683,10 @@ mod builder {
             p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
             post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         ) -> ConductorResult<ConductorHandle> {
-            tracing::warn!("finish");
-            println!("finish");
-
             handle
-            .clone()
-            .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL).await;
+                .clone()
+                .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)
+                .await;
 
             tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
