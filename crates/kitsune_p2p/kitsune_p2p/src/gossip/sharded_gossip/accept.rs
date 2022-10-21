@@ -72,7 +72,12 @@ impl ShardedGossipLocal {
             // Maybe we need to check timestamps on messages or have unique round ids?
 
             let mut metrics = inner.metrics.write();
-            metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
+            metrics.update_current_round(
+                &peer_cert,
+                &remote_agent_list,
+                self.gossip_type.into(),
+                &state,
+            );
             metrics.record_initiate(&remote_agent_list, self.gossip_type.into());
 
             inner.round_map.insert(peer_cert.clone(), state);

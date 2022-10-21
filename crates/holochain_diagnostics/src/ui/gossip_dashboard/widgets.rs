@@ -1,5 +1,8 @@
+use holochain::prelude::metrics::PeerAgentHistory;
+
 use super::*;
 
+pub mod gossip_agent_history;
 pub mod gossip_round_table;
 
 pub fn ui_node_list(nodes: impl Iterator<Item = (usize, bool)>) -> List<'static> {
@@ -90,65 +93,4 @@ pub fn ui_keymap() -> List<'static> {
         .collect::<Vec<_>>(),
     )
     .block(Block::default().borders(Borders::TOP).title("Keymap"))
-}
-
-pub fn ui_gossip_info_table(infos: &NodeInfoList<usize>, n: usize) -> Table<'static> {
-    let header = Row::new(["A", "ini", "rmt", "cmp", "err"])
-        .style(Style::default().add_modifier(Modifier::UNDERLINED));
-
-    Table::new(
-        infos
-            .iter()
-            .map(|(i, info)| ui_gossip_info_row(info, n == *i))
-            .collect::<Vec<_>>(),
-    )
-    .header(header)
-    .widths(&[
-        Constraint::Length(1),
-        Constraint::Length(3),
-        Constraint::Length(3),
-        Constraint::Length(3),
-        Constraint::Length(3),
-        // Constraint::Length(5),
-        Constraint::Percentage(100),
-    ])
-}
-
-fn ui_gossip_info_row(info: &NodeInfo, own: bool) -> Row<'static> {
-    let active = if info.current_round.is_some() {
-        "*"
-    } else {
-        " "
-    }
-    .to_string();
-    let rounds = info
-        .complete_rounds
-        .iter()
-        .map(|i| format!("{}", i.duration().as_millis()))
-        .rev()
-        .join(" ");
-    // let latency = format!("{:3}", *info.latency_micros / 1000.0);
-    if own {
-        Row::new(vec![
-            // "✓".to_string(),
-            "·".to_string(),
-            // active,
-            "·".to_string(),
-            "·".to_string(),
-            "·".to_string(),
-            "·".to_string(),
-            // latency,
-            rounds,
-        ])
-    } else {
-        Row::new(vec![
-            active,
-            info.initiates.len().to_string(),
-            info.remote_rounds.len().to_string(),
-            info.complete_rounds.len().to_string(),
-            info.errors.len().to_string(),
-            // latency,
-            rounds,
-        ])
-    }
 }

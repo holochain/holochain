@@ -277,6 +277,7 @@ impl ShardedGossip {
                     }
                     i.metrics.write().update_current_round(
                         &cert,
+                        &state.remote_agent_list,
                         self.gossip.gossip_type.into(),
                         &state,
                     );
@@ -542,7 +543,8 @@ impl ShardedGossipLocalState {
         } else if init_tgt && error {
             metrics.record_error(&remote_agent_list, gossip_type.into());
         }
-        metrics.complete_current_round(state_key);
+
+        metrics.complete_current_round(state_key, &remote_agent_list);
         r
     }
 
@@ -679,14 +681,14 @@ pub struct RoundState {
     /// gossip (will be None for Recent).
     region_set_sent: Option<Arc<RegionSetLtcs>>,
     /// When this round began
-    pub(crate) start_time: Instant,
+    start_time: Instant,
     /// Stats about ops, regions, and bytes sent and received
     pub(crate) throughput: RoundThroughput,
     /// Expectations of data to be sent and received,
     /// which is known in the case of Historical gossip after Region data has been sent.
     /// This is None for the entire round when doing Recent gossip,
     /// and before region data has been sent while doing Historical gossip.
-    pub(crate) expected_historical_throughput: Option<RoundThroughput>,
+    expected_historical_throughput: Option<RoundThroughput>,
 }
 
 impl RoundState {
@@ -923,9 +925,13 @@ impl ShardedGossipLocal {
                         ShardedGossipWire::NoAgents(_) => {}
                         ShardedGossipWire::AlreadyInProgress(_) => {}
                     }
-                    i.metrics
-                        .write()
-                        .update_current_round(&cert, self.gossip_type.into(), &state);
+
+                    i.metrics.write().update_current_round(
+                        &cert,
+                        &state.remote_agent_list,
+                        self.gossip_type.into(),
+                        &state,
+                    );
                 }
                 Ok(())
             })
@@ -1104,7 +1110,7 @@ impl ShardedGossipLocal {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
                     let mut metrics = i.metrics.write();
                     metrics.record_error(&r.remote_agent_list, self.gossip_type.into());
-                    metrics.complete_current_round(&cert);
+                    metrics.complete_current_round(&cert, &r.remote_agent_list);
                 }
                 Ok(())
             })

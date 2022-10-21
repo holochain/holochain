@@ -1,9 +1,11 @@
 use std::fmt::Display;
 
+use holochain::prelude::gossip::sharded_gossip::RoundThroughput;
+
 use super::*;
 
 pub struct GossipRoundTableState<'a, Id: Display> {
-    pub infos: &'a NodeInfoList<'a, Id>,
+    pub infos: &'a NodeHistories<'a, Id>,
     pub start_time: Instant,
     pub current_time: Instant,
     pub filter_zeroes: bool,
@@ -20,7 +22,7 @@ pub fn gossip_round_table<Id: Display>(state: &GossipRoundTableState<Id>) -> Tab
         .infos
         .iter()
         .flat_map(|(n, info)| {
-            info.complete_rounds
+            info.completed_rounds
                 .clone()
                 .into_iter()
                 .map(move |r| (n, r))
@@ -37,30 +39,38 @@ pub fn gossip_round_table<Id: Display>(state: &GossipRoundTableState<Id>) -> Tab
 
     // Add current round info
 
-    rows.extend(
-        currents
-            .into_iter()
-            .map(|(n, metric)| render_gossip_metric_row(state, n.clone(), metric, true)),
-    );
+    rows.extend(currents.into_iter().map(|(n, round)| {
+        render_gossip_metric_row(
+            state,
+            n.clone(),
+            round.gossip_type,
+            round.start_time.into(),
+            state.current_time.duration_since(round.start_time.into()),
+            Some(round.current_throughput),
+            true,
+        )
+    }));
 
     // Add past round info
 
-    rows.extend(metrics.into_iter().filter_map(|(n, info)| {
-        let zero = info
-            .round
-            .as_ref()
-            .map(|r| {
-                r.throughput.op_count.incoming
-                    + r.throughput.op_count.outgoing
-                    + r.throughput.op_bytes.incoming
-                    + r.throughput.op_bytes.outgoing
-                    == 0
-            })
-            .unwrap_or(false);
+    rows.extend(metrics.into_iter().filter_map(|(n, round)| {
+        let zero = round.throughput.op_count.incoming
+            + round.throughput.op_count.outgoing
+            + round.throughput.op_bytes.incoming
+            + round.throughput.op_bytes.outgoing
+            == 0;
         if state.filter_zeroes && zero {
             None
         } else {
-            Some(render_gossip_metric_row(state, n.clone(), info, false))
+            Some(render_gossip_metric_row(
+                state,
+                n.clone(),
+                round.gossip_type,
+                round.start_time.into(),
+                round.duration(),
+                Some(round.throughput),
+                false,
+            ))
         }
     }));
 
@@ -80,7 +90,10 @@ pub fn gossip_round_table<Id: Display>(state: &GossipRoundTableState<Id>) -> Tab
 fn render_gossip_metric_row<Id: Display>(
     state: &GossipRoundTableState<Id>,
     id: &Id,
-    metric: RoundMetric,
+    gossip_type: GossipModuleType,
+    start_time: Instant,
+    duration: Duration,
+    throughput: Option<RoundThroughput>,
     is_current: bool,
 ) -> Row<'static> {
     let throughput_cell = |b, d: Duration| {
@@ -115,7 +128,7 @@ fn render_gossip_metric_row<Id: Display>(
         }
     };
 
-    let (gt, style) = match metric.gossip_type {
+    let (gt, style) = match gossip_type {
         GossipModuleType::ShardedRecent => (
             Cell::from("R".to_string()),
             Style::default().fg(Color::Green),
@@ -130,41 +143,38 @@ fn render_gossip_metric_row<Id: Display>(
         Cell::from(id.to_string()),
         Cell::from(format!(
             "{:.1?}",
-            metric
-                .instant
-                .duration_since(TokioInstant::from(state.start_time))
+            start_time // metric
+                       //     .instant
+                       //     .duration_since(TokioInstant::from(state.start_time))
         )),
     ];
 
-    let dur = if is_current {
-        state.current_time.duration_since(metric.instant.into())
-    } else if let Some(round) = &metric.round {
-        metric.instant.duration_since(round.start_time)
-    } else {
-        Duration::ZERO
-    };
+    // let dur = if is_current {
+    //     state.current_time.duration_since(metric.instant.into())
+    // } else if let Some(round) = &metric.round {
+    //     metric.instant.duration_since(round.start_time)
+    // } else {
+    //     Duration::ZERO
+    // };
 
     cells.push({
-        let style = if dur.as_millis() >= 1000 {
+        let style = if duration.as_millis() >= 1000 {
             Style::default().fg(Color::Red)
-        } else if dur.as_millis() >= 100 {
+        } else if duration.as_millis() >= 100 {
             Style::default().fg(Color::Yellow)
         } else {
             Style::default()
         };
-        Cell::from(format!("{:3.1?}", dur)).style(style)
+        Cell::from(format!("{:3.1?}", duration)).style(style)
     });
 
-    if let Some(round) = metric.round {
+    if let Some(tp) = throughput {
         cells.extend([
-            number_cell(round.throughput.op_count.incoming),
-            number_cell(round.throughput.op_count.outgoing),
-            bytes_cell(round.throughput.op_bytes.incoming),
-            bytes_cell(round.throughput.op_bytes.outgoing),
-            throughput_cell(
-                round.throughput.op_bytes.incoming + round.throughput.op_bytes.outgoing,
-                dur,
-            ),
+            number_cell(tp.op_count.incoming),
+            number_cell(tp.op_count.outgoing),
+            bytes_cell(tp.op_bytes.incoming),
+            bytes_cell(tp.op_bytes.outgoing),
+            throughput_cell(tp.op_bytes.incoming + tp.op_bytes.outgoing, duration),
         ])
     }
     let style = if is_current {

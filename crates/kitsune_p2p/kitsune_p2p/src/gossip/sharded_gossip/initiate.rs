@@ -166,7 +166,12 @@ impl ShardedGossipLocal {
             {
                 let mut metrics = inner.metrics.write();
 
-                metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
+                metrics.update_current_round(
+                    &peer_cert,
+                    &remote_agent_list,
+                    self.gossip_type.into(),
+                    &state,
+                );
                 metrics.record_accept(&remote_agent_list, self.gossip_type.into());
             }
 

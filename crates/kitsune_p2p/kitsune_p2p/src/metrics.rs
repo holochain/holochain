@@ -132,6 +132,9 @@ pub struct PeerAgentHistory {
 /// Detailed info about the history of gossip with this node
 #[derive(Debug, Clone, Default)]
 pub struct PeerNodeHistory {
+    /// The most recent list of remote agents reported by this node
+    pub remote_agents: Vec<Arc<KitsuneAgent>>,
+
     /// Detailed info about the ongoing round with this node
     pub current_round: Option<CurrentRound>,
 
@@ -228,6 +231,34 @@ impl PartialOrd for RoundMetric {
 impl Ord for RoundMetric {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.instant.cmp(&other.instant)
+    }
+}
+
+impl PartialOrd for CompletedRound {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for CompletedRound {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.start_time.cmp(&other.start_time) {
+            core::cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.end_time.cmp(&other.end_time)
+    }
+}
+
+impl PartialOrd for CurrentRound {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for CurrentRound {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.start_time.cmp(&other.start_time)
     }
 }
 
@@ -500,13 +531,22 @@ impl Metrics {
     }
 
     /// Update node-level info about a current round, or create one if it doesn't exist
-    pub fn update_current_round(
+    pub fn update_current_round<'a, T, I>(
         &mut self,
         node: &NodeId,
+        remote_agents: I,
         gossip_type: GossipModuleType,
         round_state: &RoundState,
-    ) {
+    ) where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        let remote_agents = remote_agents
+            .into_iter()
+            .map(|a| a.into().agent().to_owned())
+            .collect();
         let history = self.node_history.entry(node.clone()).or_default();
+        history.remote_agents = remote_agents;
         if let Some(r) = &mut history.current_round {
             r.update(round_state);
         } else {
@@ -515,8 +555,17 @@ impl Metrics {
     }
 
     /// Remove the current round info once it's complete, and put it into the history list
-    pub fn complete_current_round(&mut self, node: &NodeId) {
+    pub fn complete_current_round<'a, T, I>(&mut self, node: &NodeId, remote_agents: I)
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        let remote_agents = remote_agents
+            .into_iter()
+            .map(|a| a.into().agent().to_owned())
+            .collect();
         let history = self.node_history.entry(node.clone()).or_default();
+        history.remote_agents = remote_agents;
         let r = history.current_round.take();
         if let Some(r) = r {
             history.completed_rounds.push_back(r.completed())
@@ -620,8 +669,13 @@ impl Metrics {
     }
 
     /// Getter
-    pub fn node_info(&self) -> &HashMap<Arc<KitsuneAgent>, PeerAgentHistory> {
+    pub fn peer_agent_histories(&self) -> &HashMap<Arc<KitsuneAgent>, PeerAgentHistory> {
         &self.agent_history
+    }
+
+    /// Getter
+    pub fn peer_node_histories(&self) -> &HashMap<NodeId, PeerNodeHistory> {
+        &self.node_history
     }
 }
 

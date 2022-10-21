@@ -1,6 +1,6 @@
 use holochain::prelude::{
     kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant,
-    metrics::RoundMetric,
+    metrics::{PeerNodeHistory, RoundMetric},
 };
 use human_repr::{HumanCount, HumanThroughput};
 use std::{
@@ -11,10 +11,7 @@ use std::{
 use crossterm::event::{self, Event, KeyCode};
 use holochain::{
     conductor::conductor::RwShare,
-    prelude::{
-        metrics::{Metrics, NodeInfo},
-        *,
-    },
+    prelude::{metrics::Metrics, *},
     sweettest::*,
     test_utils::itertools::Itertools,
 };
@@ -73,7 +70,7 @@ pub trait ClientState {
 
     fn total_commits(&self) -> usize;
     fn link_counts(&self) -> LinkCountsRef;
-    fn node_info_sorted<'a>(&self, metrics: &'a Metrics) -> NodeInfoList<'a, usize>;
+    fn node_info_sorted<'a>(&self, metrics: &'a Metrics) -> NodeHistories<'a, usize>;
 }
 
 /// State specific to the UI
@@ -109,7 +106,7 @@ impl LocalState {
 /// Outer vec for nodes, inner vec for bases
 pub type LinkCounts = Vec<Vec<(usize, Instant)>>;
 pub type LinkCountsRef<'a> = &'a [Vec<(usize, Instant)>];
-pub type NodeInfoList<'a, Id> = Vec<(Id, &'a NodeInfo)>;
+pub type NodeHistories<'a, Id> = Vec<(Id, &'a PeerNodeHistory)>;
 
 #[derive(Clone)]
 pub struct GossipDashboard {
@@ -217,10 +214,10 @@ impl GossipDashboard {
             // node.conductor.get_agent_infos(Some(node.zome.cell_id().clone()))
             let metrics = &state.nodes()[selected].diagnostics.metrics.read();
             let infos = state.node_info_sorted(metrics);
-            f.render_widget(
-                widgets::ui_gossip_info_table(&infos, selected),
-                layout.table_extras,
-            );
+            // f.render_widget(
+            //     widgets::ui_gossip_info_table(&infos, selected),
+            //     layout.table_extras,
+            // );
             f.render_widget(
                 gossip_round_table(&GossipRoundTableState {
                     infos: &infos,

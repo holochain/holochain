@@ -229,22 +229,28 @@ impl ClientState for State {
         self.link_counts.as_ref()
     }
 
-    fn node_info_sorted<'a>(&self, metrics: &'a metrics::Metrics) -> NodeInfoList<'a, usize> {
-        let mut infos: Vec<_> = metrics
-            .node_info()
-            .iter()
-            .map(|(agent, info)| {
-                (
-                    *self
-                        .agent_node_index
-                        .get(&AgentPubKey::from_kitsune(agent))
-                        .unwrap(),
-                    info,
-                )
+    fn node_info_sorted<'a>(&self, metrics: &'a metrics::Metrics) -> NodeHistories<'a, usize> {
+        let mut histories: Vec<_> = metrics
+            .peer_node_histories()
+            .values()
+            .filter_map(|history| {
+                assert!(
+                    history.remote_agents.len() <= 1,
+                    "this widget cannot be used with more than 1 agent per node"
+                );
+                history.remote_agents.first().map(|agent| {
+                    (
+                        *self
+                            .agent_node_index
+                            .get(&AgentPubKey::from_kitsune(agent))
+                            .unwrap(),
+                        history,
+                    )
+                })
             })
             .collect();
-        infos.sort_unstable_by_key(|(i, _)| *i);
-        infos
+        histories.sort_unstable_by_key(|(i, _)| *i);
+        histories
     }
 }
 
