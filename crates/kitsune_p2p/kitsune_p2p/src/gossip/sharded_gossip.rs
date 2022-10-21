@@ -275,6 +275,11 @@ impl ShardedGossip {
                         ShardedGossipWire::NoAgents(_) => {}
                         ShardedGossipWire::AlreadyInProgress(_) => {}
                     }
+                    i.metrics.write().update_current_round(
+                        &cert,
+                        self.gossip.gossip_type.into(),
+                        &state,
+                    );
                 }
                 Ok(())
             })
@@ -918,6 +923,9 @@ impl ShardedGossipLocal {
                         ShardedGossipWire::NoAgents(_) => {}
                         ShardedGossipWire::AlreadyInProgress(_) => {}
                     }
+                    i.metrics
+                        .write()
+                        .update_current_round(&cert, self.gossip_type.into(), &state);
                 }
                 Ok(())
             })
