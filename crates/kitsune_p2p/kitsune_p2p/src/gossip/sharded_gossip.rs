@@ -275,6 +275,11 @@ impl ShardedGossip {
                         ShardedGossipWire::NoAgents(_) => {}
                         ShardedGossipWire::AlreadyInProgress(_) => {}
                     }
+                    i.metrics.write().update_current_round(
+                        &cert,
+                        self.gossip.gossip_type.into(),
+                        &state,
+                    );
                 }
                 Ok(())
             })
@@ -473,6 +478,9 @@ type Outgoing = (Tx2Cert, HowToConnect, ShardedGossipWire);
 
 type StateKey = Tx2Cert;
 
+/// A peer (from the perspective of any other node) is uniquely identified by its Cert
+pub type NodeId = Tx2Cert;
+
 /// Info associated with an outgoing gossip target
 #[derive(Debug)]
 pub(crate) struct ShardedGossipTarget {
@@ -524,25 +532,17 @@ impl ShardedGossipLocalState {
             vec![]
         };
         let r = self.round_map.remove(state_key);
+        let mut metrics = self.metrics.write();
         if let Some(r) = &r {
             if error {
-                self.metrics.write().record_error(
-                    &r.remote_agent_list,
-                    Some(r.into()),
-                    gossip_type.into(),
-                );
+                metrics.record_error(&r.remote_agent_list, gossip_type.into());
             } else {
-                self.metrics.write().record_success(
-                    &r.remote_agent_list,
-                    Some(r.into()),
-                    gossip_type.into(),
-                );
+                metrics.record_success(&r.remote_agent_list, gossip_type.into());
             }
         } else if init_tgt && error {
-            self.metrics
-                .write()
-                .record_error(&remote_agent_list, None, gossip_type.into());
+            metrics.record_error(&remote_agent_list, gossip_type.into());
         }
+        metrics.complete_current_round(state_key);
         r
     }
 
@@ -561,7 +561,7 @@ impl ShardedGossipLocalState {
                     tracing::error!("Tgt expired {:?}", cert);
                     self.metrics
                         .write()
-                        .record_error(remote_agent_list, None, gossip_type.into());
+                        .record_error(remote_agent_list, gossip_type.into());
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
@@ -682,6 +682,11 @@ pub struct RoundState {
     pub(crate) start_time: Instant,
     /// Stats about ops, regions, and bytes sent and received
     pub(crate) throughput: RoundThroughput,
+    /// Expectations of data to be sent and received,
+    /// which is known in the case of Historical gossip after Region data has been sent.
+    /// This is None for the entire round when doing Recent gossip,
+    /// and before region data has been sent while doing Historical gossip.
+    pub(crate) expected_historical_throughput: Option<RoundThroughput>,
 }
 
 impl RoundState {
@@ -705,6 +710,7 @@ impl RoundState {
             round_timeout,
             region_set_sent,
             throughput: Default::default(),
+            expected_historical_throughput: None,
         }
     }
 }
@@ -714,20 +720,20 @@ impl RoundState {
 pub struct RoundThroughput {
     /// Number of ops blooms we have sent for this round, which is also the
     /// number of MissingOps sets we expect in response
-    pub op_bloom_count: ThroughputItem,
+    pub op_bloom_count: InOut,
     /// Total number of bytes sent for bloom filters
-    pub op_bloom_bytes: ThroughputItem,
+    pub op_bloom_bytes: InOut,
     /// Total number of bytes sent for region data (historical only)
-    pub region_bytes: ThroughputItem,
+    pub region_bytes: InOut,
     /// Total number of ops sent
-    pub op_count: ThroughputItem,
+    pub op_count: InOut,
     /// Total number of bytes sent for op data
-    pub op_bytes: ThroughputItem,
+    pub op_bytes: InOut,
 }
 
 /// Incoming and outgoing throughput
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ThroughputItem {
+pub struct InOut {
     /// Incoming throughput
     pub incoming: u32,
     /// Outgoing throughput
@@ -798,17 +804,9 @@ impl ShardedGossipLocal {
             {
                 let initiate_tgt = i.initiate_tgt.take().unwrap();
                 if error {
-                    i.metrics.write().record_error(
-                        &initiate_tgt.remote_agent_list,
-                        None,
-                        self.gossip_type.into(),
-                    );
-                } else {
-                    i.metrics.write().record_success(
-                        &initiate_tgt.remote_agent_list,
-                        None,
-                        self.gossip_type.into(),
-                    );
+                    i.metrics
+                        .write()
+                        .record_error(&initiate_tgt.remote_agent_list, self.gossip_type.into());
                 }
             }
             Ok(())
@@ -925,6 +923,9 @@ impl ShardedGossipLocal {
                         ShardedGossipWire::NoAgents(_) => {}
                         ShardedGossipWire::AlreadyInProgress(_) => {}
                     }
+                    i.metrics
+                        .write()
+                        .update_current_round(&cert, self.gossip_type.into(), &state);
                 }
                 Ok(())
             })
@@ -1101,11 +1102,9 @@ impl ShardedGossipLocal {
             .share_mut(|i, _| {
                 for (cert, ref r) in i.round_map.take_timed_out_rounds() {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
-                    i.metrics.write().record_error(
-                        &r.remote_agent_list,
-                        Some(r.into()),
-                        self.gossip_type.into(),
-                    );
+                    let mut metrics = i.metrics.write();
+                    metrics.record_error(&r.remote_agent_list, self.gossip_type.into());
+                    metrics.complete_current_round(&cert);
                 }
                 Ok(())
             })
