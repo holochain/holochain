@@ -76,7 +76,7 @@ pub mod tests {
 
                 let ephemeral_scheduled_fn = ScheduledFn::new("foo".into(), "bar".into());
                 let persisted_scheduled_fn = ScheduledFn::new("1".into(), "2".into());
-                let persisted_schedule = Schedule::Persisted("* * * * * * * ".into());
+                let persisted_schedule = Schedule::Persisted("* * * * * * *".into());
 
                 schedule_fn(
                     txn,
@@ -203,59 +203,129 @@ pub mod tests {
         let RibosomeTestFixture {
             conductor,
             alice,
+            alice_pubkey,
+            alice_host_fn_caller,
             bob,
+            bob_pubkey,
+            bob_host_fn_caller,
             ..
         } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
-        // Let's just drive alice to exhaust all ticks.
-        // let _schedule: () = conductor.call(&alice, "schedule", ()).await;
-        let now = Timestamp::now();
-        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-        conductor.handle().dispatch_scheduled_fns(now).await;
+        // We don't want the scheduler running and messing with our calculations.
+        conductor.handle().start_scheduler(std::time::Duration::from_millis(1000_000_000)).await;
 
-        let _query_tick: Vec<Record> = conductor.call(&alice, "query_tick", ()).await;
+        // At first nothing has happened because init won't run until some zome
+        // call runs.
+        let query_tick: Vec<Record> = conductor.call(&alice, "query_tick_init", ()).await;
+        assert!(query_tick.is_empty());
+
+        // Wait to make sure we've init, but it should have happened for sure.
+        while { let alice_pubkey = alice_pubkey.clone();
+            !alice_host_fn_caller.authored_db.async_commit(move |txn: &mut Transaction| {
+            let persisted_scheduled_fn = ScheduledFn::new(TestWasm::Schedule.into(), "cron_scheduled_fn_init".into());
+
+            Result::<bool, DatabaseError>::Ok(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey).unwrap())
+        }).await.unwrap() } {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+
+        let mut now = Timestamp::now();
+
+        // The ephemeral function will dispatch each millisecond.
+        // The tock will dispatch once and wait a second.
+        let mut i: usize = 0;
+        while i < 10 {
+            conductor.handle().dispatch_scheduled_fns(now).await;
+            now = (now + std::time::Duration::from_millis(2))?;
+            i = i + 1;
+        }
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            let query_tick_init: Vec<Record> = conductor.call(&alice, "query_tick_init", ()).await;
+            let query_tock_init: Vec<Record> = conductor.call(&alice, "query_tock_init", ()).await;
+            if query_tick_init.len() == 5 && query_tock_init.len() == 1 { break; }
+        }
+
+        // after a second the tock will run again.
+        now = (now + std::time::Duration::from_millis(1000))?;
+        conductor.handle().dispatch_scheduled_fns(now).await;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            let query_tick_init: Vec<Record> = conductor.call(&alice, "query_tick_init", ()).await;
+            let query_tock_init: Vec<Record> = conductor.call(&alice, "query_tock_init", ()).await;
+            if query_tick_init.len() == 5 && query_tock_init.len() == 2 { break; }
+        }
+
+        // alice can schedule things outside of init.
+        let query_tock: Vec<Record> = conductor.call(&alice, "query_tock", ()).await;
+        assert!(query_tock.is_empty());
+
+        let _schedule: () = conductor.call(&alice, "schedule", ()).await;
+        now = (Timestamp::now() + std::time::Duration::from_millis(2))?;
 
         let mut i: usize = 0;
         while i < 10 {
-            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
             conductor.handle().dispatch_scheduled_fns(now).await;
+            now = (now + std::time::Duration::from_millis(2))?;
             i = i + 1;
         }
-        let query_tick: Vec<Record> = conductor.call(&alice, "query_tick", ()).await;
-        assert_eq!(query_tick.len(), 5);
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            let query_tick: Vec<Record> = conductor.call(&alice, "query_tick", ()).await;
+            let query_tock: Vec<Record> = conductor.call(&alice, "query_tock", ()).await;
+            if query_tick.len() == 5 && query_tock.len() == 1 { break; }
+        }
 
-        // The persistent schedule should run once in second.
-        let query_tock: Vec<Record> = conductor.call(&alice, "query_tock", ()).await;
-        assert!(query_tock.len() > 0);
-        assert!(query_tock.len() < 3);
-
-        // If Bob does a few ticks and then calls `start_scheduler` the
-        // ephemeral scheduled task will be flushed so the ticks will not be
-        // exhaused until the function is rescheduled.
-        let _shedule: () = conductor.call(&bob, "schedule", ()).await;
+        // after a second the tock will run again.
+        now = (now + std::time::Duration::from_millis(1000))?;
         conductor.handle().dispatch_scheduled_fns(now).await;
-        let query1: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
-        assert_eq!(query1.len(), 1);
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            let query_tick: Vec<Record> = conductor.call(&alice, "query_tick", ()).await;
+            let query_tock: Vec<Record> = conductor.call(&alice, "query_tock", ()).await;
+            if query_tick.len() == 5 && query_tock.len() == 2 { break; }
+        }
+
+        // Starting the scheduler should flush ephemeral.
+        let _schedule: () = conductor.call(&bob, "schedule", ()).await;
+        now = (Timestamp::now() + std::time::Duration::from_millis(2))?;
         conductor.handle().dispatch_scheduled_fns(now).await;
-        let query2: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
-        assert_eq!(query2.len(), query1.len() + 1);
+        dbg!();
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            let query_tick: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
+            if query_tick.len() == 1 { break; }
+        }
 
-        // With a fast scheduler bob should clear everything out.
-        let _ = conductor
-            .clone()
-            .start_scheduler(std::time::Duration::from_millis(1))
-            .await;
+        conductor.handle().start_scheduler(std::time::Duration::from_millis(1000_000_000)).await;
 
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let q: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
-        assert_eq!(q.len(), query2.len());
+        now = (Timestamp::now() + std::time::Duration::from_millis(2))?;
+        conductor.handle().dispatch_scheduled_fns(now).await;
+        dbg!();
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            let query_tick: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
+            if query_tick.len() == 1 { break; }
+        }
+        let _schedule: () = conductor.call(&bob, "schedule", ()).await;
 
-        // Rescheduling will allow bob catch up to alice.
-        let _shedule: () = conductor.call(&bob, "schedule", ()).await;
+        while { let bob_pubkey = bob_pubkey.clone();
+            !bob_host_fn_caller.authored_db.async_commit(move |txn: &mut Transaction| {
+            let persisted_scheduled_fn = ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
 
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let q2: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
-        assert_eq!(q2.len(), 5);
+            Result::<bool, DatabaseError>::Ok(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &bob_pubkey).unwrap())
+        }).await.unwrap() } {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+
+        now = (Timestamp::now() + std::time::Duration::from_millis(2))?;
+        conductor.handle().dispatch_scheduled_fns(now).await;
+        dbg!();
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            let query_tick: Vec<Record> = conductor.call(&bob, "query_tick", ()).await;
+            if query_tick.len() == 2 { break; }
+        }
 
         Ok(())
     }
