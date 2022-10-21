@@ -157,7 +157,6 @@ impl ShardedGossipLocal {
             .await?;
 
         self.inner.share_mut(|inner, _| {
-            inner.round_map.insert(peer_cert.clone(), state);
             // If this is not the target we are accepting
             // then record it as a remote round.
             if inner
@@ -165,11 +164,14 @@ impl ShardedGossipLocal {
                 .as_ref()
                 .map_or(true, |tgt| tgt.cert != peer_cert)
             {
-                inner
-                    .metrics
-                    .write()
-                    .record_remote_round(&remote_agent_list, self.gossip_type.into());
+                let mut metrics = inner.metrics.write();
+
+                metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
+                metrics.record_accept(&remote_agent_list, self.gossip_type.into());
             }
+
+            inner.round_map.insert(peer_cert.clone(), state);
+
             // If this is the target then we should clear the when initiated timeout.
             if let Some(tgt) = inner.initiate_tgt.as_mut() {
                 if tgt.cert == peer_cert {
