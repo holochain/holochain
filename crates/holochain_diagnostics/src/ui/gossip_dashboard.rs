@@ -23,7 +23,10 @@ use tui::{
     Frame,
 };
 
-use self::widgets::gossip_round_table::{gossip_round_table, GossipRoundTableState};
+use self::widgets::{
+    gossip_round_table::{gossip_round_table, GossipRoundTableState},
+    ui_gossip_progress_gauge,
+};
 
 mod layout;
 mod state;
@@ -70,7 +73,7 @@ pub trait ClientState {
 
     fn total_commits(&self) -> usize;
     fn link_counts(&self) -> LinkCountsRef;
-    fn node_info_sorted<'a>(&self, metrics: &'a Metrics) -> NodeHistories<'a, usize>;
+    fn node_histories_sorted<'a>(&self, metrics: &'a Metrics) -> NodeHistories<'a, usize>;
 }
 
 /// State specific to the UI
@@ -172,7 +175,7 @@ impl GossipDashboard {
     pub fn render<K: Backend>(&self, f: &mut Frame<K>, state: &impl ClientState) {
         let layout = layout::layout(state.nodes().len(), state.num_bases(), f);
 
-        let (selected, filter_zeroes, done_time) = self.local_state.share_mut(|local| {
+        let (selected, filter_zeroes, done_time, gauges) = self.local_state.share_mut(|local| {
             let metrics: Vec<_> = state
                 .nodes()
                 .iter()
@@ -182,7 +185,7 @@ impl GossipDashboard {
                 .iter()
                 .map(|m| {
                     state
-                        .node_info_sorted(m)
+                        .node_histories_sorted(m)
                         .iter()
                         .any(|i| i.1.current_round.is_some())
                 })
@@ -208,16 +211,20 @@ impl GossipDashboard {
                     layout.table_extras,
                 );
             }
-            (selected, local.filter_zero_rounds, local.done_time)
+            let gauges: Vec<_> = metrics
+                .iter()
+                .map(|m| ui_gossip_progress_gauge(m.incoming_gossip_progress()))
+                .collect();
+
+            (selected, local.filter_zero_rounds, local.done_time, gauges)
         });
         if let Some(selected) = selected {
             // node.conductor.get_agent_infos(Some(node.zome.cell_id().clone()))
             let metrics = &state.nodes()[selected].diagnostics.metrics.read();
-            let infos = state.node_info_sorted(metrics);
-            // f.render_widget(
-            //     widgets::ui_gossip_info_table(&infos, selected),
-            //     layout.table_extras,
-            // );
+            let infos = state.node_histories_sorted(metrics);
+            for (i, gauge) in gauges.into_iter().enumerate() {
+                f.render_widget(gauge, layout.gauges[i]);
+            }
             f.render_widget(
                 gossip_round_table(&GossipRoundTableState {
                     infos: &infos,

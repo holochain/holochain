@@ -8,6 +8,7 @@ pub(super) struct UiLayout {
     pub node_list: Rect,
     pub basis_table: Rect,
     pub table_extras: Rect,
+    pub gauges: Vec<Rect>,
     pub bottom: Rect,
     pub time: Rect,
 }
@@ -49,10 +50,17 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
         height: 1,
     };
 
+    let gauge_heights = vec![Constraint::Length(1); n];
+    let gauges = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(gauge_heights)
+        .split(top_chunks[2]);
+
     UiLayout {
         node_list: top_chunks[0],
         basis_table: top_chunks[1],
         table_extras: top_chunks[2],
+        gauges,
         bottom: vsplit[1],
         time,
     }

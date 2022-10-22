@@ -381,6 +381,26 @@ impl Metrics {
         })
     }
 
+    /// Get an indicator of overall incoming progress for all current gossip rounds
+    pub fn incoming_gossip_progress(&self) -> Option<f64> {
+        let mut actual = 0;
+        let mut expected = 0;
+        for h in self.node_history.values() {
+            if let Some(r) = &h.current_round {
+                if let Some(final_tp) = &r.final_throughput {
+                    actual += r.current_throughput.op_bytes.incoming;
+                    expected += final_tp.op_bytes.incoming;
+                }
+            }
+        }
+
+        if expected.is_zero() {
+            None
+        } else {
+            Some(actual as f64 / expected as f64)
+        }
+    }
+
     /// Record an individual extrapolated coverage event
     /// (either from us or a remote)
     /// and add it to our running aggregate extrapolated coverage metric.

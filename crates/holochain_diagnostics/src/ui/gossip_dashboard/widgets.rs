@@ -20,6 +20,19 @@ pub fn ui_node_list(nodes: impl Iterator<Item = (usize, bool)>) -> List<'static>
     .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
 }
 
+pub fn ui_gossip_progress_gauge(ratio: Option<f64>) -> Gauge<'static> {
+    if let Some(r) = ratio {
+        let style = Style::default().bg(Color::LightBlue);
+        Gauge::default()
+            .label(format!("{:3.1}", r))
+            .ratio(r)
+            .style(style)
+    } else {
+        let style = Style::default().bg(Color::Green);
+        Gauge::default().label("complete").ratio(1.0).style(style)
+    }
+}
+
 pub fn ui_basis_table(underline_duration: Duration, counts: LinkCountsRef) -> Table<'static> {
     let mut num_bases = 0;
 
