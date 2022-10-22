@@ -152,7 +152,6 @@ async fn partial_missing_doesnt_finish() {
                     ops_batch_queue:OpsBatchQueue::new(),
                     region_set_sent:None,
                     throughput: Default::default(),
-                    expected_historical_throughput: Default::default(),
                 }
             }
             .into(),
@@ -205,7 +204,6 @@ async fn missing_ops_finishes() {
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
                     throughput: Default::default(),
-                    expected_historical_throughput: Default::default(),
                 }
             }
             .into(),
@@ -259,7 +257,6 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
                     throughput: Default::default(),
-                    expected_historical_throughput: Default::default(),
                 }
             }
             .into(),
@@ -313,7 +310,6 @@ async fn bloom_response_finishes() {
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
                     throughput: Default::default(),
-                    expected_historical_throughput: Default::default(),
                 }
             }
             .into(),
@@ -367,7 +363,6 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
                     throughput: Default::default(),
-                    expected_historical_throughput: Default::default(),
                 }
             }
             .into(),
@@ -424,7 +419,6 @@ async fn no_data_still_finishes() {
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
                     throughput: Default::default(),
-                    expected_historical_throughput: Default::default(),
                 }
             }
             .into(),
@@ -452,7 +446,6 @@ async fn no_data_still_finishes() {
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
                     throughput: Default::default(),
-                    expected_historical_throughput: Default::default(),
                 }
             }
             .into(),

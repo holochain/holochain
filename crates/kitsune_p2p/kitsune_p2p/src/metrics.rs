@@ -181,9 +181,7 @@ pub struct CurrentRound {
     /// The start time of the round
     pub start_time: Instant,
     /// Total information sent/received so far
-    pub current_throughput: RoundThroughput,
-    /// Total information that will have been sent/received at completion
-    pub final_throughput: Option<RoundThroughput>,
+    pub throughput: RoundThroughput,
 }
 
 impl CurrentRound {
@@ -193,15 +191,14 @@ impl CurrentRound {
             gossip_type,
             start_time,
             last_touch: Instant::now(),
-            current_throughput: Default::default(),
-            final_throughput: None,
+            throughput: Default::default(),
         }
     }
 
     /// Update status based on an existing round
     pub fn update(&mut self, round_state: &RoundState) {
         self.last_touch = Instant::now();
-        self.current_throughput = round_state.throughput.clone();
+        self.throughput = round_state.throughput.clone();
     }
 
     /// Convert to a CompletedRound
@@ -210,7 +207,7 @@ impl CurrentRound {
             gossip_type: self.gossip_type,
             start_time: self.start_time,
             end_time: Instant::now(),
-            throughput: self.current_throughput,
+            throughput: self.throughput,
         }
     }
 }
@@ -379,26 +376,6 @@ impl Metrics {
             "aggExtrapCov": *self.agg_extrap_cov,
             "agents": agents,
         })
-    }
-
-    /// Get an indicator of overall incoming progress for all current gossip rounds
-    pub fn incoming_gossip_progress(&self) -> Option<f64> {
-        let mut actual = 0;
-        let mut expected = 0;
-        for h in self.node_history.values() {
-            if let Some(r) = &h.current_round {
-                if let Some(final_tp) = &r.final_throughput {
-                    actual += r.current_throughput.op_bytes.incoming;
-                    expected += final_tp.op_bytes.incoming;
-                }
-            }
-        }
-
-        if expected.is_zero() {
-            None
-        } else {
-            Some(actual as f64 / expected as f64)
-        }
     }
 
     /// Record an individual extrapolated coverage event
@@ -685,6 +662,24 @@ impl Metrics {
             0.0
         } else {
             sum / cnt
+        }
+    }
+
+    /// Get an indicator of overall incoming progress for all current gossip rounds
+    pub fn incoming_gossip_progress(&self) -> Option<f64> {
+        let mut actual = 0;
+        let mut expected = 0;
+        for h in self.node_history.values() {
+            if let Some(r) = &h.current_round {
+                actual += r.throughput.op_bytes.incoming;
+                expected += r.throughput.total_region_size.incoming;
+            }
+        }
+
+        if expected.is_zero() {
+            None
+        } else {
+            Some(actual as f64 / expected as f64)
         }
     }
 

@@ -18,7 +18,7 @@ use tui::{backend::Backend, Terminal};
 
 const BASES: usize = 12;
 
-const ENTRY_SIZE: usize = 100_000;
+const ENTRY_SIZE: usize = 1_000_000;
 const MAX_COMMITS: usize = 1_000;
 const ENTRIES_PER_COMMIT: u32 = 100;
 
@@ -229,7 +229,7 @@ impl ClientState for State {
         self.link_counts.as_ref()
     }
 
-    fn node_info_sorted<'a>(&self, metrics: &'a metrics::Metrics) -> NodeHistories<'a, usize> {
+    fn node_histories_sorted<'a>(&self, metrics: &'a metrics::Metrics) -> NodeHistories<'a, usize> {
         let mut histories: Vec<_> = metrics
             .peer_node_histories()
             .values()

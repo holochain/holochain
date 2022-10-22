@@ -257,7 +257,7 @@ impl ShardedGossip {
                                 missing_hashes.size() as u32;
                         }
                         ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
-                            state.throughput.region_bytes.outgoing +=
+                            state.throughput.total_region_size.outgoing +=
                                 region_set.regions().map(|r| r.data.size).sum::<u32>();
                         }
                         ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
@@ -682,13 +682,8 @@ pub struct RoundState {
     region_set_sent: Option<Arc<RegionSetLtcs>>,
     /// When this round began
     start_time: Instant,
-    /// Stats about ops, regions, and bytes sent and received
+    /// Stats about ops, regions, bloom filter, and bytes sent and received,
     pub(crate) throughput: RoundThroughput,
-    /// Expectations of data to be sent and received,
-    /// which is known in the case of Historical gossip after Region data has been sent.
-    /// This is None for the entire round when doing Recent gossip,
-    /// and before region data has been sent while doing Historical gossip.
-    expected_historical_throughput: Option<RoundThroughput>,
 }
 
 impl RoundState {
@@ -712,7 +707,6 @@ impl RoundState {
             round_timeout,
             region_set_sent,
             throughput: Default::default(),
-            expected_historical_throughput: None,
         }
     }
 }
@@ -725,8 +719,8 @@ pub struct RoundThroughput {
     pub op_bloom_count: InOut,
     /// Total number of bytes sent for bloom filters
     pub op_bloom_bytes: InOut,
-    /// Total number of bytes sent for region data (historical only)
-    pub region_bytes: InOut,
+    /// Total number of bytes expected to be sent for region data (historical only)
+    pub total_region_size: InOut,
     /// Total number of ops sent
     pub op_count: InOut,
     /// Total number of bytes sent for op data
@@ -907,7 +901,7 @@ impl ShardedGossipLocal {
                                 missing_hashes.size() as u32;
                         }
                         ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
-                            state.throughput.region_bytes.incoming +=
+                            state.throughput.total_region_size.incoming +=
                                 region_set.regions().map(|r| r.data.size).sum::<u32>();
                         }
                         ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {

@@ -46,7 +46,7 @@ pub fn gossip_round_table<Id: Display>(state: &GossipRoundTableState<Id>) -> Tab
             round.gossip_type,
             round.start_time.into(),
             state.current_time.duration_since(round.start_time.into()),
-            Some(round.current_throughput),
+            Some(round.throughput),
             true,
         )
     }));

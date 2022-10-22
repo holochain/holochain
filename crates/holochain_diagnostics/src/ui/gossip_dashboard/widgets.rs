@@ -23,9 +23,10 @@ pub fn ui_node_list(nodes: impl Iterator<Item = (usize, bool)>) -> List<'static>
 pub fn ui_gossip_progress_gauge(ratio: Option<f64>) -> Gauge<'static> {
     if let Some(r) = ratio {
         let style = Style::default().bg(Color::LightBlue);
+        let clamped = r.min(1.0).max(0.0);
         Gauge::default()
             .label(format!("{:3.1}", r))
-            .ratio(r)
+            .ratio(clamped)
             .style(style)
     } else {
         let style = Style::default().bg(Color::Green);
