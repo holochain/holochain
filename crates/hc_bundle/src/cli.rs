@@ -277,12 +277,12 @@ impl HcAppBundle {
             Self::Pack {
                 path,
                 output,
-                pack_all,
+                recursive,
             } => {
                 let name = get_app_name(&path).await?;
 
-                if pack_all {
-                    app_pack_all_bundled(&path).await?;
+                if recursive {
+                    app_pack_recursive(&path).await?;
                 }
 
                 let (bundle_path, _) =
@@ -325,12 +325,12 @@ impl HcWebAppBundle {
             Self::Pack {
                 path,
                 output,
-                pack_all,
+                recursive,
             } => {
                 let name = get_web_app_name(&path).await?;
 
-                if pack_all {
-                    web_app_pack_all_bundled(&path).await?;
+                if recursive {
+                    web_app_pack_recursive(&path).await?;
                 }
 
                 let (bundle_path, _) =
@@ -393,7 +393,7 @@ async fn get_web_app_name(manifest_path: &Path) -> HcBundleResult<String> {
 }
 
 // Pack the app's manifest and all its DNAs if their location is bundled
-async fn web_app_pack_all_bundled(web_app_workdir_path: &PathBuf) -> anyhow::Result<()> {
+async fn web_app_pack_recursive(web_app_workdir_path: &PathBuf) -> anyhow::Result<()> {
     let canonical_web_app_workdir_path = ffs::canonicalize(web_app_workdir_path).await?;
 
     let web_app_manifest_path = canonical_web_app_workdir_path.join(WebAppManifest::path());
@@ -416,7 +416,7 @@ async fn web_app_pack_all_bundled(web_app_workdir_path: &PathBuf) -> anyhow::Res
         HcAppBundle::Pack {
             path: ffs::canonicalize(app_workdir_location).await?,
             output: None,
-            pack_all: true,
+            recursive: true,
         }
         .run()
         .await?;
@@ -426,7 +426,7 @@ async fn web_app_pack_all_bundled(web_app_workdir_path: &PathBuf) -> anyhow::Res
 }
 
 // Pack all the app's DNAs if their location is bundled
-async fn app_pack_all_bundled(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
+async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
     let app_workdir_path = ffs::canonicalize(app_workdir_path).await?;
 
     let app_manifest_path = app_workdir_path.join(AppManifest::path());
