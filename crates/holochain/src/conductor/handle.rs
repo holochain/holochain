@@ -1092,8 +1092,7 @@ impl ConductorHandleT for ConductorHandleImpl {
     /// Start the scheduler. None is not an option.
     /// Calling this will:
     /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
-    /// - Add an interval that runs IN ADDITION to previous invocations
-    /// So ideally this would be called ONCE per conductor lifecyle ONLY.
+    /// - Add an interval that runs INSTEAD OF previous invocations
     async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
         // Clear all ephemeral cruft in all cells before starting a scheduler.
         let cell_arcs = {
@@ -1111,14 +1110,14 @@ impl ConductorHandleT for ConductorHandleImpl {
         futures::future::join_all(tasks).await;
 
         let scheduler_handle = self.clone();
-        tokio::task::spawn(async move {
+        self.conductor.set_scheduler(tokio::task::spawn(async move {
             let mut interval = tokio::time::interval(interval_period);
             loop {
                 interval.tick().await;
                 let now = Timestamp::now();
                 scheduler_handle.clone().dispatch_scheduled_fns(now).await;
             }
-        });
+        }));
     }
 
     /// The scheduler wants to dispatch any functions that are due.

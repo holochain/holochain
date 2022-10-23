@@ -165,6 +165,8 @@ where
     holochain_p2p: holochain_p2p::HolochainP2pRef,
 
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
+
+    scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl Conductor {
@@ -249,6 +251,14 @@ impl Conductor {
 
     pub(super) fn ribosome_store(&self) -> &RwShare<RibosomeStore> {
         &self.ribosome_store
+    }
+
+    pub(super) fn set_scheduler(&self, join_handle: tokio::task::JoinHandle<()>) {
+        let mut scheduler = self.scheduler.lock();
+        if let Some(existing_join_handle) = &*scheduler {
+            existing_join_handle.abort();
+        }
+        *scheduler = Some(join_handle);
     }
 
     /// Broadcasts the shutdown signal to all managed tasks.
@@ -1398,6 +1408,7 @@ impl Conductor {
             keystore,
             holochain_p2p,
             post_commit,
+            scheduler: Arc::new(parking_lot::Mutex::new(None)),
         })
     }
 
