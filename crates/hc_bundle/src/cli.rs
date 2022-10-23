@@ -451,12 +451,12 @@ async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
 
 // Returns all the locations of the workdirs for the bundled DNAs in the given app manifest
 async fn bundled_dnas_workdir_locations(
-    app_manifest_path: &PathBuf,
+    app_manifest_path: &Path,
     app_manifest: &AppManifest,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let mut dna_locations: Vec<PathBuf> = vec![];
 
-    let mut app_workdir_location = app_manifest_path.clone();
+    let mut app_workdir_location = app_manifest_path.to_path_buf();
     app_workdir_location.pop();
 
     for app_role in app_manifest.app_roles() {
