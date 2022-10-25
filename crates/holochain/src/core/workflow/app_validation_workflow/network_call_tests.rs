@@ -40,7 +40,7 @@ async fn get_agent_activity_test() {
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-    let handle = conductor_test.handle();
+    let handle = conductor_test.raw_handle();
     let alice_call_data = conductor_test.alice_call_data_mut();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
@@ -321,7 +321,7 @@ async fn get_custom_package_test() {
 
     let zomes = vec![TestWasm::ValidationPackageSuccess];
     let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
-    let handle = conductor_test.handle();
+    let handle = conductor_test.raw_handle();
     let alice_call_data = conductor_test.alice_call_data();
     let bob_call_data = conductor_test.bob_call_data().unwrap();
     let alice_cell_id = &alice_call_data.cell_id;
@@ -417,7 +417,7 @@ async fn get_agent_activity_host_fn_test() {
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-    let handle = conductor_test.handle();
+    let handle = conductor_test.raw_handle();
     let alice_call_data = conductor_test.alice_call_data();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();

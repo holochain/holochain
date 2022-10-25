@@ -70,20 +70,17 @@ impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
 
 impl DnaFile {
     /// Construct a new DnaFile instance.
-    pub async fn new(
-        dna: DnaDef,
-        wasm: impl IntoIterator<Item = wasm::DnaWasm>,
-    ) -> Result<Self, DnaError> {
+    pub async fn new(dna: DnaDef, wasm: impl IntoIterator<Item = wasm::DnaWasm>) -> Self {
         let mut code = BTreeMap::new();
         for wasm in wasm {
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
         let dna = DnaDefHashed::from_content_sync(dna);
-        Ok(Self {
+        Self {
             dna,
             code: code.into(),
-        })
+        }
     }
 
     /// Update coordinator zomes for this dna.
@@ -205,7 +202,7 @@ impl DnaFile {
 
     /// Transform this DnaFile into a new DnaFile with different properties
     /// and, hence, a different DnaHash.
-    pub async fn with_properties(self, properties: SerializedBytes) -> Result<Self, DnaError> {
+    pub async fn with_properties(self, properties: SerializedBytes) -> Self {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
         dna.modifiers.properties = properties;
         DnaFile::new(dna, wasm).await
@@ -213,7 +210,7 @@ impl DnaFile {
 
     /// Transform this DnaFile into a new DnaFile with a different network seed
     /// and, hence, a different DnaHash.
-    pub async fn with_network_seed(self, network_seed: NetworkSeed) -> Result<Self, DnaError> {
+    pub async fn with_network_seed(self, network_seed: NetworkSeed) -> Self {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
         dna.modifiers.network_seed = network_seed;
         DnaFile::new(dna, wasm).await

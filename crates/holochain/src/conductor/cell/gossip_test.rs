@@ -15,9 +15,7 @@ async fn gossip_test() {
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
@@ -28,7 +26,7 @@ async fn gossip_test() {
         .call(&cell_1.zome(TestWasm::Anchor), "anchor", anchor)
         .await;
 
-    consistency_10s(&[&cell_1, &cell_2]).await;
+    consistency_10s([&cell_1, &cell_2]).await;
 
     let hashes: EntryHashes = conductors[1]
         .call(
@@ -61,9 +59,7 @@ async fn agent_info_test() {
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("zome", simple_create_read_zome()))
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_inline_zomes(("zome", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
@@ -79,7 +75,7 @@ async fn agent_info_test() {
         })
         .collect();
 
-    consistency_10s(&[&cell_1, &cell_2]).await;
+    consistency_10s([&cell_1, &cell_2]).await;
     for p2p_agents_db in p2p_agents_dbs {
         let len = fresh_reader_test(p2p_agents_db.clone(), |txn| {
             txn.p2p_list_agents().unwrap().len()

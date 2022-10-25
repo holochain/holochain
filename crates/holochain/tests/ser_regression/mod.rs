@@ -57,8 +57,7 @@ async fn ser_regression_test() {
         },
         <Vec<DnaWasm>>::from(TestWasm::SerRegression),
     )
-    .await
-    .unwrap();
+    .await;
 
     // //////////
     // END DNA

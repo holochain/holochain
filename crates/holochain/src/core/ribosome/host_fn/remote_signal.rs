@@ -68,7 +68,7 @@ mod tests {
     use tokio_stream::StreamExt;
 
     fn test_zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineIntegrityZome {
-        let entry_def = EntryDef::default_with_id("entrydef");
+        let entry_def = EntryDef::from_id("entrydef");
 
         InlineIntegrityZome::new_unique(vec![entry_def.clone()], 0)
             .function("signal_others", move |api, ()| {
@@ -121,9 +121,7 @@ mod tests {
             future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
         let zome = test_zome(agents.clone(), num_signals.clone());
-        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome))
-            .await
-            .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
 
         let apps = conductors
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])

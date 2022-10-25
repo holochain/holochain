@@ -39,8 +39,7 @@ async fn test_coordinator_zome_update() {
             DnaWasm::from(TestCoordinatorWasm::CoordinatorZome),
         ],
     )
-    .await
-    .unwrap();
+    .await;
     let dna_hash = dna.dna_hash().clone();
 
     println!("Install Dna with integrity and coordinator zomes.");
@@ -135,8 +134,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
             DnaWasm::from(TestCoordinatorWasm::CoordinatorZome),
         ],
     )
-    .await
-    .unwrap();
+    .await;
 
     let dna_hash = dna.dna_hash().clone();
 
@@ -226,8 +224,7 @@ async fn test_update_admin_interface() {
             DnaWasm::from(TestCoordinatorWasm::CoordinatorZome),
         ],
     )
-    .await
-    .unwrap();
+    .await;
 
     let dna_hash = dna.dna_hash().clone();
 
@@ -292,9 +289,7 @@ async fn test_update_admin_interface() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_wasm_memory() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     let app = conductor.setup_app("app", &[dna]).await.unwrap();
     let cells = app.into_cells();
