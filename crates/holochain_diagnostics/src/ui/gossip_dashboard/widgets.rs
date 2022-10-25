@@ -20,17 +20,31 @@ pub fn ui_node_list(nodes: impl Iterator<Item = (usize, bool)>) -> List<'static>
     .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
 }
 
-pub fn ui_gossip_progress_gauge(ratio: Option<f64>) -> Gauge<'static> {
-    if let Some(r) = ratio {
-        let style = Style::default().bg(Color::LightBlue);
+pub fn ui_gossip_progress_gauge(ratio: Option<(u32, u32)>) -> Gauge<'static> {
+    if let Some((n, t)) = ratio {
+        let r = n as f64 / t as f64;
+        let mut style = Style::default().fg(Color::Blue).bg(Color::LightBlue);
+        if r > 1.0 {
+            style = style
+                .add_modifier(Modifier::ITALIC)
+                .add_modifier(Modifier::BOLD)
+        }
         let clamped = r.min(1.0).max(0.0);
         Gauge::default()
-            .label(format!("{:3.1}", r))
+            .label(format!(
+                "{} / {} ({:3.1}%)",
+                n.human_count_bytes(),
+                t.human_count_bytes(),
+                r * 100.0,
+            ))
             .ratio(clamped)
-            .style(style)
+            .gauge_style(style)
     } else {
-        let style = Style::default().bg(Color::Green);
-        Gauge::default().label("complete").ratio(1.0).style(style)
+        let style = Style::default().fg(Color::LightMagenta).bg(Color::Magenta);
+        Gauge::default()
+            .label("complete")
+            .ratio(1.0)
+            .gauge_style(style)
     }
 }
 

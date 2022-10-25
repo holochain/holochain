@@ -162,6 +162,8 @@ pub struct CompletedRound {
     pub end_time: Instant,
     /// Throughput stats
     pub throughput: RoundThroughput,
+    /// This round ended in an error
+    pub error: bool,
 }
 
 impl CompletedRound {
@@ -202,12 +204,13 @@ impl CurrentRound {
     }
 
     /// Convert to a CompletedRound
-    pub fn completed(self) -> CompletedRound {
+    pub fn completed(self, error: bool) -> CompletedRound {
         CompletedRound {
             gossip_type: self.gossip_type,
             start_time: self.start_time,
             end_time: Instant::now(),
             throughput: self.throughput,
+            error,
         }
     }
 }
@@ -552,7 +555,7 @@ impl Metrics {
     }
 
     /// Remove the current round info once it's complete, and put it into the history list
-    pub fn complete_current_round<'a, T, I>(&mut self, node: &NodeId, remote_agents: I)
+    pub fn complete_current_round<'a, T, I>(&mut self, node: &NodeId, remote_agents: I, error: bool)
     where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
@@ -565,7 +568,7 @@ impl Metrics {
         history.remote_agents = remote_agents;
         let r = history.current_round.take();
         if let Some(r) = r {
-            history.completed_rounds.push_back(r.completed())
+            history.completed_rounds.push_back(r.completed(error))
         }
     }
 
@@ -666,7 +669,7 @@ impl Metrics {
     }
 
     /// Get an indicator of overall incoming progress for all current gossip rounds
-    pub fn incoming_gossip_progress(&self) -> Option<f64> {
+    pub fn incoming_gossip_progress(&self) -> Option<(u32, u32)> {
         let mut actual = 0;
         let mut expected = 0;
         for h in self.node_history.values() {
@@ -679,7 +682,7 @@ impl Metrics {
         if expected.is_zero() {
             None
         } else {
-            Some(actual as f64 / expected as f64)
+            Some((actual, expected))
         }
     }
 

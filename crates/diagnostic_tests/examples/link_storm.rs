@@ -311,32 +311,29 @@ fn spawn_get_task(app: App) -> tokio::task::JoinHandle<()> {
                 .call(&node.zome, "link_count", (base, false))
                 .await;
 
-            let (is_zero, is_done) = app.state.share_mut(|state| {
+            app.state.share_mut(|state| {
                 let val = state.commits[b] - links;
                 state.link_counts[n][b].0 = val;
                 state.link_counts[n][b].1 = Instant::now();
-                (val == 0, state.total_commits() >= MAX_COMMITS)
-            });
+                let (is_zero, is_done) = (val == 0, state.total_commits() >= MAX_COMMITS);
 
-            // Keep track of when we got to all zeros
-            if is_zero {
-                if let Some(last) = last_zero {
-                    if is_done && i - last > num_nodes * BASES * 2 {
-                        app.state.share_mut(|state| {
+                // Keep track of when we got to all zeros
+                if is_zero {
+                    if let Some(last) = last_zero {
+                        if is_done && i - last > num_nodes * BASES * 2 {
                             state.done_time = Some(Instant::now());
-                        });
+                        }
+                    } else {
+                        last_zero = Some(i);
                     }
                 } else {
-                    last_zero = Some(i);
-                }
-            } else {
-                if last_zero.is_some() {
-                    app.state.share_mut(|state| {
+                    if last_zero.is_some() {
                         state.done_time = None;
-                    });
-                    last_zero = None;
+                        last_zero = None;
+                    }
                 }
-            }
+                state.time = Instant::now();
+            });
 
             i += 1;
 
@@ -419,13 +416,13 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: App) -> io::
     loop {
         let cmd = app.ui.input(app.state.clone());
         match cmd {
-            Some(InputCmd::Done) => break,
-            Some(InputCmd::Clear) => {
+            Some(InputCmd::Quit) => break,
+            Some(InputCmd::ClearBuffer) => {
                 exit_tui(terminal.backend_mut())?;
                 terminal.draw(|f| app.ui.clear(f))?;
                 enter_tui(&mut io::stdout())?;
             }
-            Some(InputCmd::Exchange) => {
+            Some(InputCmd::ExchangePeers) => {
                 tokio::spawn(exchange_all_peers(app.clone()));
             }
             Some(InputCmd::AddNode(index)) => {

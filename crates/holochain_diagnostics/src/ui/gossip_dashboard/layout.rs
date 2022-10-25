@@ -17,7 +17,7 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
     let list_len = 4;
     let table_len = b as u16 * 4 + 2;
     let stats_height = 5;
-    let mut vsplit = Layout::default()
+    let vsplit = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length((n + 1) as u16),
@@ -38,8 +38,16 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
         )
         .split(vsplit[0]);
 
-    vsplit[1].y += 1;
-    vsplit[1].height -= 1;
+    let node_list = top_chunks[0];
+    let basis_table = top_chunks[1];
+    let mut table_extras = top_chunks[2];
+    let mut bottom = vsplit[1];
+
+    bottom.y += 1;
+    bottom.height -= 1;
+
+    table_extras.y += 1;
+    table_extras.height -= 1;
 
     let w = f.size().width;
     let tw = 16;
@@ -54,14 +62,14 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
     let gauges = Layout::default()
         .direction(Direction::Vertical)
         .constraints(gauge_heights)
-        .split(top_chunks[2]);
+        .split(table_extras);
 
     UiLayout {
-        node_list: top_chunks[0],
-        basis_table: top_chunks[1],
-        table_extras: top_chunks[2],
+        node_list,
+        basis_table,
+        table_extras,
         gauges,
-        bottom: vsplit[1],
+        bottom,
         time,
     }
 }

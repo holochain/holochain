@@ -70,7 +70,7 @@ impl From<OpHash> for RegionHash {
 pub struct RegionData {
     /// The XOR of hashes of all Ops in this Region
     pub hash: RegionHash,
-    /// The total size of Op data contains in this Region
+    /// The total size of Op data contained in this Region
     pub size: u32,
     /// The number of Ops in this Region.
     pub count: u32,

@@ -1,6 +1,6 @@
 use holochain::prelude::{
     kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant,
-    metrics::{PeerNodeHistory, RoundMetric},
+    metrics::PeerNodeHistory,
 };
 use human_repr::{HumanCount, HumanThroughput};
 use std::{
@@ -13,7 +13,6 @@ use holochain::{
     conductor::conductor::RwShare,
     prelude::{metrics::Metrics, *},
     sweettest::*,
-    test_utils::itertools::Itertools,
 };
 use tui::{
     backend::Backend,
@@ -85,13 +84,6 @@ pub struct LocalState {
 }
 
 impl LocalState {
-    // pub fn total_discrepancy(&self) -> usize {
-    //     self.counts
-    //         .iter()
-    //         .map(|r| r.iter().map(|(c, _)| c).copied().sum::<usize>())
-    //         .sum()
-    // }
-
     pub fn node_selector(&mut self, i: isize, max: usize) {
         if let Some(s) = self.list_state.selected() {
             let n = (s as isize + i).min(max as isize).max(0);
@@ -119,9 +111,9 @@ pub struct GossipDashboard {
 }
 
 pub enum InputCmd {
-    Done,
-    Clear,
-    Exchange,
+    Quit,
+    ClearBuffer,
+    ExchangePeers,
     AddNode(usize),
 }
 
@@ -141,13 +133,13 @@ impl GossipDashboard {
             if let Event::Key(key) = event::read().unwrap() {
                 match key.code {
                     KeyCode::Char('q') => {
-                        return Some(InputCmd::Done);
+                        return Some(InputCmd::Quit);
                     }
                     KeyCode::Char('x') => {
-                        return Some(InputCmd::Exchange);
+                        return Some(InputCmd::ExchangePeers);
                     }
                     KeyCode::Char('c') => {
-                        return Some(InputCmd::Clear);
+                        return Some(InputCmd::ClearBuffer);
                     }
                     KeyCode::Char('n') => {
                         return Some(InputCmd::AddNode(0));

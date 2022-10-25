@@ -11,6 +11,7 @@ use super::query_region_set::query_region_data;
 /// Regions larger than size_limit will be quadrisected, and the size of each subregion
 /// will be fetched from the database. The quadrisecting is recursive until either all
 /// regions are either small enough, or cannot be further subdivided.
+#[tracing::instrument(skip(db, topology))]
 pub async fn query_size_limited_regions(
     db: DbWrite<DbKindDht>,
     topology: Topology,
@@ -27,6 +28,7 @@ pub async fn query_size_limited_regions(
             let mut unchecked: Vec<(Region, bool)> =
                 regions.into_iter().map(|r| (r, false)).collect();
             let mut checked: Vec<Region> = vec![];
+            tracing::debug!("--------");
             while !unchecked.is_empty() {
                 // partition the set into regions which need to be split, and those which don't
                 let (smalls, bigs): (Vec<_>, Vec<_>) = unchecked
@@ -40,6 +42,7 @@ pub async fn query_size_limited_regions(
                 unchecked = bigs
                     .into_iter()
                     .flat_map(|(r, _)| {
+                        tracing::debug!("quadrisect: {:?}", r);
                         r.coords
                             .quadrisect()
                             .map(|rs| rs.into_iter().map(|r| (r, false)).collect())

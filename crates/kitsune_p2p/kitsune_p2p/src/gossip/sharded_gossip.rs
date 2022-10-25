@@ -212,6 +212,9 @@ impl ShardedGossip {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL_MS).await;
                     this.run_one_iteration().await;
                     this.stats(&mut stats);
+                    // this.gossip.inner.share_ref(|state| {
+                    //     state.metrics.read().incoming_gossip_progress()
+                    // })
                 }
                 KitsuneResult::Ok(())
             }
@@ -544,7 +547,7 @@ impl ShardedGossipLocalState {
             metrics.record_error(&remote_agent_list, gossip_type.into());
         }
 
-        metrics.complete_current_round(state_key, &remote_agent_list);
+        metrics.complete_current_round(state_key, &remote_agent_list, error);
         r
     }
 
@@ -561,12 +564,18 @@ impl ShardedGossipLocalState {
                     if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
                 {
                     tracing::error!("Tgt expired {:?}", cert);
-                    self.metrics
-                        .write()
-                        .record_error(remote_agent_list, gossip_type.into());
+                    {
+                        let mut metrics = self.metrics.write();
+                        metrics.complete_current_round(&cert, remote_agent_list, true);
+                        metrics.record_error(remote_agent_list, gossip_type.into());
+                    }
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
+                    {
+                        let mut metrics = self.metrics.write();
+                        metrics.complete_current_round(&cert, remote_agent_list, true);
+                    }
                     self.initiate_tgt = None;
                 }
                 _ => (),
@@ -1104,7 +1113,7 @@ impl ShardedGossipLocal {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
                     let mut metrics = i.metrics.write();
                     metrics.record_error(&r.remote_agent_list, self.gossip_type.into());
-                    metrics.complete_current_round(&cert, &r.remote_agent_list);
+                    metrics.complete_current_round(&cert, &r.remote_agent_list, true);
                 }
                 Ok(())
             })

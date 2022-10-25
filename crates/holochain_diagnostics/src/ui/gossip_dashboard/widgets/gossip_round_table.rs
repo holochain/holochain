@@ -32,8 +32,10 @@ pub fn gossip_round_table<Id: Display>(state: &GossipRoundTableState<Id>) -> Tab
     currents.sort_unstable_by(|a, b| b.1.cmp(&a.1));
     metrics.sort_unstable_by(|a, b| b.1.cmp(&a.1));
 
-    let header = Row::new(["g", "n", "T", "dur", "#in", "#out", "in", "out", "thru"])
-        .style(Style::default().add_modifier(Modifier::UNDERLINED));
+    let header = Row::new([
+        "g", "e", "n", "T", "dur", "#in", "#out", "in", "out", "thru",
+    ])
+    .style(Style::default().add_modifier(Modifier::UNDERLINED));
 
     let mut rows = vec![];
 
@@ -41,13 +43,13 @@ pub fn gossip_round_table<Id: Display>(state: &GossipRoundTableState<Id>) -> Tab
 
     rows.extend(currents.into_iter().map(|(n, round)| {
         render_gossip_metric_row(
-            state,
             n.clone(),
             round.gossip_type,
-            round.start_time.into(),
+            Instant::from(round.start_time).duration_since(state.start_time),
             state.current_time.duration_since(round.start_time.into()),
             Some(round.throughput),
             true,
+            false,
         )
     }));
 
@@ -63,18 +65,19 @@ pub fn gossip_round_table<Id: Display>(state: &GossipRoundTableState<Id>) -> Tab
             None
         } else {
             Some(render_gossip_metric_row(
-                state,
                 n.clone(),
                 round.gossip_type,
-                round.start_time.into(),
+                Instant::from(round.start_time).duration_since(state.start_time),
                 round.duration(),
                 Some(round.throughput),
                 false,
+                round.error,
             ))
         }
     }));
 
     Table::new(rows).header(header).widths(&[
+        Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Min(3),
         Constraint::Percentage(100 / 8),
@@ -88,13 +91,13 @@ pub fn gossip_round_table<Id: Display>(state: &GossipRoundTableState<Id>) -> Tab
 }
 
 fn render_gossip_metric_row<Id: Display>(
-    state: &GossipRoundTableState<Id>,
     id: &Id,
     gossip_type: GossipModuleType,
-    start_time: Instant,
+    time_since_start: Duration,
     duration: Duration,
     throughput: Option<RoundThroughput>,
     is_current: bool,
+    error: bool,
 ) -> Row<'static> {
     let throughput_cell = |b, d: Duration| {
         let cell = Cell::from(format!(
@@ -111,16 +114,28 @@ fn render_gossip_metric_row<Id: Display>(
     let number_cell = |v| {
         let cell = Cell::from(format!("{:>6}", v));
         if v == 0 {
-            cell.style(Style::default().fg(Color::DarkGray))
+            if is_current {
+                cell.style(Style::default().bg(Color::Gray))
+            } else {
+                cell.style(Style::default().fg(Color::Gray))
+            }
         } else {
             cell
         }
     };
 
-    let bytes_cell = |v: u32| {
-        let cell = Cell::from(format!("{:>3.1}", v.human_count_bytes()));
+    let bytes_cell = |v: u32, expected: u32| {
+        let cell = if expected == 0 {
+            Cell::from(format!("{:>5.1}", v.human_count_bytes()))
+        } else {
+            Cell::from(format!(
+                "{:>5.1}/{:>5.1}",
+                v.human_count_bytes(),
+                expected.human_count_bytes()
+            ))
+        };
         if v == 0 {
-            cell.style(Style::default().fg(Color::DarkGray))
+            cell.style(Style::default().fg(Color::Gray))
         } else if v >= 1_000_000 {
             cell.style(Style::default().add_modifier(Modifier::ITALIC))
         } else {
@@ -138,24 +153,13 @@ fn render_gossip_metric_row<Id: Display>(
             Style::default().fg(Color::Blue),
         ),
     };
+    let err = Cell::from(if error { "E" } else { " " });
     let mut cells = vec![
         gt,
+        err,
         Cell::from(id.to_string()),
-        Cell::from(format!(
-            "{:.1?}",
-            start_time // metric
-                       //     .instant
-                       //     .duration_since(TokioInstant::from(state.start_time))
-        )),
+        Cell::from(format!("{:.1?}", time_since_start)),
     ];
-
-    // let dur = if is_current {
-    //     state.current_time.duration_since(metric.instant.into())
-    // } else if let Some(round) = &metric.round {
-    //     metric.instant.duration_since(round.start_time)
-    // } else {
-    //     Duration::ZERO
-    // };
 
     cells.push({
         let style = if duration.as_millis() >= 1000 {
@@ -172,8 +176,8 @@ fn render_gossip_metric_row<Id: Display>(
         cells.extend([
             number_cell(tp.op_count.incoming),
             number_cell(tp.op_count.outgoing),
-            bytes_cell(tp.op_bytes.incoming),
-            bytes_cell(tp.op_bytes.outgoing),
+            bytes_cell(tp.op_bytes.incoming, tp.total_region_size.incoming),
+            bytes_cell(tp.op_bytes.outgoing, tp.total_region_size.outgoing),
             throughput_cell(tp.op_bytes.incoming + tp.op_bytes.outgoing, duration),
         ])
     }
