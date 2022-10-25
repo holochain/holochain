@@ -337,6 +337,7 @@ async fn check_app_entry_type_test() {
             coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
                 .coordinator
                 .into_inner()],
+            hacked_hash: None,
         },
         [integrity, coordinator],
     )

@@ -475,6 +475,7 @@ async fn setup(
                 .map(TestZomes::from)
                 .map(|z| z.coordinator.into_inner())
                 .collect(),
+            hacked_hash: None,
         },
         zomes.into_iter().map(Into::into),
     )

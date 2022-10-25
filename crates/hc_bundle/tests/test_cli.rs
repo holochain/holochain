@@ -223,6 +223,7 @@ async fn test_multi_integrity() {
                 .into(),
             ),
         ],
+        hacked_hash: None,
     };
     assert_eq!(
         dna.dna_def().integrity_zomes[0]

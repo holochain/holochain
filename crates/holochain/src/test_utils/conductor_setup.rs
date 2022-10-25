@@ -182,26 +182,26 @@ impl ConductorTestData {
         network: Option<KitsuneP2pConfig>,
     ) -> Self {
         let dna_file = DnaFile::new(
-            DnaDef {
-                name: "conductor_test".to_string(),
-                modifiers: DnaModifiers {
+            DnaDef::new(
+                "conductor_test".to_string(),
+                DnaModifiers {
                     network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                     properties: SerializedBytes::try_from(()).unwrap(),
                     origin_time: Timestamp::HOLOCHAIN_EPOCH,
                 },
-                integrity_zomes: zomes
+                zomes
                     .clone()
                     .into_iter()
                     .map(TestZomes::from)
                     .map(|z| z.integrity.into_inner())
                     .collect(),
-                coordinator_zomes: zomes
+                zomes
                     .clone()
                     .into_iter()
                     .map(TestZomes::from)
                     .map(|z| z.coordinator.into_inner())
                     .collect(),
-            },
+            ),
             zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
         )
         .await;

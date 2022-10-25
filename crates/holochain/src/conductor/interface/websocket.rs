@@ -614,6 +614,7 @@ pub mod test {
                     .map(TestZomes::from)
                     .map(|z| z.coordinator.into_inner())
                     .collect(),
+                hacked_hash: None,
             },
             zomes.into_iter().flat_map(|t| Vec::<DnaWasm>::from(t)),
         )

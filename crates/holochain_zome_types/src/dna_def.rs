@@ -161,7 +161,6 @@ pub struct DnaDef {
     /// Make this DNA register itself with a different hash than what its content implies.
     /// Obviously only for testing!
     #[serde(default)]
-    #[cfg(feature = "hackable-dna-hashes")]
     #[cfg_attr(feature = "full-dna-def", builder(default))]
     pub hacked_hash: Option<DnaHashB64>,
 }
@@ -193,6 +192,21 @@ impl DnaDef {
 }
 
 impl DnaDef {
+    /// Constructor
+    pub fn new(
+        name: String,
+        modifiers: DnaModifiers,
+        integrity_zomes: IntegrityZomes,
+        coordinator_zomes: CoordinatorZomes,
+    ) -> Self {
+        Self {
+            name,
+            modifiers,
+            integrity_zomes,
+            coordinator_zomes,
+            hacked_hash: None,
+        }
+    }
     /// Get all zomes including the integrity and coordinator zomes.
     pub fn all_zomes(&self) -> impl Iterator<Item = (&ZomeName, &zome::ZomeDef)> {
         self.integrity_zomes

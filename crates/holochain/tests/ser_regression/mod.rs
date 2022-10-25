@@ -54,6 +54,7 @@ async fn ser_regression_test() {
             coordinator_zomes: vec![TestZomes::from(TestWasm::SerRegression)
                 .coordinator
                 .into_inner()],
+            hacked_hash: None,
         },
         <Vec<DnaWasm>>::from(TestWasm::SerRegression),
     )

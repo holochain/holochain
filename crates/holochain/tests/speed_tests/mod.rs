@@ -130,6 +130,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             },
             integrity_zomes: vec![TestZomes::from(TestWasm::Anchor).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::Anchor).coordinator.into_inner()],
+            hacked_hash: None,
         },
         vec![TestWasm::Anchor.into()],
     )
