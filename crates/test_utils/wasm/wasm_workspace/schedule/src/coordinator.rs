@@ -7,7 +7,7 @@ fn _scheduled_fn(entry_types_unit: EntryTypesUnit, entry: Entry) -> Option<Sched
             h.borrow().create(CreateInput::new(
                 ScopedEntryDefIndex::try_from(entry_types_unit)?,
                 EntryVisibility::Public,
-                Tick.try_into().unwrap(),
+                entry,
                 // This will be running concurrently with cron_scheduled_fn.
                 ChainTopOrdering::Relaxed,
             ))

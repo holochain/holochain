@@ -112,7 +112,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
             AppRequest::ArchiveCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .archive_clone_cell(*payload.clone())
+                    .archive_clone_cell(&*payload)
                     .await?;
                 Ok(AppResponse::CloneCellArchived)
             }
