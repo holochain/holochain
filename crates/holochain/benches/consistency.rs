@@ -159,9 +159,7 @@ impl Consumer {
 
 async fn setup() -> (Producer, Consumer, Others) {
     let (tx, rx) = tokio::sync::mpsc::channel(1);
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
     let config = SweetConductorConfig::standard().no_publish();
     let configs = vec![config; 5];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;

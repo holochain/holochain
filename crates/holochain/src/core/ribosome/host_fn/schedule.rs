@@ -31,8 +31,7 @@ pub fn schedule(
                 .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
             Ok(())
         }
-        _ => {
-            Err(wasm_error!(WasmErrorInner::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
@@ -40,8 +39,7 @@ pub fn schedule(
             )
             .to_string(),
         ))
-        .into())
-    },
+        .into()),
     }
 }
 
@@ -212,7 +210,10 @@ pub mod tests {
         } = RibosomeTestFixture::new(TestWasm::Schedule).await;
 
         // We don't want the scheduler running and messing with our calculations.
-        conductor.handle().start_scheduler(std::time::Duration::from_millis(1000_000_000)).await;
+        conductor
+            .raw_handle()
+            .start_scheduler(std::time::Duration::from_millis(1000_000_000))
+            .await;
 
         // At first nothing has happened because init won't run until some zome
         // call runs.
@@ -220,40 +221,57 @@ pub mod tests {
         assert!(query_tick.is_empty());
 
         // Wait to make sure we've init, but it should have happened for sure.
-        while { let alice_pubkey = alice_pubkey.clone();
-            !alice_host_fn_caller.authored_db.async_commit(move |txn: &mut Transaction| {
-            let persisted_scheduled_fn = ScheduledFn::new(TestWasm::Schedule.into(), "cron_scheduled_fn_init".into());
+        while {
+            let alice_pubkey = alice_pubkey.clone();
+            !alice_host_fn_caller
+                .authored_db
+                .async_commit(move |txn: &mut Transaction| {
+                    let persisted_scheduled_fn = ScheduledFn::new(
+                        TestWasm::Schedule.into(),
+                        "cron_scheduled_fn_init".into(),
+                    );
 
-            Result::<bool, DatabaseError>::Ok(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey).unwrap())
-        }).await.unwrap() } {
+                    Result::<bool, DatabaseError>::Ok(
+                        fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &alice_pubkey)
+                            .unwrap(),
+                    )
+                })
+                .await
+                .unwrap()
+        } {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         }
 
         // Round up to the next second so we don't trigger two tocks in quick
         // succession.
-        let mut now = Timestamp::from_micros((Timestamp::now().as_micros() / 1_000_000 + 1) * 1_000_000 + 1);
+        let mut now =
+            Timestamp::from_micros((Timestamp::now().as_micros() / 1_000_000 + 1) * 1_000_000 + 1);
 
         // The ephemeral function will dispatch each millisecond.
         // The tock will dispatch once and wait a second.
         let mut i: usize = 0;
         while i < 10 {
-            conductor.handle().dispatch_scheduled_fns(now).await;
+            conductor.raw_handle().dispatch_scheduled_fns(now).await;
             now = (now + std::time::Duration::from_millis(2))?;
             i = i + 1;
         }
         loop {
             let query_tick_init: Vec<Record> = conductor.call(&alice, "query_tick_init", ()).await;
             let query_tock_init: Vec<Record> = conductor.call(&alice, "query_tock_init", ()).await;
-            if query_tick_init.len() == 5 && query_tock_init.len() == 1 { break; }
+            if query_tick_init.len() == 5 && query_tock_init.len() == 1 {
+                break;
+            }
         }
 
         // after a second the tock will run again.
         now = (now + std::time::Duration::from_millis(1000))?;
-        conductor.handle().dispatch_scheduled_fns(now).await;
+        conductor.raw_handle().dispatch_scheduled_fns(now).await;
         loop {
             let query_tick_init: Vec<Record> = conductor.call(&alice, "query_tick_init", ()).await;
             let query_tock_init: Vec<Record> = conductor.call(&alice, "query_tock_init", ()).await;
-            if query_tick_init.len() == 5 && query_tock_init.len() == 2 { break; }
+            if query_tick_init.len() == 5 && query_tock_init.len() == 2 {
+                break;
+            }
         }
 
         // alice can schedule things outside of init.
@@ -264,11 +282,12 @@ pub mod tests {
 
         // Round up to the next second so we don't trigger two tocks in quick
         // succession.
-        now = Timestamp::from_micros((Timestamp::now().as_micros() / 1_000_000 + 1) * 1_000_000 + 1);
+        now =
+            Timestamp::from_micros((Timestamp::now().as_micros() / 1_000_000 + 1) * 1_000_000 + 1);
 
         let mut i: usize = 0;
         while i < 10 {
-            conductor.handle().dispatch_scheduled_fns(now).await;
+            conductor.raw_handle().dispatch_scheduled_fns(now).await;
             now = (now + std::time::Duration::from_millis(2))?;
             i = i + 1;
         }
@@ -276,37 +295,62 @@ pub mod tests {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
             let query_tick: Vec<Record> = conductor.call(&alice, "query_tick", ()).await;
             let query_tock: Vec<Record> = conductor.call(&alice, "query_tock", ()).await;
-            if query_tick.len() == 5 && query_tock.len() == 1 { break; }
+            if query_tick.len() == 5 && query_tock.len() == 1 {
+                break;
+            }
         }
 
         // after a second the tock will run again.
         now = (now + std::time::Duration::from_millis(1000))?;
-        conductor.handle().dispatch_scheduled_fns(now).await;
+        conductor.raw_handle().dispatch_scheduled_fns(now).await;
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
             let query_tick: Vec<Record> = conductor.call(&alice, "query_tick", ()).await;
             let query_tock: Vec<Record> = conductor.call(&alice, "query_tock", ()).await;
-            if query_tick.len() == 5 && query_tock.len() == 2 { break; }
+            if query_tick.len() == 5 && query_tock.len() == 2 {
+                break;
+            }
         }
 
         // Starting the scheduler should flush ephemeral.
         let _schedule: () = conductor.call(&bob, "schedule", ()).await;
 
-        assert!({ let bob_pubkey = bob_pubkey.clone();
-            bob_host_fn_caller.authored_db.async_commit(move |txn: &mut Transaction| {
-            let persisted_scheduled_fn = ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
+        assert!({
+            let bob_pubkey = bob_pubkey.clone();
+            bob_host_fn_caller
+                .authored_db
+                .async_commit(move |txn: &mut Transaction| {
+                    let persisted_scheduled_fn =
+                        ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
 
-            Result::<bool, DatabaseError>::Ok(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &bob_pubkey).unwrap())
-        }).await.unwrap() });
+                    Result::<bool, DatabaseError>::Ok(
+                        fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &bob_pubkey).unwrap(),
+                    )
+                })
+                .await
+                .unwrap()
+        });
 
-        conductor.handle().start_scheduler(std::time::Duration::from_millis(1000_000_000)).await;
+        conductor
+            .raw_handle()
+            .start_scheduler(std::time::Duration::from_millis(1000_000_000))
+            .await;
 
-        assert!(!{ let bob_pubkey = bob_pubkey.clone();
-            bob_host_fn_caller.authored_db.async_commit(move |txn: &mut Transaction| {
-            let persisted_scheduled_fn = ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
+        assert!(!{
+            let bob_pubkey = bob_pubkey.clone();
+            bob_host_fn_caller
+                .authored_db
+                .async_commit(move |txn: &mut Transaction| {
+                    let persisted_scheduled_fn =
+                        ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
 
-            Result::<bool, DatabaseError>::Ok(fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &bob_pubkey).unwrap())
-        }).await.unwrap() });
+                    Result::<bool, DatabaseError>::Ok(
+                        fn_is_scheduled(txn, persisted_scheduled_fn.clone(), &bob_pubkey).unwrap(),
+                    )
+                })
+                .await
+                .unwrap()
+        });
 
         Ok(())
     }

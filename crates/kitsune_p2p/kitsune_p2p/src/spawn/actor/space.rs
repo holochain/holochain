@@ -1062,6 +1062,16 @@ impl KitsuneP2pHandler for Space {
         .boxed()
         .into())
     }
+
+    fn handle_get_diagnostics(
+        &mut self,
+        _space: KSpace,
+    ) -> KitsuneP2pHandlerResult<GossipDiagnostics> {
+        let diagnostics = GossipDiagnostics {
+            metrics: self.ro_inner.metrics.clone(),
+        };
+        Ok(async move { Ok(diagnostics) }.boxed().into())
+    }
 }
 
 pub(crate) struct SpaceReadOnlyInner {
@@ -1141,9 +1151,7 @@ impl Space {
             .flat_map(|module| match module {
                 "sharded-gossip" => {
                     let mut gossips = vec![];
-                    if !config.tuning_params.disable_recent_gossip
-                        && config.tuning_params.danger_gossip_recent_threshold_secs > 0
-                    {
+                    if !config.tuning_params.disable_recent_gossip {
                         gossips.push((
                             GossipModuleType::ShardedRecent,
                             crate::gossip::sharded_gossip::recent_factory(

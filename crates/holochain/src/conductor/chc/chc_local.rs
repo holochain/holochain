@@ -182,9 +182,7 @@ mod tests {
         config.chc_namespace = Some(CHC_LOCAL_MAGIC_STRING.to_string());
         let mut conductor = SweetConductor::from_config(config).await;
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
-            .await
-            .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
         let (agent, _) = SweetAgents::alice_and_bob();
 
         let (cell,) = conductor
@@ -233,7 +231,7 @@ mod tests {
 
         // Check that a sync picks up the new action
         conductor
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();
@@ -263,9 +261,7 @@ mod tests {
             SweetConductorBatch::from_configs([config.clone(), config.clone(), config.clone()])
                 .await;
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
-            .await
-            .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
         let (agent, _) = SweetAgents::alice_and_bob();
 
         let (c0,) = conductors[0]
@@ -297,12 +293,12 @@ mod tests {
 
         // TODO: sync conductors 1 and 2 to match conductor 0
         conductors[1]
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();
         conductors[2]
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();
@@ -360,13 +356,13 @@ mod tests {
         assert_eq!(format!("{:?}", hash1), format!("{:?}", hash2));
 
         conductors[1]
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();
 
         conductors[2]
-            .inner_handle()
+            .raw_handle()
             .chc_sync(cell_id.clone(), None)
             .await
             .unwrap();

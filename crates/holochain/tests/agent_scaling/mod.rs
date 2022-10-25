@@ -46,9 +46,7 @@ async fn many_agents_can_reach_consistency_agent_links() {
     observability::test_run().ok();
     const NUM_AGENTS: usize = 20;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("links", links_zome()))
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("links", links_zome())).await;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -97,9 +95,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
     observability::test_run().ok();
     const NUM_AGENTS: usize = 30;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -136,7 +132,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
     observability::test_run().ok();
     // Bundle the single zome into a DnaFile
     let (dna_file, _, _) =
-        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await?;
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;

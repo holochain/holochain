@@ -26,7 +26,7 @@ use tokio_stream::StreamExt;
 #[cfg(feature = "test_utils")]
 async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     // Bundle the single zome into a DnaFile
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -81,8 +81,8 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     observability::test_run().ok();
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
-    let (dna_bar, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
+    let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let (dna_bar, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     let agents = SweetAgents::get(conductor.keystore(), 3).await;
 
@@ -172,8 +172,8 @@ async fn invalid_cell() -> anyhow::Result<()> {
     observability::test_run().ok();
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
-    let (dna_bar, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
+    let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let (dna_bar, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     // let agents = SweetAgents::get(conductor.keystore(), 2).await;
 
@@ -201,7 +201,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
 async fn get_deleted() -> anyhow::Result<()> {
     observability::test_run().ok();
     // Bundle the single zome into a DnaFile
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -274,9 +274,7 @@ async fn signal_subscription() {
     observability::test_run().ok();
     const N: usize = 10;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
     let zome = &app.cells()[0].zome(SweetInlineZomes::COORDINATOR);
@@ -295,7 +293,7 @@ async fn signal_subscription() {
 
 /// Simple zome which contains a validation rule which can fail
 fn simple_validation_zome() -> InlineZomeSet {
-    let entry_def = EntryDef::default_with_id("string");
+    let entry_def = EntryDef::from_id("string");
 
     SweetInlineZomes::new(vec![entry_def.clone()], 0)
         .function("create", move |api, s: AppString| {
@@ -331,7 +329,7 @@ fn simple_validation_zome() -> InlineZomeSet {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn simple_validation() -> anyhow::Result<()> {
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_validation_zome()).await?;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_validation_zome()).await;
     let mut conductor = SweetConductor::from_standard_config().await;
     let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
     let apps = conductor
@@ -387,9 +385,7 @@ async fn can_call_real_zomes_too() {
     coordinator.push(TestWasm::Create.into());
 
     let (dna, _, _) =
-        SweetDnaFile::unique_from_zomes(integrity, coordinator, TestWasm::Create.into())
-            .await
-            .unwrap();
+        SweetDnaFile::unique_from_zomes(integrity, coordinator, TestWasm::Create.into()).await;
 
     let app = conductor
         .setup_app_for_agent("app1", agent.clone(), &[dna.clone()])
@@ -412,7 +408,7 @@ async fn can_call_real_zomes_too() {
 #[tokio::test(flavor = "multi_thread")]
 async fn call_non_existing_zome_fails_gracefully() -> anyhow::Result<()> {
     // Bundle the single zome into a DnaFile
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await?;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     // Create a Conductor
     let mut conductor = SweetConductor::from_standard_config().await;
