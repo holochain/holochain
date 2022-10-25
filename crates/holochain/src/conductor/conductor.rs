@@ -1748,7 +1748,10 @@ mod scheduler_impls {
                 let mut interval = tokio::time::interval(interval_period);
                 loop {
                     interval.tick().await;
-                    scheduler_handle.clone().dispatch_scheduled_fns(Timestamp::now()).await;
+                    scheduler_handle
+                        .clone()
+                        .dispatch_scheduled_fns(Timestamp::now())
+                        .await;
                 }
             }));
         }
