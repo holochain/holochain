@@ -15,7 +15,7 @@ use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
 use once_cell::unsync::{Lazy, OnceCell};
 use regex::Regex;
-use semver::Version;
+use semver::{Comparator, Op, Version, VersionReq};
 use std::cell::Cell;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
@@ -81,16 +81,51 @@ impl<'a> Crate<'a> {
         self.package.manifest_path()
     }
 
+    /// Sets the new version for the given crate, updates all workspace dependants,
+    /// and returns a refrence to them for post-processing.
+    pub(crate) fn set_version(
+        &'a self,
+        dry_run: bool,
+        release_version: &semver::Version,
+    ) -> Fallible<Vec<&'a Crate<'a>>> {
+        debug!(
+            "setting version to {} in manifest at {:?}",
+            release_version,
+            self.manifest_path(),
+        );
+
+        let release_version_str = release_version.to_string();
+
+        if !dry_run {
+            cargo_next::set_version(self.manifest_path(), release_version_str.as_str())?;
+        }
+
+        let dependants = self
+            .dependants_in_workspace_filtered(|(_dep_name, deps)| {
+                deps.iter().any(|dep| {
+                    dep.version_req() != &cargo::util::OptVersionReq::from(VersionReq::STAR)
+                })
+            })?
+            .to_owned();
+
+        for dependant in dependants.iter() {
+            dependant.set_dependency_version(&self.name(), &release_version, None, dry_run)?;
+        }
+
+        Ok(dependants)
+    }
+
     /// Set a dependency to a specific version
     // Adapted from https://github.com/sunng87/cargo-release/blob/f94938c3f20ef20bc8f971d59de75574a0b18931/src/cargo.rs#L122-L154
     pub(crate) fn set_dependency_version(
         &self,
         name: &str,
-        version: &str,
+        version: &Version,
+        version_req_override: Option<&VersionReq>,
         dry_run: bool,
     ) -> Fallible<()> {
         debug!(
-            "[{}] updating dependency version from dependant {} to version requirement {} in manifest {:?}",
+            "[{}] updating dependency version from dependant {} to version {} in manifest {:?}",
             &self.name(),
             &name,
             &version,
@@ -118,10 +153,69 @@ impl<'a> Crate<'a> {
                         .expect("manifest is already verified")
                         .contains_key(name)
                 {
-                    let existing_version = manifest[key][name]["version"].as_str().unwrap_or("*");
+                    let existing_version_req = if let Some(Ok(existing_version_req)) =
+                        manifest[key][name]["version"].as_str().map(|version| {
+                            VersionReq::parse(version).context(anyhow::anyhow!(
+                                "parsing version {:?} for dependency {} ",
+                                version,
+                                self.name()
+                            ))
+                        }) {
+                        existing_version_req
+                    } else {
+                        debug!(
+                            "could not parse {}'s {} version req to string: {:?}",
+                            name, key, manifest[key][name]["version"]
+                        );
 
-                    if *key == "dependencies" || !existing_version.contains("*") {
-                        manifest[key][name]["version"] = toml_edit::value(version);
+                        continue;
+                    };
+
+                    trace!(
+                        "version: {:?}, existing version req {:?} in {}",
+                        version,
+                        existing_version_req,
+                        key,
+                    );
+
+                    // only set the version if necessary
+                    if *key == "dependencies" || existing_version_req != VersionReq::STAR {
+                        let final_version_req = if let Some(vr) = version_req_override {
+                            vr.clone()
+                        } else {
+                            let mut version_req = VersionReq::parse(&version.to_string())?;
+
+                            // if the Op of the first Comparator we'll inherit that, the rest will be discarded
+                            if let Some(op) = existing_version_req
+                                .comparators
+                                .first()
+                                .map(|comp| {
+                                    if comp.op != semver::Op::Wildcard {
+                                        Some(comp.op)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .flatten()
+                            {
+                                trace!("overriding first op of {:?} with {:?}", version_req, op);
+                                let version_req_clone = version_req.clone();
+
+                                version_req
+                                    .comparators
+                                    .first_mut()
+                                    .ok_or_else(|| anyhow::anyhow!{
+                                        "first comparator of version_req {:?} should be accessible",
+                                        version_req_clone
+                                    })?
+                                    .op = op;
+                            };
+
+                            version_req
+                        };
+
+                        manifest[key][name]["version"] =
+                            toml_edit::value(final_version_req.to_string());
                     }
                 }
             }

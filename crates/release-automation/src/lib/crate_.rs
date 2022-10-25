@@ -4,7 +4,7 @@ use cargo::util::VersionExt;
 use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
 use log::{debug, info, trace, warn};
-use semver::Version;
+use semver::{Comparator, Version, VersionReq};
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
@@ -176,7 +176,7 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
                 .find(|crt| crt.name() == subcmd_args.crate_name)
                 .ok_or_else(|| anyhow::anyhow!("crate {} not found", subcmd_args.crate_name))?;
 
-            crate::common::set_version(false, crt, &subcmd_args.new_version)?;
+            crt.set_version(false, &subcmd_args.new_version)?;
 
             Ok(())
         }
@@ -222,8 +222,8 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
 }
 
 fn pin_deps<'a>(
-    ws: &'a ReleaseWorkspace<'a>,
-    subcmd_args: &CratePinDepsArgs,
+    _ws: &'a ReleaseWorkspace<'a>,
+    _subcmd_args: &CratePinDepsArgs,
 ) -> Result<(), anyhow::Error> {
     todo!()
 }
@@ -244,7 +244,12 @@ fn make_pinned_dep<'a>(
     for dependant in crt.dependants_in_workspace()? {
         dependant.set_dependency_version(
             &crt.name(),
-            &format!("{}{}", subcmd_args.version_prefix, crt.version()),
+            &crt.version(),
+            Some(&semver::VersionReq::parse(&format!(
+                "{}{}",
+                subcmd_args.version_prefix,
+                crt.version()
+            ))?),
             subcmd_args.dry_run,
         )?;
     }
@@ -471,7 +476,7 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
             version,
         );
 
-        for changed_dependant in crate::common::set_version(dry_run, crt, &version)? {
+        for changed_dependant in crt.set_version(dry_run, &version)? {
             if applicable_crates
                 .insert(changed_dependant.name(), changed_dependant)
                 .is_none()

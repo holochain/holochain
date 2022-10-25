@@ -146,23 +146,25 @@ fn bump_versions_on_selection() {
         get_crate_versions(&expected_crates, &workspace),
     );
 
-    // ensure dependants were updated
-    // todo: ensure *all* dependants were updated
-    assert_eq!(
-        "=0.0.0",
-        crate::common::get_dependency_version(
-            &workspace
-                .root()
-                .join("crates")
-                .join("crate_a")
-                .join("Cargo.toml"),
-            "crate_b"
-        )
-        .unwrap()
-        .replace("\"", "")
-        .replace("\\", "")
-        .replace(" ", ""),
-    );
+    // ensure *all* dependants were updated
+    // alas, after refactoring the code into a loop i noticed there's only one dependency in this example workspace
+    for (name, dep_name, expected_crate_version) in &[("crate_a", "crate_b", "=0.0.0")] {
+        assert_eq!(
+            expected_crate_version,
+            &crate::common::get_dependency_version(
+                &workspace
+                    .root()
+                    .join("crates")
+                    .join(name)
+                    .join("Cargo.toml"),
+                dep_name
+            )
+            .unwrap()
+            .replace("\"", "")
+            .replace("\\", "")
+            .replace(" ", ""),
+        );
+    }
 
     // check changelogs for new release headings
     assert_eq!(

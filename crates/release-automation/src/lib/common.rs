@@ -4,7 +4,7 @@ use std::{
 };
 
 use cargo::util::VersionExt;
-use semver::VersionReq;
+use semver::{Comparator, VersionReq};
 use serde::{Deserialize, Serialize};
 
 use super::*;
@@ -26,40 +26,6 @@ pub(crate) fn selection_check<'a>(
     );
 
     Ok(release_selection)
-}
-
-/// Sets the new version for the given crate and returns the dependants of the crates for post-processing them.
-pub(crate) fn set_version<'a>(
-    dry_run: bool,
-    crt: &'a crate_selection::Crate<'a>,
-    release_version: &semver::Version,
-) -> Fallible<Vec<&'a crate_selection::Crate<'a>>> {
-    let cargo_toml_path = crt.root().join("Cargo.toml");
-    debug!(
-        "setting version to {} in manifest at {:?}",
-        release_version, cargo_toml_path
-    );
-
-    let version = release_version.to_string();
-
-    if !dry_run {
-        cargo_next::set_version(&cargo_toml_path, version.as_str())?;
-    }
-
-    let version_req = format!("={}", release_version);
-
-    let dependants = crt
-        .dependants_in_workspace_filtered(|(_dep_name, deps)| {
-            deps.iter()
-                .any(|dep| dep.version_req() != &cargo::util::OptVersionReq::from(VersionReq::STAR))
-        })?
-        .to_owned();
-
-    for dependant in dependants.iter() {
-        dependant.set_dependency_version(&crt.name(), &version_req, dry_run)?;
-    }
-
-    Ok(dependants)
 }
 
 #[cfg(test)]
