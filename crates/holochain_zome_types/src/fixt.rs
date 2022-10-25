@@ -747,6 +747,7 @@ fixturator!(
         coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        hacked_hash: None,
     };
 
     curve Unpredictable DnaDef {
@@ -768,6 +769,7 @@ fixturator!(
         coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        hacked_hash: None,
     };
 
     curve Predictable DnaDef {
@@ -789,6 +791,7 @@ fixturator!(
         coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        hacked_hash: None,
     };
 );
 

@@ -127,6 +127,7 @@ impl DnaBundle {
                     },
                     integrity_zomes,
                     coordinator_zomes,
+                    hacked_hash: None,
                 };
 
                 let original_hash = DnaHash::with_data_sync(&dna_def);

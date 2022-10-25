@@ -65,6 +65,8 @@ full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full", "proper
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", "holochain_integrity_types/test_utils"]
 
+hackable-dna-hashes = ["full-dna-def"]
+
 properties = ["serde_yaml"]
 
 test_utils = [

@@ -157,6 +157,13 @@ pub struct DnaDef {
     /// A vector of zomes that do not affect
     /// the [`DnaHash`].
     pub coordinator_zomes: CoordinatorZomes,
+
+    /// Make this DNA register itself with a different hash than what its content implies.
+    /// Obviously only for testing!
+    #[serde(default)]
+    #[cfg(feature = "hackable-dna-hashes")]
+    #[cfg_attr(feature = "full-dna-def", builder(default))]
+    pub hacked_hash: Option<DnaHashB64>,
 }
 
 #[derive(Serialize, Debug, PartialEq, Eq)]
@@ -327,12 +334,14 @@ impl HashableContent for DnaDef {
         holo_hash::hash_type::Dna::new()
     }
 
+    #[cfg(not(feature = "hackable-dna-hashes"))]
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             name: &self.name,
             modifiers: &self.modifiers,
             integrity_zomes: &self.integrity_zomes,
         };
+
         HashableContentBytes::Content(
             holochain_serialized_bytes::UnsafeBytes::from(
                 holochain_serialized_bytes::encode(&hash)
@@ -341,4 +350,37 @@ impl HashableContent for DnaDef {
             .into(),
         )
     }
+
+    #[cfg(feature = "hackable-dna-hashes")]
+    fn hashable_content(&self) -> HashableContentBytes {
+        match &self.hacked_hash {
+            Some(hash) => {
+                HashableContentBytes::Prehashed39(DnaHash::from(hash.clone()).get_raw_39().to_vec())
+            }
+            None => {
+                let hash = DnaDefHash {
+                    name: &self.name,
+                    modifiers: &self.modifiers,
+                    integrity_zomes: &self.integrity_zomes,
+                };
+
+                HashableContentBytes::Content(
+                    holochain_serialized_bytes::UnsafeBytes::from(
+                        holochain_serialized_bytes::encode(&hash)
+                            .expect("Could not serialize HashableContent"),
+                    )
+                    .into(),
+                )
+            }
+        }
+    }
+}
+
+#[test]
+#[cfg(feature = "hackable-dna-hashes")]
+fn test_hacked_hash() {
+    let mut dna_def = DnaDef::unique_from_zomes(vec![], vec![]);
+    let hash = HoloHash::from_raw_32(vec![1; 32]);
+    dna_def.hacked_hash = Some(hash.clone().into());
+    assert_eq!(DnaDefHashed::from_content_sync(dna_def).hash, hash);
 }

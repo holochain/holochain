@@ -49,6 +49,7 @@ pub fn fake_dna_zomes_named(
         },
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),
+        hacked_hash: None,
     };
     tokio_helper::block_forever_on(async move {
         let mut wasm_code = Vec::new();

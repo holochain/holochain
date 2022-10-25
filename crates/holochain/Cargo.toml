@@ -181,6 +181,9 @@ no-deps = [ "holochain_keystore/no-deps", "holochain_sqlite/no-deps" ]
 # Extremely verbose wasm memory read/write logging
 wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 
+# Enable hackable DNA hashes, for testing
+hackable-dna-hashes = ["holochain_zome_types/hackable-dna-hashes"]
+
 # Enable chain head coordination
 chc = [
   "bytes",
