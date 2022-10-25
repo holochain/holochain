@@ -9,7 +9,7 @@ impl ShardedGossipLocal {
     pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
-            i.check_tgt_expired(self.gossip_type.into());
+            i.check_tgt_expired(self.gossip_type);
             let has_target = i.initiate_tgt.is_some();
             // Clear any expired rounds.
             i.round_map.current_rounds();
@@ -168,7 +168,7 @@ impl ShardedGossipLocal {
                 inner
                     .metrics
                     .write()
-                    .record_remote_round(&remote_agent_list);
+                    .record_remote_round(&remote_agent_list, self.gossip_type.into());
             }
             // If this is the target then we should clear the when initiated timeout.
             if let Some(tgt) = inner.initiate_tgt.as_mut() {

@@ -105,9 +105,7 @@ impl ShardedGossipLocal {
         if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
             // because of the order of arguments, the diff regions will contain the data
             // from *our* side, not our partner's.
-            let diff_regions = sent
-                .diff((region_set).clone())
-                .map_err(KitsuneError::other)?;
+            let diff_regions = sent.diff(region_set.clone()).map_err(KitsuneError::other)?;
 
             // This is a good place to see all the region data go by.
             // Note, this is a LOT of output!

@@ -598,7 +598,7 @@ mod dna_impls {
                             });
                             let wasms = wasms.collect::<Vec<_>>();
                             async move {
-                                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
+                                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
                                 let ribosome = RealRibosome::new(dna_file)?;
                                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
                             }
@@ -1280,7 +1280,6 @@ mod clone_cell_impls {
                     role_id.clone(),
                     modifiers.serialized()?,
                     name,
-                    self.clone(),
                 )
                 .await?;
 
@@ -1996,70 +1995,6 @@ impl Conductor {
         self.admin_websocket_ports.share_mut(|p| p.push(port));
     }
 
-    /// Associate a new clone cell with an existing app.
-    async fn add_clone_cell_to_app(
-        &self,
-        app_id: InstalledAppId,
-        role_id: AppRoleId,
-        dna_modifiers: DnaModifiersOpt,
-        name: Option<String>,
-        handle: ConductorHandle,
-    ) -> ConductorResult<InstalledCell> {
-        let ribosome_store = &self.ribosome_store;
-        // retrieve base cell DNA hash from conductor
-        let (_, base_cell_dna_hash) = self
-            .update_state_prime({
-                let app_id = app_id.clone();
-                let role_id = role_id.clone();
-                move |mut state| {
-                    let app = state.get_app_mut(&app_id)?;
-                    let app_role_assignment = app
-                        .roles()
-                        .get(&role_id)
-                        .ok_or_else(|| AppError::AppRoleIdMissing(role_id.to_owned()))?;
-                    if app_role_assignment.is_clone_limit_reached() {
-                        return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
-                            app_role_assignment.clone_limit(),
-                            app_role_assignment.clone(),
-                        )));
-                    }
-                    let parent_dna_hash = app_role_assignment.dna_hash().clone();
-                    Ok((state, parent_dna_hash))
-                }
-            })
-            .await?;
-        // clone cell from base cell DNA
-        let clone_dna = ribosome_store.share_ref(|ds| {
-            let mut dna_file = ds
-                .get_dna_file(&base_cell_dna_hash)
-                .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
-                .update_modifiers(dna_modifiers);
-            if let Some(name) = name {
-                dna_file = dna_file.set_name(name);
-            }
-            Ok::<_, DnaError>(dna_file)
-        })?;
-
-        let clone_dna_hash = clone_dna.dna_hash().to_owned();
-        // add clone cell to app and instantiate resulting clone cell
-        let (_, installed_clone_cell) = self
-            .update_state_prime(move |mut state| {
-                let app = state.get_app_mut(&app_id)?;
-                let agent_key = app.role(&role_id)?.agent_key().to_owned();
-                let cell_id = CellId::new(clone_dna_hash, agent_key);
-                let clone_id = app.add_clone(&role_id, &cell_id)?;
-                let installed_clone_cell =
-                    InstalledCell::new(cell_id, clone_id.as_app_role_id().clone());
-                Ok((state, installed_clone_cell))
-            })
-            .await?;
-
-        // register clone cell dna in ribosome store
-        handle.register_dna(clone_dna).await?;
-
-        Ok(installed_clone_cell)
-    }
-
     /// Add fully constructed cells to the cell map in the Conductor
     fn add_and_initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
         let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
@@ -2274,6 +2209,67 @@ impl Conductor {
             })
             .await?;
         Ok(app)
+    }
+
+    /// Associate a new clone cell with an existing app.
+    async fn add_clone_cell_to_app(
+        &self,
+        app_id: InstalledAppId,
+        role_id: AppRoleId,
+        dna_modifiers: DnaModifiersOpt,
+        name: Option<String>,
+    ) -> ConductorResult<InstalledCell> {
+        let ribosome_store = &self.ribosome_store;
+        // retrieve base cell DNA hash from conductor
+        let (_, base_cell_dna_hash) = self
+            .update_state_prime({
+                let app_id = app_id.clone();
+                let role_id = role_id.clone();
+                move |mut state| {
+                    let app = state.get_app_mut(&app_id)?;
+                    let app_role_assignment = app
+                        .roles()
+                        .get(&role_id)
+                        .ok_or_else(|| AppError::AppRoleIdMissing(role_id.to_owned()))?;
+                    if app_role_assignment.is_clone_limit_reached() {
+                        return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
+                            app_role_assignment.clone_limit(),
+                            app_role_assignment.clone(),
+                        )));
+                    }
+                    let parent_dna_hash = app_role_assignment.dna_hash().clone();
+                    Ok((state, parent_dna_hash))
+                }
+            })
+            .await?;
+        // clone cell from base cell DNA
+        let clone_dna = ribosome_store.share_ref(|ds| {
+            let mut dna_file = ds
+                .get_dna_file(&base_cell_dna_hash)
+                .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
+                .update_modifiers(dna_modifiers);
+            if let Some(name) = name {
+                dna_file = dna_file.set_name(name);
+            }
+            Ok::<_, DnaError>(dna_file)
+        })?;
+        let clone_dna_hash = clone_dna.dna_hash().to_owned();
+        // add clone cell to app and instantiate resulting clone cell
+        let (_, installed_clone_cell) = self
+            .update_state_prime(move |mut state| {
+                let app = state.get_app_mut(&app_id)?;
+                let agent_key = app.role(&role_id)?.agent_key().to_owned();
+                let cell_id = CellId::new(clone_dna_hash, agent_key);
+                let clone_id = app.add_clone(&role_id, &cell_id)?;
+                let installed_clone_cell =
+                    InstalledCell::new(cell_id, clone_id.as_app_role_id().clone());
+                Ok((state, installed_clone_cell))
+            })
+            .await?;
+
+        // register clone cell dna in ribosome store
+        self.register_dna(clone_dna).await?;
+        Ok(installed_clone_cell)
     }
 
     /// Print the current setup in a machine readable way

@@ -249,30 +249,33 @@ impl ShardedGossip {
         self.gossip
             .inner
             .share_mut(|i, _| {
-                i.round_map.get_mut(&cert).map(|state| match &gossip {
-                    ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
-                        state.throughput.op_bloom_count.outgoing += 1;
-                        state.throughput.op_bloom_bytes.outgoing += missing_hashes.size() as u32;
+                if let Some(state) = i.round_map.get_mut(&cert) {
+                    match &gossip {
+                        ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
+                            state.throughput.op_bloom_count.outgoing += 1;
+                            state.throughput.op_bloom_bytes.outgoing +=
+                                missing_hashes.size() as u32;
+                        }
+                        ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
+                            state.throughput.region_bytes.outgoing +=
+                                region_set.regions().map(|r| r.data.size).sum::<u32>();
+                        }
+                        ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
+                            state.throughput.op_count.outgoing += ops.len() as u32;
+                            state.throughput.op_bytes.outgoing +=
+                                ops.iter().map(|op| op.size() as u32).sum::<u32>();
+                        }
+                        ShardedGossipWire::Initiate(_) => {}
+                        ShardedGossipWire::Accept(_) => {}
+                        ShardedGossipWire::Agents(_) => {}
+                        ShardedGossipWire::MissingAgents(_) => {}
+                        ShardedGossipWire::OpBatchReceived(_) => {}
+                        ShardedGossipWire::Error(_) => {}
+                        ShardedGossipWire::Busy(_) => {}
+                        ShardedGossipWire::NoAgents(_) => {}
+                        ShardedGossipWire::AlreadyInProgress(_) => {}
                     }
-                    ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
-                        state.throughput.region_bytes.outgoing +=
-                            region_set.regions().map(|r| r.data.size).sum::<u32>();
-                    }
-                    ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
-                        state.throughput.op_count.outgoing += ops.len() as u32;
-                        state.throughput.op_bytes.outgoing +=
-                            ops.iter().map(|op| op.size() as u32).sum::<u32>();
-                    }
-                    ShardedGossipWire::Initiate(_) => {}
-                    ShardedGossipWire::Accept(_) => {}
-                    ShardedGossipWire::Agents(_) => {}
-                    ShardedGossipWire::MissingAgents(_) => {}
-                    ShardedGossipWire::OpBatchReceived(_) => {}
-                    ShardedGossipWire::Error(_) => {}
-                    ShardedGossipWire::Busy(_) => {}
-                    ShardedGossipWire::NoAgents(_) => {}
-                    ShardedGossipWire::AlreadyInProgress(_) => {}
-                });
+                }
                 Ok(())
             })
             .ok();
@@ -711,22 +714,24 @@ impl RoundState {
 pub struct RoundThroughput {
     /// Number of ops blooms we have sent for this round, which is also the
     /// number of MissingOps sets we expect in response
-    op_bloom_count: ThroughputItem,
+    pub op_bloom_count: ThroughputItem,
     /// Total number of bytes sent for bloom filters
-    op_bloom_bytes: ThroughputItem,
+    pub op_bloom_bytes: ThroughputItem,
     /// Total number of bytes sent for region data (historical only)
-    region_bytes: ThroughputItem,
+    pub region_bytes: ThroughputItem,
     /// Total number of ops sent
-    op_count: ThroughputItem,
+    pub op_count: ThroughputItem,
     /// Total number of bytes sent for op data
-    op_bytes: ThroughputItem,
+    pub op_bytes: ThroughputItem,
 }
 
 /// Incoming and outgoing throughput
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ThroughputItem {
-    incoming: u32,
-    outgoing: u32,
+    /// Incoming throughput
+    pub incoming: u32,
+    /// Outgoing throughput
+    pub outgoing: u32,
 }
 
 impl ShardedGossipLocal {
@@ -815,7 +820,7 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             if i.round_map.round_exists(&key) {
                 if state.is_finished() {
-                    i.remove_state(&key, self.gossip_type.into(), false);
+                    i.remove_state(&key, self.gossip_type, false);
                 } else {
                     i.round_map.insert(key, state);
                 }
@@ -838,7 +843,7 @@ impl ShardedGossipLocal {
                 })
                 .unwrap_or(true);
             if finished {
-                Ok(i.remove_state(state_id, self.gossip_type.into(), false))
+                Ok(i.remove_state(state_id, self.gossip_type, false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
             }
@@ -859,7 +864,7 @@ impl ShardedGossipLocal {
                 .map(update_state)
                 .unwrap_or(true)
             {
-                Ok(i.remove_state(state_id, self.gossip_type.into(), false))
+                Ok(i.remove_state(state_id, self.gossip_type, false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
             }
@@ -894,30 +899,33 @@ impl ShardedGossipLocal {
         // Record size metrics
         self.inner
             .share_mut(|i, _| {
-                i.round_map.get_mut(&cert).map(|state| match &msg {
-                    ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
-                        state.throughput.op_bloom_count.incoming += 1;
-                        state.throughput.op_bloom_bytes.incoming += missing_hashes.size() as u32;
+                if let Some(state) = i.round_map.get_mut(&cert) {
+                    match &msg {
+                        ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
+                            state.throughput.op_bloom_count.incoming += 1;
+                            state.throughput.op_bloom_bytes.incoming +=
+                                missing_hashes.size() as u32;
+                        }
+                        ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
+                            state.throughput.region_bytes.incoming +=
+                                region_set.regions().map(|r| r.data.size).sum::<u32>();
+                        }
+                        ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
+                            state.throughput.op_count.incoming += ops.len() as u32;
+                            state.throughput.op_bytes.incoming +=
+                                ops.iter().map(|op| op.size() as u32).sum::<u32>();
+                        }
+                        ShardedGossipWire::Initiate(_) => {}
+                        ShardedGossipWire::Accept(_) => {}
+                        ShardedGossipWire::Agents(_) => {}
+                        ShardedGossipWire::MissingAgents(_) => {}
+                        ShardedGossipWire::OpBatchReceived(_) => {}
+                        ShardedGossipWire::Error(_) => {}
+                        ShardedGossipWire::Busy(_) => {}
+                        ShardedGossipWire::NoAgents(_) => {}
+                        ShardedGossipWire::AlreadyInProgress(_) => {}
                     }
-                    ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
-                        state.throughput.region_bytes.incoming +=
-                            region_set.regions().map(|r| r.data.size).sum::<u32>();
-                    }
-                    ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
-                        state.throughput.op_count.incoming += ops.len() as u32;
-                        state.throughput.op_bytes.incoming +=
-                            ops.iter().map(|op| op.size() as u32).sum::<u32>();
-                    }
-                    ShardedGossipWire::Initiate(_) => {}
-                    ShardedGossipWire::Accept(_) => {}
-                    ShardedGossipWire::Agents(_) => {}
-                    ShardedGossipWire::MissingAgents(_) => {}
-                    ShardedGossipWire::OpBatchReceived(_) => {}
-                    ShardedGossipWire::Error(_) => {}
-                    ShardedGossipWire::Busy(_) => {}
-                    ShardedGossipWire::NoAgents(_) => {}
-                    ShardedGossipWire::AlreadyInProgress(_) => {}
-                });
+                }
                 Ok(())
             })
             .ok();
@@ -1489,6 +1497,7 @@ impl TryFrom<u8> for MissingOpsStatus {
 }
 
 /// Data and handlers for diagnostic info, to be used by the host.
+#[derive(Clone, Debug)]
 pub struct GossipDiagnostics {
     /// Access to metrics info
     pub metrics: MetricsSync,

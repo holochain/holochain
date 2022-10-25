@@ -1,8 +1,10 @@
 use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
+use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
+
 /// A collection of SweetConductors, with methods for operating on the entire collection
 #[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
 pub struct SweetConductorBatch(Vec<SweetConductor>);
@@ -120,13 +122,12 @@ impl SweetConductorBatch {
 
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
-        let mut all = Vec::new();
-        for c in self.0.iter() {
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(env.clone());
-            }
-        }
-        crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+        SweetConductor::exchange_peer_info(&self.0).await
+    }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn exchange_peer_info_sampled(&self, rng: &mut StdRng, s: usize) {
+        SweetConductor::exchange_peer_info_sampled(&self.0, rng, s).await
     }
 
     /// Let a conductor know about all agents on some other conductor.
