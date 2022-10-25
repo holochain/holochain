@@ -3,7 +3,7 @@ use crate::ZomeName;
 use std::time::Duration;
 
 /// Tick the scheduler every this many millis.
-pub const SCHEDULER_INTERVAL: Duration = Duration::from_millis(10000);
+pub const SCHEDULER_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Expire persisted schedules after this long.
 pub const PERSISTED_TIMEOUT: Duration = Duration::from_millis(20000);

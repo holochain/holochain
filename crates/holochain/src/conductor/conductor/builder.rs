@@ -195,11 +195,12 @@ impl ConductorBuilder {
         p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
     ) -> ConductorResult<ConductorHandle> {
-        tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
-
-        let _ = handle
+        handle
             .clone()
-            .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL);
+            .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)
+            .await;
+
+        tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
         Self::spawn_post_commit(handle.clone(), post_commit_receiver);
 
