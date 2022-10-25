@@ -44,7 +44,7 @@ pub use bandwidth::BandwidthThrottles;
 /// on every iteration. We should add a longer interval for refreshing this
 /// list (perhaps once per second), and use a cached value for other iterations,
 /// so as not to do hundreds of DB queries per second.
-const GOSSIP_LOOP_INTERVAL_MS: Duration = Duration::from_millis(10);
+const GOSSIP_LOOP_INTERVAL: Duration = Duration::from_millis(10);
 
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
@@ -204,17 +204,41 @@ impl ShardedGossip {
 
             async move {
                 let mut stats = Stats::reset();
+                let mut last_progress_report = Instant::now() - Duration::from_secs(10);
+                println!("PROGRESS REPORTS ENABLED.");
                 while !this
                     .gossip
                     .closing
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
-                    tokio::time::sleep(GOSSIP_LOOP_INTERVAL_MS).await;
+                    tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
                     this.run_one_iteration().await;
                     this.stats(&mut stats);
-                    // this.gossip.inner.share_ref(|state| {
-                    //     state.metrics.read().incoming_gossip_progress()
-                    // })
+                    this.gossip
+                        .inner
+                        .share_ref(|state| {
+                            if let Some((actual, expected)) =
+                                state.metrics.read().incoming_gossip_progress()
+                            {
+                                if expected > 0 {
+                                    let percent = (actual as f64 / expected as f64) * 100.0;
+
+                                    // once per second
+                                    if last_progress_report.elapsed() > Duration::from_secs(1) {
+                                        println!(
+                                            "PROGRESS: {:?}\t {} / {} ({}%)",
+                                            this.ep_hnd.uniq(),
+                                            actual,
+                                            expected,
+                                            percent
+                                        );
+                                        last_progress_report = Instant::now();
+                                    }
+                                }
+                            }
+                            Ok(())
+                        })
+                        .ok();
                 }
                 KitsuneResult::Ok(())
             }
