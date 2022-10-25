@@ -221,6 +221,8 @@ pub struct Conductor {
     holochain_p2p: holochain_p2p::HolochainP2pRef,
 
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
+
+    scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl Conductor {
@@ -252,6 +254,7 @@ mod startup_shutdown_impls {
                 app_interfaces: RwShare::new(HashMap::new()),
                 task_manager: RwShare::new(None),
                 admin_websocket_ports: RwShare::new(Vec::new()),
+                scheduler: Arc::new(parking_lot::Mutex::new(None)),
                 ribosome_store,
                 keystore,
                 holochain_p2p,
@@ -1711,6 +1714,14 @@ mod scheduler_impls {
     use super::*;
 
     impl Conductor {
+        pub(super) fn set_scheduler(&self, join_handle: tokio::task::JoinHandle<()>) {
+            let mut scheduler = self.scheduler.lock();
+            if let Some(existing_join_handle) = &*scheduler {
+                existing_join_handle.abort();
+            }
+            *scheduler = Some(join_handle);
+        }
+
         /// Start the scheduler. None is not an option.
         /// Calling this will:
         /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
@@ -1733,17 +1744,20 @@ mod scheduler_impls {
             futures::future::join_all(tasks).await;
 
             let scheduler_handle = self.clone();
-            tokio::task::spawn(async move {
+            self.set_scheduler(tokio::task::spawn(async move {
                 let mut interval = tokio::time::interval(interval_period);
                 loop {
                     interval.tick().await;
-                    scheduler_handle.clone().dispatch_scheduled_fns().await;
+                    scheduler_handle
+                        .clone()
+                        .dispatch_scheduled_fns(Timestamp::now())
+                        .await;
                 }
-            });
+            }));
         }
 
         /// The scheduler wants to dispatch any functions that are due.
-        pub(crate) async fn dispatch_scheduled_fns(self: Arc<Self>) {
+        pub(crate) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
             let cell_arcs = {
                 let mut cell_arcs = vec![];
                 for cell_id in self.running_cell_ids() {
@@ -1756,7 +1770,7 @@ mod scheduler_impls {
 
             let tasks = cell_arcs
                 .into_iter()
-                .map(|cell_arc| cell_arc.dispatch_scheduled_fns());
+                .map(|cell_arc| cell_arc.dispatch_scheduled_fns(now));
             futures::future::join_all(tasks).await;
         }
     }
