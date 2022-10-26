@@ -406,7 +406,7 @@ jobs:
           required: true
 
       - name: Restore cargo related state and build files
-        uses: steveeJ-forks/actions-cache/restore@main
+        uses: steveeJ-forks/actions-cache/restore@retry
         if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
         with:
           path: |
@@ -538,7 +538,7 @@ jobs:
               --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
 
       - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@main
+        uses: steveeJ-forks/actions-cache/restore@retry
         with:
           path: |
             /var/tmp/holochain_release.sh
@@ -556,7 +556,7 @@ jobs:
           cp -v $HOME/work/holochain/holochain/.git/config .git/config
 
       - name: Restore cargo related state and build files
-        uses: steveeJ-forks/actions-cache/restore@main
+        uses: steveeJ-forks/actions-cache/restore@retry
         with:
           path: |
             /var/tmp/holochain_repo/.cargo/bin/
