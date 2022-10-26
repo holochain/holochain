@@ -54,6 +54,40 @@ pub struct DnaModifiers {
     pub quantum_time: Duration,
 }
 
+/// TODO: REMOVE
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
+pub struct DnaModifiersCompat {
+    /// The network seed of a DNA is included in the computation of the DNA hash.
+    /// The DNA hash in turn determines the network peers and the DHT, meaning
+    /// that only peers with the same DNA hash of a shared DNA participate in the
+    /// same network and co-create the DHT. To create a separate DHT for the DNA,
+    /// a unique network seed can be specified.
+    // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
+    pub network_seed: NetworkSeed,
+
+    /// Any arbitrary application properties can be included in this object.
+    #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
+    pub properties: SerializedBytes,
+
+    /// The time used to denote the origin of the network, used to calculate
+    /// time windows during gossip.
+    /// All Action timestamps must come after this time.
+    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
+    pub origin_time: Timestamp,
+}
+
+impl From<DnaModifiers> for DnaModifiersCompat {
+    fn from(m: DnaModifiers) -> Self {
+        Self {
+            network_seed: m.network_seed,
+            properties: m.properties,
+            origin_time: m.origin_time,
+        }
+    }
+}
+
 const fn standard_quantum_time() -> Duration {
     kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME
 }
@@ -190,7 +224,7 @@ pub struct DnaDef {
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     name: &'a String,
-    modifiers: &'a DnaModifiers,
+    phenotype: &'a DnaModifiersCompat,
     integrity_zomes: &'a IntegrityZomes,
 }
 
@@ -363,7 +397,7 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             name: &self.name,
-            modifiers: &self.modifiers,
+            phenotype: &self.modifiers.clone().into(),
             integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(
