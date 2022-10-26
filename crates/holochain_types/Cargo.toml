@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.0.63-dev.0"
+version = "0.0.63"
 description = "Holochain common types"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -25,12 +25,12 @@ fixt = { path = "../fixt", version = "0.0.14"}
 flate2 = "1.0.14"
 futures = "0.3"
 holo_hash = { version = "0.0.34", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "0.0.61-dev.0", path = "../holochain_keystore" }
+holochain_keystore = { version = "0.0.61", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.60-dev.0"}
-holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.52-dev.0", features = ["full"] }
+holochain_sqlite = { path = "../holochain_sqlite", version = "0.0.60"}
+holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.52", features = ["full"] }
 itertools = { version = "0.10" }
-kitsune_p2p_dht = { version = "0.0.9-dev.0", path = "../kitsune_p2p/dht" }
+kitsune_p2p_dht = { version = "0.0.9", path = "../kitsune_p2p/dht" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
 mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "0.0.17"}

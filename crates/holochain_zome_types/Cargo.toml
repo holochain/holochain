@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.52-dev.0"
+version = "0.0.52"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,7 +13,7 @@ edition = "2021"
 
 [dependencies]
 kitsune_p2p_timestamp = { version = "0.0.14", path = "../kitsune_p2p/timestamp" }
-holochain_integrity_types = { version = "0.0.22-dev.0", path = "../holochain_integrity_types", features = ["tracing"] }
+holochain_integrity_types = { version = "0.0.22", path = "../holochain_integrity_types", features = ["tracing"] }
 holo_hash = { version = "0.0.34", path = "../holo_hash" }
 holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
@@ -36,7 +36,7 @@ num_enum = { version = "0.5", optional = true }
 
 # full-dna-def dependencies
 derive_builder = { version = "0.9", optional = true }
-kitsune_p2p_dht = { version = "0.0.9-dev.0", path = "../kitsune_p2p/dht", optional = true }
+kitsune_p2p_dht = { version = "0.0.9", path = "../kitsune_p2p/dht", optional = true }
 nanoid = { version = "0.3", optional = true }
 shrinkwraprs = { version = "0.3", optional = true }
 
