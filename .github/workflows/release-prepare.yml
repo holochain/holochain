@@ -92,7 +92,7 @@ jobs:
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
       - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@main
+        uses: steveeJ-forks/actions-cache/restore@retry
         with:
           path: |
             /var/tmp/holochain_release.sh
@@ -107,7 +107,7 @@ jobs:
 
       - name: Restore holochain cargo related state and build files
         if: ${{ inputs.skip_prepare_logic != 'true' }}
-        uses: steveeJ-forks/actions-cache/restore@main
+        uses: steveeJ-forks/actions-cache/restore@retry
         id: restore-build-files
         with:
           path: |
