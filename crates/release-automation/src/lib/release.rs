@@ -243,7 +243,7 @@ fn bump_release_versions<'a>(
 
         let greater_release = release_version > current_version;
         if greater_release {
-            common::set_version(cmd_args.dry_run, crt, &release_version.clone())?;
+            crt.set_version(cmd_args.dry_run, &release_version.clone())?;
         }
 
         let crate_release_heading_name = format!("{}", release_version);
