@@ -11,7 +11,7 @@ use structopt::StructOpt;
 use crate::{
     common::{increment_semver, SemverIncrementMode},
     crate_selection::Crate,
-    release::{crates_index_helper, ReleaseWorkspace},
+    release::ReleaseWorkspace,
     CommandResult, Fallible,
 };
 
@@ -538,7 +538,7 @@ pub(crate) fn fixup_unpublished_releases<'a>(
                 .collect::<Vec<_>>();
 
             for crt in crates {
-                if !crate::release::crates_index_helper::is_version_published(crt, false)? {
+                if !crates_index_helper::is_version_published(&crt.name(), &crt.version(), false)? {
                     unpublished_crates
                         .entry(release_title.clone())
                         .or_default()
@@ -609,7 +609,7 @@ pub(crate) fn ensure_crate_io_owners<'a>(
         .collect::<HashSet<String>>();
 
     for crt in crates {
-        if !crates_index_helper::is_version_published(crt, false)? {
+        if !crates_index_helper::is_version_published(&crt.name(), &crt.version(), false)? {
             warn!("{} is not published, skipping..", crt.name());
             continue;
         }
