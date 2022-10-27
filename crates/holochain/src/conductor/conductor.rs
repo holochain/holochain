@@ -1798,6 +1798,13 @@ mod misc_impls {
                 signing_key,
             } = payload;
 
+            if agent_pub_key != *cell_id.agent_pubkey() {
+                return Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(
+                    cell_id.clone(),
+                    agent_pub_key.clone(),
+                ));
+            }
+
             let source_chain_workspace = SourceChainWorkspace::init_as_root(
                 self.get_authored_db(cell_id.dna_hash())?,
                 self.get_dht_db(cell_id.dna_hash())?,
