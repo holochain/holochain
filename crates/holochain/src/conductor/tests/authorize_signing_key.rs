@@ -1,9 +1,13 @@
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{AppRoleId, CapSecret, CapSecretBytes, CAP_SECRET_BYTES};
+use holochain_zome_types::{
+    AppRoleId, AuthorizeZomeCallSigningKeyPayload, CapSecret, CapSecretBytes, CAP_SECRET_BYTES,
+};
+use matches::assert_matches;
 use rand::RngCore;
 use std::collections::BTreeSet;
 
+use crate::conductor::api::error::ConductorApiError;
 use crate::fixt::AgentPubKeyFixturator;
 use crate::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
 use ::fixt::fixt;
@@ -38,16 +42,32 @@ async fn authorize_signing_key() {
     let granted_function = ("zome".into(), "create".into());
     functions.insert(granted_function.clone());
 
+    // request authorization of signing key for another agent's cell should fail
+    let another_agent_key = fixt!(AgentPubKey);
+    let authorization_result = conductor
+        .authorize_zome_call_signing_key(AuthorizeZomeCallSigningKeyPayload {
+            agent_pub_key: another_agent_key.clone(),
+            cell_id: cell_id.clone(),
+            functions: functions.clone(),
+            signing_key: signing_key.clone(),
+            cap_secret: cap_secret.clone(),
+        })
+        .await;
+    assert!(authorization_result.is_err());
+    assert_matches!(
+        authorization_result,
+        Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(c_id, pub_key)) if c_id == *cell_id && pub_key == another_agent_key
+    );
+
+    // request authorization of signing key for agent's own cell should succeed
     conductor
-        .authorize_zome_call_signing_key(
-            holochain_types::prelude::AuthorizeZomeCallSigningKeyPayload {
-                agent_pub_key: agent_pub_key.clone(),
-                cell_id: cell_id.clone(),
-                functions,
-                signing_key: signing_key.clone(),
-                cap_secret: cap_secret.clone(),
-            },
-        )
+        .authorize_zome_call_signing_key(AuthorizeZomeCallSigningKeyPayload {
+            agent_pub_key: agent_pub_key.clone(),
+            cell_id: cell_id.clone(),
+            functions,
+            signing_key: signing_key.clone(),
+            cap_secret: cap_secret.clone(),
+        })
         .await
         .unwrap();
 
