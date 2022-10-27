@@ -1764,9 +1764,71 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
+    use holochain_zome_types::builder;
+    use std::collections::BTreeSet;
+
+    use crate::conductor::api::error::ConductorApiError;
+
     use super::*;
 
     impl Conductor {
+        /// Authorize a zome call signing key for a cell
+        pub async fn authorize_zome_call_signing_key(
+            &self,
+            payload: AuthorizeZomeCallSigningKeyPayload,
+        ) -> ConductorApiResult<()> {
+            let AuthorizeZomeCallSigningKeyPayload {
+                agent_pub_key,
+                cap_secret,
+                cell_id,
+                functions,
+                signing_key,
+            } = payload;
+
+            let source_chain_workspace = SourceChainWorkspace::init_as_root(
+                self.get_authored_db(cell_id.dna_hash())?,
+                self.get_dht_db(cell_id.dna_hash())?,
+                self.get_dht_db_cache(cell_id.dna_hash())?,
+                self.get_cache_db(&cell_id)?,
+                self.keystore.clone(),
+                agent_pub_key.clone(),
+                Arc::new(
+                    self.get_dna_def(cell_id.dna_hash())
+                        .ok_or_else(|| ConductorApiError::DnaMissing(cell_id.dna_hash().clone()))?,
+                ),
+            )
+            .await?;
+
+            let mut assignees = BTreeSet::new();
+            assignees.insert(signing_key);
+            let cap_grant = Entry::CapGrant(ZomeCallCapGrant {
+                tag: SIGNING_KEY_TAG.to_string(),
+                access: CapAccess::Assigned {
+                    secret: cap_secret,
+                    assignees,
+                },
+                functions,
+            });
+            let entry_hash = EntryHash::with_data_sync(&cap_grant);
+            let action_builder = builder::Create {
+                entry_type: EntryType::CapGrant,
+                entry_hash,
+            };
+
+            source_chain_workspace
+                .source_chain()
+                .put_weightless(action_builder, Some(cap_grant), ChainTopOrdering::default())
+                .await?;
+
+            let cell = self.cell_by_id(&cell_id)?;
+            source_chain_workspace
+                .source_chain()
+                .flush(cell.holochain_p2p_dna())
+                .await?;
+
+            Ok(())
+        }
+
         /// Create a JSON dump of the cell's state
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             let cell = self.cell_by_id(cell_id)?;
