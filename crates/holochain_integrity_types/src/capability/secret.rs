@@ -15,7 +15,7 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 ///
 /// @todo enforce that secrets are unique across all grants in a chain.
 #[derive(Clone, Copy, SerializedBytes)]
-pub struct CapSecret(pub CapSecretBytes);
+pub struct CapSecret(CapSecretBytes);
 
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for CapSecret {

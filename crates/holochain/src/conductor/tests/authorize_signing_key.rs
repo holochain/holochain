@@ -1,18 +1,17 @@
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{
-    AppRoleId, AuthorizeZomeCallSigningKeyPayload, CapSecret, CapSecretBytes, CAP_SECRET_BYTES,
-};
+use holochain_zome_types::{AppRoleId, AuthorizeZomeCallSigningKeyPayload, CapSecret};
 use matches::assert_matches;
-use rand::RngCore;
 use std::collections::BTreeSet;
 
 use crate::conductor::api::error::ConductorApiError;
 use crate::fixt::AgentPubKeyFixturator;
 use crate::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
 use ::fixt::fixt;
+use arbitrary::Arbitrary;
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "test_utils")]
 async fn authorize_signing_key() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_id: AppRoleId = "dna".to_string();
@@ -32,10 +31,8 @@ async fn authorize_signing_key() {
     let signing_key = fixt!(AgentPubKey);
 
     // compute a cap secret
-    let mut buf: CapSecretBytes = [0; CAP_SECRET_BYTES];
-    let mut rng = rand::thread_rng();
-    rng.fill_bytes(&mut buf);
-    let cap_secret = CapSecret(buf);
+    let mut buf = arbitrary::Unstructured::new(&[]);
+    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
 
     // set up functions to grant access to
     let mut functions = BTreeSet::new();
@@ -56,7 +53,7 @@ async fn authorize_signing_key() {
     assert!(authorization_result.is_err());
     assert_matches!(
         authorization_result,
-        Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(c_id, pub_key)) if c_id == *cell_id && pub_key == another_agent_key
+        Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(c_id, key)) if c_id == *cell_id && key == another_agent_key
     );
 
     // request authorization of signing key for agent's own cell should succeed
