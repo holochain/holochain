@@ -78,6 +78,9 @@ impl From<ZomeCallCapGrant> for CapGrant {
     }
 }
 
+/// Tag for an agent's signing key cap grant
+pub const SIGNING_KEY_TAG: &str = "signing_key";
+
 impl CapGrant {
     /// Given a grant, is it valid in isolation?
     /// In a world of CRUD, some new entry might update or delete an existing one, but we can check
