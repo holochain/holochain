@@ -177,7 +177,7 @@ jobs:
 
   test:
     needs: [vars, prepare]
-    if: ${{ needs.vars.outputs.skip_test != 'true' }}
+    if: ${{ github.event_name != 'pull_request' && needs.vars.outputs.skip_test != 'true' }}
     env:
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
       HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
