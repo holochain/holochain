@@ -27,4 +27,23 @@
 mod grant;
 pub use grant::*;
 
+use holo_hash::{AgentPubKey, ZomeCallSigningKey};
 pub use holochain_integrity_types::capability::*;
+use serde::{Deserialize, Serialize};
+
+use crate::CellId;
+
+/// Parameters for authorizing a zome call signing key.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AuthorizeZomeCallSigningKeyPayload {
+    /// Agent for whom to authorize the signing key.
+    pub agent_pub_key: AgentPubKey,
+    /// Cell for which to authorize the signing key.
+    pub cell_id: CellId,
+    /// Zomes and functions for which to authorize the signing key.
+    pub functions: GrantedFunctions,
+    /// The public key of the signing key pair.
+    pub signing_key: ZomeCallSigningKey,
+    /// The cap secret for the cap grant.
+    pub cap_secret: CapSecret,
+}
