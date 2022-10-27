@@ -8,11 +8,7 @@ async fn request_dna_def() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
     conductor
-        .setup_app_for_agent(
-            "app",
-            agent_pub_key.clone(),
-            [&("dna".into(), dna.clone())],
-        )
+        .setup_app_for_agent("app", agent_pub_key.clone(), [&("dna".into(), dna.clone())])
         .await
         .unwrap();
 

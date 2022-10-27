@@ -39,9 +39,9 @@ pub enum AdminRequest {
     RegisterDna(Box<RegisterDnaPayload>),
 
     /// Request the definition of a DNA.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// [`AdminResponse::DnaDefRequested`]
     RequestDnaDef(Box<DnaHash>),
 
@@ -349,7 +349,7 @@ pub enum AdminRequest {
     },
 
     /// Request authorization of a public key for signing zome calls.
-    /// 
+    ///
     /// # Returns
     ///
     /// [`AdminResponse::ZomeCallSigningKeyAuthorized`]
