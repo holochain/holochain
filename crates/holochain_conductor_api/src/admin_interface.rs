@@ -38,6 +38,13 @@ pub enum AdminRequest {
     /// [`AdminResponse::DnaRegistered`]
     RegisterDna(Box<RegisterDnaPayload>),
 
+    /// Request the definition of a DNA.
+    /// 
+    /// # Returns
+    /// 
+    /// [`AdminResponse::DnaDefRequested`]
+    RequestDnaDef(Box<DnaHash>),
+
     /// Update coordinator zomes for an already installed DNA.
     ///
     /// Replaces any installed coordinator zomes with the same zome name.
@@ -381,6 +388,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::RegisterDna`]
     DnaRegistered(DnaHash),
+
+    /// The successful response to an [`AdminRequest::GetDnaDef`]
+    DnaDefRequested(DnaDef),
 
     /// The successful response to an [`AdminRequest::UpdateCoordinators`]
     CoordinatorsUpdated,
