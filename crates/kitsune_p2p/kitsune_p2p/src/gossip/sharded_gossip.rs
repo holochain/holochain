@@ -226,11 +226,8 @@ impl ShardedGossip {
                                     // once per second
                                     if last_progress_report.elapsed() > Duration::from_secs(1) {
                                         println!(
-                                            "PROGRESS: {:?}\t {} / {} ({}%)",
-                                            this.ep_hnd.uniq(),
-                                            actual,
-                                            expected,
-                                            percent
+                                            "PROGRESS: {} / {} ({}%)",
+                                            actual, expected, percent
                                         );
                                         last_progress_report = Instant::now();
                                     }
@@ -1033,6 +1030,9 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
+                for op in &ops {
+                    println!("OP RECEIVED: {} B, data: {:?}", op.0.len(), op.0);
+                }
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
 
