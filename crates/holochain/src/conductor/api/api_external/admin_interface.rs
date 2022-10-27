@@ -122,7 +122,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let dna_def = self
                     .conductor_handle
                     .get_dna_def(&dna_hash)
-                    .ok_or_else(|| ConductorApiError::DnaMissing(*dna_hash))?;
+                    .ok_or(ConductorApiError::DnaMissing(*dna_hash))?;
                 Ok(AdminResponse::DnaDefRequested(dna_def))
             }
             UpdateCoordinators(payload) => {
