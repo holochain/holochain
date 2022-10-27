@@ -389,7 +389,7 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::RegisterDna`]
     DnaRegistered(DnaHash),
 
-    /// The successful response to an [`AdminRequest::GetDnaDef`]
+    /// The successful response to an [`AdminRequest::RequestDnaDef`]
     DnaDefRequested(DnaDef),
 
     /// The successful response to an [`AdminRequest::UpdateCoordinators`]
