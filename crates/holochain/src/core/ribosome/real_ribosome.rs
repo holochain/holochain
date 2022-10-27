@@ -954,9 +954,8 @@ pub mod wasm_test {
     async fn ribosome_extern_test() {
         observability::test_run().ok();
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern])
-            .await
-            .unwrap();
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await;
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
@@ -979,7 +978,7 @@ pub mod wasm_test {
         assert_eq!("foobar", &bar_result);
 
         let infallible_result = conductor
-            .handle()
+            .raw_handle()
             .call_zome(ZomeCall {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),

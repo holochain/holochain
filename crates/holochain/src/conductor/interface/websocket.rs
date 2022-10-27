@@ -422,11 +422,7 @@ pub mod test {
         for _i in 0..2 as u32 {
             let zomes = vec![TestWasm::Foo.into()];
             let def = DnaDef::unique_from_zomes(zomes.clone(), Vec::new());
-            dnas.push(
-                DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo))
-                    .await
-                    .unwrap(),
-            );
+            dnas.push(DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo)).await);
         }
         let dna_map = dnas
             .iter()
@@ -622,7 +618,6 @@ pub mod test {
             zomes.into_iter().flat_map(|t| Vec::<DnaWasm>::from(t)),
         )
         .await
-        .unwrap()
     }
 
     /// Check that we can add and get agent info for a conductor

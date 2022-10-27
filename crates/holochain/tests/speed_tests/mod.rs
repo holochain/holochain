@@ -133,8 +133,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         },
         vec![TestWasm::Anchor.into()],
     )
-    .await
-    .unwrap();
+    .await;
 
     // //////////
     // END DNA

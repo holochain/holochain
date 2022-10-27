@@ -123,7 +123,7 @@ pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
     /// The middle vecs correspond to the spatial segments per arq;
     /// the innermost vecs are the time segments per arq.
     #[serde(bound(deserialize = "D: serde::de::DeserializeOwned"))]
-    pub data: Vec<Vec<Vec<D>>>,
+    data: Vec<Vec<Vec<D>>>,
 }
 
 impl<D: RegionDataConstraints> std::fmt::Debug for RegionSetLtcs<D> {
@@ -235,6 +235,11 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
                 d.filter(|d| d.count() > 0)
                     .map(|d| ((a, x, y), c, d.clone()))
             })
+    }
+
+    /// Accessor
+    pub fn data(&self) -> &[Vec<Vec<D>>] {
+        self.data.as_ref()
     }
 }
 

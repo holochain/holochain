@@ -149,6 +149,13 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<String> {
         Err("stub".into())
     }
+
+    fn handle_get_diagnostics(
+        &mut self,
+        dna_hash: DnaHash,
+    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics> {
+        Err("stub".into())
+    }
 }
 
 /// Spawn a stub network that doesn't respond to any messages.

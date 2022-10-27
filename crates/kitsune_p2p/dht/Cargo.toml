@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_dht"
-version = "0.0.8"
+version = "0.0.9"
 description = "Kitsune P2p DHT definition"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,7 +13,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-colored = { version = "2", optional = true }
+colored = { version = "1", optional = true }
 derivative = "2.2.0"
 derive_more = "0.99"
 futures = "0.3"

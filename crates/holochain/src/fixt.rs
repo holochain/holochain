@@ -59,8 +59,7 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
         let uuid = StringFixturator::new(Unpredictable).next().unwrap();
         let (dna_file, _, _) = tokio_helper::block_forever_on(async move {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
-        })
-        .unwrap();
+        });
 
         let ribosome = RealRibosome::new(dna_file).unwrap();
 

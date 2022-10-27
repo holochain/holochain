@@ -340,8 +340,7 @@ async fn check_app_entry_type_test() {
         },
         [integrity, coordinator],
     )
-    .await
-    .unwrap();
+    .await;
     let dna_hash = dna_file.dna_hash().to_owned().clone();
     let mut entry_def = fixt!(EntryDef);
     entry_def.visibility = EntryVisibility::Public;

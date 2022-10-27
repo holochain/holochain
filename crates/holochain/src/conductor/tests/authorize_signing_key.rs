@@ -10,9 +10,7 @@ use ::fixt::fixt;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn authorize_signing_key() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_id: AppRoleId = "dna".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
@@ -26,16 +24,20 @@ async fn authorize_signing_key() {
         .unwrap();
     let cell_id = app.cells()[0].cell_id();
 
+    // generate a signing key
     let signing_key = fixt!(AgentPubKey);
 
+    // compute a cap secret
     let mut buf: CapSecretBytes = [0; CAP_SECRET_BYTES];
     let mut rng = rand::thread_rng();
     rng.fill_bytes(&mut buf);
     let cap_secret = CapSecret(buf);
 
+    // set up functions to grant access to
     let mut functions = BTreeSet::new();
     let granted_function = ("zome".into(), "create".into());
     functions.insert(granted_function.clone());
+
     conductor
         .authorize_zome_call_signing_key(
             holochain_types::prelude::AuthorizeZomeCallSigningKeyPayload {
@@ -49,6 +51,7 @@ async fn authorize_signing_key() {
         .await
         .unwrap();
 
+    // create a source chain read to query for the cap grant
     let authored_db = conductor.get_authored_db(cell_id.dna_hash()).unwrap();
     let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
     let dht_db_cache = conductor.get_dht_db_cache(cell_id.dna_hash()).unwrap();
@@ -71,6 +74,7 @@ async fn authorize_signing_key() {
         )
         .await
         .unwrap();
+
     assert!(signing_key_cap_grant.is_some());
     assert!(signing_key_cap_grant.unwrap().is_valid(
         &granted_function,

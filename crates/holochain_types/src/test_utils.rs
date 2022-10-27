@@ -67,7 +67,6 @@ pub fn fake_dna_zomes_named(
         }
         DnaFile::new(dna, wasm_code).await
     })
-    .unwrap()
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it

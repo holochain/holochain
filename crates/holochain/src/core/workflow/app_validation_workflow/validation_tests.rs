@@ -174,8 +174,8 @@ impl Expected {
 /// are called for each op.
 async fn app_validation_ops() {
     observability::test_run().ok();
-    let entry_def_a = EntryDef::default_with_id("a");
-    let entry_def_b = EntryDef::default_with_id("b");
+    let entry_def_a = EntryDef::from_id("a");
+    let entry_def_b = EntryDef::from_id("b");
     let call_back_a = |_zome_name: &'static str| {
         move |api: BoxApi, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
@@ -334,9 +334,7 @@ async fn app_validation_ops() {
         "validate",
         validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
     );
-    let (dna_file_a, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
-        .await
-        .unwrap();
+    let (dna_file_a, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
 
     let zomes = InlineZomeSet::new(
         [
@@ -372,9 +370,7 @@ async fn app_validation_ops() {
         validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),
     );
 
-    let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
-        .await
-        .unwrap();
+    let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
     let app = conductors[0]
         .setup_app_for_agent(&"test_app", alice.clone(), &[dna_file_a.clone()])
         .await
@@ -391,7 +387,7 @@ async fn app_validation_ops() {
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
-    consistency_10s(&[&alice, &bob]).await;
+    consistency_10s([&alice, &bob]).await;
 
     let mut expected = Expected(HashSet::new());
 
