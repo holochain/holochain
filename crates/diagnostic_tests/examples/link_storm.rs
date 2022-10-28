@@ -42,7 +42,7 @@ fn config() -> ConductorConfig {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;
             // tp.disable_historical_gossip = true;
-            tp.danger_gossip_recent_threshold_secs = 5;
+            tp.danger_gossip_recent_threshold_secs = 0;
 
             tp.gossip_inbound_target_mbps = 1000000.0;
             tp.gossip_outbound_target_mbps = 1000000.0;
@@ -80,10 +80,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let yes_ui = std::env::var("NOUI").is_err();
     let show_ui = UI && std::env::var("RUST_LOG").is_err() && yes_ui;
 
-    let commit_task = spawn_commit_task(app.clone());
-    let get_task = spawn_get_task(app.clone());
-
-    let tasks = futures::future::join_all([commit_task, get_task]);
+    let tasks = futures::future::join_all([
+        // spawn_commit_task(app.clone()),
+        spawn_get_task(app.clone()),
+        tokio::spawn(async move {}),
+    ]);
 
     if show_ui {
         let ui_task = tokio::task::spawn_blocking(|| tui_crossterm_setup(|t| run_app(t, app)));
@@ -229,25 +230,30 @@ impl ClientState for State {
         self.link_counts.as_ref()
     }
 
-    fn node_histories_sorted<'a>(&self, metrics: &'a metrics::Metrics) -> NodeHistories<'a, usize> {
+    fn node_histories_sorted<'a>(
+        &self,
+        metrics: &'a metrics::Metrics,
+        agent: &AgentPubKey,
+    ) -> NodeHistories<'a, usize> {
         let mut histories: Vec<_> = metrics
             .peer_node_histories()
             .values()
-            .filter_map(|history| {
-                assert!(
-                    history.remote_agents.len() <= 1,
-                    "this widget cannot be used with more than 1 agent per node"
-                );
-                history.remote_agents.first().map(|agent| {
-                    (
-                        *self
-                            .agent_node_index
-                            .get(&AgentPubKey::from_kitsune(agent))
-                            .unwrap(),
-                        history,
-                    )
-                })
-            })
+            .map(|history| (*self.agent_node_index.get(agent).unwrap(), history))
+            // .filter_map(|history| {
+            //     assert!(
+            //         history.remote_agents.len() <= 1,
+            //         "this widget cannot be used with more than 1 agent per node"
+            //     );
+            //     history.remote_agents.first().map(|agent| {
+            //         (
+            //             *self
+            //                 .agent_node_index
+            //                 .get(&AgentPubKey::from_kitsune(agent))
+            //                 .unwrap(),
+            //             history,
+            //         )
+            //     })
+            // })
             .collect();
         histories.sort_unstable_by_key(|(i, _)| *i);
         histories
@@ -366,16 +372,16 @@ fn random_node(state: &mut State) -> &Node {
     &state.nodes[n]
 }
 
-// fn random_base(rng: &mut StdRng, app: &App) -> &Base {
-//     let b = rng.gen_range(0..BASES);
-//     &app.bases[b]
-// }
-
-async fn commit_random(app: &App) -> usize {
-    let (node, base_index) = app
-        .state
-        .share_mut(|state| (random_node(state).clone(), state.rng.gen_range(0..BASES)));
-    commit(app, &node, base_index).await
+async fn commit_random(app: App, node_index: Option<usize>) -> usize {
+    let (node, base_index) = app.state.share_mut(|state| {
+        let node = if let Some(i) = node_index {
+            state.nodes[i].clone()
+        } else {
+            random_node(state).clone()
+        };
+        (node, state.rng.gen_range(0..BASES))
+    });
+    commit(&app, &node, base_index).await
 }
 
 async fn commit(app: &App, node: &Node, base_index: usize) -> usize {
@@ -400,7 +406,7 @@ async fn commit(app: &App, node: &Node, base_index: usize) -> usize {
 fn spawn_commit_task(app: App) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
-            let total = commit_random(&app).await;
+            let total = commit_random(app.clone(), None).await;
             if total >= MAX_COMMITS {
                 break;
             } else {
@@ -427,6 +433,10 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: App) -> io::
             }
             Some(InputCmd::AddNode(index)) => {
                 tokio::spawn(create_new_node(app.clone(), index));
+            }
+            Some(InputCmd::AddEntry(index)) => {
+                app.state.share_ref(|state| state.nodes[index].clone());
+                tokio::spawn(commit_random(app.clone(), Some(index)));
             }
             None => (),
         };

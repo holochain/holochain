@@ -40,14 +40,11 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
 
     let node_list = top_chunks[0];
     let basis_table = top_chunks[1];
-    let mut table_extras = top_chunks[2];
+    let table_extras = top_chunks[2];
     let mut bottom = vsplit[1];
 
     bottom.y += 1;
     bottom.height -= 1;
-
-    table_extras.y += 1;
-    table_extras.height -= 1;
 
     let w = f.size().width;
     let tw = 16;
@@ -58,11 +55,15 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
         height: 1,
     };
 
+    let mut gauges_rect = table_extras.clone();
+    gauges_rect.y += 1;
+    gauges_rect.height -= 1;
+
     let gauge_heights = vec![Constraint::Length(1); n];
     let gauges = Layout::default()
         .direction(Direction::Vertical)
         .constraints(gauge_heights)
-        .split(table_extras);
+        .split(gauges_rect);
 
     UiLayout {
         node_list,

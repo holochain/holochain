@@ -111,8 +111,16 @@ fn render_gossip_metric_row<Id: Display>(
         }
     };
 
-    let number_cell = |v| {
-        let cell = Cell::from(format!("{:>6}", v));
+    let number_cell = |v: u32, expected: u32| {
+        let cell = if expected == 0 {
+            Cell::from(format!("{:>6}", v.human_count_bare()))
+        } else {
+            Cell::from(format!(
+                "{:>4} / {:>4}",
+                v.human_count_bare(),
+                expected.human_count_bare()
+            ))
+        };
         if v == 0 {
             if is_current {
                 cell.style(Style::default().bg(Color::Gray))
@@ -174,10 +182,10 @@ fn render_gossip_metric_row<Id: Display>(
 
     if let Some(tp) = throughput {
         cells.extend([
-            number_cell(tp.op_count.incoming),
-            number_cell(tp.op_count.outgoing),
-            bytes_cell(tp.op_bytes.incoming, tp.total_region_size.incoming),
-            bytes_cell(tp.op_bytes.outgoing, tp.total_region_size.outgoing),
+            number_cell(tp.op_count.incoming, tp.expected_op_count.incoming),
+            number_cell(tp.op_count.outgoing, tp.expected_op_count.outgoing),
+            bytes_cell(tp.op_bytes.incoming, tp.expected_op_bytes.incoming),
+            bytes_cell(tp.op_bytes.outgoing, tp.expected_op_bytes.outgoing),
             throughput_cell(tp.op_bytes.incoming + tp.op_bytes.outgoing, duration),
         ])
     }

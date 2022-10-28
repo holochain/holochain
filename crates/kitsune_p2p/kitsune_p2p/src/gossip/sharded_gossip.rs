@@ -205,7 +205,7 @@ impl ShardedGossip {
             async move {
                 let mut stats = Stats::reset();
                 let mut last_progress_report = Instant::now() - Duration::from_secs(10);
-                println!("PROGRESS REPORTS ENABLED.");
+                // println!("PROGRESS REPORTS ENABLED.");
                 while !this
                     .gossip
                     .closing
@@ -221,14 +221,13 @@ impl ShardedGossip {
                                 state.metrics.read().incoming_gossip_progress()
                             {
                                 if expected > 0 {
-                                    let percent = (actual as f64 / expected as f64) * 100.0;
-
                                     // once per second
                                     if last_progress_report.elapsed() > Duration::from_secs(1) {
-                                        println!(
-                                            "PROGRESS: {} / {} ({}%)",
-                                            actual, expected, percent
-                                        );
+                                        // let percent = (actual as f64 / expected as f64) * 100.0;
+                                        // println!(
+                                        //     "PROGRESS: {} / {} ({}%)",
+                                        //     actual, expected, percent
+                                        // );
                                         last_progress_report = Instant::now();
                                     }
                                 }
@@ -281,8 +280,10 @@ impl ShardedGossip {
                                 missing_hashes.size() as u32;
                         }
                         ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
-                            state.throughput.total_region_size.outgoing +=
+                            state.throughput.expected_op_bytes.outgoing +=
                                 region_set.regions().map(|r| r.data.size).sum::<u32>();
+                            state.throughput.expected_op_count.outgoing +=
+                                region_set.regions().map(|r| r.data.count).sum::<u32>();
                         }
                         ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
                             state.throughput.op_count.outgoing += ops.len() as u32;
@@ -750,7 +751,9 @@ pub struct RoundThroughput {
     /// Total number of bytes sent for bloom filters
     pub op_bloom_bytes: InOut,
     /// Total number of bytes expected to be sent for region data (historical only)
-    pub total_region_size: InOut,
+    pub expected_op_bytes: InOut,
+    /// Total number of ops expected to be sent for region data (historical only)
+    pub expected_op_count: InOut,
     /// Total number of ops sent
     pub op_count: InOut,
     /// Total number of bytes sent for op data
@@ -931,8 +934,10 @@ impl ShardedGossipLocal {
                                 missing_hashes.size() as u32;
                         }
                         ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
-                            state.throughput.total_region_size.incoming +=
+                            state.throughput.expected_op_bytes.incoming +=
                                 region_set.regions().map(|r| r.data.size).sum::<u32>();
+                            state.throughput.expected_op_count.incoming +=
+                                region_set.regions().map(|r| r.data.count).sum::<u32>();
                         }
                         ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
                             state.throughput.op_count.incoming += ops.len() as u32;
@@ -1030,9 +1035,9 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
-                for op in &ops {
-                    println!("OP RECEIVED: {} B, data: {:?}", op.0.len(), op.0);
-                }
+                // for op in &ops {
+                //     println!("OP RECEIVED: {} B, data: {:?}", op.0.len(), op.0);
+                // }
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
 

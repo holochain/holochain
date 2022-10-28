@@ -72,7 +72,11 @@ pub trait ClientState {
 
     fn total_commits(&self) -> usize;
     fn link_counts(&self) -> LinkCountsRef;
-    fn node_histories_sorted<'a>(&self, metrics: &'a Metrics) -> NodeHistories<'a, usize>;
+    fn node_histories_sorted<'a>(
+        &self,
+        metrics: &'a Metrics,
+        agent: &AgentPubKey,
+    ) -> NodeHistories<'a, usize>;
 }
 
 /// State specific to the UI
@@ -115,6 +119,7 @@ pub enum InputCmd {
     ClearBuffer,
     ExchangePeers,
     AddNode(usize),
+    AddEntry(usize),
 }
 
 impl GossipDashboard {
@@ -144,6 +149,9 @@ impl GossipDashboard {
                     KeyCode::Char('n') => {
                         return Some(InputCmd::AddNode(0));
                     }
+                    KeyCode::Char('e') => {
+                        return Some(InputCmd::AddEntry(0));
+                    }
                     KeyCode::Up | KeyCode::Char('k') => self.local_state.share_mut(|s| {
                         s.node_selector(-1, state.share_ref(|state| state.nodes().len()))
                     }),
@@ -171,13 +179,18 @@ impl GossipDashboard {
             let metrics: Vec<_> = state
                 .nodes()
                 .iter()
-                .map(|n| n.diagnostics.metrics.read())
+                .map(|n| {
+                    (
+                        n.diagnostics.metrics.read(),
+                        n.zome.cell_id().agent_pubkey().clone(),
+                    )
+                })
                 .collect();
             let activity = metrics
                 .iter()
-                .map(|m| {
+                .map(|(metrics, agent)| {
                     state
-                        .node_histories_sorted(m)
+                        .node_histories_sorted(metrics, agent)
                         .iter()
                         .any(|i| i.1.current_round.is_some())
                 })
@@ -205,15 +218,17 @@ impl GossipDashboard {
             }
             let gauges: Vec<_> = metrics
                 .iter()
-                .map(|m| ui_gossip_progress_gauge(m.incoming_gossip_progress()))
+                .map(|(m, _)| ui_gossip_progress_gauge(m.incoming_gossip_progress()))
                 .collect();
 
             (selected, local.filter_zero_rounds, local.done_time, gauges)
         });
         if let Some(selected) = selected {
             // node.conductor.get_agent_infos(Some(node.zome.cell_id().clone()))
-            let metrics = &state.nodes()[selected].diagnostics.metrics.read();
-            let infos = state.node_histories_sorted(metrics);
+            let node = &state.nodes()[selected];
+            let agent = node.agent();
+            let metrics = &node.diagnostics.metrics.read();
+            let infos = state.node_histories_sorted(metrics, &agent);
             for (i, gauge) in gauges.into_iter().enumerate() {
                 f.render_widget(gauge, layout.gauges[i]);
             }

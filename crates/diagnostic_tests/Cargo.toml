@@ -3,11 +3,6 @@ name = "diagnostic_tests"
 version = "0.1.0"
 edition = "2021"
 
-[workspace]
-
-[profile.release]
-debug = true
-
 [dependencies]
 chashmap = "2.2"
 colored = "2"

@@ -675,7 +675,7 @@ impl Metrics {
         for h in self.node_history.values() {
             if let Some(r) = &h.current_round {
                 actual += r.throughput.op_bytes.incoming;
-                expected += r.throughput.total_region_size.incoming;
+                expected += r.throughput.expected_op_bytes.incoming;
             }
         }
 

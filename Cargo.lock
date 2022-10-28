@@ -708,6 +708,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "colored"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
+dependencies = [
+ "atty",
+ "lazy_static",
+ "winapi",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "1.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1214,6 +1225,21 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn",
+]
+
+[[package]]
+name = "diagnostic_tests"
+version = "0.1.0"
+dependencies = [
+ "chashmap",
+ "colored 2.0.0",
+ "crossterm 0.25.0",
+ "futures",
+ "holochain_diagnostics",
+ "observability",
+ "tokio",
+ "tokio-stream",
+ "tui",
 ]
 
 [[package]]
@@ -2229,7 +2255,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "arbitrary",
- "crossterm 0.19.0",
+ "crossterm 0.25.0",
  "holochain",
  "human-repr",
  "rand 0.8.5",
@@ -2481,7 +2507,7 @@ dependencies = [
  "nanoid 0.3.0",
  "observability",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3010,7 +3036,7 @@ dependencies = [
 name = "kitsune_p2p_dht"
 version = "0.0.9"
 dependencies = [
- "colored",
+ "colored 1.9.3",
  "derivative",
  "derive_more",
  "futures",
