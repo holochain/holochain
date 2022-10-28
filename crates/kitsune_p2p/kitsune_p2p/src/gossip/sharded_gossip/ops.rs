@@ -99,13 +99,33 @@ impl ShardedGossipLocal {
 
     pub(super) async fn queue_incoming_regions(
         &self,
+        cert: &Tx2Cert,
         state: RoundState,
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
             // because of the order of arguments, the diff regions will contain the data
             // from *our* side, not our partner's.
-            let diff_regions = sent.diff(region_set.clone()).map_err(KitsuneError::other)?;
+            let our_region_diff = sent
+                .clone()
+                .diff(region_set.clone())
+                .map_err(KitsuneError::other)?;
+            let their_region_diff = region_set.clone().diff(sent).map_err(KitsuneError::other)?;
+
+            self.inner.share_mut(|i, _| {
+                if let Some(state) = i.round_map.get_mut(cert) {
+                    state.throughput.expected_op_bytes.outgoing +=
+                        our_region_diff.iter().map(|r| r.data.size).sum::<u32>();
+                    state.throughput.expected_op_count.outgoing +=
+                        our_region_diff.iter().map(|r| r.data.count).sum::<u32>();
+                    state.throughput.expected_op_bytes.incoming +=
+                        their_region_diff.iter().map(|r| r.data.size).sum::<u32>();
+                    state.throughput.expected_op_count.incoming +=
+                        their_region_diff.iter().map(|r| r.data.count).sum::<u32>();
+                    state.region_diffs = Some((our_region_diff.clone(), their_region_diff));
+                }
+                Ok(())
+            })?;
 
             // This is a good place to see all the region data go by.
             // Note, this is a LOT of output!
@@ -120,7 +140,7 @@ impl ShardedGossipLocal {
                 .query_size_limited_regions(
                     self.space.clone(),
                     self.tuning_params.gossip_max_batch_size,
-                    diff_regions,
+                    our_region_diff,
                 )
                 .await
                 .map_err(KitsuneError::other)?;

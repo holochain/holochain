@@ -3,6 +3,7 @@ use holochain::prelude::metrics::PeerAgentHistory;
 use super::*;
 
 pub mod gossip_agent_history;
+pub mod gossip_round_detail;
 pub mod gossip_round_table;
 
 pub fn ui_node_list(nodes: impl Iterator<Item = (usize, bool)>) -> List<'static> {

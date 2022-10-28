@@ -14,7 +14,7 @@ use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::dht::region::RegionData;
+use kitsune_p2p_types::dht::region::{Region, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
@@ -279,12 +279,7 @@ impl ShardedGossip {
                             state.throughput.op_bloom_bytes.outgoing +=
                                 missing_hashes.size() as u32;
                         }
-                        ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
-                            state.throughput.expected_op_bytes.outgoing +=
-                                region_set.regions().map(|r| r.data.size).sum::<u32>();
-                            state.throughput.expected_op_count.outgoing +=
-                                region_set.regions().map(|r| r.data.count).sum::<u32>();
-                        }
+                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => {}
                         ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
                             state.throughput.op_count.outgoing += ops.len() as u32;
                             state.throughput.op_bytes.outgoing +=
@@ -306,6 +301,7 @@ impl ShardedGossip {
                         self.gossip.gossip_type.into(),
                         &state,
                     );
+                    // println!("throughput OUT {:?}", state.throughput);
                 }
                 Ok(())
             })
@@ -715,7 +711,12 @@ pub struct RoundState {
     start_time: Instant,
     /// Stats about ops, regions, bloom filter, and bytes sent and received,
     pub(crate) throughput: RoundThroughput,
+    /// Region diffs, if doing Historical gossip
+    pub(crate) region_diffs: RegionDiffs,
 }
+
+/// Our region diff and their region diff
+pub type RegionDiffs = Option<(Vec<Region>, Vec<Region>)>;
 
 impl RoundState {
     /// Constructor
@@ -738,6 +739,7 @@ impl RoundState {
             round_timeout,
             region_set_sent,
             throughput: Default::default(),
+            region_diffs: Default::default(),
         }
     }
 }
@@ -933,12 +935,7 @@ impl ShardedGossipLocal {
                             state.throughput.op_bloom_bytes.incoming +=
                                 missing_hashes.size() as u32;
                         }
-                        ShardedGossipWire::OpRegions(OpRegions { region_set, .. }) => {
-                            state.throughput.expected_op_bytes.incoming +=
-                                region_set.regions().map(|r| r.data.size).sum::<u32>();
-                            state.throughput.expected_op_count.incoming +=
-                                region_set.regions().map(|r| r.data.count).sum::<u32>();
-                        }
+                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => {}
                         ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
                             state.throughput.op_count.incoming += ops.len() as u32;
                             state.throughput.op_bytes.incoming +=
@@ -961,6 +958,7 @@ impl ShardedGossipLocal {
                         self.gossip_type.into(),
                         &state,
                     );
+                    // println!("throughput IN {:?}", state.throughput);
                 }
                 Ok(())
             })
@@ -1029,7 +1027,8 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
                 if let Some(state) = self.incoming_op_blooms_finished(&cert)? {
-                    self.queue_incoming_regions(state, region_set).await?
+                    self.queue_incoming_regions(&cert, state, region_set)
+                        .await?
                 } else {
                     vec![]
                 }

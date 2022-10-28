@@ -29,7 +29,7 @@ use std::ops::{AddAssign, Sub};
 pub const REGION_MASS: u32 = std::mem::size_of::<Region<RegionData>>() as u32;
 
 /// The coordinates defining the Region, along with the calculated [`RegionData`]
-#[derive(Debug, Clone, derive_more::Constructor)]
+#[derive(Debug, Clone, PartialEq, Eq, derive_more::Constructor)]
 pub struct Region<D: RegionDataConstraints = RegionData> {
     /// The coords
     pub coords: RegionCoords,

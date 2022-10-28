@@ -1,5 +1,7 @@
 use super::*;
 
+pub const STANDARD_QUANTUM_TIME: Duration = Duration::from_secs(60 * 5);
+
 /// Topology defines the structure of spacetime, in particular how space and
 /// time are quantized.
 ///
@@ -162,7 +164,7 @@ impl Dimension {
         Dimension {
             // 5 minutes in microseconds = 1mil * 60 * 5 = 300,000,000
             // log2 of this is 28.16, FYI
-            quantum: 1_000_000 * 60 * 5,
+            quantum: STANDARD_QUANTUM_TIME.as_micros() as u32,
             quantum_power: 29,
 
             // 12 quanta = 1 hour.

@@ -151,7 +151,7 @@ async fn partial_missing_doesnt_finish() {
                     bloom_batch_cursor:None,
                     ops_batch_queue:OpsBatchQueue::new(),
                     region_set_sent:None,
-                    throughput: Default::default(),
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -203,7 +203,7 @@ async fn missing_ops_finishes() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default(),
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -256,7 +256,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default(),
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -309,7 +309,7 @@ async fn bloom_response_finishes() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default(),
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -362,7 +362,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default(),
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -418,7 +418,7 @@ async fn no_data_still_finishes() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default(),
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -445,7 +445,7 @@ async fn no_data_still_finishes() {
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default(),
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
