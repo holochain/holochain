@@ -1790,15 +1790,15 @@ mod misc_impls {
             payload: AuthorizeZomeCallSigningKeyPayload,
         ) -> ConductorApiResult<()> {
             let AuthorizeZomeCallSigningKeyPayload {
-                provenance: agent_pub_key,
+                provenance,
                 cell_id,
                 cap_grant,
             } = payload;
 
-            if agent_pub_key != *cell_id.agent_pubkey() {
+            if provenance != *cell_id.agent_pubkey() {
                 return Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(
                     cell_id.clone(),
-                    agent_pub_key.clone(),
+                    provenance.clone(),
                 ));
             }
 
@@ -1807,7 +1807,7 @@ mod misc_impls {
                 self.get_dht_db(cell_id.dna_hash())?,
                 self.get_dht_db_cache(cell_id.dna_hash())?,
                 self.keystore.clone(),
-                agent_pub_key.clone(),
+                provenance.clone(),
             )
             .await?;
 
