@@ -13,6 +13,8 @@ use arbitrary::Arbitrary;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn authorize_signing_key() {
+    use holochain_zome_types::{CapAccess, ZomeCallCapGrant};
+
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_id: AppRoleId = "dna".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -39,15 +41,26 @@ async fn authorize_signing_key() {
     let granted_function = ("zome".into(), "create".into());
     functions.insert(granted_function.clone());
 
+    // set up assignees which is a single entry, namely the signing key
+    let mut assignees = BTreeSet::new();
+    assignees.insert(signing_key.clone());
+
+    let cap_grant = ZomeCallCapGrant {
+        tag: "signing_key".into(),
+        functions,
+        access: CapAccess::Assigned {
+            secret: cap_secret,
+            assignees,
+        },
+    };
+
     // request authorization of signing key for another agent's cell should fail
     let another_agent_key = fixt!(AgentPubKey);
     let authorization_result = conductor
         .authorize_zome_call_signing_key(AuthorizeZomeCallSigningKeyPayload {
             agent_pub_key: another_agent_key.clone(),
             cell_id: cell_id.clone(),
-            functions: functions.clone(),
-            signing_key: signing_key.clone(),
-            cap_secret: cap_secret.clone(),
+            cap_grant: cap_grant.clone(),
         })
         .await;
     assert!(authorization_result.is_err());
@@ -61,9 +74,7 @@ async fn authorize_signing_key() {
         .authorize_zome_call_signing_key(AuthorizeZomeCallSigningKeyPayload {
             agent_pub_key: agent_pub_key.clone(),
             cell_id: cell_id.clone(),
-            functions,
-            signing_key: signing_key.clone(),
-            cap_secret: cap_secret.clone(),
+            cap_grant: cap_grant.clone(),
         })
         .await
         .unwrap();
