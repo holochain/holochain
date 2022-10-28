@@ -118,12 +118,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
             }
-            RequestDnaDef(dna_hash) => {
+            GetDnaDefinition(dna_hash) => {
                 let dna_def = self
                     .conductor_handle
                     .get_dna_def(&dna_hash)
                     .ok_or(ConductorApiError::DnaMissing(*dna_hash))?;
-                Ok(AdminResponse::DnaDefRequested(dna_def))
+                Ok(AdminResponse::DnaDefinitionReturned(dna_def))
             }
             UpdateCoordinators(payload) => {
                 let UpdateCoordinatorsPayload { dna_hash, source } = *payload;

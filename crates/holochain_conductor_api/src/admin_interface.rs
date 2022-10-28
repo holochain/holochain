@@ -38,12 +38,12 @@ pub enum AdminRequest {
     /// [`AdminResponse::DnaRegistered`]
     RegisterDna(Box<RegisterDnaPayload>),
 
-    /// Request the definition of a DNA.
+    /// Get the definition of a DNA.
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::DnaDefRequested`]
-    RequestDnaDef(Box<DnaHash>),
+    /// [`AdminResponse::DnaDefinitionReturned`]
+    GetDnaDefinition(Box<DnaHash>),
 
     /// Update coordinator zomes for an already installed DNA.
     ///
@@ -389,8 +389,8 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::RegisterDna`]
     DnaRegistered(DnaHash),
 
-    /// The successful response to an [`AdminRequest::RequestDnaDef`]
-    DnaDefRequested(DnaDef),
+    /// The successful response to an [`AdminRequest::GetDnaDefinition`]
+    DnaDefinitionReturned(DnaDef),
 
     /// The successful response to an [`AdminRequest::UpdateCoordinators`]
     CoordinatorsUpdated,
