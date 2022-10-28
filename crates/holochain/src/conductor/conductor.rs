@@ -1798,21 +1798,15 @@ mod misc_impls {
             if agent_pub_key != *cell_id.agent_pubkey() {
                 return Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(
                     cell_id.clone(),
-                    agent_pub_key.clone(),
                 ));
             }
 
-            let source_chain_workspace = SourceChainWorkspace::init_as_root(
+            let source_chain = SourceChain::new(
                 self.get_authored_db(cell_id.dna_hash())?,
                 self.get_dht_db(cell_id.dna_hash())?,
                 self.get_dht_db_cache(cell_id.dna_hash())?,
-                self.get_cache_db(&cell_id)?,
                 self.keystore.clone(),
                 agent_pub_key.clone(),
-                Arc::new(
-                    self.get_dna_def(cell_id.dna_hash())
-                        .ok_or_else(|| ConductorApiError::DnaMissing(cell_id.dna_hash().clone()))?,
-                ),
             )
             .await?;
 
@@ -1823,8 +1817,7 @@ mod misc_impls {
                 entry_hash,
             };
 
-            source_chain_workspace
-                .source_chain()
+            source_chain
                 .put_weightless(
                     action_builder,
                     Some(cap_grant_entry),
@@ -1833,10 +1826,7 @@ mod misc_impls {
                 .await?;
 
             let cell = self.cell_by_id(&cell_id)?;
-            source_chain_workspace
-                .source_chain()
-                .flush(cell.holochain_p2p_dna())
-                .await?;
+            source_chain.flush(cell.holochain_p2p_dna()).await?;
 
             Ok(())
         }
