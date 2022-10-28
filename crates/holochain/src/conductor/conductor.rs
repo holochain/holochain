@@ -1790,7 +1790,7 @@ mod misc_impls {
             payload: AuthorizeZomeCallSigningKeyPayload,
         ) -> ConductorApiResult<()> {
             let AuthorizeZomeCallSigningKeyPayload {
-                agent_pub_key,
+                provenance: agent_pub_key,
                 cell_id,
                 cap_grant,
             } = payload;
@@ -1798,6 +1798,7 @@ mod misc_impls {
             if agent_pub_key != *cell_id.agent_pubkey() {
                 return Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(
                     cell_id.clone(),
+                    agent_pub_key.clone(),
                 ));
             }
 

@@ -36,8 +36,8 @@ use crate::CellId;
 /// Parameters for authorizing a zome call signing key.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AuthorizeZomeCallSigningKeyPayload {
-    /// Agent for whom to authorize the signing key.
-    pub agent_pub_key: AgentPubKey,
+    /// Agent that is requesting authorization of a signing key.
+    pub provenance: AgentPubKey,
     /// Cell for which to authorize the signing key.
     pub cell_id: CellId,
     /// Specifies zomes and functions to allow signing for as well as key

@@ -58,7 +58,7 @@ async fn authorize_signing_key() {
     let another_agent_key = fixt!(AgentPubKey);
     let authorization_result = conductor
         .authorize_zome_call_signing_key(AuthorizeZomeCallSigningKeyPayload {
-            agent_pub_key: another_agent_key.clone(),
+            provenance: another_agent_key.clone(),
             cell_id: cell_id.clone(),
             cap_grant: cap_grant.clone(),
         })
@@ -72,7 +72,7 @@ async fn authorize_signing_key() {
     // request authorization of signing key for agent's own cell should succeed
     conductor
         .authorize_zome_call_signing_key(AuthorizeZomeCallSigningKeyPayload {
-            agent_pub_key: agent_pub_key.clone(),
+            provenance: agent_pub_key.clone(),
             cell_id: cell_id.clone(),
             cap_grant: cap_grant.clone(),
         })
