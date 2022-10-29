@@ -204,7 +204,7 @@ impl ShardedGossip {
 
             async move {
                 let mut stats = Stats::reset();
-                let mut last_progress_report = Instant::now() - Duration::from_secs(10);
+                // let mut last_progress_report = Instant::now() - Duration::from_secs(10);
                 // println!("PROGRESS REPORTS ENABLED.");
                 while !this
                     .gossip
@@ -214,27 +214,27 @@ impl ShardedGossip {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
                     this.run_one_iteration().await;
                     this.stats(&mut stats);
-                    this.gossip
-                        .inner
-                        .share_ref(|state| {
-                            if let Some((actual, expected)) =
-                                state.metrics.read().incoming_gossip_progress()
-                            {
-                                if expected > 0 {
-                                    // once per second
-                                    if last_progress_report.elapsed() > Duration::from_secs(1) {
-                                        // let percent = (actual as f64 / expected as f64) * 100.0;
-                                        // println!(
-                                        //     "PROGRESS: {} / {} ({}%)",
-                                        //     actual, expected, percent
-                                        // );
-                                        last_progress_report = Instant::now();
-                                    }
-                                }
-                            }
-                            Ok(())
-                        })
-                        .ok();
+                    // this.gossip
+                    //     .inner
+                    //     .share_ref(|state| {
+                    //         if let Some((actual, expected)) =
+                    //             state.metrics.read().incoming_gossip_progress()
+                    //         {
+                    //             if expected > 0 {
+                    //                 // once per second
+                    //                 if last_progress_report.elapsed() > Duration::from_secs(1) {
+                    //                     let percent = (actual as f64 / expected as f64) * 100.0;
+                    //                     println!(
+                    //                         "PROGRESS: {} / {} ({}%)",
+                    //                         actual, expected, percent
+                    //                     );
+                    //                     last_progress_report = Instant::now();
+                    //                 }
+                    //             }
+                    //         }
+                    //         Ok(())
+                    //     })
+                    //     .ok();
                 }
                 KitsuneResult::Ok(())
             }
@@ -297,7 +297,6 @@ impl ShardedGossip {
                     }
                     i.metrics.write().update_current_round(
                         &cert,
-                        &state.remote_agent_list,
                         self.gossip.gossip_type.into(),
                         &state,
                     );
@@ -565,7 +564,7 @@ impl ShardedGossipLocalState {
             metrics.record_error(&remote_agent_list, gossip_type.into());
         }
 
-        metrics.complete_current_round(state_key, &remote_agent_list, error);
+        metrics.complete_current_round(state_key, error);
         r
     }
 
@@ -584,7 +583,7 @@ impl ShardedGossipLocalState {
                     tracing::error!("Tgt expired {:?}", cert);
                     {
                         let mut metrics = self.metrics.write();
-                        metrics.complete_current_round(&cert, remote_agent_list, true);
+                        metrics.complete_current_round(&cert, true);
                         metrics.record_error(remote_agent_list, gossip_type.into());
                     }
                     self.initiate_tgt = None;
@@ -592,7 +591,7 @@ impl ShardedGossipLocalState {
                 None if no_current_round_exist => {
                     {
                         let mut metrics = self.metrics.write();
-                        metrics.complete_current_round(&cert, remote_agent_list, true);
+                        metrics.complete_current_round(&cert, true);
                     }
                     self.initiate_tgt = None;
                 }
@@ -682,12 +681,14 @@ impl ShardedGossipState {
 #[derive(Debug, Clone)]
 pub struct RoundState {
     /// The remote agents hosted by the remote node, used for metrics tracking
-    remote_agent_list: Vec<AgentInfoSigned>,
+    pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
     /// The common ground with our gossip partner for the purposes of this round
     common_arc_set: Arc<DhtArcSet>,
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
     received_all_incoming_op_blooms: bool,
+    /// If historic gossip, we sent our region set already (will be true for Recent)
+    sent_region_set: bool,
     /// Number of ops blooms we have sent for this round, which is also the
     /// number of MissingOps sets we expect in response
     num_expected_op_blooms: u16,
@@ -707,12 +708,12 @@ pub struct RoundState {
     /// The RegionSet we will send to our gossip partner during Historical
     /// gossip (will be None for Recent).
     region_set_sent: Option<Arc<RegionSetLtcs>>,
-    /// When this round began
-    start_time: Instant,
     /// Stats about ops, regions, bloom filter, and bytes sent and received,
     pub(crate) throughput: RoundThroughput,
     /// Region diffs, if doing Historical gossip
     pub(crate) region_diffs: RegionDiffs,
+    /// Unique string ID for this round
+    pub(crate) id: String,
 }
 
 /// Our region diff and their region diff
@@ -731,10 +732,11 @@ impl RoundState {
             common_arc_set,
             received_all_incoming_op_blooms: false,
             has_pending_historical_op_data: false,
+            sent_region_set: false,
             bloom_batch_cursor: None,
             num_expected_op_blooms: 0,
             ops_batch_queue: OpsBatchQueue::new(),
-            start_time: Instant::now(),
+            id: nanoid::nanoid!(),
             last_touch: Instant::now(),
             round_timeout,
             region_set_sent,
@@ -952,12 +954,9 @@ impl ShardedGossipLocal {
                         ShardedGossipWire::AlreadyInProgress(_) => {}
                     }
 
-                    i.metrics.write().update_current_round(
-                        &cert,
-                        &state.remote_agent_list,
-                        self.gossip_type.into(),
-                        &state,
-                    );
+                    i.metrics
+                        .write()
+                        .update_current_round(&cert, self.gossip_type.into(), &state);
                     // println!("throughput IN {:?}", state.throughput);
                 }
                 Ok(())
@@ -1141,7 +1140,7 @@ impl ShardedGossipLocal {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
                     let mut metrics = i.metrics.write();
                     metrics.record_error(&r.remote_agent_list, self.gossip_type.into());
-                    metrics.complete_current_round(&cert, &r.remote_agent_list, true);
+                    metrics.complete_current_round(&cert, true);
                 }
                 Ok(())
             })
@@ -1175,12 +1174,26 @@ impl RoundState {
     /// - This node has received all the ops blooms from the remote node.
     /// - This node has no saved ops bloom batch cursor.
     /// - This node has no queued missing ops to send to the remote node.
+    /// - If running historical gossip, the number of ops sent/received matches expectations
     fn is_finished(&self) -> bool {
+        let InOut {
+            incoming: expected_in,
+            outgoing: expected_out,
+        } = self.throughput.expected_op_count;
+        let InOut {
+            incoming: ops_in,
+            outgoing: ops_out,
+        } = self.throughput.op_count;
+
+        let ops_finished = ops_in >= expected_in && ops_out >= expected_out;
+
         self.num_expected_op_blooms == 0
             && !self.has_pending_historical_op_data
             && self.received_all_incoming_op_blooms
+            && self.sent_region_set
             && self.bloom_batch_cursor.is_none()
             && self.ops_batch_queue.is_empty()
+            && ops_finished
     }
 }
 

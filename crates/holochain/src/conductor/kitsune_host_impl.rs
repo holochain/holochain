@@ -139,8 +139,6 @@ impl KitsuneHost for KitsuneHostImpl {
             .share_mut(|ds| ds.get_dna_def(&dna_hash))
             .ok_or(DnaError::DnaMissing(dna_hash));
         let cutoff = self.tuning_params.danger_gossip_recent_threshold();
-        async move { Ok(Topology::standard(dna_def?.modifiers.origin_time, cutoff)) }
-            .boxed()
-            .into()
+        async move { Ok(dna_def?.topology(cutoff)) }.boxed().into()
     }
 }

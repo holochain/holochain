@@ -166,12 +166,7 @@ impl ShardedGossipLocal {
             {
                 let mut metrics = inner.metrics.write();
 
-                metrics.update_current_round(
-                    &peer_cert,
-                    &remote_agent_list,
-                    self.gossip_type.into(),
-                    &state,
-                );
+                metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
                 metrics.record_accept(&remote_agent_list, self.gossip_type.into());
             }
 
@@ -230,12 +225,18 @@ impl ShardedGossipLocal {
                 let bloom = encode_bloom_filter(&bloom);
                 gossip.push(ShardedGossipWire::agents(bloom));
             }
+
+            // we consider recent gossip to have "sent its region"
+            // for purposes of determining the round is complete
+            state.sent_region_set = true;
+
             self.next_bloom_batch(state, gossip).await
         } else {
             // Everything has already been taken care of for Historical
             // gossip already. Just mark this true so that the state will not
             // be considered "finished" until all op data is received.
             state.has_pending_historical_op_data = true;
+            state.sent_region_set = false;
             Ok(state)
         }
     }

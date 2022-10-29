@@ -18,9 +18,9 @@ use tui::{backend::Backend, Terminal};
 
 const BASES: usize = 12;
 
-const ENTRY_SIZE: usize = 1_000_000;
+const ENTRY_SIZE: usize = 10_000_000;
 const MAX_COMMITS: usize = 1_000;
-const ENTRIES_PER_COMMIT: u32 = 100;
+const ENTRIES_PER_COMMIT: u32 = 1;
 
 const COMMIT_RATE: Duration = Duration::from_millis(0);
 const GET_RATE: Duration = Duration::from_millis(100);
@@ -116,6 +116,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 async fn setup_app(mut rng: StdRng) -> App {
     let zome = diagnostic_tests::basic_zome();
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
+    let dna =
+        dna.update_modifiers(DnaModifiersOpt::none().with_quantum_time(Duration::from_secs(5)));
     let bases = (0..BASES)
         .map(|_| ActionHash::from_raw_32(random_vec(&mut rng, 32)).into())
         .collect::<Vec<_>>()
@@ -230,33 +232,18 @@ impl ClientState for State {
         self.link_counts.as_ref()
     }
 
-    fn node_histories_sorted<'a>(
+    fn node_rounds_sorted<'a>(
         &self,
         metrics: &'a metrics::Metrics,
         agent: &AgentPubKey,
-    ) -> NodeHistories<'a, usize> {
+    ) -> NodeRounds<'a, usize> {
         let mut histories: Vec<_> = metrics
             .peer_node_histories()
             .values()
             .map(|history| (*self.agent_node_index.get(agent).unwrap(), history))
-            // .filter_map(|history| {
-            //     assert!(
-            //         history.remote_agents.len() <= 1,
-            //         "this widget cannot be used with more than 1 agent per node"
-            //     );
-            //     history.remote_agents.first().map(|agent| {
-            //         (
-            //             *self
-            //                 .agent_node_index
-            //                 .get(&AgentPubKey::from_kitsune(agent))
-            //                 .unwrap(),
-            //             history,
-            //         )
-            //     })
-            // })
             .collect();
         histories.sort_unstable_by_key(|(i, _)| *i);
-        histories
+        NodeRounds::new(histories)
     }
 }
 

@@ -15,6 +15,7 @@ use hdk::prelude::CellId;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_keystore::AgentPubKeyExt;
+use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -462,6 +463,7 @@ async fn setup(
                 network_seed,
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                quantum_time: STANDARD_QUANTUM_TIME,
             },
             integrity_zomes: zomes
                 .clone()

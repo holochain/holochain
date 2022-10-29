@@ -113,16 +113,27 @@ impl ShardedGossipLocal {
             let their_region_diff = region_set.clone().diff(sent).map_err(KitsuneError::other)?;
 
             self.inner.share_mut(|i, _| {
-                if let Some(state) = i.round_map.get_mut(cert) {
-                    state.throughput.expected_op_bytes.outgoing +=
+                if let Some(round) = i.round_map.get_mut(cert) {
+                    round.throughput.expected_op_bytes.outgoing +=
                         our_region_diff.iter().map(|r| r.data.size).sum::<u32>();
-                    state.throughput.expected_op_count.outgoing +=
+                    round.throughput.expected_op_count.outgoing +=
                         our_region_diff.iter().map(|r| r.data.count).sum::<u32>();
-                    state.throughput.expected_op_bytes.incoming +=
+                    round.throughput.expected_op_bytes.incoming +=
                         their_region_diff.iter().map(|r| r.data.size).sum::<u32>();
-                    state.throughput.expected_op_count.incoming +=
+                    round.throughput.expected_op_count.incoming +=
                         their_region_diff.iter().map(|r| r.data.count).sum::<u32>();
-                    state.region_diffs = Some((our_region_diff.clone(), their_region_diff));
+                    round.region_diffs = Some((our_region_diff.clone(), their_region_diff));
+                    round.sent_region_set = true;
+                    i.metrics.write().update_current_round(
+                        cert,
+                        GossipModuleType::ShardedHistorical,
+                        &round,
+                    );
+                } else {
+                    tracing::warn!(
+                        "attempting to queue_incoming_regions for round with no cert: {:?}",
+                        cert
+                    );
                 }
                 Ok(())
             })?;

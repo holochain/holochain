@@ -12,7 +12,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
                     InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                     EntryVisibility::Public,
                     Entry::App(AppEntryBytes(entry)),
-                    ChainTopOrdering::default(),
+                    ChainTopOrdering::Relaxed,
                 ))?;
                 let _ = api.create_link(CreateLinkInput::new(
                     base,
@@ -20,7 +20,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
                     ZomeId(0),
                     LinkType::new(0),
                     ().into(),
-                    ChainTopOrdering::default(),
+                    ChainTopOrdering::Relaxed,
                 ))?;
                 Ok(hash)
             },
@@ -36,7 +36,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
                         InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                         EntryVisibility::Public,
                         Entry::App(AppEntryBytes(entry)),
-                        ChainTopOrdering::default(),
+                        ChainTopOrdering::Relaxed,
                     ))?;
                     let _ = api.create_link(CreateLinkInput::new(
                         base.clone(),
@@ -44,7 +44,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
                         ZomeId(0),
                         LinkType::new(0),
                         ().into(),
-                        ChainTopOrdering::default(),
+                        ChainTopOrdering::Relaxed,
                     ))?;
                 }
                 Ok(())
@@ -94,7 +94,7 @@ pub fn syn_zome() -> InlineIntegrityZome {
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                 EntryVisibility::Public,
                 Entry::App(AppEntryBytes(entry)),
-                ChainTopOrdering::default(),
+                ChainTopOrdering::Relaxed,
             ))?;
             Ok(())
         })
@@ -136,7 +136,7 @@ pub fn syn_zome() -> InlineIntegrityZome {
                 EntryDefLocation::CapGrant,
                 EntryVisibility::Private,
                 Entry::CapGrant(cap_grant_entry),
-                ChainTopOrdering::default(),
+                ChainTopOrdering::Relaxed,
             ))
             .unwrap();
 

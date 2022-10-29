@@ -9,7 +9,6 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo" ]
 edition = "2021"
 
-
 [dependencies]
 anyhow = "*"
 arbitrary = { version = "=1.0.0" }

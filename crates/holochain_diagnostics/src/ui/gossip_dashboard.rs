@@ -1,6 +1,8 @@
 use holochain::prelude::{
+    dht::region::Region,
+    gossip::sharded_gossip::RegionDiffs,
     kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant,
-    metrics::PeerNodeHistory,
+    metrics::{CompletedRound, CurrentRound, PeerNodeHistory},
 };
 use human_repr::{HumanCount, HumanThroughput};
 use std::{
@@ -23,13 +25,18 @@ use tui::{
 };
 
 use self::widgets::{
+    gossip_region_table::{gossip_region_table, GossipRegionTableState},
     gossip_round_table::{gossip_round_table, GossipRoundTableState},
     ui_gossip_progress_gauge,
 };
 
+mod input;
 mod layout;
+mod render;
 mod state;
 mod widgets;
+
+pub use input::*;
 
 // 999, 99, or 9
 const MAX_COUNT: usize = 999;
@@ -72,31 +79,75 @@ pub trait ClientState {
 
     fn total_commits(&self) -> usize;
     fn link_counts(&self) -> LinkCountsRef;
-    fn node_histories_sorted<'a>(
+    fn node_rounds_sorted<'a>(
         &self,
         metrics: &'a Metrics,
         agent: &AgentPubKey,
-    ) -> NodeHistories<'a, usize>;
+    ) -> NodeRounds<'a, usize>;
+}
+
+/// Distinct modes of input handling and display
+#[derive(Debug, Clone)]
+pub enum Focus {
+    /// Nothing is selected
+    Empty,
+    /// We've drilled into a particular Node, now we can select one of its gossip rounds
+    Node(usize),
+    /// We've drilled into a Round, now we can see more detailed info about it
+    Round {
+        node: usize,
+        round: RoundInfo,
+        ours: bool,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct RoundInfo {
+    our_diff: Vec<Region>,
+    their_diff: Vec<Region>,
+}
+
+impl Default for Focus {
+    fn default() -> Self {
+        Focus::Empty
+    }
 }
 
 /// State specific to the UI
 #[derive(Default)]
 pub struct LocalState {
-    pub list_state: ListState,
-    pub filter_zero_rounds: bool,
+    pub node_list_state: ListState,
+    pub round_table_state: TableState,
+    pub region_table_state: TableState,
+    pub focus: Focus,
+    pub filter_zeroes: bool,
     pub done_time: Option<Instant>,
 }
 
 impl LocalState {
     pub fn node_selector(&mut self, i: isize, max: usize) {
-        if let Some(s) = self.list_state.selected() {
+        if let Some(s) = self.node_list_state.selected() {
             let n = (s as isize + i).min(max as isize).max(0);
-            self.list_state.select(Some(n as usize));
+            self.node_list_state.select(Some(n as usize));
+        }
+    }
+
+    pub fn round_selector(&mut self, i: isize) {
+        if let Some(s) = self.round_table_state.selected() {
+            let n = (s as isize + i).max(0);
+            self.round_table_state.select(Some(n as usize));
+        }
+    }
+
+    pub fn region_selector(&mut self, i: isize) {
+        if let Some(s) = self.region_table_state.selected() {
+            let n = (s as isize + i).max(0);
+            self.region_table_state.select(Some(n as usize));
         }
     }
 
     pub fn selected_node(&self) -> Option<usize> {
-        self.list_state
+        self.node_list_state
             .selected()
             .and_then(|s| (s > 0).then(|| s - 1))
     }
@@ -105,7 +156,43 @@ impl LocalState {
 /// Outer vec for nodes, inner vec for bases
 pub type LinkCounts = Vec<Vec<(usize, Instant)>>;
 pub type LinkCountsRef<'a> = &'a [Vec<(usize, Instant)>];
-pub type NodeHistories<'a, Id> = Vec<(Id, &'a PeerNodeHistory)>;
+pub struct NodeRounds<'a, Id> {
+    currents: Vec<(Id, &'a CurrentRound)>,
+    completed: Vec<(Id, &'a CompletedRound)>,
+}
+
+impl<'a, Id: Clone> NodeRounds<'a, Id> {
+    pub fn new(items: Vec<(Id, &'a PeerNodeHistory)>) -> Self {
+        let mut currents: Vec<_> = items
+            .iter()
+            .filter_map(|(n, i)| i.current_round.as_ref().map(|r| (n.clone(), r)))
+            .collect();
+
+        let mut completed: Vec<_> = items
+            .iter()
+            .flat_map(|(n, info)| info.completed_rounds.iter().map(|r| (n.clone(), r)))
+            .collect();
+
+        currents.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        completed.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+
+        Self {
+            currents,
+            completed,
+        }
+    }
+
+    /// Get RegionDiffs by index, given that completed rounds
+    /// immediately follow current rounds in sequence
+    pub fn round_regions(&self, index: usize) -> &RegionDiffs {
+        let num_current = self.currents.len();
+        if index < num_current {
+            &self.currents[index].1.region_diffs
+        } else {
+            &self.completed[num_current + index].1.region_diffs
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct GossipDashboard {
@@ -114,18 +201,10 @@ pub struct GossipDashboard {
     local_state: RwShare<LocalState>,
 }
 
-pub enum InputCmd {
-    Quit,
-    ClearBuffer,
-    ExchangePeers,
-    AddNode(usize),
-    AddEntry(usize),
-}
-
 impl GossipDashboard {
     pub fn new(selected_node: Option<usize>, start_time: Instant, refresh_rate: Duration) -> Self {
         let mut state = LocalState::default();
-        state.list_state.select(selected_node);
+        state.node_list_state.select(selected_node);
         Self {
             start_time,
             refresh_rate,
@@ -133,132 +212,8 @@ impl GossipDashboard {
         }
     }
 
-    pub fn input<S: ClientState>(&self, state: RwShare<S>) -> Option<InputCmd> {
-        if event::poll(self.refresh_rate).unwrap() {
-            if let Event::Key(key) = event::read().unwrap() {
-                match key.code {
-                    KeyCode::Char('q') => {
-                        return Some(InputCmd::Quit);
-                    }
-                    KeyCode::Char('x') => {
-                        return Some(InputCmd::ExchangePeers);
-                    }
-                    KeyCode::Char('c') => {
-                        return Some(InputCmd::ClearBuffer);
-                    }
-                    KeyCode::Char('n') => {
-                        return Some(InputCmd::AddNode(0));
-                    }
-                    KeyCode::Char('e') => {
-                        return Some(InputCmd::AddEntry(0));
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => self.local_state.share_mut(|s| {
-                        s.node_selector(-1, state.share_ref(|state| state.nodes().len()))
-                    }),
-                    KeyCode::Down | KeyCode::Char('j') => self.local_state.share_mut(|s| {
-                        s.node_selector(1, state.share_ref(|state| state.nodes().len()))
-                    }),
-                    KeyCode::Char('0') => self
-                        .local_state
-                        .share_mut(|s| s.filter_zero_rounds = !s.filter_zero_rounds),
-                    _ => {}
-                }
-            }
-        };
-        None
-    }
-
     pub fn clear<K: Backend>(&self, f: &mut Frame<K>) {
         f.render_widget(tui::widgets::Clear, f.size())
-    }
-
-    pub fn render<K: Backend>(&self, f: &mut Frame<K>, state: &impl ClientState) {
-        let layout = layout::layout(state.nodes().len(), state.num_bases(), f);
-
-        let (selected, filter_zeroes, done_time, gauges) = self.local_state.share_mut(|local| {
-            let metrics: Vec<_> = state
-                .nodes()
-                .iter()
-                .map(|n| {
-                    (
-                        n.diagnostics.metrics.read(),
-                        n.zome.cell_id().agent_pubkey().clone(),
-                    )
-                })
-                .collect();
-            let activity = metrics
-                .iter()
-                .map(|(metrics, agent)| {
-                    state
-                        .node_histories_sorted(metrics, agent)
-                        .iter()
-                        .any(|i| i.1.current_round.is_some())
-                })
-                .enumerate();
-            f.render_stateful_widget(
-                widgets::ui_node_list(activity),
-                layout.node_list,
-                &mut local.list_state,
-            );
-            f.render_widget(
-                widgets::ui_basis_table(self.refresh_rate * 4, state.link_counts())
-                    .block(Block::default().borders(Borders::union(Borders::LEFT, Borders::RIGHT)))
-                    // the widths have to be specified here because they are not const
-                    // and must be borrowed
-                    .widths(&vec![Constraint::Length(3); state.num_bases()]),
-                layout.basis_table,
-            );
-            let selected = local.selected_node();
-            if selected.is_none() {
-                f.render_widget(widgets::ui_keymap(), layout.bottom);
-                f.render_widget(
-                    widgets::ui_global_stats(self.start_time, state),
-                    layout.table_extras,
-                );
-            }
-            let gauges: Vec<_> = metrics
-                .iter()
-                .map(|(m, _)| ui_gossip_progress_gauge(m.incoming_gossip_progress()))
-                .collect();
-
-            (selected, local.filter_zero_rounds, local.done_time, gauges)
-        });
-        if let Some(selected) = selected {
-            // node.conductor.get_agent_infos(Some(node.zome.cell_id().clone()))
-            let node = &state.nodes()[selected];
-            let agent = node.agent();
-            let metrics = &node.diagnostics.metrics.read();
-            let infos = state.node_histories_sorted(metrics, &agent);
-            for (i, gauge) in gauges.into_iter().enumerate() {
-                f.render_widget(gauge, layout.gauges[i]);
-            }
-            f.render_widget(
-                gossip_round_table(&GossipRoundTableState {
-                    infos: &infos,
-                    start_time: self.start_time,
-                    current_time: state.time(),
-                    filter_zeroes,
-                }),
-                layout.bottom,
-            );
-        }
-
-        let z = if filter_zeroes { "(0)" } else { "   " };
-        let (t, style) = done_time
-            .map(|t| {
-                (
-                    t.duration_since(self.start_time),
-                    Style::default().add_modifier(Modifier::REVERSED),
-                )
-            })
-            .unwrap_or_else(|| {
-                (
-                    state.time().duration_since(self.start_time),
-                    Style::default(),
-                )
-            });
-        let t_widget = Paragraph::new(format!("{}  T={:<.2?}", z, t)).style(style);
-        f.render_widget(t_widget, layout.time);
     }
 }
 

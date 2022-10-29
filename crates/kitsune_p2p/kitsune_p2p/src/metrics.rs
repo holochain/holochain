@@ -155,6 +155,8 @@ pub struct RoundMetric {
 /// Metrics about a completed gossip round
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletedRound {
+    /// Unique string id
+    pub id: String,
     /// The type of gossip module
     pub gossip_type: GossipModuleType,
     /// The start time of the round
@@ -179,6 +181,8 @@ impl CompletedRound {
 /// Metrics about an ongoing gossip round
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CurrentRound {
+    /// Unique string id
+    pub id: String,
     /// The type of gossip module
     pub gossip_type: GossipModuleType,
     /// Last time this was updated
@@ -193,8 +197,9 @@ pub struct CurrentRound {
 
 impl CurrentRound {
     /// Constructor
-    pub fn new(gossip_type: GossipModuleType, start_time: Instant) -> Self {
+    pub fn new(id: String, gossip_type: GossipModuleType, start_time: Instant) -> Self {
         Self {
+            id,
             gossip_type,
             start_time,
             last_touch: Instant::now(),
@@ -213,12 +218,13 @@ impl CurrentRound {
     /// Convert to a CompletedRound
     pub fn completed(self, error: bool) -> CompletedRound {
         CompletedRound {
+            id: self.id,
             gossip_type: self.gossip_type,
             start_time: self.start_time,
             end_time: Instant::now(),
             throughput: self.throughput,
             error,
-            region_diffs: Default::default(),
+            region_diffs: self.region_diffs,
         }
     }
 }
@@ -539,41 +545,34 @@ impl Metrics {
     }
 
     /// Update node-level info about a current round, or create one if it doesn't exist
-    pub fn update_current_round<'a, T, I>(
+    pub fn update_current_round(
         &mut self,
         node: &NodeId,
-        remote_agents: I,
         gossip_type: GossipModuleType,
         round_state: &RoundState,
-    ) where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
-        let remote_agents = remote_agents
+    ) {
+        let remote_agents = round_state
+            .remote_agent_list
+            .clone()
             .into_iter()
-            .map(|a| a.into().agent().to_owned())
+            .map(|a| a.agent())
             .collect();
         let history = self.node_history.entry(node.clone()).or_default();
         history.remote_agents = remote_agents;
         if let Some(r) = &mut history.current_round {
             r.update(round_state);
         } else {
-            history.current_round = Some(CurrentRound::new(gossip_type, Instant::now()));
+            history.current_round = Some(CurrentRound::new(
+                round_state.id.clone(),
+                gossip_type,
+                Instant::now(),
+            ));
         }
     }
 
     /// Remove the current round info once it's complete, and put it into the history list
-    pub fn complete_current_round<'a, T, I>(&mut self, node: &NodeId, remote_agents: I, error: bool)
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
-        let remote_agents = remote_agents
-            .into_iter()
-            .map(|a| a.into().agent().to_owned())
-            .collect();
+    pub fn complete_current_round(&mut self, node: &NodeId, error: bool) {
         let history = self.node_history.entry(node.clone()).or_default();
-        history.remote_agents = remote_agents;
         let r = history.current_round.take();
         if let Some(r) = r {
             history.completed_rounds.push_back(r.completed(error))

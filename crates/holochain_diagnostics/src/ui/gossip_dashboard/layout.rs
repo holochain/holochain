@@ -11,6 +11,7 @@ pub(super) struct UiLayout {
     pub gauges: Vec<Rect>,
     pub bottom: Rect,
     pub time: Rect,
+    pub modal: Rect,
 }
 
 pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayout {
@@ -37,6 +38,13 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
             .as_ref(),
         )
         .split(vsplit[0]);
+
+    const MODAL_MARGIN: u16 = 3;
+    let mut modal = f.size();
+    modal.x += MODAL_MARGIN;
+    modal.y += MODAL_MARGIN;
+    modal.width -= MODAL_MARGIN;
+    modal.height -= MODAL_MARGIN;
 
     let node_list = top_chunks[0];
     let basis_table = top_chunks[1];
@@ -72,5 +80,6 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
         gauges,
         bottom,
         time,
+        modal,
     }
 }
