@@ -1777,9 +1777,61 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
+    use holochain_zome_types::builder;
+
+    use crate::conductor::api::error::ConductorApiError;
+
     use super::*;
 
     impl Conductor {
+        /// Authorize a zome call signing key for a cell
+        pub async fn authorize_zome_call_signing_key(
+            &self,
+            payload: AuthorizeZomeCallSigningKeyPayload,
+        ) -> ConductorApiResult<()> {
+            let AuthorizeZomeCallSigningKeyPayload {
+                provenance,
+                cell_id,
+                cap_grant,
+            } = payload;
+
+            if provenance != *cell_id.agent_pubkey() {
+                return Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(
+                    cell_id.clone(),
+                    provenance.clone(),
+                ));
+            }
+
+            let source_chain = SourceChain::new(
+                self.get_authored_db(cell_id.dna_hash())?,
+                self.get_dht_db(cell_id.dna_hash())?,
+                self.get_dht_db_cache(cell_id.dna_hash())?,
+                self.keystore.clone(),
+                provenance.clone(),
+            )
+            .await?;
+
+            let cap_grant_entry = Entry::CapGrant(cap_grant);
+            let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
+            let action_builder = builder::Create {
+                entry_type: EntryType::CapGrant,
+                entry_hash,
+            };
+
+            source_chain
+                .put_weightless(
+                    action_builder,
+                    Some(cap_grant_entry),
+                    ChainTopOrdering::default(),
+                )
+                .await?;
+
+            let cell = self.cell_by_id(&cell_id)?;
+            source_chain.flush(cell.holochain_p2p_dna()).await?;
+
+            Ok(())
+        }
+
         /// Create a JSON dump of the cell's state
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             let cell = self.cell_by_id(cell_id)?;

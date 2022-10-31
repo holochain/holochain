@@ -38,6 +38,13 @@ pub enum AdminRequest {
     /// [`AdminResponse::DnaRegistered`]
     RegisterDna(Box<RegisterDnaPayload>),
 
+    /// Get the definition of a DNA.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::DnaDefinitionReturned`]
+    GetDnaDefinition(Box<DnaHash>),
+
     /// Update coordinator zomes for an already installed DNA.
     ///
     /// Replaces any installed coordinator zomes with the same zome name.
@@ -341,6 +348,13 @@ pub enum AdminRequest {
         records: Vec<Record>,
     },
 
+    /// Request authorization of a public key for signing zome calls.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ZomeCallSigningKeyAuthorized`]
+    AuthorizeZomeCallSigningKey(Box<AuthorizeZomeCallSigningKeyPayload>),
+
     /// Restore a clone cell that was previously archived.
     ///
     /// # Returns
@@ -374,6 +388,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::RegisterDna`]
     DnaRegistered(DnaHash),
+
+    /// The successful response to an [`AdminRequest::GetDnaDefinition`]
+    DnaDefinitionReturned(DnaDef),
 
     /// The successful response to an [`AdminRequest::UpdateCoordinators`]
     CoordinatorsUpdated,
@@ -505,6 +522,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,
+
+    /// The successful response to an [`AdminRequest::AuthorizeZomeCallSigningKey`].
+    ZomeCallSigningKeyAuthorized,
 
     // The successful response to an [`AdminRequest::RestoreCloneCell`].
     CloneCellRestored(InstalledCell),

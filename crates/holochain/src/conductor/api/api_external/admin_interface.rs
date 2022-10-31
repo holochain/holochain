@@ -118,6 +118,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
             }
+            GetDnaDefinition(dna_hash) => {
+                let dna_def = self
+                    .conductor_handle
+                    .get_dna_def(&dna_hash)
+                    .ok_or(ConductorApiError::DnaMissing(*dna_hash))?;
+                Ok(AdminResponse::DnaDefinitionReturned(dna_def))
+            }
             UpdateCoordinators(payload) => {
                 let UpdateCoordinatorsPayload { dna_hash, source } = *payload;
                 let (coordinator_zomes, wasms) = match source {
@@ -328,6 +335,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .graft_records_onto_source_chain(cell_id, validate, records)
                     .await?;
                 Ok(AdminResponse::RecordsGrafted)
+            }
+            AuthorizeZomeCallSigningKey(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .authorize_zome_call_signing_key(*payload)
+                    .await?;
+                Ok(AdminResponse::ZomeCallSigningKeyAuthorized)
             }
             RestoreCloneCell(payload) => {
                 let restored_cell = self

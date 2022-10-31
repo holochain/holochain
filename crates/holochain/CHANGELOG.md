@@ -4,6 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add call to authorize a zome call signing key to Admin API [\#1641](https://github.com/holochain/holochain/pull/1641)
+- Add call to request DNA definition to Admin API [\#1641](https://github.com/holochain/holochain/pull/1641)
+
 ## 0.0.169
 
 ## 0.0.168
