@@ -1,7 +1,9 @@
 use holochain::prelude::{
     dht::region::Region,
     gossip::sharded_gossip::RegionDiffs,
-    kitsune_p2p::dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant,
+    kitsune_p2p::dependencies::kitsune_p2p_types::{
+        dependencies::tokio::time::Instant as TokioInstant, Tx2Cert,
+    },
     metrics::{CompletedRound, CurrentRound, PeerNodeHistory},
 };
 use human_repr::{HumanCount, HumanThroughput};
@@ -49,6 +51,7 @@ pub struct Node {
     pub conductor: Arc<SweetConductor>,
     pub zome: SweetZome,
     pub diagnostics: GossipDiagnostics,
+    pub cert: Tx2Cert,
 }
 
 impl Node {
@@ -59,10 +62,19 @@ impl Node {
             .get_diagnostics(dna_hash)
             .await
             .unwrap();
+        let infos = conductor
+            .get_agent_infos(Some(zome.cell_id().clone()))
+            .await
+            .unwrap();
+        assert_eq!(infos.len(), 1);
+        let certs = infos[0].certs();
+        assert_eq!(certs.len(), 1);
+
         Self {
             conductor,
             zome,
             diagnostics,
+            cert: certs[0].clone(),
         }
     }
 

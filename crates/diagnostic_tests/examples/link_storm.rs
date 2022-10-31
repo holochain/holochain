@@ -1,4 +1,5 @@
 use holochain_diagnostics::{
+    gossip::sharded_gossip::NodeId,
     holochain::{
         conductor::{conductor::RwShare, config::ConductorConfig},
         prelude::*,
@@ -208,7 +209,7 @@ struct State {
 
     /// Cached reverse lookup for node index by agent key.
     /// Must be in sync with `nodes`!
-    agent_node_index: HashMap<AgentPubKey, usize>,
+    node_cert_index: HashMap<NodeId, usize>,
 }
 
 impl ClientState for State {
@@ -237,10 +238,11 @@ impl ClientState for State {
         metrics: &'a metrics::Metrics,
         agent: &AgentPubKey,
     ) -> NodeRounds<'a, usize> {
+        let node_index = self.node_cert_index.get(agent).unwrap();
         let mut histories: Vec<_> = metrics
             .peer_node_histories()
-            .values()
-            .map(|history| (*self.agent_node_index.get(agent).unwrap(), history))
+            .iter()
+            .map(|(cert, history)| (*node_index, history))
             .collect();
         histories.sort_unstable_by_key(|(i, _)| *i);
         NodeRounds::new(histories)
@@ -255,18 +257,17 @@ impl State {
             rng,
             nodes: Default::default(),
             link_counts: Default::default(),
-            agent_node_index: Default::default(),
+            node_cert_index: Default::default(),
             done_time: Default::default(),
         };
         state
     }
 
-    fn add_node(&mut self, node: Node) {
+    fn add_node(&mut self, cert: NodeId, node: Node) {
         let new_index = self.nodes.len();
         self.link_counts
             .push(vec![(0, Instant::now()); self.num_bases()]);
-        self.agent_node_index
-            .insert(node.zome.cell_id().agent_pubkey().clone(), new_index);
+        self.node_cert_index.insert(cert, new_index);
         self.nodes.push(node);
     }
 }
