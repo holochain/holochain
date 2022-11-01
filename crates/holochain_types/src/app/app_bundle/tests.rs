@@ -6,7 +6,7 @@ use app_manifest_v1::tests::{app_manifest_fixture, app_manifest_properties_fixtu
 
 use super::AppBundle;
 
-async fn app_bundle_fixture() -> (AppBundle, DnaFile) {
+async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppBundle, DnaFile) {
     let dna_wasm = DnaWasmHashed::from_content(DnaWasm::new_invalid()).await;
     let fake_wasms = vec![dna_wasm.clone().into_content()];
     let fake_zomes = vec![IntegrityZome::new(
@@ -24,12 +24,13 @@ async fn app_bundle_fixture() -> (AppBundle, DnaFile) {
     let (manifest, _dna_hashes) = app_manifest_fixture(
         Some(DnaLocation::Bundled(path1.clone())),
         vec![dna1.dna_def().clone(), dna2.dna_def().clone()],
+        modifiers,
     )
     .await;
 
     let resources = vec![(path1, DnaBundle::from_dna_file(dna1.clone()).await.unwrap())];
 
-    let bundle = AppBundle::new(manifest, resources, PathBuf::from("."))
+    let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
         .await
         .unwrap();
     (bundle, dna1)
@@ -40,7 +41,12 @@ async fn app_bundle_fixture() -> (AppBundle, DnaFile) {
 async fn provisioning_1_create() {
     observability::test_run().ok();
     let agent = fixt!(AgentPubKey);
-    let (bundle, dna) = app_bundle_fixture().await;
+    let modifiers = DnaModifiersOpt {
+        properties: Some(app_manifest_properties_fixture()),
+        network_seed: Some("network_seed".into()),
+        origin_time: None,
+    };
+    let (bundle, dna) = app_bundle_fixture(modifiers).await;
 
     // Apply the modifier overrides specified in the manifest fixture
     let dna = dna
