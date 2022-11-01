@@ -236,9 +236,9 @@ impl ClientState for State {
     fn node_rounds_sorted<'a>(
         &self,
         metrics: &'a metrics::Metrics,
-        agent: &AgentPubKey,
+        cert: &NodeId,
     ) -> NodeRounds<'a, usize> {
-        let node_index = self.node_cert_index.get(agent).unwrap();
+        let node_index = self.node_cert_index.get(cert).unwrap();
         let mut histories: Vec<_> = metrics
             .peer_node_histories()
             .iter()
@@ -263,11 +263,11 @@ impl State {
         state
     }
 
-    fn add_node(&mut self, cert: NodeId, node: Node) {
+    fn add_node(&mut self, node: Node) {
         let new_index = self.nodes.len();
         self.link_counts
             .push(vec![(0, Instant::now()); self.num_bases()]);
-        self.node_cert_index.insert(cert, new_index);
+        self.node_cert_index.insert(node.cert.clone(), new_index);
         self.nodes.push(node);
     }
 }

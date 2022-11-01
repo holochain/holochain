@@ -1,8 +1,9 @@
 use holochain::prelude::{
     dht::region::Region,
-    gossip::sharded_gossip::RegionDiffs,
-    kitsune_p2p::dependencies::kitsune_p2p_types::{
-        dependencies::tokio::time::Instant as TokioInstant, Tx2Cert,
+    gossip::sharded_gossip::{NodeId, RegionDiffs},
+    kitsune_p2p::dependencies::{
+        kitsune_p2p_proxy,
+        kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},
     },
     metrics::{CompletedRound, CurrentRound, PeerNodeHistory},
 };
@@ -62,19 +63,31 @@ impl Node {
             .get_diagnostics(dna_hash)
             .await
             .unwrap();
-        let infos = conductor
+
+        let mut infos = conductor
             .get_agent_infos(Some(zome.cell_id().clone()))
             .await
             .unwrap();
         assert_eq!(infos.len(), 1);
-        let certs = infos[0].certs();
+        let info = infos.pop().unwrap();
+        let mut certs: Vec<_> = info
+            .url_list
+            .iter()
+            .filter_map(|url| {
+                kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+                    .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
+                    .ok()
+                    .map(|purl| Tx2Cert::from(purl.digest()))
+            })
+            .collect();
         assert_eq!(certs.len(), 1);
+        let cert = certs.pop().unwrap();
 
         Self {
             conductor,
             zome,
             diagnostics,
-            cert: certs[0].clone(),
+            cert,
         }
     }
 
@@ -91,11 +104,7 @@ pub trait ClientState {
 
     fn total_commits(&self) -> usize;
     fn link_counts(&self) -> LinkCountsRef;
-    fn node_rounds_sorted<'a>(
-        &self,
-        metrics: &'a Metrics,
-        agent: &AgentPubKey,
-    ) -> NodeRounds<'a, usize>;
+    fn node_rounds_sorted<'a>(&self, metrics: &'a Metrics, cert: &NodeId) -> NodeRounds<'a, usize>;
 }
 
 /// Distinct modes of input handling and display

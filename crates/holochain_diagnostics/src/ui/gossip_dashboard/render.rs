@@ -8,18 +8,11 @@ impl GossipDashboard {
             let metrics: Vec<_> = state
                 .nodes()
                 .iter()
-                .map(|n| {
-                    (
-                        n.diagnostics.metrics.read(),
-                        n.zome.cell_id().agent_pubkey().clone(),
-                    )
-                })
+                .map(|n| (n.diagnostics.metrics.read(), n.cert.clone()))
                 .collect();
             let activity = metrics
                 .iter()
-                .map(|(metrics, agent)| {
-                    !state.node_rounds_sorted(metrics, agent).currents.is_empty()
-                })
+                .map(|(metrics, cert)| !state.node_rounds_sorted(metrics, cert).currents.is_empty())
                 .enumerate();
             f.render_stateful_widget(
                 widgets::ui_node_list(activity),
@@ -50,9 +43,8 @@ impl GossipDashboard {
             if let Some(selected) = selected {
                 // node.conductor.get_agent_infos(Some(node.zome.cell_id().clone()))
                 let node = &state.nodes()[selected];
-                let agent = node.agent();
                 let metrics = &node.diagnostics.metrics.read();
-                let rounds = state.node_rounds_sorted(metrics, &agent);
+                let rounds = state.node_rounds_sorted(metrics, &node.cert);
                 for (i, gauge) in gauges.into_iter().enumerate() {
                     f.render_widget(gauge, layout.gauges[i]);
                 }

@@ -40,8 +40,7 @@ impl GossipDashboard {
                                 let diffs = state.share_mut(|state| {
                                     let node = &state.nodes()[node];
                                     let metrics = node.diagnostics.metrics.read();
-                                    let histories =
-                                        state.node_rounds_sorted(&metrics, &node.agent());
+                                    let histories = state.node_rounds_sorted(&metrics, &node.cert);
                                     histories.round_regions(round).clone()
                                 });
                                 if let Some((our_diff, their_diff)) = diffs {
