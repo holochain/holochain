@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use holochain_diagnostics::{dht::test_utils::seeded_rng, holochain::prelude::*, random_vec};
+use holochain_diagnostics::{dht::test_utils::seeded_rng, holochain::prelude::*, random_bytes};
 
 pub fn basic_zome() -> InlineIntegrityZome {
     InlineIntegrityZome::new_unique([EntryDef::from_id("a")], 1)
@@ -30,8 +30,9 @@ pub fn basic_zome() -> InlineIntegrityZome {
             |api, (base, num, size): (AnyLinkableHash, u32, u32)| {
                 let mut rng = seeded_rng(None);
                 for _ in 0..num {
-                    let bytes = random_vec(&mut rng, size as usize);
-                    let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
+                    let bytes = random_bytes(&mut rng, size as usize);
+                    let entry: SerializedBytes =
+                        UnsafeBytes::from(bytes.into_vec()).try_into().unwrap();
                     let hash = api.create(CreateInput::new(
                         InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
                         EntryVisibility::Public,

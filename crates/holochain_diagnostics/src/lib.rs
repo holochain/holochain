@@ -39,6 +39,13 @@ where
     random_iter(rng).take(num).collect()
 }
 
+pub fn random_bytes(rng: &mut StdRng, num: usize) -> Bytes
+where
+    Standard: Distribution<u8>,
+{
+    Bytes::from(random_iter::<u8>(rng).take(num).collect::<Vec<_>>())
+}
+
 pub fn config_standard() -> ConductorConfig {
     holochain::sweettest::standard_config()
 }

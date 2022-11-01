@@ -10,7 +10,7 @@ use std::{
 };
 
 use diagnostic_tests::syn_zome;
-use holochain_diagnostics::{holochain::sweettest::*, random_vec, seeded_rng, AgentPubKey};
+use holochain_diagnostics::{holochain::sweettest::*, random_bytes, seeded_rng, AgentPubKey};
 use tokio_stream::{StreamExt, StreamMap};
 
 const NODES: usize = 10;
@@ -69,7 +69,7 @@ fn task_commit(app: App) -> tokio::task::JoinHandle<()> {
         let mut n = 0;
         loop {
             let node: &Node = &app.nodes[n % NODES];
-            let data = random_vec::<u8>(&mut rng, COMMIT_SIZE);
+            let data = random_bytes(&mut rng, COMMIT_SIZE);
             let _: () = node.conductor.call(&node.zome, "commit", data).await;
 
             println!(

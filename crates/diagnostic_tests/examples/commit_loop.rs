@@ -40,7 +40,7 @@ async fn main() {
 
     // commit entries for roughly 10x as long as it took to setup the apps
     while start.elapsed().as_millis() < setup_time.as_millis() * 100 {
-        let content = random_vec::<u8>(&mut rng, entry_size);
+        let content = random_bytes(&mut rng, entry_size);
         let _: ActionHash = conductor.call(&zome, "create_bytes", content).await;
         print!(".");
         std::io::stdout().flush().ok();

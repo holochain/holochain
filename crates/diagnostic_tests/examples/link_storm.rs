@@ -120,7 +120,7 @@ async fn setup_app(mut rng: StdRng) -> App {
     let dna =
         dna.update_modifiers(DnaModifiersOpt::none().with_quantum_time(Duration::from_secs(5)));
     let bases = (0..BASES)
-        .map(|_| ActionHash::from_raw_32(random_vec(&mut rng, 32)).into())
+        .map(|_| ActionHash::from_raw_32(random_bytes(&mut rng, 32).to_vec()).into())
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
