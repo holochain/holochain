@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221102.014648
+
+## [holochain\_cli-0.0.65](crates/holochain_cli/CHANGELOG.md#0.0.65)
+
+## [holochain\_cli\_sandbox-0.0.61](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.61)
+
+## [holochain\_cli\_bundle-0.0.60](crates/holochain_cli_bundle/CHANGELOG.md#0.0.60)
+
+## [holochain-0.0.170](crates/holochain/CHANGELOG.md#0.0.170)
+
+- Add call to authorize a zome call signing key to Admin API [\#1641](https://github.com/holochain/holochain/pull/1641)
+- Add call to request DNA definition to Admin API [\#1641](https://github.com/holochain/holochain/pull/1641)
+
+## [holochain\_test\_wasm\_common-0.0.59](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.59)
+
+## [holochain\_conductor\_api-0.0.67](crates/holochain_conductor_api/CHANGELOG.md#0.0.67)
+
+## [holochain\_wasm\_test\_utils-0.0.66](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.66)
+
+## [holochain\_cascade-0.0.69](crates/holochain_cascade/CHANGELOG.md#0.0.69)
+
+## [holochain\_state-0.0.67](crates/holochain_state/CHANGELOG.md#0.0.67)
+
+## [holochain\_p2p-0.0.64](crates/holochain_p2p/CHANGELOG.md#0.0.64)
+
+## [holochain\_types-0.0.64](crates/holochain_types/CHANGELOG.md#0.0.64)
+
+## [holochain\_keystore-0.0.62](crates/holochain_keystore/CHANGELOG.md#0.0.62)
+
+## [holochain\_sqlite-0.0.61](crates/holochain_sqlite/CHANGELOG.md#0.0.61)
+
+## [hdk-0.0.158](crates/hdk/CHANGELOG.md#0.0.158)
+
+## [holochain\_zome\_types-0.0.53](crates/holochain_zome_types/CHANGELOG.md#0.0.53)
+
+## [hdi-0.1.7](crates/hdi/CHANGELOG.md#0.1.7)
+
+## [hdk\_derive-0.0.53](crates/hdk_derive/CHANGELOG.md#0.0.53)
+
+## [holochain\_integrity\_types-0.0.23](crates/holochain_integrity_types/CHANGELOG.md#0.0.23)
+
+## [holo\_hash-0.0.35](crates/holo_hash/CHANGELOG.md#0.0.35)
+
 # 20221026.192152
 
 ## [holochain\_cli-0.0.64](crates/holochain_cli/CHANGELOG.md#0.0.64)

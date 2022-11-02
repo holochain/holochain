@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.0.61"
+version = "0.0.62"
 description = "keystore for libsodium keypairs"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -19,9 +19,9 @@ no-deps = [ "lair_keystore/rusqlite-bundled" ]
 [dependencies]
 base64 = "0.13.0"
 futures = "0.3.23"
-holo_hash = { version = "0.0.34", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.0.35", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.51"
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.0.52"}
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.0.53"}
 kitsune_p2p_types = { version = "^0.0.37", path = "../kitsune_p2p/types" }
 lair_keystore = { version = "0.2.1", default-features = false }
 must_future = "0.1.2"
@@ -37,7 +37,7 @@ tracing = "0.1"
 
 # This is a redundant dependency.
 # It's included only to set the proper feature flag for database encryption.
-holochain_sqlite = { version = "^0.0.60", path = "../holochain_sqlite" }
+holochain_sqlite = { version = "^0.0.61", path = "../holochain_sqlite" }
 
 [dev-dependencies]
 assert_cmd = "2.0.4"
