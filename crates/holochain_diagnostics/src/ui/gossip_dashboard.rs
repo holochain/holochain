@@ -104,7 +104,7 @@ pub trait ClientState {
 
     fn total_commits(&self) -> usize;
     fn link_counts(&self) -> LinkCountsRef;
-    fn node_rounds_sorted<'a>(&self, metrics: &'a Metrics, cert: &NodeId) -> NodeRounds<'a, usize>;
+    fn node_rounds_sorted<'a>(&self, metrics: &'a Metrics) -> NodeRounds<'a, usize>;
 }
 
 /// Distinct modes of input handling and display

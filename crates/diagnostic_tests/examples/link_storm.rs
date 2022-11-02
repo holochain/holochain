@@ -233,16 +233,11 @@ impl ClientState for State {
         self.link_counts.as_ref()
     }
 
-    fn node_rounds_sorted<'a>(
-        &self,
-        metrics: &'a metrics::Metrics,
-        cert: &NodeId,
-    ) -> NodeRounds<'a, usize> {
-        let node_index = self.node_cert_index.get(cert).unwrap();
+    fn node_rounds_sorted<'a>(&self, metrics: &'a metrics::Metrics) -> NodeRounds<'a, usize> {
         let mut histories: Vec<_> = metrics
             .peer_node_histories()
             .iter()
-            .map(|(cert, history)| (*node_index, history))
+            .map(|(cert, history)| (*self.node_cert_index.get(cert).unwrap(), history))
             .collect();
         histories.sort_unstable_by_key(|(i, _)| *i);
         NodeRounds::new(histories)
