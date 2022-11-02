@@ -1,6 +1,8 @@
+#![allow(unused_imports)]
+
 use holochain::prelude::{
     dht::region::Region,
-    gossip::sharded_gossip::{NodeId, RegionDiffs},
+    gossip::sharded_gossip::RegionDiffs,
     kitsune_p2p::dependencies::{
         kitsune_p2p_proxy,
         kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},

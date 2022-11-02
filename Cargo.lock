@@ -2260,6 +2260,8 @@ dependencies = [
  "human-repr",
  "rand 0.8.5",
  "tracing",
+ "tracing-appender",
+ "tracing-subscriber 0.3.15",
  "tui",
 ]
 
@@ -6246,6 +6248,7 @@ version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c3f9a28b618c3a6b9251b6908e9c99e04b9e5c02e6581ccbb67d59c34ef7f9b"
 dependencies = [
+ "itoa 1.0.3",
  "libc",
  "num_threads",
 ]
@@ -6433,6 +6436,17 @@ dependencies = [
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-appender"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09d48f71a791638519505cefafe162606f706c25592e4bde4d97600c0195312e"
+dependencies = [
+ "crossbeam-channel",
+ "time 0.3.14",
+ "tracing-subscriber 0.3.15",
 ]
 
 [[package]]

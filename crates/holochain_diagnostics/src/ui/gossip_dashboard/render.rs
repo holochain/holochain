@@ -12,7 +12,7 @@ impl GossipDashboard {
                 .collect();
             let activity = metrics
                 .iter()
-                .map(|(metrics, cert)| !state.node_rounds_sorted(metrics).currents.is_empty())
+                .map(|(metrics, _)| !state.node_rounds_sorted(metrics).currents.is_empty())
                 .enumerate();
             f.render_stateful_widget(
                 widgets::ui_node_list(activity),

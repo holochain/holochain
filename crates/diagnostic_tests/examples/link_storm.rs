@@ -4,6 +4,7 @@ use holochain_diagnostics::{
         conductor::{conductor::RwShare, config::ConductorConfig},
         prelude::*,
         sweettest::*,
+        tracing,
     },
     ui::gossip_dashboard::*,
     *,
@@ -12,24 +13,22 @@ use std::{
     collections::HashMap,
     error::Error,
     io::{self},
+    path::PathBuf,
     sync::Arc,
     time::{Duration, Instant},
 };
 use tui::{backend::Backend, Terminal};
 
-const BASES: usize = 12;
+const BASES: usize = 1;
 
 const ENTRY_SIZE: usize = 10_000_000;
 const MAX_COMMITS: usize = 1_000;
 const ENTRIES_PER_COMMIT: u32 = 1;
 
 const COMMIT_RATE: Duration = Duration::from_millis(0);
-const GET_RATE: Duration = Duration::from_millis(100);
+const GET_RATE: Duration = Duration::from_millis(2000);
 
 const REFRESH_RATE: Duration = Duration::from_millis(50);
-
-/// Display the UI if all other conditions are met
-const UI: bool = true;
 
 /// Config for each conductor
 fn config() -> ConductorConfig {
@@ -69,17 +68,22 @@ fn config() -> ConductorConfig {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    observability::test_run().ok();
+    // observability::test_run().ok();
 
-    println!(
+    let show_ui = std::env::var("NOUI").is_err();
+
+    if show_ui {
+        setup_logging(Some((&PathBuf::from("link_storm.log"), true)));
+    } else {
+        setup_logging(None);
+    }
+
+    tracing::info!(
         "Total amount of entry data to commit: {}",
         (MAX_COMMITS * ENTRY_SIZE).human_count_bytes()
     );
 
     let app = setup_app(seeded_rng(None)).await;
-
-    let yes_ui = std::env::var("NOUI").is_err();
-    let show_ui = UI && std::env::var("RUST_LOG").is_err() && yes_ui;
 
     let tasks = futures::future::join_all([
         // spawn_commit_task(app.clone()),

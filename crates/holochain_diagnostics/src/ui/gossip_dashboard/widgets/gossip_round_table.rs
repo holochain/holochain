@@ -46,7 +46,6 @@ pub fn gossip_round_table<Id: Display + Clone>(
                 )
             }),
     );
-    let num_current = rows.len();
 
     // Add past round info
 

@@ -14,6 +14,9 @@ use rand::*;
 mod terminal;
 pub use terminal::*;
 
+mod logging;
+pub use logging::*;
+
 pub use human_repr::*;
 
 pub mod ui;

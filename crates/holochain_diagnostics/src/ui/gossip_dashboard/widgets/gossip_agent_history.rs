@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn ui_gossip_agent_history_table(
+pub fn _ui_gossip_agent_history_table(
     infos: Vec<(usize, &PeerAgentHistory)>,
     n: usize,
 ) -> Table<'static> {
@@ -10,7 +10,7 @@ pub fn ui_gossip_agent_history_table(
     Table::new(
         infos
             .iter()
-            .map(|(i, info)| row(info, n == *i))
+            .map(|(i, info)| _row(info, n == *i))
             .collect::<Vec<_>>(),
     )
     .header(header)
@@ -25,7 +25,7 @@ pub fn ui_gossip_agent_history_table(
     ])
 }
 
-fn row(info: &PeerAgentHistory, own: bool) -> Row<'static> {
+fn _row(info: &PeerAgentHistory, own: bool) -> Row<'static> {
     let active = if info.current_round { "*" } else { " " }.to_string();
 
     // let latency = format!("{:3}", *info.latency_micros / 1000.0);
