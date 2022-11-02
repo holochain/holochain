@@ -139,6 +139,7 @@ impl SweetConductor {
         Conductor::builder()
             .config(config.clone())
             .with_keystore(keystore)
+            .no_print_setup()
             .test(db_dir, extra_dnas)
             .await
             .unwrap()

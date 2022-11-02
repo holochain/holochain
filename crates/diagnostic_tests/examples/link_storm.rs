@@ -160,11 +160,11 @@ async fn introduce_node_to_peers(node: &Node, peers: &[Node]) {
                 .new_integrated_data(peer.zome.cell_id().dna_hash().clone())
                 .await
                 .unwrap();
-            dbg!(peer
-                .conductor
-                .get_agent_infos(Some(peer.zome.cell_id().clone()))
-                .await
-                .unwrap());
+            // dbg!(peer
+            //     .conductor
+            //     .get_agent_infos(Some(peer.zome.cell_id().clone()))
+            //     .await
+            //     .unwrap());
         }))
         .await;
     }
