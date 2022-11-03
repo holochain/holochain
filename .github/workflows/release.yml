@@ -383,7 +383,6 @@ jobs:
         if: ${{ contains(matrix.platform.largeCacheStorage.nix, 'cachix') && contains(matrix.testCommand.largeCacheStorage, 'nix') }}
         with:
           name: holochain-ci
-          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
           installCommand: |
             nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV} \
@@ -530,7 +529,6 @@ jobs:
         uses: cachix/cachix-action@v11
         with:
           name: holochain-ci
-          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
           installCommand: |
             nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV} \
