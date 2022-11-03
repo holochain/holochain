@@ -342,3 +342,39 @@ impl HashableContent for DnaDef {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use holochain_serialized_bytes::prelude::*;
+
+    #[test]
+    fn test_update_modifiers() {
+        #[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+        struct Props(u32);
+
+        let props = SerializedBytes::try_from(Props(42)).unwrap();
+
+        let now = Timestamp::now();
+        let mods = DnaModifiers {
+            network_seed: "seed".into(),
+            properties: ().try_into().unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+        };
+
+        let opt = DnaModifiersOpt {
+            network_seed: None,
+            properties: Some(props.clone()),
+            origin_time: Some(now),
+        };
+
+        let expected = DnaModifiers {
+            network_seed: "seed".into(),
+            properties: props.clone(),
+            origin_time: now,
+        };
+
+        assert_eq!(mods.update(opt), expected);
+    }
+}
