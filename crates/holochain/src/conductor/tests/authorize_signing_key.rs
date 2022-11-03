@@ -1,6 +1,6 @@
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{AppRoleId, AuthorizeZomeCallSigningKeyPayload, CapSecret};
+use holochain_zome_types::{AppRoleId, CapSecret, GrantZomeCallCapPayload};
 use matches::assert_matches;
 use std::collections::BTreeSet;
 
@@ -57,7 +57,7 @@ async fn authorize_signing_key() {
     // request authorization of signing key for another agent's cell should fail
     let another_agent_key = fixt!(AgentPubKey);
     let authorization_result = conductor
-        .authorize_zome_call_signing_key(AuthorizeZomeCallSigningKeyPayload {
+        .authorize_zome_call_signing_key(GrantZomeCallCapPayload {
             provenance: another_agent_key.clone(),
             cell_id: cell_id.clone(),
             cap_grant: cap_grant.clone(),
@@ -71,7 +71,7 @@ async fn authorize_signing_key() {
 
     // request authorization of signing key for agent's own cell should succeed
     conductor
-        .authorize_zome_call_signing_key(AuthorizeZomeCallSigningKeyPayload {
+        .authorize_zome_call_signing_key(GrantZomeCallCapPayload {
             provenance: agent_pub_key.clone(),
             cell_id: cell_id.clone(),
             cap_grant: cap_grant.clone(),

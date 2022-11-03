@@ -1787,9 +1787,9 @@ mod misc_impls {
         /// Authorize a zome call signing key for a cell
         pub async fn authorize_zome_call_signing_key(
             &self,
-            payload: AuthorizeZomeCallSigningKeyPayload,
+            payload: GrantZomeCallCapPayload,
         ) -> ConductorApiResult<()> {
-            let AuthorizeZomeCallSigningKeyPayload {
+            let GrantZomeCallCapPayload {
                 provenance,
                 cell_id,
                 cap_grant,

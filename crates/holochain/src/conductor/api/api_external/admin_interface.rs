@@ -336,12 +336,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::RecordsGrafted)
             }
-            AuthorizeZomeCallSigningKey(payload) => {
+            GrantZomeCallCap(payload) => {
                 self.conductor_handle
                     .clone()
                     .authorize_zome_call_signing_key(*payload)
                     .await?;
-                Ok(AdminResponse::ZomeCallSigningKeyAuthorized)
+                Ok(AdminResponse::ZomeCallCapGranted)
             }
             RestoreCloneCell(payload) => {
                 let restored_cell = self

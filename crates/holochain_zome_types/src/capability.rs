@@ -33,14 +33,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::CellId;
 
-/// Parameters for authorizing a zome call signing key.
+/// Parameters for granting a zome call capability.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct AuthorizeZomeCallSigningKeyPayload {
+pub struct GrantZomeCallCapPayload {
     /// Agent that is requesting authorization of a signing key.
     pub provenance: AgentPubKey,
-    /// Cell for which to authorize the signing key.
+    /// Cell for which to authorize the capability.
     pub cell_id: CellId,
-    /// Specifies zomes and functions to allow signing for as well as key
-    /// and secret.
+    /// Specifies the capability, consisting of zomes and functions to allow
+    /// signing for as well as access level, secret and assignees.
     pub cap_grant: ZomeCallCapGrant,
 }
