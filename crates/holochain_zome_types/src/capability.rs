@@ -27,7 +27,6 @@
 mod grant;
 pub use grant::*;
 
-use holo_hash::AgentPubKey;
 pub use holochain_integrity_types::capability::*;
 use serde::{Deserialize, Serialize};
 
@@ -36,8 +35,6 @@ use crate::CellId;
 /// Parameters for granting a zome call capability.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GrantZomeCallCapPayload {
-    /// Agent that is requesting authorization of a signing key.
-    pub provenance: AgentPubKey,
     /// Cell for which to authorize the capability.
     pub cell_id: CellId,
     /// Specifies the capability, consisting of zomes and functions to allow

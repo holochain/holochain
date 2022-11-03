@@ -1,10 +1,8 @@
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{AppRoleId, CapSecret, GrantZomeCallCapPayload};
-use matches::assert_matches;
 use std::collections::BTreeSet;
 
-use crate::conductor::api::error::ConductorApiError;
 use crate::fixt::AgentPubKeyFixturator;
 use crate::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
 use ::fixt::fixt;
@@ -54,25 +52,9 @@ async fn authorize_signing_key() {
         },
     };
 
-    // request authorization of signing key for another agent's cell should fail
-    let another_agent_key = fixt!(AgentPubKey);
-    let authorization_result = conductor
-        .authorize_zome_call_signing_key(GrantZomeCallCapPayload {
-            provenance: another_agent_key.clone(),
-            cell_id: cell_id.clone(),
-            cap_grant: cap_grant.clone(),
-        })
-        .await;
-    assert!(authorization_result.is_err());
-    assert_matches!(
-        authorization_result,
-        Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(c_id, key)) if c_id == *cell_id && key == another_agent_key
-    );
-
     // request authorization of signing key for agent's own cell should succeed
     conductor
         .authorize_zome_call_signing_key(GrantZomeCallCapPayload {
-            provenance: agent_pub_key.clone(),
             cell_id: cell_id.clone(),
             cap_grant: cap_grant.clone(),
         })
