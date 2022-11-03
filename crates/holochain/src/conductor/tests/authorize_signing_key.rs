@@ -1,6 +1,6 @@
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{AppRoleId, CapSecret, GrantZomeCallCapPayload};
+use holochain_zome_types::{AppRoleId, CapSecret, GrantZomeCallCapabilityPayload};
 use std::collections::BTreeSet;
 
 use crate::fixt::AgentPubKeyFixturator;
@@ -10,7 +10,7 @@ use arbitrary::Arbitrary;
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
-async fn authorize_signing_key() {
+async fn grant_zome_call_capability() {
     use holochain_zome_types::{CapAccess, ZomeCallCapGrant};
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -27,34 +27,34 @@ async fn authorize_signing_key() {
         .unwrap();
     let cell_id = app.cells()[0].cell_id();
 
-    // generate a signing key
-    let signing_key = fixt!(AgentPubKey);
+    // generate a cap access public key
+    let cap_access_public_key = fixt!(AgentPubKey);
 
-    // compute a cap secret
+    // compute a cap access secret
     let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
+    let cap_access_secret = CapSecret::arbitrary(&mut buf).unwrap();
 
     // set up functions to grant access to
     let mut functions = BTreeSet::new();
     let granted_function = ("zome".into(), "create".into());
     functions.insert(granted_function.clone());
 
-    // set up assignees which is a single entry, namely the signing key
+    // set up assignees which is only the agent key
     let mut assignees = BTreeSet::new();
-    assignees.insert(signing_key.clone());
+    assignees.insert(cap_access_public_key.clone());
 
     let cap_grant = ZomeCallCapGrant {
         tag: "signing_key".into(),
         functions,
         access: CapAccess::Assigned {
-            secret: cap_secret,
+            secret: cap_access_secret,
             assignees,
         },
     };
 
     // request authorization of signing key for agent's own cell should succeed
     conductor
-        .authorize_zome_call_signing_key(GrantZomeCallCapPayload {
+        .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
             cell_id: cell_id.clone(),
             cap_grant: cap_grant.clone(),
         })
@@ -76,19 +76,19 @@ async fn authorize_signing_key() {
     .await
     .unwrap();
 
-    let signing_key_cap_grant = source_chain_read
+    let actual_cap_grant = source_chain_read
         .valid_cap_grant(
             granted_function.clone(),
-            signing_key.clone(),
-            Some(cap_secret.clone()),
+            cap_access_public_key.clone(),
+            Some(cap_access_secret.clone()),
         )
         .await
         .unwrap();
 
-    assert!(signing_key_cap_grant.is_some());
-    assert!(signing_key_cap_grant.unwrap().is_valid(
+    assert!(actual_cap_grant.is_some());
+    assert!(actual_cap_grant.unwrap().is_valid(
         &granted_function,
-        &signing_key,
-        Some(&cap_secret)
+        &cap_access_public_key,
+        Some(&cap_access_secret)
     ));
 }

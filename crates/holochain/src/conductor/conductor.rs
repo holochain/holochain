@@ -1782,12 +1782,12 @@ mod misc_impls {
     use super::*;
 
     impl Conductor {
-        /// Authorize a zome call signing key for a cell
-        pub async fn authorize_zome_call_signing_key(
+        /// Grant a zome call capability for a cell
+        pub async fn grant_zome_call_capability(
             &self,
-            payload: GrantZomeCallCapPayload,
+            payload: GrantZomeCallCapabilityPayload,
         ) -> ConductorApiResult<()> {
-            let GrantZomeCallCapPayload { cell_id, cap_grant } = payload;
+            let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
             let source_chain = SourceChain::new(
                 self.get_authored_db(cell_id.dna_hash())?,

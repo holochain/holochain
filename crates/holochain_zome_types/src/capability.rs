@@ -34,7 +34,7 @@ use crate::CellId;
 
 /// Parameters for granting a zome call capability.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct GrantZomeCallCapPayload {
+pub struct GrantZomeCallCapabilityPayload {
     /// Cell for which to authorize the capability.
     pub cell_id: CellId,
     /// Specifies the capability, consisting of zomes and functions to allow
