@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221103.145333
+
+## [holochain\_cli-0.0.66](crates/holochain_cli/CHANGELOG.md#0.0.66)
+
+## [holochain\_cli\_sandbox-0.0.62](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.62)
+
+## [holochain\_cli\_bundle-0.0.61](crates/holochain_cli_bundle/CHANGELOG.md#0.0.61)
+
+## [holochain-0.0.171](crates/holochain/CHANGELOG.md#0.0.171)
+
+## [holochain\_test\_wasm\_common-0.0.60](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.60)
+
+## [holochain\_conductor\_api-0.0.68](crates/holochain_conductor_api/CHANGELOG.md#0.0.68)
+
+## [holochain\_wasm\_test\_utils-0.0.67](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.67)
+
+## [holochain\_cascade-0.0.70](crates/holochain_cascade/CHANGELOG.md#0.0.70)
+
+## [holochain\_state-0.0.68](crates/holochain_state/CHANGELOG.md#0.0.68)
+
+## [holochain\_p2p-0.0.65](crates/holochain_p2p/CHANGELOG.md#0.0.65)
+
+## [holochain\_types-0.0.65](crates/holochain_types/CHANGELOG.md#0.0.65)
+
+- Fixed a bug where DNA modifiers specified in a hApp manifest would not be respected when specifying a `network_seed` in a `InstallAppBundlePayload`. [\#1642](https://github.com/holochain/holochain/pull/1642)
+
+## [holochain\_keystore-0.0.63](crates/holochain_keystore/CHANGELOG.md#0.0.63)
+
+## [holochain\_sqlite-0.0.62](crates/holochain_sqlite/CHANGELOG.md#0.0.62)
+
+## [hdk-0.0.159](crates/hdk/CHANGELOG.md#0.0.159)
+
+## [holochain\_zome\_types-0.0.54](crates/holochain_zome_types/CHANGELOG.md#0.0.54)
+
 # 20221102.014648
 
 ## [holochain\_cli-0.0.65](crates/holochain_cli/CHANGELOG.md#0.0.65)
