@@ -41,8 +41,9 @@ fn config() -> ConductorConfig {
     config.network.as_mut().map(|c| {
         *c = c.clone().tune(|mut tp| {
             tp.disable_publish = true;
-            // tp.disable_historical_gossip = true;
-            tp.danger_gossip_recent_threshold_secs = 0;
+
+            tp.disable_recent_gossip = true;
+            tp.danger_gossip_recent_threshold_secs = 3;
 
             tp.gossip_inbound_target_mbps = 1000000.0;
             tp.gossip_outbound_target_mbps = 1000000.0;
@@ -88,7 +89,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let tasks = futures::future::join_all([
         // spawn_commit_task(app.clone()),
         spawn_get_task(app.clone()),
-        tokio::spawn(async move {}),
+        // tokio::spawn(async move {}),
     ]);
 
     if show_ui {
@@ -98,9 +99,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             r = ui_task => { r.unwrap().unwrap() }
         }
     } else {
-        tokio::select! {
-            r = tasks => { r.into_iter().collect::<Result<Vec<_>, _>>().unwrap();  }
-        }
+        // tokio::select! {
+        //     r = tasks => { r.into_iter().collect::<Result<Vec<_>, _>>().unwrap();  }
+        // }
     }
 
     Ok(())
@@ -325,7 +326,6 @@ fn spawn_get_task(app: App) -> tokio::task::JoinHandle<()> {
                         last_zero = None;
                     }
                 }
-                state.time = Instant::now();
             });
 
             i += 1;
@@ -425,9 +425,19 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: App) -> io::
                 app.state.share_ref(|state| state.nodes[index].clone());
                 tokio::spawn(commit_random(app.clone(), Some(index)));
             }
+            Some(InputCmd::AwakenGossip) => {
+                tokio::spawn(futures::future::join_all(app.state.share_ref(|state| {
+                    state.nodes.clone().into_iter().map(|n| {
+                        n.conductor
+                            .holochain_p2p()
+                            .new_integrated_data(n.zome.cell_id().dna_hash().clone())
+                    })
+                })));
+            }
             None => (),
         };
 
+        let _ = app.state.share_mut(|state| state.time = Instant::now());
         let _ = app
             .state
             .share_ref(|state| terminal.draw(|f| app.ui.render(f, state)).unwrap());

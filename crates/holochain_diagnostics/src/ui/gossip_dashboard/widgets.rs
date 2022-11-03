@@ -112,6 +112,8 @@ pub fn ui_keymap() -> List<'static> {
         [
             "↑/↓/j/k : select node".to_string(),
             "      n : add new Node".to_string(),
+            "      e : commit new Entry".to_string(),
+            "      g : force Gossip to reawaken".to_string(),
             "      x : eXchange peer info across all nodes".to_string(),
             "      c : Clear garbage from background buffer".to_string(),
             "      0 : toggle empty gossip rounds".to_string(),

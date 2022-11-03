@@ -228,7 +228,7 @@ impl ShardedGossipLocal {
 
             // we consider recent gossip to have "sent its region"
             // for purposes of determining the round is complete
-            state.sent_region_set = true;
+            state.regions_are_queued = true;
 
             self.next_bloom_batch(state, gossip).await
         } else {
@@ -236,7 +236,7 @@ impl ShardedGossipLocal {
             // gossip already. Just mark this true so that the state will not
             // be considered "finished" until all op data is received.
             state.has_pending_historical_op_data = true;
-            state.sent_region_set = false;
+            state.regions_are_queued = false;
             Ok(state)
         }
     }

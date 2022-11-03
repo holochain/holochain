@@ -6,6 +6,7 @@ pub enum InputCmd {
     ExchangePeers,
     AddNode(usize),
     AddEntry(usize),
+    AwakenGossip,
 }
 
 impl GossipDashboard {
@@ -27,6 +28,9 @@ impl GossipDashboard {
                     }
                     KeyCode::Char('e') => {
                         return Some(InputCmd::AddEntry(0));
+                    }
+                    KeyCode::Char('g') => {
+                        return Some(InputCmd::AwakenGossip);
                     }
                     KeyCode::Enter => self.local_state.share_mut(|s| match s.focus {
                         Focus::Empty => {

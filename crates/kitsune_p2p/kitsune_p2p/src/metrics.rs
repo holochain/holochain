@@ -460,6 +460,9 @@ impl Metrics {
                 gossip_type,
             };
             record_item(&mut history.initiates, round);
+            if history.current_round {
+                tracing::warn!("Recorded initiate with current round already set");
+            }
             history.current_round = true;
         }
     }
@@ -471,7 +474,7 @@ impl Metrics {
         I: IntoIterator<Item = T>,
     {
         for agent_info in remote_agent_list {
-            let info = self
+            let history = self
                 .agent_history
                 .entry(agent_info.into().agent().clone())
                 .or_default();
@@ -479,8 +482,11 @@ impl Metrics {
                 instant: Instant::now(),
                 gossip_type,
             };
-            record_item(&mut info.accepts, round);
-            info.current_round = true;
+            record_item(&mut history.accepts, round);
+            if history.current_round {
+                tracing::warn!("Recorded accept with current round already set");
+            }
+            history.current_round = true;
         }
     }
 
@@ -493,18 +499,18 @@ impl Metrics {
         let mut should_dec_force_initiates = false;
 
         for agent_info in remote_agent_list {
-            let info = self
+            let history = self
                 .agent_history
                 .entry(agent_info.into().agent().clone())
                 .or_default();
-            info.reachability_quotient.push(100);
+            history.reachability_quotient.push(100);
             let round = RoundMetric {
                 instant: Instant::now(),
                 gossip_type,
             };
-            record_item(&mut info.successes, round);
-            info.current_round = false;
-            if info.is_initiate_round() {
+            record_item(&mut history.successes, round);
+            history.current_round = false;
+            if history.is_initiate_round() {
                 should_dec_force_initiates = true;
             }
         }
@@ -526,17 +532,17 @@ impl Metrics {
         I: IntoIterator<Item = T>,
     {
         for agent_info in remote_agent_list {
-            let info = self
+            let history = self
                 .agent_history
                 .entry(agent_info.into().agent().clone())
                 .or_default();
-            info.reachability_quotient.push_n(1, 5);
+            history.reachability_quotient.push_n(1, 5);
             let round = RoundMetric {
                 instant: Instant::now(),
                 gossip_type,
             };
-            record_item(&mut info.errors, round);
-            info.current_round = false;
+            record_item(&mut history.errors, round);
+            history.current_round = false;
         }
         tracing::debug!(
             "recorded error in metrics. force_initiates={}",

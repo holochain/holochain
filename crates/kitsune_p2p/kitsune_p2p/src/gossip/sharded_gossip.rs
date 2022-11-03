@@ -343,7 +343,7 @@ impl ShardedGossip {
 
         if let Some(msg) = outgoing.as_ref() {
             tracing::debug!(
-                "OUTGOING GOSSIP [{}]  => {:16} ({:10}) : {:?} -> {:?} [{}]",
+                "OUTGOING GOSSIP [{}]  => {:17} ({:10}) : {:?} -> {:?} [{}]",
                 gossip_type_char,
                 msg.2
                     .variant_type()
@@ -370,7 +370,7 @@ impl ShardedGossip {
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
                 Ok(r) => {
                     tracing::debug!(
-                        "INCOMING GOSSIP [{}] <=  {:16} ({:10}) : {:?} -> {:?} [{}]",
+                        "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> {:?} [{}]",
                         gossip_type_char,
                         variant_type,
                         len,
@@ -687,8 +687,8 @@ pub struct RoundState {
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
     received_all_incoming_op_blooms: bool,
-    /// If historic gossip, we sent our region set already (will be true for Recent)
-    sent_region_set: bool,
+    /// If historic gossip, we calculated and queued our region diff (will be true for Recent)
+    regions_are_queued: bool,
     /// Number of ops blooms we have sent for this round, which is also the
     /// number of MissingOps sets we expect in response
     num_expected_op_blooms: u16,
@@ -732,7 +732,7 @@ impl RoundState {
             common_arc_set,
             received_all_incoming_op_blooms: false,
             has_pending_historical_op_data: false,
-            sent_region_set: false,
+            regions_are_queued: false,
             bloom_batch_cursor: None,
             num_expected_op_blooms: 0,
             ops_batch_queue: OpsBatchQueue::new(),
@@ -883,7 +883,7 @@ impl ShardedGossipLocal {
 
     fn decrement_op_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
         self.inner.share_mut(|i, _| {
-            let update_state = |state: &mut RoundState| {
+            let remove_state = |state: &mut RoundState| {
                 let num_op_blooms = state.num_expected_op_blooms.saturating_sub(1);
                 state.num_expected_op_blooms = num_op_blooms;
                 // NOTE: there is only ever one "batch" of OpRegions
@@ -892,7 +892,7 @@ impl ShardedGossipLocal {
             };
             if i.round_map
                 .get_mut(state_id)
-                .map(update_state)
+                .map(remove_state)
                 .unwrap_or(true)
             {
                 Ok(i.remove_state(state_id, self.gossip_type, false))
@@ -1187,10 +1187,20 @@ impl RoundState {
 
         let ops_finished = ops_in >= expected_in && ops_out >= expected_out;
 
+        // tracing::debug!(
+        //     "FINISHED? {} {} {} {} {} {} {}",
+        //     self.num_expected_op_blooms == 0,
+        //     !self.has_pending_historical_op_data,
+        //     self.received_all_incoming_op_blooms,
+        //     self.regions_are_queued,
+        //     self.bloom_batch_cursor.is_none(),
+        //     self.ops_batch_queue.is_empty(),
+        //     ops_finished
+        // );
         self.num_expected_op_blooms == 0
             && !self.has_pending_historical_op_data
             && self.received_all_incoming_op_blooms
-            && self.sent_region_set
+            && self.regions_are_queued
             && self.bloom_batch_cursor.is_none()
             && self.ops_batch_queue.is_empty()
             && ops_finished

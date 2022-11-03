@@ -123,7 +123,7 @@ impl ShardedGossipLocal {
                     round.throughput.expected_op_count.incoming +=
                         their_region_diff.iter().map(|r| r.data.count).sum::<u32>();
                     round.region_diffs = Some((our_region_diff.clone(), their_region_diff));
-                    round.sent_region_set = true;
+                    round.regions_are_queued = true;
                     i.metrics.write().update_current_round(
                         cert,
                         GossipModuleType::ShardedHistorical,

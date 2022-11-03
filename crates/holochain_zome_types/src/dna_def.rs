@@ -49,11 +49,13 @@ pub struct DnaModifiers {
 
     /// The smallest unit of time used for gossip time windows.
     /// You probably don't need to change this.
-    #[cfg_attr(
-        feature = "full-dna-def",
-        builder(default = "kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME")
-    )]
+    #[cfg_attr(feature = "full-dna-def", builder(default = "standard_quantum_time()"))]
+    #[serde(default = "standard_quantum_time")]
     pub quantum_time: Duration,
+}
+
+const fn standard_quantum_time() -> Duration {
+    kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME
 }
 
 impl DnaModifiers {
