@@ -82,7 +82,7 @@ jobs:
         continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           name: holochain-ci
-          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
+          # signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
           installCommand: |
             nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV:?} \
