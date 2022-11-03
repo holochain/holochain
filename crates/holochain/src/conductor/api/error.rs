@@ -20,10 +20,6 @@ pub enum ConductorApiError {
     #[error("The Dna for this Cell is not installed in the conductor! DnaHash: {0}")]
     DnaMissing(DnaHash),
 
-    /// Attempted to authorize a zome call signing key for another agent's cell.
-    #[error("Attempted to authorize a zome call signing for another agent's cell.\nCellId: {0:?}\nAgentPubKey: {1:?}")]
-    IllegalZomeCallSigningKeyAuthorization(CellId, AgentPubKey),
-
     /// Cell was referenced, but is missing from the conductor.
     #[error(
         "A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {call_cell_id:?}"
