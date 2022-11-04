@@ -5,6 +5,7 @@ use holo_hash::WasmHash;
 use holochain::conductor::api::AdminInterfaceApi;
 use holochain::conductor::api::RealAdminInterfaceApi;
 use holochain::sweettest::*;
+use holochain::test_utils::host_fn_caller::Post;
 use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_types::dna::CoordinatorBundle;
@@ -26,7 +27,6 @@ use holochain_zome_types::WasmZome;
 use holochain_zome_types::Zome;
 use holochain_zome_types::ZomeDef;
 use mr_bundle::Bundle;
-use holochain::test_utils::host_fn_caller::Post;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_coordinator_zome_update() {
@@ -311,12 +311,12 @@ async fn test_multiple_integrity_zomes() {
     let cells = app.into_cells();
 
     let _hash: ActionHash = conductor
-    .call(
-        &cells[0].zome(TestCoordinatorWasm::CoordinatorZomeUpdate),
-        "create_post",
-        Post("Hey".to_string()),
-    )
-    .await;
+        .call(
+            &cells[0].zome(TestCoordinatorWasm::CoordinatorZomeUpdate),
+            "create_post",
+            Post("Hey".to_string()),
+        )
+        .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
