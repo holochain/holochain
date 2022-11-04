@@ -348,12 +348,12 @@ pub enum AdminRequest {
         records: Vec<Record>,
     },
 
-    /// Request authorization of a public key for signing zome calls.
+    /// Request capability grant for making zome calls.
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::ZomeCallSigningKeyAuthorized`]
-    AuthorizeZomeCallSigningKey(Box<AuthorizeZomeCallSigningKeyPayload>),
+    /// [`AdminResponse::ZomeCallCapabilityGranted`]
+    GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
 
     /// Restore a clone cell that was previously archived.
     ///
@@ -523,8 +523,8 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,
 
-    /// The successful response to an [`AdminRequest::AuthorizeZomeCallSigningKey`].
-    ZomeCallSigningKeyAuthorized,
+    /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
+    ZomeCallCapabilityGranted,
 
     // The successful response to an [`AdminRequest::RestoreCloneCell`].
     CloneCellRestored(InstalledCell),

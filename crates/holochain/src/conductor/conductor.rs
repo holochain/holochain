@@ -1779,35 +1779,22 @@ mod scheduler_impls {
 mod misc_impls {
     use holochain_zome_types::builder;
 
-    use crate::conductor::api::error::ConductorApiError;
-
     use super::*;
 
     impl Conductor {
-        /// Authorize a zome call signing key for a cell
-        pub async fn authorize_zome_call_signing_key(
+        /// Grant a zome call capability for a cell
+        pub async fn grant_zome_call_capability(
             &self,
-            payload: AuthorizeZomeCallSigningKeyPayload,
+            payload: GrantZomeCallCapabilityPayload,
         ) -> ConductorApiResult<()> {
-            let AuthorizeZomeCallSigningKeyPayload {
-                provenance,
-                cell_id,
-                cap_grant,
-            } = payload;
-
-            if provenance != *cell_id.agent_pubkey() {
-                return Err(ConductorApiError::IllegalZomeCallSigningKeyAuthorization(
-                    cell_id.clone(),
-                    provenance.clone(),
-                ));
-            }
+            let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
             let source_chain = SourceChain::new(
                 self.get_authored_db(cell_id.dna_hash())?,
                 self.get_dht_db(cell_id.dna_hash())?,
                 self.get_dht_db_cache(cell_id.dna_hash())?,
                 self.keystore.clone(),
-                provenance.clone(),
+                cell_id.agent_pubkey().clone(),
             )
             .await?;
 
