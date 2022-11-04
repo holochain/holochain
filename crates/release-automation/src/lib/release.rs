@@ -243,7 +243,7 @@ fn bump_release_versions<'a>(
 
         let greater_release = release_version > current_version;
         if greater_release {
-            common::set_version(cmd_args.dry_run, crt, &release_version.clone())?;
+            crt.set_version(cmd_args.dry_run, &release_version.clone())?;
         }
 
         let crate_release_heading_name = format!("{}", release_version);
@@ -620,52 +620,6 @@ impl PublishError {
     }
 }
 
-/// module that implements helper functionality for the crates_index crate
-pub mod crates_index_helper {
-    use super::*;
-
-    static CRATES_IO_INDEX: OnceCell<Mutex<crates_index::Index>> = OnceCell::new();
-
-    /// retrieves the statically saved index with the option to force an update.
-    pub fn index(update: bool) -> Fallible<&'static Mutex<crates_index::Index>> {
-        let first_run = CRATES_IO_INDEX.get().is_none();
-
-        let crates_io_index = CRATES_IO_INDEX.get_or_try_init(|| -> Fallible<_> {
-            let mut index = crates_index::Index::new_cargo_default()?;
-            trace!("Using crates index at {:?}", index.path());
-
-            index.update()?;
-
-            Ok(Mutex::new(index))
-        })?;
-
-        if !first_run && update {
-            crates_io_index
-                .lock()
-                .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?
-                .update()?;
-        }
-
-        Ok(crates_io_index)
-    }
-
-    pub(crate) fn is_version_published(crt: &Crate, update: bool) -> Fallible<bool> {
-        let index_lock = index(update)?
-            .lock()
-            .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?;
-
-        Ok(index_lock
-            .crate_(&crt.name())
-            .map(|indexed_crate| -> bool {
-                indexed_crate
-                    .versions()
-                    .iter()
-                    .any(|version| crt.version().to_string() == version.version())
-            })
-            .unwrap_or_default())
-    }
-}
-
 /// Try to publish the given crates to crates.io.
 ///
 /// If dry-run is given, the following error conditoins are tolerated:
@@ -681,9 +635,6 @@ pub(crate) fn do_publish_to_crates_io<'a>(
     allowed_missing_dependencies: &HashSet<String>,
     cargo_target_dir: &Option<PathBuf>,
 ) -> Fallible<()> {
-    static USER_AGENT: &str = "Holochain_Core_Dev_Team (devcore@holochain.org)";
-    static CRATES_IO_CLIENT: OnceCell<crates_io_api::AsyncClient> = OnceCell::new();
-
     ensure_release_order_consistency(&crates)?;
 
     let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
@@ -729,7 +680,9 @@ pub(crate) fn do_publish_to_crates_io<'a>(
     };
 
     while let Some(crt) = queue.pop_front() {
-        if !crt.state().changed() && crates_index_helper::is_version_published(crt, false)? {
+        if !crt.state().changed()
+            && crates_index_helper::is_version_published(&crt.name(), &crt.version(), false)?
+        {
             debug!(
                 "{} is unchanged and already published, skipping..",
                 crt.name_version()
@@ -857,7 +810,7 @@ pub(crate) fn do_publish_to_crates_io<'a>(
                 let duration = std::time::Duration::from_secs(*delay_secs);
                 std::thread::sleep(duration);
 
-                if crates_index_helper::is_version_published(crt, true)? {
+                if crates_index_helper::is_version_published(&crt.name(), &crt.version(), true)? {
                     debug!(
                         "Found recently published {} on crates.io!",
                         crt.name_version()

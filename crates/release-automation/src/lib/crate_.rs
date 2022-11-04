@@ -4,14 +4,14 @@ use cargo::util::VersionExt;
 use linked_hash_map::LinkedHashMap;
 use linked_hash_set::LinkedHashSet;
 use log::{debug, info, trace, warn};
-use semver::Version;
+use semver::{Comparator, Version, VersionReq};
 use std::collections::{HashMap, HashSet};
 use structopt::StructOpt;
 
 use crate::{
     common::{increment_semver, SemverIncrementMode},
     crate_selection::Crate,
-    release::{crates_index_helper, ReleaseWorkspace},
+    release::ReleaseWorkspace,
     CommandResult, Fallible,
 };
 
@@ -123,6 +123,28 @@ pub(crate) struct EnsureCrateOwnersArgs {
 }
 
 #[derive(Debug, StructOpt)]
+pub(crate) struct CratePinDepsArgs {
+    #[structopt(long)]
+    dry_run: bool,
+
+    #[structopt(long, default_value = "=")]
+    version_prefix: String,
+
+    crt: String,
+}
+
+#[derive(Debug, StructOpt)]
+pub(crate) struct CrateMakePinnedArgs {
+    #[structopt(long)]
+    dry_run: bool,
+
+    #[structopt(long, default_value = "=")]
+    version_prefix: String,
+
+    crt: String,
+}
+
+#[derive(Debug, StructOpt)]
 pub(crate) enum CrateCommands {
     SetVersion(CrateSetVersionArgs),
     ApplyDevVersions(CrateApplyDevVersionsArgs),
@@ -135,6 +157,12 @@ pub(crate) enum CrateCommands {
 
     Check(CrateCheckArgs),
     EnsureCrateOwners(EnsureCrateOwnersArgs),
+
+    /// Pins all dependencies of a given crate and its path dependencies recursively
+    PinDeps(CratePinDepsArgs),
+
+    /// Makes a given crate a pinned dependency in the entire workspace
+    MakePinnedDep(CrateMakePinnedArgs),
 }
 
 pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResult {
@@ -148,7 +176,7 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
                 .find(|crt| crt.name() == subcmd_args.crate_name)
                 .ok_or_else(|| anyhow::anyhow!("crate {} not found", subcmd_args.crate_name))?;
 
-            crate::common::set_version(false, crt, &subcmd_args.new_version)?;
+            crt.set_version(false, &subcmd_args.new_version)?;
 
             Ok(())
         }
@@ -188,7 +216,45 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResul
         CrateCommands::DetectMissingReleaseheadings(subcmd_args) => {
             cmd_detect_missing_releaseheadings(&ws, subcmd_args)
         }
+        CrateCommands::PinDeps(subcmd_args) => pin_deps(&ws, subcmd_args),
+        CrateCommands::MakePinnedDep(subcmd_args) => make_pinned_dep(&ws, subcmd_args),
     }
+}
+
+fn pin_deps<'a>(
+    _ws: &'a ReleaseWorkspace<'a>,
+    _subcmd_args: &CratePinDepsArgs,
+) -> Result<(), anyhow::Error> {
+    todo!()
+}
+
+fn make_pinned_dep<'a>(
+    ws: &'a ReleaseWorkspace<'a>,
+    subcmd_args: &CrateMakePinnedArgs,
+) -> Result<(), anyhow::Error> {
+    let crt = ws
+        .members()?
+        .into_iter()
+        .find(|member| member.name() == subcmd_args.crt)
+        .ok_or(anyhow::anyhow!(
+            "looking for crate {} in workspace",
+            subcmd_args.crt
+        ))?;
+
+    for dependant in crt.dependants_in_workspace()? {
+        dependant.set_dependency_version(
+            &crt.name(),
+            &crt.version(),
+            Some(&semver::VersionReq::parse(&format!(
+                "{}{}",
+                subcmd_args.version_prefix,
+                crt.version()
+            ))?),
+            subcmd_args.dry_run,
+        )?;
+    }
+
+    Ok(())
 }
 
 fn cmd_detect_missing_releaseheadings<'a>(
@@ -410,7 +476,7 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
             version,
         );
 
-        for changed_dependant in crate::common::set_version(dry_run, crt, &version)? {
+        for changed_dependant in crt.set_version(dry_run, &version)? {
             if applicable_crates
                 .insert(changed_dependant.name(), changed_dependant)
                 .is_none()
@@ -472,7 +538,7 @@ pub(crate) fn fixup_unpublished_releases<'a>(
                 .collect::<Vec<_>>();
 
             for crt in crates {
-                if !crate::release::crates_index_helper::is_version_published(crt, false)? {
+                if !crates_index_helper::is_version_published(&crt.name(), &crt.version(), false)? {
                     unpublished_crates
                         .entry(release_title.clone())
                         .or_default()
@@ -543,7 +609,7 @@ pub(crate) fn ensure_crate_io_owners<'a>(
         .collect::<HashSet<String>>();
 
     for crt in crates {
-        if !crates_index_helper::is_version_published(crt, false)? {
+        if !crates_index_helper::is_version_published(&crt.name(), &crt.version(), false)? {
             warn!("{} is not published, skipping..", crt.name());
             continue;
         }

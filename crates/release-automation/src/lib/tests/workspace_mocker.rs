@@ -328,7 +328,7 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
             name: "crate_a".to_string(),
             version: "0.0.1".to_string(),
             dependencies: vec![
-                r#"crate_b = { path = "../crate_b", version = "0.0.0-alpha.1" }"#.to_string(),
+                r#"crate_b = { path = "../crate_b", version = "=0.0.0-alpha.1" }"#.to_string(),
             ],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Bin,

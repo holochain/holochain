@@ -6,6 +6,201 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221103.145333
+
+## [holochain\_cli-0.0.66](crates/holochain_cli/CHANGELOG.md#0.0.66)
+
+## [holochain\_cli\_sandbox-0.0.62](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.62)
+
+## [holochain\_cli\_bundle-0.0.61](crates/holochain_cli_bundle/CHANGELOG.md#0.0.61)
+
+## [holochain-0.0.171](crates/holochain/CHANGELOG.md#0.0.171)
+
+## [holochain\_test\_wasm\_common-0.0.60](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.60)
+
+## [holochain\_conductor\_api-0.0.68](crates/holochain_conductor_api/CHANGELOG.md#0.0.68)
+
+## [holochain\_wasm\_test\_utils-0.0.67](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.67)
+
+## [holochain\_cascade-0.0.70](crates/holochain_cascade/CHANGELOG.md#0.0.70)
+
+## [holochain\_state-0.0.68](crates/holochain_state/CHANGELOG.md#0.0.68)
+
+## [holochain\_p2p-0.0.65](crates/holochain_p2p/CHANGELOG.md#0.0.65)
+
+## [holochain\_types-0.0.65](crates/holochain_types/CHANGELOG.md#0.0.65)
+
+- Fixed a bug where DNA modifiers specified in a hApp manifest would not be respected when specifying a `network_seed` in a `InstallAppBundlePayload`. [\#1642](https://github.com/holochain/holochain/pull/1642)
+
+## [holochain\_keystore-0.0.63](crates/holochain_keystore/CHANGELOG.md#0.0.63)
+
+## [holochain\_sqlite-0.0.62](crates/holochain_sqlite/CHANGELOG.md#0.0.62)
+
+## [hdk-0.0.159](crates/hdk/CHANGELOG.md#0.0.159)
+
+## [holochain\_zome\_types-0.0.54](crates/holochain_zome_types/CHANGELOG.md#0.0.54)
+
+# 20221102.014648
+
+## [holochain\_cli-0.0.65](crates/holochain_cli/CHANGELOG.md#0.0.65)
+
+## [holochain\_cli\_sandbox-0.0.61](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.61)
+
+## [holochain\_cli\_bundle-0.0.60](crates/holochain_cli_bundle/CHANGELOG.md#0.0.60)
+
+## [holochain-0.0.170](crates/holochain/CHANGELOG.md#0.0.170)
+
+- Add call to authorize a zome call signing key to Admin API [\#1641](https://github.com/holochain/holochain/pull/1641)
+- Add call to request DNA definition to Admin API [\#1641](https://github.com/holochain/holochain/pull/1641)
+
+## [holochain\_test\_wasm\_common-0.0.59](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.59)
+
+## [holochain\_conductor\_api-0.0.67](crates/holochain_conductor_api/CHANGELOG.md#0.0.67)
+
+## [holochain\_wasm\_test\_utils-0.0.66](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.66)
+
+## [holochain\_cascade-0.0.69](crates/holochain_cascade/CHANGELOG.md#0.0.69)
+
+## [holochain\_state-0.0.67](crates/holochain_state/CHANGELOG.md#0.0.67)
+
+## [holochain\_p2p-0.0.64](crates/holochain_p2p/CHANGELOG.md#0.0.64)
+
+## [holochain\_types-0.0.64](crates/holochain_types/CHANGELOG.md#0.0.64)
+
+## [holochain\_keystore-0.0.62](crates/holochain_keystore/CHANGELOG.md#0.0.62)
+
+## [holochain\_sqlite-0.0.61](crates/holochain_sqlite/CHANGELOG.md#0.0.61)
+
+## [hdk-0.0.158](crates/hdk/CHANGELOG.md#0.0.158)
+
+## [holochain\_zome\_types-0.0.53](crates/holochain_zome_types/CHANGELOG.md#0.0.53)
+
+## [hdi-0.1.7](crates/hdi/CHANGELOG.md#0.1.7)
+
+## [hdk\_derive-0.0.53](crates/hdk_derive/CHANGELOG.md#0.0.53)
+
+## [holochain\_integrity\_types-0.0.23](crates/holochain_integrity_types/CHANGELOG.md#0.0.23)
+
+## [holo\_hash-0.0.35](crates/holo_hash/CHANGELOG.md#0.0.35)
+
+# 20221026.192152
+
+## [holochain\_cli-0.0.64](crates/holochain_cli/CHANGELOG.md#0.0.64)
+
+## [holochain\_cli\_sandbox-0.0.60](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.60)
+
+## [holochain\_cli\_bundle-0.0.59](crates/holochain_cli_bundle/CHANGELOG.md#0.0.59)
+
+- Adds `--recursive` command to `hc web-app pack` and `hc app pack` which packs all bundled dependencies for the given manifest. So `hc app pack ./workdir --recursive` will first go to each of the DNA manifests which have their location specified as bundled in the app manifest, pack each of them, and finally pack the app itself. `hc web-app pack ./workdir --recursive` will first pack the app recursively first if specified as bundled, and then pack the web-app manifest itself.
+
+## [holochain-0.0.169](crates/holochain/CHANGELOG.md#0.0.169)
+
+## [holochain\_test\_wasm\_common-0.0.58](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.58)
+
+## [holochain\_conductor\_api-0.0.66](crates/holochain_conductor_api/CHANGELOG.md#0.0.66)
+
+## [holochain\_wasm\_test\_utils-0.0.65](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.65)
+
+## [holochain\_cascade-0.0.68](crates/holochain_cascade/CHANGELOG.md#0.0.68)
+
+## [holochain\_state-0.0.66](crates/holochain_state/CHANGELOG.md#0.0.66)
+
+## [holochain\_p2p-0.0.63](crates/holochain_p2p/CHANGELOG.md#0.0.63)
+
+## [holochain\_types-0.0.63](crates/holochain_types/CHANGELOG.md#0.0.63)
+
+## [holochain\_keystore-0.0.61](crates/holochain_keystore/CHANGELOG.md#0.0.61)
+
+## [holochain\_sqlite-0.0.60](crates/holochain_sqlite/CHANGELOG.md#0.0.60)
+
+## [kitsune\_p2p-0.0.50](crates/kitsune_p2p/CHANGELOG.md#0.0.50)
+
+## [kitsune\_p2p\_proxy-0.0.37](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.37)
+
+## [kitsune\_p2p\_transport\_quic-0.0.37](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.37)
+
+## [kitsune\_p2p\_types-0.0.37](crates/kitsune_p2p_types/CHANGELOG.md#0.0.37)
+
+## [hdk-0.0.157](crates/hdk/CHANGELOG.md#0.0.157)
+
+- Pin the *hdi* dependency version. [\#1605](https://github.com/holochain/holochain/pull/1605)
+
+## [holochain\_zome\_types-0.0.52](crates/holochain_zome_types/CHANGELOG.md#0.0.52)
+
+## [kitsune\_p2p\_dht-0.0.9](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.9)
+
+## [hdi-0.1.6](crates/hdi/CHANGELOG.md#0.1.6)
+
+## [hdk\_derive-0.0.52](crates/hdk_derive/CHANGELOG.md#0.0.52)
+
+## [holochain\_integrity\_types-0.0.22](crates/holochain_integrity_types/CHANGELOG.md#0.0.22)
+
+# 20221019.014538
+
+## [holochain\_cli-0.0.63](crates/holochain_cli/CHANGELOG.md#0.0.63)
+
+## [holochain\_cli\_sandbox-0.0.59](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.59)
+
+## [holochain\_cli\_bundle-0.0.58](crates/holochain_cli_bundle/CHANGELOG.md#0.0.58)
+
+- Adds experimental `--raw` command to hc unpack commands (e.g. `hc dna unpack`) which allows an invalid manifest to still be unpacked. This can help to “salvage” a bundle which is no longer compatible with the current Holochain version, correcting the manifest so that it can be re-packed into a valid bundle.
+
+## [holochain-0.0.168](crates/holochain/CHANGELOG.md#0.0.168)
+
+- Fixes bug that causes crash when starting a conductor with a clone cell installed
+
+## [holochain\_test\_wasm\_common-0.0.57](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.57)
+
+## [holochain\_conductor\_api-0.0.65](crates/holochain_conductor_api/CHANGELOG.md#0.0.65)
+
+## [holochain\_wasm\_test\_utils-0.0.64](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.64)
+
+## [holochain\_cascade-0.0.67](crates/holochain_cascade/CHANGELOG.md#0.0.67)
+
+## [holochain\_state-0.0.65](crates/holochain_state/CHANGELOG.md#0.0.65)
+
+## [holochain\_p2p-0.0.62](crates/holochain_p2p/CHANGELOG.md#0.0.62)
+
+## [holochain\_types-0.0.62](crates/holochain_types/CHANGELOG.md#0.0.62)
+
+## [mr\_bundle-0.0.17](crates/mr_bundle/CHANGELOG.md#0.0.17)
+
+## [hdk-0.0.156](crates/hdk/CHANGELOG.md#0.0.156)
+
+## [hdi-0.1.5](crates/hdi/CHANGELOG.md#0.1.5)
+
+# 20221012.015828
+
+## [holochain\_cli-0.0.62](crates/holochain_cli/CHANGELOG.md#0.0.62)
+
+## [holochain\_cli\_sandbox-0.0.58](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.58)
+
+## [holochain\_cli\_bundle-0.0.57](crates/holochain_cli_bundle/CHANGELOG.md#0.0.57)
+
+## [holochain-0.0.167](crates/holochain/CHANGELOG.md#0.0.167)
+
+- Adds `SweetConductorConfig`, which adds a few builder methods for constructing variations of the standard ConductorConfig
+
+## [holochain\_conductor\_api-0.0.64](crates/holochain_conductor_api/CHANGELOG.md#0.0.64)
+
+## [holochain\_wasm\_test\_utils-0.0.63](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.63)
+
+## [holochain\_cascade-0.0.66](crates/holochain_cascade/CHANGELOG.md#0.0.66)
+
+## [holochain\_state-0.0.64](crates/holochain_state/CHANGELOG.md#0.0.64)
+
+## [holochain\_p2p-0.0.61](crates/holochain_p2p/CHANGELOG.md#0.0.61)
+
+## [holochain\_types-0.0.61](crates/holochain_types/CHANGELOG.md#0.0.61)
+
+- Added `WebAppManifestCurrentBuilder` and exposed it.
+
+## [holochain\_keystore-0.0.60](crates/holochain_keystore/CHANGELOG.md#0.0.60)
+
+## [holochain\_sqlite-0.0.59](crates/holochain_sqlite/CHANGELOG.md#0.0.59)
+
+## [kitsune\_p2p-0.0.49](crates/kitsune_p2p/CHANGELOG.md#0.0.49)
+
 # 20221005.164304
 
 ## [holochain\_cli-0.0.61](crates/holochain_cli/CHANGELOG.md#0.0.61)

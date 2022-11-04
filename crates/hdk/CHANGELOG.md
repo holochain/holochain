@@ -4,6 +4,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.159
+
+## 0.0.158
+
+## 0.0.157
+
+- Pin the *hdi* dependency version. [\#1605](https://github.com/holochain/holochain/pull/1605)
+
+## 0.0.156
+
 ## 0.0.155
 
 ## 0.0.154

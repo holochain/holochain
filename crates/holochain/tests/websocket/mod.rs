@@ -93,9 +93,7 @@ how_many: 42
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
     let mut tmp_dna = dna.dna_def().clone();
     tmp_dna.modifiers.properties = properties.try_into().unwrap();
-    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm)
-        .await
-        .unwrap();
+    let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm).await;
 
     assert_ne!(&original_dna_hash, dna.dna_hash());
 
@@ -217,7 +215,6 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
-        .unwrap()
         .0;
 
     let apps = conductors
@@ -231,7 +228,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {
-        rxs.push(h.signal_broadcaster().await.subscribe_separately())
+        rxs.push(h.signal_broadcaster().subscribe_separately())
     }
     let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
@@ -586,7 +583,6 @@ async fn full_state_dump_cursor_works() {
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
-        .unwrap()
         .0;
 
     let app = conductor

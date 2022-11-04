@@ -11,6 +11,9 @@ use crate::HoloHash;
 /// An Agent public signing key. Not really a hash, more of an "identity hash".
 pub type AgentPubKey = HoloHash<hash_type::Agent>;
 
+/// A public key of a pair of signing keys for signing zome calls.
+pub type ZomeCallSigningKey = AgentPubKey;
+
 /// The hash of a DnaDef
 pub type DnaHash = HoloHash<hash_type::Dna>;
 

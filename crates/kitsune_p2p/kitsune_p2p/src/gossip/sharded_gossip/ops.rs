@@ -105,9 +105,7 @@ impl ShardedGossipLocal {
         if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
             // because of the order of arguments, the diff regions will contain the data
             // from *our* side, not our partner's.
-            let diff_regions = sent
-                .diff((region_set).clone())
-                .map_err(KitsuneError::other)?;
+            let diff_regions = sent.diff(region_set.clone()).map_err(KitsuneError::other)?;
 
             // This is a good place to see all the region data go by.
             // Note, this is a LOT of output!
@@ -164,7 +162,7 @@ impl ShardedGossipLocal {
             .collect();
         // TODO: make region set diffing more robust to different times (arc power differences are already handled)
 
-        let ops = self
+        let ops: Vec<KOp> = self
             .evt_sender
             .fetch_op_data(FetchOpDataEvt {
                 space: self.space.clone(),

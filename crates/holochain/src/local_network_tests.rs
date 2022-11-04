@@ -33,9 +33,7 @@ use tracing::debug_span;
 #[tokio::test(flavor = "multi_thread")]
 async fn conductors_call_remote(num_conductors: usize) {
     observability::test_run().ok();
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let cells: Vec<_> = apps
@@ -480,8 +478,7 @@ async fn setup(
         },
         zomes.into_iter().map(Into::into),
     )
-    .await
-    .unwrap();
+    .await;
 
     let mut handles = Vec::with_capacity(num_conductors);
     for _ in 0..num_conductors {

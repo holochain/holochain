@@ -62,7 +62,7 @@ impl CellHostFnCaller {
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
         let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
-        let signal_tx = handle.signal_broadcaster().await;
+        let signal_tx = handle.signal_broadcaster();
         CellHostFnCaller {
             cell_id: cell_id.clone(),
             authored_db,
@@ -204,8 +204,7 @@ impl ConductorTestData {
             },
             zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
         )
-        .await
-        .unwrap();
+        .await;
 
         let mut agents = vec![fake_agent_pubkey_1()];
         if with_bob {

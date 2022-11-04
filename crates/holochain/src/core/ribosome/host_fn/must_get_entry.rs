@@ -144,7 +144,7 @@ pub mod test {
             .await;
 
         let dht_db = conductor
-            .inner_handle()
+            .raw_handle()
             .get_dht_db(alice.cell_id().dna_hash())
             .unwrap();
 

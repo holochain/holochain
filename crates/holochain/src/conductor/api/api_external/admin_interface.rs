@@ -118,6 +118,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
             }
+            GetDnaDefinition(dna_hash) => {
+                let dna_def = self
+                    .conductor_handle
+                    .get_dna_def(&dna_hash)
+                    .ok_or(ConductorApiError::DnaMissing(*dna_hash))?;
+                Ok(AdminResponse::DnaDefinitionReturned(dna_def))
+            }
             UpdateCoordinators(payload) => {
                 let UpdateCoordinatorsPayload { dna_hash, source } = *payload;
                 let (coordinator_zomes, wasms) = match source {
@@ -284,7 +291,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(port)
+                    .add_app_interface(either::Either::Left(port))
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -329,18 +336,25 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::RecordsGrafted)
             }
+            GrantZomeCallCapability(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .grant_zome_call_capability(*payload)
+                    .await?;
+                Ok(AdminResponse::ZomeCallCapabilityGranted)
+            }
             RestoreCloneCell(payload) => {
                 let restored_cell = self
                     .conductor_handle
                     .clone()
-                    .restore_archived_clone_cell(*payload)
+                    .restore_archived_clone_cell(&*payload)
                     .await?;
                 Ok(AdminResponse::CloneCellRestored(restored_cell))
             }
             DeleteArchivedCloneCells(payload) => {
                 self.conductor_handle
                     .clone()
-                    .delete_archived_clone_cells(*payload)
+                    .delete_archived_clone_cells(&*payload)
                     .await?;
                 Ok(AdminResponse::ArchivedCloneCellsDeleted)
             }

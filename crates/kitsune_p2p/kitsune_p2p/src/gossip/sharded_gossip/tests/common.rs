@@ -5,6 +5,7 @@ use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
 use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
+use num_traits::Zero;
 
 use super::*;
 
@@ -72,7 +73,7 @@ impl KitsuneHost for StandardResponsesHostApi {
                 };
                 coords.into_region_set_infallible(|_| data.clone())
             } else {
-                RegionSetLtcs::from_data(coords, vec![])
+                coords.into_region_set_infallible(|_| RegionData::zero())
             };
             Ok(region_set)
         }

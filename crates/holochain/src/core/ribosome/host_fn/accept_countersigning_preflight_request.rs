@@ -116,13 +116,13 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::error::WorkflowError;
+    use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::SweetDnaFile;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasmer_host::prelude::*;
-    use crate::sweettest::SweetConductorBatch;
-    use crate::sweettest::SweetDnaFile;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -201,7 +201,7 @@ pub mod wasm_test {
 
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
-            .handle()
+            .raw_handle()
             .call_zome(ZomeCall {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
@@ -217,7 +217,7 @@ pub mod wasm_test {
         // Creating the INCORRECT countersigned entry WILL immediately unlock
         // the chain.
         let countersign_fail_create_alice = conductor
-            .handle()
+            .raw_handle()
             .call_zome(ZomeCall {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
@@ -292,7 +292,7 @@ pub mod wasm_test {
 
         // Can't accept a second preflight request while the first is active.
         let preflight_acceptance_fail = conductor
-            .handle()
+            .raw_handle()
             .call_zome(ZomeCall {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
@@ -324,7 +324,7 @@ pub mod wasm_test {
 
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
-            .handle()
+            .raw_handle()
             .call_zome(ZomeCall {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
@@ -337,7 +337,7 @@ pub mod wasm_test {
         expect_chain_locked(thing_fail_create_alice);
 
         let thing_fail_create_bob = conductor
-            .handle()
+            .raw_handle()
             .call_zome(ZomeCall {
                 cell_id: bob.cell_id().clone(),
                 zome_name: bob.name().clone(),
@@ -359,7 +359,7 @@ pub mod wasm_test {
             )
             .await;
         let thing_fail_create_alice = conductor
-            .handle()
+            .raw_handle()
             .call_zome(ZomeCall {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
@@ -390,7 +390,7 @@ pub mod wasm_test {
 
         // Creation will still fail for bob.
         let thing_fail_create_bob = conductor
-            .handle()
+            .raw_handle()
             .call_zome(ZomeCall {
                 cell_id: bob.cell_id().clone(),
                 zome_name: bob.name().clone(),
@@ -457,7 +457,7 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s(&[&alice_cell, &bob_cell]).await;
+        consistency_10s([&alice_cell, &bob_cell]).await;
 
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
@@ -622,12 +622,14 @@ pub mod wasm_test {
     async fn enzymatic_session_fail() {
         observability::test_run().ok();
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
-        .await
-        .unwrap();
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
         let mut conductors = SweetConductorBatch::from_standard_config(3).await;
-        let apps = conductors.setup_app("countersigning", &[dna_file.clone()]).await.unwrap();
+        let apps = conductors
+            .setup_app("countersigning", &[dna_file.clone()])
+            .await
+            .unwrap();
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
 
@@ -647,7 +649,7 @@ pub mod wasm_test {
 
         // NON ENZYMATIC
         {
-            consistency_10s(&[&alice_cell, &bob_cell, &carol_cell]).await;
+            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
 
             // The countersigned entry does NOT appear in alice's activity yet.
             let alice_activity_pre: AgentActivity = bob_conductor
@@ -735,7 +737,7 @@ pub mod wasm_test {
                 )
                 .await;
 
-            consistency_10s(&[&alice_cell, &bob_cell, &carol_cell]).await;
+            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
 
             // Now the action appears in alice's activty.
             let alice_activity: AgentActivity = bob_conductor
