@@ -33,9 +33,7 @@ use tracing::debug_span;
 #[tokio::test(flavor = "multi_thread")]
 async fn conductors_call_remote(num_conductors: usize) {
     observability::test_run().ok();
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let cells: Vec<_> = apps
@@ -48,6 +46,8 @@ async fn conductors_call_remote(num_conductors: usize) {
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 
     let iter = cells.into_iter().zip(conductors.into_inner().into_iter());
+    let keep = std::sync::Mutex::new(Vec::new());
+    let keep = &keep;
     futures::stream::iter(iter)
         .for_each_concurrent(20, |(cell, conductor)| {
             let agents = agents.clone();
@@ -64,9 +64,11 @@ async fn conductors_call_remote(num_conductors: usize) {
                         )
                         .await;
                 }
+                keep.lock().unwrap().push(conductor);
             }
         })
         .await;
+    drop(keep);
 }
 
 #[test_case(2, 1, 1)]
@@ -465,9 +467,11 @@ async fn setup(
     let dna_file = DnaFile::new(
         DnaDef {
             name: "conductor_test".to_string(),
-            network_seed,
-            properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            modifiers: DnaModifiers {
+                network_seed,
+                properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            },
             integrity_zomes: zomes
                 .clone()
                 .into_iter()
@@ -483,8 +487,7 @@ async fn setup(
         },
         zomes.into_iter().map(Into::into),
     )
-    .await
-    .unwrap();
+    .await;
 
     let mut handles = Vec::with_capacity(num_conductors);
     for _ in 0..num_conductors {

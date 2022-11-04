@@ -4,6 +4,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.65
+
+- Fixed a bug where DNA modifiers specified in a hApp manifest would not be respected when specifying a `network_seed` in a `InstallAppBundlePayload`. [\#1642](https://github.com/holochain/holochain/pull/1642)
+
+## 0.0.64
+
+## 0.0.63
+
+## 0.0.62
+
+## 0.0.61
+
+- Added `WebAppManifestCurrentBuilder` and exposed it.
+
+## 0.0.60
+
+## 0.0.59
+
+## 0.0.58
+
+- **BREAKING CHANGE**: `network_seed`, `origin_time` and `properties` are combined in a new struct `DnaModifiers`. API calls `RegisterDna`, `InstallAppBundle` and `CreateCloneCell` require this new struct as a substruct under the field `modifiers` now. [\#1578](https://github.com/holochain/holochain/pull/1578)
+  - This means that all DNAs which set these fields will have to be rebuilt, and any code using the API will have to be updated (the @holochain/client Javascript client will be updated accordingly).
+- **BREAKING CHANGE**: `origin_time` is a required field now in the `integrity` section of a DNA manifest.
+
+## 0.0.57
+
+- Renamed `SweetEasyInline` to `SweetInlineZomes`
+- Renamed `InlineZome::callback` to `InlineZome::function`
+
+## 0.0.56
+
+- Add function to add a clone cell to an app. [\#1547](https://github.com/holochain/holochain/pull/1547)
+
+## 0.0.55
+
+## 0.0.54
+
+## 0.0.53
+
 ## 0.0.52
 
 ## 0.0.51

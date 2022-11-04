@@ -21,6 +21,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_leave(
         &mut self,
         dna_hash: DnaHash,
@@ -29,7 +30,6 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
-    /// Stub outgoing remote calls.
     fn handle_call_remote(
         &mut self,
         dna_hash: DnaHash,
@@ -46,7 +46,6 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
-    /// Stub outgoing remote signals.
     fn handle_remote_signal(
         &mut self,
         dna_hash: DnaHash,
@@ -61,23 +60,19 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_publish(
         &mut self,
         dna_hash: DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<usize> {
         Err("stub".into())
     }
-    fn handle_get_validation_package(
-        &mut self,
-        input: actor::GetValidationPackage,
-    ) -> HolochainP2pHandlerResult<ValidationPackageResponse> {
-        Err("stub".into())
-    }
+
     fn handle_get(
         &mut self,
         dna_hash: DnaHash,
@@ -86,6 +81,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<WireOps>> {
         Err("stub".into())
     }
+
     fn handle_get_meta(
         &mut self,
         dna_hash: DnaHash,
@@ -94,6 +90,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<MetadataSet>> {
         Err("stub".into())
     }
+
     fn handle_get_links(
         &mut self,
         dna_hash: DnaHash,
@@ -102,6 +99,7 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
         Err("stub".into())
     }
+
     fn handle_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,
@@ -111,6 +109,16 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<Vec<AgentActivityResponse<ActionHash>>> {
         Err("stub".into())
     }
+
+    fn handle_must_get_agent_activity(
+        &mut self,
+        dna_hash: DnaHash,
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> HolochainP2pHandlerResult<Vec<MustGetAgentActivityResponse>> {
+        Err("stub".into())
+    }
+
     fn handle_send_validation_receipt(
         &mut self,
         dna_hash: DnaHash,
@@ -119,13 +127,15 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_new_integrated_data(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_authority_for_hash(
         &mut self,
         dna_hash: DnaHash,
-        dht_hash: AnyDhtHash,
+        basis_hash: OpBasis,
     ) -> HolochainP2pHandlerResult<bool> {
         Err("stub".into())
     }
@@ -137,10 +147,18 @@ impl HolochainP2pHandler for StubNetwork {
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
+
     fn handle_dump_network_metrics(
         &mut self,
         dna_hash: Option<DnaHash>,
     ) -> HolochainP2pHandlerResult<String> {
+        Err("stub".into())
+    }
+
+    fn handle_get_diagnostics(
+        &mut self,
+        dna_hash: DnaHash,
+    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics> {
         Err("stub".into())
     }
 }
@@ -169,6 +187,7 @@ fixturator!(
             let holochain_p2p = crate::test::stub_network().await;
             holochain_p2p.to_dna(
                 DnaHashFixturator::new(Empty).next().unwrap(),
+                None
             )
         })
     };
@@ -396,9 +415,9 @@ mod tests {
         p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
         p2p.join(dna.clone(), a3.clone(), None).await.unwrap();
 
-        let action_hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
+        let action_hash = holo_hash::OpBasis::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash::hash_type::AnyDht::Action,
+            holo_hash::hash_type::AnyLinkable::Action,
         );
 
         // this will fail because we can't reach any remote nodes

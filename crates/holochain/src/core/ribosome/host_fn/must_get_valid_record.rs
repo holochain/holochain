@@ -25,14 +25,16 @@ pub fn must_get_valid_record<'a>(
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
                 let mut cascade = match call_context.host_context {
-                    HostContext::Validate(_) => Cascade::from_workspace(workspace.stores(), None),
-                    _ => Cascade::from_workspace_network(
+                    HostContext::Validate(_) => {
+                        Cascade::from_workspace_stores(workspace.stores(), None)
+                    }
+                    _ => Cascade::from_workspace_and_network(
                         &workspace,
                         call_context.host_context.network().clone(),
                     ),
                 };
                 match cascade
-                    .get_action_details(action_hash.clone(), GetOptions::content())
+                    .get_record_details(action_hash.clone(), GetOptions::content())
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
@@ -54,26 +56,28 @@ pub fn must_get_valid_record<'a>(
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
-                                    vec![action_hash.into()],
+                                    UnresolvedDependencies::Hashes(vec![action_hash.into()],)
                                 ))
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             )
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                         ))
                         .into()),
                         HostContext::Validate(_) => {
                             Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
-                                        ValidateCallbackResult::UnresolvedDependencies(vec![
-                                            action_hash.into()
-                                        ],)
+                                        ValidateCallbackResult::UnresolvedDependencies(
+                                            UnresolvedDependencies::Hashes(
+                                                vec![action_hash.into()],
+                                            )
+                                        )
                                     )
                                     .map_err(
-                                        |e| -> RuntimeError { wasm_error!(e.into()).into() }
+                                        |e| -> RuntimeError { wasm_error!(e).into() }
                                     )?,
                                 )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                             ))
                             .into())
                         }
@@ -86,10 +90,10 @@ pub fn must_get_valid_record<'a>(
                                         ),
                                     )
                                     .map_err(
-                                        |e| -> RuntimeError { wasm_error!(e.into()).into() }
+                                        |e| -> RuntimeError { wasm_error!(e).into() }
                                     )?
                                 )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             ))
                             .into())
                         }

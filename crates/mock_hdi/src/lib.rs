@@ -50,6 +50,10 @@ use hdi::prelude::*;
             &self,
             must_get_valid_record_input: MustGetValidRecordInput,
         ) -> ExternResult<Record>;
+        fn must_get_agent_activity(
+            &self,
+            input: MustGetAgentActivityInput,
+        ) -> ExternResult<Vec<RegisterAgentActivity>>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;

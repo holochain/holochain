@@ -62,7 +62,7 @@ pub fn accept_countersigning_preflight_request<'a>(
                             &input,
                             &countersigning_agent_state,
                         )
-                        .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                        .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                         .into(),
                     )
                     .await
@@ -207,7 +207,7 @@ pub mod wasm_test {
 
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
-            .handle()
+            .raw_handle()
             .call_zome(
                 ZomeCall::try_from_unsigned_zome_call(
                     conductor.handle().keystore(),
@@ -234,7 +234,7 @@ pub mod wasm_test {
         // Creating the INCORRECT countersigned entry WILL immediately unlock
         // the chain.
         let countersign_fail_create_alice = conductor
-            .handle()
+            .raw_handle()
             .call_zome(
                 ZomeCall::try_from_unsigned_zome_call(
                     conductor.handle().keystore(),
@@ -325,7 +325,7 @@ pub mod wasm_test {
         
         // Can't accept a second preflight request while the first is active.
         let preflight_acceptance_fail = conductor
-            .handle()
+            .raw_handle()
             .call_zome(
                 ZomeCall::try_from_unsigned_zome_call(
                     conductor.handle().keystore(),
@@ -368,7 +368,7 @@ pub mod wasm_test {
         
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
-            .handle()
+            .raw_handle()
             .call_zome(
                 ZomeCall::try_from_unsigned_zome_call(
                     conductor.handle().keystore(),
@@ -392,7 +392,7 @@ pub mod wasm_test {
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         let thing_fail_create_bob = conductor
-            .handle()
+            .raw_handle()
             .call_zome(
                 ZomeCall::try_from_unsigned_zome_call(
                     conductor.handle().keystore(),
@@ -425,7 +425,7 @@ pub mod wasm_test {
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         let thing_fail_create_alice = conductor
-            .handle()
+            .raw_handle()
             .call_zome(
                 ZomeCall::try_from_unsigned_zome_call(
                     conductor.handle().keystore(),
@@ -467,7 +467,7 @@ pub mod wasm_test {
 
         // Creation will still fail for bob.
         let thing_fail_create_bob = conductor
-            .handle()
+            .raw_handle()
             .call_zome(
                 ZomeCall::try_from_unsigned_zome_call(
                     conductor.handle().keystore(),
@@ -543,7 +543,7 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s(&[&alice_cell, &bob_cell]).await;
+        consistency_10s([&alice_cell, &bob_cell]).await;
 
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
@@ -708,9 +708,8 @@ pub mod wasm_test {
     async fn enzymatic_session_fail() {
         observability::test_run().ok();
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning])
-            .await
-            .unwrap();
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
         let mut conductors = SweetConductorBatch::from_standard_config(3).await;
         let apps = conductors
@@ -736,7 +735,7 @@ pub mod wasm_test {
 
         // NON ENZYMATIC
         {
-            consistency_10s(&[&alice_cell, &bob_cell, &carol_cell]).await;
+            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
 
             // The countersigned entry does NOT appear in alice's activity yet.
             let alice_activity_pre: AgentActivity = bob_conductor
@@ -824,7 +823,7 @@ pub mod wasm_test {
                 )
                 .await;
 
-            consistency_10s(&[&alice_cell, &bob_cell, &carol_cell]).await;
+            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
 
             // Now the action appears in alice's activty.
             let alice_activity: AgentActivity = bob_conductor

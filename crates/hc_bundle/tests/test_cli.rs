@@ -88,7 +88,10 @@ async fn test_integrity() {
         cmd.assert().success();
         let dna_path = PathBuf::from(format!("{}/integrity dna.dna", path));
         let original_dna = read_dna(&dna_path).unwrap();
-        original_dna.into_dna_file(None, None).await.unwrap()
+        original_dna
+            .into_dna_file(DnaModifiersOpt::none())
+            .await
+            .unwrap()
     };
     let (integrity_dna, integrity_dna_hash) = pack_dna("tests/fixtures/my-app/dnas/dna3").await;
     let (coordinator_dna, coordinator_dna_hash) = pack_dna("tests/fixtures/my-app/dnas/dna4").await;
@@ -156,7 +159,10 @@ async fn test_multi_integrity() {
         cmd.assert().success();
         let dna_path = PathBuf::from(format!("{}/multi integrity dna.dna", path));
         let original_dna = read_dna(&dna_path).unwrap();
-        original_dna.into_dna_file(None, None).await.unwrap()
+        original_dna
+            .into_dna_file(DnaModifiersOpt::none())
+            .await
+            .unwrap()
     };
 
     let (dna, _) = pack_dna("tests/fixtures/my-app/dnas/dna5").await;
@@ -176,9 +182,11 @@ async fn test_multi_integrity() {
     let origin_time = Timestamp::from_str(s).unwrap();
     let expected = DnaDef {
         name: "multi integrity dna".into(),
-        network_seed: "00000000-0000-0000-0000-000000000000".into(),
-        properties: ().try_into().unwrap(),
-        origin_time,
+        modifiers: DnaModifiers {
+            network_seed: "00000000-0000-0000-0000-000000000000".into(),
+            properties: ().try_into().unwrap(),
+            origin_time,
+        },
         integrity_zomes: vec![
             (
                 "zome1".into(),

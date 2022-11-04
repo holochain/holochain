@@ -184,15 +184,6 @@ ghost_actor::ghost_chan! {
             ops: Vec<holochain_types::dht_op::DhtOp>,
         ) -> ();
 
-        /// A remote node is requesting a validation package.
-        fn get_validation_package(
-            // The dna_hash / space_hash context.
-            dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
-            to_agent: AgentPubKey,
-            action_hash: ActionHash,
-        ) -> ValidationPackageResponse;
-
         /// A remote node is requesting entry data from us.
         fn get(
             dna_hash: DnaHash,
@@ -225,6 +216,14 @@ ghost_actor::ghost_chan! {
             query: ChainQueryFilter,
             options: GetActivityOptions,
         ) -> AgentActivityResponse<ActionHash>;
+
+        /// A remote node is requesting agent activity from us.
+        fn must_get_agent_activity(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            author: AgentPubKey,
+            filter: holochain_zome_types::chain::ChainFilter,
+        ) -> MustGetAgentActivityResponse;
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(
@@ -275,11 +274,11 @@ macro_rules! match_p2p_evt {
     ($h:ident => |$i:ident| { $($t:tt)* }, { $($t2:tt)* }) => {
         match $h {
             HolochainP2pEvent::CallRemote { $i, .. } => { $($t)* }
-            HolochainP2pEvent::GetValidationPackage { $i, .. } => { $($t)* }
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
+            HolochainP2pEvent::MustGetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
             HolochainP2pEvent::CountersigningSessionNegotiation { $i, .. } => { $($t)* }

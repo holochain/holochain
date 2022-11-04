@@ -17,9 +17,8 @@ async fn test_validation_receipt() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -31,7 +30,7 @@ async fn test_validation_receipt() {
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    consistency_10s(&[&alice, &bobbo, &carol]).await;
+    consistency_10s([&alice, &bobbo, &carol]).await;
 
     // Get op hashes
     let vault = alice.dht_db().clone().into();

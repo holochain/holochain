@@ -13,7 +13,7 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
-use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
 use crate::conductor::interface::SignalBroadcaster;
@@ -97,7 +97,7 @@ impl CallContext {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum HostContext {
     EntryDefs(EntryDefsHostAccess),
     GenesisSelfCheck(GenesisSelfCheckHostAccess),
@@ -399,13 +399,13 @@ impl ZomeCallInvocation {
 
 mockall::mock! {
     Invocation {}
-    trait Invocation {
+    impl Invocation for Invocation {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
         fn auth(&self) -> InvocationAuth;
     }
-    trait Clone {
+    impl Clone for Invocation {
         fn clone(&self) -> Self;
     }
 }
@@ -457,10 +457,9 @@ impl Invocation for ZomeCallInvocation {
 
 impl ZomeCallInvocation {
     pub async fn try_from_interface_call(
-        conductor_api: CellConductorApi,
+        conductor_api: CellConductorHandle,
         call: ZomeCall,
     ) -> RibosomeResult<Self> {
-        use crate::conductor::api::CellConductorApiT;
         let ZomeCall {
             cell_id,
             zome_name,
@@ -523,6 +522,12 @@ pub struct ZomeCallHostAccess {
     pub network: HolochainP2pDna,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
+}
+
+impl std::fmt::Debug for ZomeCallHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ZomeCallHostAccess").finish()
+    }
 }
 
 impl From<ZomeCallHostAccess> for HostContext {
@@ -795,9 +800,7 @@ pub mod wasm_test {
 
     impl RibosomeTestFixture {
         pub async fn new(test_wasm: TestWasm) -> Self {
-            let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
-                .await
-                .unwrap();
+            let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
             let mut conductor = SweetConductor::from_standard_config().await;
             let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
@@ -815,7 +818,7 @@ pub mod wasm_test {
 
             let alice_host_fn_caller = HostFnCaller::create_for_zome(
                 alice_cell.cell_id(),
-                &conductor.handle(),
+                &conductor.raw_handle(),
                 &dna_file,
                 0,
             )
@@ -823,7 +826,7 @@ pub mod wasm_test {
 
             let bob_host_fn_caller = HostFnCaller::create_for_zome(
                 bob_cell.cell_id(),
-                &conductor.handle(),
+                &conductor.raw_handle(),
                 &dna_file,
                 0,
             )

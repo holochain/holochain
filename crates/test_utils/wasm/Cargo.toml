@@ -1,6 +1,6 @@
 [package]
 name = "holochain_wasm_test_utils"
-version = "0.0.54"
+version = "0.0.67"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2021"
 description = "Utilities for Wasm testing for Holochain"
@@ -19,10 +19,10 @@ only_check = []
 
 
 [dependencies]
-holochain_types = { path = "../../holochain_types", version = "0.0.52"}
+holochain_types = { path = "../../holochain_types", version = "^0.0.65"}
 strum = "0.18.0"
 strum_macros = "0.18.0"
-holochain_util = { version = "0.0.11", path = "../../holochain_util" }
+holochain_util = { version = "0.0.12", path = "../../holochain_util" }
 
 [build-dependencies]
 toml = "0.5"

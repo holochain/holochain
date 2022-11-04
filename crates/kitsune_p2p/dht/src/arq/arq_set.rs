@@ -135,7 +135,7 @@ impl<S: ArqStart> ArqSetImpl<S> {
 
 impl ArqBoundsSet {
     /// Convert back from a continuous arc set to a quantized one.
-    /// If any information is lost, return None.
+    /// If any information is lost (the match is not exact), return None.
     pub fn from_dht_arc_set(
         topo: &Topology,
         strat: &ArqStrat,
@@ -153,6 +153,31 @@ impl ArqBoundsSet {
                 })
                 .collect::<Option<Vec<_>>>()?,
         ))
+    }
+
+    /// Convert back from a continuous arc set to a quantized one.
+    /// If the match is not exact, return the nearest possible quantized arc.
+    pub fn from_dht_arc_set_rounded(
+        topo: &Topology,
+        strat: &ArqStrat,
+        dht_arc_set: &DhtArcSet,
+    ) -> (Self, bool) {
+        let max_chunks = strat.max_chunks();
+        let mut rounded = false;
+        let arqs = dht_arc_set
+            .intervals()
+            .into_iter()
+            .map(|i| {
+                let len = i.length();
+                let (pow, _) = power_and_count_from_length(&topo.space, len, max_chunks);
+                let (a, r) = ArqBounds::from_interval_rounded(topo, pow, i);
+                if r {
+                    rounded = true;
+                }
+                a
+            })
+            .collect::<Vec<_>>();
+        (Self::new(arqs), rounded)
     }
 }
 
@@ -279,5 +304,24 @@ mod tests {
                 },
             ]
         );
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn rounded_arcset_intersections(p1 in 0u8..15, s1: u32, c1 in 8u32..64, p2 in 0u8..15, s2: u32, c2 in 8u32..64) {
+            let topo = Topology::standard_epoch_full();
+            let arq1 = Arq::new(p1, Loc::from(s1), c1.into());
+            let arq2 = Arq::new(p2, Loc::from(s2), c2.into());
+            let arcset1: DhtArcSet = arq1.to_bounds(&topo).to_dht_arc_range(&topo).into();
+            let arcset2: DhtArcSet = arq2.to_bounds(&topo).to_dht_arc_range(&topo).into();
+            let common = arcset1.intersection(&arcset2);
+            let ii = common.intervals();
+            for i in ii {
+                let p = p1.min(p2);
+                dbg!(&p, &i);
+                let (_, rounded) = ArqBounds::from_interval_rounded(&topo, p, i);
+                assert!(!rounded);
+            }
+        }
     }
 }

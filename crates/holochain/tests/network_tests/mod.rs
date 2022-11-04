@@ -2,7 +2,6 @@
 #![cfg(todo_redo_old_tests)]
 #![allow(unused_imports)]
 #![allow(dead_code)]
-#![allow(deprecated)]
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::Either;

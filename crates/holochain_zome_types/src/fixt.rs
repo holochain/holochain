@@ -480,7 +480,7 @@ fixturator!(
 
 fixturator!(
     EntryDef;
-    constructor fn new(EntryDefId, EntryVisibility, RequiredValidations);
+    constructor fn new(EntryDefId, EntryVisibility, RequiredValidations, bool);
 );
 
 fixturator!(
@@ -732,13 +732,15 @@ fixturator!(
         name: StringFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
-        network_seed: StringFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
-            .next()
-            .unwrap(),
-        origin_time: Timestamp::HOLOCHAIN_EPOCH,
+        modifiers: DnaModifiers {
+            network_seed: StringFixturator::new_indexed(Empty, get_fixt_index!())
+                .next()
+                .unwrap(),
+            properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
+                .next()
+                .unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+        },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
@@ -751,13 +753,15 @@ fixturator!(
         name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
-        network_seed: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        origin_time: Timestamp::HOLOCHAIN_EPOCH,
+        modifiers: DnaModifiers {
+            network_seed: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+                .next()
+                .unwrap(),
+            properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
+                .next()
+                .unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+        },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -770,13 +774,15 @@ fixturator!(
         name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        network_seed: StringFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        origin_time: Timestamp::HOLOCHAIN_EPOCH,
+        modifiers: DnaModifiers {
+            network_seed: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+                .next()
+                .unwrap(),
+            properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
+                .next()
+                .unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+        },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),

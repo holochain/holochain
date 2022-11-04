@@ -121,7 +121,9 @@ impl HostFnCaller {
         let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_db(cell_id).unwrap();
         let keystore = handle.keystore().clone();
-        let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
+        let network = handle
+            .holochain_p2p()
+            .to_dna(cell_id.dna_hash().clone(), None);
 
         let zome_path = (
             cell_id.clone(),
@@ -135,7 +137,7 @@ impl HostFnCaller {
         )
             .into();
         let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
-        let signal_tx = handle.signal_broadcaster().await;
+        let signal_tx = handle.signal_broadcaster();
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {

@@ -29,6 +29,14 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
         size += region.data.size;
         if first || size <= batch_size {
             to_fetch.push(queue.pop_front().unwrap());
+            if size > batch_size {
+                // TODO: we should split this Region up into smaller chunks
+                tracing::warn!(
+                    "Including a region of size {}, which is larger than the batch size of {}",
+                    size,
+                    batch_size
+                );
+            }
         }
         first = false;
         if size > batch_size {
@@ -38,13 +46,13 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
     to_fetch
 }
 
-/// Queued missing ops hashes can either
+/// Queued MissingOps hashes can either
 /// be saved as the remaining hashes or if this
 /// is too large the bloom filter is saved so the
 /// remaining hashes can be generated in the future.
 enum QueuedOps {
     /// Hashes that need to be fetched and returned
-    /// as missing ops to a remote node.
+    /// as MissingOps to a remote node.
     Hashes(Vec<Arc<KitsuneOpHash>>),
     /// A remote nodes bloom filter that has been adjusted
     /// to the remaining time window to fetch the remaining hashes.
@@ -97,9 +105,7 @@ impl ShardedGossipLocal {
         if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
             // because of the order of arguments, the diff regions will contain the data
             // from *our* side, not our partner's.
-            let diff_regions = sent
-                .diff((region_set).clone())
-                .map_err(KitsuneError::other)?;
+            let diff_regions = sent.diff(region_set.clone()).map_err(KitsuneError::other)?;
 
             // This is a good place to see all the region data go by.
             // Note, this is a LOT of output!
@@ -156,7 +162,7 @@ impl ShardedGossipLocal {
             .collect();
         // TODO: make region set diffing more robust to different times (arc power differences are already handled)
 
-        let ops = self
+        let ops: Vec<KOp> = self
             .evt_sender
             .fetch_op_data(FetchOpDataEvt {
                 space: self.space.clone(),
@@ -339,7 +345,7 @@ impl OpsBatchQueue {
         self.0
             .share_mut(|i, _| {
                 i.queues.retain(|_, q| !q.is_empty());
-                Ok(i.queues.is_empty())
+                Ok(i.queues.is_empty() && i.region_queue.is_empty())
             })
             .unwrap_or(true)
     }

@@ -12,7 +12,7 @@ use holo_hash::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
 
-use super::handle::ConductorHandleT;
+use super::Conductor;
 
 pub mod error;
 
@@ -22,7 +22,7 @@ pub(crate) async fn get_entry_def(
     entry_def_index: EntryDefIndex,
     zome: IntegrityZomeDef,
     dna_hash: &DnaHash,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     // Try to get the entry def from the entry def store
     let key = EntryDefBufferKey::new(zome, entry_def_index);
@@ -133,11 +133,13 @@ mod tests {
             id: "post".into(),
             visibility: EntryVisibility::Public,
             required_validations: 5.into(),
+            ..Default::default()
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
             required_validations: 5.into(),
+            ..Default::default()
         };
         let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await

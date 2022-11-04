@@ -89,7 +89,8 @@ pub fn remote_signal(
                 "remote_signal".into(),
             )
             .to_string(),
-        )).into()),
+        ))
+        .into()),
     }
 }
 
@@ -102,13 +103,13 @@ mod tests {
     use crate::sweettest::*;
     use futures::future;
     use hdk::prelude::*;
-    use holochain_types::inline_zome::InlineZomeSet;
+    use tokio_stream::StreamExt;
 
-    fn zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineZomeSet {
-        let entry_def = EntryDef::default_with_id("entrydef");
+    fn test_zome(agents: Vec<AgentPubKey>, num_signals: Arc<AtomicUsize>) -> InlineIntegrityZome {
+        let entry_def = EntryDef::from_id("entrydef");
 
-        SweetEasyInline::new(vec![entry_def.clone()], 0)
-            .callback("signal_others", move |api, ()| {
+        InlineIntegrityZome::new_unique(vec![entry_def.clone()], 0)
+            .function("signal_others", move |api, ()| {
                 let signal = ExternIO::encode("Hey").unwrap();
                 let signal = RemoteSignal {
                     agents: agents.clone(),
@@ -118,12 +119,12 @@ mod tests {
                 api.remote_signal(signal)?;
                 Ok(())
             })
-            .callback("recv_remote_signal", move |api, signal: ExternIO| {
+            .function("recv_remote_signal", move |api, signal: ExternIO| {
                 tracing::debug!("remote signal");
                 num_signals.fetch_add(1, Ordering::SeqCst);
                 api.emit_signal(AppSignal::new(signal)).map_err(Into::into)
             })
-            .callback("init", move |api, ()| {
+            .function("init", move |api, ()| {
                 let mut functions: GrantedFunctions = BTreeSet::new();
                 functions.insert((api.zome_info(()).unwrap().name, "recv_remote_signal".into()));
                 let cap_grant_entry = CapGrantEntry {
@@ -142,7 +143,6 @@ mod tests {
 
                 Ok(InitCallbackResult::Pass)
             })
-            .into()
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -158,10 +158,8 @@ mod tests {
         let agents =
             future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
-        let (dna_file, _, _) =
-            SweetDnaFile::unique_from_inline_zomes(zome(agents.clone(), num_signals.clone()))
-                .await
-                .unwrap();
+        let zome = test_zome(agents.clone(), num_signals.clone());
+        let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
 
         let apps = conductors
             .setup_app_for_zipped_agents("app", &agents, &[dna_file.clone().into()])
@@ -174,22 +172,17 @@ mod tests {
 
         let mut signals = Vec::new();
         for h in conductors.iter() {
-            signals.push(h.signal_broadcaster().await.subscribe_separately())
+            signals.push(h.signal_broadcaster().subscribe_merged())
         }
-        let signals = signals.into_iter().flatten().collect::<Vec<_>>();
 
         let _: () = conductors[0]
-            .call(
-                &cells[0].zome(SweetEasyInline::COORDINATOR),
-                "signal_others",
-                (),
-            )
+            .call(&cells[0].zome("zome"), "signal_others", ())
             .await;
 
         crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
 
         for mut signal in signals {
-            signal.try_recv().expect("Failed to recv signal");
+            signal.next().await.expect("Failed to recv signal");
         }
 
         Ok(())

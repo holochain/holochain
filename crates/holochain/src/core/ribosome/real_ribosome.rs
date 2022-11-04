@@ -45,6 +45,7 @@ use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
+use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
 use crate::core::ribosome::host_fn::query::query;
@@ -408,29 +409,31 @@ impl RealRibosome {
         Ok(())
     }
 
+    pub fn build_instance(
+        &self,
+        zome_name: &ZomeName,
+        context_key: u64,
+    ) -> RibosomeResult<Arc<Mutex<Instance>>> {
+        let module = self.module(zome_name)?;
+        let imports: ImportObject = Self::imports(self, context_key, module.store());
+        let instance = Arc::new(Mutex::new(Instance::new(&module, &imports).map_err(
+            |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
+        )?));
+        RibosomeResult::Ok(instance)
+    }
+
     pub fn instance(
         &self,
         call_context: CallContext,
     ) -> RibosomeResult<(Arc<Mutex<Instance>>, u64)> {
         use holochain_wasmer_host::module::PlruCache;
-        let zome_name = call_context.zome.zome_name().clone();
-
-        // Fallback to creating an instance if we don't have a cache hit.
-        let fallback = |context_key| {
-            let module = self.module(&zome_name)?;
-            let imports: ImportObject = Self::imports(self, context_key, module.store());
-            let instance = Arc::new(Mutex::new(Instance::new(&module, &imports).map_err(
-                |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
-            )?));
-            RibosomeResult::Ok(instance)
-        };
 
         // Get the start of the possible keys.
         let key_start = instance_cache_key(
             &self
                 .dna_file
                 .dna()
-                .get_wasm_zome(&zome_name)
+                .get_wasm_zome(call_context.zome.zome_name())
                 .map_err(DnaError::from)?
                 .wasm_hash,
             self.dna_file.dna_hash(),
@@ -441,7 +444,7 @@ impl RealRibosome {
             &self
                 .dna_file
                 .dna()
-                .get_wasm_zome(&zome_name)
+                .get_wasm_zome(call_context.zome.zome_name())
                 .map_err(DnaError::from)?
                 .wasm_hash,
             self.dna_file.dna_hash(),
@@ -473,6 +476,8 @@ impl RealRibosome {
         }
         // We didn't get an instance hit so create a new key.
         let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let instance = self.build_instance(call_context.zome.zome_name(), context_key)?;
+
         // Update the context.
         {
             CONTEXT_MAP
@@ -480,7 +485,6 @@ impl RealRibosome {
                 .insert(context_key, Arc::new(call_context));
         }
         // Fallback to creating the instance.
-        let instance = fallback(context_key)?;
         Ok((instance, context_key))
     }
 
@@ -572,6 +576,11 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__must_get_valid_record", must_get_valid_record)
             .with_host_function(
                 &mut ns,
+                "__must_get_agent_activity",
+                must_get_agent_activity,
+            )
+            .with_host_function(
+                &mut ns,
                 "__accept_countersigning_preflight_request",
                 accept_countersigning_preflight_request,
             )
@@ -613,7 +622,7 @@ macro_rules! do_callback {
                         zome.into(),
                         extern_io
                             .decode()
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                     ),
                     Err((zome, RibosomeError::WasmRuntimeError(runtime_error))) => (
                         zome.into(),
@@ -699,7 +708,7 @@ impl RibosomeT for RealRibosome {
                         extern_fns.sort();
                         extern_fns
                     }
-                    ZomeDef::Inline { inline_zome, .. } => inline_zome.0.callbacks(),
+                    ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),
                 }
             },
             zome_types,
@@ -741,8 +750,21 @@ impl RibosomeT for RealRibosome {
                         invocation.to_owned().host_input()?,
                     );
 
+                    // a bit of typefu to avoid cloning the result.
+                    let (can_cache, result) = match result {
+                        Err(runtime_error) => match runtime_error.downcast::<WasmError>() {
+                            Ok(wasm_error) => {
+                                (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into()))
+                            }
+                            Err(result) => (false, Err(result)),
+                        },
+                        result => (true, result),
+                    };
+
                     // Cache this instance.
-                    self.cache_instance(context_key, instance, zome.zome_name())?;
+                    if can_cache {
+                        self.cache_instance(context_key, instance, zome.zome_name())?;
+                    }
 
                     Ok(Some(result?))
                 } else {
@@ -950,9 +972,8 @@ pub mod wasm_test {
     async fn ribosome_extern_test() {
         observability::test_run().ok();
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern])
-            .await
-            .unwrap();
+        let (dna_file, _, _) =
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await;
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
 
@@ -978,7 +999,7 @@ pub mod wasm_test {
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         let infallible_result = conductor
-            .handle()
+            .raw_handle()
             .call_zome(
                 ZomeCall::try_from_unsigned_zome_call(
                     conductor.handle().keystore(),

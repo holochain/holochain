@@ -107,7 +107,7 @@ impl RegionCoordSetLtcs {
 /// The coordinates for the regions are specified by a few values.
 /// The data to match the coordinates are specified in a 2D vector which must
 /// correspond to the generated coordinates.
-#[derive(Debug, serde::Serialize, serde::Deserialize, Derivative)]
+#[derive(serde::Serialize, serde::Deserialize, Derivative)]
 #[derivative(PartialEq, Eq)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
 pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
@@ -123,7 +123,18 @@ pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
     /// The middle vecs correspond to the spatial segments per arq;
     /// the innermost vecs are the time segments per arq.
     #[serde(bound(deserialize = "D: serde::de::DeserializeOwned"))]
-    pub data: Vec<Vec<Vec<D>>>,
+    data: Vec<Vec<Vec<D>>>,
+}
+
+impl<D: RegionDataConstraints> std::fmt::Debug for RegionSetLtcs<D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegionSetLtcs")
+            .field(
+                "nonzero_regions",
+                &self.nonzero_regions().collect::<Vec<_>>(),
+            )
+            .finish()
+    }
 }
 
 impl<D: RegionDataConstraints> RegionSetLtcs<D> {
@@ -207,6 +218,29 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
 
         Ok(regions)
     }
+
+    /// Return only the regions which have ops in them. Useful for testing
+    /// sparse scenarios.
+    pub fn nonzero_regions(
+        &self,
+    ) -> impl '_ + Iterator<Item = ((usize, usize, usize), RegionCoords, D)> {
+        self.coords
+            .region_coords_flat()
+            .filter_map(|((a, x, y), c)| {
+                let d = &self
+                    .data
+                    .get(a)
+                    .and_then(|d| d.get(x))
+                    .and_then(|d| d.get(y));
+                d.filter(|d| d.count() > 0)
+                    .map(|d| ((a, x, y), c, d.clone()))
+            })
+    }
+
+    /// Accessor
+    pub fn data(&self) -> &[Vec<Vec<D>>] {
+        self.data.as_ref()
+    }
 }
 
 #[cfg(feature = "test_utils")]
@@ -218,21 +252,5 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         coords: RegionCoordSetLtcs,
     ) -> Self {
         coords.into_region_set_infallible(|(_, coords)| store.query_region_data(&coords))
-    }
-}
-
-#[cfg(feature = "test_utils")]
-impl RegionSetLtcs {
-    /// Return only the regions which have ops in them. Useful for testing
-    /// sparse scenarios.
-    pub fn nonzero_regions(
-        &self,
-    ) -> impl '_ + Iterator<Item = ((usize, usize, usize), RegionCoords, RegionData)> {
-        self.coords
-            .region_coords_flat()
-            .filter_map(|((a, x, y), c)| {
-                let d = &self.data[a][x][y];
-                (d.count > 0).then(|| ((a, x, y), c, d.clone()))
-            })
     }
 }

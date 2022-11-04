@@ -256,7 +256,7 @@ where
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
-    let dna_network = network.to_dna(dna.clone());
+    let dna_network = network.to_dna(dna.clone(), None);
     network.join(dna.clone(), agent_key, None).await.unwrap();
     TestNetwork::new(network, respond_task, dna_network)
 }
@@ -439,32 +439,90 @@ impl WaitOps {
 }
 
 /// Wait for all cells to reach consistency for 10 seconds
-pub async fn consistency_10s(all_cells: &[&SweetCell]) {
+pub async fn consistency_10s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
     const NUM_ATTEMPTS: usize = 100;
     const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
     consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
 }
 
+/// Wait for all cells to reach consistency for 10 seconds,
+/// with the option to specify that some cells are offline.
+pub async fn consistency_10s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
+    all_cells: I,
+) {
+    const NUM_ATTEMPTS: usize = 100;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+    consistency_advanced(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
+/// Wait for all cells to reach consistency for 60 seconds
+pub async fn consistency_60s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
+    const NUM_ATTEMPTS: usize = 60;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_secs(1);
+    consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
+/// Wait for all cells to reach consistency for 60 seconds,
+/// with the option to specify that some cells are offline.
+pub async fn consistency_60s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
+    all_cells: I,
+) {
+    const NUM_ATTEMPTS: usize = 60;
+    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_secs(1);
+    consistency_advanced(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+}
+
 /// Wait for all cells to reach consistency
 #[tracing::instrument(skip(all_cells))]
-pub async fn consistency(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
-    let all_cell_dbs: Vec<(AgentPubKey, DbRead<DbKindAuthored>, DbRead<DbKindDht>)> = all_cells
-        .iter()
-        .map(|c| {
+pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
+    all_cells: I,
+    num_attempts: usize,
+    delay: Duration,
+) {
+    consistency_advanced(
+        all_cells.into_iter().map(|c| (c, true)),
+        num_attempts,
+        delay,
+    )
+    .await
+}
+
+/// Wait for all cells to reach consistency,
+/// with the option to specify that some cells are offline.
+///
+/// Cells paired with a `false` value will have their authored ops counted towards the total,
+/// but not their integrated ops (since they are not online to integrate things).
+/// This is useful for tests where nodes go offline.
+#[tracing::instrument(skip(all_cells))]
+pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
+    all_cells: I,
+    num_attempts: usize,
+    delay: Duration,
+) {
+    let all_cell_dbs: Vec<(
+        AgentPubKey,
+        DbRead<DbKindAuthored>,
+        Option<DbRead<DbKindDht>>,
+    )> = all_cells
+        .into_iter()
+        .map(|(c, online)| {
             (
                 c.agent_pubkey().clone(),
                 c.authored_db().clone().into(),
-                c.dht_db().clone().into(),
+                online.then(|| c.dht_db().clone().into()),
             )
         })
         .collect();
-    let all_cell_dbs: Vec<_> = all_cell_dbs.iter().map(|c| (&c.0, &c.1, &c.2)).collect();
+    let all_cell_dbs: Vec<_> = all_cell_dbs
+        .iter()
+        .map(|c| (&c.0, &c.1, c.2.as_ref()))
+        .collect();
     consistency_dbs(&all_cell_dbs[..], num_attempts, delay).await
 }
 
 /// Wait for all cell envs to reach consistency
 pub async fn consistency_dbs<AuthorDb, DhtDb>(
-    all_cell_dbs: &[(&AgentPubKey, &AuthorDb, &DhtDb)],
+    all_cell_dbs: &[(&AgentPubKey, &AuthorDb, Option<&DhtDb>)],
     num_attempts: usize,
     delay: Duration,
 ) where
@@ -476,7 +534,7 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
         let count = get_published_ops(*db, *author).len();
         expected_count += count;
     }
-    for &db in all_cell_dbs.iter().map(|(_, _, d)| d) {
+    for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
         wait_for_integration(db, expected_count, num_attempts, delay).await
     }
 }
@@ -583,7 +641,11 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
 ) {
     for i in 0..num_attempts {
         let count = display_integration(db).await;
-        if count == expected_count {
+        if count >= expected_count {
+            if count > expected_count {
+                tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
+                Consistency may not be complete.")
+            }
             return;
         } else {
             let total_time_waited = delay * i as u32;
@@ -638,7 +700,11 @@ pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
         };
         let change = total.checked_sub(last_total).expect("LOST A VALUE");
         last_total = total;
-        if count.integrated == expected_count {
+        if count.integrated >= expected_count {
+            if count.integrated > expected_count {
+                tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
+                Consistency may not be complete.")
+            }
             return;
         } else {
             let time_waited = this_start.elapsed().as_secs();
@@ -839,6 +905,7 @@ pub async fn fake_genesis_for_agent(
         keystore,
         dna_hash,
         agent,
+        None,
         None,
     )
     .await

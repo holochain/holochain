@@ -3,13 +3,15 @@
 //! It combines an AgentPubKey with a Dna to create a SourceChain, upon which
 //! Records can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
+
+use super::api::CellConductorHandle;
+use super::api::ZomeCall;
 use super::interface::SignalBroadcaster;
 use super::manager::ManagedTaskAdd;
 use super::space::Space;
+use super::ConductorHandle;
 use crate::conductor::api::CellConductorApi;
-use crate::conductor::api::CellConductorApiT;
 use crate::conductor::cell::error::CellResult;
-use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
@@ -35,9 +37,10 @@ use holochain_cascade::authority;
 use holochain_cascade::Cascade;
 use holochain_conductor_api::ZomeCall;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+use holochain_p2p::ChcImpl;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::*;
@@ -54,8 +57,6 @@ use tracing::*;
 use tracing_futures::Instrument;
 
 pub const INIT_MUTEX_TIMEOUT_SECS: u64 = 30;
-
-mod validation_package;
 
 #[allow(missing_docs)]
 pub mod error;
@@ -95,16 +96,12 @@ impl PartialEq for Cell {
 /// The [`Conductor`](super::Conductor) manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [`CellConductorApi`](super::api::CellConductorApi) or an [`AppInterfaceApi`](super::api::AppInterfaceApi))
-pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pDna>
-where
-    Api: CellConductorApiT,
-    P2pCell: holochain_p2p::HolochainP2pDnaT,
-{
+pub struct Cell {
     id: CellId,
-    conductor_api: Api,
+    conductor_api: CellConductorHandle,
     conductor_handle: ConductorHandle,
     space: Space,
-    holochain_p2p_cell: P2pCell,
+    holochain_p2p_cell: HolochainP2pDna,
     queue_triggers: QueueTriggers,
     init_mutex: tokio::sync::Mutex<()>,
 }
@@ -126,7 +123,7 @@ impl Cell {
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
-        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
+        let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
 
         // check if genesis has been run
         let has_genesis = {
@@ -167,6 +164,7 @@ impl Cell {
     /// Performs the Genesis workflow the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
+    #[allow(clippy::too_many_arguments)]
     pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,
@@ -175,6 +173,7 @@ impl Cell {
         dht_db_cache: DhtDbQueryCache,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
+        chc: Option<ChcImpl>,
     ) -> CellResult<()>
     where
         Ribosome: RibosomeT + 'static,
@@ -191,17 +190,22 @@ impl Cell {
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
+        // exit early if genesis has already run
+        if workspace.has_genesis(id.agent_pubkey().clone()).await? {
+            return Ok(());
+        }
+
         let args = GenesisWorkflowArgs::new(
             dna_file,
             id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
             dht_db_cache,
+            chc,
         );
 
         genesis_workflow(workspace, conductor_api, args)
             .await
-            .map_err(Box::new)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
@@ -233,8 +237,8 @@ impl Cell {
         &self.holochain_p2p_cell
     }
 
-    async fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_api.signal_broadcaster().await
+    fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.conductor_api.signal_broadcaster()
     }
 
     pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
@@ -248,8 +252,7 @@ impl Cell {
             .await?)
     }
 
-    pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
-        let now = Timestamp::now();
+    pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         let author = self.id.agent_pubkey().clone();
         let lives = self
             .space
@@ -387,6 +390,7 @@ impl Cell {
                 // These events are aggregated over a set of cells, so need to be handled at the conductor level.
                 unreachable!()
             }
+
             CallRemote {
                 span_context: _,
                 from_agent,
@@ -413,22 +417,7 @@ impl Cell {
                 .instrument(debug_span!("call_remote"))
                 .await;
             }
-            GetValidationPackage {
-                span_context: _,
-                respond,
-                action_hash,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_get_validation_package(action_hash)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_get_validation_package"))
-                .await;
-            }
+
             Get {
                 span_context: _,
                 respond,
@@ -446,6 +435,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get"))
                 .await;
             }
+
             GetMeta {
                 span_context: _,
                 respond,
@@ -463,6 +453,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_meta"))
                 .await;
             }
+
             GetLinks {
                 span_context: _,
                 respond,
@@ -480,6 +471,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_links"))
                 .await;
             }
+
             GetAgentActivity {
                 span_context: _,
                 respond,
@@ -498,6 +490,25 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_agent_activity"))
                 .await;
             }
+
+            MustGetAgentActivity {
+                span_context: _,
+                respond,
+                author,
+                filter,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_must_get_agent_activity(author, filter)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_must_get_agent_activity"))
+                .await;
+            }
+
             ValidationReceiptReceived {
                 span_context: _,
                 respond,
@@ -517,6 +528,7 @@ impl Cell {
                 // and should reset the publish back off loop to its minimum.
                 self.queue_triggers.publish_dht_ops.reset_back_off();
             }
+
             SignNetworkData {
                 span_context: _,
                 respond,
@@ -532,6 +544,7 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_sign_network_data"))
                 .await;
             }
+
             CountersigningSessionNegotiation {
                 respond, message, ..
             } => {
@@ -579,50 +592,11 @@ impl Cell {
                     self.id.agent_pubkey().clone(),
                     signed_actions,
                     self.queue_triggers.clone(),
-                    self.conductor_api.signal_broadcaster().await,
+                    self.conductor_api.signal_broadcaster(),
                 )
                 .await
                 .map_err(Box::new)?)
             }
-        }
-    }
-
-    #[instrument(skip(self))]
-    /// a remote node is attempting to retrieve a validation package
-    #[tracing::instrument(skip(self), level = "trace")]
-    async fn handle_get_validation_package(
-        &self,
-        action_hash: ActionHash,
-    ) -> CellResult<ValidationPackageResponse> {
-        let db: DbRead<DbKindDht> = self.dht_db().clone().into();
-
-        // Get the action
-        let mut cascade = Cascade::empty().with_dht(db.clone());
-        let action = match cascade
-            .retrieve_action(action_hash, Default::default())
-            .await?
-        {
-            Some(shh) => shh.hashed,
-            None => return Ok(None.into()),
-        };
-
-        let ribosome = self.get_ribosome()?;
-
-        // This agent is the author so get the validation package from the source chain
-        if action.author() == self.id.agent_pubkey() {
-            validation_package::get_as_author(
-                action,
-                self.space.authored_db.clone().into(),
-                self.dht_db().clone().into(),
-                self.space.dht_query_cache.clone(),
-                self.space.cache_db.clone(),
-                &ribosome,
-                &(*self.conductor_handle),
-                &self.holochain_p2p_cell,
-            )
-            .await
-        } else {
-            validation_package::get_as_authority(action, db).await
         }
     }
 
@@ -714,6 +688,18 @@ impl Cell {
     ) -> CellResult<AgentActivityResponse<ActionHash>> {
         let db = self.space.dht_db.clone();
         authority::handle_get_agent_activity(db.into(), agent, query, options)
+            .await
+            .map_err(Into::into)
+    }
+
+    #[instrument(skip(self))]
+    async fn handle_must_get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> CellResult<MustGetAgentActivityResponse> {
+        let db = self.space.dht_db.clone();
+        authority::handle_must_get_agent_activity(db.into(), author, filter)
             .await
             .map_err(Into::into)
     }
@@ -834,7 +820,7 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    #[instrument(skip(self, call, workspace_lock))]
+    // #[instrument(skip(self, call, workspace_lock))]
     pub async fn call_zome(
         &self,
         call: ZomeCall,
@@ -853,7 +839,7 @@ impl Cell {
         let keystore = self.conductor_api.keystore().clone();
 
         let conductor_handle = self.conductor_handle.clone();
-        let signal_tx = self.signal_broadcaster().await;
+        let signal_tx = self.signal_broadcaster();
         let ribosome = self.get_ribosome()?;
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
@@ -937,7 +923,7 @@ impl Cell {
         }
         trace!("running init");
 
-        let signal_tx = self.signal_broadcaster().await;
+        let signal_tx = self.signal_broadcaster();
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs {

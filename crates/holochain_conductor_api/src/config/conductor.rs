@@ -46,7 +46,12 @@ pub struct ConductorConfig {
     /// Optional config for the network module.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
 
+    /// **PLACEHOLDER**: Optional specification of the Cloudflare namespace to use in Chain Head Coordination
+    /// service URLs. This is a placeholder for future work and may even go away.
+    /// Setting this to anything other than `None` will surely lead to no good.
     #[serde(default)]
+    pub chc_namespace: Option<String>,
+
     /// Override the default database synchronous strategy.
     ///
     /// See [sqlite documentation] for information about database sync levels.
@@ -55,6 +60,7 @@ pub struct ConductorConfig {
     /// are doing.
     ///
     /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
+    #[serde(default)]
     pub db_sync_strategy: DbSyncStrategy,
     //
     //
@@ -115,7 +121,7 @@ pub mod tests {
     environment_path: /path/to/env
 
     keystore:
-      type: danger_test_keystore_legacy_deprecated
+      type: danger_test_keystore
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(
@@ -124,9 +130,10 @@ pub mod tests {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
-                keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
+                keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
+                chc_namespace: None,
             }
         );
     }
@@ -142,8 +149,7 @@ pub mod tests {
     decryption_service_uri: ws://localhost:9003
 
     keystore:
-      type: lair_server_legacy_deprecated
-      danger_passphrase_insecure_from_config: "test-passphrase"
+      type: lair_server_in_proc
 
     dpki:
       instance_id: some_id
@@ -212,20 +218,17 @@ pub mod tests {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
                 }),
-                keystore: KeystoreConfig::LairServerLegacyDeprecated {
-                    keystore_path: None,
-                    danger_passphrase_insecure_from_config: "test-passphrase".to_string(),
-                },
+                keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
                 network: Some(network_config),
                 db_sync_strategy: DbSyncStrategy::Fast,
+                chc_namespace: None,
             }
         );
     }
 
-    /* TODO uncomment when lair_keystore_api initialization is implemented
     #[test]
     fn test_config_new_lair_keystore() {
         let yaml = r#"---
@@ -247,9 +250,9 @@ pub mod tests {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ").into(),
                 },
                 admin_interfaces: None,
-                db_sync_level: DbSyncLevel::default(),
+                db_sync_strategy: DbSyncStrategy::Fast,
+                chc_namespace: None,
             }
         );
     }
-    */
 }

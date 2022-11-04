@@ -26,7 +26,7 @@ pub fn get_details<'a>(
                             any_dht_hash,
                             get_options,
                         } = input;
-                        Cascade::from_workspace_network(
+                        Cascade::from_workspace_and_network(
                             &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         )

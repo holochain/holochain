@@ -344,7 +344,12 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
 
             this.metrics.write_len(dbg_name, len);
 
-            timeout.mix(r_res.map_err(KitsuneError::other)).await?
+            timeout
+                .mix(
+                    "Tx2ConHnd::priv_request",
+                    r_res.map_err(KitsuneError::other),
+                )
+                .await?
         }
     }
 

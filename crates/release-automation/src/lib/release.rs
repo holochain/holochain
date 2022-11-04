@@ -28,11 +28,12 @@ use std::{
 };
 use structopt::StructOpt;
 
-use crate::changelog::{Changelog, WorkspaceCrateReleaseHeading};
-use crate::crate_::ensure_crate_io_owners;
-use crate::crate_::increment_patch;
-use crate::crate_selection::ensure_release_order_consistency;
-use crate::crate_selection::Crate;
+use crate::{
+    changelog::{Changelog, WorkspaceCrateReleaseHeading},
+    common::{increment_semver, SemverIncrementMode},
+    crate_::ensure_crate_io_owners,
+    crate_selection::{ensure_release_order_consistency, Crate},
+};
 pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
 
 const TARGET_DIR_SUFFIX: &str = "target/release_automation";
@@ -194,17 +195,22 @@ fn bump_release_versions<'a>(
 
     for crt in &selection {
         let current_version = crt.version();
-        let maybe_previous_release_version = crt
-            .changelog()
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "[{}] cannot determine most recent release: missing changelog",
-                    crt.name()
-                )
-            })?
+        let changelog = crt.changelog().ok_or_else(|| {
+            anyhow::anyhow!(
+                "[{}] cannot determine most recent release: missing changelog",
+                crt.name()
+            )
+        })?;
+
+        let maybe_previous_release_version = changelog
             .topmost_release()?
             .map(|change| semver::Version::parse(change.title()))
             .transpose()?;
+
+        let maybe_semver_increment_mode = changelog
+            .front_matter()?
+            .map(|fm| fm.semver_increment_mode());
+        let semver_increment_mode = maybe_semver_increment_mode.unwrap_or_default();
 
         let release_version = if let Some(mut previous_release_version) =
             maybe_previous_release_version.clone()
@@ -213,8 +219,7 @@ fn bump_release_versions<'a>(
                 bail!("previously documented release version '{}' is greater than this release version '{}'", previous_release_version, current_version);
             }
 
-            // todo(backlog): support configurable major/minor/patch/rc? version bumps
-            increment_patch(&mut previous_release_version);
+            increment_semver(&mut previous_release_version, semver_increment_mode)?;
 
             previous_release_version
         } else {
@@ -222,8 +227,7 @@ fn bump_release_versions<'a>(
             let mut new_version = current_version.clone();
 
             if new_version.is_prerelease() {
-                // todo(backlog): support configurable major/minor/patch/rc? version bumps
-                increment_patch(&mut new_version);
+                increment_semver(&mut new_version, semver_increment_mode)?;
             }
 
             new_version
@@ -239,17 +243,13 @@ fn bump_release_versions<'a>(
 
         let greater_release = release_version > current_version;
         if greater_release {
-            common::set_version(cmd_args.dry_run, crt, &release_version.clone())?;
+            crt.set_version(cmd_args.dry_run, &release_version.clone())?;
         }
 
         let crate_release_heading_name = format!("{}", release_version);
 
         if maybe_previous_release_version.is_none() || greater_release {
             // create a new release entry in the crate's changelog and move all items from the unreleased heading if there are any
-
-            let changelog = crt
-                .changelog()
-                .ok_or_else(|| anyhow::anyhow!("{} doesn't have changelog", crt.name()))?;
 
             debug!(
                 "[{}] creating crate release heading '{}' in '{:?}'",
@@ -262,6 +262,13 @@ fn bump_release_versions<'a>(
                 changelog
                     .add_release(crate_release_heading_name.clone())
                     .context(format!("adding release to changelog for '{}'", crt.name()))?;
+
+                // FIXME: now we should reread the whole thing?
+
+                if greater_release {
+                    // rewrite frontmatter to reset it to its defaults
+                    changelog.reset_front_matter_to_defaults()?;
+                }
             }
 
             changed_crate_changelogs.push(WorkspaceCrateReleaseHeading {
@@ -613,52 +620,6 @@ impl PublishError {
     }
 }
 
-/// module that implements helper functionality for the crates_index crate
-pub mod crates_index_helper {
-    use super::*;
-
-    static CRATES_IO_INDEX: OnceCell<Mutex<crates_index::Index>> = OnceCell::new();
-
-    /// retrieves the statically saved index with the option to force an update.
-    pub fn index(update: bool) -> Fallible<&'static Mutex<crates_index::Index>> {
-        let first_run = CRATES_IO_INDEX.get().is_none();
-
-        let crates_io_index = CRATES_IO_INDEX.get_or_try_init(|| -> Fallible<_> {
-            let mut index = crates_index::Index::new_cargo_default()?;
-            trace!("Using crates index at {:?}", index.path());
-
-            index.update()?;
-
-            Ok(Mutex::new(index))
-        })?;
-
-        if !first_run && update {
-            crates_io_index
-                .lock()
-                .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?
-                .update()?;
-        }
-
-        Ok(crates_io_index)
-    }
-
-    pub(crate) fn is_version_published(crt: &Crate, update: bool) -> Fallible<bool> {
-        let index_lock = index(update)?
-            .lock()
-            .map_err(|e| anyhow::anyhow!("failed to lock the index: {}", e))?;
-
-        Ok(index_lock
-            .crate_(&crt.name())
-            .map(|indexed_crate| -> bool {
-                indexed_crate
-                    .versions()
-                    .iter()
-                    .any(|version| crt.version().to_string() == version.version())
-            })
-            .unwrap_or_default())
-    }
-}
-
 /// Try to publish the given crates to crates.io.
 ///
 /// If dry-run is given, the following error conditoins are tolerated:
@@ -674,9 +635,6 @@ pub(crate) fn do_publish_to_crates_io<'a>(
     allowed_missing_dependencies: &HashSet<String>,
     cargo_target_dir: &Option<PathBuf>,
 ) -> Fallible<()> {
-    static USER_AGENT: &str = "Holochain_Core_Dev_Team (devcore@holochain.org)";
-    static CRATES_IO_CLIENT: OnceCell<crates_io_api::AsyncClient> = OnceCell::new();
-
     ensure_release_order_consistency(&crates)?;
 
     let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
@@ -722,7 +680,9 @@ pub(crate) fn do_publish_to_crates_io<'a>(
     };
 
     while let Some(crt) = queue.pop_front() {
-        if !crt.state().changed() && crates_index_helper::is_version_published(crt, false)? {
+        if !crt.state().changed()
+            && crates_index_helper::is_version_published(&crt.name(), &crt.version(), false)?
+        {
             debug!(
                 "{} is unchanged and already published, skipping..",
                 crt.name_version()
@@ -850,7 +810,7 @@ pub(crate) fn do_publish_to_crates_io<'a>(
                 let duration = std::time::Duration::from_secs(*delay_secs);
                 std::thread::sleep(duration);
 
-                if crates_index_helper::is_version_published(crt, true)? {
+                if crates_index_helper::is_version_published(&crt.name(), &crt.version(), true)? {
                     debug!(
                         "Found recently published {} on crates.io!",
                         crt.name_version()

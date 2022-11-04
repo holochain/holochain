@@ -175,7 +175,7 @@ pub(crate) fn search_remotes_covering_basis(
             }
 
             // if we've exhausted our timeout, we should exit
-            timeout.ok()?;
+            timeout.ok("search_remotes_covering_basis")?;
 
             if near_nodes.is_empty() {
                 // maybe just wait and try again?

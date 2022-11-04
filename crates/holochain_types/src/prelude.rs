@@ -14,6 +14,7 @@ pub use crate::app::error::*;
 pub use crate::app::*;
 pub use crate::autonomic::*;
 pub use crate::chain::*;
+pub use crate::chc::*;
 pub use crate::combinators::*;
 pub use crate::db::*;
 pub use crate::dht_op::error::*;
@@ -31,9 +32,12 @@ pub use crate::signal::*;
 pub use crate::validate::*;
 pub use crate::zome_call::*;
 
+#[cfg(feature = "fixturators")]
 pub use crate::fixt::TimestampFixturator;
+
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::*;
+
 #[cfg(feature = "test_utils")]
 pub use crate::test_utils::*;
 

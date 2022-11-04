@@ -13,13 +13,13 @@ use crate::core::ribosome::guest_callback::genesis_self_check::{
 };
 use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
 use derive_more::Constructor;
+use holochain_p2p::ChcImpl;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
 use holochain_state::workspace::WorkspaceResult;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
-use tracing::*;
 
 /// The struct which implements the genesis Workflow
 #[derive(Constructor)]
@@ -32,9 +32,10 @@ where
     membrane_proof: Option<MembraneProof>,
     ribosome: Ribosome,
     dht_db_cache: DhtDbQueryCache,
+    chc: Option<ChcImpl>,
 }
 
-#[instrument(skip(workspace, api, args))]
+// #[instrument(skip(workspace, api, args))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
     mut workspace: GenesisWorkspace,
     api: Api,
@@ -61,6 +62,7 @@ where
         membrane_proof,
         ribosome,
         dht_db_cache,
+        chc,
     } = args;
 
     if workspace.has_genesis(agent_pubkey.clone()).await? {
@@ -70,7 +72,7 @@ where
     let dna_hash = ribosome.dna_def().to_hash();
     let DnaDef {
         name,
-        properties,
+        modifiers: DnaModifiers { properties, .. },
         integrity_zomes,
         ..
     } = &ribosome.dna_def().content;
@@ -114,6 +116,7 @@ where
         dna_file.dna_hash().clone(),
         agent_pubkey,
         membrane_proof,
+        chc,
     )
     .await?;
 
@@ -203,6 +206,7 @@ pub mod tests {
                 membrane_proof: None,
                 ribosome,
                 dht_db_cache: dht_db_cache.clone(),
+                chc: None,
             };
             let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }

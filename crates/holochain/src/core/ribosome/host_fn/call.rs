@@ -98,7 +98,7 @@ pub fn call(
                                     Ok(serialized_bytes) => ZomeCallResponse::try_from(
                                         serialized_bytes,
                                     )
-                                    .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() }),
+                                    .map_err(|e| -> RuntimeError { wasm_error!(e).into() }),
                                     Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
                                 }
                             }
@@ -120,7 +120,7 @@ pub fn call(
                                             )
                                             .await
                                             .map_err(|e| -> RuntimeError {
-                                                wasm_error!(e.into()).into()
+                                                wasm_error!(e).into()
                                             })
                                             .and_then(|c| {
                                                 c.ok_or_else(|| {
@@ -233,15 +233,12 @@ pub mod wasm_test {
     async fn call_test() {
         observability::test_run().ok();
         let test_wasm = TestWasm::WhoAmI;
-        let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
-            .await
-            .unwrap();
+        let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
         let dna_file_2 = dna_file_1
             .clone()
             .with_network_seed("CLONE".to_string())
-            .await
-            .unwrap();
+            .await;
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let (alice_pubkey, _) = SweetAgents::alice_and_bob();
@@ -331,9 +328,7 @@ pub mod wasm_test {
     async fn bridge_call() {
         observability::test_run().ok();
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-            .await
-            .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
@@ -344,9 +339,7 @@ pub mod wasm_test {
             .unwrap();
         let ((alice,), (_bobbo,)) = apps.into_tuples();
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
-            .await
-            .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
         let apps = conductor
             .setup_app_for_agents("app2", &[bob.clone()], &[dna_file])
             .await

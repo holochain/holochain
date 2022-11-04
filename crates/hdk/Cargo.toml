@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.0.147"
+version = "0.0.159"
 description = "The Holochain HDK"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
@@ -9,10 +9,6 @@ authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hdk" ]
 categories = [ "cryptography" ]
 edition = "2021"
-
-[lib]
-crate-type = ["cdylib", "rlib"]
-path = "src/lib.rs"
 
 [features]
 default = []
@@ -27,13 +23,13 @@ test_utils = [
 properties = ["holochain_zome_types/properties"]
 
 [dependencies]
-hdi = { version = "0.0.19", path = "../hdi", features = ["trace"] }
-hdk_derive = { version = "0.0.45", path = "../hdk_derive" }
-holo_hash = { version = "0.0.31", path = "../holo_hash" }
-holochain_wasmer_guest = "=0.0.80"
+hdi = { version = "=0.1.7", path = "../hdi", features = ["trace"] }
+hdk_derive = { version = "^0.0.53", path = "../hdk_derive" }
+holo_hash = { version = "^0.0.35", path = "../holo_hash" }
+holochain_wasmer_guest = "=0.0.82"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_zome_types = { version = "0.0.44", path = "../holochain_zome_types", default-features = false }
+holochain_zome_types = { version = "^0.0.54", path = "../holochain_zome_types", default-features = false }
 paste = "=1.0.5"
 serde = "1.0"
 serde_bytes = "0.11"

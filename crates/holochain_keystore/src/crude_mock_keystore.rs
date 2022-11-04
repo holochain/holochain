@@ -5,7 +5,7 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use ghost_actor::dependencies::futures::FutureExt;
+use futures::FutureExt;
 use kitsune_p2p_types::dependencies::lair_keystore_api::lair_client::traits::AsLairClient;
 use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::{LairApiEnum, LairClient};
 use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
@@ -18,7 +18,13 @@ pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> MetaLairClient
 where
     F: Fn() -> one_err::OneErr + Send + Sync + 'static,
 {
-    MetaLairClient::Lair(LairClient(Arc::new(CrudeMockKeystore(Arc::new(err_fn)))))
+    let (s, _) = tokio::sync::mpsc::unbounded_channel();
+    MetaLairClient(
+        Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(
+            CrudeMockKeystore(Arc::new(err_fn)),
+        )))),
+        s,
+    )
 }
 
 /// Spawn a test keystore that can switch between mocked and real.
@@ -40,7 +46,14 @@ where
 
     let control = MockLairControl(use_mock);
 
-    Ok((MetaLairClient::Lair(LairClient(Arc::new(mock))), control))
+    let (s, _) = tokio::sync::mpsc::unbounded_channel();
+    Ok((
+        MetaLairClient(
+            Arc::new(parking_lot::Mutex::new(LairClient(Arc::new(mock)))),
+            s,
+        ),
+        control,
+    ))
 }
 /// A keystore which always returns the same LairError for every call.
 struct RealOrMockKeystore {
@@ -81,17 +94,14 @@ impl AsLairClient for CrudeMockKeystore {
         unimplemented!()
     }
 
-    fn shutdown(
-        &self,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<()>> {
+    fn shutdown(&self) -> futures::future::BoxFuture<'static, LairResult<()>> {
         unimplemented!()
     }
 
     fn request(
         &self,
         _request: LairApiEnum,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<LairApiEnum>>
-    {
+    ) -> futures::future::BoxFuture<'static, LairResult<LairApiEnum>> {
         let err = (self.0)();
         async move { Err(err) }.boxed()
     }
@@ -99,37 +109,26 @@ impl AsLairClient for CrudeMockKeystore {
 
 impl AsLairClient for RealOrMockKeystore {
     fn get_enc_ctx_key(&self) -> sodoken::BufReadSized<32> {
-        match &self.real {
-            MetaLairClient::Lair(client) => client.get_enc_ctx_key(),
-        }
+        self.real.cli().0.get_enc_ctx_key()
     }
 
     fn get_dec_ctx_key(&self) -> sodoken::BufReadSized<32> {
-        match &self.real {
-            MetaLairClient::Lair(client) => client.get_dec_ctx_key(),
-        }
+        self.real.cli().0.get_dec_ctx_key()
     }
 
-    fn shutdown(
-        &self,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<()>> {
-        match &self.real {
-            MetaLairClient::Lair(client) => client.shutdown().boxed(),
-        }
+    fn shutdown(&self) -> futures::future::BoxFuture<'static, LairResult<()>> {
+        self.real.cli().0.shutdown().boxed()
     }
 
     fn request(
         &self,
         request: LairApiEnum,
-    ) -> ghost_actor::dependencies::futures::future::BoxFuture<'static, LairResult<LairApiEnum>>
-    {
+    ) -> futures::future::BoxFuture<'static, LairResult<LairApiEnum>> {
         if self.use_mock.load(std::sync::atomic::Ordering::SeqCst) {
             let r = (self.mock)(request);
             async move { r }.boxed()
         } else {
-            match &self.real {
-                MetaLairClient::Lair(client) => client.0.request(request),
-            }
+            AsLairClient::request(&*self.real.cli().0 .0, request)
         }
     }
 }

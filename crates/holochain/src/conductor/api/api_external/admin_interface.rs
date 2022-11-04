@@ -78,47 +78,35 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
-                let RegisterDnaPayload {
-                    network_seed,
-                    properties,
-                    source,
-                } = *payload;
+                let RegisterDnaPayload { modifiers, source } = *payload;
+                let modifiers = modifiers.serialized().map_err(SerializationError::Bytes)?;
                 // network seed and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
-                        if properties.is_none() && network_seed.is_none() {
+                        if !modifiers.has_some_option_set() {
                             return Err(ConductorApiError::DnaReadError(
-                                "Hash Dna source requires properties or network seed to create a derived Dna"
+                                "DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
                                     .to_string(),
                             ));
                         }
-                        let mut dna =
-                            self.conductor_handle.get_dna_file(hash).ok_or_else(|| {
+                        self.conductor_handle
+                            .get_dna_file(hash)
+                            .ok_or_else(|| {
                                 ConductorApiError::DnaReadError(format!(
                                     "Unable to create derived Dna: {} not registered",
                                     hash
                                 ))
-                            })?;
-                        if let Some(props) = properties {
-                            let properties = SerializedBytes::try_from(props)
-                                .map_err(SerializationError::from)?;
-                            dna = dna.with_properties(properties).await?;
-                        }
-                        if let Some(network_seed) = network_seed {
-                            dna = dna.with_network_seed(network_seed).await?;
-                        }
-                        dna
+                            })?
+                            .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(network_seed, properties).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(network_seed, properties).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                 };
@@ -129,6 +117,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     self.conductor_handle.register_dna(dna).await?;
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
+            }
+            GetDnaDefinition(dna_hash) => {
+                let dna_def = self
+                    .conductor_handle
+                    .get_dna_def(&dna_hash)
+                    .ok_or(ConductorApiError::DnaMissing(*dna_hash))?;
+                Ok(AdminResponse::DnaDefinitionReturned(dna_def))
             }
             UpdateCoordinators(payload) => {
                 let UpdateCoordinatorsPayload { dna_hash, source } = *payload;
@@ -146,14 +141,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
 
                 Ok(AdminResponse::CoordinatorsUpdated)
-            }
-            CreateCloneCell(payload) => {
-                let cell_id = payload.cell_id();
-                self.conductor_handle
-                    .clone()
-                    .create_clone_cell(*payload)
-                    .await?;
-                Ok(AdminResponse::CloneCellCreated(cell_id))
             }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
@@ -304,7 +291,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(port)
+                    .add_app_interface(either::Either::Left(port))
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -338,58 +325,60 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
                 Ok(AdminResponse::AgentInfoRequested(r))
             }
-
-            // deprecated aliases
-            ListActiveApps => {
-                tracing::warn!("Admin method ListActiveApps is deprecated: use ListApps instead.");
-                self.handle_admin_request_inner(ListEnabledApps).await
-            }
-            ActivateApp { installed_app_id } => {
-                tracing::warn!("Admin method ActivateApp is deprecated: use EnableApp instead (functionality is identical).");
-                self.handle_admin_request_inner(EnableApp { installed_app_id })
-                    .await
-            }
-            DeactivateApp { installed_app_id } => {
-                tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
-                self.handle_admin_request_inner(DisableApp { installed_app_id })
-                    .await
-            }
-            AddRecords {
+            GraftRecords {
                 cell_id,
-                truncate,
                 validate,
                 records,
             } => {
                 self.conductor_handle
                     .clone()
-                    .insert_records_into_source_chain(cell_id, truncate, validate, records)
+                    .graft_records_onto_source_chain(cell_id, validate, records)
                     .await?;
-                Ok(AdminResponse::RecordsAdded)
+                Ok(AdminResponse::RecordsGrafted)
+            }
+            GrantZomeCallCapability(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .grant_zome_call_capability(*payload)
+                    .await?;
+                Ok(AdminResponse::ZomeCallCapabilityGranted)
+            }
+            RestoreCloneCell(payload) => {
+                let restored_cell = self
+                    .conductor_handle
+                    .clone()
+                    .restore_archived_clone_cell(&*payload)
+                    .await?;
+                Ok(AdminResponse::CloneCellRestored(restored_cell))
+            }
+            DeleteArchivedCloneCells(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .delete_archived_clone_cells(&*payload)
+                    .await?;
+                Ok(AdminResponse::ArchivedCloneCellsDeleted)
+            }
+
+            // deprecated aliases
+            #[allow(deprecated)]
+            ListActiveApps => {
+                tracing::warn!("Admin method ListActiveApps is deprecated: use ListApps instead.");
+                self.handle_admin_request_inner(ListEnabledApps).await
+            }
+            #[allow(deprecated)]
+            ActivateApp { installed_app_id } => {
+                tracing::warn!("Admin method ActivateApp is deprecated: use EnableApp instead (functionality is identical).");
+                self.handle_admin_request_inner(EnableApp { installed_app_id })
+                    .await
+            }
+            #[allow(deprecated)]
+            DeactivateApp { installed_app_id } => {
+                tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
+                self.handle_admin_request_inner(DisableApp { installed_app_id })
+                    .await
             }
         }
     }
-}
-
-/// Return the proper phenotype for a Dna, given a manifest and some optional
-/// overrides
-fn _resolve_phenotype(
-    manifest: &DnaManifest,
-    payload_network_seed: Option<&NetworkSeed>,
-    payload_properties: Option<&YamlProperties>,
-) -> (Option<NetworkSeed>, Option<YamlProperties>) {
-    let bundle_network_seed = manifest.network_seed();
-    let bundle_properties = manifest.properties();
-    let properties = if payload_properties.is_some() {
-        payload_properties.cloned()
-    } else {
-        bundle_properties
-    };
-    let network_seed = if payload_network_seed.is_some() {
-        payload_network_seed.cloned()
-    } else {
-        bundle_network_seed
-    };
-    (network_seed, properties)
 }
 
 #[async_trait::async_trait]
@@ -445,8 +434,7 @@ mod test {
         let dna_hash = dna.dna_hash().clone();
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let path_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: None,
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path_install_response = admin_api
@@ -459,8 +447,7 @@ mod test {
 
         // re-register idempotent
         let path_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: None,
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path1_install_response = admin_api
@@ -477,25 +464,23 @@ mod test {
 
         // register by hash
         let hash_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: None,
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Hash(dna_hash.clone()),
         };
 
-        // without properties or network seed should throw error
+        // without modifiers seed should throw error
         let hash_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties or network seed to create a derived Dna")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna")
         );
 
         // with a property should install and produce a different hash
         let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
         let hash_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: Some(YamlProperties::new(json.clone())),
+            modifiers: DnaModifiersOpt::none().with_properties(YamlProperties::new(json.clone())),
             source: DnaSource::Hash(dna_hash.clone()),
         };
         let install_response = admin_api
@@ -508,8 +493,8 @@ mod test {
 
         // with a network seed should install and produce a different hash
         let hash_payload = RegisterDnaPayload {
-            network_seed: Some(String::from("12345678900000000000000")),
-            properties: None,
+            modifiers: DnaModifiersOpt::none()
+                .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Hash(dna_hash.clone()),
         };
         let hash2_install_response = admin_api
@@ -529,8 +514,8 @@ mod test {
 
         // from a path with a same network seed should return the already registered hash so it's idempotent
         let path_payload = RegisterDnaPayload {
-            network_seed: Some(String::from("12345678900000000000000")),
-            properties: None,
+            modifiers: DnaModifiersOpt::none()
+                .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path2_install_response = admin_api
@@ -543,8 +528,7 @@ mod test {
 
         // from a path with different network seed should produce different hash
         let path_payload = RegisterDnaPayload {
-            network_seed: Some(String::from("foo")),
-            properties: None,
+            modifiers: DnaModifiersOpt::none().with_network_seed(String::from("foo")),
             source: DnaSource::Path(dna_path),
         };
         let path3_install_response = admin_api
@@ -597,8 +581,7 @@ mod test {
 
         // now register a DNA
         let path_payload = RegisterDnaPayload {
-            network_seed: None,
-            properties: None,
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path),
         };
         let path_install_response = admin_api

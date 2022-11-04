@@ -37,6 +37,9 @@ pub enum ConductorError {
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
 
+    #[error("Error while cloning cell: {0}")]
+    CloneCellError(String),
+
     #[error(transparent)]
     ConductorConfigError(#[from] ConductorConfigError),
 
@@ -103,6 +106,9 @@ pub enum ConductorError {
 
     #[error(transparent)]
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
+
+    #[error(transparent)]
+    SourceChainError(#[from] holochain_state::source_chain::SourceChainError),
 
     #[error(transparent)]
     StateQueryError(#[from] holochain_state::query::StateQueryError),

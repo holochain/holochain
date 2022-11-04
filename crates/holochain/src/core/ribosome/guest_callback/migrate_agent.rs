@@ -29,6 +29,12 @@ pub struct MigrateAgentHostAccess {
     pub workspace: HostFnWorkspace,
 }
 
+impl std::fmt::Debug for MigrateAgentHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MigrateAgentHostAccess").finish()
+    }
+}
+
 impl From<MigrateAgentHostAccess> for HostContext {
     fn from(migrate_agent_host_access: MigrateAgentHostAccess) -> Self {
         Self::MigrateAgent(migrate_agent_host_access)

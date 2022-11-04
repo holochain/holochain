@@ -44,7 +44,7 @@ members = [
   "crates/test_utils/wasm_common",
 ]
 
-exclude = ["crates/diagnostics", "crates/release-automation"]
+exclude = ["crates/release-automation"]
 
 [profile.fast-test]
 inherits = "dev"
@@ -58,6 +58,7 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
+# isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
@@ -67,6 +68,7 @@ codegen-units = 16
 # ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
 #lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
+#lair_keystore = { path = "../lair/crates/lair_keystore" }
 #lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
 #lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }
 #lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }

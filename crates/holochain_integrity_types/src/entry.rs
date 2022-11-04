@@ -119,6 +119,14 @@ impl Entry {
         }
     }
 
+    /// If this entry represents an App entry, return `AppEntryBytes`.
+    pub fn as_app_entry(&self) -> Option<&AppEntryBytes> {
+        match self {
+            Entry::App(bytes) => Some(bytes),
+            _ => None,
+        }
+    }
+
     /// Create an Entry::App from SerializedBytes
     pub fn app(sb: SerializedBytes) -> Result<Self, EntryError> {
         Ok(Entry::App(AppEntryBytes::try_from(sb)?))

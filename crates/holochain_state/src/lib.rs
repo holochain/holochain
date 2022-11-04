@@ -24,8 +24,6 @@
 //! The Query trait allows combining arbitrary database SQL queries with
 //! the scratch space so reads can union across the database and in-memory data.
 
-#![allow(deprecated)]
-
 pub mod chain_lock;
 #[allow(missing_docs)]
 pub mod dna_def;

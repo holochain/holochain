@@ -12,11 +12,6 @@ use unwrap_to::unwrap_to;
 pub struct SweetConductorHandle(pub(crate) ConductorHandle);
 
 impl SweetConductorHandle {
-    /// Handle accessor.
-    pub fn handle(&self) -> ConductorHandle {
-        std::sync::Arc::clone(&self.0)
-    }
-
     /// Make a zome call to a Cell, as if that Cell were the caller. Most common case.
     /// No capability is necessary, since the authorship capability is automatically granted.
     pub async fn call<I, O, F>(&self, zome: &SweetZome, fn_name: F, payload: I) -> O
@@ -91,7 +86,7 @@ impl SweetConductorHandle {
             expires_at,
         };
         let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
-        let response = self.handle().call_zome(call).await;
+        let response = self.0.call_zome(call).await;
         match response {
             Ok(Ok(response)) => Ok(unwrap_to!(response => ZomeCallResponse::Ok)
                 .decode()
@@ -101,10 +96,10 @@ impl SweetConductorHandle {
         }
     }
 
-    // /// Get a stream of all Signals emitted since the time of this function call.
-    // pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
-    //     self.0.signal_broadcaster().await.subscribe_merged()
-    // }
+    /// Get a stream of all Signals emitted since the time of this function call.
+    pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
+        self.0.signal_broadcaster().subscribe_merged()
+    }
 
     /// Manually await shutting down the conductor.
     /// Conductors are already cleaned up on drop but this

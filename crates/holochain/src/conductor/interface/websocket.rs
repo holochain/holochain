@@ -406,7 +406,7 @@ pub mod test {
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeCallInvocation { .. });
+            assert_matches!(response, AppResponse::ZomeCall { .. });
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));
@@ -427,11 +427,7 @@ pub mod test {
         for _i in 0..2 as u32 {
             let zomes = vec![TestWasm::Foo.into()];
             let def = DnaDef::unique_from_zomes(zomes.clone(), Vec::new());
-            dnas.push(
-                DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo))
-                    .await
-                    .unwrap(),
-            );
+            dnas.push(DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo)).await);
         }
         let dna_map = dnas
             .iter()
@@ -499,7 +495,7 @@ pub mod test {
         }
 
         // Now deactivate app
-        let msg = AdminRequest::DeactivateApp {
+        let msg = AdminRequest::DisableApp {
             installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
@@ -606,9 +602,11 @@ pub mod test {
         DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                network_seed: network_seed.to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
-                origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                modifiers: DnaModifiers {
+                    network_seed: network_seed.to_string(),
+                    properties: SerializedBytes::try_from(()).unwrap(),
+                    origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                },
                 integrity_zomes: zomes
                     .clone()
                     .into_iter()
@@ -625,7 +623,6 @@ pub mod test {
             zomes.into_iter().flat_map(|t| Vec::<DnaWasm>::from(t)),
         )
         .await
-        .unwrap()
     }
 
     /// Check that we can add and get agent info for a conductor

@@ -117,18 +117,11 @@ impl AppBundle {
                 location,
                 version,
                 clone_limit,
-                properties,
-                network_seed,
+                modifiers,
                 deferred: _,
             } => {
-                self.resolve_cell_create(
-                    &location,
-                    version.as_ref(),
-                    clone_limit,
-                    network_seed,
-                    properties,
-                )
-                .await?
+                self.resolve_cell_create(&location, version.as_ref(), clone_limit, modifiers)
+                    .await?
             }
 
             AppRoleManifestValidated::CreateClone { .. } => {
@@ -143,20 +136,13 @@ impl AppBundle {
                 location,
                 version,
                 clone_limit,
-                properties,
-                network_seed,
+                modifiers,
                 deferred: _,
             } => match self.resolve_cell_existing(&version, clone_limit) {
                 op @ CellProvisioningOp::Existing(_, _) => op,
                 CellProvisioningOp::NoMatch => {
-                    self.resolve_cell_create(
-                        &location,
-                        Some(&version),
-                        clone_limit,
-                        network_seed,
-                        properties,
-                    )
-                    .await?
+                    self.resolve_cell_create(&location, Some(&version), clone_limit, modifiers)
+                        .await?
                 }
                 CellProvisioningOp::Conflict(_) => {
                     unimplemented!("conflicts are not handled, or even possible yet")
@@ -183,13 +169,11 @@ impl AppBundle {
         location: &mr_bundle::Location,
         version: Option<&DnaVersionSpec>,
         clone_limit: u32,
-        network_seed: Option<NetworkSeed>,
-        properties: Option<YamlProperties>,
+        modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        let (dna_file, original_dna_hash) =
-            dna_bundle.into_dna_file(network_seed, properties).await?;
+        let (dna_file, original_dna_hash) = dna_bundle.into_dna_file(modifiers).await?;
         if let Some(spec) = version {
             if !spec.matches(original_dna_hash) {
                 return Ok(CellProvisioningOp::NoMatch);
@@ -209,7 +193,6 @@ impl AppBundle {
 
 /// This function is called in places where it will be necessary to rework that
 /// area after use_existing has been implemented
-#[deprecated = "Raising visibility into a change that needs to happen after `use_existing` is implemented"]
 pub fn we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution(
 ) {
 }

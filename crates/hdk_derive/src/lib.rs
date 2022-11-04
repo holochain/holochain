@@ -77,6 +77,7 @@ impl Parse for EntryDef {
             id,
             visibility,
             required_validations,
+            cache_at_agent_activity: false,
         }))
     }
 }
@@ -123,7 +124,6 @@ impl quote::ToTokens for RequiredValidationType {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let variant = syn::Ident::new(
             match self.0 {
-                holochain_integrity_types::validate::RequiredValidationType::Custom => "Custom",
                 holochain_integrity_types::validate::RequiredValidationType::Record => "Record",
                 holochain_integrity_types::validate::RequiredValidationType::SubChain => "SubChain",
                 holochain_integrity_types::validate::RequiredValidationType::Full => "Full",

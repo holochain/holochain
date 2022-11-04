@@ -52,3 +52,11 @@ impl SweetCell {
         SweetZome::new(self.cell_id.clone(), zome_name.into())
     }
 }
+
+impl std::fmt::Debug for SweetCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SweetCell")
+            .field("cell_id", &self.cell_id)
+            .finish()
+    }
+}

@@ -63,6 +63,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
+            #[allow(deprecated)]
             AppRequest::ZomeCallInvocation(call) => {
                 tracing::warn!(
                     "AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)"
@@ -99,6 +100,21 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     )),
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
+            }
+            AppRequest::CreateCloneCell(payload) => {
+                let installed_clone_cell = self
+                    .conductor_handle
+                    .clone()
+                    .create_clone_cell(*payload)
+                    .await?;
+                Ok(AppResponse::CloneCellCreated(installed_clone_cell))
+            }
+            AppRequest::ArchiveCloneCell(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .archive_clone_cell(&*payload)
+                    .await?;
+                Ok(AppResponse::CloneCellArchived)
             }
             AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
             AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),
