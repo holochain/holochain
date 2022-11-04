@@ -72,7 +72,7 @@ pub fn call(
                                     Ok(serialized_bytes) => ZomeCallResponse::try_from(
                                         serialized_bytes,
                                     )
-                                    .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() }),
+                                    .map_err(|e| -> RuntimeError { wasm_error!(e).into() }),
                                     Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
                                 }
                             }
@@ -94,7 +94,7 @@ pub fn call(
                                             )
                                             .await
                                             .map_err(|e| -> RuntimeError {
-                                                wasm_error!(e.into()).into()
+                                                wasm_error!(e).into()
                                             })
                                             .and_then(|c| {
                                                 c.ok_or_else(|| {

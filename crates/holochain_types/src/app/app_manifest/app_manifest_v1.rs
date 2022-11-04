@@ -196,8 +196,7 @@ impl AppManifestV1 {
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for mut role in self.roles.iter_mut() {
             if matches!(role.provisioning, Some(CellProvisioning::Create { .. })) {
-                role.dna.modifiers =
-                    DnaModifiersOpt::none().with_network_seed(network_seed.clone());
+                role.dna.modifiers.network_seed = Some(network_seed.clone());
             }
         }
     }
@@ -306,7 +305,8 @@ pub mod tests {
     pub async fn app_manifest_fixture<I: IntoIterator<Item = DnaDef>>(
         location: Option<mr_bundle::Location>,
         dnas: I,
-    ) -> (AppManifest, Vec<DnaHashB64>) {
+        modifiers: DnaModifiersOpt<YamlProperties>,
+    ) -> (AppManifestV1, Vec<DnaHashB64>) {
         let hashes = join_all(
             dnas.into_iter()
                 .map(|dna| async move { DnaHash::with_data_sync(&dna).into() }),
@@ -314,12 +314,6 @@ pub mod tests {
         .await;
 
         let version = DnaVersionSpec::from(hashes.clone()).into();
-        let modifiers = DnaModifiersOpt {
-            properties: Some(app_manifest_properties_fixture()),
-            network_seed: Some("network_seed".into()),
-            origin_time: None,
-            quantum_time: None,
-        };
 
         let roles = vec![AppRoleManifest {
             id: "role_id".into(),
@@ -331,19 +325,26 @@ pub mod tests {
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
         }];
-        let manifest = AppManifest::V1(AppManifestV1 {
+        let manifest = AppManifestV1 {
             name: "Test app".to_string(),
             description: Some("Serialization roundtrip test".to_string()),
             roles,
-        });
+        };
         (manifest, hashes)
     }
 
     #[tokio::test]
     async fn manifest_v1_roundtrip() {
         let location = Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna")));
+        let modifiers = DnaModifiersOpt {
+            properties: Some(app_manifest_properties_fixture()),
+            network_seed: Some("network_seed".into()),
+            origin_time: None,
+            quantum_time: None,
+        };
         let (manifest, dna_hashes) =
-            app_manifest_fixture(location, vec![fixt!(DnaDef), fixt!(DnaDef)]).await;
+            app_manifest_fixture(location, vec![fixt!(DnaDef), fixt!(DnaDef)], modifiers).await;
+        let manifest = AppManifest::from(manifest);
         let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
         let manifest_roundtrip = serde_yaml::from_str(&manifest_yaml).unwrap();
 

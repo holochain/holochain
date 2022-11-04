@@ -52,9 +52,9 @@ pub fn must_get_agent_activity(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
                                     UnresolvedDependencies::AgentActivity(author, chain_filter)
                                 ))
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             )
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                         ))
                         .into())
                     }
@@ -64,9 +64,9 @@ pub fn must_get_agent_activity(
                                 &ExternIO::encode(ValidateCallbackResult::UnresolvedDependencies(
                                     UnresolvedDependencies::AgentActivity(author, chain_filter)
                                 ))
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             )
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                         ))
                         .into())
                     }
