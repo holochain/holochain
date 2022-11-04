@@ -91,3 +91,78 @@ pub(super) fn query_region_data(
     )
     .map_err(DatabaseError::from)
 }
+
+#[cfg(test)]
+mod tests {
+    use holochain_serialized_bytes::UnsafeBytes;
+    use holochain_state::prelude::StateMutationResult;
+    use holochain_state::{prelude::insert_op, test_utils::test_dht_db};
+    use holochain_types::fixt::*;
+    use holochain_types::prelude::{DhtOp, DhtOpHashed, NewEntryAction};
+    use holochain_zome_types::{AppEntryBytes, Entry};
+    use kitsune_p2p::KitsuneOpData;
+
+    use super::*;
+
+    /// Ensure that the size reported by RegionData is "close enough" to the actual size of
+    /// ops that get transferred over the wire.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn query_region_set_size() {
+        let db = test_dht_db();
+        let topo = Topology::standard_epoch_full();
+        let strat = ArqStrat::default();
+        let arcset = Arc::new(DhtArcSet::Full);
+        {
+            let regions = query_region_set(db.to_db(), topo.clone(), &strat, arcset.clone())
+                .await
+                .unwrap();
+            let sum: RegionData = regions.regions().map(|r| r.data).sum();
+            assert_eq!(sum.count, 0);
+            assert_eq!(sum.size, 0);
+        }
+
+        let mk_op = |i: u8| {
+            let entry = Box::new(Entry::App(AppEntryBytes(
+                UnsafeBytes::from(vec![i; 1_000_000]).try_into().unwrap(),
+            )));
+            let sig = fixt::fixt!(Signature);
+            let mut create = fixt::fixt!(Create);
+            create.timestamp = Timestamp::now();
+            let action = NewEntryAction::Create(create);
+            DhtOpHashed::from_content_sync(DhtOp::StoreEntry(sig, action, entry))
+        };
+        let num = 100;
+
+        let ops: Vec<_> = (0..num).map(mk_op).collect();
+        let wire_bytes: usize = ops
+            .clone()
+            .into_iter()
+            .map(|op| {
+                holochain_p2p::WireDhtOpData {
+                    op_data: op.into_content(),
+                }
+                .encode()
+                .unwrap()
+                .len()
+            })
+            .sum();
+
+        db.test_commit(|txn| {
+            for op in ops.iter() {
+                insert_op(txn, op).unwrap()
+            }
+            StateMutationResult::Ok(())
+        })
+        .unwrap();
+
+        {
+            let regions = query_region_set(db.to_db(), topo, &strat, arcset)
+                .await
+                .unwrap();
+            let sum: RegionData = regions.regions().map(|r| r.data).sum();
+            assert_eq!(sum.count, num as u32);
+            // 32 bytes is "close enough"
+            assert!(wire_bytes as u32 - sum.size < 32 * num as u32);
+        }
+    }
+}

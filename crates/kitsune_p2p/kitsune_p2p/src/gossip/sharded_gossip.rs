@@ -204,8 +204,8 @@ impl ShardedGossip {
 
             async move {
                 let mut stats = Stats::reset();
-                // let mut last_progress_report = Instant::now() - Duration::from_secs(10);
-                // println!("PROGRESS REPORTS ENABLED.");
+                let mut last_progress_report = Instant::now() - Duration::from_secs(10);
+                tracing::info!("PROGRESS REPORTS ENABLED.");
                 while !this
                     .gossip
                     .closing
@@ -214,27 +214,29 @@ impl ShardedGossip {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
                     this.run_one_iteration().await;
                     this.stats(&mut stats);
-                    // this.gossip
-                    //     .inner
-                    //     .share_ref(|state| {
-                    //         if let Some((actual, expected)) =
-                    //             state.metrics.read().incoming_gossip_progress()
-                    //         {
-                    //             if expected > 0 {
-                    //                 // once per second
-                    //                 if last_progress_report.elapsed() > Duration::from_secs(1) {
-                    //                     let percent = (actual as f64 / expected as f64) * 100.0;
-                    //                     println!(
-                    //                         "PROGRESS: {} / {} ({}%)",
-                    //                         actual, expected, percent
-                    //                     );
-                    //                     last_progress_report = Instant::now();
-                    //                 }
-                    //             }
-                    //         }
-                    //         Ok(())
-                    //     })
-                    //     .ok();
+                    this.gossip
+                        .inner
+                        .share_ref(|state| {
+                            if let Some((actual, expected)) =
+                                state.metrics.read().incoming_gossip_progress()
+                            {
+                                if expected > 0 {
+                                    // once per second
+                                    if last_progress_report.elapsed() > Duration::from_secs(1) {
+                                        let percent = (actual as f64 / expected as f64) * 100.0;
+                                        tracing::info!(
+                                            "PROGRESS: {} / {} ({}%)",
+                                            actual,
+                                            expected,
+                                            percent
+                                        );
+                                        last_progress_report = Instant::now();
+                                    }
+                                }
+                            }
+                            Ok(())
+                        })
+                        .ok();
                 }
                 KitsuneResult::Ok(())
             }
