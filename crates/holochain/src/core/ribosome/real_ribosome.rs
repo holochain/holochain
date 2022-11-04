@@ -409,8 +409,12 @@ impl RealRibosome {
         Ok(())
     }
 
-    pub fn build_instance(&self, zome_name: &ZomeName, context_key: u64) -> RibosomeResult<Arc<Mutex<Instance>>> {
-        let module = self.module(&zome_name)?;
+    pub fn build_instance(
+        &self,
+        zome_name: &ZomeName,
+        context_key: u64,
+    ) -> RibosomeResult<Arc<Mutex<Instance>>> {
+        let module = self.module(zome_name)?;
         let imports: ImportObject = Self::imports(self, context_key, module.store());
         let instance = Arc::new(Mutex::new(Instance::new(&module, &imports).map_err(
             |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
@@ -749,7 +753,9 @@ impl RibosomeT for RealRibosome {
                     // a bit of typefu to avoid cloning the result.
                     let (can_cache, result) = match result {
                         Err(runtime_error) => match runtime_error.downcast::<WasmError>() {
-                            Ok(wasm_error) => (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into())),
+                            Ok(wasm_error) => {
+                                (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into()))
+                            }
                             Err(result) => (false, Err(result)),
                         },
                         result => (true, result),

@@ -297,10 +297,10 @@ impl Path {
     pub fn make_tag(&self) -> ExternResult<LinkTag> {
         Ok(LinkTag::new(match self.leaf() {
             None => <Vec<u8>>::with_capacity(0),
-            Some(component) => UnsafeBytes::from(
-                SerializedBytes::try_from(component).map_err(|e| wasm_error!(e))?,
-            )
-            .into(),
+            Some(component) => {
+                UnsafeBytes::from(SerializedBytes::try_from(component).map_err(|e| wasm_error!(e))?)
+                    .into()
+            }
         }))
     }
 

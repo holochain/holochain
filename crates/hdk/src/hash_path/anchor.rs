@@ -50,9 +50,7 @@ impl TryFrom<&Path> for Anchor {
             if components[0] == Component::new(ROOT.to_vec()) {
                 Ok(Anchor {
                     anchor_type: std::str::from_utf8(components[1].as_ref())
-                        .map_err(|e| {
-                            wasm_error!(SerializedBytesError::Deserialize(e.to_string()))
-                        })?
+                        .map_err(|e| wasm_error!(SerializedBytesError::Deserialize(e.to_string())))?
                         .to_string(),
                     anchor_text: {
                         match components.get(2) {
