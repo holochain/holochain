@@ -26,7 +26,7 @@ use holochain_zome_types::WasmZome;
 use holochain_zome_types::Zome;
 use holochain_zome_types::ZomeDef;
 use mr_bundle::Bundle;
-use serde::Serialize;
+use holochain::test_utils::host_fn_caller::Post;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_coordinator_zome_update() {
@@ -288,7 +288,8 @@ async fn test_update_admin_interface() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multiple_integrity_zomes() {
-    let mut conductor = SweetConductor::from_config(Default::default()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+
     let mut coordinator: CoordinatorZome = TestCoordinatorWasm::CoordinatorZomeUpdate.into();
     coordinator.set_dependency(TestIntegrityWasm::IntegrityZome);
     coordinator.set_dependency(TestIntegrityWasm::MusicIntegrityZome);
@@ -304,8 +305,10 @@ async fn test_multiple_integrity_zomes() {
             DnaWasm::from(TestCoordinatorWasm::CoordinatorZomeUpdate),
         ],
     )
-    .await
-    .unwrap();
+    .await;
+
+    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+    let cells = app.into_cells();
 
     let _hash: ActionHash = conductor
     .call(
@@ -323,9 +326,6 @@ async fn test_wasm_memory() {
 
     let app = conductor.setup_app("app", &[dna]).await.unwrap();
     let cells = app.into_cells();
-
-    #[derive(Debug, Serialize)]
-    struct Post(String);
 
     let data = String::from_utf8(vec![0u8; 10_000_000]).unwrap();
 
