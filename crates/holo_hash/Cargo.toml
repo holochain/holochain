@@ -1,6 +1,6 @@
 [package]
 name = "holo_hash"
-version = "0.0.31"
+version = "0.0.35"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hash", "blake", "blake2b" ]
 categories = [ "cryptography" ]
@@ -23,10 +23,10 @@ derive_more = { version = "0.99", optional = true }
 fixt = { version = "0.0.14", path = "../fixt", optional = true }
 futures = {version = "0.3", optional = true}
 holochain_serialized_bytes = {version = "=0.0.51", optional = true }
-kitsune_p2p_dht_arc = { version = "0.0.14", path = "../kitsune_p2p/dht_arc" }
+kitsune_p2p_dht_arc = { version = "0.0.16", path = "../kitsune_p2p/dht_arc" }
 must_future = {version = "0.1", optional = true}
 rand = {version = "0.8.5", optional = true}
-rusqlite = { version = "0.26", optional = true }
+rusqlite = { version = "0.28", optional = true }
 serde = { version = "1", optional = true }
 serde_bytes = { version = "0.11", optional = true }
 tracing = { version = "0.1", optional = true}

@@ -1,39 +1,28 @@
-//! @todo: update diagram and types
-//! # Persisted State building blocks
+//! The holochain state crate provides helpers and abstractions for working
+//! with the `holochain_sqlite` crate.
 //!
-//! This crate provides a few types for working with databases. The types build upon those found in holochain_sqlite::buffer.
-//! - RecordBuf the union of two CasBuffers, one for Entries, one for Actions
-//! - ChainSequenceBuf: database representing the chain sequence DB, which provides a special method for accessing the chain head
-//! - SourceChainBuf: the union of a RecordBuf and a ChainSequenceBuf, which fully represents a source chain
-//! - MetadataBuf: (*unimplemented*) Uses a KvvBuffer to represent EAV-like relationships between CAS entries
-//! - Cascade: (*unimplemented*) Unifies two RecordBuf and two MetadataBuf references (one of each is a cache)
-//! in order to perform the complex metadata-aware queries for getting entries and links, including CRUD resolution
+//! ## Reads
+//! The main abstraction for creating data read queries is the [`Query`](query::Query) trait.
+//! This can be implemented to make constructing complex queries easier.
 //!
-//! The follow diagram shows the composition hierarchy.
-//! The arrows mean "contains at least one of".
+//! The [`source_chain`] module provides the [`SourceChain`](source_chain::SourceChain) type,
+//! which is the abstraction for working with chains of actions.
 //!
-//! ```none
-//!               Cascade         SourceChain
-//!                  |                 |
-//!                  |                 V
-//!                  |           SourceChainBuf
-//!                  |                 |
-//!                  |                 |
-//!            +----------+      +-----+------+
-//!            |          |      |            |
-//!            |          V      V            |
-//!            V         RecordBuf          V
-//!       MetadataBuf         |        ChainSequenceBuf
-//!            |              V               |
-//!            |           CasBuf             |
-//!            |              |               |
-//!            V              V               V
-//!         KvvBuf          KvBuf          IntKvBuf
+//! The [`host_fn_workspace`] module provides abstractions for reading data during workflows.
 //!
-//! source: https://textik.com/#d7907793784e17e9
-//! ```
-
-#![allow(deprecated)]
+//! ## Writes
+//! The [`mutations`] module is the complete set of functions
+//! for writing data to sqlite in holochain.
+//!
+//! ## In-memory
+//! The [`scratch`] module provides the [`Scratch`](scratch::Scratch) type for
+//! reading and writing data in memory that is not visible anywhere else.
+//!
+//! The SourceChain type uses the Scratch for in-memory operations which
+//! can be flushed to the database.
+//!
+//! The Query trait allows combining arbitrary database SQL queries with
+//! the scratch space so reads can union across the database and in-memory data.
 
 pub mod chain_lock;
 #[allow(missing_docs)]

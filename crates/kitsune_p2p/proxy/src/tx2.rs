@@ -220,8 +220,8 @@ impl AsConHnd for ProxyConHnd {
         timeout: KitsuneTimeout,
     ) -> BoxFuture<'static, KitsuneResult<()>> {
         data.reserve_front(PROXY_TYPE_BYTES + DIGEST_BYTES + DIGEST_BYTES);
-        data.prepend_from_slice(&self.local_cert);
-        data.prepend_from_slice(&self.peer_cert);
+        data.prepend_from_slice(&**self.local_cert);
+        data.prepend_from_slice(&**self.peer_cert);
         data.prepend_from_slice(&[PROXY_FWD_MSG]);
         self.sub_con.write(msg_id, data, timeout).boxed()
     }
@@ -688,7 +688,7 @@ async fn incoming_evt_handle(
                             };
                             let mut data = PoolBuf::new();
                             data.extend_from_slice(format!("{:?}", e).as_bytes());
-                            data.prepend_from_slice(&local_cert);
+                            data.prepend_from_slice(&**local_cert);
                             data.prepend_from_slice(&[PROXY_ROUTE_ERR]);
                             let _ = write_to_sub_con(
                                 tuning_params,

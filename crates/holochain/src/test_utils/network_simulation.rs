@@ -25,7 +25,6 @@ use rand::distributions::Standard;
 use rand::Rng;
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
-use crate::conductor::handle::DevSettingsDelta;
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 
 #[derive(SerializedBytes, serde::Serialize, serde::Deserialize, Debug)]
@@ -145,7 +144,7 @@ impl MockNetworkData {
 
     /// Hashes that an agent is an authority for.
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
-        let arc = self.agent_to_arc[agent].interval();
+        let arc = self.agent_to_arc[agent].inner();
         match arc {
             DhtArcRange::Empty => Vec::with_capacity(0),
             DhtArcRange::Full => self.ops_by_loc.values().flatten().cloned().collect(),
@@ -382,6 +381,7 @@ async fn create_test_data(
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "none".to_string();
+    tuning.disable_publish = true;
 
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
@@ -390,10 +390,6 @@ async fn create_test_data(
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
-    conductor.update_dev_settings(DevSettingsDelta {
-        publish: Some(false),
-        ..Default::default()
-    });
     let mut agents = Vec::new();
     dbg!("generating agents");
     for i in 0..num_agents {
@@ -556,7 +552,7 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
         )],
         [(coordinator_zome_name, coordinator_uuid)],
     )
-    .callback(
+    .function(
         coordinator_zome_name,
         "create_many",
         move |api, entries: Vec<Entry>| {
@@ -571,13 +567,11 @@ pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaF
             Ok(())
         },
     )
-    .callback(coordinator_zome_name, "read", |api, hash: ActionHash| {
+    .function(coordinator_zome_name, "read", |api, hash: ActionHash| {
         api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
             .map(|e| e.into_iter().next().unwrap())
             .map_err(Into::into)
     });
-    let (dna_file, _, _) = SweetDnaFile::from_inline_zomes(integrity_uuid, zomes)
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::from_inline_zomes(integrity_uuid, zomes).await;
     dna_file
 }

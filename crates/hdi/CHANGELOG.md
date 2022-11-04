@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Adds the ability to enable the feature flag `no-externs` on any zome to disable all exported functions. This is useful for importing a zome into another zome as a rust dependency without getting linker symbol collisions. If the feature flag `no-externs` is enabled on a zome then all exports will be disabled. The functions will still exist though and if they are not marked `pub` will given unused warnings. To fix this, make the functions `pub`.
 
+## 0.1.7
+
+## 0.1.6
+
+## 0.1.5
+
+## 0.1.4
+
+## 0.1.3
+
+## 0.1.2
+
+## 0.1.1
+
+## 0.1.0
+
+- Initial minor version bump. This indicates our impression that we have made significant progress towards stabilizing the detereministic integrity layer’s API. [\#1550](https://github.com/holochain/holochain/pull/1550)
+
+## 0.0.21
+
+## 0.0.20
+
+- Adds `must_get_agent_activity` which allows depending on an agents source chain by using a deterministic hash bounded range query. [\#1502](https://github.com/holochain/holochain/pull/1502)
+
+## 0.0.19
+
+## 0.0.18
+
 ## 0.0.17
 
 ## 0.0.16

@@ -31,6 +31,12 @@ pub struct ValidationPackageHostAccess {
     pub network: HolochainP2pDna,
 }
 
+impl std::fmt::Debug for ValidationPackageHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ValidationPackageHostAccess").finish()
+    }
+}
+
 impl From<ValidationPackageHostAccess> for HostContext {
     fn from(validation_package_host_access: ValidationPackageHostAccess) -> Self {
         Self::ValidationPackage(validation_package_host_access)

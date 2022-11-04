@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 
 /// A reference to a Zome in a Cell created by a SweetConductor installation function.
 /// Think of it as a partially applied SweetCell, with the ZomeName baked in.
-#[derive(Clone, derive_more::Constructor)]
+#[derive(Clone, Debug, derive_more::Constructor)]
 pub struct SweetZome {
     cell_id: CellId,
     name: ZomeName,
@@ -22,11 +22,16 @@ impl SweetZome {
     }
 }
 
-#[derive(Default)]
-/// A helper for creating [`InlineZomeSet`]
-pub struct SweetEasyInline(pub InlineZomeSet);
+#[deprecated = "alias for SweetInlineZomes"]
+/// Alias for SweetInlineZomes
+pub type SweetEasyInline = SweetInlineZomes;
 
-impl SweetEasyInline {
+#[derive(Default)]
+/// A helper for creating an [`InlineZomeSet`] consisting of a single
+/// integrity zome and a single coordinator zome.
+pub struct SweetInlineZomes(pub InlineZomeSet);
+
+impl SweetInlineZomes {
     /// Zome name for the integrity zome.
     pub const INTEGRITY: &'static str = "integrity";
     /// Zome name for the coordinator zome.
@@ -44,29 +49,51 @@ impl SweetEasyInline {
         )
     }
 
-    /// Add a callback to the integrity zome.
+    /// Add a function to the integrity zome.
+    pub fn integrity_function<F, I, O>(self, name: &str, f: F) -> Self
+    where
+        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
+        I: DeserializeOwned + std::fmt::Debug,
+        O: Serialize + std::fmt::Debug,
+    {
+        Self(self.0.function(Self::INTEGRITY, name, f))
+    }
+
+    /// Add a function to the coordinator_zome.
+    pub fn function<F, I, O>(self, name: &str, f: F) -> Self
+    where
+        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
+        I: DeserializeOwned + std::fmt::Debug,
+        O: Serialize + std::fmt::Debug,
+    {
+        Self(self.0.function(Self::COORDINATOR, name, f))
+    }
+
+    /// Alias for `integrity_function`
+    #[deprecated = "Alias for `integrity_function`"]
     pub fn integrity_callback<F, I, O>(self, name: &str, f: F) -> Self
     where
         F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
         I: DeserializeOwned + std::fmt::Debug,
         O: Serialize + std::fmt::Debug,
     {
-        Self(self.0.callback(Self::INTEGRITY, name, f))
+        self.integrity_function(name, f)
     }
 
-    /// Add a callback to the coordinator_zome.
+    /// Alias for `function`
+    #[deprecated = "Alias for `function`"]
     pub fn callback<F, I, O>(self, name: &str, f: F) -> Self
     where
         F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
         I: DeserializeOwned + std::fmt::Debug,
         O: Serialize + std::fmt::Debug,
     {
-        Self(self.0.callback(Self::COORDINATOR, name, f))
+        self.function(name, f)
     }
 }
 
-impl From<SweetEasyInline> for InlineZomeSet {
-    fn from(s: SweetEasyInline) -> Self {
+impl From<SweetInlineZomes> for InlineZomeSet {
+    fn from(s: SweetInlineZomes) -> Self {
         s.0
     }
 }

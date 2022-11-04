@@ -14,6 +14,7 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_zome_types::CellId;
+use std::collections::HashSet;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -131,6 +132,30 @@ pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
             let infos_b = all_agent_infos(b.clone().into()).await.unwrap();
 
             inject_agent_infos(a.clone(), infos_b.iter()).await.unwrap();
+            inject_agent_infos(b.clone(), infos_a.iter()).await.unwrap();
+        }
+    }
+}
+
+/// Interconnect provided pair of conductors via their peer store databases,
+/// according to the connectivity matrix
+#[cfg(any(test, feature = "test_utils"))]
+pub async fn exchange_peer_info_sparse(
+    envs: Vec<DbWrite<DbKindP2pAgents>>,
+    connectivity: Vec<HashSet<usize>>,
+) {
+    assert_eq!(envs.len(), connectivity.len());
+    for (i, a) in envs.iter().enumerate() {
+        let infos_a = all_agent_infos(a.clone().into()).await.unwrap();
+        for (j, b) in envs.iter().enumerate() {
+            if i == j {
+                continue;
+            }
+            if !connectivity[j].contains(&i) {
+                continue;
+            }
+            // let infos_b = all_agent_infos(b.clone().into()).await.unwrap();
+            // inject_agent_infos(a.clone(), infos_b.iter()).await.unwrap();
             inject_agent_infos(b.clone(), infos_a.iter()).await.unwrap();
         }
     }

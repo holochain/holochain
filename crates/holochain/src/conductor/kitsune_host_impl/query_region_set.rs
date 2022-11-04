@@ -1,10 +1,16 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicI64, Ordering},
+    Arc,
+};
 
 use holochain_p2p::{dht::prelude::*, dht_arc::DhtArcSet};
 use holochain_sqlite::prelude::*;
 use rusqlite::named_params;
 
 use crate::conductor::error::ConductorResult;
+
+static LAST_LOG_MS: AtomicI64 = AtomicI64::new(0);
+const LOG_RATE_MS: i64 = 1000;
 
 /// The network module needs info about various groupings ("regions") of ops
 pub async fn query_region_set(
@@ -13,8 +19,33 @@ pub async fn query_region_set(
     strat: &ArqStrat,
     dht_arc_set: Arc<DhtArcSet>,
 ) -> ConductorResult<RegionSetLtcs> {
-    let arq_set = ArqBoundsSet::from_dht_arc_set(&topology, strat, &dht_arc_set)
-        .expect("arc is not quantizable (FIXME: only use quantized arcs)");
+    let (arq_set, rounded) = ArqBoundsSet::from_dht_arc_set_rounded(&topology, strat, &dht_arc_set);
+    if rounded {
+        // If an arq was rounded, emit a warning, but throttle it to once every LOG_RATE_MS
+        // so we don't get slammed.
+        let it_is_time = LAST_LOG_MS
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |t| {
+                let now = Timestamp::now();
+                // If the difference is greater than the logging interval,
+                // produce a Some so that the atomic val gets updated, which
+                // will trigger a log after the update.
+                now.checked_difference_signed(&Timestamp::from_micros(t * 1000))
+                    .map(|d| d > chrono::Duration::milliseconds(LOG_RATE_MS))
+                    .unwrap_or(false)
+                    .then(|| now.as_millis())
+            })
+            .is_ok();
+        if it_is_time {
+            tracing::warn!(
+                "A continuous arc set could not be properly quantized.
+            Original:  {:?}
+            Quantized: {:?}",
+                dht_arc_set,
+                arq_set
+            );
+        }
+    }
+
     let times = TelescopingTimes::historical(&topology);
     let coords = RegionCoordSetLtcs::new(times, arq_set);
 

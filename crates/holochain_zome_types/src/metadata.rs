@@ -33,7 +33,7 @@ pub struct RecordDetails {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
-/// An Entry with all it's metadata.
+/// An Entry with all its metadata.
 pub struct EntryDetails {
     /// The data
     pub entry: Entry,
@@ -58,11 +58,12 @@ pub struct EntryDetails {
     /// ## Update relationships.
     /// These are the updates that have the
     /// `original_entry_address` set to the above Entry.
+    ///
     /// ### Notes
     /// This is just the relationship and you will need call get
     /// if you want to get the new Entry (the entry on the `entry_hash` field).
     ///
-    /// You **cannot** make an [Record] from these actions
+    /// You **cannot** make a [Record] from these actions
     /// and the above entry.
     pub updates: Vec<SignedActionHashed>,
     /// The status of this entry currently

@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
@@ -36,6 +38,13 @@ pub enum AdminRequest {
     /// [`AdminResponse::DnaRegistered`]
     RegisterDna(Box<RegisterDnaPayload>),
 
+    /// Get the definition of a DNA.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::DnaDefinitionReturned`]
+    GetDnaDefinition(Box<DnaHash>),
+
     /// Update coordinator zomes for an already installed DNA.
     ///
     /// Replaces any installed coordinator zomes with the same zome name.
@@ -47,24 +56,13 @@ pub enum AdminRequest {
     /// [`AdminResponse::CoordinatorsUpdated`]
     UpdateCoordinators(Box<UpdateCoordinatorsPayload>),
 
-    /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
-    ///
-    /// Using the provided, already-registered DNA, create a new DNA with a unique
-    /// ID and the specified properties, create a new cell from this cloned DNA,
-    /// and add the cell to the specified app.
-    ///
-    /// # Returns
-    ///
-    /// [`AdminResponse::CloneCellCreated`]
-    CreateCloneCell(Box<CreateCloneCellPayload>),
-
     /// Install an app from a list of DNA paths.
     ///
     /// Triggers genesis to be run on all cells and to be stored.
-    /// An app is intended for use by
-    /// one and only one agent and for that reason it takes an `AgentPubKey` and
-    /// installs all the DNAs with that `AgentPubKey` forming new Cells.
-    /// See [`InstallAppPayload`] for full details on the configuration.
+    /// An app is intended for use by one and only one agent and for that reason
+    /// it takes an `AgentPubKey` and installs all the DNAs with that `AgentPubKey`
+    /// forming new Cells. See [`InstallAppPayload`] for full details on the
+    /// configuration.  
     ///
     /// Note that the new app will not be enabled automatically after installation
     /// and can be enabled by calling [`EnableApp`].
@@ -155,8 +153,8 @@ pub enum AdminRequest {
     /// Changes the specified app from a disabled to an enabled state in the conductor.
     ///
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
-    /// installed app is not enabled automatically. When an app is enabled,
-    /// zomes can be called and it will be loaded on a reboot of the conductor.
+    /// installed app is not enabled automatically. Once the app is enabled,
+    /// zomes can be immediately called and it will also be loaded and enabled automatically on any reboot of the conductor.
     ///
     /// # Returns
     ///
@@ -299,7 +297,19 @@ pub enum AdminRequest {
         cell_id: Option<CellId>,
     },
 
-    /// Insert [`Record`]s into the source chain of the [`CellId`].
+    /// "Graft" [`Record`]s onto the source chain of the specified [`CellId`].
+    ///
+    /// The records must form a valid chain segment (ascending sequence numbers,
+    /// and valid `prev_action` references). If the first record contains a `prev_action`
+    /// which matches the existing records, then the new records will be "grafted" onto
+    /// the existing chain at that point, and any other records following that point which do
+    /// not match the new records will be removed.
+    ///
+    /// If this operation is called when there are no forks, the final state will also have
+    /// no forks.
+    ///
+    /// **BEWARE** that this may result in the deletion of data! Any existing records which form
+    /// a fork with respect to the new records will be deleted.
     ///
     /// All records must be authored and signed by the same agent.
     /// The [`DnaFile`] (but not necessarily the cell) must already be installed
@@ -324,17 +334,10 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::RecordsAdded`]
-    AddRecords {
+    /// [`AdminResponse::RecordsGrafted`]
+    GraftRecords {
         /// The cell that the records are being inserted into.
         cell_id: CellId,
-        /// If this is true then all records in the source chain will be
-        /// removed before the new records are inserted.
-        /// **Warning**: this cannot be undone. Use with care!
-        ///
-        /// If this is `false`, then the records will be appended to the end
-        /// of the source chain.
-        truncate: bool,
         /// If this is `true`, then the records will be validated before insertion.
         /// This is much slower but is useful for verifying the chain is valid.
         ///
@@ -344,6 +347,27 @@ pub enum AdminRequest {
         /// The records to be inserted into the source chain.
         records: Vec<Record>,
     },
+
+    /// Request capability grant for making zome calls.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ZomeCallCapabilityGranted`]
+    GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
+
+    /// Restore a clone cell that was previously archived.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CloneCellRestored`]
+    RestoreCloneCell(Box<RestoreCloneCellPayload>),
+
+    /// Delete all clone cells that were previously archived.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ArchivedCloneCellsDeleted`]
+    DeleteArchivedCloneCells(Box<DeleteArchivedCloneCellsPayload>),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -364,6 +388,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::RegisterDna`]
     DnaRegistered(DnaHash),
+
+    /// The successful response to an [`AdminRequest::GetDnaDefinition`]
+    DnaDefinitionReturned(DnaDef),
 
     /// The successful response to an [`AdminRequest::UpdateCoordinators`]
     CoordinatorsUpdated,
@@ -386,11 +413,6 @@ pub enum AdminResponse {
     ///
     /// It means the app was uninstalled successfully.
     AppUninstalled,
-
-    /// The successful response to an [`AdminRequest::CreateCloneCell`].
-    ///
-    /// The response contains the [`CellId`] of the newly created clone.
-    CloneCellCreated(CellId),
 
     /// The successful response to an [`AdminRequest::AddAdminInterfaces`].
     ///
@@ -498,8 +520,17 @@ pub enum AdminResponse {
     /// This is all the agent info that was found for the request.
     AgentInfoRequested(Vec<AgentInfoSigned>),
 
-    /// The successful response to an [`AdminRequest::AddRecords`].
-    RecordsAdded,
+    /// The successful response to an [`AdminRequest::GraftRecords`].
+    RecordsGrafted,
+
+    /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
+    ZomeCallCapabilityGranted,
+
+    // The successful response to an [`AdminRequest::RestoreCloneCell`].
+    CloneCellRestored(InstalledCell),
+
+    /// The successful response to an [`AdminRequest::DeleteArchivedCloneCells`].
+    ArchivedCloneCellsDeleted,
 }
 
 /// Error type that goes over the websocket wire.

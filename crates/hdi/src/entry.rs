@@ -125,15 +125,14 @@ macro_rules! app_entry {
                 match entry {
                     $crate::prelude::Entry::App(eb) => Ok(Self::try_from(
                         $crate::prelude::SerializedBytes::from(eb.to_owned()),
-                    ).map_err(|e| $crate::prelude::wasm_error!(e.into()))?),
+                    ).map_err(|e| $crate::prelude::wasm_error!(e))?),
                     $crate::prelude::Entry::CounterSign(_, eb) => Ok(Self::try_from(
                         $crate::prelude::SerializedBytes::from(eb.to_owned()),
-                    ).map_err(|e| $crate::prelude::wasm_error!(e.into()))?),
-                    _ => Err($crate::prelude::wasm_error!($crate::prelude::SerializedBytesError::Deserialize(format!(
+                    ).map_err(|e| $crate::prelude::wasm_error!(e))?),
+                    _ => Err($crate::prelude::wasm_error!(
                         "{:?} is not an Entry::App or Entry::CounterSign so has no serialized bytes",
                         entry
-                    ))
-                    .into())),
+                    )),
                 }
             }
         }
@@ -175,7 +174,7 @@ macro_rules! app_entry {
         impl TryFrom<&$t> for $crate::prelude::AppEntryBytes {
             type Error = $crate::prelude::WasmError;
             fn try_from(t: &$t) -> Result<Self, Self::Error> {
-                AppEntryBytes::try_from(SerializedBytes::try_from(t).map_err(|e| wasm_error!(e.into()))?).map_err(|entry_error| match entry_error {
+                AppEntryBytes::try_from(SerializedBytes::try_from(t).map_err(|e| wasm_error!(e))?).map_err(|entry_error| match entry_error {
                     EntryError::SerializedBytes(serialized_bytes_error) => {
                         wasm_error!(WasmErrorInner::Serialize(serialized_bytes_error))
                     }

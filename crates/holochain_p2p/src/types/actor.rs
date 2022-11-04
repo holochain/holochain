@@ -4,6 +4,7 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
+use kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics;
 
 /// Request a validation package.
 #[derive(Clone, Debug)]
@@ -243,13 +244,10 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             request_validation_receipt: bool,
             countersigning_session: bool,
-            dht_hash: holo_hash::AnyDhtHash,
+            basis_hash: holo_hash::OpBasis,
             ops: Vec<holochain_types::dht_op::DhtOp>,
             timeout_ms: Option<u64>,
         ) -> usize;
-
-        /// Request a validation package.
-        fn get_validation_package(input: GetValidationPackage) -> ValidationPackageResponse;
 
         /// Get an entry from the DHT.
         fn get(
@@ -280,6 +278,13 @@ ghost_actor::ghost_chan! {
             options: GetActivityOptions,
         ) -> Vec<AgentActivityResponse<ActionHash>>;
 
+        /// A remote node is requesting agent activity from us.
+        fn must_get_agent_activity(
+            dna_hash: DnaHash,
+            author: AgentPubKey,
+            filter: holochain_zome_types::chain::ChainFilter,
+        ) -> Vec<MustGetAgentActivityResponse>;
+
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, receipt: SerializedBytes) -> ();
 
@@ -287,7 +292,7 @@ ghost_actor::ghost_chan! {
         fn new_integrated_data(dna_hash: DnaHash) -> ();
 
         /// Check if any local agent in this space is an authority for a hash.
-        fn authority_for_hash(dna_hash: DnaHash, dht_hash: AnyDhtHash) -> bool;
+        fn authority_for_hash(dna_hash: DnaHash, basis: OpBasis) -> bool;
 
         /// Messages between agents negotiation a countersigning session.
         fn countersigning_session_negotiation(
@@ -300,6 +305,9 @@ ghost_actor::ghost_chan! {
         fn dump_network_metrics(
             dna_hash: Option<DnaHash>,
         ) -> String;
+
+        /// Get struct for diagnostic data
+        fn get_diagnostics(dna_hash: DnaHash) -> GossipDiagnostics;
     }
 }
 
@@ -310,22 +318,23 @@ pub type HolochainP2pRef = ghost_actor::GhostSender<HolochainP2p>;
 pub trait HolochainP2pRefToDna {
     /// Partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific dna context.
-    fn into_dna(self, dna_hash: DnaHash) -> crate::HolochainP2pDna;
+    fn into_dna(self, dna_hash: DnaHash, chc: Option<ChcImpl>) -> crate::HolochainP2pDna;
 
     /// Clone and partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific dna context.
-    fn to_dna(&self, dna_hash: DnaHash) -> crate::HolochainP2pDna;
+    fn to_dna(&self, dna_hash: DnaHash, chc: Option<ChcImpl>) -> crate::HolochainP2pDna;
 }
 
 impl HolochainP2pRefToDna for HolochainP2pRef {
-    fn into_dna(self, dna_hash: DnaHash) -> crate::HolochainP2pDna {
+    fn into_dna(self, dna_hash: DnaHash, chc: Option<ChcImpl>) -> crate::HolochainP2pDna {
         crate::HolochainP2pDna {
             sender: self,
             dna_hash: Arc::new(dna_hash),
+            chc,
         }
     }
 
-    fn to_dna(&self, dna_hash: DnaHash) -> crate::HolochainP2pDna {
-        self.clone().into_dna(dna_hash)
+    fn to_dna(&self, dna_hash: DnaHash, chc: Option<ChcImpl>) -> crate::HolochainP2pDna {
+        self.clone().into_dna(dna_hash, chc)
     }
 }

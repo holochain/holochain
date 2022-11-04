@@ -185,10 +185,26 @@ mod tests {
     use crate::types::KitsuneBinType;
     use crate::types::KitsuneSignature;
     use ::fixt::prelude::*;
-    use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::internal::sign_ed25519::sign_ed25519_keypair_new_from_entropy;
     use kitsune_p2p_types::KitsuneError;
     use std::convert::TryInto;
     use std::sync::Arc;
+
+    // stub struct to make these tests compile (though they won't run).
+    #[derive(Clone)]
+    struct Keypair {
+        pub pub_key: (Arc<Vec<u8>>,),
+    }
+
+    impl Keypair {
+        async fn sign(&self, _: Arc<Vec<u8>>) -> Result<(Arc<Vec<u8>>,), std::io::Error> {
+            todo!()
+        }
+    }
+
+    // stub function to make these tests compile (though they won't run).
+    async fn sign_ed25519_keypair_new_from_entropy() -> Result<Keypair, std::io::Error> {
+        todo!()
+    }
 
     // TODO - FIXME - davidb
     // I'm disabling all these tests that depend on outside systems

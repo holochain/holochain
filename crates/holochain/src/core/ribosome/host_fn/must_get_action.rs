@@ -25,8 +25,10 @@ pub fn must_get_action<'a>(
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
                 let mut cascade = match call_context.host_context {
-                    HostContext::Validate(_) => Cascade::from_workspace(workspace.stores(), None),
-                    _ => Cascade::from_workspace_network(
+                    HostContext::Validate(_) => {
+                        Cascade::from_workspace_stores(workspace.stores(), None)
+                    }
+                    _ => Cascade::from_workspace_and_network(
                         &workspace,
                         call_context.host_context.network().clone(),
                     ),
@@ -50,36 +52,47 @@ pub fn must_get_action<'a>(
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
-                                    vec![action_hash.into()],
+                                    UnresolvedDependencies::Hashes(vec![action_hash.into()],)
                                 ))
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             )
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                         ))
                         .into()),
-                        HostContext::Validate(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
-                            holochain_serialized_bytes::encode(
-                                &ExternIO::encode(ValidateCallbackResult::UnresolvedDependencies(
-                                    vec![action_hash.into()],
-                                ))
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
-                            )
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
-                        ))
-                        .into()),
-                        HostContext::ValidationPackage(_) =>
-                           Err(wasm_error!(WasmErrorInner::HostShortCircuit(
+                        HostContext::Validate(_) => {
+                            Err(wasm_error!(WasmErrorInner::HostShortCircuit(
+                                holochain_serialized_bytes::encode(
+                                    &ExternIO::encode(
+                                        ValidateCallbackResult::UnresolvedDependencies(
+                                            UnresolvedDependencies::Hashes(
+                                                vec![action_hash.into()],
+                                            )
+                                        )
+                                    )
+                                    .map_err(
+                                        |e| -> RuntimeError { wasm_error!(e).into() }
+                                    )?,
+                                )
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
+                            ))
+                            .into())
+                        }
+                        HostContext::ValidationPackage(_) => {
+                            Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
                                         ValidationPackageCallbackResult::UnresolvedDependencies(
                                             vec![action_hash.into(),]
                                         ),
                                     )
-                                    .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                                    .map_err(
+                                        |e| -> RuntimeError { wasm_error!(e).into() }
+                                    )?
                                 )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             ))
                             .into())
+                        }
                     },
                 }
             })
@@ -91,6 +104,7 @@ pub fn must_get_action<'a>(
                 "must_get_action".into(),
             )
             .to_string(),
-        )).into()),
+        ))
+        .into()),
     }
 }

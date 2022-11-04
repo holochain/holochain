@@ -11,8 +11,9 @@ roles:
       deferred: false
     dna:
       bundled: dnas/dna1/a dna.dna
-      network_seed: 0123456
-      properties: ~
+      modifiers:
+        network_seed: 0123456
+        properties: ~
       clone_limit: 0
   - id: role-2
     provisioning:
@@ -20,8 +21,9 @@ roles:
       deferred: true
     dna:
       bundled: dnas/dna2/another dna.dna
-      network_seed: ~
-      properties:
-        foo: 1111
-        bar: it could be anything
+      modifiers:
+        network_seed: ~
+        properties:
+          foo: 1111
+          bar: it could be anything
       clone_limit: 10

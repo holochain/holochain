@@ -11,6 +11,9 @@ use crate::HoloHash;
 /// An Agent public signing key. Not really a hash, more of an "identity hash".
 pub type AgentPubKey = HoloHash<hash_type::Agent>;
 
+/// A public key of a pair of signing keys for signing zome calls.
+pub type ZomeCallSigningKey = AgentPubKey;
+
 /// The hash of a DnaDef
 pub type DnaHash = HoloHash<hash_type::Dna>;
 
@@ -40,6 +43,9 @@ pub type AnyDhtHash = HoloHash<hash_type::AnyDht>;
 
 /// The hash of anything linkable.
 pub type AnyLinkableHash = HoloHash<hash_type::AnyLinkable>;
+
+/// Alias for AnyLinkableHash. This hash forms the notion of the "basis hash" of an op.
+pub type OpBasis = AnyLinkableHash;
 
 /// The primitive hash types represented by this composite hash
 pub enum AnyDhtHashPrimitive {
@@ -133,9 +139,10 @@ impl AnyDhtHash {
     }
 }
 
-impl From<AnyLinkableHash> for AnyDhtHash {
-    fn from(hash: AnyLinkableHash) -> Self {
-        hash.retype(hash_type::AnyDht::Entry)
+impl From<AnyDhtHash> for AnyLinkableHash {
+    fn from(hash: AnyDhtHash) -> Self {
+        let t = (*hash.hash_type()).into();
+        hash.retype(t)
     }
 }
 

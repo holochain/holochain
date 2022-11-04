@@ -174,8 +174,8 @@ impl Expected {
 /// are called for each op.
 async fn app_validation_ops() {
     observability::test_run().ok();
-    let entry_def_a = EntryDef::default_with_id("a");
-    let entry_def_b = EntryDef::default_with_id("b");
+    let entry_def_a = EntryDef::from_id("a");
+    let entry_def_b = EntryDef::from_id("b");
     let call_back_a = |_zome_name: &'static str| {
         move |api: BoxApi, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
@@ -266,7 +266,7 @@ async fn app_validation_ops() {
                             with_entry_def_index,
                         }
                     }
-                    Op::RegisterAgentActivity(RegisterAgentActivity { action }) => Event {
+                    Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Event {
                         action: ActionLocation::new(action.action().clone(), &agents),
                         op_type: DhtOpType::RegisterAgentActivity,
                         called_zome: zome,
@@ -320,23 +320,21 @@ async fn app_validation_ops() {
     )
     .with_dependency("zome1", "integrity_zome1")
     .with_dependency("zome2", "integrity_zome2")
-    .callback("zome1", "create_a", call_back_a("integrity_zome1"))
-    .callback("zome1", "create_b", call_back_b("integrity_zome1"))
-    .callback(
+    .function("zome1", "create_a", call_back_a("integrity_zome1"))
+    .function("zome1", "create_b", call_back_b("integrity_zome1"))
+    .function(
         "integrity_zome1",
         "validate",
         validation_callback(ZOME_A_0, agents.clone(), events_tx.clone()),
     )
-    .callback("zome2", "create_a", call_back_a("integrity_zome2"))
-    .callback("zome2", "create_b", call_back_b("integrity_zome2"))
-    .callback(
+    .function("zome2", "create_a", call_back_a("integrity_zome2"))
+    .function("zome2", "create_b", call_back_b("integrity_zome2"))
+    .function(
         "integrity_zome2",
         "validate",
         validation_callback(ZOME_A_1, agents.clone(), events_tx.clone()),
     );
-    let (dna_file_a, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
-        .await
-        .unwrap();
+    let (dna_file_a, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
 
     let zomes = InlineZomeSet::new(
         [
@@ -357,24 +355,22 @@ async fn app_validation_ops() {
     )
     .with_dependency("zome1", "integrity_zome1")
     .with_dependency("zome2", "integrity_zome2")
-    .callback("zome1", "create_a", call_back_a("integrity_zome1"))
-    .callback("zome1", "create_b", call_back_b("integrity_zome2"))
-    .callback(
+    .function("zome1", "create_a", call_back_a("integrity_zome1"))
+    .function("zome1", "create_b", call_back_b("integrity_zome2"))
+    .function(
         "integrity_zome1",
         "validate",
         validation_callback(ZOME_B_0, agents.clone(), events_tx.clone()),
     )
-    .callback("zome2", "create_a", call_back_a("integrity_zome2"))
-    .callback("zome2", "create_b", call_back_b("integrity_zome2"))
-    .callback(
+    .function("zome2", "create_a", call_back_a("integrity_zome2"))
+    .function("zome2", "create_b", call_back_b("integrity_zome2"))
+    .function(
         "integrity_zome2",
         "validate",
         validation_callback(ZOME_B_1, agents.clone(), events_tx.clone()),
     );
 
-    let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes)
-        .await
-        .unwrap();
+    let (dna_file_b, _, _) = SweetDnaFile::from_inline_zomes("".into(), zomes).await;
     let app = conductors[0]
         .setup_app_for_agent(&"test_app", alice.clone(), &[dna_file_a.clone()])
         .await
@@ -391,7 +387,7 @@ async fn app_validation_ops() {
         .call(&alice.zome("zome1"), "create_a", ())
         .await;
 
-    consistency_10s(&[&alice, &bob]).await;
+    consistency_10s([&alice, &bob]).await;
 
     let mut expected = Expected(HashSet::new());
 

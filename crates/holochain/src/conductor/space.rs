@@ -3,8 +3,9 @@
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use holo_hash::{DhtOpHash, DnaHash};
+use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
@@ -27,8 +28,10 @@ use holochain_sqlite::{
     prelude::{DatabaseError, DatabaseResult},
 };
 use holochain_state::{
+    mutations,
     prelude::{from_blob, StateQueryResult},
     query::{map_sql_dht_op_common, StateQueryError},
+    source_chain::{SourceChain, SourceChainResult},
 };
 use holochain_types::{
     db_cache::DhtDbQueryCache,
@@ -39,9 +42,10 @@ use kitsune_p2p::{
     event::{TimeWindow, TimeWindowInclusive},
     KitsuneP2pConfig,
 };
-use rusqlite::named_params;
+use rusqlite::{named_params, OptionalExtension};
 use tracing::instrument;
 
+use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::{
     queue_consumer::QueueConsumerMap,
     workflow::{
@@ -154,6 +158,69 @@ impl Spaces {
             wasm_db,
             network_config: config.network.clone().unwrap_or_default(),
         })
+    }
+
+    /// Get the holochain conductor state
+    pub async fn get_state(&self) -> ConductorResult<ConductorState> {
+        let state = self
+            .conductor_db
+            .async_reader(|txn| {
+                let state = txn
+                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                        row.get("blob")
+                    })
+                    .optional()?;
+                match state {
+                    Some(state) => ConductorResult::Ok(Some(from_blob(state)?)),
+                    None => ConductorResult::Ok(None),
+                }
+            })
+            .await?;
+
+        match state {
+            Some(state) => Ok(state),
+            // update_state will again try to read the state. It's a little
+            // inefficient in the infrequent case where we haven't saved the
+            // state yet, but more atomic, so worth it.
+            None => self.update_state(Ok).await,
+        }
+    }
+
+    /// Update the internal state with a pure function mapping old state to new
+    pub async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+    where
+        F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
+    {
+        let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
+        Ok(state)
+    }
+
+    /// Update the internal state with a pure function mapping old state to new,
+    /// which may also produce an output value which will be the output of
+    /// this function
+    pub async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
+    where
+        F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+        O: Send + 'static,
+    {
+        let output = self
+            .conductor_db
+            .async_commit(move |txn| {
+                let state = txn
+                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                        row.get("blob")
+                    })
+                    .optional()?;
+                let state = match state {
+                    Some(state) => from_blob(state)?,
+                    None => ConductorState::default(),
+                };
+                let (new_state, output) = f(state)?;
+                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+                Result::<_, ConductorError>::Ok((new_state, output))
+            })
+            .await?;
+        Ok(output)
     }
 
     /// Get something from every space
@@ -342,7 +409,7 @@ impl Spaces {
                 .map(|i| {
                     let len = i.length();
                     let (pow, _) = power_and_count_from_length(&topology.space, len, max_chunks);
-                    ArqBounds::from_interval_rounded(&topology, pow, i)
+                    ArqBounds::from_interval_rounded(&topology, pow, i).0
                 })
                 .collect(),
         );
@@ -638,6 +705,22 @@ impl Space {
             dht_query_cache,
         };
         Ok(r)
+    }
+
+    /// Construct a SourceChain for an author in this Space
+    pub async fn source_chain(
+        &self,
+        keystore: MetaLairClient,
+        author: AgentPubKey,
+    ) -> SourceChainResult<SourceChain> {
+        SourceChain::raw_empty(
+            self.authored_db.clone(),
+            self.dht_db.clone(),
+            self.dht_query_cache.clone(),
+            keystore,
+            author,
+        )
+        .await
     }
 }
 

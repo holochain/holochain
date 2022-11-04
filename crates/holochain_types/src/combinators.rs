@@ -19,3 +19,8 @@ pub fn second<A, B>(tup: (A, B)) -> B {
 pub fn second_ref<A, B>(tup: &(A, B)) -> &B {
     &tup.1
 }
+
+/// Swap the two items in 2-tuple
+pub fn swap2<A, B>(tup: (A, B)) -> (B, A) {
+    (tup.1, tup.0)
+}

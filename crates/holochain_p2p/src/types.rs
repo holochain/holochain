@@ -29,6 +29,10 @@ pub enum HolochainP2pError {
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
+
+    /// Chain Head Coordination error
+    #[error(transparent)]
+    ChcError(#[from] holochain_types::chc::ChcError),
 }
 
 impl HolochainP2pError {
@@ -194,4 +198,5 @@ macro_rules! to_kitsune {
 
 to_kitsune! {
     AnyDhtHashExt<holo_hash::AnyDhtHash> -> kitsune_p2p::KitsuneBasis,
+    AnyLinkableHashExt<holo_hash::AnyLinkableHash> -> kitsune_p2p::KitsuneBasis,
 }

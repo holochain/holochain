@@ -24,16 +24,17 @@ async fn direct_validation_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "direct_validation_test".to_string(),
-            network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            modifiers: DnaModifiers {
+                network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            },
             integrity_zomes: vec![TestZomes::from(TestWasm::Update).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::Update).coordinator.into_inner()],
         },
         [integrity, coordinator],
     )
-    .await
-    .unwrap();
+    .await;
 
     let alice_agent_id = fake_agent_pubkey_1();
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());

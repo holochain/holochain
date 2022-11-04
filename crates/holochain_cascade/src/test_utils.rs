@@ -1,3 +1,5 @@
+//! Test utils for holochain_cascade
+
 use crate::authority;
 use crate::authority::get_entry_ops_query::GetEntryOpsQuery;
 use crate::authority::get_record_query::GetRecordOpsQuery;
@@ -10,6 +12,7 @@ use holo_hash::HasHash;
 use holochain_p2p::actor;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -23,25 +26,30 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::mutations::insert_op;
 use holochain_state::mutations::set_validation_status;
 use holochain_state::mutations::set_when_integrated;
+use holochain_state::prelude::insert_action;
+use holochain_state::prelude::insert_op_lite;
+use holochain_state::prelude::test_in_mem_db;
 use holochain_state::prelude::Query;
 use holochain_state::prelude::Txn;
+use holochain_state::scratch::SyncScratch;
 use holochain_types::activity::AgentActivityResponse;
+use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
 use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::OpOrder;
+use holochain_types::dht_op::UniqueForm;
 use holochain_types::dht_op::WireOps;
 use holochain_types::link::WireLinkKey;
 use holochain_types::link::WireLinkOps;
 use holochain_types::metadata::MetadataSet;
-use holochain_types::prelude::ValidationPackageResponse;
 use holochain_types::prelude::WireEntryOps;
 use holochain_types::record::WireRecordOps;
-use holochain_zome_types::ActionHashed;
+use holochain_types::test_utils::chain::*;
+use holochain_zome_types::ActionRefMut;
 use holochain_zome_types::QueryFilter;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
-use holochain_zome_types::TryInto;
 use holochain_zome_types::ValidationStatus;
 
 pub use activity_test_data::*;
@@ -52,6 +60,8 @@ mod activity_test_data;
 mod entry_test_data;
 mod record_test_data;
 
+/// A network implementation which routes to the local databases,
+/// and can declare itself an authority either for all ops, or for no ops.
 #[derive(Clone)]
 pub struct PassThroughNetwork {
     envs: Vec<DbRead<DbKindDht>>,
@@ -59,6 +69,7 @@ pub struct PassThroughNetwork {
 }
 
 impl PassThroughNetwork {
+    /// Declare that this node has full coverage
     pub fn authority_for_all(envs: Vec<DbRead<DbKindDht>>) -> Self {
         Self {
             envs,
@@ -66,6 +77,7 @@ impl PassThroughNetwork {
         }
     }
 
+    /// Declare that this node has zero coverage
     pub fn authority_for_nothing(envs: Vec<DbRead<DbKindDht>>) -> Self {
         Self {
             envs,
@@ -74,10 +86,12 @@ impl PassThroughNetwork {
     }
 }
 
+/// A mutex-guarded [`MockHolochainP2pDnaT`]
 #[derive(Clone)]
 pub struct MockNetwork(std::sync::Arc<tokio::sync::Mutex<MockHolochainP2pDnaT>>);
 
 impl MockNetwork {
+    /// Constructor
     pub fn new(mock: MockHolochainP2pDnaT) -> Self {
         Self(std::sync::Arc::new(tokio::sync::Mutex::new(mock)))
     }
@@ -85,14 +99,6 @@ impl MockNetwork {
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for PassThroughNetwork {
-    async fn get_validation_package(
-        &self,
-        _request_from: AgentPubKey,
-        _action_hash: ActionHash,
-    ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
-        todo!()
-    }
-
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,
@@ -127,6 +133,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         }
         Ok(out)
     }
+
     async fn get_meta(
         &self,
         _dht_hash: holo_hash::AnyDhtHash,
@@ -134,6 +141,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     ) -> actor::HolochainP2pResult<Vec<MetadataSet>> {
         todo!()
     }
+
     async fn get_links(
         &self,
         link_key: WireLinkKey,
@@ -148,6 +156,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         }
         Ok(out)
     }
+
     async fn get_agent_activity(
         &self,
         agent: AgentPubKey,
@@ -169,9 +178,28 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         Ok(out)
     }
 
+    async fn must_get_agent_activity(
+        &self,
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
+        let mut out = Vec::new();
+        for env in &self.envs {
+            let r = authority::handle_must_get_agent_activity(
+                env.clone(),
+                agent.clone(),
+                filter.clone(),
+            )
+            .await
+            .map_err(|e| HolochainP2pError::Other(e.into()))?;
+            out.push(r);
+        }
+        Ok(out)
+    }
+
     async fn authority_for_hash(
         &self,
-        _dht_hash: holo_hash::AnyDhtHash,
+        _dht_hash: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool> {
         Ok(self.authority)
     }
@@ -196,7 +224,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         _request_validation_receipt: bool,
         _countersigning_session: bool,
-        _dht_hash: holo_hash::AnyDhtHash,
+        _basis_hash: holo_hash::OpBasis,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize> {
@@ -246,8 +274,13 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }
+
+    fn chc(&self) -> Option<ChcImpl> {
+        None
+    }
 }
 
+/// Insert ops directly into the database and mark integrated as valid
 pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
@@ -261,6 +294,7 @@ pub fn fill_db<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
         .unwrap();
 }
 
+/// Insert ops directly into the database and mark integrated as rejected
 pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
@@ -274,6 +308,7 @@ pub fn fill_db_rejected<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHash
         .unwrap();
 }
 
+/// Insert ops directly into the database and mark valid and pending integration
 pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
@@ -286,6 +321,7 @@ pub fn fill_db_pending<Db: DbKindT + DbKindOp>(env: &DbWrite<Db>, op: DhtOpHashe
         .unwrap();
 }
 
+/// Insert ops into the authored database
 pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
     env.conn()
         .unwrap()
@@ -298,18 +334,6 @@ pub fn fill_db_as_author(env: &DbWrite<DbKindAuthored>, op: DhtOpHashed) {
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for MockNetwork {
-    async fn get_validation_package(
-        &self,
-        request_from: AgentPubKey,
-        action_hash: ActionHash,
-    ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
-        self.0
-            .lock()
-            .await
-            .get_validation_package(request_from, action_hash)
-            .await
-    }
-
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,
@@ -347,9 +371,21 @@ impl HolochainP2pDnaT for MockNetwork {
             .await
     }
 
+    async fn must_get_agent_activity(
+        &self,
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
+        self.0
+            .lock()
+            .await
+            .must_get_agent_activity(agent, filter)
+            .await
+    }
+
     async fn authority_for_hash(
         &self,
-        dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool> {
         self.0.lock().await.authority_for_hash(dht_hash).await
     }
@@ -374,7 +410,7 @@ impl HolochainP2pDnaT for MockNetwork {
         &self,
         _request_validation_receipt: bool,
         _countersigning_session: bool,
-        _dht_hash: holo_hash::AnyDhtHash,
+        _basis_hash: holo_hash::OpBasis,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize> {
@@ -424,15 +460,9 @@ impl HolochainP2pDnaT for MockNetwork {
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }
-}
 
-pub fn wire_to_shh<T: TryInto<SignedAction> + Clone>(op: &T) -> SignedActionHashed {
-    let r = op.clone().try_into();
-    match r {
-        Ok(SignedAction(action, signature)) => {
-            SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature)
-        }
-        Err(_) => unreachable!(),
+    fn chc(&self) -> Option<ChcImpl> {
+        None
     }
 }
 
@@ -466,4 +496,81 @@ pub fn handle_get_txn(
         AnyDht::Entry => WireOps::Entry(handle_get_entry_txn(txn, hash.into(), options)),
         AnyDht::Action => WireOps::Record(handle_get_record_txn(txn, hash.into(), options)),
     }
+}
+
+/// Commit the chain to a test in-memory database, returning a handle to that DB
+pub fn commit_chain<Kind: DbKindT>(
+    db_kind: Kind,
+    chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+) -> DbWrite<Kind> {
+    let data: Vec<_> = chain
+        .into_iter()
+        .map(|(a, c)| {
+            chain_to_ops(c)
+                .into_iter()
+                .map(|mut op| {
+                    *op.action.hashed.content.author_mut() = a.clone();
+                    op
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    let db = test_in_mem_db(db_kind);
+
+    db.test_commit(|txn| {
+        for data in &data {
+            for op in data {
+                let op_light = DhtOpLight::RegisterAgentActivity(
+                    op.action.action_address().clone(),
+                    op.action
+                        .hashed
+                        .entry_hash()
+                        .cloned()
+                        .unwrap_or_else(|| entry_hash(&[0]))
+                        .into(),
+                );
+
+                let timestamp = Timestamp::now();
+                let (_, hash) =
+                    UniqueForm::op_hash(op_light.get_type(), op.action.hashed.content.clone())
+                        .unwrap();
+                insert_action(txn, &op.action).unwrap();
+                insert_op_lite(
+                    txn,
+                    &op_light,
+                    &hash,
+                    &OpOrder::new(op_light.get_type(), timestamp),
+                    &timestamp,
+                )
+                .unwrap();
+                set_validation_status(txn, &hash, holochain_zome_types::ValidationStatus::Valid)
+                    .unwrap();
+                set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
+            }
+        }
+    });
+    db
+}
+
+/// Add the items to the provided scratch
+pub fn commit_scratch(scratch: SyncScratch, chain: Vec<(AgentPubKey, Vec<TestChainItem>)>) {
+    let data = chain.into_iter().map(|(a, c)| {
+        chain_to_ops(c)
+            .into_iter()
+            .map(|mut op| {
+                *op.action.hashed.content.author_mut() = a.clone();
+                op
+            })
+            .collect::<Vec<_>>()
+    });
+
+    scratch
+        .apply(|scratch| {
+            for data in data {
+                for op in data {
+                    scratch.add_action(op.action, Default::default());
+                }
+            }
+        })
+        .unwrap();
 }

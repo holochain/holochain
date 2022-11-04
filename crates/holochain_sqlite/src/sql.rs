@@ -6,6 +6,8 @@ pub mod sql_cell {
         include_str!("sql/cell/activity_integrated_upper_bound.sql");
     pub const ALL_ACTIVITY_AUTHORS: &str = include_str!("sql/cell/all_activity_authors.sql");
     pub const ALL_READY_ACTIVITY: &str = include_str!("sql/cell/all_ready_activity.sql");
+    pub const DELETE_ACTIONS_AFTER_SEQ: &str =
+        include_str!("sql/cell/delete_actions_after_seq.sql");
     pub const UPDATE_INTEGRATE_DEP_STORE_RECORD: &str =
         include_str!("sql/cell/update_dep_store_record.sql");
     pub const UPDATE_INTEGRATE_DEP_STORE_ENTRY: &str =
@@ -24,6 +26,13 @@ pub mod sql_cell {
     pub const FETCH_OPS_BY_REGION: &str = include_str!("sql/cell/fetch_ops_by_region.sql");
 
     pub const FETCH_OP: &str = include_str!("sql/cell/fetch_op.sql");
+
+    pub mod must_get_agent_activity {
+        pub const MUST_GET_AGENT_ACTIVITY: &str =
+            include_str!("sql/cell/agent_activity/must_get_agent_activity.sql");
+        pub const ACTION_HASH_TO_SEQ: &str =
+            include_str!("sql/cell/agent_activity/action_hash_to_seq.sql");
+    }
 
     pub mod schedule {
         pub const UPDATE: &str = include_str!("sql/cell/schedule/update.sql");

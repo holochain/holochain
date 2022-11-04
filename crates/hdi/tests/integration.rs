@@ -165,10 +165,13 @@ fn to_zome_id_test_unit() {
 mod entry_defs_to_entry_type_index_test {
     use hdi::prelude::*;
 
+    #[derive(PartialEq, Eq)]
     #[hdk_entry_helper]
     pub struct A;
+    #[derive(PartialEq, Eq)]
     #[hdk_entry_helper]
     pub struct B;
+    #[derive(PartialEq, Eq)]
     #[hdk_entry_helper]
     pub struct C;
 
@@ -177,6 +180,7 @@ mod entry_defs_to_entry_type_index_test {
 
         #[hdk_entry_defs(skip_hdk_extern = true)]
         #[unit_enum(UnitFoo)]
+        #[derive(PartialEq, Eq)]
         pub enum EntryTypes {
             A(A),
             B(B),
@@ -207,7 +211,7 @@ mod entry_defs_overrides_mod {
         A(A),
         #[entry_def(visibility = "private")]
         B(A),
-        #[entry_def(required_validations = 10)]
+        #[entry_def(required_validations = 10, cache_at_agent_activity = true)]
         C(A),
     }
 }
@@ -221,16 +225,19 @@ fn entry_defs_overrides() {
                 id: "hey".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
+                ..Default::default()
             },
             EntryDef {
                 id: "b".into(),
                 visibility: EntryVisibility::Private,
                 required_validations: Default::default(),
+                ..Default::default()
             },
             EntryDef {
                 id: "c".into(),
                 visibility: Default::default(),
                 required_validations: RequiredValidations(10),
+                cache_at_agent_activity: true,
             },
         ]))
     );
@@ -258,16 +265,19 @@ fn entry_defs_default() {
                 id: "a".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
+                ..Default::default()
             },
             EntryDef {
                 id: "b".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
+                ..Default::default()
             },
             EntryDef {
                 id: "c".into(),
                 visibility: Default::default(),
                 required_validations: Default::default(),
+                ..Default::default()
             },
         ]))
     );
@@ -297,27 +307,27 @@ fn entry_defs_to_entry_type_index() {
         (1, 2)
     );
 
-    assert!(matches!(
+    assert_eq!(
         integrity_a::EntryTypes::deserialize_from_type(1, 0, &Entry::try_from(A {}).unwrap()),
         Ok(Some(integrity_a::EntryTypes::A(A {})))
-    ));
-    assert!(matches!(
+    );
+    assert_eq!(
         integrity_a::EntryTypes::deserialize_from_type(1, 1, &Entry::try_from(A {}).unwrap()),
         Ok(Some(integrity_a::EntryTypes::B(B {})))
-    ));
-    assert!(matches!(
+    );
+    assert_eq!(
         integrity_a::EntryTypes::deserialize_from_type(1, 2, &Entry::try_from(A {}).unwrap()),
         Ok(Some(integrity_a::EntryTypes::C(C {})))
-    ));
+    );
 
     assert!(matches!(
         integrity_a::EntryTypes::deserialize_from_type(1, 20, &Entry::try_from(A {}).unwrap()),
-        Ok(None)
+        Err(_)
     ));
-    assert!(matches!(
+    assert_eq!(
         integrity_a::EntryTypes::deserialize_from_type(0, 0, &Entry::try_from(A {}).unwrap()),
         Ok(None)
-    ));
+    );
 
     // Set the integrity_b scope.
     set_zome_types(&[(12, 3)], &[]);

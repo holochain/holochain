@@ -17,6 +17,8 @@ struct VarOpts {
     visibility: Option<String>,
     #[darling(default)]
     required_validations: Option<u8>,
+    #[darling(default)]
+    cache_at_agent_activity: Option<bool>,
 }
 
 #[derive(FromDeriveInput)]
@@ -42,17 +44,20 @@ pub fn derive(input: TokenStream) -> TokenStream {
                      name,
                      visibility,
                      required_validations,
+                     cache_at_agent_activity,
                      ..
                  }| {
                     let id = crate::util::to_snake_case(name, &v_ident);
                     let visibility = parse_visibility(&v_ident, visibility);
                     let required_validations =
                         required_validations.unwrap_or_else(|| RequiredValidations::default().0);
+                    let cache_at_agent_activity = cache_at_agent_activity.unwrap_or(false);
                     quote::quote! {
                         EntryDef {
                             id: EntryDefId::App(AppEntryDefName::from_str(#id)),
                             visibility: #visibility,
                             required_validations: RequiredValidations(#required_validations),
+                            cache_at_agent_activity: #cache_at_agent_activity,
                         },
                     }
                 },

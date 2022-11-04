@@ -1,4 +1,5 @@
 use crate::prelude::*;
+pub use hdi::chain::*;
 
 /// Query the _actions_ of a remote agent's chain.
 ///

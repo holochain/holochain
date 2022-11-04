@@ -149,7 +149,6 @@ macro_rules! secure_primitive {
         }
 
         impl Eq for $t {}
-
         /// The only meaningful debug information for a cryptograhpic secret is the literal bytes.
         /// Also, encodings like base64 are not constant time so debugging could open some weird
         /// side channel issue trying to be 'human friendly'.

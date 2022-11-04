@@ -201,9 +201,7 @@ pub mod wasm_test {
 
         observability::test_run().unwrap();
         let mut conductor = SweetConductor::from_standard_config().await;
-        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls])
-            .await
-            .unwrap();
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MultipleCalls]).await;
 
         let app = conductor.setup_app("app", &[dna]).await.unwrap();
         let (cell,) = app.into_tuple();

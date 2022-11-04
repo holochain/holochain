@@ -52,17 +52,11 @@ pub trait RegionDataConstraints:
     + serde::Serialize
     + serde::de::DeserializeOwned
 {
-}
-impl<T> RegionDataConstraints for T where
-    T: Eq
-        + Zero
-        + AddAssign
-        + Sub<Output = T>
-        + Clone
-        + Send
-        + Sync
-        + std::fmt::Debug
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-{
+    /// The number of ops in this region
+    fn count(&self) -> u32;
+
+    /// The size of all ops in this region
+    fn size(&self) -> u32;
+
+    // TODO: hash (not currently needed to be generic)
 }
