@@ -417,7 +417,7 @@ mod tests {
     use super::*;
 
     fn make_arq(topo: &Topology, pow: u8, lo: u32, hi: u32) -> Arq {
-        let a = ArqBounds::from_interval_rounded(
+        let (a, _) = ArqBounds::from_interval_rounded(
             topo,
             pow,
             DhtArcRange::from_bounds(

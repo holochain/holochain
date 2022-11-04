@@ -409,7 +409,7 @@ impl Spaces {
                 .map(|i| {
                     let len = i.length();
                     let (pow, _) = power_and_count_from_length(&topology.space, len, max_chunks);
-                    ArqBounds::from_interval_rounded(&topology, pow, i)
+                    ArqBounds::from_interval_rounded(&topology, pow, i).0
                 })
                 .collect(),
         );

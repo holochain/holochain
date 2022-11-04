@@ -36,7 +36,7 @@ pub enum WireMessage {
     Publish {
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     },
     ValidationReceipt {
@@ -98,13 +98,13 @@ impl WireMessage {
     pub fn publish(
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> WireMessage {
         Self::Publish {
             request_validation_receipt,
             countersigning_session,
-            dht_hash,
+            basis_hash,
             ops,
         }
     }

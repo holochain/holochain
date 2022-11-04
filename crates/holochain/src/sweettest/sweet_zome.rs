@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 
 /// A reference to a Zome in a Cell created by a SweetConductor installation function.
 /// Think of it as a partially applied SweetCell, with the ZomeName baked in.
-#[derive(Clone, derive_more::Constructor)]
+#[derive(Clone, Debug, derive_more::Constructor)]
 pub struct SweetZome {
     cell_id: CellId,
     name: ZomeName,
@@ -27,7 +27,8 @@ impl SweetZome {
 pub type SweetEasyInline = SweetInlineZomes;
 
 #[derive(Default)]
-/// A helper for creating [`InlineZomeSet`]
+/// A helper for creating an [`InlineZomeSet`] consisting of a single
+/// integrity zome and a single coordinator zome.
 pub struct SweetInlineZomes(pub InlineZomeSet);
 
 impl SweetInlineZomes {

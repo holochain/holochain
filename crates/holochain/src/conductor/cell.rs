@@ -4,14 +4,14 @@
 //! Records can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
+use super::api::CellConductorHandle;
 use super::api::ZomeCall;
 use super::interface::SignalBroadcaster;
 use super::manager::ManagedTaskAdd;
 use super::space::Space;
+use super::ConductorHandle;
 use crate::conductor::api::CellConductorApi;
-use crate::conductor::api::CellConductorApiT;
 use crate::conductor::cell::error::CellResult;
-use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
@@ -35,6 +35,8 @@ use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+use holochain_p2p::ChcImpl;
+use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -91,16 +93,12 @@ impl PartialEq for Cell {
 /// The [`Conductor`](super::Conductor) manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [`CellConductorApi`](super::api::CellConductorApi) or an [`AppInterfaceApi`](super::api::AppInterfaceApi))
-pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pDna>
-where
-    Api: CellConductorApiT,
-    P2pCell: holochain_p2p::HolochainP2pDnaT,
-{
+pub struct Cell {
     id: CellId,
-    conductor_api: Api,
+    conductor_api: CellConductorHandle,
     conductor_handle: ConductorHandle,
     space: Space,
-    holochain_p2p_cell: P2pCell,
+    holochain_p2p_cell: HolochainP2pDna,
     queue_triggers: QueueTriggers,
     init_mutex: tokio::sync::Mutex<()>,
 }
@@ -122,7 +120,7 @@ impl Cell {
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
-        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
+        let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
 
         // check if genesis has been run
         let has_genesis = {
@@ -163,6 +161,7 @@ impl Cell {
     /// Performs the Genesis workflow the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
+    #[allow(clippy::too_many_arguments)]
     pub async fn genesis<Ribosome>(
         id: CellId,
         conductor_handle: ConductorHandle,
@@ -171,6 +170,7 @@ impl Cell {
         dht_db_cache: DhtDbQueryCache,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
+        chc: Option<ChcImpl>,
     ) -> CellResult<()>
     where
         Ribosome: RibosomeT + 'static,
@@ -187,17 +187,22 @@ impl Cell {
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
+        // exit early if genesis has already run
+        if workspace.has_genesis(id.agent_pubkey().clone()).await? {
+            return Ok(());
+        }
+
         let args = GenesisWorkflowArgs::new(
             dna_file,
             id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
             dht_db_cache,
+            chc,
         );
 
         genesis_workflow(workspace, conductor_api, args)
             .await
-            .map_err(Box::new)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
 
@@ -229,8 +234,8 @@ impl Cell {
         &self.holochain_p2p_cell
     }
 
-    async fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_api.signal_broadcaster().await
+    fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.conductor_api.signal_broadcaster()
     }
 
     pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
@@ -244,8 +249,7 @@ impl Cell {
             .await?)
     }
 
-    pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>) {
-        let now = Timestamp::now();
+    pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         let author = self.id.agent_pubkey().clone();
         let lives = self
             .space
@@ -552,7 +556,7 @@ impl Cell {
                     self.id.agent_pubkey().clone(),
                     signed_actions,
                     self.queue_triggers.clone(),
-                    self.conductor_api.signal_broadcaster().await,
+                    self.conductor_api.signal_broadcaster(),
                 )
                 .await
                 .map_err(Box::new)?)
@@ -773,7 +777,7 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    #[instrument(skip(self, call, workspace_lock))]
+    // #[instrument(skip(self, call, workspace_lock))]
     pub async fn call_zome(
         &self,
         call: ZomeCall,
@@ -792,7 +796,7 @@ impl Cell {
         let keystore = self.conductor_api.keystore().clone();
 
         let conductor_handle = self.conductor_handle.clone();
-        let signal_tx = self.signal_broadcaster().await;
+        let signal_tx = self.signal_broadcaster();
         let ribosome = self.get_ribosome()?;
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
@@ -876,7 +880,7 @@ impl Cell {
         }
         trace!("running init");
 
-        let signal_tx = self.signal_broadcaster().await;
+        let signal_tx = self.signal_broadcaster();
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs {

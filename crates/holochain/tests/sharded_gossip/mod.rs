@@ -1,15 +1,17 @@
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
-use holochain::conductor::handle::DevSettingsDelta;
-use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes};
-use holochain::test_utils::inline_zomes::{batch_create_zome, simple_crud_zome};
-use holochain::test_utils::inline_zomes::{simple_create_read_zome, AppString};
+use holochain::sweettest::{
+    standard_config, SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes,
+};
+use holochain::test_utils::inline_zomes::{
+    batch_create_zome, simple_create_read_zome, simple_crud_zome,
+};
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
-use holochain::test_utils::{consistency, consistency_10s};
+use holochain::test_utils::{consistency_10s, consistency_60s, consistency_60s_advanced};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
@@ -20,10 +22,13 @@ use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_boom, create_age
 use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
-fn make_config(recent_threshold: Option<u64>) -> ConductorConfig {
+fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) -> ConductorConfig {
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.disable_publish = true;
+    tuning.disable_recent_gossip = !recent;
+    tuning.disable_historical_gossip = !historical;
     tuning.danger_gossip_recent_threshold_secs =
         recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
     tuning.gossip_inbound_target_mbps = 10000.0;
@@ -39,7 +44,7 @@ fn make_config(recent_threshold: Option<u64>) -> ConductorConfig {
         override_port: None,
     }];
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
+    let mut config = standard_config();
     config.network = Some(network);
     config
 }
@@ -50,17 +55,11 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(None)).await;
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
+    let mut conductors =
+        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(true, true, None)).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -71,10 +70,9 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
-    let all_cells = vec![&alice, &bobbo];
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s(&all_cells).await;
+    consistency_10s([&alice, &bobbo]).await;
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
@@ -103,17 +101,10 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     const NUM_OPS: usize = 100;
 
     let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(Some(0))).await;
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
+        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, true, Some(0))).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(batch_create_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome())).await;
 
     let apps = conductors
         .setup_app("app", &[dna_file.clone()])
@@ -125,16 +116,11 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<ActionHash> = conductors[0]
-        .call(
-            &alice.zome(holochain::sweettest::SweetInlineZomes::COORDINATOR),
-            "create_batch",
-            NUM_OPS,
-        )
+        .call(&alice.zome("zome"), "create_batch", NUM_OPS)
         .await;
-    let all_cells = vec![&alice, &bobbo, &carol];
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s(&all_cells).await;
+    consistency_10s([&alice, &bobbo, &carol]).await;
 
     let mut all_op_hashes = vec![];
 
@@ -164,11 +150,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let element: Option<Record> = conductors[1]
-        .call(
-            &bobbo.zome(holochain::sweettest::SweetInlineZomes::COORDINATOR),
-            "read",
-            hashes[0].clone(),
-        )
+        .call(&bobbo.zome("zome"), "read", hashes[0].clone())
         .await;
     let element = element.expect("Record was None: bobbo couldn't `get` it");
 
@@ -182,88 +164,151 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test that a gossip payload larger than the max frame size does not
+/// cause problems
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
-async fn large_entry_test() {
+async fn test_gossip_shutdown() {
     observability::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_config(2, make_config(Some(0))).await;
-    let start = Instant::now();
-    dbg!(start.elapsed());
+    let mut conductors = SweetConductorBatch::from_config(2, make_config(true, true, None)).await;
 
-    for c in conductors.iter() {
-        c.update_dev_settings(DevSettingsDelta {
-            publish: Some(false),
-            ..Default::default()
-        });
-    }
-
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    let ((cell_1,), (cell_2,)) = apps.into_tuples();
-
+    let ((cell_0,), (cell_1,)) = apps.into_tuples();
+    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
     let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
-    let zome_2 = cell_2.zome(SweetInlineZomes::COORDINATOR);
 
-    // TODO: we should be able to get up to multiple entries each 10MB or more being gossiped
-    // in a reasonable time, but right now we can only handle about 1MB in a timely fashion.
+    // Create an entry before the conductors know about each other
+    let hash: ActionHash = conductors[0]
+        .call(&zome_0, "create_string", "hi".to_string())
+        .await;
 
-    // let size = 1_000;
-    // let size = 10_000;
-    // let size = 100_000;
-    // let size = 1_000_000;
-    let size = 5_000_000;
-    // let size = 10_000_000;
-    // let size = 15_000_000;
-    let num = 10;
+    // After shutting down conductor 0, test that gossip doesn't happen within 3 seconds
+    // of peer discovery (assuming it will never happen)
+    conductors[0].shutdown().await;
+    conductors.exchange_peer_info().await;
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
+    assert!(record.is_none());
+
+    // Ensure that gossip loops resume upon startup
+    conductors[0].startup().await;
+
+    consistency_60s([&cell_0, &cell_1]).await;
+    let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
+    assert_eq!(record.unwrap().action_address(), &hash);
+}
+
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+async fn three_way_gossip_recent() {
+    observability::test_run().ok();
+    let config = make_config(true, false, None);
+    three_way_gossip(config).await;
+}
+
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+async fn three_way_gossip_historical() {
+    observability::test_run().ok();
+    let config = make_config(false, true, Some(0));
+    three_way_gossip(config).await;
+}
+
+/// Test that:
+/// - 30MB of data can pass from node A to B,
+/// - then A can shut down and C and start up,
+/// - and then that same data passes from B to C.
+async fn three_way_gossip(config: ConductorConfig) {
+    let mut conductors = SweetConductorBatch::from_config(2, config.clone()).await;
+    let start = Instant::now();
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+
+    let cells: Vec<_> = futures::future::join_all(conductors.iter_mut().map(|c| async {
+        let (cell,) = c.setup_app("app", [&dna_file]).await.unwrap().into_tuple();
+        cell
+    }))
+    .await;
+
+    let zomes: Vec<_> = cells
+        .iter()
+        .map(|c| c.zome(SweetInlineZomes::COORDINATOR))
+        .collect();
+
+    let size = 15_000_000;
+    let num = 2;
+
     let mut hashes = vec![];
     for i in 0..num {
-        let app_string = AppString(String::from_utf8(vec![42u8 + i as u8; size]).unwrap());
-        let hash: ActionHash = conductors[0]
-            .call(&zome_1, "create_string", app_string.clone())
-            .await;
+        let bytes = vec![42u8 + i as u8; size];
+        let hash: ActionHash = conductors[0].call(&zomes[0], "create_bytes", bytes).await;
         hashes.push(hash);
         dbg!(start.elapsed());
     }
 
     conductors.exchange_peer_info().await;
-    consistency(&[&cell_1, &cell_2], 60 * 4, Duration::from_secs(1)).await;
+    consistency_60s([&cells[0], &cells[1]]).await;
 
-    let records: Vec<Option<Record>> = conductors[1].call(&zome_2, "read_multi", hashes).await;
-    assert_eq!(records.len(), num);
+    tracing::info!(
+        "CONSISTENCY REACHED between first two nodes in {:?}",
+        start.elapsed()
+    );
+
+    let records_0: Vec<Option<Record>> = conductors[0]
+        .call(&zomes[0], "read_multi", hashes.clone())
+        .await;
+    let records_1: Vec<Option<Record>> = conductors[1]
+        .call(&zomes[1], "read_multi", hashes.clone())
+        .await;
     assert_eq!(
-        records.iter().filter(|r| r.is_some()).count(),
+        records_1.iter().filter(|r| r.is_some()).count(),
         num,
         "couldn't get records at positions: {:?}",
-        records
+        records_1
             .iter()
             .enumerate()
             .filter_map(|(i, r)| r.is_none().then(|| i))
             .collect::<Vec<_>>()
     );
+    assert_eq!(records_0, records_1);
+    dbg!(start.elapsed());
+
+    conductors[0].shutdown().await;
+
+    // Bring a third conductor online
+    let mut conductor = SweetConductor::from_config(config).await;
+    let (cell,) = conductor
+        .setup_app("app", [&dna_file])
+        .await
+        .unwrap()
+        .into_tuple();
+    let zome = cell.zome(SweetInlineZomes::COORDINATOR);
+
+    conductors.add_conductor(conductor);
+    conductors.exchange_peer_info().await;
+
+    consistency_60s_advanced([(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
+
+    dbg!(start.elapsed());
+
+    let records_2: Vec<Option<Record>> = conductors[2].call(&zome, "read_multi", hashes).await;
+    assert_eq!(records_2, records_1);
 }
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
-    use holochain::{
-        conductor::handle::DevSettingsDelta, sweettest::SweetConductor,
-        test_utils::inline_zomes::simple_create_read_zome,
-    };
+    use holochain::{sweettest::SweetConductor, test_utils::inline_zomes::simple_create_read_zome};
 
     let _g = observability::test_run().ok();
 
-    let mut conductor = SweetConductor::from_config(make_config(None)).await;
-    conductor.update_dev_settings(DevSettingsDelta {
-        publish: Some(false),
-        ..Default::default()
-    });
+    let mut conductor = SweetConductor::from_config(make_config(true, true, None)).await;
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_create_read_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let alice = conductor
         .setup_app("app", &[dna_file.clone()])
@@ -277,10 +322,9 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductor.call(&alice.zome("simple"), "create", ()).await;
-    let all_cells = vec![&alice, &bobbo];
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s(&all_cells).await;
+    consistency_10s([&alice, &bobbo]).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductor.call(&bobbo.zome("simple"), "read", hash).await;
@@ -476,6 +520,7 @@ async fn mock_network_sharded_gossip() {
                         gossip,
                     } => {
                         if let kitsune_p2p::GossipModuleType::ShardedRecent = module {
+                            #[allow(irrefutable_let_patterns)]
                             if let GossipProtocol::Sharded(gossip) = gossip {
                                 use kitsune_p2p::gossip::sharded_gossip::*;
                                 match gossip {
@@ -789,7 +834,7 @@ async fn mock_network_sharded_gossip() {
 
     // Wait for consistency to be reached.
     local_machine_session_with_hashes(
-        vec![&conductor.handle()],
+        vec![&conductor.raw_handle()],
         hashes_to_be_held.iter().map(|(l, h)| (*l, (**h).clone())),
         dna_file.dna_hash(),
         std::time::Duration::from_secs(60 * 60),
@@ -1024,6 +1069,7 @@ async fn mock_network_sharding() {
                         gossip,
                     } => {
                         if let kitsune_p2p::GossipModuleType::ShardedRecent = module {
+                            #[allow(irrefutable_let_patterns)]
                             if let GossipProtocol::Sharded(gossip) = gossip {
                                 use kitsune_p2p::gossip::sharded_gossip::*;
                                 match gossip {

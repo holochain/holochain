@@ -1,7 +1,5 @@
 use super::*;
-use crate::conductor::handle::MockConductorHandleT;
 use crate::conductor::space::TestSpaces;
-use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
@@ -12,6 +10,7 @@ use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
+use holochain_state::test_utils::test_db_dir;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
 use holochain_wasm_test_utils::*;
@@ -72,7 +71,7 @@ async fn check_valid_if_dna_test() {
     let _activity_return = vec![fixt!(ActionHash)];
 
     let mut dna_def = fixt!(DnaDef);
-    dna_def.phenotype.origin_time = Timestamp::MIN;
+    dna_def.modifiers.origin_time = Timestamp::MIN;
 
     // Empty store not dna
     let action = fixt!(CreateLink);
@@ -98,7 +97,7 @@ async fn check_valid_if_dna_test() {
 
     // - Test that an origin_time in the future leads to invalid Dna action commit
     let dna_def_original = workspace.dna_def();
-    dna_def.phenotype.origin_time = Timestamp::MAX;
+    dna_def.modifiers.origin_time = Timestamp::MAX;
     workspace.dna_def = Arc::new(dna_def);
     assert_matches!(
         check_valid_if_dna(&action.clone().into(), &workspace).await,
@@ -150,7 +149,7 @@ async fn check_previous_timestamp() {
     assert_matches!(
         r,
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::Timestamp)
+            ValidationOutcome::PrevActionError(PrevActionError::Timestamp(_, _))
         ))
     );
 }
@@ -329,7 +328,7 @@ async fn check_app_entry_type_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "app_entry_type_test".to_string(),
-            phenotype: DnaPhenotype {
+            modifiers: DnaModifiers {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
@@ -341,20 +340,13 @@ async fn check_app_entry_type_test() {
         },
         [integrity, coordinator],
     )
-    .await
-    .unwrap();
+    .await;
     let dna_hash = dna_file.dna_hash().to_owned().clone();
-    let ribosome = RealRibosome::new(dna_file).unwrap();
     let mut entry_def = fixt!(EntryDef);
     entry_def.visibility = EntryVisibility::Public;
 
-    // Setup mock conductor
-    let mut conductor_handle = MockConductorHandleT::new();
-    // # No dna or entry def
-    let dh = dna_hash.clone();
-    conductor_handle
-        .expect_get_ribosome()
-        .returning(move |_| Err(DnaError::DnaMissing(dh.to_owned()).into()));
+    let db_dir = test_db_dir();
+    let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
@@ -365,12 +357,7 @@ async fn check_app_entry_type_test() {
 
     // # Dna but no entry def in buffer
     // ## ZomeId out of range
-    conductor_handle.checkpoint();
-    let r = ribosome.clone();
-    conductor_handle
-        .expect_get_ribosome()
-        .returning(move |_| Ok(r.clone()));
-    conductor_handle.expect_get_entry_def().return_const(None);
+    conductor_handle.register_dna(dna_file).await.unwrap();
 
     // ## EntryId is out of range
     let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
@@ -402,11 +389,6 @@ async fn check_app_entry_type_test() {
             ValidationOutcome::EntryVisibility(_)
         ))
     );
-
-    // # Add an entry def to the buffer
-    conductor_handle
-        .expect_get_entry_def()
-        .return_const(Some(entry_def));
 
     // ## Can get the entry from the entry def
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);

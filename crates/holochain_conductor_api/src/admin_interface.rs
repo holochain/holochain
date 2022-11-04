@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
@@ -35,6 +37,13 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::DnaRegistered`]
     RegisterDna(Box<RegisterDnaPayload>),
+
+    /// Get the definition of a DNA.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::DnaDefinitionReturned`]
+    GetDnaDefinition(Box<DnaHash>),
 
     /// Update coordinator zomes for an already installed DNA.
     ///
@@ -144,8 +153,8 @@ pub enum AdminRequest {
     /// Changes the specified app from a disabled to an enabled state in the conductor.
     ///
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
-    /// installed app is not enabled automatically. When an app is enabled,
-    /// zomes can be called and it will be loaded on a reboot of the conductor.
+    /// installed app is not enabled automatically. Once the app is enabled,
+    /// zomes can be immediately called and it will also be loaded and enabled automatically on any reboot of the conductor.
     ///
     /// # Returns
     ///
@@ -338,6 +347,27 @@ pub enum AdminRequest {
         /// The records to be inserted into the source chain.
         records: Vec<Record>,
     },
+
+    /// Request capability grant for making zome calls.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ZomeCallCapabilityGranted`]
+    GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
+
+    /// Restore a clone cell that was previously archived.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CloneCellRestored`]
+    RestoreCloneCell(Box<RestoreCloneCellPayload>),
+
+    /// Delete all clone cells that were previously archived.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ArchivedCloneCellsDeleted`]
+    DeleteArchivedCloneCells(Box<DeleteArchivedCloneCellsPayload>),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -358,6 +388,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::RegisterDna`]
     DnaRegistered(DnaHash),
+
+    /// The successful response to an [`AdminRequest::GetDnaDefinition`]
+    DnaDefinitionReturned(DnaDef),
 
     /// The successful response to an [`AdminRequest::UpdateCoordinators`]
     CoordinatorsUpdated,
@@ -489,6 +522,15 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,
+
+    /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
+    ZomeCallCapabilityGranted,
+
+    // The successful response to an [`AdminRequest::RestoreCloneCell`].
+    CloneCellRestored(InstalledCell),
+
+    /// The successful response to an [`AdminRequest::DeleteArchivedCloneCells`].
+    ArchivedCloneCellsDeleted,
 }
 
 /// Error type that goes over the websocket wire.

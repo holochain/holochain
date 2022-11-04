@@ -9,7 +9,7 @@ use super::{
 };
 use crate::prelude::{AppRoleId, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
-use holochain_zome_types::{DnaPhenotypeOpt, NetworkSeed};
+use holochain_zome_types::{DnaModifiersOpt, NetworkSeed};
 use std::collections::HashMap;
 
 /// Version 1 of the App manifest schema
@@ -74,9 +74,9 @@ pub struct AppRoleDnaManifest {
     #[serde(flatten)]
     pub location: Option<mr_bundle::Location>,
 
-    /// Optional default phenotype values. May be overridden during installation.
-    #[serde(flatten)]
-    pub phenotype: DnaPhenotypeOpt<YamlProperties>,
+    /// Optional default modifier values. May be overridden during installation.
+    #[serde(default)]
+    pub modifiers: DnaModifiersOpt<YamlProperties>,
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
@@ -97,7 +97,7 @@ impl AppRoleDnaManifest {
             location: Some(mr_bundle::Location::Bundled(
                 "./path/to/my/dnabundle.dna".into(),
             )),
-            phenotype: DnaPhenotypeOpt::none(),
+            modifiers: DnaModifiersOpt::none(),
             version: None,
             clone_limit: 0,
         }
@@ -196,7 +196,7 @@ impl AppManifestV1 {
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for mut role in self.roles.iter_mut() {
             if matches!(role.provisioning, Some(CellProvisioning::Create { .. })) {
-                role.dna.phenotype.network_seed = Some(network_seed.clone());
+                role.dna.modifiers.network_seed = Some(network_seed.clone());
             }
         }
     }
@@ -220,9 +220,9 @@ impl AppManifestV1 {
                         location,
                         version,
                         clone_limit,
-                        phenotype,
+                        modifiers,
                     } = dna;
-                    let phenotype = phenotype.serialized()?;
+                    let modifiers = modifiers.serialized()?;
                     // Go from "flexible" enum into proper DnaVersionSpec.
                     let version = version.map(Into::into);
                     let validated = match provisioning.unwrap_or_default() {
@@ -230,7 +230,7 @@ impl AppManifestV1 {
                             deferred,
                             clone_limit,
                             location: Self::require(location, "roles.dna.(path|url)")?,
-                            phenotype,
+                            modifiers,
                             version,
                         },
                         CellProvisioning::CreateClone { deferred } => {
@@ -238,7 +238,7 @@ impl AppManifestV1 {
                                 deferred,
                                 clone_limit,
                                 location: Self::require(location, "roles.dna.(path|url)")?,
-                                phenotype,
+                                modifiers,
                                 version,
                             }
                         }
@@ -255,7 +255,7 @@ impl AppManifestV1 {
                                 clone_limit,
                                 location: Self::require(location, "roles.dna.(path|url)")?,
                                 version: Self::require(version, "roles.dna.version")?,
-                                phenotype,
+                                modifiers,
                             }
                         }
                         CellProvisioning::Disabled => AppRoleManifestValidated::Disabled {
@@ -305,7 +305,8 @@ pub mod tests {
     pub async fn app_manifest_fixture<I: IntoIterator<Item = DnaDef>>(
         location: Option<mr_bundle::Location>,
         dnas: I,
-    ) -> (AppManifest, Vec<DnaHashB64>) {
+        modifiers: DnaModifiersOpt<YamlProperties>,
+    ) -> (AppManifestV1, Vec<DnaHashB64>) {
         let hashes = join_all(
             dnas.into_iter()
                 .map(|dna| async move { DnaHash::with_data_sync(&dna).into() }),
@@ -313,35 +314,36 @@ pub mod tests {
         .await;
 
         let version = DnaVersionSpec::from(hashes.clone()).into();
-        let phenotype = DnaPhenotypeOpt {
-            properties: Some(app_manifest_properties_fixture()),
-            network_seed: Some("network_seed".into()),
-            origin_time: None,
-        };
 
         let roles = vec![AppRoleManifest {
             id: "role_id".into(),
             dna: AppRoleDnaManifest {
                 location,
-                phenotype,
+                modifiers,
                 version: Some(version),
                 clone_limit: 50,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
         }];
-        let manifest = AppManifest::V1(AppManifestV1 {
+        let manifest = AppManifestV1 {
             name: "Test app".to_string(),
             description: Some("Serialization roundtrip test".to_string()),
             roles,
-        });
+        };
         (manifest, hashes)
     }
 
     #[tokio::test]
     async fn manifest_v1_roundtrip() {
         let location = Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna")));
+        let modifiers = DnaModifiersOpt {
+            properties: Some(app_manifest_properties_fixture()),
+            network_seed: Some("network_seed".into()),
+            origin_time: None,
+        };
         let (manifest, dna_hashes) =
-            app_manifest_fixture(location, vec![fixt!(DnaDef), fixt!(DnaDef)]).await;
+            app_manifest_fixture(location, vec![fixt!(DnaDef), fixt!(DnaDef)], modifiers).await;
+        let manifest = AppManifest::from(manifest);
         let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
         let manifest_roundtrip = serde_yaml::from_str(&manifest_yaml).unwrap();
 
@@ -409,21 +411,21 @@ roles:
 
         // - The Create roles have the network seed rewritten.
         assert_eq!(
-            manifest.roles[0].dna.phenotype.network_seed.as_ref(),
+            manifest.roles[0].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
         assert_eq!(
-            manifest.roles[1].dna.phenotype.network_seed.as_ref(),
+            manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
 
         // - The others do not.
         assert_ne!(
-            manifest.roles[2].dna.phenotype.network_seed.as_ref(),
+            manifest.roles[2].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
         assert_ne!(
-            manifest.roles[3].dna.phenotype.network_seed.as_ref(),
+            manifest.roles[3].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
     }

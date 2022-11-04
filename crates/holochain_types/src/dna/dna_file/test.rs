@@ -44,17 +44,15 @@ async fn test_update_coordinators() {
             })),
         ),
     ];
-    let mut dna_phenotype = DnaPhenotypeBuilder::default();
-    dna_phenotype.network_seed("00000000-0000-0000-0000-000000000000".into());
+    let mut dna_modifiers = DnaModifiersBuilder::default();
+    dna_modifiers.network_seed("00000000-0000-0000-0000-000000000000".into());
     let mut dna_def = DnaDefBuilder::default();
     dna_def
         .integrity_zomes(init_integrity.clone())
         .coordinator_zomes(init_coordinators.clone())
-        .phenotype(dna_phenotype.build().unwrap());
+        .modifiers(dna_modifiers.build().unwrap());
     let dna_def = dna_def.build().unwrap();
-    let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone())
-        .await
-        .unwrap();
+    let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone()).await;
 
     let original_dna = dna.clone();
 
@@ -85,9 +83,7 @@ async fn test_update_coordinators() {
     expect_def.coordinator_zomes[0] = new_coordinators[0].clone();
     let mut expect_wasms = dna_wasms.clone();
     expect_wasms[2] = new_dna_wasms[0].clone();
-    let expect = DnaFile::new(expect_def.clone(), expect_wasms.clone())
-        .await
-        .unwrap();
+    let expect = DnaFile::new(expect_def.clone(), expect_wasms.clone()).await;
 
     assert_eq!(expect, dna);
 
@@ -114,9 +110,7 @@ async fn test_update_coordinators() {
         .coordinator_zomes
         .push(new_coordinators[0].clone());
     expect_wasms.push(new_dna_wasms[0].clone());
-    let expect = DnaFile::new(expect_def.clone(), expect_wasms.clone())
-        .await
-        .unwrap();
+    let expect = DnaFile::new(expect_def.clone(), expect_wasms.clone()).await;
 
     assert_eq!(expect, dna);
 
@@ -196,7 +190,7 @@ async fn test_update_coordinators() {
     expect_wasms[3] = new_dna_wasms[1].clone();
     expect_wasms[4] = new_dna_wasms[2].clone();
     expect_wasms.push(new_dna_wasms[3].clone());
-    let expect = DnaFile::new(expect_def, expect_wasms).await.unwrap();
+    let expect = DnaFile::new(expect_def, expect_wasms).await;
 
     assert_eq!(expect, dna);
 }
@@ -243,17 +237,15 @@ async fn test_update_coordinators_checks_deps() {
             })),
         ),
     ];
-    let mut dna_phenotype = DnaPhenotypeBuilder::default();
-    dna_phenotype.network_seed("00000000-0000-0000-0000-000000000000".into());
+    let mut dna_modifiers = DnaModifiersBuilder::default();
+    dna_modifiers.network_seed("00000000-0000-0000-0000-000000000000".into());
     let mut dna_def = DnaDefBuilder::default();
     dna_def
         .integrity_zomes(init_integrity.clone())
         .coordinator_zomes(init_coordinators.clone())
-        .phenotype(dna_phenotype.build().unwrap());
+        .modifiers(dna_modifiers.build().unwrap());
     let dna_def = dna_def.build().unwrap();
-    let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone())
-        .await
-        .unwrap();
+    let mut dna = DnaFile::new(dna_def.clone(), dna_wasms.clone()).await;
 
     // Replace coordinator "c" with coordinator that has a dangling reference.
     let new_dna_wasms = vec![DnaWasm {

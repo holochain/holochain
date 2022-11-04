@@ -87,22 +87,22 @@ pub mod tuning_params_struct {
         gossip_loop_iteration_delay_ms: u32 = 1000,
 
         /// The gossip loop will attempt to rate-limit output
-        /// to this count megabits per second. [Default: 10.0]
-        gossip_outbound_target_mbps: f64 = 10.0,
+        /// to this count megabits per second. [Default: 100.0]
+        gossip_outbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop will attempt to rate-limit input
-        /// to this count megabits per second. [Default: 10.0]
-        gossip_inbound_target_mbps: f64 = 10.0,
+        /// to this count megabits per second. [Default: 100.0]
+        gossip_inbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop will attempt to rate-limit outbound
         /// traffic for the historic loop (if there is one)
-        /// to this count megabits per second. [Default: 10.0]
-        gossip_historic_outbound_target_mbps: f64 = 10.0,
+        /// to this count megabits per second. [Default: 100.0]
+        gossip_historic_outbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop will attempt to rate-limit inbound
         /// traffic for the historic loop (if there is one)
-        /// to this count megabits per second. [Default: 10.0]
-        gossip_historic_inbound_target_mbps: f64 = 10.0,
+        /// to this count megabits per second. [Default: 100.0]
+        gossip_historic_inbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop accomodates this amount of excess capacity
         /// before enacting the target rate limit, expressed as a ratio
@@ -110,7 +110,7 @@ pub mod tuning_params_struct {
         /// outbound target is 10mbps, a burst ratio of 50 will allow
         /// an extra 500mb of outbound traffic before the target rate
         /// limiting kicks in (and this extra capacity will take 50
-        /// seconds to "refill"). [Default: 100]
+        /// seconds to "refill"). [Default: 100.0]
         gossip_burst_ratio: f64 = 100.0,
 
         /// How long should we hold off talking to a peer
@@ -226,6 +226,14 @@ pub mod tuning_params_struct {
 
         /// Don't publish ops, only rely on gossip. Useful for testing the efficacy of gossip.
         disable_publish: bool = false,
+
+        /// Disable recent gossip. Useful for testing Historical gossip in isolation.
+        /// Note that this also disables agent gossip!
+        disable_recent_gossip: bool = false,
+
+        /// Disable historical gossip. Useful for testing Recent gossip in isolation.
+        disable_historical_gossip: bool = false,
+
     }
 
     impl KitsuneP2pTuningParams {

@@ -20,7 +20,7 @@ pub fn dna_info(
         } => Ok(DnaInfo {
             name: ribosome.dna_def().name.clone(),
             hash: ribosome.dna_def().as_hash().clone(),
-            properties: ribosome.dna_def().phenotype.properties.clone(),
+            properties: ribosome.dna_def().modifiers.properties.clone(),
             zome_names: ribosome
                 .dna_def()
                 .integrity_zomes
@@ -56,8 +56,7 @@ pub mod test {
             vec![TestWasm::ZomeInfo],
             properties,
         )
-        .await
-        .unwrap();
+        .await;
 
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);

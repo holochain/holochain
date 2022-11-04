@@ -58,9 +58,9 @@ pub fn must_get_valid_record<'a>(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
                                     UnresolvedDependencies::Hashes(vec![action_hash.into()],)
                                 ))
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             )
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                         ))
                         .into()),
                         HostContext::Validate(_) => {
@@ -74,10 +74,10 @@ pub fn must_get_valid_record<'a>(
                                         )
                                     )
                                     .map_err(
-                                        |e| -> RuntimeError { wasm_error!(e.into()).into() }
+                                        |e| -> RuntimeError { wasm_error!(e).into() }
                                     )?,
                                 )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                             ))
                             .into())
                         }
@@ -90,10 +90,10 @@ pub fn must_get_valid_record<'a>(
                                         ),
                                     )
                                     .map_err(
-                                        |e| -> RuntimeError { wasm_error!(e.into()).into() }
+                                        |e| -> RuntimeError { wasm_error!(e).into() }
                                     )?
                                 )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             ))
                             .into())
                         }

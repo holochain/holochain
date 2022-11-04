@@ -70,7 +70,7 @@ pub trait HolochainP2pDnaT {
         &self,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize>;
@@ -121,7 +121,7 @@ pub trait HolochainP2pDnaT {
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(
         &self,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool>;
 
     /// Messages between agents driving a countersigning session.
@@ -133,6 +133,9 @@ pub trait HolochainP2pDnaT {
 
     /// New data has been integrated and is ready for gossiping.
     async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()>;
+
+    /// Access to the specified CHC
+    fn chc(&self) -> Option<ChcImpl>;
 }
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
@@ -141,7 +144,11 @@ pub trait HolochainP2pDnaT {
 pub struct HolochainP2pDna {
     sender: ghost_actor::GhostSender<actor::HolochainP2p>,
     dna_hash: Arc<DnaHash>,
+    chc: Option<ChcImpl>,
 }
+
+/// A CHC implementation
+pub type ChcImpl = Arc<dyn Send + Sync + ChainHeadCoordinator<Item = SignedActionHashed>>;
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for HolochainP2pDna {
@@ -220,7 +227,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         &self,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize> {
@@ -229,7 +236,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 (*self.dna_hash).clone(),
                 request_validation_receipt,
                 countersigning_session,
-                dht_hash,
+                basis_hash,
                 ops,
                 timeout_ms,
             )
@@ -306,7 +313,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(
         &self,
-        dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool> {
         self.sender
             .authority_for_hash((*self.dna_hash).clone(), dht_hash)
@@ -327,6 +334,10 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         self.sender
             .new_integrated_data((*self.dna_hash).clone())
             .await
+    }
+
+    fn chc(&self) -> Option<ChcImpl> {
+        self.chc.clone()
     }
 }
 

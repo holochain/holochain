@@ -143,7 +143,7 @@ impl EntryDef {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn default_with_id<I: Into<EntryDefId>>(id: I) -> Self {
+    pub fn from_id<I: Into<EntryDefId>>(id: I) -> Self {
         EntryDef {
             id: id.into(),
             ..Default::default()

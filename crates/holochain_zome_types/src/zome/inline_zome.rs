@@ -25,20 +25,18 @@ pub struct CoordinatorZomeMarker;
 pub type InlineIntegrityZome = InlineZome<IntegrityZomeMarker>;
 pub type InlineCoordinatorZome = InlineZome<CoordinatorZomeMarker>;
 
-/// An InlineZome, which consists
-pub struct InlineZome<T> {
+/// An "inline" zome definition in pure Rust, as opposed to a zome defined in Wasm.
+pub struct InlineZome<T = IntegrityZomeMarker> {
     /// Inline zome type marker.
     _t: PhantomData<T>,
-    /// Since closures cannot be serialized, we include a network seed which
+
+    /// Since closures cannot be serialized, we include a UUID which
     /// is the only part of an InlineZome that gets serialized.
-    /// This uuid becomes part of the determination of the DnaHash
+    /// This UUID becomes part of the determination of the DnaHash
     /// that it is a part of.
     /// Think of it as a stand-in for the WasmHash of a WasmZome.
     pub(super) uuid: String,
 
-    // /// The EntryDefs returned by the `entry_defs` callback function,
-    // /// which will be automatically provided
-    // pub(super) entry_defs: EntryDefs,
     /// The collection of closures which define this zome.
     /// These functions are directly called by the Ribosome.
     pub(super) functions: HashMap<FunctionName, InlineZomeFn>,
@@ -120,7 +118,12 @@ impl<T> InlineZome<T> {
 
 impl InlineIntegrityZome {
     /// Create a new integrity zome with the given network seed
-    pub fn new<S: Into<String>>(uuid: S, entry_defs: Vec<EntryDef>, num_link_types: u8) -> Self {
+    pub fn new<S: Into<String>, E: IntoIterator<Item = EntryDef>>(
+        uuid: S,
+        entry_defs: E,
+        num_link_types: u8,
+    ) -> Self {
+        let entry_defs = entry_defs.into_iter().collect::<Vec<_>>();
         let num_entry_types = entry_defs.len();
         let entry_defs_callback =
             move |_, _: ()| Ok(EntryDefsCallbackResult::Defs(entry_defs.clone().into()));
@@ -130,7 +133,7 @@ impl InlineIntegrityZome {
             .set_global("__num_link_types", num_link_types)
     }
     /// Create a new integrity zome with a unique random network seed
-    pub fn new_unique(entry_defs: Vec<EntryDef>, num_link_types: u8) -> Self {
+    pub fn new_unique<E: IntoIterator<Item = EntryDef>>(entry_defs: E, num_link_types: u8) -> Self {
         Self::new(nanoid::nanoid!(), entry_defs, num_link_types)
     }
 }

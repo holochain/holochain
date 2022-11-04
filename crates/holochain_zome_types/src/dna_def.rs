@@ -17,13 +17,13 @@ pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 /// Placeholder for a real network seed type. See [`DnaDef`].
 pub type NetworkSeed = String;
 
-/// "Phenotype" of this DNA - the network seed, properties and origin time - as
-/// opposed to its "genotype" - the actual DNA code. The phenotype fields are
-/// included in the DNA hash computation.
+/// Modifiers of this DNA - the network seed, properties and origin time - as
+/// opposed to the actual DNA code. These modifiers are included in the DNA
+/// hash computation.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
-pub struct DnaPhenotype {
+pub struct DnaModifiers {
     /// The network seed of a DNA is included in the computation of the DNA hash.
     /// The DNA hash in turn determines the network peers and the DHT, meaning
     /// that only peers with the same DNA hash of a shared DNA participate in the
@@ -43,38 +43,38 @@ pub struct DnaPhenotype {
     pub origin_time: Timestamp,
 }
 
-impl DnaPhenotype {
-    /// Replace fields in the phenotype with any Some fields in the argument.
+impl DnaModifiers {
+    /// Replace fields in the modifiers with any Some fields in the argument.
     /// None fields remain unchanged.
-    pub fn update(mut self, phenotype: DnaPhenotypeOpt) -> DnaPhenotype {
-        self.network_seed = phenotype.network_seed.unwrap_or(self.network_seed);
-        self.properties = phenotype.properties.unwrap_or(self.properties);
-        self.origin_time = phenotype.origin_time.unwrap_or(self.origin_time);
+    pub fn update(mut self, modifiers: DnaModifiersOpt) -> DnaModifiers {
+        self.network_seed = modifiers.network_seed.unwrap_or(self.network_seed);
+        self.properties = modifiers.properties.unwrap_or(self.properties);
+        self.origin_time = modifiers.origin_time.unwrap_or(self.origin_time);
         self
     }
 }
 
-/// [`DnaPhenotype`] options of which all are optional.
+/// [`DnaModifiers`] options of which all are optional.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct DnaPhenotypeOpt<P = SerializedBytes> {
-    /// see [`DnaPhenotype`]
+pub struct DnaModifiersOpt<P = SerializedBytes> {
+    /// see [`DnaModifiers`]
     pub network_seed: Option<NetworkSeed>,
-    /// see [`DnaPhenotype`]
+    /// see [`DnaModifiers`]
     pub properties: Option<P>,
-    /// see [`DnaPhenotype`]
+    /// see [`DnaModifiers`]
     pub origin_time: Option<Timestamp>,
 }
 
 impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> Default
-    for DnaPhenotypeOpt<P>
+    for DnaModifiersOpt<P>
 {
     fn default() -> Self {
         Self::none()
     }
 }
 
-impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaPhenotypeOpt<P> {
+impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaModifiersOpt<P> {
     /// Constructor with all fields set to `None`
     pub fn none() -> Self {
         Self {
@@ -85,7 +85,7 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaP
     }
 
     /// Serialize the properties field into SerializedBytes
-    pub fn serialized(self) -> Result<DnaPhenotypeOpt<SerializedBytes>, E> {
+    pub fn serialized(self) -> Result<DnaModifiersOpt<SerializedBytes>, E> {
         let Self {
             network_seed,
             properties,
@@ -96,7 +96,7 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaP
         } else {
             None
         };
-        Ok(DnaPhenotypeOpt {
+        Ok(DnaModifiersOpt {
             network_seed,
             properties,
             origin_time,
@@ -146,11 +146,10 @@ pub struct DnaDef {
     )]
     pub name: String,
 
-    /// "Phenotype" of this DNA - the network seed, properties and origin time - as
-    /// opposed to its "genotype" - the actual DNA code. The phenotype fields are
-    /// included in the DNA hash computation.
-    #[serde(flatten)]
-    pub phenotype: DnaPhenotype,
+    /// Modifiers of this DNA - the network seed, properties and origin time - as
+    /// opposed to the actual DNA code. The modifiers are included in the DNA hash
+    /// computation.
+    pub modifiers: DnaModifiers,
 
     /// A vector of zomes associated with your DNA.
     pub integrity_zomes: IntegrityZomes,
@@ -164,7 +163,7 @@ pub struct DnaDef {
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     name: &'a String,
-    phenotype: &'a DnaPhenotype,
+    modifiers: &'a DnaModifiers,
     integrity_zomes: &'a IntegrityZomes,
 }
 
@@ -283,17 +282,17 @@ impl DnaDef {
         clone
     }
 
-    /// Change the "phenotype" of this DNA -- the network seed, properties and origin time -- while
-    /// leaving the "genotype" of actual DNA code intact.
-    pub fn modify_phenotype(&self, dna_phenotype: DnaPhenotypeOpt) -> Self {
+    /// Change the DNA modifiers -- the network seed, properties and origin time -- while
+    /// leaving the actual DNA code intact.
+    pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
-        clone.phenotype = clone.phenotype.update(dna_phenotype);
+        clone.modifiers = clone.modifiers.update(dna_modifiers);
         clone
     }
 
     /// Get the topology to use for kitsune gossip
     pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
-        kitsune_p2p_dht::spacetime::Topology::standard(self.phenotype.origin_time, cutoff)
+        kitsune_p2p_dht::spacetime::Topology::standard(self.modifiers.origin_time, cutoff)
     }
 }
 
@@ -307,7 +306,7 @@ pub fn random_network_seed() -> String {
 impl DnaDefBuilder {
     /// Provide a random network seed
     pub fn random_network_seed(&mut self) -> &mut Self {
-        self.phenotype = Some(DnaPhenotype {
+        self.modifiers = Some(DnaModifiers {
             network_seed: random_network_seed(),
             properties: SerializedBytes::try_from(()).unwrap(),
             origin_time: Timestamp::now(),
@@ -331,7 +330,7 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             name: &self.name,
-            phenotype: &self.phenotype,
+            modifiers: &self.modifiers,
             integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(
@@ -341,5 +340,41 @@ impl HashableContent for DnaDef {
             )
             .into(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use holochain_serialized_bytes::prelude::*;
+
+    #[test]
+    fn test_update_modifiers() {
+        #[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+        struct Props(u32);
+
+        let props = SerializedBytes::try_from(Props(42)).unwrap();
+
+        let now = Timestamp::now();
+        let mods = DnaModifiers {
+            network_seed: "seed".into(),
+            properties: ().try_into().unwrap(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+        };
+
+        let opt = DnaModifiersOpt {
+            network_seed: None,
+            properties: Some(props.clone()),
+            origin_time: Some(now),
+        };
+
+        let expected = DnaModifiers {
+            network_seed: "seed".into(),
+            properties: props.clone(),
+            origin_time: now,
+        };
+
+        assert_eq!(mods.update(opt), expected);
     }
 }

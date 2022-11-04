@@ -24,7 +24,7 @@ async fn direct_validation_test() {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "direct_validation_test".to_string(),
-            phenotype: DnaPhenotype {
+            modifiers: DnaModifiers {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
@@ -34,8 +34,7 @@ async fn direct_validation_test() {
         },
         [integrity, coordinator],
     )
-    .await
-    .unwrap();
+    .await;
 
     let alice_agent_id = fake_agent_pubkey_1();
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());

@@ -6,8 +6,8 @@ use super::ribosome::RibosomeT;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::entry_def_store::get_entry_def;
-use crate::conductor::handle::ConductorHandleT;
 use crate::conductor::space::Space;
+use crate::conductor::Conductor;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pDna;
 use holochain_types::prelude::*;
@@ -189,7 +189,7 @@ pub async fn check_valid_if_dna(
         Action::Dna(_) => {
             if !workspace.is_chain_empty(action.author()).await? {
                 Err(PrevActionError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-            } else if action.timestamp() < workspace.dna_def().phenotype.origin_time {
+            } else if action.timestamp() < workspace.dna_def().modifiers.origin_time {
                 // If the Dna timestamp is ahead of the origin time, every other action
                 // will be inductively so also due to the prev_action check
                 Err(PrevActionError::InvalidRootOriginTime)
@@ -233,10 +233,12 @@ pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
 
 /// Check previous action timestamp is before this action
 pub fn check_prev_timestamp(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
-    if action.timestamp() > prev_action.timestamp() {
+    let t1 = prev_action.timestamp();
+    let t2 = action.timestamp();
+    if t2 > t1 {
         Ok(())
     } else {
-        Err(PrevActionError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
+        Err(PrevActionError::Timestamp(t1, t2)).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
@@ -269,7 +271,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 pub async fn check_app_entry_type(
     dna_hash: &DnaHash,
     entry_type: &AppEntryType,
-    conductor: &dyn ConductorHandleT,
+    conductor: &Conductor,
 ) -> SysValidationResult<EntryDef> {
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks

@@ -61,7 +61,7 @@ impl HolochainP2pHandler for StubNetwork {
         dna_hash: DnaHash,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<usize> {
@@ -130,7 +130,7 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_authority_for_hash(
         &mut self,
         dna_hash: DnaHash,
-        dht_hash: AnyDhtHash,
+        basis_hash: OpBasis,
     ) -> HolochainP2pHandlerResult<bool> {
         Err("stub".into())
     }
@@ -147,6 +147,13 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: Option<DnaHash>,
     ) -> HolochainP2pHandlerResult<String> {
+        Err("stub".into())
+    }
+
+    fn handle_get_diagnostics(
+        &mut self,
+        dna_hash: DnaHash,
+    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics> {
         Err("stub".into())
     }
 }
@@ -175,6 +182,7 @@ fixturator!(
             let holochain_p2p = crate::test::stub_network().await;
             holochain_p2p.to_dna(
                 DnaHashFixturator::new(Empty).next().unwrap(),
+                None
             )
         })
     };
@@ -379,9 +387,9 @@ mod tests {
         p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
         p2p.join(dna.clone(), a3.clone(), None).await.unwrap();
 
-        let action_hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
+        let action_hash = holo_hash::OpBasis::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash::hash_type::AnyDht::Action,
+            holo_hash::hash_type::AnyLinkable::Action,
         );
 
         // this will fail because we can't reach any remote nodes

@@ -15,7 +15,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::action::builder;
-use tracing::*;
 
 #[derive(Constructor)]
 pub struct InitializeZomesWorkflowArgs<Ribosome>
@@ -37,7 +36,7 @@ where
     }
 }
 
-#[instrument(skip(network, keystore, workspace, args))]
+// #[instrument(skip(network, keystore, workspace, args))]
 pub async fn initialize_zomes_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
@@ -131,7 +130,7 @@ pub mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::conductor::handle::MockConductorHandleT;
+    use crate::conductor::Conductor;
     use crate::core::ribosome::guest_callback::validate::ValidateResult;
     use crate::core::ribosome::MockRibosomeT;
     use crate::fixt::DnaDefFixturator;
@@ -145,7 +144,9 @@ pub mod tests {
     use holochain_state::prelude::test_cache_db;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::prelude::SourceChain;
+    use holochain_state::test_utils::test_db_dir;
     use holochain_types::db_cache::DhtDbQueryCache;
+    use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::prelude::DnaDefHashed;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::fake_agent_pubkey_1;
@@ -205,7 +206,8 @@ pub mod tests {
             .expect_dna_def()
             .return_const(dna_def_hashed.clone());
 
-        let conductor_handle = Arc::new(MockConductorHandleT::new());
+        let db_dir = test_db_dir();
+        let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let args = InitializeZomesWorkflowArgs {
             ribosome,
             conductor_handle,
@@ -230,9 +232,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init() {
         // SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail])
-        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-            .await
-            .unwrap();
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
         let app = conductor.setup_app("app", &[dna]).await.unwrap();
@@ -264,9 +264,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init_one_zome_passes_one_fails() {
         let (dna, _, _) =
-            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail])
-                .await
-                .unwrap();
+            SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail]).await;
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();
         let app = conductor.setup_app("app", &[dna]).await.unwrap();
@@ -303,10 +301,13 @@ pub mod tests {
             ))?;
             Ok(InitCallbackResult::Fail("reason".into()))
         });
-        let zomes =
-            crate::conductor::conductor::tests::simple_create_entry_zome().merge(zome_fail.0);
+        let zomes = InlineZomeSet::from((
+            "create_entry",
+            crate::conductor::conductor::tests::simple_create_entry_zome(),
+        ))
+        .merge(zome_fail.0);
 
-        let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await.unwrap();
+        let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
 
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();

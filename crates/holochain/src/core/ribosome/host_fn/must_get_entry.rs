@@ -53,9 +53,9 @@ pub fn must_get_entry<'a>(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
                                     UnresolvedDependencies::Hashes(vec![entry_hash.into()],)
                                 ))
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             )
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                         ))
                         .into()),
                         HostContext::Validate(_) => {
@@ -69,10 +69,10 @@ pub fn must_get_entry<'a>(
                                         ),
                                     )
                                     .map_err(
-                                        |e| -> RuntimeError { wasm_error!(e.into()).into() }
+                                        |e| -> RuntimeError { wasm_error!(e).into() }
                                     )?
                                 )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             ))
                             .into())
                         }
@@ -84,9 +84,9 @@ pub fn must_get_entry<'a>(
                                             vec![entry_hash.into(),]
                                         ),
                                     )
-                                    .map_err(|e| wasm_error!(e.into()))?
+                                    .map_err(|e| wasm_error!(e))?
                                 )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             ))
                             .into())
                         }
@@ -144,7 +144,7 @@ pub mod test {
             .await;
 
         let dht_db = conductor
-            .inner_handle()
+            .raw_handle()
             .get_dht_db(alice.cell_id().dna_hash())
             .unwrap();
 

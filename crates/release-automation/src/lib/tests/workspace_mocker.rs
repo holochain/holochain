@@ -328,7 +328,7 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
             name: "crate_a".to_string(),
             version: "0.0.1".to_string(),
             dependencies: vec![
-                r#"crate_b = { path = "../crate_b", version = "0.0.0-alpha.1" }"#.to_string(),
+                r#"crate_b = { path = "../crate_b", version = "=0.0.0-alpha.1" }"#.to_string(),
             ],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Bin,
@@ -385,8 +385,6 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
 
                 ### Changed
                 - `Signature` is a 64 byte 'secure primitive'
-
-                ## 0.0.0-alpha.1
 
                 [Unreleased]: https://duckduckgo.com/?q=version&t=hd&va=u
                 "#
@@ -519,7 +517,6 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
     workspace_mocker.commit(None);
 
     // todo: derive the tag from a function
-    workspace_mocker.tag("crate_b-0.0.1-alpha.1");
     workspace_mocker.add_or_replace_file(
         "crates/crate_b/README.md",
         indoc::indoc! {r#"

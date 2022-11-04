@@ -352,11 +352,11 @@ CREATE TABLE mytable (
 );
     ";
 
-    m1.execute(schema, NO_PARAMS).unwrap();
-    m2.execute(schema, NO_PARAMS).unwrap();
+    m1.execute(schema, []).unwrap();
+    m2.execute(schema, []).unwrap();
 
     let num = m1
-        .execute("INSERT INTO mytable (x) VALUES (1)", NO_PARAMS)
+        .execute("INSERT INTO mytable (x) VALUES (1)", [])
         .unwrap();
     assert_eq!(num, 1);
 
@@ -365,7 +365,7 @@ CREATE TABLE mytable (
         .unwrap()
         .prepare_cached("SELECT x FROM mytable")
         .unwrap()
-        .query_map(NO_PARAMS, |row| row.get(0))
+        .query_map([], |row| row.get(0))
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
@@ -375,7 +375,7 @@ CREATE TABLE mytable (
         .unwrap()
         .prepare_cached("SELECT * FROM mytable")
         .unwrap()
-        .query_map(NO_PARAMS, |row| row.get(0))
+        .query_map([], |row| row.get(0))
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();

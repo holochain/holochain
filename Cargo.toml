@@ -44,7 +44,7 @@ members = [
   "crates/test_utils/wasm_common",
 ]
 
-exclude = ["crates/diagnostics", "crates/release-automation"]
+exclude = ["crates/release-automation"]
 
 [profile.fast-test]
 inherits = "dev"

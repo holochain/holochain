@@ -12,6 +12,7 @@ use holo_hash::HasHash;
 use holochain_p2p::actor;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -198,7 +199,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn authority_for_hash(
         &self,
-        _dht_hash: holo_hash::AnyDhtHash,
+        _dht_hash: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool> {
         Ok(self.authority)
     }
@@ -223,7 +224,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         _request_validation_receipt: bool,
         _countersigning_session: bool,
-        _dht_hash: holo_hash::AnyDhtHash,
+        _basis_hash: holo_hash::OpBasis,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize> {
@@ -272,6 +273,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _payload: holochain_zome_types::ExternIO,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
+    }
+
+    fn chc(&self) -> Option<ChcImpl> {
+        None
     }
 }
 
@@ -380,7 +385,7 @@ impl HolochainP2pDnaT for MockNetwork {
 
     async fn authority_for_hash(
         &self,
-        dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool> {
         self.0.lock().await.authority_for_hash(dht_hash).await
     }
@@ -405,7 +410,7 @@ impl HolochainP2pDnaT for MockNetwork {
         &self,
         _request_validation_receipt: bool,
         _countersigning_session: bool,
-        _dht_hash: holo_hash::AnyDhtHash,
+        _basis_hash: holo_hash::OpBasis,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
         _timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<usize> {
@@ -454,6 +459,10 @@ impl HolochainP2pDnaT for MockNetwork {
         _payload: holochain_zome_types::ExternIO,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
+    }
+
+    fn chc(&self) -> Option<ChcImpl> {
+        None
     }
 }
 
