@@ -396,16 +396,21 @@ impl Metrics {
     }
 
     /// Get the sum of throughputs for all current rounds
-    pub fn current_throughputs(&self) -> impl Iterator<Item = RoundThroughput> + '_ {
+    pub fn current_throughputs(
+        &self,
+        gossip_type: GossipModuleType,
+    ) -> impl Iterator<Item = RoundThroughput> + '_ {
         self.node_history
             .values()
             .flat_map(|r| &r.current_round)
+            .filter(move |r| r.gossip_type == gossip_type)
             .map(|r| r.throughput.clone())
     }
 
     /// Get the sum of throughputs for all current rounds
-    pub fn total_current_throughput(&self) -> RoundThroughput {
-        self.current_throughputs().sum()
+    pub fn total_current_historical_throughput(&self) -> RoundThroughput {
+        self.current_throughputs(GossipModuleType::ShardedHistorical)
+            .sum()
     }
 
     /// Record an individual extrapolated coverage event
@@ -590,8 +595,10 @@ impl Metrics {
 
         // print progress
         {
-            let tps = self.current_throughputs().count();
-            let tot = self.total_current_throughput();
+            let tps = self
+                .current_throughputs(GossipModuleType::ShardedHistorical)
+                .count();
+            let tot = self.total_current_historical_throughput();
             let n = tot.op_bytes.incoming;
             let d = tot.expected_op_bytes.incoming;
             if d > 0 {
