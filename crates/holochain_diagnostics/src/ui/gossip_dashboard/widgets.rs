@@ -1,4 +1,4 @@
-use holochain::prelude::metrics::PeerAgentHistory;
+use holochain::prelude::{gossip::sharded_gossip::RoundThroughput, metrics::PeerAgentHistory};
 
 use super::*;
 
@@ -21,10 +21,13 @@ pub fn ui_node_list(nodes: impl Iterator<Item = (usize, bool)>) -> List<'static>
     .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
 }
 
-pub fn ui_gossip_progress_gauge(ratio: Option<(u32, u32)>) -> Gauge<'static> {
-    if let Some((n, t)) = ratio {
-        let r = n as f64 / t as f64;
-        let mut style = Style::default().fg(Color::Blue).bg(Color::LightBlue);
+pub fn ui_gossip_progress_gauge(throughput: RoundThroughput) -> Gauge<'static> {
+    let n = throughput.op_bytes.incoming;
+    let d = throughput.expected_op_bytes.incoming;
+
+    if d > 0 {
+        let r = n as f64 / d as f64;
+        let mut style = Style::default().fg(Color::DarkGray).bg(Color::Cyan);
         if r > 1.0 {
             style = style
                 .add_modifier(Modifier::ITALIC)
@@ -35,13 +38,13 @@ pub fn ui_gossip_progress_gauge(ratio: Option<(u32, u32)>) -> Gauge<'static> {
             .label(format!(
                 "{} / {} ({:3.1}%)",
                 n.human_count_bytes(),
-                t.human_count_bytes(),
+                d.human_count_bytes(),
                 r * 100.0,
             ))
             .ratio(clamped)
             .gauge_style(style)
     } else {
-        let style = Style::default().fg(Color::LightMagenta).bg(Color::Magenta);
+        let style = Style::default().fg(Color::Green).bg(Color::Blue);
         Gauge::default()
             .label("complete")
             .ratio(1.0)

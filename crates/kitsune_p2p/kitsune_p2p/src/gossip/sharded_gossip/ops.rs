@@ -99,7 +99,7 @@ impl ShardedGossipLocal {
 
     pub(super) async fn queue_incoming_regions(
         &self,
-        cert: &Tx2Cert,
+        peer_cert: &Tx2Cert,
         state: RoundState,
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
@@ -113,7 +113,7 @@ impl ShardedGossipLocal {
             let their_region_diff = region_set.clone().diff(sent).map_err(KitsuneError::other)?;
 
             self.inner.share_mut(|i, _| {
-                if let Some(round) = i.round_map.get_mut(cert) {
+                if let Some(round) = i.round_map.get_mut(peer_cert) {
                     round.throughput.expected_op_bytes.outgoing +=
                         our_region_diff.iter().map(|r| r.data.size).sum::<u32>();
                     round.throughput.expected_op_count.outgoing +=
@@ -125,14 +125,14 @@ impl ShardedGossipLocal {
                     round.region_diffs = Some((our_region_diff.clone(), their_region_diff));
                     round.regions_are_queued = true;
                     i.metrics.write().update_current_round(
-                        cert,
+                        peer_cert,
                         GossipModuleType::ShardedHistorical,
                         &round,
                     );
                 } else {
                     tracing::warn!(
                         "attempting to queue_incoming_regions for round with no cert: {:?}",
-                        cert
+                        peer_cert
                     );
                 }
                 Ok(())

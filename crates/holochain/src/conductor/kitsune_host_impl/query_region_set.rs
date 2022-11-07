@@ -53,11 +53,9 @@ pub async fn query_region_set(
         .async_reader(move |txn| {
             let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
             let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
-            DatabaseResult::Ok(
-                coords.into_region_set(|(_, coords)| {
-                    query_region_data(&mut stmt, &topology, coords)
-                })?,
-            )
+            let regions = coords
+                .into_region_set(|(_, coords)| query_region_data(&mut stmt, &topology, coords))?;
+            DatabaseResult::Ok(regions)
         })
         .await?;
 
@@ -80,7 +78,9 @@ pub(super) fn query_region_data(
             ":timestamp_max": t1,
         },
         |row| {
-            let size: f64 = row.get("total_size")?;
+            let total_action_size: f64 = row.get("total_action_size")?;
+            let total_entry_size: f64 = row.get("total_entry_size")?;
+            let size = total_action_size + total_entry_size;
             Ok(RegionData {
                 hash: RegionHash::from_vec(row.get("xor_hash")?)
                     .expect("region hash must be 32 bytes"),
@@ -94,36 +94,39 @@ pub(super) fn query_region_data(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use super::*;
     use holochain_serialized_bytes::UnsafeBytes;
     use holochain_state::prelude::StateMutationResult;
     use holochain_state::{prelude::insert_op, test_utils::test_dht_db};
     use holochain_types::fixt::*;
     use holochain_types::prelude::{DhtOp, DhtOpHashed, NewEntryAction};
     use holochain_zome_types::{AppEntryBytes, Entry};
-    use kitsune_p2p::KitsuneOpData;
-
-    use super::*;
 
     /// Ensure that the size reported by RegionData is "close enough" to the actual size of
     /// ops that get transferred over the wire.
     #[tokio::test(flavor = "multi_thread")]
-    async fn query_region_set_size() {
+    async fn query_region_set_diff_size() {
         let db = test_dht_db();
-        let topo = Topology::standard_epoch_full();
+        let topo = Topology::standard(Timestamp::now(), Duration::ZERO);
         let strat = ArqStrat::default();
         let arcset = Arc::new(DhtArcSet::Full);
+
+        let regions_empty = query_region_set(db.to_db(), topo.clone(), &strat, arcset.clone())
+            .await
+            .unwrap();
         {
-            let regions = query_region_set(db.to_db(), topo.clone(), &strat, arcset.clone())
-                .await
-                .unwrap();
-            let sum: RegionData = regions.regions().map(|r| r.data).sum();
+            let sum: RegionData = regions_empty.regions().map(|r| r.data).sum();
             assert_eq!(sum.count, 0);
             assert_eq!(sum.size, 0);
         }
 
         let mk_op = |i: u8| {
             let entry = Box::new(Entry::App(AppEntryBytes(
-                UnsafeBytes::from(vec![i; 1_000_000]).try_into().unwrap(),
+                UnsafeBytes::from(vec![i % 10; 10_000_000])
+                    .try_into()
+                    .unwrap(),
             )));
             let sig = fixt::fixt!(Signature);
             let mut create = fixt::fixt!(Create);
@@ -155,11 +158,13 @@ mod tests {
         })
         .unwrap();
 
+        let regions = query_region_set(db.to_db(), topo, &strat, arcset)
+            .await
+            .unwrap();
+
+        let diff = regions.diff(regions_empty).unwrap();
         {
-            let regions = query_region_set(db.to_db(), topo, &strat, arcset)
-                .await
-                .unwrap();
-            let sum: RegionData = regions.regions().map(|r| r.data).sum();
+            let sum: RegionData = diff.into_iter().map(|r| r.data).sum();
             assert_eq!(sum.count, num as u32);
             // 32 bytes is "close enough"
             assert!(wire_bytes as u32 - sum.size < 32 * num as u32);

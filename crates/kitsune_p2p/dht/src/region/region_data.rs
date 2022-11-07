@@ -82,7 +82,7 @@ impl RegionDataConstraints for RegionData {
     }
 
     fn size(&self) -> u32 {
-        self.count
+        self.size
     }
 }
 

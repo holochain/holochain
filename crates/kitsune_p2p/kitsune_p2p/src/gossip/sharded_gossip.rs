@@ -23,6 +23,7 @@ use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
+use std::iter::Sum;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -204,8 +205,6 @@ impl ShardedGossip {
 
             async move {
                 let mut stats = Stats::reset();
-                let mut last_progress_report = Instant::now() - Duration::from_secs(10);
-                tracing::info!("PROGRESS REPORTS ENABLED.");
                 while !this
                     .gossip
                     .closing
@@ -214,29 +213,6 @@ impl ShardedGossip {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
                     this.run_one_iteration().await;
                     this.stats(&mut stats);
-                    this.gossip
-                        .inner
-                        .share_ref(|state| {
-                            if let Some((actual, expected)) =
-                                state.metrics.read().incoming_gossip_progress()
-                            {
-                                if expected > 0 {
-                                    // once per second
-                                    if last_progress_report.elapsed() > Duration::from_secs(1) {
-                                        let percent = (actual as f64 / expected as f64) * 100.0;
-                                        tracing::info!(
-                                            "PROGRESS: {} / {} ({}%)",
-                                            actual,
-                                            expected,
-                                            percent
-                                        );
-                                        last_progress_report = Instant::now();
-                                    }
-                                }
-                            }
-                            Ok(())
-                        })
-                        .ok();
                 }
                 KitsuneResult::Ok(())
             }
@@ -359,7 +335,6 @@ impl ShardedGossip {
                     .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))
                     .unwrap(),
             );
-            tracing::debug!("url + message: {:?} {:#?}", &msg.1, &msg.2);
         }
 
         if let Some((con, remote_url, msg, bytes)) = incoming {
@@ -749,7 +724,7 @@ impl RoundState {
 }
 
 /// Stats about ops, regions, and blooms sent and received
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, derive_more::Add)]
 pub struct RoundThroughput {
     /// Number of ops blooms we have sent for this round, which is also the
     /// number of MissingOps sets we expect in response
@@ -766,8 +741,14 @@ pub struct RoundThroughput {
     pub op_bytes: InOut,
 }
 
+impl Sum for RoundThroughput {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::default(), |a, r| a + r)
+    }
+}
+
 /// Incoming and outgoing throughput
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, derive_more::Add)]
 pub struct InOut {
     /// Incoming throughput
     pub incoming: u32,
@@ -906,23 +887,23 @@ impl ShardedGossipLocal {
 
     async fn process_incoming(
         &self,
-        cert: Tx2Cert,
+        peer_cert: Tx2Cert,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let s = match self.gossip_type {
             GossipType::Recent => {
-                let s = tracing::trace_span!("process_incoming_recent", ?cert, agents = ?self.show_local_agents(), ?msg);
+                let s = tracing::trace_span!("process_incoming_recent", ?peer_cert, agents = ?self.show_local_agents(), ?msg);
                 s.in_scope(|| self.log_state());
                 s
             }
             GossipType::Historical => match &msg {
                 ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
-                    let s = tracing::trace_span!("process_incoming_historical", ?cert, agents = ?self.show_local_agents(), msg = %"MissingOps", num_ops = %ops.len(), ?finished);
+                    let s = tracing::trace_span!("process_incoming_historical", ?peer_cert, agents = ?self.show_local_agents(), msg = %"MissingOps", num_ops = %ops.len(), ?finished);
                     s.in_scope(|| self.log_state());
                     s
                 }
                 _ => {
-                    let s = tracing::trace_span!("process_incoming_historical", ?cert, agents = ?self.show_local_agents(), ?msg);
+                    let s = tracing::trace_span!("process_incoming_historical", ?peer_cert, agents = ?self.show_local_agents(), ?msg);
                     s.in_scope(|| self.log_state());
                     s
                 }
@@ -932,7 +913,7 @@ impl ShardedGossipLocal {
         // Record size metrics
         self.inner
             .share_mut(|i, _| {
-                if let Some(state) = i.round_map.get_mut(&cert) {
+                if let Some(state) = i.round_map.get_mut(&peer_cert) {
                     match &msg {
                         ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
                             state.throughput.op_bloom_count.incoming += 1;
@@ -956,9 +937,11 @@ impl ShardedGossipLocal {
                         ShardedGossipWire::AlreadyInProgress(_) => {}
                     }
 
-                    i.metrics
-                        .write()
-                        .update_current_round(&cert, self.gossip_type.into(), &state);
+                    i.metrics.write().update_current_round(
+                        &peer_cert,
+                        self.gossip_type.into(),
+                        &state,
+                    );
                     // println!("throughput IN {:?}", state.throughput);
                 }
                 Ok(())
@@ -972,15 +955,18 @@ impl ShardedGossipLocal {
                 id,
                 agent_list,
             }) => {
-                self.incoming_initiate(cert, intervals, id, agent_list)
+                self.incoming_initiate(peer_cert, intervals, id, agent_list)
                     .await?
             }
             ShardedGossipWire::Accept(Accept {
                 intervals,
                 agent_list,
-            }) => self.incoming_accept(cert, intervals, agent_list).await?,
+            }) => {
+                self.incoming_accept(peer_cert, intervals, agent_list)
+                    .await?
+            }
             ShardedGossipWire::Agents(Agents { filter }) => {
-                if let Some(state) = self.get_state(&cert)? {
+                if let Some(state) = self.get_state(&peer_cert)? {
                     let filter = decode_bloom_filter(&filter);
                     self.incoming_agents(state, filter).await?
                 } else {
@@ -988,7 +974,7 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingAgents(MissingAgents { agents }) => {
-                if self.get_state(&cert)?.is_some() {
+                if self.get_state(&peer_cert)?.is_some() {
                     self.incoming_missing_agents(agents.as_slice()).await?;
                 }
                 Vec::with_capacity(0)
@@ -998,9 +984,9 @@ impl ShardedGossipLocal {
                 finished,
             }) => {
                 let state = if finished {
-                    self.incoming_op_blooms_finished(&cert)?
+                    self.incoming_op_blooms_finished(&peer_cert)?
                 } else {
-                    self.get_state(&cert)?
+                    self.get_state(&peer_cert)?
                 };
                 match state {
                     Some(state) => match missing_hashes {
@@ -1027,8 +1013,8 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
-                if let Some(state) = self.incoming_op_blooms_finished(&cert)? {
-                    self.queue_incoming_regions(&cert, state, region_set)
+                if let Some(state) = self.incoming_op_blooms_finished(&peer_cert)? {
+                    self.queue_incoming_regions(&peer_cert, state, region_set)
                         .await?
                 } else {
                     vec![]
@@ -1043,19 +1029,19 @@ impl ShardedGossipLocal {
 
                 let state = match finished {
                     // This is a single chunk of ops. No need to reply.
-                    MissingOpsStatus::ChunkComplete => self.get_state(&cert)?,
+                    MissingOpsStatus::ChunkComplete => self.get_state(&peer_cert)?,
                     // This is the last chunk in the batch. Reply with [`OpBatchReceived`]
                     // to get the next batch of missing ops.
                     MissingOpsStatus::BatchComplete => {
                         gossip = vec![ShardedGossipWire::op_batch_received()];
-                        self.get_state(&cert)?
+                        self.get_state(&peer_cert)?
                     }
                     // All the batches of missing ops for the bloom this node sent
                     // to the remote node have been sent back to this node.
                     MissingOpsStatus::AllComplete => {
                         // This node can decrement the number of outstanding ops bloom replies
                         // it is waiting for.
-                        let mut state = self.decrement_op_blooms(&cert)?;
+                        let mut state = self.decrement_op_blooms(&peer_cert)?;
 
                         // If there are more blooms to send because this node had to batch the blooms
                         // and all the outstanding blooms have been received then this node will send
@@ -1068,7 +1054,7 @@ impl ShardedGossipLocal {
                             // Generate the next ops blooms batch.
                             *state = self.next_bloom_batch(state.clone(), &mut gossip).await?;
                             // Update the state.
-                            self.update_state_if_active(cert.clone(), state.clone())?;
+                            self.update_state_if_active(peer_cert.clone(), state.clone())?;
                         }
                         state
                     }
@@ -1084,35 +1070,35 @@ impl ShardedGossipLocal {
                 }
                 gossip
             }
-            ShardedGossipWire::OpBatchReceived(_) => match self.get_state(&cert)? {
+            ShardedGossipWire::OpBatchReceived(_) => match self.get_state(&peer_cert)? {
                 Some(state) => {
                     // The last ops batch has been received by the
                     // remote node so now send the next batch.
                     let r = self.next_missing_ops_batch(state.clone()).await?;
                     if state.is_finished() {
-                        self.remove_state(&cert, false)?;
+                        self.remove_state(&peer_cert, false)?;
                     }
                     r
                 }
                 None => Vec::with_capacity(0),
             },
             ShardedGossipWire::NoAgents(_) => {
-                tracing::warn!("No agents to gossip with on the node {:?}", cert);
-                self.remove_state(&cert, true)?;
+                tracing::warn!("No agents to gossip with on the node {:?}", peer_cert);
+                self.remove_state(&peer_cert, true)?;
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::AlreadyInProgress(_) => {
-                self.remove_target(&cert, false)?;
+                self.remove_target(&peer_cert, false)?;
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::Busy(_) => {
-                tracing::warn!("The node {:?} is busy", cert);
-                self.remove_target(&cert, true)?;
+                tracing::warn!("The node {:?} is busy", peer_cert);
+                self.remove_target(&peer_cert, true)?;
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::Error(Error { message }) => {
-                tracing::warn!("gossiping with: {:?} and got error: {}", cert, message);
-                self.remove_state(&cert, true)?;
+                tracing::warn!("gossiping with: {:?} and got error: {}", peer_cert, message);
+                self.remove_state(&peer_cert, true)?;
                 Vec::with_capacity(0)
             }
         };

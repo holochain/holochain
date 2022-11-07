@@ -395,6 +395,19 @@ impl Metrics {
         })
     }
 
+    /// Get the sum of throughputs for all current rounds
+    pub fn current_throughputs(&self) -> impl Iterator<Item = RoundThroughput> + '_ {
+        self.node_history
+            .values()
+            .flat_map(|r| &r.current_round)
+            .map(|r| r.throughput.clone())
+    }
+
+    /// Get the sum of throughputs for all current rounds
+    pub fn total_current_throughput(&self) -> RoundThroughput {
+        self.current_throughputs().sum()
+    }
+
     /// Record an individual extrapolated coverage event
     /// (either from us or a remote)
     /// and add it to our running aggregate extrapolated coverage metric.
@@ -553,7 +566,7 @@ impl Metrics {
     /// Update node-level info about a current round, or create one if it doesn't exist
     pub fn update_current_round(
         &mut self,
-        node: &NodeId,
+        peer: &NodeId,
         gossip_type: GossipModuleType,
         round_state: &RoundState,
     ) {
@@ -563,7 +576,7 @@ impl Metrics {
             .into_iter()
             .map(|a| a.agent())
             .collect();
-        let history = self.node_history.entry(node.clone()).or_default();
+        let history = self.node_history.entry(peer.clone()).or_default();
         history.remote_agents = remote_agents;
         if let Some(r) = &mut history.current_round {
             r.update(round_state);
@@ -573,6 +586,25 @@ impl Metrics {
                 gossip_type,
                 Instant::now(),
             ));
+        }
+
+        // print progress
+        {
+            let tps = self.current_throughputs().count();
+            let tot = self.total_current_throughput();
+            let n = tot.op_bytes.incoming;
+            let d = tot.expected_op_bytes.incoming;
+            if d > 0 {
+                let r = n as f64 / d as f64 * 100.0;
+                tracing::debug!(
+                    "PROGRESS [{:?}] {} / {} ({:>3.1}%) : {}",
+                    peer,
+                    n,
+                    d,
+                    r,
+                    tps,
+                );
+            }
         }
     }
 
@@ -678,24 +710,6 @@ impl Metrics {
             0.0
         } else {
             sum / cnt
-        }
-    }
-
-    /// Get an indicator of overall incoming progress for all current gossip rounds
-    pub fn incoming_gossip_progress(&self) -> Option<(u32, u32)> {
-        let mut actual = 0;
-        let mut expected = 0;
-        for h in self.node_history.values() {
-            if let Some(r) = &h.current_round {
-                actual += r.throughput.op_bytes.incoming;
-                expected += r.throughput.expected_op_bytes.incoming;
-            }
-        }
-
-        if expected.is_zero() {
-            None
-        } else {
-            Some((actual, expected))
         }
     }
 

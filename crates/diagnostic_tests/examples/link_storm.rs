@@ -21,7 +21,7 @@ use tui::{backend::Backend, Terminal};
 
 const BASES: usize = 1;
 
-const ENTRY_SIZE: usize = 10_000_000;
+const ENTRY_SIZE: usize = 1_000_000;
 const MAX_COMMITS: usize = 1_000;
 const ENTRIES_PER_COMMIT: u32 = 1;
 
@@ -86,11 +86,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let app = setup_app(seeded_rng(None)).await;
 
-    let tasks = futures::future::join_all([
-        // spawn_commit_task(app.clone()),
-        spawn_get_task(app.clone()),
-        // tokio::spawn(async move {}),
-    ]);
+    let mut tasks = vec![];
+    if COMMIT_RATE > Duration::ZERO {
+        tasks.push(spawn_commit_task(app.clone()));
+    }
+    tasks.push(spawn_get_task(app.clone()));
+    let tasks = futures::future::join_all(tasks);
 
     if show_ui {
         let ui_task = tokio::task::spawn_blocking(|| tui_crossterm_setup(|t| run_app(t, app)));
@@ -150,7 +151,9 @@ async fn setup_app(mut rng: StdRng) -> App {
 }
 
 async fn construct_node(dna: DnaFile) -> Node {
-    let (conductor, zome) = diagnostic_tests::setup_conductor_with_single_dna(config(), dna).await;
+    let (mut conductor, zome) =
+        diagnostic_tests::setup_conductor_with_single_dna(config(), dna).await;
+    tracing::info!("LINK_STORM add node, db: {:?}", conductor.persist());
     let conductor = Arc::new(conductor);
     let node = Node::new(conductor.clone(), zome).await;
     node

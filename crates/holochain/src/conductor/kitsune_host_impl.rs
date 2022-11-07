@@ -107,7 +107,39 @@ impl KitsuneHost for KitsuneHostImpl {
         async move {
             let topology = self.get_topology(space.clone()).await?;
             let db = self.spaces.dht_db(&dna_hash)?;
-            Ok(query_region_set::query_region_set(db, topology, &self.strat, dht_arc_set).await?)
+            let region_set =
+                query_region_set::query_region_set(db, topology.clone(), &self.strat, dht_arc_set)
+                    .await?;
+            for r in region_set.regions() {
+                if r.data.size > 900_000 {
+                    let ops = self
+                        .spaces
+                        .handle_fetch_op_data_by_regions(
+                            &dna_hash,
+                            vec![r.coords.to_bounds(&topology)],
+                        )
+                        .await?;
+                    let hashes_and_lens: Vec<_> = ops
+                        .into_iter()
+                        .map(|(hash, op_data)| {
+                            (
+                                hash,
+                                op_data.clone(),
+                                holochain_p2p::WireDhtOpData { op_data }
+                                    .encode()
+                                    .unwrap()
+                                    .len(),
+                            )
+                        })
+                        .collect();
+                    tracing::debug!(
+                        "REGION OPS: REGION / REAL = {:?} / {:#?} ",
+                        r,
+                        hashes_and_lens,
+                    );
+                }
+            }
+            Ok(region_set)
         }
         .boxed()
         .into()
