@@ -37,7 +37,7 @@ impl GossipDashboard {
             }
             let gauges: Vec<_> = metrics
                 .iter()
-                .map(|(m, _)| ui_gossip_progress_gauge(m.total_current_throughput()))
+                .map(|(m, _)| ui_gossip_progress_gauge(m.total_current_historical_throughput()))
                 .collect();
 
             if let Some(selected) = selected {

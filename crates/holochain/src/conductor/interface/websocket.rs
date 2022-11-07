@@ -415,6 +415,57 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn gossip_info_request() {
+        observability::test_run().ok();
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+
+        // warm the zome
+        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+
+        let dna_hash = dna.dna_hash().clone();
+        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
+
+        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
+        let request = GossipInfoRequestPayload {
+            dnas: vec![dna_hash],
+        };
+
+        let msg = AppRequest::GossipInfo(Box::new(request));
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AppResponse = bytes.try_into().unwrap();
+            match response {
+                AppResponse::GossipInfo(info) => {
+                    assert_eq!(
+                        info,
+                        vec![DnaGossipInfo {
+                            total_historical_gossip_throughput: HistoricalGossipThroughput::default(
+                            )
+                        }]
+                    )
+                }
+                other => panic!("unexpected response {:?}", other),
+            }
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, app_api).await.unwrap();
+        // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
+        // the overhead of a websocket request locally is small
+        let shutdown = handle.take_shutdown_handle().unwrap();
+        handle.shutdown();
+        shutdown.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn enable_disable_app() {
         observability::test_run().ok();
         let agent_key = fake_agent_pubkey_1();

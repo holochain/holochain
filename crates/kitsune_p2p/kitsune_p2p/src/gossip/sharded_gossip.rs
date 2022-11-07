@@ -748,7 +748,9 @@ impl Sum for RoundThroughput {
 }
 
 /// Incoming and outgoing throughput
-#[derive(Debug, Clone, Default, PartialEq, Eq, derive_more::Add)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, derive_more::Add, serde::Serialize, serde::Deserialize,
+)]
 pub struct InOut {
     /// Incoming throughput
     pub incoming: u32,
