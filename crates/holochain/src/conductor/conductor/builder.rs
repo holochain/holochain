@@ -19,6 +19,8 @@ pub struct ConductorBuilder {
     #[cfg(any(test, feature = "test_utils"))]
     /// Optional state override (for testing)
     pub state: Option<ConductorState>,
+    /// Skip printing setup info to stdout
+    pub no_print_setup: bool,
 }
 
 impl ConductorBuilder {
@@ -38,6 +40,12 @@ impl ConductorBuilder {
     /// Set the passphrase for use in keystore initialization
     pub fn passphrase(mut self, passphrase: Option<sodoken::BufRead>) -> Self {
         self.passphrase = passphrase;
+        self
+    }
+
+    /// Set up the builder to skip printing setup
+    pub fn no_print_setup(mut self) -> Self {
+        self.no_print_setup = true;
         self
     }
 
@@ -150,7 +158,14 @@ impl ConductorBuilder {
             });
         }
 
-        Self::finish(handle, config, p2p_evt, post_commit_receiver).await
+        Self::finish(
+            handle,
+            config,
+            p2p_evt,
+            post_commit_receiver,
+            self.no_print_setup,
+        )
+        .await
     }
 
     pub(crate) fn spawn_post_commit(
@@ -190,22 +205,23 @@ impl ConductorBuilder {
     }
 
     pub(crate) async fn finish(
-        handle: ConductorHandle,
+        conductor: ConductorHandle,
         conductor_config: ConductorConfig,
         p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
+        no_print_setup: bool,
     ) -> ConductorResult<ConductorHandle> {
-        handle
+        conductor
             .clone()
             .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)
             .await;
 
-        tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
+        tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()));
 
-        Self::spawn_post_commit(handle.clone(), post_commit_receiver);
+        Self::spawn_post_commit(conductor.clone(), post_commit_receiver);
 
         let configs = conductor_config.admin_interfaces.unwrap_or_default();
-        let cell_startup_errors = handle.clone().initialize_conductor(configs).await?;
+        let cell_startup_errors = conductor.clone().initialize_conductor(configs).await?;
 
         // TODO: This should probably be emitted over the admin interface
         if !cell_startup_errors.is_empty() {
@@ -215,9 +231,11 @@ impl ConductorBuilder {
             );
         }
 
-        handle.print_setup();
+        if !no_print_setup {
+            conductor.print_setup();
+        }
 
-        Ok(handle)
+        Ok(conductor)
     }
 
     /// Pass a test keystore in, to ensure that generated test agents
@@ -297,6 +315,13 @@ impl ConductorBuilder {
                 .expect("Could not install DNA");
         }
 
-        Self::finish(handle, self.config, p2p_evt, post_commit_receiver).await
+        Self::finish(
+            handle,
+            self.config,
+            p2p_evt,
+            post_commit_receiver,
+            self.no_print_setup,
+        )
+        .await
     }
 }

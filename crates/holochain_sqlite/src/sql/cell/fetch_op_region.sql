@@ -1,7 +1,15 @@
 SELECT
   COUNT(DhtOp.hash) AS count,
-  TOTAL(LENGTH(Action.blob)) + TOTAL(LENGTH(Entry.blob)) AS total_size,
-  REDUCE_XOR(DhtOp.hash) AS xor_hash
+  REDUCE_XOR(DhtOp.hash) AS xor_hash,
+  TOTAL(LENGTH(Action.blob)) AS total_action_size,
+  -- We need to only account for entry data in the size count when the op contains the entry itself.
+  -- Other ops refer to actions that refer to entries, but we don't want to include that in the size.
+  TOTAL(
+    CASE
+      WHEN DhtOp.type IN ('StoreEntry', 'StoreRecord') THEN LENGTH(Entry.blob)
+      ELSE 0
+    END
+  ) AS total_entry_size
 FROM
   DhtOp
   JOIN Action ON DhtOp.action_hash = Action.hash

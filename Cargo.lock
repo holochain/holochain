@@ -2911,6 +2911,7 @@ dependencies = [
  "maplit",
  "mockall 0.10.2",
  "must_future",
+ "nanoid 0.4.0",
  "num-traits",
  "observability",
  "once_cell",
