@@ -1163,24 +1163,12 @@ impl RoundState {
     /// - This node has no queued missing ops to send to the remote node.
     /// - If running historical gossip, the number of ops sent/received matches expectations
     fn is_finished(&self) -> bool {
-        let InOut {
-            incoming: expected_in,
-            outgoing: expected_out,
-        } = self.throughput.expected_op_count;
-        let InOut {
-            incoming: ops_in,
-            outgoing: ops_out,
-        } = self.throughput.op_count;
-
-        let ops_finished = ops_in >= expected_in && ops_out >= expected_out;
-
         self.num_expected_op_blooms == 0
             && !self.has_pending_historical_op_data
             && self.received_all_incoming_op_blooms
             && self.regions_are_queued
             && self.bloom_batch_cursor.is_none()
             && self.ops_batch_queue.is_empty()
-            && ops_finished
     }
 }
 
