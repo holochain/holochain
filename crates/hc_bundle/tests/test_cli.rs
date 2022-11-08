@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
+    time::Duration,
 };
 
 fn read_app(path: &Path) -> anyhow::Result<AppBundle> {
@@ -186,6 +187,7 @@ async fn test_multi_integrity() {
             network_seed: "00000000-0000-0000-0000-000000000000".into(),
             properties: ().try_into().unwrap(),
             origin_time,
+            quantum_time: Duration::from_secs(5 * 60),
         },
         integrity_zomes: vec![
             (

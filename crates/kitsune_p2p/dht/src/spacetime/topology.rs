@@ -1,5 +1,8 @@
 use super::*;
 
+/// Quantum time used in the standard topology
+pub const STANDARD_QUANTUM_TIME: Duration = Duration::from_secs(60 * 5);
+
 /// Topology defines the structure of spacetime, in particular how space and
 /// time are quantized.
 ///
@@ -159,20 +162,36 @@ impl Dimension {
 
     /// The standard time quantum size is 5 minutes (300 million microseconds)
     pub const fn standard_time() -> Self {
+        let quantum = STANDARD_QUANTUM_TIME.as_micros() as u32;
         Dimension {
             // 5 minutes in microseconds = 1mil * 60 * 5 = 300,000,000
             // log2 of this is 28.16, FYI
-            quantum: 1_000_000 * 60 * 5,
+            quantum,
             quantum_power: 29,
 
             // 12 quanta = 1 hour.
             // If we set the max lifetime for a network to ~100 years, which
-            // is 12 * 24 * 365 * 1000 = 105,120,000 time quanta,
-            // the log2 of which is 26.64,
-            // then we can store any time coordinate in that range using 27 bits.
+            // is 12 * 24 * 365 * 100 = 10,512,000 time quanta,
+            // the log2 of which is 23.32,
+            // then we can store any time coordinate in that range using 24 bits.
             //
             // BTW, the log2 of 100 years in microseconds is 54.81
-            bit_depth: 27,
+            bit_depth: 24,
+        }
+    }
+
+    /// Calculate from a quantum size
+    pub fn time(quantum_dur: Duration) -> Self {
+        let quantum = quantum_dur.as_micros() as u32;
+        let quantum_power = ((quantum as f64).log2().ceil() as u32).try_into().unwrap();
+        let quanta_per_100_years = 60 * 60 / quantum_dur.as_secs() * 24 * 365 * 100;
+        let bit_depth = ((quanta_per_100_years as f64).log2().ceil() as u32)
+            .try_into()
+            .unwrap();
+        Dimension {
+            quantum,
+            quantum_power,
+            bit_depth,
         }
     }
 }
