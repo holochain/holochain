@@ -27,7 +27,7 @@ pub fn ui_gossip_progress_gauge(throughput: RoundThroughput) -> Gauge<'static> {
 
     if d > 0 {
         let r = n as f64 / d as f64;
-        let mut style = Style::default().fg(Color::DarkGray).bg(Color::Cyan);
+        let mut style = Style::default().fg(Color::Cyan).bg(Color::DarkGray);
         if r > 1.0 {
             style = style
                 .add_modifier(Modifier::ITALIC)
@@ -44,7 +44,7 @@ pub fn ui_gossip_progress_gauge(throughput: RoundThroughput) -> Gauge<'static> {
             .ratio(clamped)
             .gauge_style(style)
     } else {
-        let style = Style::default().fg(Color::Green).bg(Color::Blue);
+        let style = Style::default().fg(Color::Gray).bg(Color::Green);
         Gauge::default()
             .label("complete")
             .ratio(1.0)
