@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - BREAKING CHANGE - Update wasmer crate dependency [\#1620](https://github.com/holochain/holochain/pull/1620)
 - Adds GossipInfo app interface method, which returns data about historical gossip progress which can be used to implement a progress bar in app UIs. [\#1649](https://github.com/holochain/holochain/pull/1649)
+- BREAKING CHANGE - Add `quantum_time` as a DNA modifier. The default is set to 5 minutes, which is what it was previously hardcoded to. DNA manifests do not need to be updated, but this will change the DNA hash of all existing DNAs.
 
 ## 0.0.171
 
