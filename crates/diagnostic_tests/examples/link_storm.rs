@@ -21,7 +21,7 @@ use tui::{backend::Backend, Terminal};
 
 const BASES: usize = 1;
 
-const ENTRY_SIZE: usize = 1_000_000;
+const ENTRY_SIZE: usize = 10_000_000;
 const MAX_COMMITS: usize = 1_000;
 const ENTRIES_PER_COMMIT: u32 = 1;
 
