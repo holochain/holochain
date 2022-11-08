@@ -82,7 +82,7 @@ pub async fn app_validation_workflow(
 async fn app_validation_workflow_inner(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
-    conductor_handle: ConductorHandle,
+    conductor: ConductorHandle,
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
@@ -99,7 +99,7 @@ async fn app_validation_workflow_inner(
         let workspace = workspace.clone();
         move |so| {
             let network = network.clone();
-            let conductor_handle = conductor_handle.clone();
+            let conductor = conductor.clone();
             let workspace = workspace.clone();
             let dna_hash = dna_hash.clone();
             async move {
@@ -122,8 +122,7 @@ async fn app_validation_workflow_inner(
                 let mut cascade = workspace.full_cascade(network.clone());
                 let r = match dhtop_to_op(op, &mut cascade).await {
                     Ok(op) => {
-                        validate_op_outer(dna_hash, &op, &conductor_handle, &(*workspace), &network)
-                            .await
+                        validate_op_outer(dna_hash, &op, &conductor, &(*workspace), &network).await
                     }
                     Err(e) => Err(e),
                 };
