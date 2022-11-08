@@ -340,6 +340,7 @@ pub mod tests {
             properties: Some(app_manifest_properties_fixture()),
             network_seed: Some("network_seed".into()),
             origin_time: None,
+            quantum_time: None,
         };
         let (manifest, dna_hashes) =
             app_manifest_fixture(location, vec![fixt!(DnaDef), fixt!(DnaDef)], modifiers).await;
