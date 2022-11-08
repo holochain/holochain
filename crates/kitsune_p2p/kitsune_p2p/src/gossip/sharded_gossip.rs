@@ -276,7 +276,7 @@ impl ShardedGossip {
                     i.metrics.write().update_current_round(
                         &cert,
                         self.gossip.gossip_type.into(),
-                        &state,
+                        state,
                     );
                     // println!("throughput OUT {:?}", state.throughput);
                 }
@@ -942,7 +942,7 @@ impl ShardedGossipLocal {
                     i.metrics.write().update_current_round(
                         &peer_cert,
                         self.gossip_type.into(),
-                        &state,
+                        state,
                     );
                     // println!("throughput IN {:?}", state.throughput);
                 }
@@ -1023,9 +1023,6 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
-                // for op in &ops {
-                //     println!("OP RECEIVED: {} B, data: {:?}", op.0.len(), op.0);
-                // }
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
 
@@ -1177,16 +1174,6 @@ impl RoundState {
 
         let ops_finished = ops_in >= expected_in && ops_out >= expected_out;
 
-        // tracing::debug!(
-        //     "FINISHED? {} {} {} {} {} {} {}",
-        //     self.num_expected_op_blooms == 0,
-        //     !self.has_pending_historical_op_data,
-        //     self.received_all_incoming_op_blooms,
-        //     self.regions_are_queued,
-        //     self.bloom_batch_cursor.is_none(),
-        //     self.ops_batch_queue.is_empty(),
-        //     ops_finished
-        // );
         self.num_expected_op_blooms == 0
             && !self.has_pending_historical_op_data
             && self.received_all_incoming_op_blooms

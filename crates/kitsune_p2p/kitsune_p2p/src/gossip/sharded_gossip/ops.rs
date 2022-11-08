@@ -127,7 +127,7 @@ impl ShardedGossipLocal {
                     i.metrics.write().update_current_round(
                         peer_cert,
                         GossipModuleType::ShardedHistorical,
-                        &round,
+                        round,
                     );
                 } else {
                     tracing::warn!(
