@@ -140,18 +140,19 @@ async fn partial_missing_doesnt_finish() {
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
-                    remote_agent_list:vec![],
-                    common_arc_set:Arc::new(DhtArcSet::Full),
-                    num_expected_op_blooms:1,
-                    received_all_incoming_op_blooms:true,
-                    has_pending_historical_op_data:false,
-                    start_time:Instant::now(),
-                    last_touch:Instant::now(),
-                    round_timeout:std::time::Duration::MAX,
-                    bloom_batch_cursor:None,
-                    ops_batch_queue:OpsBatchQueue::new(),
-                    region_set_sent:None,
-                    throughput: Default::default()
+                    remote_agent_list: vec![],
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
+                    last_touch: Instant::now(),
+                    round_timeout: std::time::Duration::MAX,
+                    bloom_batch_cursor: None,
+                    ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -197,13 +198,14 @@ async fn missing_ops_finishes() {
                     num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: true,
                     has_pending_historical_op_data: false,
-                    start_time: Instant::now(),
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default()
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -250,13 +252,14 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
                     num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: false,
                     has_pending_historical_op_data: false,
-                    start_time: Instant::now(),
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default()
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -303,13 +306,14 @@ async fn bloom_response_finishes() {
                     num_expected_op_blooms: 0,
                     received_all_incoming_op_blooms: false,
                     has_pending_historical_op_data: false,
-                    start_time: Instant::now(),
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default()
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -356,13 +360,14 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
                     num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: false,
                     has_pending_historical_op_data: false,
-                    start_time: Instant::now(),
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default()
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -412,13 +417,14 @@ async fn no_data_still_finishes() {
                     num_expected_op_blooms: 0,
                     received_all_incoming_op_blooms: false,
                     has_pending_historical_op_data: false,
-                    start_time: Instant::now(),
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default()
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -439,13 +445,14 @@ async fn no_data_still_finishes() {
                     num_expected_op_blooms: 1,
                     received_all_incoming_op_blooms: true,
                     has_pending_historical_op_data: false,
-                    start_time: Instant::now(),
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
                     region_set_sent: None,
-                    throughput: Default::default()
+                    throughput: Default::default(), region_diffs: Default::default(),
                 }
             }
             .into(),
