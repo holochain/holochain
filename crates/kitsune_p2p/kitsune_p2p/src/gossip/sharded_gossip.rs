@@ -257,7 +257,7 @@ impl ShardedGossip {
                             state.throughput.op_bloom_bytes.outgoing +=
                                 missing_hashes.size() as u32;
                         }
-                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => {}
+                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => (),
                         ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
                             state.throughput.op_count.outgoing += ops.len() as u32;
                             state.throughput.op_bytes.outgoing +=
@@ -278,7 +278,6 @@ impl ShardedGossip {
                         self.gossip.gossip_type.into(),
                         state,
                     );
-                    // println!("throughput OUT {:?}", state.throughput);
                 }
                 Ok(())
             })
