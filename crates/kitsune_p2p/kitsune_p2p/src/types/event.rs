@@ -210,7 +210,7 @@ pub struct MetricRecord {
     pub kind: MetricRecordKind,
 
     /// agent associated with this metric (if applicable)
-    pub agent: Option<Arc<super::KitsuneAgent>>,
+    pub agent: Option<KAgent>,
 
     /// timestamp this metric was recorded at
     pub recorded_at_utc: Timestamp,
