@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221109.012313
+
+## [holochain\_cli-0.0.67](crates/holochain_cli/CHANGELOG.md#0.0.67)
+
+## [holochain\_cli\_sandbox-0.0.63](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.63)
+
+## [holochain\_cli\_bundle-0.0.62](crates/holochain_cli_bundle/CHANGELOG.md#0.0.62)
+
+## [holochain-0.0.172](crates/holochain/CHANGELOG.md#0.0.172)
+
+- BREAKING CHANGE - Update wasmer crate dependency [\#1620](https://github.com/holochain/holochain/pull/1620)
+
+## [holochain\_test\_wasm\_common-0.0.61](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.61)
+
+## [holochain\_conductor\_api-0.0.69](crates/holochain_conductor_api/CHANGELOG.md#0.0.69)
+
+## [holochain\_wasm\_test\_utils-0.0.68](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.68)
+
+## [holochain\_cascade-0.0.71](crates/holochain_cascade/CHANGELOG.md#0.0.71)
+
+## [holochain\_state-0.0.69](crates/holochain_state/CHANGELOG.md#0.0.69)
+
+## [holochain\_p2p-0.0.66](crates/holochain_p2p/CHANGELOG.md#0.0.66)
+
+## [holochain\_types-0.0.66](crates/holochain_types/CHANGELOG.md#0.0.66)
+
+## [holochain\_keystore-0.0.64](crates/holochain_keystore/CHANGELOG.md#0.0.64)
+
+## [holochain\_sqlite-0.0.63](crates/holochain_sqlite/CHANGELOG.md#0.0.63)
+
+## [hdk-0.0.160](crates/hdk/CHANGELOG.md#0.0.160)
+
+## [holochain\_zome\_types-0.0.55](crates/holochain_zome_types/CHANGELOG.md#0.0.55)
+
+**BREAKING CHANGE**: Rename `AuthorizeZomeCallSigningKey` to `GrantZomeCallCapability` & remove parameter `provenance`. [\#1647](https://github.com/holochain/holochain/pull/1647)
+
+## [hdi-0.1.8](crates/hdi/CHANGELOG.md#0.1.8)
+
+## [hdk\_derive-0.0.54](crates/hdk_derive/CHANGELOG.md#0.0.54)
+
 # 20221103.145333
 
 ## [holochain\_cli-0.0.66](crates/holochain_cli/CHANGELOG.md#0.0.66)
