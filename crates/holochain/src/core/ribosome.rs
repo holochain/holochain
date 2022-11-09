@@ -750,7 +750,7 @@ pub mod wasm_test {
             .unwrap();
 
         // The call should fail for bob.
-        let bob_call_result = conductor.handle().call_zome(bob_signed_zome_call).await;
+        let bob_call_result = conductor.raw_handle().call_zome(bob_signed_zome_call).await;
 
         match bob_call_result {
             Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* (☞ ͡° ͜ʖ ͡°)☞ */
@@ -760,7 +760,7 @@ pub mod wasm_test {
 
         // The call should NOT fail for alice (e.g. bob's forgery should not consume alice's nonce).
         let alice_call_result_0 = conductor
-            .handle()
+            .raw_handle()
             .call_zome(alice_signed_zome_call.clone())
             .await;
 
@@ -770,7 +770,10 @@ pub mod wasm_test {
         }
 
         // The same call cannot be used a second time.
-        let alice_call_result_1 = conductor.handle().call_zome(alice_signed_zome_call).await;
+        let alice_call_result_1 = conductor
+            .raw_handle()
+            .call_zome(alice_signed_zome_call)
+            .await;
 
         match alice_call_result_1 {
             Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* ☜(ﾟヮﾟ☜) */ }
