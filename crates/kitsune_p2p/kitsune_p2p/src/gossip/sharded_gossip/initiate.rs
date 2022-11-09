@@ -157,7 +157,6 @@ impl ShardedGossipLocal {
             .await?;
 
         self.inner.share_mut(|inner, _| {
-            inner.round_map.insert(peer_cert.clone(), state);
             // If this is not the target we are accepting
             // then record it as a remote round.
             if inner
@@ -165,11 +164,14 @@ impl ShardedGossipLocal {
                 .as_ref()
                 .map_or(true, |tgt| tgt.cert != peer_cert)
             {
-                inner
-                    .metrics
-                    .write()
-                    .record_remote_round(&remote_agent_list, self.gossip_type.into());
+                let mut metrics = inner.metrics.write();
+
+                metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
+                metrics.record_accept(&remote_agent_list, self.gossip_type.into());
             }
+
+            inner.round_map.insert(peer_cert.clone(), state);
+
             // If this is the target then we should clear the when initiated timeout.
             if let Some(tgt) = inner.initiate_tgt.as_mut() {
                 if tgt.cert == peer_cert {
@@ -223,12 +225,18 @@ impl ShardedGossipLocal {
                 let bloom = encode_bloom_filter(&bloom);
                 gossip.push(ShardedGossipWire::agents(bloom));
             }
+
+            // we consider recent gossip to have "sent its region"
+            // for purposes of determining the round is complete
+            state.regions_are_queued = true;
+
             self.next_bloom_batch(state, gossip).await
         } else {
             // Everything has already been taken care of for Historical
             // gossip already. Just mark this true so that the state will not
             // be considered "finished" until all op data is received.
             state.has_pending_historical_op_data = true;
+            state.regions_are_queued = false;
             Ok(state)
         }
     }
