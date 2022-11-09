@@ -238,6 +238,9 @@ mod tests {
 
     #[test]
     fn custom_quantum_time() {
-        assert_eq!(Dimension::standard_time(), Dimension::time(STANDARD_QUANTUM_TIME));
+        assert_eq!(
+            Dimension::standard_time(),
+            Dimension::time(STANDARD_QUANTUM_TIME)
+        );
     }
 }
