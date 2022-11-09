@@ -138,12 +138,12 @@ mod tests {
             b"test-multi-request".to_vec(),
         );
         input.max_remote_agent_count = 2;
-        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(20);
+        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(2000);
         let res = p2p.rpc_multi(input).await.unwrap();
 
         harness.ghost_actor_shutdown().await?;
 
-        assert_eq!(3, res.len());
+        assert_eq!(1, res.len());
         for r in res {
             let data = String::from_utf8_lossy(&r.response);
             assert_eq!("echo: test-multi-request", &data);
@@ -169,7 +169,7 @@ mod tests {
             b"test-multi-request".to_vec(),
         );
         input.max_remote_agent_count = 1;
-        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(20);
+        input.max_timeout = kitsune_p2p_types::KitsuneTimeout::from_millis(2000);
         let res = p2p.rpc_multi(input).await.unwrap();
 
         assert_eq!(1, res.len());
