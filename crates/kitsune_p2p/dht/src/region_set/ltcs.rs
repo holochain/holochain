@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use once_cell::sync::OnceCell;
 
 use crate::{
@@ -69,7 +71,12 @@ impl RegionCoordSetLtcs {
                     .collect::<Result<Vec<Vec<D>>, E>>()
             })
             .collect::<Result<Vec<Vec<Vec<D>>>, E>>()?;
-        Ok(RegionSetLtcs::from_data(self, data))
+        let set = RegionSetLtcs {
+            coords: self,
+            data,
+            _region_coords: OnceCell::new(),
+        };
+        Ok(set)
     }
 
     /// Generate data for each coord in the set, creating the corresponding [`RegionSetLtcs`],
@@ -147,16 +154,6 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         }
     }
 
-    /// Construct the region set from existing data.
-    /// The data must match the coords!
-    pub fn from_data(coords: RegionCoordSetLtcs, data: Vec<Vec<Vec<D>>>) -> Self {
-        Self {
-            coords,
-            data,
-            _region_coords: OnceCell::new(),
-        }
-    }
-
     /// The total number of regions represented in this region set
     pub fn count(&self) -> usize {
         self.data
@@ -206,17 +203,17 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
 
     /// Given two region sets, return only the ones which are different between
     /// the two
-    pub fn diff(mut self, mut other: Self) -> GossipResult<Vec<Region<D>>> {
+    pub fn diff(mut self, mut other: Self) -> GossipResult<RegionDiffs<D>> {
         self.rectify(&mut other)?;
 
-        let regions = self
+        let (ours, theirs) = self
             .regions()
             .into_iter()
             .zip(other.regions().into_iter())
-            .filter_map(|(a, b)| (a.data != b.data).then(|| a))
-            .collect();
+            .filter_map(|(a, b)| (a.data != b.data).then(|| (a, b)))
+            .unzip();
 
-        Ok(regions)
+        Ok(RegionDiffs { ours, theirs })
     }
 
     /// Return only the regions which have ops in them. Useful for testing
@@ -243,6 +240,67 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
     }
 }
 
+#[derive(Clone, Debug)]
+/// The diff of two region sets, from the perspective of both parties
+///
+/// Both sets of regions will have the same coordinates: what's different is the data
+/// in each region. This *could* be expressed a single set of RegionCoords and two
+/// sets of data to go with each coord, but it's not worth the trouble.
+pub struct RegionDiffs<D> {
+    /// The regions that "we" (this node) hold
+    pub ours: Vec<Region<D>>,
+    /// The regions that they (our gossip partner) hold
+    pub theirs: Vec<Region<D>>,
+}
+
+impl<D: RegionDataConstraints> RegionDiffs<D> {
+    /// Pick regions from both sets up until the max_size is reached, skipping locked regions,
+    /// and discard all others
+    pub fn round_limited(self, max_size: u32, locked: HashSet<RegionCoords>) -> Self {
+        Self {
+            ours: Self::round_limited_1(self.ours, max_size, &locked),
+            theirs: Self::round_limited_1(self.theirs, max_size, &locked),
+        }
+    }
+
+    fn round_limited_1(
+        regions: Vec<Region<D>>,
+        max_size: u32,
+        locked: &HashSet<RegionCoords>,
+    ) -> Vec<Region<D>> {
+        use itertools::FoldWhile::{Continue, Done};
+        use itertools::Itertools;
+
+        let (limited, _) = regions
+            .into_iter()
+            .enumerate()
+            .fold_while((vec![], 0), |(mut v, total), (i, r)| {
+                let size = r.data.size();
+                if i == 0 || total + size <= max_size {
+                    if locked.contains(&r.coords) {
+                        Continue((v, total))
+                    } else {
+                        v.push(r);
+                        Continue((v, total + size))
+                    }
+                } else {
+                    Done((v, total))
+                }
+            })
+            .into_inner();
+        limited
+    }
+}
+
+impl<D> Default for RegionDiffs<D> {
+    fn default() -> Self {
+        Self {
+            ours: vec![],
+            theirs: vec![],
+        }
+    }
+}
+
 #[cfg(feature = "test_utils")]
 impl<D: RegionDataConstraints> RegionSetLtcs<D> {
     /// Query the specified OpStore for each coord in the set, constructing
@@ -252,5 +310,84 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         coords: RegionCoordSetLtcs,
     ) -> Self {
         coords.into_region_set_infallible(|(_, coords)| store.query_region_data(&coords))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use num_traits::Zero;
+
+    use super::*;
+
+    #[test]
+    fn test_round_limiting() {
+        let num_coords = 20;
+        let coords = RegionCoordSetLtcs::new(
+            TelescopingTimes::new(1.into()),
+            ArqBoundsSet::new(vec![ArqBounds::new(8, 0.into(), num_coords.into())]),
+        );
+        assert_eq!(coords.count(), num_coords as usize);
+
+        let a = coords.clone().into_region_set_infallible(|_| RegionData {
+            count: 1,
+            size: 100,
+            hash: Zero::zero(),
+        });
+        let b = coords.clone().into_region_set_infallible(|_| RegionData {
+            count: 1,
+            size: 200,
+            hash: Zero::zero(),
+        });
+        let diffs = a.diff(b).unwrap();
+
+        {
+            let diffs_1k = diffs.clone().round_limited(1000, HashSet::new());
+            assert_eq!(diffs_1k.ours.len(), 10);
+            assert_eq!(diffs_1k.theirs.len(), 5);
+            assert_eq!(diffs_1k.ours.iter().map(|r| r.data.size).sum::<u32>(), 1000);
+            assert_eq!(
+                diffs_1k.theirs.iter().map(|r| r.data.size).sum::<u32>(),
+                1000
+            );
+        }
+        {
+            let locked = coords
+                .region_coords_flat()
+                .map(|(_, c)| c)
+                .take(12)
+                .collect();
+            let diffs_1k_locked = diffs.clone().round_limited(1000, locked);
+            assert_eq!(diffs_1k_locked.ours.len(), 8);
+            assert_eq!(diffs_1k_locked.theirs.len(), 5);
+            // - we're constrained by the lack of unlocked regions
+            assert_eq!(
+                diffs_1k_locked
+                    .ours
+                    .iter()
+                    .map(|r| r.data.size)
+                    .sum::<u32>(),
+                800
+            );
+            // - we're still constrained by the size limit
+            assert_eq!(
+                diffs_1k_locked
+                    .theirs
+                    .iter()
+                    .map(|r| r.data.size)
+                    .sum::<u32>(),
+                1000
+            );
+        }
+        {
+            let diffs_5k = diffs.round_limited(5000, HashSet::new());
+            assert_eq!(diffs_5k.ours.len(), 20);
+            assert_eq!(diffs_5k.theirs.len(), 20);
+            assert_eq!(diffs_5k.ours.iter().map(|r| r.data.size).sum::<u32>(), 2000);
+            assert_eq!(
+                diffs_5k.theirs.iter().map(|r| r.data.size).sum::<u32>(),
+                4000
+            );
+        }
     }
 }
