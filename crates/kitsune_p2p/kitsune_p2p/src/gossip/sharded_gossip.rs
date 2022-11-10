@@ -1028,6 +1028,9 @@ impl ShardedGossipLocal {
                     // This is the last chunk in the batch. Reply with [`OpBatchReceived`]
                     // to get the next batch of missing ops.
                     MissingOpsStatus::BatchComplete => {
+                        // TODO: if this is historical gossip and an entire region is complete,
+                        // we can unlock that region for this round. But currently we have no way to associate
+                        // the ops received with the region that they were for.
                         gossip = vec![ShardedGossipWire::op_batch_received()];
                         self.get_state(&peer_cert)?
                     }
