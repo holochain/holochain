@@ -1099,6 +1099,7 @@ dependencies = [
  "futures",
  "gcollections",
  "intervallum",
+ "itertools 0.10.3",
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_timestamp",
  "must_future",

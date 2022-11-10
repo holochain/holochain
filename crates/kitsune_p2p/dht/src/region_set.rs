@@ -62,7 +62,7 @@ impl<D: RegionDataConstraints> RegionSet<D> {
 
     /// Find a set of Regions which represents the intersection of the two
     /// input RegionSets.
-    pub fn diff(self, other: Self) -> GossipResult<Vec<Region<D>>> {
+    pub fn diff(self, other: Self) -> GossipResult<RegionDiffs<D>> {
         match (self, other) {
             (Self::Ltcs(left), Self::Ltcs(right)) => left.diff(right),
         }
@@ -261,7 +261,7 @@ mod tests {
         let rset_b = RegionSetLtcs::from_store(&store2, coords_b);
         assert_ne!(rset_a.data(), rset_b.data());
 
-        let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
+        let diff = rset_a.clone().diff(rset_b.clone()).unwrap().ours;
         dbg!(&diff, &extra_ops);
         assert_eq!(diff.len(), 2);
 
@@ -323,7 +323,7 @@ mod tests {
         let rset_b = RegionSetLtcs::from_store(&store2, coords_b);
         assert_ne!(rset_a.data(), rset_b.data());
 
-        let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
+        let diff = rset_a.clone().diff(rset_b.clone()).unwrap().ours;
         dbg!(&diff, &extra_ops);
         assert_eq!(diff.len(), 2);
 

@@ -1,7 +1,7 @@
 use crate::{
     error::{GossipError, GossipResult},
     persistence::HostAccessTest,
-    prelude::ArqBoundsSet,
+    prelude::{ArqBoundsSet, RegionDiffs},
     region::REGION_MASS,
     spacetime::{Quantum, TimeQuantum},
 };
@@ -75,15 +75,14 @@ pub fn gossip_direct<Peer: HostAccessTest>(
         // ROUND IV: Calculate diffs and send missing ops
 
         // - calculate diffs
-        let diff_left = regions_left.clone().diff(regions_right.clone())?;
-        let diff_right = regions_right.diff(regions_left)?;
+        let RegionDiffs { ours, theirs } = regions_left.clone().diff(regions_right.clone())?;
 
         // - fetch ops
-        let ops_left: Vec<_> = diff_left
+        let ops_left: Vec<_> = ours
             .iter()
             .flat_map(|r| left.query_op_data(&r.coords))
             .collect();
-        let ops_right: Vec<_> = diff_right
+        let ops_right: Vec<_> = theirs
             .iter()
             .flat_map(|r| right.query_op_data(&r.coords))
             .collect();

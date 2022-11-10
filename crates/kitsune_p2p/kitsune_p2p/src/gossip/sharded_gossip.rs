@@ -14,7 +14,7 @@ use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::dht::region::{Region, RegionData};
+use kitsune_p2p_types::dht::region::{RegionCoords, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
@@ -686,14 +686,11 @@ pub struct RoundState {
     region_set_sent: Option<Arc<RegionSetLtcs>>,
     /// Stats about ops, regions, bloom filter, and bytes sent and received,
     pub(crate) throughput: RoundThroughput,
-    /// Region diffs, if doing Historical gossip
-    pub(crate) region_diffs: RegionDiffs,
+    /// If doing Historical gossip, the set of regions I am expecting data for this round.
+    pub(crate) locked_regions: HashSet<RegionCoords>,
     /// Unique string ID for this round
     pub(crate) id: String,
 }
-
-/// Our region diff and their region diff
-pub type RegionDiffs = Option<(Vec<Region>, Vec<Region>)>;
 
 impl RoundState {
     /// Constructor
@@ -717,7 +714,7 @@ impl RoundState {
             round_timeout,
             region_set_sent,
             throughput: Default::default(),
-            region_diffs: Default::default(),
+            locked_regions: Default::default(),
         }
     }
 }

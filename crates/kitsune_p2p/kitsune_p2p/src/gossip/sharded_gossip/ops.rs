@@ -1,6 +1,12 @@
-use kitsune_p2p_types::{combinators::second, dht::region::Region};
+use kitsune_p2p_types::{
+    combinators::second,
+    dht::{region::Region, region_set::RegionDiffs},
+};
 
 use super::*;
+
+/// 64 MiB
+pub const MAX_ROUND_CAPACITY: u32 = 67_108_864;
 
 #[derive(Clone, derive_more::Deref)]
 /// A queue of missing op hashes that have been batched
@@ -104,25 +110,24 @@ impl ShardedGossipLocal {
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
-            // because of the order of arguments, the diff regions will contain the data
-            // from *our* side, not our partner's.
-            let our_region_diff = sent
+            let locked = todo!();
+            let RegionDiffs { ours, theirs } = sent
                 .clone()
                 .diff(region_set.clone())
-                .map_err(KitsuneError::other)?;
-            let their_region_diff = region_set.clone().diff(sent).map_err(KitsuneError::other)?;
+                .map_err(KitsuneError::other)?
+                .round_limited(MAX_ROUND_CAPACITY, locked);
 
             self.inner.share_mut(|i, _| {
                 if let Some(round) = i.round_map.get_mut(peer_cert) {
                     round.throughput.expected_op_bytes.outgoing +=
-                        our_region_diff.iter().map(|r| r.data.size).sum::<u32>();
+                        ours.iter().map(|r| r.data.size).sum::<u32>();
                     round.throughput.expected_op_count.outgoing +=
-                        our_region_diff.iter().map(|r| r.data.count).sum::<u32>();
+                        ours.iter().map(|r| r.data.count).sum::<u32>();
                     round.throughput.expected_op_bytes.incoming +=
-                        their_region_diff.iter().map(|r| r.data.size).sum::<u32>();
+                        theirs.iter().map(|r| r.data.size).sum::<u32>();
                     round.throughput.expected_op_count.incoming +=
-                        their_region_diff.iter().map(|r| r.data.count).sum::<u32>();
-                    round.region_diffs = Some((our_region_diff.clone(), their_region_diff));
+                        theirs.iter().map(|r| r.data.count).sum::<u32>();
+                    round.locked_regions = theirs.into_iter().map(|r| r.coords).collect();
                     round.regions_are_queued = true;
                     i.metrics.write().update_current_round(
                         peer_cert,
@@ -151,7 +156,7 @@ impl ShardedGossipLocal {
                 .query_size_limited_regions(
                     self.space.clone(),
                     self.tuning_params.gossip_max_batch_size,
-                    our_region_diff,
+                    ours,
                 )
                 .await
                 .map_err(KitsuneError::other)?;

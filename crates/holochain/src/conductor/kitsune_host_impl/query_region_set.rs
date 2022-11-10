@@ -162,7 +162,7 @@ mod tests {
             .await
             .unwrap();
 
-        let diff = regions.diff(regions_empty).unwrap();
+        let diff = regions.diff(regions_empty).unwrap().ours;
         {
             let sum: RegionData = diff.into_iter().map(|r| r.data).sum();
             assert_eq!(sum.count, num as u32);
