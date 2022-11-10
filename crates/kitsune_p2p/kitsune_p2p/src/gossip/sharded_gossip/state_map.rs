@@ -75,6 +75,14 @@ impl RoundStateMap {
         std::mem::take(&mut self.timed_out)
     }
 
+    /// Get the set of all locked regions for all rounds
+    pub fn locked_regions(&self) -> HashSet<RegionCoords> {
+        self.map
+            .values()
+            .flat_map(|r| r.locked_regions.clone())
+            .collect()
+    }
+
     /// Touch a round to reset its timeout.
     fn touch(&mut self, key: &StateKey) {
         if let Some(state) = self.map.get_mut(key) {

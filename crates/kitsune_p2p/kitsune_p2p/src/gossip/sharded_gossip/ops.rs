@@ -5,9 +5,6 @@ use kitsune_p2p_types::{
 
 use super::*;
 
-/// 64 MiB
-pub const MAX_ROUND_CAPACITY: u32 = 67_108_864;
-
 #[derive(Clone, derive_more::Deref)]
 /// A queue of missing op hashes that have been batched
 /// for future processing.
@@ -110,12 +107,15 @@ impl ShardedGossipLocal {
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
-            let locked = todo!();
+            let locked = self
+                .inner
+                .share_ref(|s| Ok(s.round_map.locked_regions()))
+                .unwrap();
             let RegionDiffs { ours, theirs } = sent
                 .clone()
                 .diff(region_set.clone())
                 .map_err(KitsuneError::other)?
-                .round_limited(MAX_ROUND_CAPACITY, locked);
+                .round_limited(self.tuning_params.gossip_max_round_op_bytes, locked);
 
             self.inner.share_mut(|i, _| {
                 if let Some(round) = i.round_map.get_mut(peer_cert) {
