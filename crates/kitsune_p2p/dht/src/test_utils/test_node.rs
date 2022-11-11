@@ -39,10 +39,10 @@ impl TestNode {
     }
 
     /// Get the RegionSet for this node, suitable for gossiping
-    pub fn region_set(&self, arq_set: ArqBoundsSet, now: TimeQuantum) -> RegionSet {
+    pub fn region_set_no_lock(&self, arq_set: ArqBoundsSet, now: TimeQuantum) -> RegionSet {
         let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(now), arq_set);
         coords
-            .into_region_set_infallible(|(_, coords)| self.query_region_data(&coords))
+            .into_region_set_infallible_unlocked(|(_, coords)| self.query_region_data(&coords))
             .into()
     }
 

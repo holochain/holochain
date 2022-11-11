@@ -29,7 +29,7 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
     let mut to_fetch = vec![];
     let mut first = true;
     while let Some(region) = queue.front() {
-        size += region.data.size;
+        size += region.data.size();
         if first || size <= batch_size {
             to_fetch.push(queue.pop_front().unwrap());
             if size > batch_size {
@@ -107,26 +107,34 @@ impl ShardedGossipLocal {
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
-            let locked = self
-                .inner
-                .share_ref(|s| Ok(s.round_map.locked_regions()))
-                .unwrap();
             let RegionDiffs { ours, theirs } = sent
                 .clone()
                 .diff(region_set.clone())
                 .map_err(KitsuneError::other)?
-                .round_limited(self.tuning_params.gossip_max_round_op_bytes, locked);
+                .round_limited(self.tuning_params.gossip_max_round_op_bytes);
 
             self.inner.share_mut(|i, _| {
                 if let Some(round) = i.round_map.get_mut(peer_cert) {
-                    round.throughput.expected_op_bytes.outgoing +=
-                        ours.iter().map(|r| r.data.size).sum::<u32>();
-                    round.throughput.expected_op_count.outgoing +=
-                        ours.iter().map(|r| r.data.count).sum::<u32>();
-                    round.throughput.expected_op_bytes.incoming +=
-                        theirs.iter().map(|r| r.data.size).sum::<u32>();
-                    round.throughput.expected_op_count.incoming +=
-                        theirs.iter().map(|r| r.data.count).sum::<u32>();
+                    round.throughput.expected_op_bytes.outgoing += ours
+                        .iter()
+                        .filter_map(|r| r.data.as_option())
+                        .map(|d| d.size)
+                        .sum::<u32>();
+                    round.throughput.expected_op_count.outgoing += ours
+                        .iter()
+                        .filter_map(|r| r.data.as_option())
+                        .map(|d| d.count)
+                        .sum::<u32>();
+                    round.throughput.expected_op_bytes.incoming += theirs
+                        .iter()
+                        .filter_map(|r| r.data.as_option())
+                        .map(|d| d.size)
+                        .sum::<u32>();
+                    round.throughput.expected_op_count.incoming += theirs
+                        .iter()
+                        .filter_map(|r| r.data.as_option())
+                        .map(|d| d.count)
+                        .sum::<u32>();
                     round.locked_regions = theirs.into_iter().map(|r| r.coords).collect();
                     round.regions_are_queued = true;
                     i.metrics.write().update_current_round(

@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use kitsune_p2p_types::dht::{
     prelude::Segment,
-    region::{Region, RegionCoords, RegionData},
+    region::{Region, RegionCell, RegionCoords, RegionData},
 };
 
 use crate::gossip::sharded_gossip::ops::get_region_queue_batch;
@@ -13,11 +13,11 @@ fn fake_region(count: u32, size: u32) -> Region {
             space: Segment::new(0, 0),
             time: Segment::new(0, 0),
         },
-        data: RegionData {
+        data: RegionCell::Data(RegionData {
             hash: [0; 32].into(),
             count,
             size,
-        },
+        }),
     }
 }
 
@@ -26,7 +26,7 @@ fn test_region_queue() {
     fn run(queue: &mut VecDeque<Region>, batch_size: u32) -> Vec<u32> {
         get_region_queue_batch(queue, batch_size)
             .into_iter()
-            .map(|r| r.data.size)
+            .map(|r| r.data.size())
             .collect()
     }
 

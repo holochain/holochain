@@ -53,6 +53,7 @@ impl KitsuneHost for StandardResponsesHostApi {
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
+        _locked_regions: HashSet<RegionCoords>,
     ) -> crate::KitsuneHostResult<RegionSetLtcs> {
         async move {
             let arqs = ArqBoundsSet::from_dht_arc_set(
@@ -71,9 +72,9 @@ impl KitsuneHost for StandardResponsesHostApi {
                     size: 1,
                     count: 1,
                 };
-                coords.into_region_set_infallible(|_| data.clone())
+                coords.into_region_set_infallible_unlocked(|_| data.clone())
             } else {
-                coords.into_region_set_infallible(|_| RegionData::zero())
+                coords.into_region_set_infallible_unlocked(|_| RegionData::zero())
             };
             Ok(region_set)
         }

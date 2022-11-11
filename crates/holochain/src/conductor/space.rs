@@ -1,7 +1,11 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
@@ -11,7 +15,7 @@ use holochain_p2p::{
         arq::{power_and_count_from_length, ArqBoundsSet},
         hash::RegionHash,
         prelude::Topology,
-        region::{RegionBounds, RegionData},
+        region::{RegionBounds, RegionCoords, RegionData},
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::TelescopingTimes,
         ArqBounds, ArqStrat,
@@ -399,6 +403,7 @@ impl Spaces {
         dna_hash: &DnaHash,
         topology: Topology,
         dht_arc_set: DhtArcSet,
+        locked_regions: HashSet<RegionCoords>,
     ) -> ConductorResult<RegionSetLtcs> {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
         let max_chunks = ArqStrat::default().max_chunks();
@@ -419,7 +424,7 @@ impl Spaces {
         let db = self.dht_db(dna_hash)?;
         db.async_reader(move |txn| {
             let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
-            Ok(coords_clone.into_region_set(|(_, coords)| {
+            Ok(coords_clone.into_region_set(locked_regions, |(_, coords)| {
                 let bounds = coords.to_bounds(&topology);
                 let (x0, x1) = bounds.x;
                 let (t0, t1) = bounds.t;

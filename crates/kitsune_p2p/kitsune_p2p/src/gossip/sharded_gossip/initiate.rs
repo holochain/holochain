@@ -203,10 +203,12 @@ impl ShardedGossipLocal {
         let common_arc_set = Arc::new(arc_set.intersection(&remote_arc_set));
 
         let region_set = if let GossipType::Historical = self.gossip_type {
+            let locked_regions = self.inner.share_ref(|s| Ok(s.round_map.locked_regions()))?;
             let region_set = store::query_region_set(
                 self.host_api.clone(),
                 self.space.clone(),
                 common_arc_set.clone(),
+                locked_regions,
             )
             .await?;
             gossip.push(ShardedGossipWire::op_regions(region_set.clone()));

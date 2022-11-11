@@ -2,6 +2,7 @@
 
 #![allow(clippy::unit_arg)]
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
@@ -14,6 +15,7 @@ use kitsune_p2p_types::dht::hash::RegionHash;
 use kitsune_p2p_types::dht::prelude::{
     array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetLtcs, RegionData,
 };
+use kitsune_p2p_types::dht::region::RegionCoords;
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, TimeQuantum};
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
 use kitsune_p2p_types::*;
@@ -91,6 +93,7 @@ impl KitsuneHost for SwitchboardEventHandler {
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<dht_arc::DhtArcSet>,
+        _locked_regions: HashSet<RegionCoords>,
     ) -> crate::KitsuneHostResult<dht::region_set::RegionSetLtcs> {
         async move {
             let topo = self.get_topology(space).await?;
@@ -105,7 +108,10 @@ impl KitsuneHost for SwitchboardEventHandler {
             let times =
                 TelescopingTimes::new(TimeQuantum::from_timestamp(&self.sb.topology, current));
             let coord_set = RegionCoordSetLtcs::new(times, arq_set);
-            coord_set.into_region_set(|(_, coords)| {
+
+            // XXX: region locking is not implemented for the switchboard
+            let locked_regions = Default::default();
+            coord_set.into_region_set(locked_regions, |(_, coords)| {
                 let bounds = coords.to_bounds(&self.sb.topology);
                 let RegionBounds {
                     x: (x0, x1),
@@ -114,16 +120,6 @@ impl KitsuneHost for SwitchboardEventHandler {
                 let ops: Vec<_> = self.sb.share(|sb| {
                     let all_ops = &sb.ops;
                     let node_ops = &sb.nodes;
-
-                    // let held: Vec<Loc8> = sb
-                    // .nodes
-                    // .get(&self.node)
-                    // .unwrap()
-                    // .ops
-                    // .iter()
-                    // .filter(|(_, o)| o.is_integrated)
-                    // .map(|(loc8, _)| loc8)
-                    // .collect();
 
                     all_ops
                         .iter()

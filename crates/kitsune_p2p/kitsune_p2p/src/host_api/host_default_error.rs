@@ -126,6 +126,7 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
+        _locked_regions: HashSet<RegionCoords>,
     ) -> KitsuneHostResult<RegionSetLtcs> {
         KitsuneHostDefaultError::query_region_set(self, space, dht_arc_set)
     }
