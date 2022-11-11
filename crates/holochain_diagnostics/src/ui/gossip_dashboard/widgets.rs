@@ -21,6 +21,17 @@ pub fn ui_node_list(nodes: impl Iterator<Item = (usize, bool)>) -> List<'static>
     .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
 }
 
+pub fn ui_throughput_summary(sums: Vec<u32>) -> List<'static> {
+    let sums = sums.into_iter().map(|s| s.human_count_bytes().to_string());
+    List::new(
+        ["<G>".to_string()]
+            .into_iter()
+            .chain(sums)
+            .map(ListItem::new)
+            .collect::<Vec<_>>(),
+    )
+}
+
 pub fn ui_gossip_progress_gauge(throughput: RoundThroughput) -> Gauge<'static> {
     let n = throughput.op_bytes.incoming;
     let d = throughput.expected_op_bytes.incoming;

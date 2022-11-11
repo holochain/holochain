@@ -7,6 +7,7 @@ use tui::{
 pub(super) struct UiLayout {
     pub node_list: Rect,
     pub basis_table: Rect,
+    pub throughput_summary: Rect,
     pub table_extras: Rect,
     pub gauges: Vec<Rect>,
     pub bottom: Rect,
@@ -33,6 +34,7 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
             [
                 Constraint::Length(list_len),
                 Constraint::Length(table_len),
+                Constraint::Length(8),
                 Constraint::Length(16),
             ]
             .as_ref(),
@@ -48,7 +50,8 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
 
     let node_list = top_chunks[0];
     let basis_table = top_chunks[1];
-    let table_extras = top_chunks[2];
+    let throughput_summary = top_chunks[2];
+    let table_extras = top_chunks[3];
     let mut bottom = vsplit[1];
 
     bottom.y += 1;
@@ -76,6 +79,7 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
     UiLayout {
         node_list,
         basis_table,
+        throughput_summary,
         table_extras,
         gauges,
         bottom,
