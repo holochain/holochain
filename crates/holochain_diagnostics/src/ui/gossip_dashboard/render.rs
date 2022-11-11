@@ -10,15 +10,18 @@ impl GossipDashboard {
                 .iter()
                 .map(|n| (n.diagnostics.metrics.read(), n.cert.clone()))
                 .collect();
-            let activity = metrics
-                .iter()
-                .map(|(metrics, _)| !state.node_rounds_sorted(metrics).currents.is_empty())
-                .enumerate();
-            f.render_stateful_widget(
-                widgets::ui_node_list(activity),
-                layout.node_list,
-                &mut local.node_list_state,
-            );
+
+            {
+                let activity = metrics
+                    .iter()
+                    .map(|(metrics, _)| !state.node_rounds_sorted(metrics).currents.is_empty())
+                    .enumerate();
+                f.render_stateful_widget(
+                    widgets::ui_node_list(activity),
+                    layout.node_list,
+                    &mut local.node_list_state,
+                );
+            }
             f.render_widget(
                 widgets::ui_basis_table(self.refresh_rate * 4, state.link_counts())
                     .block(Block::default().borders(Borders::union(Borders::LEFT, Borders::RIGHT)))
@@ -27,6 +30,31 @@ impl GossipDashboard {
                     .widths(&vec![Constraint::Length(3); state.num_bases()]),
                 layout.basis_table,
             );
+
+            {
+                let sums = metrics
+                    .iter()
+                    .map(|(metrics, _)| {
+                        let rounds = state.node_rounds_sorted(metrics);
+                        let completed_bytes: u32 = rounds
+                            .completed
+                            .iter()
+                            .map(|(_, r)| r.throughput.op_bytes.incoming)
+                            .sum();
+                        let current_bytes: u32 = rounds
+                            .currents
+                            .iter()
+                            .map(|(_, r)| r.throughput.op_bytes.incoming)
+                            .sum();
+                        completed_bytes + current_bytes
+                    })
+                    .collect();
+                f.render_widget(
+                    widgets::ui_throughput_summary(sums),
+                    layout.throughput_summary,
+                );
+            }
+
             let selected = local.selected_node();
             if selected.is_none() {
                 f.render_widget(widgets::ui_keymap(), layout.bottom);
