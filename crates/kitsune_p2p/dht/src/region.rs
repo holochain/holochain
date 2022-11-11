@@ -15,9 +15,11 @@
 //! Regions represents the union of those two Regions. The sum of hashes is defined
 //! as the XOR of hashes, which allows this compatibility.
 
+mod region_cell;
 mod region_coords;
 mod region_data;
 
+pub use region_cell::*;
 pub use region_coords::*;
 pub use region_data::*;
 
@@ -34,7 +36,7 @@ pub struct Region<D = RegionData> {
     /// The coords
     pub coords: RegionCoords,
     /// The data
-    pub data: D,
+    pub data: RegionCell<D>,
 }
 
 impl<D: RegionDataConstraints> Region<D> {}

@@ -10,6 +10,7 @@ use crate::event::{
 use crate::types::event::KitsuneP2pEventSender;
 use crate::HostApi;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dht::region::RegionCoords;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
@@ -264,9 +265,10 @@ pub(super) async fn query_region_set<'a>(
     host_api: HostApi,
     space: Arc<KitsuneSpace>,
     common_arc_set: Arc<DhtArcSet>,
+    locked_regions: HashSet<RegionCoords>,
 ) -> KitsuneResult<RegionSetLtcs> {
     host_api
-        .query_region_set(space, common_arc_set)
+        .query_region_set(space, common_arc_set, locked_regions)
         .await
         .map_err(KitsuneError::other)
 }

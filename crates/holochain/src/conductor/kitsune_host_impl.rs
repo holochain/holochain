@@ -3,13 +3,13 @@
 mod query_region_set;
 mod query_size_limited_regions;
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use super::{ribosome_store::RibosomeStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
 use holochain_p2p::{
-    dht::{spacetime::Topology, ArqStrat},
+    dht::{region::RegionCoords, spacetime::Topology, ArqStrat},
     DnaHashExt,
 };
 use holochain_types::{db::PermittedConn, prelude::DnaError, share::RwShare};
@@ -102,14 +102,20 @@ impl KitsuneHost for KitsuneHostImpl {
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         dht_arc_set: Arc<holochain_p2p::dht_arc::DhtArcSet>,
+        locked_regions: HashSet<RegionCoords>,
     ) -> KitsuneHostResult<holochain_p2p::dht::region_set::RegionSetLtcs> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
             let topology = self.get_topology(space.clone()).await?;
             let db = self.spaces.dht_db(&dna_hash)?;
-            let region_set =
-                query_region_set::query_region_set(db, topology.clone(), &self.strat, dht_arc_set)
-                    .await?;
+            let region_set = query_region_set::query_region_set(
+                db,
+                topology.clone(),
+                &self.strat,
+                dht_arc_set,
+                locked_regions,
+            )
+            .await?;
             Ok(region_set)
         }
         .boxed()

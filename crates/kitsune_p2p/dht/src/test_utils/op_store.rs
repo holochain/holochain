@@ -56,9 +56,12 @@ impl<D: RegionDataConstraints, O: OpRegion<D>> AccessOpStore<O, D> for OpStore<O
         &self,
         coords: crate::prelude::RegionCoordSetLtcs,
     ) -> must_future::MustBoxFuture<Result<crate::prelude::RegionSetLtcs<D>, ()>> {
-        async move { coords.into_region_set(|(_, coords)| Ok(self.query_region_data(&coords))) }
-            .boxed()
-            .into()
+        async move {
+            Ok(coords
+                .into_region_set_infallible_unlocked(|(_, coords)| self.query_region_data(&coords)))
+        }
+        .boxed()
+        .into()
     }
 
     fn integrate_ops<Ops: Clone + Iterator<Item = Arc<O>>>(&mut self, ops: Ops) {

@@ -73,10 +73,18 @@ async fn test_region_queries() {
 
     // - Check that we have no ops to begin with
     let region_set = spaces
-        .handle_fetch_op_regions(dna_def.as_hash(), topo.clone(), DhtArcSet::Full)
+        .handle_fetch_op_regions(
+            dna_def.as_hash(),
+            topo.clone(),
+            DhtArcSet::Full,
+            Default::default(),
+        )
         .await
         .unwrap();
-    let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
+    let region_sum: RegionData = region_set
+        .regions()
+        .map(|r| r.data.into_option().unwrap())
+        .sum();
     assert_eq!(region_sum.count as usize, 0);
 
     for _ in 0..NUM_OPS {
@@ -101,12 +109,20 @@ async fn test_region_queries() {
         fill_db(&db, op2);
     }
     let region_set = spaces
-        .handle_fetch_op_regions(dna_def.as_hash(), topo.clone(), DhtArcSet::Full)
+        .handle_fetch_op_regions(
+            dna_def.as_hash(),
+            topo.clone(),
+            DhtArcSet::Full,
+            Default::default(),
+        )
         .await
         .unwrap();
 
     // - Check that the aggregate of all region data matches expectations
-    let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
+    let region_sum: RegionData = region_set
+        .regions()
+        .map(|r| r.data.into_option().unwrap())
+        .sum();
     let hash_sum = ops
         .iter()
         .map(|op| RegionHash::from_vec(op.as_hash().get_raw_39().to_vec()).unwrap())
