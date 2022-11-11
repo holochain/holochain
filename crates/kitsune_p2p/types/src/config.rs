@@ -138,7 +138,7 @@ pub mod tuning_params_struct {
 
         /// The max number of bytes of op data to send in a single message.
         /// Payloads larger than this are split into multiple batches.
-        gossip_max_batch_size: u32 = 16_000_000,
+        gossip_max_batch_size: u32 = 1_000_000,
 
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = true,
@@ -152,8 +152,8 @@ pub mod tuning_params_struct {
         /// what you are doing.
         gossip_single_storage_arc_per_space: bool = false,
 
-        /// Default timeout for rpc single. [Default: 30s]
-        default_rpc_single_timeout_ms: u32 = 1000 * 30,
+        /// Default timeout for rpc single. [Default: 60s]
+        default_rpc_single_timeout_ms: u32 = 1000 * 60,
 
         /// Default agent count for rpc multi. [Default: 3]
         default_rpc_multi_remote_agent_count: u8 = 3,
@@ -186,8 +186,8 @@ pub mod tuning_params_struct {
         concurrent_limit_per_thread: usize = 4096,
 
         /// tx2 quic max_idle_timeout
-        /// [Default: 30 seconds]
-        tx2_quic_max_idle_timeout_ms: u32 = 1000 * 30,
+        /// [Default: 60 seconds]
+        tx2_quic_max_idle_timeout_ms: u32 = 1000 * 60,
 
         /// tx2 pool max connection count
         /// [Default: 4096]
@@ -199,8 +199,8 @@ pub mod tuning_params_struct {
 
         /// tx2 timeout used for passive background operations
         /// like reads / responds.
-        /// [Default: 30 seconds]
-        tx2_implicit_timeout_ms: u32 = 1000 * 30,
+        /// [Default: 60 seconds]
+        tx2_implicit_timeout_ms: u32 = 1000 * 60,
 
         /// tx2 initial connect retry delay
         /// (note, this delay is currenty exponentially backed off--
