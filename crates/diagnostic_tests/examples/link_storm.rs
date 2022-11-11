@@ -24,6 +24,7 @@ const BASES: usize = 1;
 const ENTRY_SIZE: usize = 10_000_000;
 const MAX_COMMITS: usize = 1_000;
 const ENTRIES_PER_COMMIT: u32 = 1;
+const QUANTUM_TIME: Duration = Duration::from_secs(5);
 
 const COMMIT_RATE: Duration = Duration::from_millis(0);
 const GET_RATE: Duration = Duration::from_millis(2000);
@@ -123,8 +124,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 async fn setup_app(mut rng: StdRng) -> App {
     let zome = diagnostic_tests::basic_zome();
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome", zome)).await;
-    let dna =
-        dna.update_modifiers(DnaModifiersOpt::none().with_quantum_time(Duration::from_secs(5)));
+    let dna = dna.update_modifiers(DnaModifiersOpt::none().with_quantum_time(QUANTUM_TIME));
     let bases = (0..BASES)
         .map(|_| ActionHash::from_raw_32(random_bytes(&mut rng, 32).to_vec()).into())
         .collect::<Vec<_>>()

@@ -45,7 +45,7 @@ impl GossipDashboard {
                                     let node = &state.nodes()[node];
                                     let metrics = node.diagnostics.metrics.read();
                                     let histories = state.node_rounds_sorted(&metrics);
-                                    histories.round_regions(round).clone()
+                                    histories.round_regions(round)
                                 });
                                 if let Some((our_diff, their_diff)) = diffs {
                                     s.focus = Focus::Round {

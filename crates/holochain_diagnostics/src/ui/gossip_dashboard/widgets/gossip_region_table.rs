@@ -24,8 +24,8 @@ pub fn gossip_region_table(state: &GossipRegionTableState) -> Table<'static> {
 fn gossip_region_row(region: &Region) -> Row<'static> {
     let cells = [
         format!("{:?}", region.coords),
-        format!("{}", region.data.count.human_count_bare()),
-        format!("{}", region.data.size.human_count_bytes()),
+        format!("{}", region.data.count().human_count_bare()),
+        format!("{}", region.data.size().human_count_bytes()),
         // format!("{:?}", region.data.hash),
     ];
     Row::new(cells)

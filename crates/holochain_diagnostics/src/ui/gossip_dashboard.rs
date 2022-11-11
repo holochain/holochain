@@ -2,7 +2,6 @@
 
 use holochain::prelude::{
     dht::region::Region,
-    gossip::sharded_gossip::RegionDiffs,
     kitsune_p2p::dependencies::{
         kitsune_p2p_proxy,
         kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},
@@ -207,13 +206,14 @@ impl<'a, Id: Clone> NodeRounds<'a, Id> {
 
     /// Get RegionDiffs by index, given that completed rounds
     /// immediately follow current rounds in sequence
-    pub fn round_regions(&self, index: usize) -> &RegionDiffs {
-        let num_current = self.currents.len();
-        if index < num_current {
-            &self.currents[index].1.region_diffs
-        } else {
-            &self.completed[num_current + index].1.region_diffs
-        }
+    pub fn round_regions(&self, _index: usize) -> ! {
+        todo!()
+        // let num_current = self.currents.len();
+        // if index < num_current {
+        //     &self.currents[index].1.region_diffs
+        // } else {
+        //     &self.completed[num_current + index].1.region_diffs
+        // }
     }
 }
 
