@@ -1,14 +1,15 @@
 //! metrics tracked by kitsune_p2p spaces
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
+use kitsune_p2p_types::dht::region::RegionCoords;
 use tokio::time::Instant;
 
 use crate::gossip::sharded_gossip::NodeId;
-use crate::gossip::sharded_gossip::RegionDiffs;
 use crate::gossip::sharded_gossip::RoundState;
 use crate::gossip::sharded_gossip::RoundThroughput;
 use crate::types::event::*;
@@ -168,7 +169,7 @@ pub struct CompletedRound {
     /// This round ended in an error
     pub error: bool,
     /// If historical, the region diffs
-    pub region_diffs: RegionDiffs,
+    pub locked_regions: HashSet<RegionCoords>,
 }
 
 impl CompletedRound {
@@ -192,7 +193,7 @@ pub struct CurrentRound {
     /// Total information sent/received so far
     pub throughput: RoundThroughput,
     /// If historical, the region diffs
-    pub region_diffs: RegionDiffs,
+    pub locked_regions: HashSet<RegionCoords>,
 }
 
 impl CurrentRound {
@@ -204,7 +205,7 @@ impl CurrentRound {
             start_time,
             last_touch: Instant::now(),
             throughput: Default::default(),
-            region_diffs: Default::default(),
+            locked_regions: Default::default(),
         }
     }
 
@@ -212,7 +213,7 @@ impl CurrentRound {
     pub fn update(&mut self, round_state: &RoundState) {
         self.last_touch = Instant::now();
         self.throughput = round_state.throughput.clone();
-        self.region_diffs = round_state.region_diffs.clone();
+        self.locked_regions = round_state.locked_regions.clone();
     }
 
     /// Convert to a CompletedRound
@@ -224,7 +225,7 @@ impl CurrentRound {
             end_time: Instant::now(),
             throughput: self.throughput,
             error,
-            region_diffs: self.region_diffs,
+            locked_regions: self.locked_regions,
         }
     }
 }

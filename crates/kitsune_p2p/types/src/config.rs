@@ -138,7 +138,13 @@ pub mod tuning_params_struct {
 
         /// The max number of bytes of op data to send in a single message.
         /// Payloads larger than this are split into multiple batches.
+        /// [Default: 16MB]
         gossip_max_batch_size: u32 = 16_000_000,
+
+        /// The max number of bytes that will be sent in a single gossip round for
+        /// transmitting op data. Only applies to historical gossip, currently.
+        /// [Default: 64MiB]
+        gossip_max_round_op_bytes: u32 = 67_108_864,
 
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = true,

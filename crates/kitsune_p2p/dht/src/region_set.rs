@@ -14,7 +14,9 @@ pub use ltcs::*;
 
 use crate::{error::GossipResult, spacetime::*};
 
-use crate::region::{Region, RegionBounds, RegionCoords, RegionData, RegionDataConstraints};
+use crate::region::{
+    Region, RegionBounds, RegionCell, RegionCoords, RegionData, RegionDataConstraints,
+};
 
 /// The generic definition of a set of Regions.
 /// The current representation is very specific to our current algorithm,
@@ -62,7 +64,7 @@ impl<D: RegionDataConstraints> RegionSet<D> {
 
     /// Find a set of Regions which represents the intersection of the two
     /// input RegionSets.
-    pub fn diff(self, other: Self) -> GossipResult<Vec<Region<D>>> {
+    pub fn diff(self, other: Self) -> GossipResult<RegionDiffs<D>> {
         match (self, other) {
             (Self::Ltcs(left), Self::Ltcs(right)) => left.diff(right),
         }
@@ -81,7 +83,7 @@ impl RegionSet {
     /// sparse scenarios.
     pub fn nonzero_regions(
         &self,
-    ) -> impl '_ + Iterator<Item = ((usize, usize, usize), RegionCoords, RegionData)> {
+    ) -> impl '_ + Iterator<Item = ((usize, usize, usize), RegionCoords, RegionCell)> {
         match self {
             Self::Ltcs(set) => set.nonzero_regions(),
         }
@@ -148,7 +150,7 @@ mod tests {
         let expected = (8 + 7 + 5) * nt;
         let coords = RegionCoordSetLtcs::new(tt, arqs);
         assert_eq!(coords.count(), expected);
-        let regions = coords.into_region_set_infallible(|_| RegionData::zero());
+        let regions = coords.into_region_set_infallible_unlocked(|_| RegionData::zero());
         assert_eq!(regions.count(), expected);
     }
 
@@ -186,7 +188,7 @@ mod tests {
                 .concat()
                 .concat()
                 .iter()
-                .map(|r| r.count)
+                .map(|r| r.count())
                 .sum::<u32>() as usize,
             nx * nt / 2
         );
@@ -261,7 +263,7 @@ mod tests {
         let rset_b = RegionSetLtcs::from_store(&store2, coords_b);
         assert_ne!(rset_a.data(), rset_b.data());
 
-        let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
+        let diff = rset_a.clone().diff(rset_b.clone()).unwrap().ours;
         dbg!(&diff, &extra_ops);
         assert_eq!(diff.len(), 2);
 
@@ -273,12 +275,12 @@ mod tests {
         // of the store which contains the extra ops over the same region
         // TODO: proptest this
         assert_eq!(
-            diff[0].data.clone() + extra_ops[0].region_data(),
-            store2.query_region_data(&diff[0].coords)
+            diff[0].data.clone() + RegionCell::Data(extra_ops[0].region_data()),
+            RegionCell::Data(store2.query_region_data(&diff[0].coords))
         );
         assert_eq!(
-            diff[1].data.clone() + extra_ops[1].region_data(),
-            store2.query_region_data(&diff[1].coords)
+            diff[1].data.clone() + RegionCell::Data(extra_ops[1].region_data()),
+            RegionCell::Data(store2.query_region_data(&diff[1].coords))
         );
     }
 
@@ -323,7 +325,7 @@ mod tests {
         let rset_b = RegionSetLtcs::from_store(&store2, coords_b);
         assert_ne!(rset_a.data(), rset_b.data());
 
-        let diff = rset_a.clone().diff(rset_b.clone()).unwrap();
+        let diff = rset_a.clone().diff(rset_b.clone()).unwrap().ours;
         dbg!(&diff, &extra_ops);
         assert_eq!(diff.len(), 2);
 
@@ -335,12 +337,12 @@ mod tests {
         // of the store which contains the extra ops over the same region
         // TODO: proptest this
         assert_eq!(
-            (diff[0].data).clone() + extra_ops[0].region_data(),
-            store2.query_region_data(&diff[0].coords)
+            (diff[0].data).clone() + RegionCell::Data(extra_ops[0].region_data()),
+            RegionCell::Data(store2.query_region_data(&diff[0].coords))
         );
         assert_eq!(
-            (diff[1].data).clone() + extra_ops[1].region_data(),
-            store2.query_region_data(&diff[1].coords)
+            (diff[1].data).clone() + RegionCell::Data(extra_ops[1].region_data()),
+            RegionCell::Data(store2.query_region_data(&diff[1].coords))
         );
     }
 }

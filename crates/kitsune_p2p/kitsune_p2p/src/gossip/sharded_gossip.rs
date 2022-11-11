@@ -14,7 +14,7 @@ use governor::RateLimiter;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::dht::region::{Region, RegionData};
+use kitsune_p2p_types::dht::region::{RegionCoords, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
@@ -257,7 +257,7 @@ impl ShardedGossip {
                             state.throughput.op_bloom_bytes.outgoing +=
                                 missing_hashes.size() as u32;
                         }
-                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => {}
+                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => (),
                         ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
                             state.throughput.op_count.outgoing += ops.len() as u32;
                             state.throughput.op_bytes.outgoing +=
@@ -278,7 +278,6 @@ impl ShardedGossip {
                         self.gossip.gossip_type.into(),
                         state,
                     );
-                    // println!("throughput OUT {:?}", state.throughput);
                 }
                 Ok(())
             })
@@ -687,14 +686,11 @@ pub struct RoundState {
     region_set_sent: Option<Arc<RegionSetLtcs>>,
     /// Stats about ops, regions, bloom filter, and bytes sent and received,
     pub(crate) throughput: RoundThroughput,
-    /// Region diffs, if doing Historical gossip
-    pub(crate) region_diffs: RegionDiffs,
+    /// If doing Historical gossip, the set of regions I am expecting data for this round.
+    pub(crate) locked_regions: HashSet<RegionCoords>,
     /// Unique string ID for this round
     pub(crate) id: String,
 }
-
-/// Our region diff and their region diff
-pub type RegionDiffs = Option<(Vec<Region>, Vec<Region>)>;
 
 impl RoundState {
     /// Constructor
@@ -718,7 +714,7 @@ impl RoundState {
             round_timeout,
             region_set_sent,
             throughput: Default::default(),
-            region_diffs: Default::default(),
+            locked_regions: Default::default(),
         }
     }
 }
@@ -1032,6 +1028,9 @@ impl ShardedGossipLocal {
                     // This is the last chunk in the batch. Reply with [`OpBatchReceived`]
                     // to get the next batch of missing ops.
                     MissingOpsStatus::BatchComplete => {
+                        // TODO: if this is historical gossip and an entire region is complete,
+                        // we can unlock that region for this round. But currently we have no way to associate
+                        // the ops received with the region that they were for.
                         gossip = vec![ShardedGossipWire::op_batch_received()];
                         self.get_state(&peer_cert)?
                     }

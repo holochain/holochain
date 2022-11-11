@@ -228,12 +228,15 @@ pub struct DnaGossipInfo {
 pub struct HistoricalGossipThroughput {
     /// Total number of bytes expected to be sent for region data (historical only)
     pub expected_op_bytes: InOut,
+
     /// Total number of ops expected to be sent for region data (historical only)
     pub expected_op_count: InOut,
-    /// Total number of ops sent
-    pub op_count: InOut,
+
     /// Total number of bytes sent for op data
     pub op_bytes: InOut,
+
+    /// Total number of ops sent
+    pub op_count: InOut,
 }
 
 impl From<RoundThroughput> for HistoricalGossipThroughput {

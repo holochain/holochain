@@ -15,9 +15,11 @@
 //! Regions represents the union of those two Regions. The sum of hashes is defined
 //! as the XOR of hashes, which allows this compatibility.
 
+mod region_cell;
 mod region_coords;
 mod region_data;
 
+pub use region_cell::*;
 pub use region_coords::*;
 pub use region_data::*;
 
@@ -30,11 +32,11 @@ pub const REGION_MASS: u32 = std::mem::size_of::<Region<RegionData>>() as u32;
 
 /// The coordinates defining the Region, along with the calculated [`RegionData`]
 #[derive(Debug, Clone, PartialEq, Eq, derive_more::Constructor)]
-pub struct Region<D: RegionDataConstraints = RegionData> {
+pub struct Region<D = RegionData> {
     /// The coords
     pub coords: RegionCoords,
     /// The data
-    pub data: D,
+    pub data: RegionCell<D>,
 }
 
 impl<D: RegionDataConstraints> Region<D> {}

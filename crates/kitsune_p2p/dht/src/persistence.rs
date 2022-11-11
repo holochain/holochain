@@ -57,7 +57,7 @@ pub trait AccessOpStore<O: OpRegion<D>, D: RegionDataConstraints = RegionData>: 
     fn region_set(&self, arq_set: ArqBoundsSet, now: TimeQuantum) -> RegionSet<D> {
         let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(now), arq_set);
         coords
-            .into_region_set_infallible(|(_, coords)| self.query_region_data(&coords))
+            .into_region_set_infallible_unlocked(|(_, coords)| self.query_region_data(&coords))
             .into()
     }
 }

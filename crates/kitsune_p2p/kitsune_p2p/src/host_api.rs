@@ -1,9 +1,13 @@
 use must_future::MustBoxFuture;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
-    dht::{region::Region, region_set::RegionSetLtcs, spacetime::Topology},
+    dht::{
+        region::{Region, RegionCoords},
+        region_set::RegionSetLtcs,
+        spacetime::Topology,
+    },
     dht_arc::DhtArcSet,
 };
 
@@ -34,6 +38,7 @@ pub trait KitsuneHost: 'static + Send + Sync {
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: Arc<DhtArcSet>,
+        locked_regions: HashSet<RegionCoords>,
     ) -> KitsuneHostResult<RegionSetLtcs>;
 
     /// Given an input list of regions, return a list of equal or greater length

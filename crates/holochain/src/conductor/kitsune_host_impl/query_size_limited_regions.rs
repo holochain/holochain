@@ -33,7 +33,7 @@ pub async fn query_size_limited_regions(
                 // partition the set into regions which need to be split, and those which don't
                 let (smalls, bigs): (Vec<_>, Vec<_>) = unchecked
                     .iter()
-                    .partition(|(r, quantum)| *quantum || r.data.size <= size_limit);
+                    .partition(|(r, quantum)| *quantum || r.data.size() <= size_limit);
                 // add the unsplittables to the final set to be returned
                 checked.extend(smalls.into_iter().map(first_ref).cloned());
 
@@ -50,7 +50,7 @@ pub async fn query_size_limited_regions(
                     })
                     .map(|(c, q)| {
                         let data = query_region_data(&mut stmt, &topology, c)?;
-                        DatabaseResult::Ok((Region::new(c, data), q))
+                        DatabaseResult::Ok((Region::new(c, RegionCell::Data(data)), q))
                     })
                     .collect::<Result<Vec<(Region, bool)>, _>>()?;
             }

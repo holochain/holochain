@@ -1,6 +1,9 @@
-use std::sync::{
-    atomic::{AtomicI64, Ordering},
-    Arc,
+use std::{
+    collections::HashSet,
+    sync::{
+        atomic::{AtomicI64, Ordering},
+        Arc,
+    },
 };
 
 use holochain_p2p::{dht::prelude::*, dht_arc::DhtArcSet};
@@ -18,6 +21,7 @@ pub async fn query_region_set(
     topology: Topology,
     strat: &ArqStrat,
     dht_arc_set: Arc<DhtArcSet>,
+    locked_regions: HashSet<RegionCoords>,
 ) -> ConductorResult<RegionSetLtcs> {
     let (arq_set, rounded) = ArqBoundsSet::from_dht_arc_set_rounded(&topology, strat, &dht_arc_set);
     if rounded {
@@ -53,8 +57,9 @@ pub async fn query_region_set(
         .async_reader(move |txn| {
             let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
             let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
-            let regions = coords
-                .into_region_set(|(_, coords)| query_region_data(&mut stmt, &topology, coords))?;
+            let regions = coords.into_region_set(locked_regions, |(_, coords)| {
+                query_region_data(&mut stmt, &topology, coords)
+            })?;
             DatabaseResult::Ok(regions)
         })
         .await?;
@@ -113,11 +118,20 @@ mod tests {
         let strat = ArqStrat::default();
         let arcset = Arc::new(DhtArcSet::Full);
 
-        let regions_empty = query_region_set(db.to_db(), topo.clone(), &strat, arcset.clone())
-            .await
-            .unwrap();
+        let regions_empty = query_region_set(
+            db.to_db(),
+            topo.clone(),
+            &strat,
+            arcset.clone(),
+            Default::default(),
+        )
+        .await
+        .unwrap();
         {
-            let sum: RegionData = regions_empty.regions().map(|r| r.data).sum();
+            let sum: RegionData = regions_empty
+                .regions()
+                .map(|r| r.data.into_option().unwrap())
+                .sum();
             assert_eq!(sum.count, 0);
             assert_eq!(sum.size, 0);
         }
@@ -158,13 +172,16 @@ mod tests {
         })
         .unwrap();
 
-        let regions = query_region_set(db.to_db(), topo, &strat, arcset)
+        let regions = query_region_set(db.to_db(), topo, &strat, arcset, Default::default())
             .await
             .unwrap();
 
-        let diff = regions.diff(regions_empty).unwrap();
+        let diff = regions.diff(regions_empty).unwrap().ours;
         {
-            let sum: RegionData = diff.into_iter().map(|r| r.data).sum();
+            let sum: RegionData = diff
+                .into_iter()
+                .map(|r| r.data.into_option().unwrap())
+                .sum();
             assert_eq!(sum.count, num as u32);
             // 32 bytes is "close enough"
             assert!(wire_bytes as u32 - sum.size < 32 * num as u32);
