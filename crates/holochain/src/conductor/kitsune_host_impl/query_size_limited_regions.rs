@@ -27,10 +27,13 @@ pub async fn query_size_limited_regions(
             let mut unchecked: Vec<(Region, bool)> =
                 regions.into_iter().map(|r| (r, false)).collect();
             let mut checked: Vec<Region> = vec![];
+
             while !unchecked.is_empty() {
                 // partition the set into regions which need to be split, and those which don't
                 let (smalls, bigs): (Vec<_>, Vec<_>) = unchecked
                     .iter()
+                    // If the region is locked, the size is considered 0, so a locked region
+                    // will not be a candidate for quandrisection
                     .partition(|(r, quantum)| *quantum || r.data.size() <= size_limit);
                 // add the unsplittables to the final set to be returned
                 checked.extend(smalls.into_iter().map(first_ref).cloned());

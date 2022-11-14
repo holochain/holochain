@@ -272,6 +272,7 @@ impl ShardedGossip {
                         ShardedGossipWire::Busy(_) => {}
                         ShardedGossipWire::NoAgents(_) => {}
                         ShardedGossipWire::AlreadyInProgress(_) => {}
+                        ShardedGossipWire::ChottoMatte(_) => {}
                     }
                     i.metrics.write().update_current_round(
                         &cert,
@@ -933,6 +934,7 @@ impl ShardedGossipLocal {
                         ShardedGossipWire::Busy(_) => {}
                         ShardedGossipWire::NoAgents(_) => {}
                         ShardedGossipWire::AlreadyInProgress(_) => {}
+                        ShardedGossipWire::ChottoMatte(_) => {}
                     }
 
                     i.metrics.write().update_current_round(
@@ -1092,6 +1094,11 @@ impl ShardedGossipLocal {
             ShardedGossipWire::Busy(_) => {
                 tracing::warn!("The node {:?} is busy", peer_cert);
                 self.remove_target(&peer_cert, true)?;
+                Vec::with_capacity(0)
+            }
+            ShardedGossipWire::ChottoMatte(_) => {
+                tracing::warn!("The node {:?} needs a moment before proceeding", peer_cert);
+                self.remove_target(&peer_cert, false)?;
                 Vec::with_capacity(0)
             }
             ShardedGossipWire::Error(Error { message }) => {
@@ -1330,17 +1337,18 @@ kitsune_p2p_types::write_codec_enum! {
         /// The node currently is gossiping with too many
         /// other nodes and is too busy to accept your initiate.
         /// Please try again later.
-        Busy(0xa1) {
-        },
+        Busy(0xa1) { },
 
         /// The node you are trying to gossip with has no agents anymore.
-        NoAgents(0xa2) {
-        },
+        NoAgents(0xa2) { },
 
         /// You have sent a stale initiate to a node
         /// that already has an active round with you.
-        AlreadyInProgress(0xa3) {
-        },
+        AlreadyInProgress(0xa3) { },
+
+        /// Similar to Busy, but does not imply an error. This just means "I am not ready
+        /// right now, but if you come back in a moment I probably will be."
+        ChottoMatte(0xa4) { },
     }
 }
 
@@ -1364,11 +1372,23 @@ impl AsGossipModule for ShardedGossip {
                 );
             }
             // If we are overloaded then return busy to any new initiates.
-            if overloaded && new_initiate {
+            if new_initiate && overloaded {
                 i.push_outgoing([(
                     con.peer_cert(),
                     HowToConnect::Con(con, remote_url),
                     ShardedGossipWire::busy(),
+                )]);
+            } else if new_initiate
+                && self
+                    .gossip
+                    .inner
+                    .share_ref(|i| Ok(i.round_map.negotiating_region_diff()))?
+            {
+                tracing::warn!("peer {:?} says chotto matte!", con.peer_cert());
+                i.push_outgoing([(
+                    con.peer_cert(),
+                    HowToConnect::Con(con, remote_url),
+                    ShardedGossipWire::chotto_matte(),
                 )]);
             } else {
                 i.push_incoming([(con, remote_url, gossip, bytes as usize)]);

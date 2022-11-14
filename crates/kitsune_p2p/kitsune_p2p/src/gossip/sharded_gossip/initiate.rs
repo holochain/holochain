@@ -204,6 +204,7 @@ impl ShardedGossipLocal {
 
         let region_set = if let GossipType::Historical = self.gossip_type {
             let locked_regions = self.inner.share_ref(|s| Ok(s.round_map.locked_regions()))?;
+            tracing::info!("num locked regions: {}", locked_regions.len());
             let region_set = store::query_region_set(
                 self.host_api.clone(),
                 self.space.clone(),

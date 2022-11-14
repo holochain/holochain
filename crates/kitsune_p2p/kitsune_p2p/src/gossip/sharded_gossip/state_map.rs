@@ -83,6 +83,16 @@ impl RoundStateMap {
             .collect()
     }
 
+    /// Are there any historical rounds which have begun but have not yet calculated
+    /// the region diff and hence the locked regions?
+    ///
+    /// This check is useful because we want to turn away new historic gossip requests
+    /// while this negotiation is happening, so that we don't have a race condition
+    /// for region locking
+    pub fn negotiating_region_diff(&self) -> bool {
+        self.map.values().any(|r| !r.regions_are_queued)
+    }
+
     /// Touch a round to reset its timeout.
     fn touch(&mut self, key: &StateKey) {
         if let Some(state) = self.map.get_mut(key) {

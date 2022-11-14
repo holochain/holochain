@@ -219,7 +219,8 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
             .regions()
             .into_iter()
             .zip(other.regions().into_iter())
-            .filter_map(|(a, b)| (a.data != b.data).then(|| (a, b)))
+            // Any regions which are declared locked, or which match perfectly, are excluded
+            .filter(|(a, b)| !(a.data.is_locked() || b.data.is_locked() || a.data == b.data))
             .unzip();
 
         Ok(RegionDiffs { ours, theirs })

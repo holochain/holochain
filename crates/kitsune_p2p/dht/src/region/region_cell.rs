@@ -34,6 +34,11 @@ impl<D: RegionDataConstraints> RegionCell<D> {
         }
     }
 
+    /// This region is locked
+    pub fn is_locked(&self) -> bool {
+        *self == Self::Locked
+    }
+
     /// Get the op count for this region, or zero if locked
     pub fn count(&self) -> u32 {
         match self {
