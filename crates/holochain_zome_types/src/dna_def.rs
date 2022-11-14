@@ -54,6 +54,7 @@ pub struct DnaModifiers {
     pub quantum_time: Duration,
 }
 
+#[cfg(feature = "full-dna-def")]
 const fn standard_quantum_time() -> Duration {
     kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME
 }
