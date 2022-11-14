@@ -32,7 +32,7 @@ use tokio::time::Instant;
 pub use self::bandwidth::BandwidthThrottle;
 use self::ops::OpsBatchQueue;
 use self::state_map::RoundStateMap;
-use crate::metrics::MetricsSync;
+use crate::metrics::{MetricsSync, RoundOutcome};
 
 use super::{HowToConnect, MetaOpKey};
 
@@ -532,16 +532,20 @@ impl ShardedGossipLocalState {
         let r = self.round_map.remove(state_key);
         let mut metrics = self.metrics.write();
         if let Some(r) = &r {
-            if error {
-                metrics.record_error(&r.remote_agent_list, gossip_type.into());
+            let outcome = if error {
+                RoundOutcome::Error
+            } else if r.locked_regions.is_empty() {
+                RoundOutcome::SuccessComplete
             } else {
-                metrics.record_success(&r.remote_agent_list, gossip_type.into());
-            }
-        } else if init_tgt && error {
-            metrics.record_error(&remote_agent_list, gossip_type.into());
+                RoundOutcome::SuccessPartial
+            };
+            metrics.record_completion(&r.remote_agent_list, gossip_type.into(), outcome);
+            metrics.complete_current_round(state_key, outcome);
+        } else if init_tgt {
+            metrics.record_completion(&remote_agent_list, gossip_type.into(), RoundOutcome::Error);
+            metrics.complete_current_round(state_key, RoundOutcome::Error);
         }
 
-        metrics.complete_current_round(state_key, error);
         r
     }
 
@@ -560,15 +564,19 @@ impl ShardedGossipLocalState {
                     tracing::error!("Tgt expired {:?}", cert);
                     {
                         let mut metrics = self.metrics.write();
-                        metrics.complete_current_round(&cert, true);
-                        metrics.record_error(remote_agent_list, gossip_type.into());
+                        metrics.complete_current_round(&cert, RoundOutcome::Error);
+                        metrics.record_completion(
+                            remote_agent_list,
+                            gossip_type.into(),
+                            RoundOutcome::Error,
+                        );
                     }
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
                     {
                         let mut metrics = self.metrics.write();
-                        metrics.complete_current_round(&cert, true);
+                        metrics.complete_current_round(&cert, RoundOutcome::Error);
                     }
                     self.initiate_tgt = None;
                 }
@@ -819,9 +827,11 @@ impl ShardedGossipLocal {
             {
                 let initiate_tgt = i.initiate_tgt.take().unwrap();
                 if error {
-                    i.metrics
-                        .write()
-                        .record_error(&initiate_tgt.remote_agent_list, self.gossip_type.into());
+                    i.metrics.write().record_completion(
+                        &initiate_tgt.remote_agent_list,
+                        self.gossip_type.into(),
+                        RoundOutcome::Error,
+                    );
                 }
             }
             Ok(())
@@ -1132,8 +1142,12 @@ impl ShardedGossipLocal {
                 for (cert, ref r) in i.round_map.take_timed_out_rounds() {
                     tracing::warn!("The node {:?} has timed out their gossip round", cert);
                     let mut metrics = i.metrics.write();
-                    metrics.record_error(&r.remote_agent_list, self.gossip_type.into());
-                    metrics.complete_current_round(&cert, true);
+                    metrics.record_completion(
+                        &r.remote_agent_list,
+                        self.gossip_type.into(),
+                        RoundOutcome::Error,
+                    );
+                    metrics.complete_current_round(&cert, RoundOutcome::Error);
                 }
                 Ok(())
             })

@@ -123,10 +123,8 @@ pub struct PeerAgentHistory {
     pub initiates: VecDeque<RoundMetric>,
     /// Times we recorded initates from this node (we accepted).
     pub accepts: VecDeque<RoundMetric>,
-    /// Times we recorded complete rounds for this node.
-    pub successes: VecDeque<RoundMetric>,
-    /// Times we recorded errors for this node.
-    pub errors: VecDeque<RoundMetric>,
+    /// Times we recorded complete rounds, along with the outcome of that round.
+    pub completions: VecDeque<(RoundOutcome, RoundMetric)>,
     /// Is this node currently in an active round?
     pub current_round: bool,
 }
@@ -166,8 +164,8 @@ pub struct CompletedRound {
     pub end_time: Instant,
     /// Throughput stats
     pub throughput: RoundThroughput,
-    /// This round ended in an error
-    pub error: bool,
+    /// This outcome of this round
+    pub outcome: RoundOutcome,
     /// If historical, the region diffs
     pub locked_regions: HashSet<RegionCoords>,
 }
@@ -217,14 +215,14 @@ impl CurrentRound {
     }
 
     /// Convert to a CompletedRound
-    pub fn completed(self, error: bool) -> CompletedRound {
+    pub fn completed(self, outcome: RoundOutcome) -> CompletedRound {
         CompletedRound {
             id: self.id,
             gossip_type: self.gossip_type,
             start_time: self.start_time,
             end_time: Instant::now(),
             throughput: self.throughput,
-            error,
+            outcome,
             locked_regions: self.locked_regions,
         }
     }
@@ -296,12 +294,27 @@ pub struct Metrics {
 }
 
 /// Outcome of a gossip round.
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+///
+/// NOTE: the order matters!
+#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum RoundOutcome {
-    /// Success outcome
-    Success(RoundMetric),
+    /// Successful outcome with partial data sync
+    SuccessPartial,
+    /// Successful outcome with complete data sync
+    SuccessComplete,
     /// Error outcome
-    Error(RoundMetric),
+    Error,
+}
+
+impl RoundOutcome {
+    /// The outcome was not an error
+    pub fn is_success(&self) -> bool {
+        match self {
+            Self::SuccessComplete => true,
+            Self::SuccessPartial => true,
+            Self::Error => false,
+        }
+    }
 }
 
 /// Accept differing key types
@@ -510,8 +523,12 @@ impl Metrics {
     }
 
     /// Record a gossip round has completed successfully.
-    pub fn record_success<'a, T, I>(&mut self, remote_agent_list: I, gossip_type: GossipModuleType)
-    where
+    pub fn record_completion<'a, T, I>(
+        &mut self,
+        remote_agent_list: I,
+        gossip_type: GossipModuleType,
+        outcome: RoundOutcome,
+    ) where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
     {
@@ -527,9 +544,9 @@ impl Metrics {
                 instant: Instant::now(),
                 gossip_type,
             };
-            record_item(&mut history.successes, round);
+            record_item(&mut history.completions, (outcome, round));
             history.current_round = false;
-            if history.is_initiate_round() {
+            if outcome.is_success() && history.is_initiate_round() {
                 should_dec_force_initiates = true;
             }
         }
@@ -537,36 +554,6 @@ impl Metrics {
         if should_dec_force_initiates {
             self.force_initiates = self.force_initiates.saturating_sub(1);
         }
-
-        tracing::debug!(
-            "recorded success in metrics. force_initiates={}",
-            self.force_initiates
-        );
-    }
-
-    /// Record a gossip round has finished with an error.
-    pub fn record_error<'a, T, I>(&mut self, remote_agent_list: I, gossip_type: GossipModuleType)
-    where
-        T: Into<AgentLike<'a>>,
-        I: IntoIterator<Item = T>,
-    {
-        for agent_info in remote_agent_list {
-            let history = self
-                .agent_history
-                .entry(agent_info.into().agent().clone())
-                .or_default();
-            history.reachability_quotient.push_n(1, 5);
-            let round = RoundMetric {
-                instant: Instant::now(),
-                gossip_type,
-            };
-            record_item(&mut history.errors, round);
-            history.current_round = false;
-        }
-        tracing::debug!(
-            "recorded error in metrics. force_initiates={}",
-            self.force_initiates
-        );
     }
 
     /// Update node-level info about a current round, or create one if it doesn't exist
@@ -617,11 +604,11 @@ impl Metrics {
     }
 
     /// Remove the current round info once it's complete, and put it into the history list
-    pub fn complete_current_round(&mut self, node: &NodeId, error: bool) {
+    pub fn complete_current_round(&mut self, node: &NodeId, outcome: RoundOutcome) {
         let history = self.node_history.entry(node.clone()).or_default();
         let r = history.current_round.take();
         if let Some(r) = r {
-            history.completed_rounds.push_back(r.completed(error))
+            history.completed_rounds.push_back(r.completed(outcome))
         }
     }
 
@@ -631,7 +618,7 @@ impl Metrics {
     }
 
     /// Get the last successful round time.
-    pub fn last_success<'a, T, I>(&self, remote_agent_list: I) -> Option<&RoundMetric>
+    pub fn last_complete_success<'a, T, I>(&self, remote_agent_list: I) -> Option<&RoundMetric>
     where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
@@ -639,7 +626,13 @@ impl Metrics {
         remote_agent_list
             .into_iter()
             .filter_map(|agent_info| self.agent_history.get(agent_info.into().agent()))
-            .filter_map(|info| info.successes.back())
+            .filter_map(|info| {
+                info.completions
+                    .iter()
+                    .rev()
+                    .find(|(outcome, _)| *outcome == RoundOutcome::SuccessComplete)
+            })
+            .map(|(_, r)| r)
             .min_by_key(|r| r.instant)
     }
 
@@ -656,7 +649,10 @@ impl Metrics {
     }
 
     /// What was the last outcome for this node's gossip round?
-    pub fn last_outcome<'a, T, I>(&self, remote_agent_list: I) -> Option<RoundOutcome>
+    pub fn last_outcome<'a, T, I>(
+        &self,
+        remote_agent_list: I,
+    ) -> Option<(RoundOutcome, RoundMetric)>
     where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
@@ -665,16 +661,7 @@ impl Metrics {
         remote_agent_list
             .into_iter()
             .filter_map(|agent_info| self.agent_history.get(agent_info.into().agent()))
-            .map(|info| {
-                [
-                    info.errors.back().map(|x| RoundOutcome::Error(x.clone())),
-                    info.successes
-                        .back()
-                        .map(|x| RoundOutcome::Success(x.clone())),
-                ]
-            })
-            .flatten()
-            .flatten()
+            .filter_map(|info| info.completions.back().cloned())
             .max()
     }
 
@@ -741,6 +728,13 @@ impl PeerAgentHistory {
             (Some(remote), Some(initiate)) => initiate > remote,
         }
     }
+
+    /// Filter the completed metrics by outcome
+    pub fn completions(&self, outcome: RoundOutcome) -> impl Iterator<Item = &RoundMetric> {
+        self.completions
+            .iter()
+            .filter_map(move |(o, r)| (*o == outcome).then(|| r))
+    }
 }
 
 fn record_item<T>(buffer: &mut VecDeque<T>, item: T) {
@@ -763,31 +757,36 @@ impl std::fmt::Display for Metrics {
         let mut complete_rounds = 0;
         let mut min_complete_rounds = usize::MAX;
         for (key, info) in &self.agent_history {
-            let completion_frequency: std::time::Duration =
-                info.successes.iter().map(|i| i.elapsed()).sum();
+            let num_successes = info.completions(RoundOutcome::SuccessComplete).count();
+            let completion_frequency: std::time::Duration = info
+                .completions(RoundOutcome::SuccessComplete)
+                .map(|i| i.elapsed())
+                .sum();
             let completion_frequency = completion_frequency
-                .checked_div(info.successes.len() as u32)
+                .checked_div(num_successes as u32)
                 .unwrap_or_default();
             let last_completion = info
-                .successes
-                .back()
+                .completions(RoundOutcome::SuccessComplete)
+                .last()
                 .map(|i| i.elapsed())
                 .unwrap_or_default();
             average_last_completion += last_completion;
             max_last_completion = max_last_completion.max(last_completion);
             average_completion_frequency += completion_frequency;
-            if !info.successes.is_empty() {
+            if info.completions(RoundOutcome::SuccessComplete).count() > 0 {
                 complete_rounds += 1;
             }
-            min_complete_rounds = min_complete_rounds.min(info.successes.len());
+            min_complete_rounds = min_complete_rounds.min(num_successes);
             if trace {
+                let num_errors = info.completions(RoundOutcome::Error).count();
+                let last_error = info
+                    .completions(RoundOutcome::Error)
+                    .last()
+                    .map(|i| i.elapsed())
+                    .unwrap_or_default();
+
                 write!(f, "\n\t{:?}:", key)?;
-                write!(
-                    f,
-                    "\n\t\tErrors: {}, Last: {:?}",
-                    info.errors.len(),
-                    info.errors.back().map(|i| i.elapsed()).unwrap_or_default()
-                )?;
+                write!(f, "\n\t\tErrors: {}, Last: {:?}", num_errors, last_error)?;
                 write!(
                     f,
                     "\n\t\tInitiates: {}, Last: {:?}",
@@ -806,9 +805,7 @@ impl std::fmt::Display for Metrics {
                 write!(
                     f,
                     "\n\t\tComplete Rounds: {}, Last: {:?}, Average completion Frequency: {:?}",
-                    info.successes.len(),
-                    last_completion,
-                    completion_frequency
+                    num_successes, last_completion, completion_frequency
                 )?;
                 write!(f, "\n\t\tCurrent Round: {:?}", info.current_round)?;
             }
