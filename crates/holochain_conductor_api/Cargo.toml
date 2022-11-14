@@ -25,7 +25,7 @@ structopt = "0.3"
 tracing = "0.1.26"
 thiserror = "1.0.22"
 url2 = "0.0.6"
-holochain_keystore = { version = "0.0.63", path = "../holochain_keystore" }
+holochain_keystore = { version = "0.0.64", path = "../holochain_keystore" }
 
 [dev-dependencies]
 matches = {version = "0.1.8"}

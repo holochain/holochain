@@ -1848,7 +1848,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa14c35079167a5e3f8a33f32c43ab080d33dfd495d99c2f4075441b2e7faa91"
 dependencies = [
  "futures",
- "one_err 0.0.6",
+ "one_err 0.0.7",
  "rmp-serde 1.1.0",
  "rmpv",
  "serde",
@@ -2039,7 +2039,7 @@ dependencies = [
  "num_cpus",
  "observability",
  "once_cell",
- "one_err 0.0.6",
+ "one_err 0.0.7",
  "parking_lot 0.10.2",
  "predicates 1.0.8",
  "pretty_assertions 0.6.1",
@@ -2228,7 +2228,7 @@ dependencies = [
  "lair_keystore",
  "must_future",
  "nanoid 0.4.0",
- "one_err 0.0.6",
+ "one_err 0.0.7",
  "parking_lot 0.11.2",
  "serde",
  "serde_bytes",
@@ -2384,7 +2384,7 @@ dependencies = [
  "mockall 0.10.2",
  "nanoid 0.3.0",
  "observability",
- "one_err 0.0.6",
+ "one_err 0.0.7",
  "parking_lot 0.10.2",
  "pretty_assertions 0.6.1",
  "rand 0.8.5",
@@ -4038,6 +4038,18 @@ name = "once_cell"
 version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f7254b99e31cad77da24b08ebf628882739a608578bb1bcdfc1f9c21260d7c0"
+
+[[package]]
+name = "one_err"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42901c1956c1ef1de5bce4428695aa03505a8e27bd2262173395c804834f44ec"
+dependencies = [
+ "indexmap",
+ "libc",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "one_err"
@@ -5784,7 +5796,7 @@ dependencies = [
  "libsodium-sys-stable",
  "num_cpus",
  "once_cell",
- "one_err 0.0.6",
+ "one_err 0.0.7",
  "parking_lot 0.12.1",
  "tokio",
 ]

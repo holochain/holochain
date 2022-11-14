@@ -402,7 +402,7 @@ pub mod test {
             .await
             .unwrap();
 
-        let msg = AppRequest::ZomeCallInvocation(Box::new(request));
+        let msg = AppRequest::ZomeCall(Box::new(request));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
