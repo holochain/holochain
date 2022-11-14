@@ -75,7 +75,7 @@ pub fn gossip_direct<Peer: HostAccessTest>(
         // ROUND IV: Calculate diffs and send missing ops
 
         // - calculate diffs
-        let RegionDiffs { ours, theirs } = regions_left.clone().diff(regions_right.clone())?;
+        let RegionDiffs { ours, theirs } = regions_left.diff(regions_right)?;
 
         // - fetch ops
         let ops_left: Vec<_> = ours
