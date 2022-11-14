@@ -50,7 +50,7 @@ pub struct DnaModifiers {
     /// The smallest unit of time used for gossip time windows.
     /// You probably don't need to change this.
     #[cfg_attr(feature = "full-dna-def", builder(default = "standard_quantum_time()"))]
-    #[serde(default = "standard_quantum_time")]
+    #[cfg_attr(feature = "full-dna-def", serde(default = "standard_quantum_time"))]
     pub quantum_time: Duration,
 }
 
