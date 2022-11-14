@@ -1,7 +1,6 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use holo_hash::{DhtOpHash, DnaHash};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
@@ -43,8 +42,6 @@ use kitsune_p2p::{
     event::{TimeWindow, TimeWindowInclusive},
     KitsuneP2pConfig,
 };
-use rusqlite::named_params;
-use std::{collections::HashMap, sync::Arc, time::Duration};
 use rusqlite::{named_params, OptionalExtension};
 use tracing::instrument;
 

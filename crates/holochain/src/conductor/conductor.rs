@@ -98,10 +98,9 @@ use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::sql::sql_cell::state_dump;
-use holochain_state::mutations;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::witness_nonce;
 use holochain_state::nonce::WitnessNonceResult;
-use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
@@ -239,33 +238,25 @@ impl Conductor {
 mod startup_shutdown_impls {
     use super::*;
 
-//-----------------------------------------------------------------------------
-/// Methods used by the [ConductorHandle]
-//-----------------------------------------------------------------------------
-impl Conductor {
-    pub(super) async fn witness_nonce_from_calling_agent(
-        &self,
-        agent: AgentPubKey,
-        nonce: IntNonce,
-        expires: Timestamp,
-    ) -> ConductorResult<WitnessNonceResult> {
-        Ok(witness_nonce(
-            &self.spaces.conductor_db,
-            agent,
-            nonce,
-            Timestamp::now(),
-            expires,
-        )
-        .await?)
-    }
-
-    pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
-        let cell = self
-            .cells
-            .share_ref(|c| c.get(cell_id).map(|i| i.cell.clone()))
-            .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-        Ok(cell)
-    }
+    //-----------------------------------------------------------------------------
+    /// Methods used by the [ConductorHandle]
+    //-----------------------------------------------------------------------------
+    impl Conductor {
+        pub(crate) async fn witness_nonce_from_calling_agent(
+            &self,
+            agent: AgentPubKey,
+            nonce: IntNonce,
+            expires: Timestamp,
+        ) -> ConductorResult<WitnessNonceResult> {
+            Ok(witness_nonce(
+                &self.spaces.conductor_db,
+                agent,
+                nonce,
+                Timestamp::now(),
+                expires,
+            )
+            .await?)
+        }
 
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(

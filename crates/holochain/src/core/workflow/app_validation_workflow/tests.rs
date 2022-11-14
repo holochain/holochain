@@ -200,7 +200,7 @@ async fn run_test(
     let delay_per_attempt = Duration::from_millis(100);
 
     let invocation = new_zome_call(
-        conductors[1].handle().keystore(),
+        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "always_validates",
         (),
@@ -253,7 +253,7 @@ async fn run_test(
     });
 
     let invocation = new_zome_call(
-        conductors[1].handle().keystore(),
+        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "add_valid_link",
         (),
@@ -283,7 +283,7 @@ async fn run_test(
     });
 
     let invocation = new_invocation(
-        conductors[1].handle().keystore(),
+        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "add_invalid_link",
         (),
@@ -322,7 +322,7 @@ async fn run_test(
     });
 
     let invocation = new_invocation(
-        conductors[1].handle().keystore(),
+        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "remove_valid_link",
         (),
@@ -359,7 +359,7 @@ async fn run_test(
     });
 
     let invocation = new_invocation(
-        conductors[1].handle().keystore(),
+        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "remove_invalid_link",
         (),

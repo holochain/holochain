@@ -51,8 +51,6 @@ use holochain_types::test_utils::chain::*;
 use holochain_zome_types::ActionRefMut;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;
-use holochain_zome_types::SignedAction;
-use holochain_zome_types::SignedActionHashed;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::ValidationStatus;
 
