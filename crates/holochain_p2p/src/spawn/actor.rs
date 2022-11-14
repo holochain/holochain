@@ -131,7 +131,7 @@ impl WrapEvtSender {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> impl Future<Output = HolochainP2pResult<SerializedBytes>> + 'static + Send {
         timing_trace!(
@@ -366,7 +366,7 @@ impl HolochainP2pActor {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         data: Vec<u8>,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
         let evt_sender = self.evt_sender.clone();
@@ -988,7 +988,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         let space = dna_hash.into_kitsune();
@@ -1022,7 +1022,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();

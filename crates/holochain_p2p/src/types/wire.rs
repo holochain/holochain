@@ -34,7 +34,7 @@ pub enum WireMessage {
         cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     },
     CallRemoteMulti {
@@ -45,7 +45,7 @@ pub enum WireMessage {
         cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     },
     Publish {
@@ -106,7 +106,7 @@ impl WireMessage {
         to_agent: holo_hash::AgentPubKey,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> WireMessage {
         Self::CallRemote {
@@ -130,7 +130,7 @@ impl WireMessage {
         to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> WireMessage {
         Self::CallRemoteMulti {

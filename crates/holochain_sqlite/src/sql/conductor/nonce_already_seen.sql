@@ -1,6 +1,6 @@
 -- simple select the matching agent
 SELECT
-  nonce
+  1
 FROM
   nonce
 WHERE

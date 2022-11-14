@@ -245,7 +245,7 @@ mod startup_shutdown_impls {
         pub(crate) async fn witness_nonce_from_calling_agent(
             &self,
             agent: AgentPubKey,
-            nonce: IntNonce,
+            nonce: Nonce256Bits,
             expires: Timestamp,
         ) -> ConductorResult<WitnessNonceResult> {
             Ok(witness_nonce(

@@ -56,11 +56,20 @@ pub enum DatabaseError {
 
     #[error(transparent)]
     Timestamp(TimestampError),
+
+    #[error(transparent)]
+    GetRandom(getrandom::Error),
 }
 
 impl From<TimestampError> for DatabaseError {
     fn from(timestamp_error: TimestampError) -> Self {
         Self::Timestamp(timestamp_error)
+    }
+}
+
+impl From<getrandom::Error> for DatabaseError {
+    fn from(getrandom_error: getrandom::Error) -> Self {
+        Self::GetRandom(getrandom_error)
     }
 }
 

@@ -194,7 +194,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn witness_nonce_from_calling_agent(
         &self,
         agent: AgentPubKey,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires: Timestamp,
     ) -> ConductorApiResult<WitnessNonceResult>;
 
@@ -238,7 +238,7 @@ impl CellConductorReadHandleT for CellConductorApi {
     async fn witness_nonce_from_calling_agent(
         &self,
         agent: AgentPubKey,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires: Timestamp,
     ) -> ConductorApiResult<WitnessNonceResult> {
         Ok(self

@@ -51,7 +51,7 @@ pub trait HolochainP2pDnaT {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
@@ -67,7 +67,7 @@ pub trait HolochainP2pDnaT {
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()>;
 
@@ -190,7 +190,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
@@ -221,7 +221,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
         self.sender

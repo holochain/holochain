@@ -40,6 +40,7 @@ tracing-futures = "0.2.5"
 cron = "0.9"
 async-recursion = "0.3"
 rand = "0.8.5"
+getrandom = "0.2.7"
 
 tempfile = { version = "3.3", optional = true }
 base64 = { version = "0.13", optional = true }

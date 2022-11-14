@@ -140,7 +140,7 @@ pub struct ZomeCall {
     /// MUST match the signature.
     pub provenance: AgentPubKey,
     pub signature: Signature,
-    pub nonce: IntNonce,
+    pub nonce: Nonce256Bits,
     pub expires_at: Timestamp,
 }
 
@@ -164,7 +164,15 @@ impl ZomeCall {
         keystore: &MetaLairClient,
         unsigned_zome_call: ZomeCallUnsigned,
     ) -> LairResult<Self> {
-        let signature = unsigned_zome_call.sign(keystore).await?;
+        let signature = unsigned_zome_call
+            .provenance
+            .sign_raw(
+                keystore,
+                unsigned_zome_call
+                    .data_to_sign()
+                    .map_err(|e| e.to_string())?,
+            )
+            .await?;
         Ok(Self {
             cell_id: unsigned_zome_call.cell_id,
             zome_name: unsigned_zome_call.zome_name,

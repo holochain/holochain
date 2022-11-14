@@ -797,7 +797,7 @@ impl Cell {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCall {

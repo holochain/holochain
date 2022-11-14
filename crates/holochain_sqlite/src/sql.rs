@@ -56,7 +56,7 @@ pub mod sql_cell {
 
 pub mod sql_conductor {
     pub(crate) const SCHEMA: &str = include_str!("sql/conductor/schema.sql");
-    pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/select_nonce.sql");
+    pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/nonce_already_seen.sql");
     pub const DELETE_EXPIRED_NONCE: &str = include_str!("sql/conductor/delete_expired_nonce.sql");
 }
 

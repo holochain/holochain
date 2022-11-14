@@ -364,7 +364,7 @@ impl ZomeCallInvocation {
                 .call_zome_handle
                 .witness_nonce_from_calling_agent(
                     self.provenance.clone(),
-                    self.nonce,
+                    self.nonce.clone(),
                     self.expires_at,
                 )
                 .await
@@ -435,7 +435,7 @@ pub struct ZomeCallInvocation {
     pub signature: Signature,
     /// The nonce of the call. Must be unique and monotonic.
     /// If a higher nonce has been seen then older zome calls will be discarded.
-    pub nonce: IntNonce,
+    pub nonce: Nonce256Bits,
     /// This call MUST NOT be respected after this time, in the opinion of the callee.
     pub expires_at: Timestamp,
 }
@@ -699,8 +699,8 @@ pub mod wasm_test {
     use holo_hash::AgentPubKey;
     use holochain_keystore::AgentPubKeyExt;
     use holochain_state::nonce::fresh_nonce;
-    use holochain_types::zome_call::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::zome_io::ZomeCallUnsigned;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()

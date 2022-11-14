@@ -224,7 +224,7 @@ ghost_actor::ghost_chan! {
             fn_name: FunctionName,
             cap_secret: Option<CapSecret>,
             payload: ExternIO,
-            nonce: IntNonce,
+            nonce: Nonce256Bits,
             expires_at: Timestamp,
         ) -> SerializedBytes;
 
@@ -240,7 +240,7 @@ ghost_actor::ghost_chan! {
             fn_name: FunctionName,
             cap: Option<CapSecret>,
             payload: ExternIO,
-            nonce: IntNonce,
+            nonce: Nonce256Bits,
             expires_at: Timestamp,
         ) -> ();
 

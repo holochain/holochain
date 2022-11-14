@@ -37,7 +37,6 @@ pub mod signal;
 pub mod sql;
 pub mod validate;
 pub mod web_app;
-pub mod zome_call;
 pub mod zome_types;
 
 #[cfg(feature = "test_utils")]

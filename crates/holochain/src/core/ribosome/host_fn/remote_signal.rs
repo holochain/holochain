@@ -11,10 +11,11 @@ use holochain_zome_types::zome::FunctionName;
 use std::sync::Arc;
 use tracing::Instrument;
 use holochain_types::prelude::Signature;
-use holochain_types::zome_call::ZomeCallUnsigned;
+use holochain_zome_types::zome_io::ZomeCallUnsigned;
 use holochain_types::prelude::CellId;
 use holochain_types::prelude::AgentPubKey;
 use holochain_zome_types::Timestamp;
+use holochain_keystore::AgentPubKeyExt;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -51,16 +52,23 @@ pub fn remote_signal(
                     };
 
                     for agent in agents {
-                        let potentially_signature = ZomeCallUnsigned {
+                        let zome_call_unsigned = ZomeCallUnsigned {
                             provenance: from_agent.clone(),
                             cell_id: CellId::new(network.dna_hash(), agent.clone()),
                             zome_name: zome_name.clone(),
                             fn_name: fn_name.clone(),
                             cap_secret: None,
                             payload: signal.clone(),
-                            nonce,
+                            nonce: nonce.clone(),
                             expires_at,
-                        }.sign(call_context.host_context.keystore()).await;
+                        };
+                        let potentially_signature = zome_call_unsigned.provenance.sign_raw(call_context.host_context.keystore(), match zome_call_unsigned.data_to_sign() {
+                            Ok(to_sign) => to_sign,
+                            Err(e) => {
+                                tracing::info!("Failed to serialize zome call for signal because of {:?}", e);
+                                return;
+                            }
+                        }).await;
 
                         match potentially_signature {
                             Ok(signature) => to_agent_list.push((signature, agent)),

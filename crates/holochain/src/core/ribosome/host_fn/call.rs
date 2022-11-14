@@ -78,8 +78,8 @@ pub fn call(
                                     .network()
                                     .call_remote(
                                         provenance.clone(),
-                                        zome_call_unsigned
-                                            .sign(call_context.host_context.keystore())
+                                        zome_call_unsigned.provenance
+                                            .sign_raw(call_context.host_context.keystore(), zome_call_unsigned.data_to_sign().map_err(|e| -> RuntimeError { wasm_error!(e.to_string()).into() })?)
                                             .await
                                             .map_err(|e| -> RuntimeError {
                                                 wasm_error!(WasmErrorInner::Host(e.to_string()))

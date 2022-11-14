@@ -2,8 +2,8 @@
 
 pub use holochain_keystore::AgentPubKeyExt;
 pub use holochain_serialized_bytes::prelude::*;
-pub use holochain_sqlite::nonce::IntNonce;
 pub use holochain_zome_types::prelude::*;
+pub use holochain_zome_types::zome_io::Nonce256Bits;
 pub use std::convert::TryFrom;
 pub use std::convert::TryInto;
 
@@ -30,7 +30,6 @@ pub use crate::record::error::*;
 pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validate::*;
-pub use crate::zome_call::*;
 
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::TimestampFixturator;

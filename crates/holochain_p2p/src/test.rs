@@ -40,7 +40,7 @@ impl HolochainP2pHandler for StubNetwork {
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         Err("stub".into())
@@ -55,7 +55,7 @@ impl HolochainP2pHandler for StubNetwork {
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
-        nonce: IntNonce,
+        nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
@@ -210,7 +210,7 @@ mod tests {
 
     use crate::HolochainP2pSender;
     use holochain_types::prelude::AgentPubKeyExt;
-    use holochain_types::zome_call::ZomeCallUnsigned;
+    use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use holochain_zome_types::ValidationStatus;
     use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
     use kitsune_p2p::KitsuneP2pConfig;
@@ -281,7 +281,7 @@ mod tests {
 
         let zome_name: ZomeName = "".into();
         let fn_name: FunctionName = "".into();
-        let nonce = 1;
+        let nonce = Nonce256Bits::try_from([0; 32]).unwrap();
         let cap_secret = None;
         let payload = ExternIO::encode(b"yippo").unwrap();
         let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
@@ -296,7 +296,7 @@ mod tests {
                     fn_name: fn_name.clone(),
                     cap_secret: cap_secret.clone(),
                     payload: payload.clone(),
-                    nonce,
+                    nonce: nonce.clone(),
                     expires_at: expires_at.clone(),
                 }
                 .data_to_sign()

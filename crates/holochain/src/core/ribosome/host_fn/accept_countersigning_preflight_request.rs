@@ -121,7 +121,7 @@ pub mod wasm_test {
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
-    use holochain_types::zome_call::ZomeCallUnsigned;
+    use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasmer_host::prelude::*;
 
