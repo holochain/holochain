@@ -34,7 +34,7 @@ pub enum WireMessage {
         cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
-        nonce: Nonce256Bits,
+        nonce: Box<Nonce256Bits>,
         expires_at: Timestamp,
     },
     CallRemoteMulti {
@@ -45,7 +45,7 @@ pub enum WireMessage {
         cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
-        nonce: Nonce256Bits,
+        nonce: Box<Nonce256Bits>,
         expires_at: Timestamp,
     },
     Publish {
@@ -117,7 +117,7 @@ impl WireMessage {
             signature,
             cap_secret,
             data: payload.into_vec(),
-            nonce,
+            nonce: Box::new(nonce),
             expires_at,
         }
     }
@@ -140,7 +140,7 @@ impl WireMessage {
             to_agents,
             cap_secret,
             data: payload.into_vec(),
-            nonce,
+            nonce: Box::new(nonce),
             expires_at,
         }
     }

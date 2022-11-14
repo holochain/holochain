@@ -688,7 +688,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 expires_at,
             } => self.handle_incoming_call_remote(
                 space, from_agent, signature, to_agent, zome_name, fn_name, cap_secret, data,
-                nonce, expires_at,
+                *nonce, expires_at,
             ),
             crate::wire::WireMessage::CallRemoteMulti {
                 zome_name,
@@ -706,7 +706,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 {
                     Some((signature, to_agent)) => self.handle_incoming_call_remote(
                         space, from_agent, signature, to_agent, zome_name, fn_name, cap_secret,
-                        data, nonce, expires_at,
+                        data, *nonce, expires_at,
                     ),
                     None => Err(HolochainP2pError::RoutingAgentError(to_agent).into()),
                 }
@@ -790,7 +790,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             } => {
                 let fut = self.handle_incoming_call_remote(
                     space, from_agent, signature, to_agent, zome_name, fn_name, cap_secret, data,
-                    nonce, expires_at,
+                    *nonce, expires_at,
                 );
                 Ok(async move {
                     let _ = fut?.await?;
@@ -816,7 +816,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                     Some((signature, to_agent)) => {
                         let fut = self.handle_incoming_call_remote(
                             space, from_agent, signature, to_agent, zome_name, fn_name, cap_secret,
-                            data, nonce, expires_at,
+                            data, *nonce, expires_at,
                         );
                         Ok(async move {
                             let _ = fut?.await?;
