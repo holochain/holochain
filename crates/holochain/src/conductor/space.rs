@@ -434,7 +434,9 @@ impl Spaces {
                         ":timestamp_max": t1,
                     },
                     |row| {
-                        let size: f64 = row.get("total_size")?;
+                        let total_action_size: f64 = row.get("total_action_size")?;
+                        let total_entry_size: f64 = row.get("total_entry_size")?;
+                        let size = total_action_size + total_entry_size;
                         Ok(RegionData {
                             hash: RegionHash::from_vec(row.get("xor_hash")?)
                                 .expect("region hash must be 32 bytes"),
@@ -479,34 +481,33 @@ impl Spaces {
             .dht_db(dna_hash)?
             .async_reader(move |txn| {
                 let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
-                StateQueryResult::Ok(
-                    regions
-                        .into_iter()
-                        .map(|bounds| {
-                            let (x0, x1) = bounds.x;
-                            let (t0, t1) = bounds.t;
-                            stmt.query_and_then(
-                                named_params! {
-                                    ":storage_start_loc": x0,
-                                    ":storage_end_loc": x1,
-                                    ":timestamp_min": t0,
-                                    ":timestamp_max": t1,
-                                },
-                                |row| {
-                                    let hash: DhtOpHash =
-                                        row.get("hash").map_err(StateQueryError::from)?;
-                                    Ok(map_sql_dht_op_common(row)?.map(|op| (hash, op)))
-                                },
-                            )
-                            .map_err(StateQueryError::from)?
-                            .collect::<Result<Vec<Option<_>>, StateQueryError>>()
-                        })
-                        .collect::<Result<Vec<Vec<Option<_>>>, _>>()?
-                        .into_iter()
-                        .flatten()
-                        .flatten()
-                        .collect(),
-                )
+                let results = regions
+                    .into_iter()
+                    .map(|bounds| {
+                        let (x0, x1) = bounds.x;
+                        let (t0, t1) = bounds.t;
+                        stmt.query_and_then(
+                            named_params! {
+                                ":storage_start_loc": x0,
+                                ":storage_end_loc": x1,
+                                ":timestamp_min": t0,
+                                ":timestamp_max": t1,
+                            },
+                            |row| {
+                                let hash: DhtOpHash =
+                                    row.get("hash").map_err(StateQueryError::from)?;
+                                Ok(map_sql_dht_op_common(row)?.map(|op| (hash, op)))
+                            },
+                        )
+                        .map_err(StateQueryError::from)?
+                        .collect::<Result<Vec<Option<_>>, StateQueryError>>()
+                    })
+                    .collect::<Result<Vec<Vec<Option<_>>>, _>>()?
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .collect();
+                StateQueryResult::Ok(results)
             })
             .await?)
     }

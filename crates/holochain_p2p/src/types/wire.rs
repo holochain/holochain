@@ -51,6 +51,8 @@ pub enum WireMessage {
     Publish {
         request_validation_receipt: bool,
         countersigning_session: bool,
+        // For backward compat with holochain < 0.0.164
+        #[serde(alias = "dht_hash")]
         basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     },
