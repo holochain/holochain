@@ -618,7 +618,16 @@ impl ShardedGossipLocalState {
             // unless our target is the same as the incoming initiate in question
             .map(|(tgt, accepted)| (!accepted && tgt.cert != *incoming_peer_cert))
             .unwrap_or(false);
-        pending_accept || self.round_map.map.values().any(|r| !r.regions_are_queued)
+        let negotiating =
+            pending_accept || self.round_map.map.values().any(|r| !r.regions_are_queued);
+        if negotiating {
+            tracing::warn!(
+                "chotto matte kudasai! {:?} {} ",
+                incoming_peer_cert,
+                pending_accept
+            );
+        }
+        negotiating
     }
 }
 
@@ -998,14 +1007,14 @@ impl ShardedGossipLocal {
                     let filter = decode_bloom_filter(&filter);
                     self.incoming_agents(state, filter).await?
                 } else {
-                    Vec::with_capacity(0)
+                    vec![]
                 }
             }
             ShardedGossipWire::MissingAgents(MissingAgents { agents }) => {
                 if self.get_state(&peer_cert)?.is_some() {
                     self.incoming_missing_agents(agents.as_slice()).await?;
                 }
-                Vec::with_capacity(0)
+                vec![]
             }
             ShardedGossipWire::OpBloom(OpBloom {
                 missing_hashes,
@@ -1018,7 +1027,7 @@ impl ShardedGossipLocal {
                 };
                 match state {
                     Some(state) => match missing_hashes {
-                        EncodedTimedBloomFilter::NoOverlap => Vec::with_capacity(0),
+                        EncodedTimedBloomFilter::NoOverlap => vec![],
                         EncodedTimedBloomFilter::MissingAllHashes { time_window } => {
                             let filter = TimedBloomFilter {
                                 bloom: None,
@@ -1037,7 +1046,7 @@ impl ShardedGossipLocal {
                             self.incoming_op_bloom(state, filter, None).await?
                         }
                     },
-                    None => Vec::with_capacity(0),
+                    None => vec![],
                 }
             }
             ShardedGossipWire::OpRegions(OpRegions { region_set }) => {
@@ -1049,7 +1058,7 @@ impl ShardedGossipLocal {
                 }
             }
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
-                let mut gossip = Vec::with_capacity(0);
+                let mut gossip = vec![];
                 let finished = MissingOpsStatus::try_from(finished)?;
 
                 let state = match finished {
@@ -1108,31 +1117,31 @@ impl ShardedGossipLocal {
                     }
                     r
                 }
-                None => Vec::with_capacity(0),
+                None => vec![],
             },
             ShardedGossipWire::NoAgents(_) => {
                 tracing::warn!("No agents to gossip with on the node {:?}", peer_cert);
                 self.remove_state(&peer_cert, true)?;
-                Vec::with_capacity(0)
+                vec![]
             }
             ShardedGossipWire::AlreadyInProgress(_) => {
                 self.remove_target(&peer_cert, false)?;
-                Vec::with_capacity(0)
+                vec![]
             }
             ShardedGossipWire::Busy(_) => {
                 tracing::warn!("The node {:?} is busy", peer_cert);
                 self.remove_target(&peer_cert, true)?;
-                Vec::with_capacity(0)
+                vec![]
             }
             ShardedGossipWire::ChottoMatte(_) => {
                 tracing::warn!("The node {:?} needs a moment before proceeding", peer_cert);
                 self.remove_target(&peer_cert, false)?;
-                Vec::with_capacity(0)
+                vec![]
             }
             ShardedGossipWire::Error(Error { message }) => {
                 tracing::warn!("gossiping with: {:?} and got error: {}", peer_cert, message);
                 self.remove_state(&peer_cert, true)?;
-                Vec::with_capacity(0)
+                vec![]
             }
         };
         s.in_scope(|| {

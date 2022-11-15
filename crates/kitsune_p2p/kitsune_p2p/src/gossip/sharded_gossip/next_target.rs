@@ -171,19 +171,24 @@ fn next_remote_node(
     remote_nodes
         .into_iter()
         // Don't initiate with nodes we are currently gossiping with.
-        .filter(|n| !metrics.read().is_current_round(&n.agent_info_list))
+        .filter(|n| {
+            let in_current_round = metrics.read().is_current_round(&n.agent_info_list);
+            tracing::debug!("in_current_round: {}", in_current_round);
+            !in_current_round
+        })
         .find(|n| {
             match metrics.read().last_outcome(&n.agent_info_list) {
-                Some((RoundOutcome::SuccessComplete, when)) => {
+                Some((when, RoundOutcome::SuccessComplete)) => {
                     // If we should force initiate then we don't need to wait for the delay.
                     forced_initiate
                         || when.elapsed().as_millis() as u32
                             >= tuning_params.gossip_peer_on_success_next_gossip_delay_ms
                 }
-                Some((RoundOutcome::Error, when)) => {
+                Some((when, RoundOutcome::Error)) => {
                     when.elapsed().as_millis() as u32
                         >= tuning_params.gossip_peer_on_error_next_gossip_delay_ms
                 }
+                Some((_, RoundOutcome::SuccessPartial)) => true,
                 _ => true,
             }
         })

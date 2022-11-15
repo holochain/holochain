@@ -124,7 +124,7 @@ pub struct PeerAgentHistory {
     /// Times we recorded initates from this node (we accepted).
     pub accepts: VecDeque<RoundMetric>,
     /// Times we recorded complete rounds, along with the outcome of that round.
-    pub completions: VecDeque<(RoundOutcome, RoundMetric)>,
+    pub completions: VecDeque<(RoundMetric, RoundOutcome)>,
     /// Is this node currently in an active round?
     pub current_round: bool,
 }
@@ -295,15 +295,15 @@ pub struct Metrics {
 
 /// Outcome of a gossip round.
 ///
-/// NOTE: the order matters!
+/// NOTE: the order matters! Complete Success < Error < Partial Success.
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum RoundOutcome {
-    /// Successful outcome with partial data sync
-    SuccessPartial,
     /// Successful outcome with complete data sync
     SuccessComplete,
     /// Error outcome
     Error,
+    /// Successful outcome with partial data sync
+    SuccessPartial,
 }
 
 impl RoundOutcome {
@@ -544,7 +544,7 @@ impl Metrics {
                 instant: Instant::now(),
                 gossip_type,
             };
-            record_item(&mut history.completions, (outcome, round));
+            record_item(&mut history.completions, (round, outcome));
             history.current_round = false;
             if outcome.is_success() && history.is_initiate_round() {
                 should_dec_force_initiates = true;
@@ -630,9 +630,9 @@ impl Metrics {
                 info.completions
                     .iter()
                     .rev()
-                    .find(|(outcome, _)| *outcome == RoundOutcome::SuccessComplete)
+                    .find(|(_, outcome)| *outcome == RoundOutcome::SuccessComplete)
             })
-            .map(|(_, r)| r)
+            .map(|(r, _)| r)
             .min_by_key(|r| r.instant)
     }
 
@@ -649,9 +649,9 @@ impl Metrics {
                 info.completions
                     .iter()
                     .rev()
-                    .find(|(outcome, _)| *outcome == RoundOutcome::SuccessPartial)
+                    .find(|(_, outcome)| *outcome == RoundOutcome::SuccessPartial)
             })
-            .map(|(_, r)| r)
+            .map(|(r, _)| r)
             .min_by_key(|r| r.instant)
     }
 
@@ -671,7 +671,7 @@ impl Metrics {
     pub fn last_outcome<'a, T, I>(
         &self,
         remote_agent_list: I,
-    ) -> Option<(RoundOutcome, RoundMetric)>
+    ) -> Option<(RoundMetric, RoundOutcome)>
     where
         T: Into<AgentLike<'a>>,
         I: IntoIterator<Item = T>,
@@ -752,7 +752,7 @@ impl PeerAgentHistory {
     pub fn completions(&self, outcome: RoundOutcome) -> impl Iterator<Item = &RoundMetric> {
         self.completions
             .iter()
-            .filter_map(move |(o, r)| (*o == outcome).then(|| r))
+            .filter_map(move |(r, o)| (*o == outcome).then(|| r))
     }
 }
 

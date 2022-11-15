@@ -109,9 +109,10 @@ impl ShardedGossipLocal {
         // leading to massive redundancy when multiple nodes try to initiate with us
         // in quick successions
         if self.gossip_type == GossipType::Historical
-            && self.inner.share_ref(|i| Ok(i.negotiating_region_diff(&peer_cert)))?
+            && self
+                .inner
+                .share_ref(|i| Ok(i.negotiating_region_diff(&peer_cert)))?
         {
-            tracing::warn!("chotto matte kudasai! {:?}", peer_cert);
             return Ok(vec![ShardedGossipWire::chotto_matte()]);
         }
 
