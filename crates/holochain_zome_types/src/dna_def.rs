@@ -1,5 +1,7 @@
 //! Defines DnaDef struct
 
+use std::time::Duration;
+
 use super::zome;
 use crate::prelude::*;
 
@@ -7,6 +9,9 @@ use crate::prelude::*;
 use crate::zome::error::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
+
+#[cfg(feature = "full-dna-def")]
+use kitsune_p2p_dht::spacetime::Dimension;
 
 /// Ordered list of integrity zomes in this DNA.
 pub type IntegrityZomes = Vec<(ZomeName, zome::IntegrityZomeDef)>;
@@ -41,6 +46,17 @@ pub struct DnaModifiers {
     /// All Action timestamps must come after this time.
     #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
     pub origin_time: Timestamp,
+
+    /// The smallest unit of time used for gossip time windows.
+    /// You probably don't need to change this.
+    #[cfg_attr(feature = "full-dna-def", builder(default = "standard_quantum_time()"))]
+    #[cfg_attr(feature = "full-dna-def", serde(default = "standard_quantum_time"))]
+    pub quantum_time: Duration,
+}
+
+#[cfg(feature = "full-dna-def")]
+const fn standard_quantum_time() -> Duration {
+    kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME
 }
 
 impl DnaModifiers {
@@ -50,6 +66,7 @@ impl DnaModifiers {
         self.network_seed = modifiers.network_seed.unwrap_or(self.network_seed);
         self.properties = modifiers.properties.unwrap_or(self.properties);
         self.origin_time = modifiers.origin_time.unwrap_or(self.origin_time);
+        self.quantum_time = modifiers.quantum_time.unwrap_or(self.quantum_time);
         self
     }
 }
@@ -64,6 +81,8 @@ pub struct DnaModifiersOpt<P = SerializedBytes> {
     pub properties: Option<P>,
     /// see [`DnaModifiers`]
     pub origin_time: Option<Timestamp>,
+    /// see [`DnaModifiers`]
+    pub quantum_time: Option<Duration>,
 }
 
 impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> Default
@@ -81,6 +100,7 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
             network_seed: None,
             properties: None,
             origin_time: None,
+            quantum_time: None,
         }
     }
 
@@ -90,6 +110,7 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
             network_seed,
             properties,
             origin_time,
+            quantum_time,
         } = self;
         let properties = if let Some(p) = properties {
             Some(p.try_into()?)
@@ -100,6 +121,7 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
             network_seed,
             properties,
             origin_time,
+            quantum_time,
         })
     }
 
@@ -118,6 +140,12 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
     /// Return a modified form with the `origin_time` field set
     pub fn with_origin_time(mut self, origin_time: Timestamp) -> Self {
         self.origin_time = Some(origin_time);
+        self
+    }
+
+    /// Return a modified form with the `quantum_time` field set
+    pub fn with_quantum_time(mut self, quantum_time: Duration) -> Self {
+        self.quantum_time = Some(quantum_time);
         self
     }
 
@@ -292,7 +320,12 @@ impl DnaDef {
 
     /// Get the topology to use for kitsune gossip
     pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
-        kitsune_p2p_dht::spacetime::Topology::standard(self.modifiers.origin_time, cutoff)
+        kitsune_p2p_dht::spacetime::Topology {
+            space: Dimension::standard_space(),
+            time: Dimension::time(self.modifiers.quantum_time),
+            time_origin: self.modifiers.origin_time,
+            time_cutoff: cutoff,
+        }
     }
 }
 
@@ -306,11 +339,12 @@ pub fn random_network_seed() -> String {
 impl DnaDefBuilder {
     /// Provide a random network seed
     pub fn random_network_seed(&mut self) -> &mut Self {
-        self.modifiers = Some(DnaModifiers {
-            network_seed: random_network_seed(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::now(),
-        });
+        self.modifiers = Some(
+            DnaModifiersBuilder::default()
+                .network_seed(random_network_seed())
+                .build()
+                .unwrap(),
+        );
         self
     }
 }
@@ -348,6 +382,7 @@ mod tests {
 
     use super::*;
     use holochain_serialized_bytes::prelude::*;
+    use kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME;
 
     #[test]
     fn test_update_modifiers() {
@@ -361,18 +396,21 @@ mod tests {
             network_seed: "seed".into(),
             properties: ().try_into().unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            quantum_time: STANDARD_QUANTUM_TIME,
         };
 
         let opt = DnaModifiersOpt {
             network_seed: None,
             properties: Some(props.clone()),
             origin_time: Some(now),
+            quantum_time: Some(Duration::from_secs(60)),
         };
 
         let expected = DnaModifiers {
             network_seed: "seed".into(),
             properties: props.clone(),
             origin_time: now,
+            quantum_time: Duration::from_secs(60),
         };
 
         assert_eq!(mods.update(opt), expected);
