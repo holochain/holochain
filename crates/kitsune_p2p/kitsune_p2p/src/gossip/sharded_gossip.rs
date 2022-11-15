@@ -610,11 +610,13 @@ impl ShardedGossipLocalState {
     /// This check is useful because we want to turn away new historic gossip requests
     /// while this negotiation is happening, so that we don't have a race condition
     /// for region locking
-    pub fn negotiating_region_diff(&self) -> bool {
+    pub fn negotiating_region_diff(&self, incoming_peer_cert: &Tx2Cert) -> bool {
         let pending_accept = self
             .initiate_tgt
             .as_ref()
-            .map(|(_, accepted)| !accepted)
+            // If we have an unaccepted initiate, we are considered to be negotiating,
+            // unless our target is the same as the incoming initiate in question
+            .map(|(tgt, accepted)| (!accepted && tgt.cert != *incoming_peer_cert))
             .unwrap_or(false);
         pending_accept || self.round_map.map.values().any(|r| !r.regions_are_queued)
     }

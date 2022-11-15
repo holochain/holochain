@@ -2,7 +2,7 @@ use super::common::*;
 use super::*;
 use crate::gossip::sharded_gossip::next_target::Node;
 use crate::NOISE;
-use arbitrary::Arbitrary;
+use arbitrary::{Arbitrary, Unstructured};
 
 fn new_round(num_expected_op_blooms: u16, received_all_incoming_op_blooms: bool) -> RoundState {
     RoundState {
@@ -687,9 +687,12 @@ async fn region_diff_race_condition_is_handled() {
     )
     .await;
 
+    let mut u = Unstructured::new(&[0; 256]);
+    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+
     let is_negotiating = |n: &ShardedGossipLocal| {
         n.inner
-            .share_ref(|s| Ok(s.negotiating_region_diff()))
+            .share_ref(|s| Ok(s.negotiating_region_diff(&cert)))
             .unwrap()
     };
 
@@ -712,7 +715,7 @@ async fn region_diff_race_condition_is_handled() {
     assert!(matches!(bob_outgoing[0], ShardedGossipWire::Accept(_)));
     assert!(matches!(bob_outgoing[1], ShardedGossipWire::OpRegions(_)));
 
-    let it_was_alice = {
+    {
         let (cert1, _, init1) = carol.try_initiate().await.unwrap().unwrap();
         if cert1 == alice_node.cert {
             let busy1 = alice
@@ -725,7 +728,6 @@ async fn region_diff_race_condition_is_handled() {
                 .process_incoming(alice_node.cert.clone(), busy1)
                 .await
                 .unwrap();
-            true
         } else if cert1 == bob_node.cert {
             let busy1 = bob
                 .process_incoming(carol_node.cert.clone(), init1)
@@ -737,67 +739,77 @@ async fn region_diff_race_condition_is_handled() {
                 .process_incoming(bob_node.cert.clone(), busy1)
                 .await
                 .unwrap();
-            false
         } else {
             panic!("unexpected cert");
         }
     };
     {
-        if it_was_alice {
-            // bob is next
-            let (cert2, _, init2) = carol.try_initiate().await.unwrap().unwrap();
-            assert_eq!(cert2, bob_node.cert);
-            let busy2 = bob
-                .process_incoming(carol_node.cert.clone(), init2)
-                .await
-                .unwrap()[0]
-                .clone();
-            assert_eq!(busy2, ShardedGossipWire::ChottoMatte(ChottoMatte {}));
-            carol
-                .process_incoming(bob_node.cert.clone(), busy2)
-                .await
-                .unwrap();
-        } else {
-            // (it was bob, so alice is next)
-            let (cert2, _, init2) = carol.try_initiate().await.unwrap().unwrap();
-            assert_eq!(cert2, alice_node.cert);
-            let busy2 = alice
-                .process_incoming(carol_node.cert.clone(), init2)
-                .await
-                .unwrap()[0]
-                .clone();
-            assert_eq!(busy2, ShardedGossipWire::ChottoMatte(ChottoMatte {}));
-            carol
-                .process_incoming(alice_node.cert.clone(), busy2)
-                .await
-                .unwrap();
-        }
-    }
-    {
-        let (cert1, _, init1) = carol.try_initiate().await.unwrap().unwrap();
-        assert_eq!(cert1, alice_node.cert);
+        let (_, _, init) = carol.try_initiate().await.unwrap().unwrap();
         let busy1 = alice
-            .process_incoming(carol_node.cert.clone(), init1)
+            .process_incoming(carol_node.cert.clone(), init.clone())
+            .await
+            .unwrap()[0]
+            .clone();
+        let busy2 = bob
+            .process_incoming(carol_node.cert.clone(), init.clone())
             .await
             .unwrap()[0]
             .clone();
         assert_eq!(busy1, ShardedGossipWire::ChottoMatte(ChottoMatte {}));
+        assert_eq!(busy2, ShardedGossipWire::ChottoMatte(ChottoMatte {}));
         carol
-            .process_incoming(alice_node.cert, busy1)
+            .process_incoming(alice_node.cert.clone(), busy1)
+            .await
+            .unwrap();
+        carol
+            .process_incoming(bob_node.cert.clone(), busy2)
             .await
             .unwrap();
     }
-
     {
-        alice
+        let mut alice_regions = alice
             .process_incoming(bob_node.cert.clone(), bob_outgoing[0].clone())
             .await
             .unwrap();
-        alice
+
+        let _ = alice
             .process_incoming(bob_node.cert.clone(), bob_outgoing[1].clone())
             .await
             .unwrap();
 
+        bob.process_incoming(alice_node.cert.clone(), alice_regions.pop().unwrap())
+            .await
+            .unwrap();
+
         assert!(!is_negotiating(&alice));
+        assert!(!is_negotiating(&bob));
+    }
+    {
+        let (cert, _, init) = carol.try_initiate().await.unwrap().unwrap();
+        if cert == alice_node.cert {
+            let r = alice
+                .process_incoming(carol_node.cert.clone(), init.clone())
+                .await
+                .unwrap()[0]
+                .clone();
+            assert!(matches!(r, ShardedGossipWire::Accept(_)));
+            carol
+                .process_incoming(alice_node.cert.clone(), r)
+                .await
+                .unwrap();
+        } else if cert == bob_node.cert {
+            let r = bob
+                .process_incoming(carol_node.cert.clone(), init.clone())
+                .await
+                .unwrap()[0]
+                .clone();
+            assert!(matches!(r, ShardedGossipWire::Accept(_)));
+            carol
+                .process_incoming(bob_node.cert.clone(), r)
+                .await
+                .unwrap();
+        } else {
+            panic!("unexpected cert");
+        }
     }
 }

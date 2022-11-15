@@ -109,7 +109,7 @@ impl ShardedGossipLocal {
         // leading to massive redundancy when multiple nodes try to initiate with us
         // in quick successions
         if self.gossip_type == GossipType::Historical
-            && self.inner.share_ref(|i| Ok(i.negotiating_region_diff()))?
+            && self.inner.share_ref(|i| Ok(i.negotiating_region_diff(&peer_cert)))?
         {
             tracing::warn!("chotto matte kudasai! {:?}", peer_cert);
             return Ok(vec![ShardedGossipWire::chotto_matte()]);
@@ -181,7 +181,6 @@ impl ShardedGossipLocal {
                 metrics.record_accept(&remote_agent_list, self.gossip_type.into());
             }
 
-            dbg!("round added", state.regions_are_queued);
             inner.round_map.insert(peer_cert.clone(), state);
 
             // If this is the target then we should clear the when initiated timeout.
@@ -244,7 +243,6 @@ impl ShardedGossipLocal {
             // we consider recent gossip to have "sent its region"
             // for purposes of determining the round is complete
             state.regions_are_queued = true;
-            dbg!("regions_are_queued = true");
 
             self.next_bloom_batch(state, gossip).await
         } else {
@@ -253,7 +251,6 @@ impl ShardedGossipLocal {
             // be considered "finished" until all op data is received.
             state.has_pending_historical_op_data = true;
             state.regions_are_queued = false;
-            dbg!("regions_are_queued = false");
             Ok(state)
         }
     }
