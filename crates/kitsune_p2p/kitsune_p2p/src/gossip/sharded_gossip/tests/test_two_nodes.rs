@@ -687,14 +687,27 @@ async fn region_diff_race_condition_is_handled() {
     )
     .await;
 
+    let is_negotiating = |n: &ShardedGossipLocal| {
+        n.inner
+            .share_ref(|s| Ok(s.negotiating_region_diff()))
+            .unwrap()
+    };
+
+    assert!(!is_negotiating(&alice));
+    assert!(!is_negotiating(&bob));
+    assert!(!is_negotiating(&carol));
+
     // - Alice initiates with bob
     let (bob_cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
     assert_eq!(bob_cert, bob_node.cert);
+    assert!(is_negotiating(&alice));
+    assert!(!is_negotiating(&bob));
 
     let bob_outgoing = bob
         .process_incoming(alice_node.cert.clone(), alice_initiate)
         .await
         .unwrap();
+    assert!(is_negotiating(&bob));
 
     assert!(matches!(bob_outgoing[0], ShardedGossipWire::Accept(_)));
     assert!(matches!(bob_outgoing[1], ShardedGossipWire::OpRegions(_)));
@@ -773,5 +786,18 @@ async fn region_diff_race_condition_is_handled() {
             .process_incoming(alice_node.cert, busy1)
             .await
             .unwrap();
+    }
+
+    {
+        alice
+            .process_incoming(bob_node.cert.clone(), bob_outgoing[0].clone())
+            .await
+            .unwrap();
+        alice
+            .process_incoming(bob_node.cert.clone(), bob_outgoing[1].clone())
+            .await
+            .unwrap();
+
+        assert!(!is_negotiating(&alice));
     }
 }

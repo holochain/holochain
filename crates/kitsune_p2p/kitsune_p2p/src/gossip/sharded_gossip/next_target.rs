@@ -141,12 +141,26 @@ fn next_remote_node(
             (Some(_), None) => Ordering::Greater,
             // Put b behind a that hasn't been gossiped with.
             (None, Some(_)) => Ordering::Less,
-            // Randomly break ties.
+            // Otherwise look for partial successes.
             (None, None) => {
-                if rng.gen() {
-                    Ordering::Less
-                } else {
-                    Ordering::Greater
+                match (
+                    metrics.read().last_partial_success(&a.agent_info_list),
+                    metrics.read().last_partial_success(&b.agent_info_list),
+                ) {
+                    // Choose the smallest (oldest) Instant.
+                    (Some(a), Some(b)) => a.cmp(b),
+                    // Put a behind b that hasn't been gossiped with.
+                    (Some(_), None) => Ordering::Greater,
+                    // Put b behind a that hasn't been gossiped with.
+                    (None, Some(_)) => Ordering::Less,
+                    // Randomly break ties.
+                    (None, None) => {
+                        if rng.gen() {
+                            Ordering::Less
+                        } else {
+                            Ordering::Greater
+                        }
+                    }
                 }
             }
         }
@@ -347,6 +361,49 @@ mod tests {
         let r = next_remote_node(remote_nodes.clone(), &metrics, tuning_params_no_delay());
 
         // - Expect the last node to be chosen because it was never gossiped with.
+        assert_eq!(r, remote_nodes.last().cloned());
+    }
+
+    #[test_case(2)]
+    #[test_case(5)]
+    #[test_case(10)]
+    fn next_remote_node_partial_success(n: usize) {
+        // - Create N remote nodes.
+        let mut remote_nodes = create_remote_nodes(n);
+
+        let metrics = MetricsSync::default();
+
+        // - Pop the last node off the list.
+        let last = remote_nodes.pop().unwrap();
+
+        // - Record successful initiate rounds for the rest of the nodes.
+        for node in remote_nodes.iter() {
+            metrics
+                .write()
+                .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+            metrics.write().record_completion(
+                &node.agent_info_list,
+                GossipModuleType::ShardedRecent,
+                RoundOutcome::SuccessComplete,
+            );
+        }
+
+        // Record a partial success for the last round
+        metrics
+            .write()
+            .record_initiate(&last.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics.write().record_completion(
+            &last.agent_info_list,
+            GossipModuleType::ShardedRecent,
+            RoundOutcome::SuccessPartial,
+        );
+
+        // - Push the last node back into the remote nodes.
+        remote_nodes.push(last);
+
+        let r = next_remote_node(remote_nodes.clone(), &metrics, tuning_params_no_delay());
+
+        // - Expect the last node to be chosen because it had only a partial success.
         assert_eq!(r, remote_nodes.last().cloned());
     }
 

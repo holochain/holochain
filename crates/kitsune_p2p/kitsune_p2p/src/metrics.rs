@@ -636,6 +636,25 @@ impl Metrics {
             .min_by_key(|r| r.instant)
     }
 
+    /// Get the last successful round time.
+    pub fn last_partial_success<'a, T, I>(&self, remote_agent_list: I) -> Option<&RoundMetric>
+    where
+        T: Into<AgentLike<'a>>,
+        I: IntoIterator<Item = T>,
+    {
+        remote_agent_list
+            .into_iter()
+            .filter_map(|agent_info| self.agent_history.get(agent_info.into().agent()))
+            .filter_map(|info| {
+                info.completions
+                    .iter()
+                    .rev()
+                    .find(|(outcome, _)| *outcome == RoundOutcome::SuccessPartial)
+            })
+            .map(|(_, r)| r)
+            .min_by_key(|r| r.instant)
+    }
+
     /// Is this node currently in an active round?
     pub fn is_current_round<'a, T, I>(&self, remote_agent_list: I) -> bool
     where
