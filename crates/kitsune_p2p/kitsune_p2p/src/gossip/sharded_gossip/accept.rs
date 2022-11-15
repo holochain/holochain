@@ -15,9 +15,12 @@ impl ShardedGossipLocal {
                 let accept_is_from_target = i
                     .initiate_tgt
                     .as_ref()
-                    .map(|tgt| tgt.cert == peer_cert)
+                    .map(|(tgt, _)| tgt.cert == peer_cert)
                     .unwrap_or(false);
-                let when_initiated = i.initiate_tgt.as_ref().and_then(|i| i.when_initiated);
+                let when_initiated = i
+                    .initiate_tgt
+                    .as_ref()
+                    .and_then(|(tgt, _)| tgt.when_initiated);
                 Ok((
                     i.local_agents.clone(),
                     when_initiated,
@@ -76,6 +79,10 @@ impl ShardedGossipLocal {
             metrics.record_initiate(&remote_agent_list, self.gossip_type.into());
 
             inner.round_map.insert(peer_cert.clone(), state);
+            if let Some(tgt) = inner.initiate_tgt.as_mut() {
+                // record that the target has accepted
+                tgt.1 = true;
+            }
             Ok(())
         })?;
         Ok(gossip)

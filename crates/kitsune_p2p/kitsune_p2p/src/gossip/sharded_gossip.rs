@@ -496,7 +496,8 @@ pub struct ShardedGossipLocalState {
     /// The list of agents on this node
     local_agents: HashSet<Arc<KitsuneAgent>>,
     /// If Some, we are in the process of trying to initiate gossip with this target.
-    initiate_tgt: Option<ShardedGossipTarget>,
+    /// The bool indicates if the initiate has been accepted or not.
+    initiate_tgt: Option<(ShardedGossipTarget, bool)>,
     round_map: RoundStateMap,
     /// Metrics that track remote node states and help guide
     /// the next node to gossip with.
@@ -521,10 +522,10 @@ impl ShardedGossipLocalState {
         let init_tgt = self
             .initiate_tgt
             .as_ref()
-            .map(|tgt| &tgt.cert == state_key)
+            .map(|(tgt, _)| &tgt.cert == state_key)
             .unwrap_or(false);
         let remote_agent_list = if init_tgt {
-            let initiate_tgt = self.initiate_tgt.take().unwrap();
+            let initiate_tgt = self.initiate_tgt.take().unwrap().0;
             initiate_tgt.remote_agent_list
         } else {
             vec![]
@@ -553,7 +554,7 @@ impl ShardedGossipLocalState {
         if let Some((remote_agent_list, cert, when_initiated)) = self
             .initiate_tgt
             .as_ref()
-            .map(|tgt| (&tgt.remote_agent_list, tgt.cert.clone(), tgt.when_initiated))
+            .map(|(tgt, _)| (&tgt.remote_agent_list, tgt.cert.clone(), tgt.when_initiated))
         {
             // Check if no current round exists and we've timed out the initiate.
             let no_current_round_exist = !self.round_map.round_exists(&cert);
@@ -601,6 +602,21 @@ impl ShardedGossipLocalState {
             ?self.round_map,
             ?self.initiate_tgt,
         )
+    }
+
+    /// Are there any historical rounds which have begun but have not yet calculated
+    /// the region diff and hence the locked regions?
+    ///
+    /// This check is useful because we want to turn away new historic gossip requests
+    /// while this negotiation is happening, so that we don't have a race condition
+    /// for region locking
+    pub fn negotiating_region_diff(&self) -> bool {
+        let pending_accept = self
+            .initiate_tgt
+            .as_ref()
+            .map(|(_, accepted)| !accepted)
+            .unwrap_or(false);
+        pending_accept || self.round_map.map.values().any(|r| !r.regions_are_queued)
     }
 }
 
@@ -822,10 +838,10 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             if i.initiate_tgt
                 .as_ref()
-                .map(|tgt| &tgt.cert == id)
+                .map(|(tgt, _)| &tgt.cert == id)
                 .unwrap_or(false)
             {
-                let initiate_tgt = i.initiate_tgt.take().unwrap();
+                let (initiate_tgt, _) = i.initiate_tgt.take().unwrap();
                 if error {
                     i.metrics.write().record_completion(
                         &initiate_tgt.remote_agent_list,
@@ -1391,18 +1407,6 @@ impl AsGossipModule for ShardedGossip {
                     con.peer_cert(),
                     HowToConnect::Con(con, remote_url),
                     ShardedGossipWire::busy(),
-                )]);
-            } else if new_initiate
-                && self
-                    .gossip
-                    .inner
-                    .share_ref(|i| Ok(i.round_map.negotiating_region_diff()))?
-            {
-                tracing::warn!("peer {:?} says chotto matte!", con.peer_cert());
-                i.push_outgoing([(
-                    con.peer_cert(),
-                    HowToConnect::Con(con, remote_url),
-                    ShardedGossipWire::chotto_matte(),
                 )]);
             } else {
                 i.push_incoming([(con, remote_url, gossip, bytes as usize)]);

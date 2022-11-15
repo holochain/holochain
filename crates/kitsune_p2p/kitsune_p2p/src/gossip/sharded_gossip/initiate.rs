@@ -65,7 +65,7 @@ impl ShardedGossipLocal {
             };
 
             self.inner.share_mut(|inner, _| {
-                inner.initiate_tgt = Some(tgt);
+                inner.initiate_tgt = Some((tgt, false));
                 Ok(())
             })?;
             Some((cert, HowToConnect::Url(url), gossip))
@@ -91,8 +91,8 @@ impl ShardedGossipLocal {
                 let same_as_target = i
                     .initiate_tgt
                     .as_ref()
-                    .filter(|tgt| tgt.cert == peer_cert)
-                    .map(|tgt| tgt.tie_break);
+                    .filter(|(tgt, _)| tgt.cert == peer_cert)
+                    .map(|(tgt, _)| tgt.tie_break);
                 Ok((i.local_agents.clone(), same_as_target, already_in_progress))
             })?;
 
@@ -102,6 +102,17 @@ impl ShardedGossipLocal {
             // This means one side has already started a round but
             // a stale initiate was received.
             return Ok(vec![ShardedGossipWire::already_in_progress()]);
+        }
+
+        // We don't want to accept a new initiate if any of our rounds are negotiating
+        // a region diff, so we don't have a race condition over the locking of regions,
+        // leading to massive redundancy when multiple nodes try to initiate with us
+        // in quick successions
+        if self.gossip_type == GossipType::Historical
+            && self.inner.share_ref(|i| Ok(i.negotiating_region_diff()))?
+        {
+            tracing::warn!("chotto matte kudasai! {:?}", peer_cert);
+            return Ok(vec![ShardedGossipWire::chotto_matte()]);
         }
 
         // If this is the same connection as our current target then we need to decide who proceeds.
@@ -162,7 +173,7 @@ impl ShardedGossipLocal {
             if inner
                 .initiate_tgt
                 .as_ref()
-                .map_or(true, |tgt| tgt.cert != peer_cert)
+                .map_or(true, |(tgt, _)| tgt.cert != peer_cert)
             {
                 let mut metrics = inner.metrics.write();
 
@@ -170,10 +181,11 @@ impl ShardedGossipLocal {
                 metrics.record_accept(&remote_agent_list, self.gossip_type.into());
             }
 
+            dbg!("round added", state.regions_are_queued);
             inner.round_map.insert(peer_cert.clone(), state);
 
             // If this is the target then we should clear the when initiated timeout.
-            if let Some(tgt) = inner.initiate_tgt.as_mut() {
+            if let Some((tgt, _)) = inner.initiate_tgt.as_mut() {
                 if tgt.cert == peer_cert {
                     tgt.when_initiated = None;
                     // we also want to update the agent list
@@ -232,6 +244,7 @@ impl ShardedGossipLocal {
             // we consider recent gossip to have "sent its region"
             // for purposes of determining the round is complete
             state.regions_are_queued = true;
+            dbg!("regions_are_queued = true");
 
             self.next_bloom_batch(state, gossip).await
         } else {
@@ -240,6 +253,7 @@ impl ShardedGossipLocal {
             // be considered "finished" until all op data is received.
             state.has_pending_historical_op_data = true;
             state.regions_are_queued = false;
+            dbg!("regions_are_queued = false");
             Ok(state)
         }
     }

@@ -137,6 +137,7 @@ impl ShardedGossipLocal {
                         .sum::<u32>();
                     round.locked_regions = theirs.into_iter().map(|r| r.coords).collect();
                     round.regions_are_queued = true;
+                    dbg!("regions_are_queued = true");
                     tracing::info!("Locked regions are recorded with peer {:?}", peer_cert);
                     i.metrics.write().update_current_round(
                         peer_cert,

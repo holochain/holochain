@@ -12,6 +12,27 @@ pub(crate) struct Node {
     pub(crate) url: TxUrl,
 }
 
+impl Node {
+    /// Compute url and cert from agent info with url list
+    #[allow(dead_code)]
+    pub fn from_agent_info(info: AgentInfoSigned) -> Option<Self> {
+        info.url_list
+            .iter()
+            .cloned()
+            .filter_map(|url| {
+                kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+                    .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
+                    .ok()
+                    .map(|purl| Node {
+                        agent_info_list: vec![info.clone()],
+                        cert: Tx2Cert::from(purl.digest()),
+                        url: TxUrl::from(url.as_str()),
+                    })
+            })
+            .next()
+    }
+}
+
 impl ShardedGossipLocal {
     /// Find a remote endpoint from agents within arc set.
     pub(super) async fn find_remote_agent_within_arcset(

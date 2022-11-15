@@ -1,7 +1,27 @@
 use super::common::*;
 use super::*;
+use crate::gossip::sharded_gossip::next_target::Node;
 use crate::NOISE;
 use arbitrary::Arbitrary;
+
+fn new_round(num_expected_op_blooms: u16, received_all_incoming_op_blooms: bool) -> RoundState {
+    RoundState {
+        remote_agent_list: vec![],
+        common_arc_set: Arc::new(DhtArcSet::Full),
+        num_expected_op_blooms,
+        received_all_incoming_op_blooms,
+        has_pending_historical_op_data: false,
+        regions_are_queued: true,
+        id: nanoid::nanoid!(),
+        last_touch: Instant::now(),
+        round_timeout: std::time::Duration::MAX,
+        bloom_batch_cursor: None,
+        ops_batch_queue: OpsBatchQueue::new(),
+        region_set_sent: None,
+        throughput: Default::default(),
+        locked_regions: Default::default(),
+    }
+}
 
 #[tokio::test(flavor = "multi_thread")]
 /// Runs through a happy path gossip round between two agents.
@@ -37,7 +57,7 @@ async fn sharded_sanity_test() {
     let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
     let alices_cert = bob
         .inner
-        .share_ref(|i| Ok(i.initiate_tgt.as_ref().unwrap().cert.clone()))
+        .share_ref(|i| Ok(i.initiate_tgt.as_ref().unwrap().0.cert.clone()))
         .unwrap();
 
     // - Send initiate to alice.
@@ -139,21 +159,7 @@ async fn partial_missing_doesnt_finish() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_expected_op_blooms: 1,
-                    received_all_incoming_op_blooms: true,
-                    has_pending_historical_op_data: false,
-                    regions_are_queued: true,
-                    id: nanoid::nanoid!(),
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
-                    region_set_sent: None,
-                    throughput: Default::default(), locked_regions: Default::default(),
-                }
+                cert.clone() => new_round(1, true)
             }
             .into(),
             ..Default::default()
@@ -192,21 +198,7 @@ async fn missing_ops_finishes() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_expected_op_blooms: 1,
-                    received_all_incoming_op_blooms: true,
-                    has_pending_historical_op_data: false,
-                    regions_are_queued: true,
-                    id: nanoid::nanoid!(),
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
-                    region_set_sent: None,
-                    throughput: Default::default(), locked_regions: Default::default(),
-                }
+                cert.clone() => new_round(1, true)
             }
             .into(),
             ..Default::default()
@@ -246,21 +238,8 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_expected_op_blooms: 1,
-                    received_all_incoming_op_blooms: false,
-                    has_pending_historical_op_data: false,
-                    regions_are_queued: true,
-                    id: nanoid::nanoid!(),
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
-                    region_set_sent: None,
-                    throughput: Default::default(), locked_regions: Default::default(),
-                }
+                cert.clone() => new_round(1, false)
+
             }
             .into(),
             ..Default::default()
@@ -300,21 +279,7 @@ async fn bloom_response_finishes() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_expected_op_blooms: 0,
-                    received_all_incoming_op_blooms: false,
-                    has_pending_historical_op_data: false,
-                    regions_are_queued: true,
-                    id: nanoid::nanoid!(),
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
-                    region_set_sent: None,
-                    throughput: Default::default(), locked_regions: Default::default(),
-                }
+                cert.clone() => new_round(0, false)
             }
             .into(),
             ..Default::default()
@@ -354,21 +319,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_expected_op_blooms: 1,
-                    received_all_incoming_op_blooms: false,
-                    has_pending_historical_op_data: false,
-                    regions_are_queued: true,
-                    id: nanoid::nanoid!(),
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
-                    region_set_sent: None,
-                    throughput: Default::default(), locked_regions: Default::default(),
-                }
+                cert.clone() => new_round(1, false)
             }
             .into(),
             ..Default::default()
@@ -411,21 +362,7 @@ async fn no_data_still_finishes() {
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[0].0.clone()),
             round_map: maplit::hashmap! {
-                bob_cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_expected_op_blooms: 0,
-                    received_all_incoming_op_blooms: false,
-                    has_pending_historical_op_data: false,
-                    regions_are_queued: true,
-                    id: nanoid::nanoid!(),
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
-                    region_set_sent: None,
-                    throughput: Default::default(), locked_regions: Default::default(),
-                }
+                bob_cert.clone() => new_round(0, false)
             }
             .into(),
             ..Default::default()
@@ -439,21 +376,7 @@ async fn no_data_still_finishes() {
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[1].0.clone()),
             round_map: maplit::hashmap! {
-                alice_cert.clone() => RoundState {
-                    remote_agent_list: vec![],
-                    common_arc_set: Arc::new(DhtArcSet::Full),
-                    num_expected_op_blooms: 1,
-                    received_all_incoming_op_blooms: true,
-                    has_pending_historical_op_data: false,
-                    regions_are_queued: true,
-                    id: nanoid::nanoid!(),
-                    last_touch: Instant::now(),
-                    round_timeout: std::time::Duration::MAX,
-                    bloom_batch_cursor: None,
-                    ops_batch_queue: OpsBatchQueue::new(),
-                    region_set_sent: None,
-                    throughput: Default::default(), locked_regions: Default::default(),
-                }
+                alice_cert.clone() => new_round(1, true)
             }
             .into(),
             ..Default::default()
@@ -713,4 +636,142 @@ async fn initiate_times_out() {
             Ok(())
         })
         .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+/// Checks that incoming initates are not accepted as long as there is either:
+/// - a pending initiate that hasn't been accepted, using historical gossip, or
+/// - any round which has not yet marked that "regions_are_queued = true"
+///
+/// This test tests both cases: alice is covered by the first case, and bob by the second.
+async fn region_diff_race_condition_is_handled() {
+    observability::test_run().ok();
+
+    // - alice initiates with bob
+    // - before bob sends region data, carol tries to initiate with both of them
+    // - she should get ChottoMatte in both cases.
+
+    let agents = agents_with_infos(3).await;
+
+    let alice_node = Node::from_agent_info(agents[0].1.clone()).unwrap();
+    let bob_node = Node::from_agent_info(agents[1].1.clone()).unwrap();
+    let carol_node = Node::from_agent_info(agents[2].1.clone()).unwrap();
+
+    let mut round = new_round(0, true);
+    round.regions_are_queued = false;
+
+    let alice = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[0].0.clone()),
+            ..Default::default()
+        },
+        agents[0..2].to_vec(),
+    )
+    .await;
+
+    let bob = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[1].0.clone()),
+            ..Default::default()
+        },
+        agents[0..2].to_vec(),
+    )
+    .await;
+
+    let carol = setup_empty_player(
+        ShardedGossipLocalState {
+            local_agents: maplit::hashset!(agents[2].0.clone()),
+            ..Default::default()
+        },
+        agents.clone(),
+    )
+    .await;
+
+    // - Alice initiates with bob
+    let (bob_cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
+    assert_eq!(bob_cert, bob_node.cert);
+
+    let bob_outgoing = bob
+        .process_incoming(alice_node.cert.clone(), alice_initiate)
+        .await
+        .unwrap();
+
+    assert!(matches!(bob_outgoing[0], ShardedGossipWire::Accept(_)));
+    assert!(matches!(bob_outgoing[1], ShardedGossipWire::OpRegions(_)));
+
+    let it_was_alice = {
+        let (cert1, _, init1) = carol.try_initiate().await.unwrap().unwrap();
+        if cert1 == alice_node.cert {
+            let busy1 = alice
+                .process_incoming(carol_node.cert.clone(), init1)
+                .await
+                .unwrap()[0]
+                .clone();
+            assert_eq!(busy1, ShardedGossipWire::ChottoMatte(ChottoMatte {}));
+            carol
+                .process_incoming(alice_node.cert.clone(), busy1)
+                .await
+                .unwrap();
+            true
+        } else if cert1 == bob_node.cert {
+            let busy1 = bob
+                .process_incoming(carol_node.cert.clone(), init1)
+                .await
+                .unwrap()[0]
+                .clone();
+            assert_eq!(busy1, ShardedGossipWire::ChottoMatte(ChottoMatte {}));
+            carol
+                .process_incoming(bob_node.cert.clone(), busy1)
+                .await
+                .unwrap();
+            false
+        } else {
+            panic!("unexpected cert");
+        }
+    };
+    {
+        if it_was_alice {
+            // bob is next
+            let (cert2, _, init2) = carol.try_initiate().await.unwrap().unwrap();
+            assert_eq!(cert2, bob_node.cert);
+            let busy2 = bob
+                .process_incoming(carol_node.cert.clone(), init2)
+                .await
+                .unwrap()[0]
+                .clone();
+            assert_eq!(busy2, ShardedGossipWire::ChottoMatte(ChottoMatte {}));
+            carol
+                .process_incoming(bob_node.cert.clone(), busy2)
+                .await
+                .unwrap();
+        } else {
+            // (it was bob, so alice is next)
+            let (cert2, _, init2) = carol.try_initiate().await.unwrap().unwrap();
+            assert_eq!(cert2, alice_node.cert);
+            let busy2 = alice
+                .process_incoming(carol_node.cert.clone(), init2)
+                .await
+                .unwrap()[0]
+                .clone();
+            assert_eq!(busy2, ShardedGossipWire::ChottoMatte(ChottoMatte {}));
+            carol
+                .process_incoming(alice_node.cert.clone(), busy2)
+                .await
+                .unwrap();
+        }
+    }
+    {
+        let (cert1, _, init1) = carol.try_initiate().await.unwrap().unwrap();
+        assert_eq!(cert1, alice_node.cert);
+        let busy1 = alice
+            .process_incoming(carol_node.cert.clone(), init1)
+            .await
+            .unwrap()[0]
+            .clone();
+        assert_eq!(busy1, ShardedGossipWire::ChottoMatte(ChottoMatte {}));
+        carol
+            .process_incoming(alice_node.cert, busy1)
+            .await
+            .unwrap();
+    }
 }
