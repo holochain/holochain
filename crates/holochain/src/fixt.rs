@@ -451,7 +451,7 @@ fixturator!(
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
         signature: SignatureFixturator::new(Empty).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtySixBytesFixturator::new(Empty).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()).unwrap(),
         expires_at: TimestampFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
@@ -462,7 +462,7 @@ fixturator!(
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
         signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtySixBytesFixturator::new(Unpredictable).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()).unwrap(),
         // @todo should this be less predictable?
         expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
@@ -486,7 +486,7 @@ fixturator!(
             .next()
             .unwrap(),
         signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
-        nonce: Nonce256Bits::try_from(ThirtySixBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()).unwrap(),
+        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()).unwrap(),
         // @todo should this be more predictable?
         expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
