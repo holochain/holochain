@@ -609,25 +609,13 @@ impl ShardedGossipLocalState {
     ///
     /// This check is useful because we want to turn away new historic gossip requests
     /// while this negotiation is happening, so that we don't have a race condition
-    /// for region locking
-    pub fn negotiating_region_diff(&self, incoming_peer_cert: &Tx2Cert) -> bool {
-        let pending_accept = self
-            .initiate_tgt
-            .as_ref()
-            // If we have an unaccepted initiate, we are considered to be negotiating,
-            // unless our target is the same as the incoming initiate in question
-            .map(|(tgt, accepted)| (!accepted && tgt.cert != *incoming_peer_cert))
-            .unwrap_or(false);
-        let negotiating =
-            pending_accept || self.round_map.map.values().any(|r| !r.regions_are_queued);
-        if negotiating {
-            tracing::warn!(
-                "chotto matte kudasai! {:?} {} ",
-                incoming_peer_cert,
-                pending_accept
-            );
-        }
-        negotiating
+    /// for region locking.
+    ///
+    /// Note that there can still be a race due to the delay between initiate and accept:
+    /// if a node initiates with someone, and then accepts a new round with someone else,
+    /// both rounds will run concurrently.
+    pub fn negotiating_region_diff(&self, _incoming_peer_cert: &Tx2Cert) -> bool {
+        self.round_map.map.values().any(|r| !r.regions_are_queued)
     }
 }
 
@@ -1135,7 +1123,7 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::ChottoMatte(_) => {
                 tracing::warn!("The node {:?} needs a moment before proceeding", peer_cert);
-                self.remove_target(&peer_cert, false)?;
+                self.remove_state(&peer_cert, false)?;
                 vec![]
             }
             ShardedGossipWire::Error(Error { message }) => {

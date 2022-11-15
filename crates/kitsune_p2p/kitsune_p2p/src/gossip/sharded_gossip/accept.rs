@@ -49,6 +49,20 @@ impl ShardedGossipLocal {
             return Ok(vec![ShardedGossipWire::no_agents()]);
         }
 
+        // We don't want to accept a new accept if any of our rounds are negotiating
+        // a region diff, so we don't have a race condition over the locking of regions,
+        // leading to massive redundancy when multiple nodes try to gossip with us
+        // in quick succession
+        if self.gossip_type == GossipType::Historical
+            && self.inner.share_mut(|i, _| {
+                let yes = i.negotiating_region_diff(&peer_cert);
+                i.remove_state(&peer_cert, self.gossip_type, false);
+                Ok(yes)
+            })?
+        {
+            return Ok(vec![ShardedGossipWire::chotto_matte()]);
+        }
+
         // Get the local intervals.
         let local_agent_arcs: Vec<_> =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents)

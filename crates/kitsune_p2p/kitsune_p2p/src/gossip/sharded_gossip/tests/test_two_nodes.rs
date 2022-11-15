@@ -703,7 +703,7 @@ async fn region_diff_race_condition_is_handled() {
     // - Alice initiates with bob
     let (bob_cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
     assert_eq!(bob_cert, bob_node.cert);
-    assert!(is_negotiating(&alice));
+    assert!(!is_negotiating(&alice));
     assert!(!is_negotiating(&bob));
 
     let bob_outgoing = bob
