@@ -614,8 +614,20 @@ impl ShardedGossipLocalState {
     /// Note that there can still be a race due to the delay between initiate and accept:
     /// if a node initiates with someone, and then accepts a new round with someone else,
     /// both rounds will run concurrently.
-    pub fn negotiating_region_diff(&self, _incoming_peer_cert: &Tx2Cert) -> bool {
-        self.round_map.map.values().any(|r| !r.regions_are_queued)
+    pub fn negotiating_region_diff(&self, _peer_cert: &Tx2Cert) -> bool {
+        if let Some((tgt, accepted)) = self.initiate_tgt.as_ref() {
+            self.round_map
+                .map
+                .iter()
+                // if we have an initiate target that hasn't been accepted,
+                // then that round will always have regions_are_queued == false.
+                // If we don't filter that out, then deadlocks become possible wrt
+                // to initate/accept handshake, e.g. when a cycle forms.
+                .filter(|(cert, _)| *accepted || **cert != tgt.cert)
+                .any(|(_, r)| !r.regions_are_queued)
+        } else {
+            self.round_map.map.values().any(|r| !r.regions_are_queued)
+        }
     }
 }
 
