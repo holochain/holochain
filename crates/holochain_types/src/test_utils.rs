@@ -46,6 +46,7 @@ pub fn fake_dna_zomes_named(
                 .unwrap(),
             network_seed: network_seed.to_string(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),

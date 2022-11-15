@@ -48,6 +48,7 @@ async fn ser_regression_test() {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
             },
             integrity_zomes: vec![TestZomes::from(TestWasm::SerRegression)
                 .integrity
