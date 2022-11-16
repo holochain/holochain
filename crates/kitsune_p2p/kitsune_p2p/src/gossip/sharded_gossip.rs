@@ -529,7 +529,6 @@ impl ShardedGossipLocalState {
             .map(|(tgt, _)| &tgt.cert == state_key)
             .unwrap_or(false);
         let remote_agent_list = if init_tgt {
-            dbg!();
             let initiate_tgt = self.initiate_tgt.take().unwrap().0;
             initiate_tgt.remote_agent_list
         } else {
@@ -577,7 +576,6 @@ impl ShardedGossipLocalState {
                             RoundOutcome::Error,
                         );
                     }
-                    dbg!();
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
@@ -585,7 +583,6 @@ impl ShardedGossipLocalState {
                         let mut metrics = self.metrics.write();
                         metrics.complete_current_round(&cert, RoundOutcome::Error);
                     }
-                    dbg!();
                     self.initiate_tgt = None;
                 }
                 _ => (),
@@ -631,10 +628,7 @@ impl ShardedGossipLocalState {
                 // If we don't filter that out, then deadlocks become possible wrt
                 // to initate/accept handshake, e.g. when a cycle forms.
                 .filter(|(cert, _)| *accepted || **cert != tgt.cert)
-                .any(|(c, r)| {
-                    dbg!(c, !r.regions_are_queued);
-                    !r.regions_are_queued
-                })
+                .any(|(_, r)| !r.regions_are_queued)
         } else {
             self.round_map.map.values().any(|r| !r.regions_are_queued)
         }
@@ -851,7 +845,6 @@ impl ShardedGossipLocal {
     }
 
     fn remove_state(&self, id: &StateKey, error: bool) -> KitsuneResult<Option<RoundState>> {
-        dbg!();
         self.inner
             .share_mut(|i, _| Ok(i.remove_state(id, self.gossip_type, error)))
     }
@@ -863,7 +856,6 @@ impl ShardedGossipLocal {
                 .map(|(tgt, _)| &tgt.cert == id)
                 .unwrap_or(false)
             {
-                dbg!();
                 let (initiate_tgt, _) = i.initiate_tgt.take().unwrap();
                 if error {
                     i.metrics.write().record_completion(
@@ -882,7 +874,6 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             if i.round_map.round_exists(&key) {
                 if state.is_finished() {
-                    dbg!();
                     i.remove_state(&key, self.gossip_type, false);
                 } else {
                     i.round_map.insert(key, state);
@@ -906,7 +897,6 @@ impl ShardedGossipLocal {
                 })
                 .unwrap_or(true);
             if finished {
-                dbg!();
                 Ok(i.remove_state(state_id, self.gossip_type, false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
@@ -922,7 +912,6 @@ impl ShardedGossipLocal {
                 state.num_expected_op_blooms = num_op_blooms;
                 // NOTE: there is only ever one "batch" of OpRegions
                 state.has_pending_historical_op_data = false;
-                dbg!();
                 state.is_finished()
             };
             if i.round_map
@@ -930,7 +919,6 @@ impl ShardedGossipLocal {
                 .map(remove_state)
                 .unwrap_or(true)
             {
-                dbg!();
                 Ok(i.remove_state(state_id, self.gossip_type, false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
@@ -1076,7 +1064,6 @@ impl ShardedGossipLocal {
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
                 let mut gossip = vec![];
                 let finished = MissingOpsStatus::try_from(finished)?;
-                dbg!();
 
                 let state = match finished {
                     // This is a single chunk of ops. No need to reply.
@@ -1084,7 +1071,6 @@ impl ShardedGossipLocal {
                     // This is the last chunk in the batch. Reply with [`OpBatchReceived`]
                     // to get the next batch of missing ops.
                     MissingOpsStatus::BatchComplete => {
-                        dbg!();
                         // TODO: if this is historical gossip and an entire region is complete,
                         // we can unlock that region for this round. But currently we have no way to associate
                         // the ops received with the region that they were for.
@@ -1094,18 +1080,15 @@ impl ShardedGossipLocal {
                     // All the batches of missing ops for the bloom this node sent
                     // to the remote node have been sent back to this node.
                     MissingOpsStatus::AllComplete => {
-                        dbg!();
                         // This node can decrement the number of outstanding ops bloom replies
                         // it is waiting for.
                         let mut state = self.decrement_op_blooms(&peer_cert)?;
-                        dbg!(&state);
                         // If there are more blooms to send because this node had to batch the blooms
                         // and all the outstanding blooms have been received then this node will send
                         // the next batch of ops blooms starting from the saved cursor.
                         if let Some(state) = state.as_mut().filter(|s| {
                             s.bloom_batch_cursor.is_some() && s.num_expected_op_blooms == 0
                         }) {
-                            dbg!();
                             // We will be producing some gossip so we need to allocate.
                             gossip = Vec::new();
                             // Generate the next ops blooms batch.

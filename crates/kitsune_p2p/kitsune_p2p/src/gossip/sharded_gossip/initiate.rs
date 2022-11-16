@@ -61,7 +61,6 @@ impl ShardedGossipLocal {
             };
 
             self.inner.share_mut(|inner, _| {
-                dbg!();
                 inner.initiate_tgt = Some((tgt, false));
                 Ok(())
             })?;
@@ -87,13 +86,8 @@ impl ShardedGossipLocal {
                 let same_as_target = i
                     .initiate_tgt
                     .as_ref()
-                    .map(|(tgt, _)| {
-                        dbg!(tgt.cert.as_nick());
-                        dbg!(peer_cert.as_nick());
-                        dbg!(tgt.cert == peer_cert)
-                    })
+                    .map(|(tgt, _)| tgt.cert == peer_cert)
                     .unwrap_or(false);
-                dbg!(&self.local_cert.as_nick());
                 Ok((i.local_agents.clone(), same_as_target, already_in_progress))
             })?;
 
@@ -116,7 +110,6 @@ impl ShardedGossipLocal {
                 return Ok(Vec::with_capacity(0));
             } else {
                 self.inner.share_mut(|i, _| {
-                    dbg!();
                     i.initiate_tgt = None;
                     Ok(())
                 })?;
@@ -189,7 +182,6 @@ impl ShardedGossipLocal {
             inner.round_map.insert(peer_cert.clone(), state);
 
             // If this is the target then we should clear the when initiated timeout.
-            dbg!();
             if let Some((tgt, _)) = inner.initiate_tgt.as_mut() {
                 if tgt.cert == peer_cert {
                     tgt.when_initiated = None;
