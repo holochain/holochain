@@ -547,8 +547,14 @@ impl ShardedGossipLocalState {
             metrics.record_completion(&r.remote_agent_list, gossip_type.into(), outcome);
             metrics.complete_current_round(state_key, outcome);
         } else if init_tgt {
-            metrics.record_completion(&remote_agent_list, gossip_type.into(), RoundOutcome::Error);
-            metrics.complete_current_round(state_key, RoundOutcome::Error);
+            let outcome = if error {
+                RoundOutcome::Error
+            } else {
+                // TODO: could this cause an endless loop of retries?
+                RoundOutcome::SuccessPartial
+            };
+            metrics.record_completion(&remote_agent_list, gossip_type.into(), outcome);
+            metrics.complete_current_round(state_key, outcome);
         }
 
         r

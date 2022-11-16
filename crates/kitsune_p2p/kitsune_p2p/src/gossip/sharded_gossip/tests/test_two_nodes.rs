@@ -647,10 +647,6 @@ async fn initiate_times_out() {
 async fn region_diff_race_condition_is_handled() {
     observability::test_run().ok();
 
-    // - alice initiates with bob
-    // - before bob sends region data, carol tries to initiate with both of them
-    // - she should get ChottoMatte in both cases.
-
     let agents = agents_with_infos(3).await;
 
     let alice_node = Node::from_agent_info(agents[0].1.clone()).unwrap();
@@ -710,10 +706,18 @@ async fn region_diff_race_condition_is_handled() {
         .process_incoming(alice_node.cert.clone(), alice_initiate)
         .await
         .unwrap();
+    // after bob accepts, he will be in the "negotiating" state until calculating the region diff
     assert!(is_negotiating(&bob));
 
     assert!(matches!(bob_outgoing[0], ShardedGossipWire::Accept(_)));
     assert!(matches!(bob_outgoing[1], ShardedGossipWire::OpRegions(_)));
+
+    // after alice receives bob's accept, she will be in the "negotiating" state until calculating the region diff
+    alice
+        .process_incoming(bob_node.cert.clone(), bob_outgoing[0].clone())
+        .await
+        .unwrap();
+    assert!(is_negotiating(&alice));
 
     {
         let (cert1, _, init1) = carol.try_initiate().await.unwrap().unwrap();
@@ -765,6 +769,12 @@ async fn region_diff_race_condition_is_handled() {
             .process_incoming(bob_node.cert.clone(), busy2)
             .await
             .unwrap();
+
+        let carol_no_tgt = carol
+            .inner
+            .share_ref(|i| Ok(i.initiate_tgt.is_none()))
+            .unwrap();
+        assert!(carol_no_tgt);
     }
     {
         let mut alice_regions = alice

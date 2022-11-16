@@ -82,8 +82,6 @@ impl ShardedGossipLocal {
                 })
                 .next();
 
-            // dbg!(&info);
-
             // If we found a remote address add this agent to the node
             // or create the node if it doesn't exist.
             if let Some((info, cert, url)) = info {
@@ -124,8 +122,6 @@ fn next_remote_node(
 ) -> Option<Node> {
     use rand::prelude::*;
     let mut rng = thread_rng();
-
-    // dbg!(&remote_nodes, metrics);
 
     // Sort the nodes by longest time since we last successfully gossiped with them.
     // Randomly break ties between nodes we haven't successfully gossiped with.
@@ -189,7 +185,7 @@ fn next_remote_node(
                         >= tuning_params.gossip_peer_on_error_next_gossip_delay_ms
                 }
                 Some((_, RoundOutcome::SuccessPartial)) => true,
-                _ => true,
+                _ => dbg!(true),
             }
         })
 }
