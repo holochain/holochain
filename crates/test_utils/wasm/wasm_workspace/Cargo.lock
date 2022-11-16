@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.160"
+version = "0.0.161"
 dependencies = [
  "getrandom",
  "hdi",
@@ -946,7 +946,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.61"
+version = "0.0.62"
 dependencies = [
  "hdk",
  "serde",
@@ -981,7 +981,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.55"
+version = "0.0.56"
 dependencies = [
  "derive_builder",
  "fixt",
@@ -1091,7 +1091,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.0.9"
+version = "0.0.10"
 dependencies = [
  "colored",
  "derivative",

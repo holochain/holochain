@@ -1,6 +1,6 @@
 [package]
 name = "hdk"
-version = "0.0.160"
+version = "0.0.161"
 description = "The Holochain HDK"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
@@ -29,7 +29,7 @@ holo_hash = { version = "^0.0.35", path = "../holo_hash" }
 holochain_wasmer_guest = "=0.0.82"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_zome_types = { version = "^0.0.55", path = "../holochain_zome_types", default-features = false }
+holochain_zome_types = { version = "^0.0.56", path = "../holochain_zome_types", default-features = false }
 paste = "=1.0.5"
 serde = "1.0"
 serde_bytes = "0.11"

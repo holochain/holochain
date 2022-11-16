@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.56
+
 ## 0.0.55
 
 **BREAKING CHANGE**: Rename `AuthorizeZomeCallSigningKey` to `GrantZomeCallCapability` & remove parameter `provenance`. [\#1647](https://github.com/holochain/holochain/pull/1647)
