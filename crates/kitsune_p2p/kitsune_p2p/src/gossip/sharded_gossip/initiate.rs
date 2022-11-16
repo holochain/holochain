@@ -1,5 +1,4 @@
 use kitsune_p2p_types::dht_arc::DhtArcRange;
-use rand::Rng;
 
 use super::*;
 
@@ -44,8 +43,6 @@ impl ShardedGossipLocal {
             url,
         }) = remote_agent
         {
-            let id = rand::thread_rng().gen();
-
             let agent_list = self
                 .evt_sender
                 .query_agents(
@@ -54,17 +51,17 @@ impl ShardedGossipLocal {
                 .await
                 .map_err(KitsuneError::other)?;
 
-            let gossip = ShardedGossipWire::initiate(intervals, id, agent_list);
+            let gossip = ShardedGossipWire::initiate(intervals, agent_list);
 
             let tgt = ShardedGossipTarget {
                 remote_agent_list: agent_info_list,
                 cert: cert.clone(),
-                tie_break: id,
                 when_initiated: Some(Instant::now()),
                 url: url.clone(),
             };
 
             self.inner.share_mut(|inner, _| {
+                dbg!();
                 inner.initiate_tgt = Some((tgt, false));
                 Ok(())
             })?;
@@ -82,7 +79,6 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: Tx2Cert,
         remote_arc_set: Vec<DhtArcRange>,
-        remote_id: u32,
         remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, same_as_target, already_in_progress) =
@@ -91,8 +87,13 @@ impl ShardedGossipLocal {
                 let same_as_target = i
                     .initiate_tgt
                     .as_ref()
-                    .filter(|(tgt, _)| tgt.cert == peer_cert)
-                    .map(|(tgt, _)| tgt.tie_break);
+                    .map(|(tgt, _)| {
+                        dbg!(tgt.cert.as_nick());
+                        dbg!(peer_cert.as_nick());
+                        dbg!(tgt.cert == peer_cert)
+                    })
+                    .unwrap_or(false);
+                dbg!(&self.local_cert.as_nick());
                 Ok((i.local_agents.clone(), same_as_target, already_in_progress))
             })?;
 
@@ -104,6 +105,24 @@ impl ShardedGossipLocal {
             return Ok(vec![ShardedGossipWire::already_in_progress()]);
         }
 
+        // If this is the same connection as our current target then we need to decide who proceeds.
+        if same_as_target {
+            // If we have a lower id then we proceed
+            // and the remote will exit.
+            // If we have a higher id than the remote
+            // then we exit and the remote will proceed.
+            // If we tie then we both exit (This will be very rare).
+            if self.local_cert >= peer_cert {
+                return Ok(Vec::with_capacity(0));
+            } else {
+                self.inner.share_mut(|i, _| {
+                    dbg!();
+                    i.initiate_tgt = None;
+                    Ok(())
+                })?;
+            }
+        }
+
         // We don't want to accept a new initiate if any of our rounds are negotiating
         // a region diff, so we don't have a race condition over the locking of regions,
         // leading to massive redundancy when multiple nodes try to initiate with us
@@ -111,28 +130,11 @@ impl ShardedGossipLocal {
         if self.gossip_type == GossipType::Historical
             && self.inner.share_mut(|i, _| {
                 let yes = i.negotiating_region_diff(&peer_cert);
-                i.remove_state(&peer_cert, self.gossip_type, false);
                 Ok(yes)
             })?
         {
+            self.remove_target(&peer_cert, false)?;
             return Ok(vec![ShardedGossipWire::chotto_matte()]);
-        }
-
-        // If this is the same connection as our current target then we need to decide who proceeds.
-        if let Some(our_id) = same_as_target {
-            // If we have a lower id then we proceed
-            // and the remote will exit.
-            // If we have a higher id than the remote
-            // then we exit and the remote will proceed.
-            // If we tie then we both exit (This will be very rare).
-            if our_id >= remote_id {
-                return Ok(Vec::with_capacity(0));
-            } else {
-                self.inner.share_mut(|i, _| {
-                    i.initiate_tgt = None;
-                    Ok(())
-                })?;
-            }
         }
 
         // If we don't have a local agent then there's nothing to do.
@@ -187,6 +189,7 @@ impl ShardedGossipLocal {
             inner.round_map.insert(peer_cert.clone(), state);
 
             // If this is the target then we should clear the when initiated timeout.
+            dbg!();
             if let Some((tgt, _)) = inner.initiate_tgt.as_mut() {
                 if tgt.cert == peer_cert {
                     tgt.when_initiated = None;

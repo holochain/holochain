@@ -56,7 +56,9 @@ impl ShardedGossipLocal {
         if self.gossip_type == GossipType::Historical
             && self.inner.share_mut(|i, _| {
                 let yes = i.negotiating_region_diff(&peer_cert);
-                i.remove_state(&peer_cert, self.gossip_type, false);
+                if yes {
+                    i.remove_state(&peer_cert, self.gossip_type, false);
+                }
                 Ok(yes)
             })?
         {
@@ -92,10 +94,13 @@ impl ShardedGossipLocal {
             metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
             metrics.record_initiate(&remote_agent_list, self.gossip_type.into());
 
+            tracing::debug!("inserted new state into round map for cert {:?}", peer_cert);
             inner.round_map.insert(peer_cert.clone(), state);
             if let Some(tgt) = inner.initiate_tgt.as_mut() {
-                // record that the target has accepted
-                tgt.1 = true;
+                if tgt.0.cert == peer_cert {
+                    // record that the target has accepted
+                    tgt.1 = true;
+                }
             }
             Ok(())
         })?;

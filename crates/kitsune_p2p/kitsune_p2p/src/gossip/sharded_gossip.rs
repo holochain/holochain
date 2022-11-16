@@ -186,6 +186,8 @@ impl ShardedGossip {
         #[cfg(not(feature = "test"))]
         let state = Default::default();
 
+        let local_cert = ep_hnd.local_cert();
+
         let this = Arc::new(Self {
             ep_hnd,
             state: Share::new(state),
@@ -197,6 +199,7 @@ impl ShardedGossip {
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
+                local_cert,
             },
             bandwidth,
         });
@@ -343,6 +346,7 @@ impl ShardedGossip {
                 .variant_type()
                 .to_string()
                 .replace("ShardedGossipWire::", "");
+            // TODO: PERF: remove this line which is only for logging
             let len = msg.encode_vec().expect("can't encode msg").len();
             let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
                 Ok(r) => {
@@ -467,6 +471,7 @@ pub struct ShardedGossipLocal {
     host_api: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
+    local_cert: Tx2Cert,
 }
 
 /// Incoming gossip.
@@ -484,7 +489,6 @@ pub type NodeId = Tx2Cert;
 pub(crate) struct ShardedGossipTarget {
     pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
     pub(crate) cert: Tx2Cert,
-    pub(crate) tie_break: u32,
     pub(crate) when_initiated: Option<tokio::time::Instant>,
     #[allow(dead_code)]
     pub(crate) url: TxUrl,
@@ -525,6 +529,7 @@ impl ShardedGossipLocalState {
             .map(|(tgt, _)| &tgt.cert == state_key)
             .unwrap_or(false);
         let remote_agent_list = if init_tgt {
+            dbg!();
             let initiate_tgt = self.initiate_tgt.take().unwrap().0;
             initiate_tgt.remote_agent_list
         } else {
@@ -572,6 +577,7 @@ impl ShardedGossipLocalState {
                             RoundOutcome::Error,
                         );
                     }
+                    dbg!();
                     self.initiate_tgt = None;
                 }
                 None if no_current_round_exist => {
@@ -579,6 +585,7 @@ impl ShardedGossipLocalState {
                         let mut metrics = self.metrics.write();
                         metrics.complete_current_round(&cert, RoundOutcome::Error);
                     }
+                    dbg!();
                     self.initiate_tgt = None;
                 }
                 _ => (),
@@ -624,7 +631,10 @@ impl ShardedGossipLocalState {
                 // If we don't filter that out, then deadlocks become possible wrt
                 // to initate/accept handshake, e.g. when a cycle forms.
                 .filter(|(cert, _)| *accepted || **cert != tgt.cert)
-                .any(|(_, r)| !r.regions_are_queued)
+                .any(|(c, r)| {
+                    dbg!(c, !r.regions_are_queued);
+                    !r.regions_are_queued
+                })
         } else {
             self.round_map.map.values().any(|r| !r.regions_are_queued)
         }
@@ -841,6 +851,7 @@ impl ShardedGossipLocal {
     }
 
     fn remove_state(&self, id: &StateKey, error: bool) -> KitsuneResult<Option<RoundState>> {
+        dbg!();
         self.inner
             .share_mut(|i, _| Ok(i.remove_state(id, self.gossip_type, error)))
     }
@@ -852,6 +863,7 @@ impl ShardedGossipLocal {
                 .map(|(tgt, _)| &tgt.cert == id)
                 .unwrap_or(false)
             {
+                dbg!();
                 let (initiate_tgt, _) = i.initiate_tgt.take().unwrap();
                 if error {
                     i.metrics.write().record_completion(
@@ -870,6 +882,7 @@ impl ShardedGossipLocal {
         self.inner.share_mut(|i, _| {
             if i.round_map.round_exists(&key) {
                 if state.is_finished() {
+                    dbg!();
                     i.remove_state(&key, self.gossip_type, false);
                 } else {
                     i.round_map.insert(key, state);
@@ -883,7 +896,7 @@ impl ShardedGossipLocal {
         &self,
         state_id: &StateKey,
     ) -> KitsuneResult<Option<RoundState>> {
-        self.inner.share_mut(|i, _| {
+        let r = self.inner.share_mut(|i, _| {
             let finished = i
                 .round_map
                 .get_mut(state_id)
@@ -893,11 +906,13 @@ impl ShardedGossipLocal {
                 })
                 .unwrap_or(true);
             if finished {
+                dbg!();
                 Ok(i.remove_state(state_id, self.gossip_type, false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
             }
-        })
+        });
+        r
     }
 
     fn decrement_op_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
@@ -907,6 +922,7 @@ impl ShardedGossipLocal {
                 state.num_expected_op_blooms = num_op_blooms;
                 // NOTE: there is only ever one "batch" of OpRegions
                 state.has_pending_historical_op_data = false;
+                dbg!();
                 state.is_finished()
             };
             if i.round_map
@@ -914,6 +930,7 @@ impl ShardedGossipLocal {
                 .map(remove_state)
                 .unwrap_or(true)
             {
+                dbg!();
                 Ok(i.remove_state(state_id, self.gossip_type, false))
             } else {
                 Ok(i.round_map.get(state_id).cloned())
@@ -989,10 +1006,9 @@ impl ShardedGossipLocal {
         let r = match msg {
             ShardedGossipWire::Initiate(Initiate {
                 intervals,
-                id,
                 agent_list,
             }) => {
-                self.incoming_initiate(peer_cert, intervals, id, agent_list)
+                self.incoming_initiate(peer_cert, intervals, agent_list)
                     .await?
             }
             ShardedGossipWire::Accept(Accept {
@@ -1060,6 +1076,7 @@ impl ShardedGossipLocal {
             ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
                 let mut gossip = vec![];
                 let finished = MissingOpsStatus::try_from(finished)?;
+                dbg!();
 
                 let state = match finished {
                     // This is a single chunk of ops. No need to reply.
@@ -1067,6 +1084,7 @@ impl ShardedGossipLocal {
                     // This is the last chunk in the batch. Reply with [`OpBatchReceived`]
                     // to get the next batch of missing ops.
                     MissingOpsStatus::BatchComplete => {
+                        dbg!();
                         // TODO: if this is historical gossip and an entire region is complete,
                         // we can unlock that region for this round. But currently we have no way to associate
                         // the ops received with the region that they were for.
@@ -1076,16 +1094,18 @@ impl ShardedGossipLocal {
                     // All the batches of missing ops for the bloom this node sent
                     // to the remote node have been sent back to this node.
                     MissingOpsStatus::AllComplete => {
+                        dbg!();
                         // This node can decrement the number of outstanding ops bloom replies
                         // it is waiting for.
                         let mut state = self.decrement_op_blooms(&peer_cert)?;
-
+                        dbg!(&state);
                         // If there are more blooms to send because this node had to batch the blooms
                         // and all the outstanding blooms have been received then this node will send
                         // the next batch of ops blooms starting from the saved cursor.
                         if let Some(state) = state.as_mut().filter(|s| {
                             s.bloom_batch_cursor.is_some() && s.num_expected_op_blooms == 0
                         }) {
+                            dbg!();
                             // We will be producing some gossip so we need to allocate.
                             gossip = Vec::new();
                             // Generate the next ops blooms batch.
@@ -1210,6 +1230,16 @@ impl RoundState {
     /// - This node has no queued missing ops to send to the remote node.
     /// - If running historical gossip, the number of ops sent/received matches expectations
     fn is_finished(&self) -> bool {
+        tracing::debug!(
+            "is_finished? {} {} {} {} {} {}",
+            self.num_expected_op_blooms == 0,
+            !self.has_pending_historical_op_data,
+            self.received_all_incoming_op_blooms,
+            self.regions_are_queued,
+            self.bloom_batch_cursor.is_none(),
+            self.ops_batch_queue.is_empty()
+        );
+
         self.num_expected_op_blooms == 0
             && !self.has_pending_historical_op_data
             && self.received_all_incoming_op_blooms
@@ -1295,10 +1325,8 @@ kitsune_p2p_types::write_codec_enum! {
             /// The list of arc intervals (equivalent to a [`DhtArcSet`])
             /// for all local agents
             intervals.0: Vec<DhtArcRange>,
-            /// A random number to resolve concurrent initiates.
-            id.1: u32,
             /// List of active local agents represented by this node.
-            agent_list.2: Vec<AgentInfoSigned>,
+            agent_list.1: Vec<AgentInfoSigned>,
         },
 
         /// Accept an incoming round of gossip from a remote node
