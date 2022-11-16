@@ -6,6 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221116.012050
+
+## [holochain\_cli-0.0.68](crates/holochain_cli/CHANGELOG.md#0.0.68)
+
+## [holochain\_cli\_sandbox-0.0.64](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.64)
+
+## [holochain\_cli\_bundle-0.0.63](crates/holochain_cli_bundle/CHANGELOG.md#0.0.63)
+
+## [holochain-0.0.173](crates/holochain/CHANGELOG.md#0.0.173)
+
+## [holochain\_test\_wasm\_common-0.0.62](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.62)
+
+## [holochain\_conductor\_api-0.0.70](crates/holochain_conductor_api/CHANGELOG.md#0.0.70)
+
+## [holochain\_wasm\_test\_utils-0.0.69](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.69)
+
+## [holochain\_cascade-0.0.72](crates/holochain_cascade/CHANGELOG.md#0.0.72)
+
+## [holochain\_state-0.0.70](crates/holochain_state/CHANGELOG.md#0.0.70)
+
+## [holochain\_p2p-0.0.67](crates/holochain_p2p/CHANGELOG.md#0.0.67)
+
+## [holochain\_types-0.0.67](crates/holochain_types/CHANGELOG.md#0.0.67)
+
+## [holochain\_keystore-0.0.65](crates/holochain_keystore/CHANGELOG.md#0.0.65)
+
+## [holochain\_sqlite-0.0.64](crates/holochain_sqlite/CHANGELOG.md#0.0.64)
+
+## [kitsune\_p2p-0.0.51](crates/kitsune_p2p/CHANGELOG.md#0.0.51)
+
+- `rpc_multi` now only actually makes a single request. This greatly simplifies the code path and eliminates a source of network bandwidth congestion, but removes the redundancy of aggregating the results of multiple peers. [\#1651](https://github.com/holochain/holochain/pull/1651)
+
+## [kitsune\_p2p\_proxy-0.0.38](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.38)
+
+## [kitsune\_p2p\_transport\_quic-0.0.38](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.38)
+
+## [kitsune\_p2p\_types-0.0.38](crates/kitsune_p2p_types/CHANGELOG.md#0.0.38)
+
+## [mr\_bundle-0.0.18](crates/mr_bundle/CHANGELOG.md#0.0.18)
+
+## [holochain\_util-0.0.13](crates/holochain_util/CHANGELOG.md#0.0.13)
+
+## [hdk-0.0.161](crates/hdk/CHANGELOG.md#0.0.161)
+
+## [holochain\_zome\_types-0.0.56](crates/holochain_zome_types/CHANGELOG.md#0.0.56)
+
+## [kitsune\_p2p\_dht-0.0.10](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.10)
+
 # 20221109.012313
 
 ## [holochain\_cli-0.0.67](crates/holochain_cli/CHANGELOG.md#0.0.67)
