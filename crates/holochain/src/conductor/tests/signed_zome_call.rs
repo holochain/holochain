@@ -97,6 +97,8 @@ async fn signed_zome_call() {
         Some(&cap_access_secret)
     ));
 
+    // a zome call without the cap secret that enables lookup of the authorized
+    // signing key should be rejected
     let response = conductor
         .call_zome(
             ZomeCall::try_from_unsigned_zome_call(
@@ -107,6 +109,33 @@ async fn signed_zome_call() {
                     zome_name: zome.coordinator_zome_name(),
                     fn_name: "create_entry".into(),
                     cap_secret: None,
+                    payload: ExternIO::encode(()).unwrap(),
+                    nonce: Nonce256Bits::from([0; 32]),
+                    expires_at: Timestamp(Timestamp::now().as_micros() + 100000),
+                },
+            )
+            .await
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_matches!(
+        response,
+        holochain_zome_types::ZomeCallResponse::Unauthorized(..)
+    );
+
+    // a zome call with the cap secret of the authorized signing key should succeed
+    let response = conductor
+        .call_zome(
+            ZomeCall::try_from_unsigned_zome_call(
+                &conductor.keystore(),
+                ZomeCallUnsigned {
+                    provenance: agent_pub_key.clone(),
+                    cell_id: cell_id.clone(),
+                    zome_name: zome.coordinator_zome_name(),
+                    fn_name: "create_entry".into(),
+                    cap_secret: Some(cap_access_secret),
                     payload: ExternIO::encode(()).unwrap(),
                     nonce: Nonce256Bits::from([0; 32]),
                     expires_at: Timestamp(Timestamp::now().as_micros() + 100000),
