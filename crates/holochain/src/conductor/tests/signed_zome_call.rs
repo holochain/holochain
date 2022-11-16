@@ -10,10 +10,15 @@ use arbitrary::Arbitrary;
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
-async fn grant_zome_call_capability() {
-    use holochain_zome_types::{CapAccess, ZomeCallCapGrant};
+async fn signed_zome_call() {
+    use holochain_conductor_api::ZomeCall;
+    use holochain_zome_types::{
+        CapAccess, ExternIO, Nonce256Bits, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned,
+    };
+    use matches::assert_matches;
 
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let zome = TestWasm::Create;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let role_id: AppRoleId = "dna".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
@@ -91,4 +96,27 @@ async fn grant_zome_call_capability() {
         &cap_access_public_key,
         Some(&cap_access_secret)
     ));
+
+    let response = conductor
+        .call_zome(
+            ZomeCall::try_from_unsigned_zome_call(
+                &conductor.keystore(),
+                ZomeCallUnsigned {
+                    provenance: agent_pub_key.clone(),
+                    cell_id: cell_id.clone(),
+                    zome_name: zome.coordinator_zome_name(),
+                    fn_name: "create_entry".into(),
+                    cap_secret: None,
+                    payload: ExternIO::encode(()).unwrap(),
+                    nonce: Nonce256Bits::from([0; 32]),
+                    expires_at: Timestamp(Timestamp::now().as_micros() + 100000),
+                },
+            )
+            .await
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_matches!(response, holochain_zome_types::ZomeCallResponse::Ok(_));
 }
