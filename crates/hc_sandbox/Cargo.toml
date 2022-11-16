@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_sandbox"
-version = "0.0.64-dev.0"
+version = "0.0.64"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_sandbox"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
@@ -19,11 +19,11 @@ anyhow = "1.0"
 ansi_term = "0.12"
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 futures = "0.3"
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.0.70-dev.0"}
-holochain_types = { path = "../holochain_types", version = "^0.0.67-dev.0"}
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.0.70"}
+holochain_types = { path = "../holochain_types", version = "^0.0.67"}
 holochain_websocket = { path = "../holochain_websocket", version = "0.0.39"}
-holochain_p2p = { path = "../holochain_p2p", version = "^0.0.67-dev.0"}
-holochain_util = { version = "^0.0.13-dev.0", path = "../holochain_util", features = [ "pw" ] }
+holochain_p2p = { path = "../holochain_p2p", version = "^0.0.67"}
+holochain_util = { version = "^0.0.13", path = "../holochain_util", features = [ "pw" ] }
 nanoid = "0.3"
 observability = "0.1.3"
 once_cell = "1.13.0"
