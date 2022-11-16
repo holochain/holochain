@@ -225,15 +225,33 @@ pub enum ZomeCallResponse {
 }
 
 /// 256 Bit generic nonce.
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Nonce256Bits([u8; 32]);
-// Nonces aren't really "secure" but this is a conveninent way to derive a bunch
-// of things we do want.
-crate::secure_primitive!(Nonce256Bits, 32);
 
 impl Nonce256Bits {
     pub fn into_inner(self) -> [u8; 32] {
         self.0
+    }
+}
+
+impl From<[u8; 32]> for Nonce256Bits {
+    fn from(b: [u8; 32]) -> Self {
+        Self(b)
+    }
+}
+
+impl PartialEq for Nonce256Bits {
+    fn eq(&self, other: &Self) -> bool {
+        use subtle::ConstantTimeEq;
+        self.0.ct_eq(&other.0).into()
+    }
+}
+
+impl std::fmt::Debug for Nonce256Bits {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = String::from_utf8(subtle_encoding::hex::encode(self.0.to_vec()))
+            .unwrap_or_else(|_| "<unparseable signature>".into());
+        f.write_str(&str)
     }
 }
 
