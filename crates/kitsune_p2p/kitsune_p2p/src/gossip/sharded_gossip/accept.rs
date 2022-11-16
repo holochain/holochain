@@ -54,14 +54,11 @@ impl ShardedGossipLocal {
         // leading to massive redundancy when multiple nodes try to gossip with us
         // in quick succession
         if self.gossip_type == GossipType::Historical
-            && self.inner.share_mut(|i, _| {
-                let yes = i.negotiating_region_diff(&peer_cert);
-                if yes {
-                    i.remove_state(&peer_cert, self.gossip_type, false);
-                }
-                Ok(yes)
-            })?
+            && self
+                .inner
+                .share_ref(|i| Ok(i.negotiating_region_diff(&peer_cert)))?
         {
+            self.remove_state(&peer_cert, false)?;
             return Ok(vec![ShardedGossipWire::chotto_matte()]);
         }
 

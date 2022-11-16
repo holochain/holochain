@@ -887,7 +887,7 @@ impl ShardedGossipLocal {
         &self,
         state_id: &StateKey,
     ) -> KitsuneResult<Option<RoundState>> {
-        let r = self.inner.share_mut(|i, _| {
+        self.inner.share_mut(|i, _| {
             let finished = i
                 .round_map
                 .get_mut(state_id)
@@ -901,8 +901,7 @@ impl ShardedGossipLocal {
             } else {
                 Ok(i.round_map.get(state_id).cloned())
             }
-        });
-        r
+        })
     }
 
     fn decrement_op_blooms(&self, state_id: &StateKey) -> KitsuneResult<Option<RoundState>> {
