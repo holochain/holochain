@@ -726,7 +726,6 @@ async fn mock_network_sharded_gossip() {
                                     ShardedGossipWire::NoAgents(_) => (),
                                     ShardedGossipWire::AlreadyInProgress(_) => (),
                                     ShardedGossipWire::Busy(_) => (),
-                                    ShardedGossipWire::ChottoMatte(_) => (),
                                     ShardedGossipWire::Error(_) => (),
                                     ShardedGossipWire::OpBatchReceived(_) => (),
                                 }
@@ -1230,7 +1229,6 @@ async fn mock_network_sharding() {
                                     ShardedGossipWire::NoAgents(_) => (),
                                     ShardedGossipWire::AlreadyInProgress(_) => (),
                                     ShardedGossipWire::Busy(_) => (),
-                                    ShardedGossipWire::ChottoMatte(_) => (),
                                     ShardedGossipWire::Error(_) => (),
                                     ShardedGossipWire::OpBatchReceived(_) => (),
                                 }

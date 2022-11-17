@@ -275,7 +275,6 @@ impl ShardedGossip {
                         ShardedGossipWire::Busy(_) => {}
                         ShardedGossipWire::NoAgents(_) => {}
                         ShardedGossipWire::AlreadyInProgress(_) => {}
-                        ShardedGossipWire::ChottoMatte(_) => {}
                     }
                     i.metrics.write().update_current_round(
                         &cert,
@@ -550,8 +549,10 @@ impl ShardedGossipLocalState {
             let outcome = if error {
                 RoundOutcome::Error
             } else {
-                // TODO: could this cause an endless loop of retries?
-                RoundOutcome::SuccessPartial
+                // Not sure which flavor of success this should be, because it's hard to
+                // tell what could lead to this case, so let's err on the side
+                // of completion.
+                RoundOutcome::SuccessComplete
             };
             metrics.record_completion(&remote_agent_list, gossip_type.into(), outcome);
             metrics.complete_current_round(state_key, outcome);
@@ -986,7 +987,6 @@ impl ShardedGossipLocal {
                         ShardedGossipWire::Busy(_) => {}
                         ShardedGossipWire::NoAgents(_) => {}
                         ShardedGossipWire::AlreadyInProgress(_) => {}
-                        ShardedGossipWire::ChottoMatte(_) => {}
                     }
 
                     i.metrics.write().update_current_round(
@@ -1144,11 +1144,6 @@ impl ShardedGossipLocal {
             ShardedGossipWire::Busy(_) => {
                 tracing::warn!("The node {:?} is busy", peer_cert);
                 self.remove_target(&peer_cert, true)?;
-                vec![]
-            }
-            ShardedGossipWire::ChottoMatte(_) => {
-                tracing::warn!("The node {:?} needs a moment before proceeding", peer_cert);
-                self.remove_state(&peer_cert, false)?;
                 vec![]
             }
             ShardedGossipWire::Error(Error { message }) => {
@@ -1408,9 +1403,6 @@ kitsune_p2p_types::write_codec_enum! {
         /// that already has an active round with you.
         AlreadyInProgress(0xa3) { },
 
-        /// Similar to Busy, but does not imply an error. This just means "I am not ready
-        /// right now, but if you come back in a moment I probably will be."
-        ChottoMatte(0xa4) { },
     }
 }
 

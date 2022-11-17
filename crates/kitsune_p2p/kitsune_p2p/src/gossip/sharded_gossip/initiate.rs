@@ -116,19 +116,6 @@ impl ShardedGossipLocal {
             }
         }
 
-        // We don't want to accept a new initiate if any of our rounds are negotiating
-        // a region diff, so we don't have a race condition over the locking of regions,
-        // leading to massive redundancy when multiple nodes try to initiate with us
-        // in quick successions
-        if self.gossip_type == GossipType::Historical
-            && self
-                .inner
-                .share_ref(|i| Ok(i.negotiating_region_diff(&peer_cert)))?
-        {
-            self.remove_target(&peer_cert, false)?;
-            return Ok(vec![ShardedGossipWire::chotto_matte()]);
-        }
-
         // If we don't have a local agent then there's nothing to do.
         if local_agents.is_empty() {
             // No local agents so there's no one to initiate gossip from.
