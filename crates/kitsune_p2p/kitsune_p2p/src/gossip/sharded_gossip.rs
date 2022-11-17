@@ -539,10 +539,10 @@ impl ShardedGossipLocalState {
         if let Some(r) = &r {
             let outcome = if error {
                 RoundOutcome::Error
-            } else if r.locked_regions.is_empty() {
-                RoundOutcome::SuccessComplete
-            } else {
+            } else if r.size_limited {
                 RoundOutcome::SuccessPartial
+            } else {
+                RoundOutcome::SuccessComplete
             };
             metrics.record_completion(&r.remote_agent_list, gossip_type.into(), outcome);
             metrics.complete_current_round(state_key, outcome);
@@ -730,6 +730,8 @@ pub struct RoundState {
     /// The RegionSet we will send to our gossip partner during Historical
     /// gossip (will be None for Recent).
     region_set_sent: Option<Arc<RegionSetLtcs>>,
+    /// Was the size of this round limited, or did we send as much as we possibly could?
+    size_limited: bool,
     /// Stats about ops, regions, bloom filter, and bytes sent and received,
     pub(crate) throughput: RoundThroughput,
     /// If doing Historical gossip, the set of regions I am expecting data for this round.
@@ -745,6 +747,7 @@ impl RoundState {
         common_arc_set: Arc<DhtArcSet>,
         region_set_sent: Option<Arc<RegionSetLtcs<RegionData>>>,
         round_timeout: Duration,
+        size_limited: bool,
     ) -> Self {
         RoundState {
             remote_agent_list,
@@ -759,6 +762,7 @@ impl RoundState {
             last_touch: Instant::now(),
             round_timeout,
             region_set_sent,
+            size_limited,
             throughput: Default::default(),
             locked_regions: Default::default(),
         }
@@ -842,6 +846,7 @@ impl ShardedGossipLocal {
             common_arc_set,
             region_set_sent.map(Arc::new),
             ROUND_TIMEOUT,
+            false,
         ))
     }
 

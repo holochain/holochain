@@ -266,11 +266,14 @@ pub struct RegionDiffs<D> {
 impl<D: RegionDataConstraints> RegionDiffs<D> {
     /// Pick regions from both sets up until the max_size is reached, skipping locked regions,
     /// and discard all others
-    pub fn round_limited(self, max_size: u32) -> Self {
-        Self {
-            ours: Self::round_limited_1(self.ours, max_size),
-            theirs: Self::round_limited_1(self.theirs, max_size),
-        }
+    pub fn round_limited(self, max_size: u32) -> (Self, bool) {
+        let len_ours = self.ours.len();
+        let len_theirs = self.theirs.len();
+        let ours = Self::round_limited_1(self.ours, max_size);
+        let theirs = Self::round_limited_1(self.theirs, max_size);
+        let diffs = Self { ours, theirs };
+        let limited = diffs.ours.len() < len_ours || diffs.theirs.len() < len_theirs;
+        (diffs, limited)
     }
 
     fn round_limited_1(regions: Vec<Region<D>>, max_size: u32) -> Vec<Region<D>> {
@@ -386,7 +389,7 @@ mod tests {
         };
 
         {
-            let diffs_1k = diffs.clone().round_limited(1000);
+            let (diffs_1k, lim) = diffs.clone().round_limited(1000);
             assert_eq!(diffs_1k.ours.len(), 10);
             assert_eq!(diffs_1k.theirs.len(), 5);
             assert_eq!(
@@ -399,7 +402,7 @@ mod tests {
             );
         }
         {
-            let diffs_1k_locked = diffs_locked.clone().round_limited(1000);
+            let (diffs_1k_locked, lim) = diffs_locked.clone().round_limited(1000);
             assert_eq!(diffs_1k_locked.ours.len(), 8);
             assert_eq!(diffs_1k_locked.theirs.len(), 5);
             // - we're constrained by the lack of unlocked regions
@@ -422,7 +425,7 @@ mod tests {
             );
         }
         {
-            let diffs_5k = diffs.round_limited(5000);
+            let (diffs_5k, lim) = diffs.round_limited(5000);
             assert_eq!(diffs_5k.ours.len(), 20);
             assert_eq!(diffs_5k.theirs.len(), 20);
             assert_eq!(

@@ -20,6 +20,7 @@ fn new_round(num_expected_op_blooms: u16, received_all_incoming_op_blooms: bool)
         region_set_sent: None,
         throughput: Default::default(),
         locked_regions: Default::default(),
+        size_limited: false,
     }
 }
 
