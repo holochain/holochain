@@ -2191,7 +2191,7 @@ dependencies = [
  "observability",
  "serde",
  "serde_derive",
- "serde_yaml 0.8.26",
+ "serde_yaml 0.9.11",
  "structopt",
  "thiserror",
  "tracing",
