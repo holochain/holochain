@@ -427,6 +427,18 @@ impl KitsuneP2pActor {
                                             );
                                         }
                                     }
+                                    wire::Wire::FetchOp(wire::FetchOp {
+                                        space: _,
+                                        fetch_list: _,
+                                    }) => {
+                                        todo!("RECEIVED a fetch op, see if we have it, add it to the push op data queue");
+                                    }
+                                    wire::Wire::PushOpData(wire::PushOpData {
+                                        space: _,
+                                        op_data_list: _,
+                                    }) => {
+                                        todo!("RECEIVED op data, hopefully we asked for it : ) - send it for integration");
+                                    }
                                     wire::Wire::MetricExchange(wire::MetricExchange {
                                         space,
                                         msgs,
