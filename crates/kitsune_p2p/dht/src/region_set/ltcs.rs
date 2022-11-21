@@ -250,7 +250,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 /// The diff of two region sets, from the perspective of both parties
 ///
 /// Both sets of regions will have the same coordinates: what's different is the data
@@ -387,9 +387,14 @@ mod tests {
 
             al.diff(bl).unwrap()
         };
-
+        {
+            let (diffs_10k, lim) = diffs.clone().round_limited(10000);
+            assert!(!lim);
+            assert_eq!(diffs, diffs_10k);
+        }
         {
             let (diffs_1k, lim) = diffs.clone().round_limited(1000);
+            assert!(lim);
             assert_eq!(diffs_1k.ours.len(), 10);
             assert_eq!(diffs_1k.theirs.len(), 5);
             assert_eq!(
@@ -403,6 +408,7 @@ mod tests {
         }
         {
             let (diffs_1k_locked, lim) = diffs_locked.clone().round_limited(1000);
+            assert!(lim);
             assert_eq!(diffs_1k_locked.ours.len(), 8);
             assert_eq!(diffs_1k_locked.theirs.len(), 5);
             // - we're constrained by the lack of unlocked regions
@@ -426,6 +432,7 @@ mod tests {
         }
         {
             let (diffs_5k, lim) = diffs.round_limited(5000);
+            assert!(lim);
             assert_eq!(diffs_5k.ours.len(), 20);
             assert_eq!(diffs_5k.theirs.len(), 20);
             assert_eq!(
