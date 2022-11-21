@@ -507,6 +507,8 @@ impl HolochainP2pMockMsg {
             kwire::Wire::PeerQueryResp(msg) => HolochainP2pMockMsg::PeerQueryResp(msg),
             kwire::Wire::CallResp(msg) => HolochainP2pMockMsg::CallResp(msg.data),
             kwire::Wire::Failure(msg) => HolochainP2pMockMsg::Failure(msg.reason),
+            kwire::Wire::FetchOp(_) => todo!(),
+            kwire::Wire::PushOpData(_) => todo!(),
         }
     }
 }
