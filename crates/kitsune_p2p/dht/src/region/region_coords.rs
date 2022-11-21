@@ -6,7 +6,17 @@ use crate::spacetime::{SpaceSegment, SpacetimeQuantumCoords, TimeSegment, Topolo
 
 /// The cross product of a space segment and at time segment forms a Region.
 /// Hence, these two segments are the coordinates which define a Region of spacetime.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Constructor,
+    serde::Deserialize,
+    serde::Serialize,
+)]
 pub struct RegionCoords {
     /// The space segment
     pub space: SpaceSegment,

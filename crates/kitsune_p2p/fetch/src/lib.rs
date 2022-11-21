@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use kitsune_p2p_types::{bin_types::*, dht::region::RegionCoords};
 
+mod queue;
+
 /// Determine what should be fetched.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
