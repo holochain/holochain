@@ -23,13 +23,13 @@ serde_derive = "1.0"
 thiserror = "1.0"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
-serde_yaml = { version = "0.8", optional = true }
+serde_yaml = { version = "0.9", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0"
 matches = "0.1"
 maplit = "1"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 tokio = { version = "1.11", features = ["full"] }
 tempfile = "3"
 

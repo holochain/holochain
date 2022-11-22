@@ -45,7 +45,7 @@ serde = { version = "1.0", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
 serde_derive = "1.0"
 serde_with = "1.12.0"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 shrinkwraprs = "0.3.0"
 strum = "0.18.0"
 strum_macros = "0.18.0"

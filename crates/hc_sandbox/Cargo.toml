@@ -28,7 +28,7 @@ nanoid = "0.3"
 observability = "0.1.3"
 once_cell = "1.13.0"
 serde = { version = "1.0", features = [ "derive" ] }
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 sodoken = "=0.0.6"
 tokio = { version = "1.11", features = [ "full" ] }
 structopt = "0.3"
