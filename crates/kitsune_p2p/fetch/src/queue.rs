@@ -1,14 +1,19 @@
 use std::collections::BTreeSet;
 
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent};
+use kitsune_p2p_types::{
+    codec::{rmp_decode, rmp_encode},
+    tx2::tx2_utils::Share,
+    KAgent,
+};
 use linked_hash_map::{Entry, LinkedHashMap};
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{FetchContext, FetchKey, FetchOptions, FetchRequest, FetchResponse, FetchResult};
 
 pub struct FetchQueue(Share<FetchQueueState>);
 
-type ContextMergeFn = Box<dyn Fn(&mut FetchContext, FetchContext) + Send + Sync + 'static>;
+type ContextMergeFn = Box<dyn Fn(u32, u32) -> u32 + Send + Sync + 'static>;
 
 pub struct FetchQueueState {
     /// Items ready to be fetched
@@ -55,9 +60,7 @@ impl PartialOrd for FetchQueueCurrentJob {
 }
 
 impl FetchQueueState {
-    pub fn new(
-        context_merge_fn: impl Fn(&mut FetchContext, FetchContext) + Send + Sync + 'static,
-    ) -> Self {
+    pub fn new(context_merge_fn: impl Fn(u32, u32) -> u32 + Send + Sync + 'static) -> Self {
         Self {
             ready: Default::default(),
             awaiting: Default::default(),
@@ -65,7 +68,7 @@ impl FetchQueueState {
         }
     }
 
-    pub fn push(&mut self, source: KAgent, request: FetchRequest) -> () {
+    pub fn push(&mut self, request: FetchRequest, source: KAgent) {
         let FetchRequest {
             key,
             author,
@@ -92,9 +95,9 @@ impl FetchQueueState {
                 let v = e.get_mut();
                 v.sources.push(source);
                 v.options = options;
-                match (&mut v.context, context) {
-                    (Some(a), Some(b)) => (self.context_merge_fn)(a, b),
-                    (a, b) => v.context = a.take().and(b),
+                v.context = match (v.context.take(), context) {
+                    (Some(a), Some(b)) => Some((self.context_merge_fn)(*a, *b).into()),
+                    (a, b) => a.and(b),
                 }
             }
         }
@@ -112,6 +115,7 @@ impl FetchQueueState {
 #[cfg(test)]
 mod tests {
 
+    use pretty_assertions::assert_eq;
     use std::sync::Arc;
 
     use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash};
@@ -125,26 +129,27 @@ mod tests {
             Arc::new(KitsuneAgent::new(vec![1; 36])),
             Arc::new(KitsuneAgent::new(vec![2; 36])),
         ];
-        let mut q = FetchQueueState::new(|_, _| {});
+        let mut q = FetchQueueState::new(|a, b| (a + b).min(1));
 
         let key_op = |n| FetchKey::Op {
             op_hash: Arc::new(KitsuneOpHash::new(vec![n; 36])),
         };
-        let req = |n| FetchRequest::with_key(key_op(n));
-        let item = |sources| FetchQueueItem {
+        let req = |n, c| FetchRequest::with_key(key_op(n), c);
+        let item = |sources, context| FetchQueueItem {
             sources,
             options: Default::default(),
-            context: None,
+            context,
             expiry: None,
         };
 
-        q.push(agents[0].clone(), req(1));
-        q.push(agents[0].clone(), req(2));
-        q.push(agents[1].clone(), req(1));
+        q.push(req(1, Some(0.into())), agents[0].clone());
+        q.push(req(1, Some(1.into())), agents[1].clone());
+
+        q.push(req(2, Some(0.into())), agents[0].clone());
 
         let expected_ready = [
-            (key_op(1), item(agents[0..=1].to_vec())),
-            (key_op(2), item(vec![agents[0].clone()])),
+            (key_op(1), item(agents[0..=1].to_vec(), Some(1.into()))),
+            (key_op(2), item(vec![agents[0].clone()], Some(0.into()))),
         ]
         .into_iter()
         .collect();

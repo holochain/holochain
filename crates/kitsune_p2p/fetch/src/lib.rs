@@ -48,20 +48,24 @@ pub struct FetchRequest {
 }
 
 impl FetchRequest {
-    pub fn with_key(key: FetchKey) -> Self {
+    pub fn with_key(key: FetchKey, context: Option<FetchContext>) -> Self {
         Self {
             key,
             author: None,
-            context: Default::default(),
+            context,
             options: Default::default(),
         }
     }
 
-    pub fn with_key_and_author(key: FetchKey, author: KAgent) -> Self {
+    pub fn with_key_and_author(
+        key: FetchKey,
+        context: Option<FetchContext>,
+        author: KAgent,
+    ) -> Self {
         Self {
             key,
             author: Some(author),
-            context: Default::default(),
+            context,
             options: Default::default(),
         }
     }
@@ -77,5 +81,14 @@ pub struct FetchResponse {
     op_data: Vec<()>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-pub struct FetchContext(#[serde(with = "serde_bytes")] Vec<u8>);
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::Deref,
+    derive_more::From,
+)]
+pub struct FetchContext(u32);
