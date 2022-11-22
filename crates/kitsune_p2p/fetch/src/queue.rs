@@ -1,13 +1,8 @@
 use std::collections::BTreeSet;
 
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::{
-    codec::{rmp_decode, rmp_encode},
-    tx2::tx2_utils::Share,
-    KAgent,
-};
+use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent};
 use linked_hash_map::{Entry, LinkedHashMap};
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{FetchContext, FetchKey, FetchOptions, FetchRequest, FetchResponse, FetchResult};
 

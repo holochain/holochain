@@ -1,13 +1,10 @@
-use std::sync::Arc;
-
-use kitsune_p2p_types::{bin_types::*, dht::region::RegionCoords, KAgent, KOpHash};
+use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash};
 
 mod error;
 mod queue;
 
 pub use error::*;
 pub use queue::*;
-use serde::{Deserialize, Serialize};
 
 /// Determine what should be fetched.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
@@ -78,7 +75,7 @@ pub struct FetchOptions {
 }
 
 pub struct FetchResponse {
-    op_data: Vec<()>,
+    _op_data: Vec<()>,
 }
 
 #[derive(
