@@ -334,6 +334,15 @@ pub mod tx2;
 pub use kitsune_p2p_dht as dht;
 pub use kitsune_p2p_dht_arc as dht_arc;
 
+/// KitsuneAgent in an Arc
+pub type KAgent = Arc<bin_types::KitsuneAgent>;
+/// KitsuneBasis in an Arc
+pub type KBasis = Arc<bin_types::KitsuneBasis>;
+/// KitsuneOpHash in an Arc
+pub type KOpHash = Arc<bin_types::KitsuneOpHash>;
+/// KitsuneSpace in an Arc
+pub type KSpace = Arc<bin_types::KitsuneSpace>;
+
 use metrics::metric_task;
 
 #[cfg(test)]

@@ -1,8 +1,13 @@
 use std::sync::Arc;
 
-use kitsune_p2p_types::{bin_types::*, dht::region::RegionCoords};
+use kitsune_p2p_types::{bin_types::*, dht::region::RegionCoords, KAgent, KOpHash};
 
+mod error;
 mod queue;
+
+pub use error::*;
+pub use queue::*;
+use serde::{Deserialize, Serialize};
 
 /// Determine what should be fetched.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
@@ -17,26 +22,49 @@ pub enum FetchKey {
     /// Fetch via op hash.
     Op {
         /// The hash of the op to fetch.
-        op_hash: Arc<KitsuneOpHash>,
+        op_hash: KOpHash,
     },
 }
 
 /// A fetch "unit" that can be de-duplicated.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub struct FetchRequest {
     /// Description of what to fetch.
-    key: FetchKey,
+    pub key: FetchKey,
 
     /// If specified, the author of the op.
     /// NOTE: author is additive-only. That is, an op without an author
     /// is the same as one *with* an author, but should be updated to
     /// include the author. It is UB to have two FetchKeys with the
     /// same op_hash, but different authors.
-    author: Option<Arc<KitsuneAgent>>,
+    pub author: Option<KAgent>,
 
     /// Optional arguments related to fetching the data.
-    _options: Option<FetchOptions>,
+    pub options: Option<FetchOptions>,
+
+    /// Opaque "context" to be provided and interpreted by the host.
+    pub context: Option<FetchContext>,
+}
+
+impl FetchRequest {
+    pub fn with_key(key: FetchKey) -> Self {
+        Self {
+            key,
+            author: None,
+            context: Default::default(),
+            options: Default::default(),
+        }
+    }
+
+    pub fn with_key_and_author(key: FetchKey, author: KAgent) -> Self {
+        Self {
+            key,
+            author: Some(author),
+            context: Default::default(),
+            options: Default::default(),
+        }
+    }
 }
 
 /// Options which affect how the fetch is performed
@@ -44,3 +72,10 @@ pub struct FetchRequest {
 pub struct FetchOptions {
     __: (),
 }
+
+pub struct FetchResponse {
+    op_data: Vec<()>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct FetchContext(#[serde(with = "serde_bytes")] Vec<u8>);
