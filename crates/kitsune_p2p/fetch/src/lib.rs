@@ -2,9 +2,11 @@ use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash};
 
 mod error;
 mod queue;
+mod respond;
 
 pub use error::*;
 pub use queue::*;
+pub use respond::*;
 
 /// Determine what should be fetched.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]

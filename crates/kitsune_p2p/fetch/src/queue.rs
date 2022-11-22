@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+#![allow(dead_code)]
 use std::collections::BTreeSet;
 
 use kitsune_p2p_timestamp::Timestamp;
