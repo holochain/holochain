@@ -238,7 +238,7 @@ async fn three_way_gossip(config: ConductorConfig) {
         .map(|c| c.zome(SweetInlineZomes::COORDINATOR))
         .collect();
 
-    let size = 15_000_000;
+    let size = 3_000_000;
     let num = 2;
 
     let mut hashes = vec![];

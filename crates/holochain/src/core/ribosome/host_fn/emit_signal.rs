@@ -13,7 +13,7 @@ pub fn emit_signal(
     input: AppSignal,
 ) -> Result<(), RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
+        HostFnAccess{ non_determinism: Permission::Allow, .. } => {
             let cell_id = CellId::new(
                 ribosome.dna_def().as_hash().clone(),
                 call_context.host_context.workspace().source_chain().as_ref().expect("Must have a source chain to emit signals").agent_pubkey().clone(),

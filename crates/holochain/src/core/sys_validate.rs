@@ -28,8 +28,11 @@ mod error;
 mod tests;
 
 /// 16mb limit on Entries due to websocket limits.
+/// 4mb limit to constrain bandwidth usage on uploading.
+/// (Assuming a baseline 5mbps upload for now... update this
+/// as consumer internet connections trend toward more upload)
 /// Consider splitting large entries up.
-pub const MAX_ENTRY_SIZE: usize = 16_000_000;
+pub const MAX_ENTRY_SIZE: usize = 4_000_000;
 
 /// 1kb limit on LinkTags.
 /// Tags are used as keys to the database to allow
