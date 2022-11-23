@@ -466,12 +466,16 @@ impl KitsuneP2pActor {
                                     }) => {
                                         for (space, key_list) in fetch_list {
                                             let mut hashes = Vec::new();
-                                            //let mut regions = Vec::new();
+                                            let topo = match host.get_topology(space.clone()).await {
+                                                Err(_) => continue,
+                                                Ok(topo) => topo,
+                                            };
+                                            let mut regions = Vec::new();
 
                                             for key in key_list {
                                                 match key {
-                                                    FetchKey::Region { region_coords: _ } => {
-                                                        todo!()
+                                                    FetchKey::Region { region_coords } => {
+                                                        regions.push(region_coords.to_bounds(&topo));
                                                     }
                                                     FetchKey::Op { op_hash } => {
                                                         hashes.push(op_hash);
@@ -489,12 +493,25 @@ impl KitsuneP2pActor {
                                                     }
                                                 }
                                             }
+
+                                            if !regions.is_empty() {
+                                                if let Ok(list) = evt_sender.fetch_op_data(FetchOpDataEvt {
+                                                    space: space.clone(),
+                                                    query: FetchOpDataEvtQuery::Regions(regions),
+                                                }).await {
+                                                    for (_hash, op) in list {
+                                                        fetch_response_queue.enqueue_op(space.clone(), (con.clone(), url.clone()), op);
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                     wire::Wire::PushOpData(wire::PushOpData {
-                                        op_data_list: _,
+                                        op_data_list,
                                     }) => {
-                                        todo!("RECEIVED op data, hopefully we asked for it : ) - send it for integration");
+                                        for (space, op_list) in op_data_list {
+                                            let _ = evt_sender.gossip(space.clone(), op_list).await;
+                                        }
                                     }
                                     wire::Wire::MetricExchange(wire::MetricExchange {
                                         space,
