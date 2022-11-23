@@ -111,7 +111,7 @@ pub fn sys_time() -> ExternResult<Timestamp> {
 ///   simply be logged and otherwise ignored.
 ///   ```ignore
 ///   #[hdk_extern(infallible)]
-///     fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
+///   fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {}
 ///   ```
 ///   This is because the scheduler runs in a background loop and unlike regular
 ///   zome calls there is no client or workflow attached to report back to or
