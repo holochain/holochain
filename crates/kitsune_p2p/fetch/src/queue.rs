@@ -6,13 +6,15 @@ use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent};
 use linked_hash_map::{Entry, LinkedHashMap};
 
-use crate::{FetchContext, FetchKey, FetchOptions, FetchRequest, FetchResponse, FetchResult};
+use crate::{FetchContext, FetchKey, FetchOptions, FetchRequest};
 
+/// Kitsune fetch queue.
 pub struct FetchQueue(Share<FetchQueueState>);
 
 type ContextMergeFn = Box<dyn Fn(u32, u32) -> u32 + Send + Sync + 'static>;
 
-pub struct FetchQueueState {
+/// Kitsune fetch queue internal state.
+struct FetchQueueState {
     /// Items ready to be fetched
     ready: LinkedHashMap<FetchKey, FetchQueueItem>,
     /// Items for which a fetch has been initiated and we're waiting
@@ -24,6 +26,7 @@ pub struct FetchQueueState {
     context_merge_fn: ContextMergeFn,
 }
 
+/// Fetch item within the fetch queue state.
 #[derive(Debug, PartialEq, Eq)]
 struct FetchQueueItem {
     /// Known sources from whom we can fetch this item.
@@ -57,6 +60,7 @@ impl PartialOrd for FetchQueueCurrentJob {
 }
 
 impl FetchQueueState {
+    /// Construct a new fetch queue state.
     pub fn new(context_merge_fn: impl Fn(u32, u32) -> u32 + Send + Sync + 'static) -> Self {
         Self {
             ready: Default::default(),
@@ -65,6 +69,7 @@ impl FetchQueueState {
         }
     }
 
+    /// Push a new item onto the fetch queue.
     pub fn push(&mut self, request: FetchRequest, source: KAgent) {
         let FetchRequest {
             key,
@@ -104,9 +109,11 @@ impl FetchQueueState {
         // - is the key integrated? then go straight to the post-integration phase.
     }
 
+    /*
     async fn await_item(&mut self, key: &FetchKey) -> FetchResult<Option<FetchResponse>> {
         todo!()
     }
+    */
 }
 
 #[cfg(test)]

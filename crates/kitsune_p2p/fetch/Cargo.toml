@@ -1,7 +1,7 @@
 [package]
 name = "kitsune_p2p_fetch"
 version = "0.0.1"
-description = "Kitsune P2p DHT definition"
+description = "Kitsune P2p Fetch Queue Logic"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/kitsune_p2p_fetch"

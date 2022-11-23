@@ -1,3 +1,8 @@
+#![deny(missing_docs)]
+#![deny(unsafe_code)]
+#![deny(warnings)]
+//! Kitsune P2p Fetch Queue Logic
+
 use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash};
 
 mod error;
@@ -47,6 +52,7 @@ pub struct FetchRequest {
 }
 
 impl FetchRequest {
+    /// Construct a fetch request with key and context.
     pub fn with_key(key: FetchKey, context: Option<FetchContext>) -> Self {
         Self {
             key,
@@ -56,6 +62,7 @@ impl FetchRequest {
         }
     }
 
+    /// Construct a fetch request with key, context, and author.
     pub fn with_key_and_author(
         key: FetchKey,
         context: Option<FetchContext>,
@@ -70,16 +77,13 @@ impl FetchRequest {
     }
 }
 
-/// Options which affect how the fetch is performed
+/// Options which affect how the fetch is performed.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub struct FetchOptions {
     __: (),
 }
 
-pub struct FetchResponse {
-    _op_data: Vec<()>,
-}
-
+/// Usage agnostic context data.
 #[derive(
     Debug,
     Clone,
