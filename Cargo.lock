@@ -1858,7 +1858,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "arbitrary",
  "fixt",
@@ -1877,7 +1877,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.161"
+version = "0.0.162"
 dependencies = [
  "fixt",
  "getrandom 0.2.7",
@@ -1898,7 +1898,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.54"
+version = "0.0.55"
 dependencies = [
  "darling 0.14.1",
  "heck 0.4.0",
@@ -1983,7 +1983,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.0.173"
+version = "0.0.174"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2078,7 +2078,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.0.72"
+version = "0.0.73"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2113,7 +2113,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.0.68"
+version = "0.0.69"
 dependencies = [
  "anyhow",
  "futures",
@@ -2126,7 +2126,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.63"
+version = "0.0.64"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
@@ -2147,7 +2147,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.0.64"
+version = "0.0.65"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2176,7 +2176,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.0.70"
+version = "0.0.71"
 dependencies = [
  "derive_more",
  "directories",
@@ -2200,7 +2200,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.23"
+version = "0.0.24"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -2214,7 +2214,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.0.65"
+version = "0.0.66"
 dependencies = [
  "assert_cmd 2.0.4",
  "base64",
@@ -2249,7 +2249,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.0.67"
+version = "0.0.68"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2303,7 +2303,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.0.64"
+version = "0.0.65"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2352,7 +2352,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.0.70"
+version = "0.0.71"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2398,7 +2398,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.62"
+version = "0.0.63"
 dependencies = [
  "hdk",
  "serde",
@@ -2406,7 +2406,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.0.67"
+version = "0.0.68"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2480,7 +2480,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.0.69"
+version = "0.0.70"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.56"
+version = "0.0.57"
 dependencies = [
  "arbitrary",
  "contrafact",
@@ -2887,7 +2887,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.0.51"
+version = "0.0.52"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -2956,7 +2956,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "colored",
  "derivative",
@@ -3069,7 +3069,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.0.38"
+version = "0.0.39"
 dependencies = [
  "base64",
  "blake2b_simd 0.5.11",
@@ -3094,7 +3094,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -3107,7 +3107,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.0.38"
+version = "0.0.39"
 dependencies = [
  "blake2b_simd 1.0.0",
  "futures",
@@ -3125,7 +3125,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.0.38"
+version = "0.0.39"
 dependencies = [
  "arbitrary",
  "base64",
@@ -3639,7 +3639,7 @@ dependencies = [
 
 [[package]]
 name = "mr_bundle"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "anyhow",
  "arbitrary",
