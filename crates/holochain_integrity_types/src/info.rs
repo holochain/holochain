@@ -1,5 +1,5 @@
 //! Information about the current zome and dna.
-use crate::action::ZomeId;
+use crate::action::ZomeIndex;
 use crate::zome::ZomeName;
 use crate::EntryDefIndex;
 use crate::EntryDefs;
@@ -17,7 +17,7 @@ mod test;
 pub struct ZomeInfo {
     pub name: ZomeName,
     /// The position of this zome in the `dna.json`
-    pub id: ZomeId,
+    pub id: ZomeIndex,
     pub properties: SerializedBytes,
     pub entry_defs: EntryDefs,
     // @todo make this include function signatures when they exist.
@@ -30,7 +30,7 @@ impl ZomeInfo {
     /// Create a new ZomeInfo.
     pub fn new(
         name: ZomeName,
-        id: ZomeId,
+        id: ZomeIndex,
         properties: SerializedBytes,
         entry_defs: EntryDefs,
         extern_fns: Vec<FunctionName>,
@@ -56,7 +56,7 @@ pub struct DnaInfo {
     pub hash: DnaHash,
     /// The properties of this DNA.
     pub properties: SerializedBytes,
-    // In ZomeId order as to match corresponding `ZomeInfo` for each.
+    // In ZomeIndex order as to match corresponding `ZomeInfo` for each.
     /// The zomes in this DNA.
     pub zome_names: Vec<ZomeName>,
 }
@@ -72,7 +72,7 @@ pub struct ScopedZomeTypesSet {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 /// zome types that are in scope for the calling zome.
-pub struct ScopedZomeTypes<T>(pub Vec<(ZomeId, Vec<T>)>);
+pub struct ScopedZomeTypes<T>(pub Vec<(ZomeIndex, Vec<T>)>);
 
 impl<T> Default for ScopedZomeTypes<T> {
     fn default() -> Self {
@@ -86,7 +86,7 @@ pub struct ZomeTypesKey<T>
 where
     T: U8Index + Copy,
 {
-    /// The index into the [`ZomeId`] vec.
+    /// The index into the [`ZomeIndex`] vec.
     pub zome_index: ZomeDependencyIndex,
     /// The index into the types vec.
     pub type_index: T,
@@ -98,14 +98,14 @@ pub type ZomeEntryTypesKey = ZomeTypesKey<EntryDefIndex>;
 pub type ZomeLinkTypesKey = ZomeTypesKey<LinkType>;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// The index into the [`ZomeId`] vec.
+/// The index into the [`ZomeIndex`] vec.
 pub struct ZomeDependencyIndex(pub u8);
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A type with the zome that it is defined in.
 pub struct ScopedZomeType<T> {
     /// The zome that defines this type.
-    pub zome_id: ZomeId,
+    pub zome_id: ZomeIndex,
     /// The type that is defined.
     pub zome_type: T,
 }
@@ -173,8 +173,8 @@ where
             })
     }
 
-    /// Get all the [`ZomeId`] dependencies for the calling zome.
-    pub fn dependencies(&self) -> impl Iterator<Item = ZomeId> + '_ {
+    /// Get all the [`ZomeIndex`] dependencies for the calling zome.
+    pub fn dependencies(&self) -> impl Iterator<Item = ZomeIndex> + '_ {
         self.0.iter().map(|(zome_id, _)| *zome_id)
     }
 }

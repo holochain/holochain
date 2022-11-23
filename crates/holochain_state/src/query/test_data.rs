@@ -128,7 +128,7 @@ impl LinkTestData {
             create_link_hash: later_create_link_hash.clone(),
         };
 
-        let base_query = GetLinksQuery::base(base_hash.clone().into(), vec![ZomeId(0)]);
+        let base_query = GetLinksQuery::base(base_hash.clone().into(), vec![ZomeIndex(0)]);
         let tag_query = GetLinksQuery::new(
             base_hash.clone().into(),
             LinkTypeFilter::single_dep(0.into()),

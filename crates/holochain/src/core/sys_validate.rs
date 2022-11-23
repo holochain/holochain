@@ -270,7 +270,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 }
 
 /// Check the AppEntryType is valid for the zome.
-/// Check the EntryDefId and ZomeId are in range.
+/// Check the EntryDefId and ZomeIndex are in range.
 pub async fn check_app_entry_type(
     dna_hash: &DnaHash,
     entry_type: &AppEntryType,
@@ -285,7 +285,7 @@ pub async fn check_app_entry_type(
     // Check if the zome is found
     let zome = ribosome
         .get_integrity_zome(&entry_type.zome_id())
-        .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
+        .ok_or_else(|| ValidationOutcome::ZomeIndex(entry_type.clone()))?
         .into_inner()
         .1;
 

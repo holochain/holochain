@@ -9,7 +9,7 @@ use crate::action::ChainTopOrdering;
 use holochain_integrity_types::EntryDefIndex;
 use holochain_integrity_types::EntryVisibility;
 use holochain_integrity_types::ScopedEntryDefIndex;
-use holochain_integrity_types::ZomeId;
+use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
@@ -42,7 +42,7 @@ pub enum EntryDefLocation {
 /// The location of an app entry definition.
 pub struct AppEntryDefLocation {
     /// The zome that defines this entry type.
-    pub zome_id: ZomeId,
+    pub zome_id: ZomeIndex,
     /// The entry type within the zome.
     pub entry_def_index: EntryDefIndex,
 }
@@ -216,7 +216,7 @@ impl From<holo_hash::ActionHash> for DeleteInput {
 
 impl EntryDefLocation {
     /// Create an [`EntryDefLocation::App`].
-    pub fn app(zome_id: impl Into<ZomeId>, entry_def_index: impl Into<EntryDefIndex>) -> Self {
+    pub fn app(zome_id: impl Into<ZomeIndex>, entry_def_index: impl Into<EntryDefIndex>) -> Self {
         Self::App(AppEntryDefLocation {
             zome_id: zome_id.into(),
             entry_def_index: entry_def_index.into(),

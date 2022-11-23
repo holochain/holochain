@@ -11,7 +11,7 @@ struct TestData {
     link_add: CreateLink,
     link_remove: DeleteLink,
     base_hash: EntryHash,
-    zome_id: ZomeId,
+    zome_id: ZomeIndex,
     link_type: LinkType,
     tag: LinkTag,
     expected_link: Link,
@@ -32,7 +32,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
         let target_address = target_hash_fixt.next().unwrap();
 
         let tag = LinkTag::new(tag_fix.next().unwrap());
-        let zome_id = ZomeId(i as u8);
+        let zome_id = ZomeIndex(i as u8);
         let link_type = LinkType(i as u8);
 
         let link_add = KnownCreateLink {

@@ -133,8 +133,8 @@ pub enum ValidationOutcome {
     UpdateTypeMismatch(EntryType, EntryType),
     #[error("Signature {0:?} failed to verify for Action {1:?}")]
     VerifySignature(Signature, Action),
-    #[error("The app entry type {0:?} zome id was out of range")]
-    ZomeId(AppEntryType),
+    #[error("The app entry type {0:?} zome index was out of range")]
+    ZomeIndex(AppEntryType),
 }
 
 impl ValidationOutcome {

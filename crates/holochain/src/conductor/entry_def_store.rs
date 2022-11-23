@@ -63,7 +63,7 @@ pub(crate) async fn get_entry_defs(
         .iter()
         .cloned()
         .enumerate()
-        .map(|(i, (zome_name, zome))| (zome_name, (ZomeId(i as u8), zome)))
+        .map(|(i, (zome_name, zome))| (zome_name, (ZomeIndex(i as u8), zome)))
         .collect::<HashMap<_, _>>();
 
     let result = tokio::task::spawn_blocking(move || {

@@ -311,7 +311,7 @@ impl Path {
 }
 
 impl TypedPath {
-    /// Create a new [`TypedPath`] by attaching a [`ZomeId`] and [`LinkType`] to a [`Path`].
+    /// Create a new [`TypedPath`] by attaching a [`ZomeIndex`] and [`LinkType`] to a [`Path`].
     pub fn new(link_type: impl Into<ScopedLinkType>, path: Path) -> Self {
         Self {
             link_type: link_type.into(),

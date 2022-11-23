@@ -105,7 +105,7 @@ pub struct RealRibosome {
     pub zome_types: Arc<GlobalZomeTypes>,
 
     /// Dependencies for every zome.
-    pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeId>>>,
+    pub zome_dependencies: Arc<HashMap<ZomeName, Vec<ZomeIndex>>>,
 }
 
 struct HostFnBuilder {
@@ -280,13 +280,13 @@ impl RealRibosome {
 
         let zome_types = Arc::new(map?);
 
-        // Create a map of integrity zome names to ZomeIds.
+        // Create a map of integrity zome names to ZomeIndexs.
         let integrity_zomes: HashMap<_, _> = ribosome
             .dna_def()
             .integrity_zomes
             .iter()
             .enumerate()
-            .map(|(i, (n, _))| Some((n.clone(), ZomeId(i.try_into().ok()?))))
+            .map(|(i, (n, _))| Some((n.clone(), ZomeIndex(i.try_into().ok()?))))
             .collect::<Option<_>>()
             .ok_or(ZomeTypesError::ZomeIndexOverflow)?;
 
@@ -299,18 +299,18 @@ impl RealRibosome {
 
                 if integrity_zomes.len() == 1 {
                     // If there's only one integrity zome we add it to this zome and are done.
-                    dependencies.push(ZomeId(0));
+                    dependencies.push(ZomeIndex(0));
                 } else {
                     // Integrity zomes need to have themselves as a dependency.
                     if ribosome.dna_def().is_integrity_zome(zome_name) {
-                        // Get the ZomeId for this zome.
+                        // Get the ZomeIndex for this zome.
                         let id = integrity_zomes.get(zome_name).copied().ok_or_else(|| {
                             ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
                         })?;
                         dependencies.push(id);
                     }
                     for name in def.dependencies() {
-                        // Get the ZomeId for this dependency.
+                        // Get the ZomeIndex for this dependency.
                         let id = integrity_zomes.get(name).copied().ok_or_else(|| {
                             ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
                         })?;
@@ -600,7 +600,7 @@ impl RealRibosome {
         imports
     }
 
-    pub fn get_zome_dependencies(&self, zome_name: &ZomeName) -> RibosomeResult<&[ZomeId]> {
+    pub fn get_zome_dependencies(&self, zome_name: &ZomeName) -> RibosomeResult<&[ZomeIndex]> {
         Ok(self
             .zome_dependencies
             .get(zome_name)
@@ -942,7 +942,7 @@ impl RibosomeT for RealRibosome {
         &self.dna_file
     }
 
-    fn get_integrity_zome(&self, zome_id: &ZomeId) -> Option<IntegrityZome> {
+    fn get_integrity_zome(&self, zome_id: &ZomeIndex) -> Option<IntegrityZome> {
         self.dna_file
             .dna_def()
             .integrity_zomes

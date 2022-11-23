@@ -589,9 +589,9 @@ where
     }
 }
 
-/// Get the app defined link type from a [`ZomeId`] and [`LinkType`].
-/// If the [`ZomeId`] is not a dependency of this zome then return a host error.
-fn in_scope_link_type<LT>(zome_id: ZomeId, link_type: LinkType) -> Result<LT, WasmError>
+/// Get the app defined link type from a [`ZomeIndex`] and [`LinkType`].
+/// If the [`ZomeIndex`] is not a dependency of this zome then return a host error.
+fn in_scope_link_type<LT>(zome_id: ZomeIndex, link_type: LinkType) -> Result<LT, WasmError>
 where
     LT: LinkTypesHelper,
     WasmError: From<<LT as LinkTypesHelper>::Error>,
@@ -602,9 +602,9 @@ where
     }
 }
 
-/// Get the app defined link type from a [`ZomeId`] and [`LinkType`].
-/// If the [`ZomeId`] is not a dependency of this zome then return a host error.
-fn activity_link_type<LT>(zome_id: ZomeId, link_type: LinkType) -> Result<Option<LT>, WasmError>
+/// Get the app defined link type from a [`ZomeIndex`] and [`LinkType`].
+/// If the [`ZomeIndex`] is not a dependency of this zome then return a host error.
+fn activity_link_type<LT>(zome_id: ZomeIndex, link_type: LinkType) -> Result<Option<LT>, WasmError>
 where
     LT: LinkTypesHelper,
     WasmError: From<<LT as LinkTypesHelper>::Error>,
@@ -617,7 +617,7 @@ where
 /// Returns a [`WasmErrorInner::Guest`] error if the zome id is a
 /// dependency but the [`EntryDefIndex`] is out of range.
 fn get_unit_entry_type<ET>(
-    zome_id: ZomeId,
+    zome_id: ZomeIndex,
     entry_def_index: EntryDefIndex,
 ) -> Result<Option<<ET as UnitEnum>::Unit>, WasmError>
 where

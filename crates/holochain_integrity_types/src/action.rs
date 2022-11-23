@@ -376,9 +376,9 @@ impl_hashable_content_for_ref!(Delete);
     SerializedBytes,
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct ZomeId(pub u8);
+pub struct ZomeIndex(pub u8);
 
-impl ZomeId {
+impl ZomeIndex {
     pub fn new(u: u8) -> Self {
         Self(u)
     }
@@ -445,7 +445,7 @@ pub struct CreateLink<W = RateWeight> {
 
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
-    pub zome_id: ZomeId,
+    pub zome_id: ZomeIndex,
     pub link_type: LinkType,
     pub tag: LinkTag,
 
@@ -634,14 +634,14 @@ pub struct AppEntryType {
     /// entry type.
     pub id: EntryDefIndex,
     /// The id of the zome that defines this entry type.
-    pub zome_id: ZomeId,
+    pub zome_id: ZomeIndex,
     // @todo don't do this, use entry defs instead
     /// The visibility of this app entry.
     pub visibility: EntryVisibility,
 }
 
 impl AppEntryType {
-    pub fn new(id: EntryDefIndex, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
+    pub fn new(id: EntryDefIndex, zome_id: ZomeIndex, visibility: EntryVisibility) -> Self {
         Self {
             id,
             zome_id,
@@ -652,7 +652,7 @@ impl AppEntryType {
     pub fn id(&self) -> EntryDefIndex {
         self.id
     }
-    pub fn zome_id(&self) -> ZomeId {
+    pub fn zome_id(&self) -> ZomeIndex {
         self.zome_id
     }
     pub fn visibility(&self) -> &EntryVisibility {
@@ -666,14 +666,14 @@ impl From<EntryDefIndex> for u8 {
     }
 }
 
-impl ZomeId {
+impl ZomeIndex {
     /// Use as an index into a slice
     pub fn index(&self) -> usize {
         self.0 as usize
     }
 }
 
-impl std::ops::Deref for ZomeId {
+impl std::ops::Deref for ZomeIndex {
     type Target = u8;
 
     fn deref(&self) -> &Self::Target {
@@ -681,7 +681,7 @@ impl std::ops::Deref for ZomeId {
     }
 }
 
-impl Borrow<u8> for ZomeId {
+impl Borrow<u8> for ZomeIndex {
     fn borrow(&self) -> &u8 {
         &self.0
     }

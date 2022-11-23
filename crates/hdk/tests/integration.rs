@@ -144,7 +144,7 @@ fn combine_integrity_zomes() {
 
 #[test]
 fn link_types_create_link() {
-    set_zome_types_and_compare(&[], &[(3, 3)], CreateLink(ZomeId(3), LinkType(0)));
+    set_zome_types_and_compare(&[], &[(3, 3)], CreateLink(ZomeIndex(3), LinkType(0)));
     create_link(
         base(),
         base(),
@@ -173,14 +173,14 @@ fn link_zomes_create_link() {
     set_zome_types_and_compare(
         &[],
         &[(32, 3), (15, 3)],
-        CreateLink(ZomeId(32), LinkType(2)),
+        CreateLink(ZomeIndex(32), LinkType(2)),
     );
     create_link(base(), base(), LinkZomes::A(integrity_a::LinkTypes::C), ()).unwrap();
 
     set_zome_types_and_compare(
         &[],
         &[(32, 3), (15, 6)],
-        CreateLink(ZomeId(15), LinkType(2)),
+        CreateLink(ZomeIndex(15), LinkType(2)),
     );
     create_link(base(), base(), LinkZomes::B(integrity_b::LinkTypes::C), ()).unwrap();
 
@@ -417,7 +417,7 @@ fn link_zomes_from_action() {
 
 enum Compare {
     GetLinks(LinkTypeFilter),
-    CreateLink(ZomeId, LinkType),
+    CreateLink(ZomeIndex, LinkType),
     Nothing,
 }
 
@@ -426,7 +426,7 @@ fn make_filter(r: &[(u8, std::ops::RangeInclusive<u8>)]) -> LinkTypeFilter {
         r.iter()
             .map(|(z, r)| {
                 (
-                    ZomeId(*z),
+                    ZomeIndex(*z),
                     r.clone().map(|t| LinkType(t)).collect::<Vec<_>>(),
                 )
             })
@@ -451,13 +451,13 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
             entries: ScopedZomeTypes(
                 entries
                     .iter()
-                    .map(|(z, types)| (ZomeId(*z), (0..*types).map(|t| EntryDefIndex(t)).collect()))
+                    .map(|(z, types)| (ZomeIndex(*z), (0..*types).map(|t| EntryDefIndex(t)).collect()))
                     .collect(),
             ),
             links: ScopedZomeTypes(
                 links
                     .iter()
-                    .map(|(z, types)| (ZomeId(*z), (0..*types).map(|t| LinkType(t)).collect()))
+                    .map(|(z, types)| (ZomeIndex(*z), (0..*types).map(|t| LinkType(t)).collect()))
                     .collect(),
             ),
         };

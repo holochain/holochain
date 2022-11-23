@@ -80,8 +80,8 @@ impl<'a> From<&'a LinkTag> for SqlOutput<'a> {
     }
 }
 
-impl<'a, 'b> From<&'b ZomeId> for SqlOutput<'a> {
-    fn from(d: &'b ZomeId) -> Self {
+impl<'a, 'b> From<&'b ZomeIndex> for SqlOutput<'a> {
+    fn from(d: &'b ZomeIndex) -> Self {
         Self(d.0.into())
     }
 }

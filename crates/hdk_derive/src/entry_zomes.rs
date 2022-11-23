@@ -107,7 +107,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                 match zome_info()?.zome_types.entries.get(value) {
                     Some(t) => Ok(t),
                     _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "{:?} does not map to any ZomeId and EntryDefIndex that is in scope for this zome.",
+                        "{:?} does not map to any ZomeIndex and EntryDefIndex that is in scope for this zome.",
                         value
                     )))),
                 }
@@ -152,7 +152,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                 entry: &Entry,
             ) -> Result<Option<Self>, Self::Error>
             where
-                Z: Into<ZomeId>,
+                Z: Into<ZomeIndex>,
                 I: Into<EntryDefIndex>
             {
                 let scoped_type = ScopedEntryDefIndex {

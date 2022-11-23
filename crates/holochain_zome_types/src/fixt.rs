@@ -94,7 +94,7 @@ fixturator!(
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, ZomeId, LinkType, LinkTag);
+    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, ZomeIndex, LinkType, LinkTag);
 );
 
 fixturator!(
@@ -109,7 +109,7 @@ pub struct KnownCreateLink {
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
-    pub zome_id: ZomeId,
+    pub zome_id: ZomeIndex,
     pub link_type: LinkType,
 }
 
@@ -176,7 +176,7 @@ fixturator!(
 );
 
 fixturator!(
-    ZomeId;
+    ZomeIndex;
     from u8;
 );
 
@@ -187,7 +187,7 @@ fixturator!(
 
 fixturator!(
     ZomeInfo;
-    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec, ScopedZomeTypesSet);
+    constructor fn new(ZomeName, ZomeIndex, SerializedBytes, EntryDefs, FunctionNameVec, ScopedZomeTypesSet);
 );
 
 fixturator!(

@@ -68,7 +68,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 match zome_info()?.zome_types.links.get(value) {
                     Some(t) => Ok(t),
                     _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "{:?} does not map to any ZomeId and LinkType that is in scope for this zome.",
+                        "{:?} does not map to any ZomeIndex and LinkType that is in scope for this zome.",
                         value
                     )))),
                 }
@@ -135,7 +135,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
             fn from_type<Z, I>(zome_id: Z, link_type: I) -> Result<Option<Self>, Self::Error>
             where
-                Z: Into<ZomeId>,
+                Z: Into<ZomeIndex>,
                 I: Into<LinkType>
             {
                 let link_type = ScopedLinkType {

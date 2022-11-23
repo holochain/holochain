@@ -83,7 +83,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 match zome_info()?.zome_types.entries.get(value) {
                     Some(t) => Ok(t),
                     _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "{:?} does not map to any ZomeId and EntryDefIndex that is in scope for this zome.",
+                        "{:?} does not map to any ZomeIndex and EntryDefIndex that is in scope for this zome.",
                         value
                     )))),
                 }
@@ -232,7 +232,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 entry: &Entry,
             ) -> std::result::Result<Option<Self>, Self::Error>
             where
-                Z: Into<ZomeId>,
+                Z: Into<ZomeIndex>,
                 I: Into<EntryDefIndex>
             {
                 let s = ScopedEntryDefIndex{ zome_id: zome_id.into(), zome_type: entry_def_index.into() };
@@ -244,7 +244,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                     None => if entries.dependencies().any(|z| z == s.zome_id) {
                         Err(wasm_error!(WasmErrorInner::Guest(format!(
                             "Entry type: {:?} is out of range for this zome. \
-                            This happens when an Action is created with a ZomeId for a dependency \
+                            This happens when an Action is created with a ZomeIndex for a dependency \
                             of this zome and an EntryDefIndex that is out of range of all the \
                             app defined entry types.",
                             s

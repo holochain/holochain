@@ -1,7 +1,7 @@
 use crate::record::SignedActionHashed;
 use crate::ChainTopOrdering;
 use holo_hash::ActionHash;
-use holochain_integrity_types::ZomeId;
+use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::link::*;
@@ -23,8 +23,8 @@ pub struct Link {
     pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
     pub timestamp: crate::Timestamp,
-    /// The [`ZomeId`] for where this link is defined.
-    pub zome_id: ZomeId,
+    /// The [`ZomeIndex`] for where this link is defined.
+    pub zome_id: ZomeIndex,
     /// The [`LinkType`] for this link.
     pub link_type: LinkType,
     /// A tag used to find this link
@@ -38,7 +38,7 @@ pub struct Link {
 pub struct CreateLinkInput {
     pub base_address: holo_hash::AnyLinkableHash,
     pub target_address: holo_hash::AnyLinkableHash,
-    pub zome_id: ZomeId,
+    pub zome_id: ZomeIndex,
     pub link_type: LinkType,
     pub tag: LinkTag,
     pub chain_top_ordering: ChainTopOrdering,
@@ -48,7 +48,7 @@ impl CreateLinkInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
         target_address: holo_hash::AnyLinkableHash,
-        zome_id: ZomeId,
+        zome_id: ZomeIndex,
         link_type: LinkType,
         tag: LinkTag,
         chain_top_ordering: ChainTopOrdering,

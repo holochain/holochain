@@ -297,7 +297,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
         ValidationOutcome::VerifySignature(_, _) => Rejected,
-        ValidationOutcome::ZomeId(_) => Rejected,
+        ValidationOutcome::ZomeIndex(_) => Rejected,
         ValidationOutcome::CounterSigningError(_) => Rejected,
     }
 }

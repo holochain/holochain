@@ -493,18 +493,18 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         }
     }
 
-    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
+    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeIndex> {
         match self
             .dna_def()
             .all_zomes()
             .position(|(name, _)| name == zome_name)
         {
-            Some(index) => Ok(holochain_zome_types::action::ZomeId::from(index as u8)),
+            Some(index) => Ok(holochain_zome_types::action::ZomeIndex::from(index as u8)),
             None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
         }
     }
 
-    fn get_integrity_zome(&self, zome_id: &ZomeId) -> Option<IntegrityZome>;
+    fn get_integrity_zome(&self, zome_id: &ZomeIndex) -> Option<IntegrityZome>;
 
     fn call_iterator<I: Invocation + 'static>(
         &self,

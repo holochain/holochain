@@ -2,19 +2,19 @@ use super::*;
 use test_case::test_case;
 
 fn make_set(entries: &[(u8, u8)], links: &[(u8, u8)]) -> GlobalZomeTypes {
-    let entries = entries.into_iter().map(|(z, l)| (ZomeId(*z), *l)).collect();
-    let links = links.into_iter().map(|(z, l)| (ZomeId(*z), *l)).collect();
+    let entries = entries.into_iter().map(|(z, l)| (ZomeIndex(*z), *l)).collect();
+    let links = links.into_iter().map(|(z, l)| (ZomeIndex(*z), *l)).collect();
     GlobalZomeTypes { entries, links }
 }
 
 fn make_scope(entries: &[(u8, u8)], links: &[(u8, u8)]) -> ScopedZomeTypesSet {
     let entries = entries
         .into_iter()
-        .map(|(z, l)| (ZomeId(*z), (0..*l).map(|t| t.into()).collect()))
+        .map(|(z, l)| (ZomeIndex(*z), (0..*l).map(|t| t.into()).collect()))
         .collect();
     let links = links
         .into_iter()
-        .map(|(z, l)| (ZomeId(*z), (0..*l).map(|t| t.into()).collect()))
+        .map(|(z, l)| (ZomeIndex(*z), (0..*l).map(|t| t.into()).collect()))
         .collect();
     ScopedZomeTypesSet {
         entries: ScopedZomeTypes(entries),
@@ -65,15 +65,15 @@ fn construction_is_deterministic() {
 
     let mut expect = GlobalZomeTypes::default();
 
-    expect.entries.insert(ZomeId(0), 3);
-    expect.entries.insert(ZomeId(1), 0);
-    expect.entries.insert(ZomeId(2), 5);
-    expect.entries.insert(ZomeId(3), 12);
+    expect.entries.insert(ZomeIndex(0), 3);
+    expect.entries.insert(ZomeIndex(1), 0);
+    expect.entries.insert(ZomeIndex(2), 5);
+    expect.entries.insert(ZomeIndex(3), 12);
 
-    expect.links.insert(ZomeId(0), 2);
-    expect.links.insert(ZomeId(1), 0);
-    expect.links.insert(ZomeId(2), 1);
-    expect.links.insert(ZomeId(3), 0);
+    expect.links.insert(ZomeIndex(0), 2);
+    expect.links.insert(ZomeIndex(1), 0);
+    expect.links.insert(ZomeIndex(2), 1);
+    expect.links.insert(ZomeIndex(3), 0);
 
     assert_eq!(
         GlobalZomeTypes::from_ordered_iterator(zome_types).unwrap(),
@@ -91,6 +91,6 @@ fn construction_is_deterministic() {
 #[test_case(make_set(&[(0, 20), (1, 10), (2, 15)], &[(0, 5), (1, 10), (2, 3)]), &[2, 1] => make_scope(&[(2, 15), (1, 10)], &[(2, 3), (1, 10)]))]
 #[test_case(make_set(&[(0, 20), (1, 10), (2, 15)], &[(0, 5), (1, 10), (2, 3)]), &[0, 2] => make_scope(&[(0, 20), (2, 15)], &[(0, 5), (2, 3)]))]
 fn test_in_scope_subset(set: GlobalZomeTypes, zomes: &[u8]) -> ScopedZomeTypesSet {
-    let zomes = zomes.iter().map(|z| ZomeId(*z)).collect::<Vec<_>>();
+    let zomes = zomes.iter().map(|z| ZomeIndex(*z)).collect::<Vec<_>>();
     set.in_scope_subset(&zomes[..])
 }

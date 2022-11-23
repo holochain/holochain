@@ -71,7 +71,7 @@ pub struct WireCreateLink {
     pub prev_action: ActionHash,
 
     pub target_address: AnyLinkableHash,
-    pub zome_id: ZomeId,
+    pub zome_id: ZomeIndex,
     pub link_type: LinkType,
     pub tag: Option<LinkTag>,
     pub signature: Signature,

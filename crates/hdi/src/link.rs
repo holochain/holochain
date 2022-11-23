@@ -41,7 +41,7 @@ where
 {
     fn try_into_filter(self) -> Result<LinkTypeFilter, WasmError> {
         // Collect into a 2d vector of where `LinkType`s are collected
-        // into their common `ZomeId`s.
+        // into their common `ZomeIndex`s.
         let vec = self
             .into_iter()
             .try_fold(HashMap::new(), |mut map: HashMap<_, Vec<_>>, t| {

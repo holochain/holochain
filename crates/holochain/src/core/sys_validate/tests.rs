@@ -357,7 +357,7 @@ async fn check_app_entry_type_test() {
     );
 
     // # Dna but no entry def in buffer
-    // ## ZomeId out of range
+    // ## ZomeIndex out of range
     conductor_handle.register_dna(dna_file).await.unwrap();
 
     // ## EntryId is out of range
@@ -373,7 +373,7 @@ async fn check_app_entry_type_test() {
     assert_matches!(
         check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::ZomeId(_)
+            ValidationOutcome::ZomeIndex(_)
         ))
     );
 

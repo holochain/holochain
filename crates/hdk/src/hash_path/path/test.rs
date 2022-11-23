@@ -4,7 +4,7 @@ use crate::hash_path::path::root_hash;
 use crate::prelude::*;
 
 const LINK_TYPE: ScopedLinkType = ScopedLinkType {
-    zome_id: ZomeId(0),
+    zome_id: ZomeIndex(0),
     zome_type: LinkType(0),
 };
 
@@ -25,7 +25,7 @@ fn root_ensures() {
         .with(eq(CreateLinkInput {
             base_address: root_hash().unwrap(),
             target_address: Path::from("foo").path_entry_hash().unwrap().into(),
-            zome_id: ZomeId(0),
+            zome_id: ZomeIndex(0),
             link_type: LinkType(0),
             tag: Path::from("foo").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
@@ -88,7 +88,7 @@ fn parent_path_committed() {
         .with(eq(CreateLinkInput {
             base_address: Path::from("foo").path_entry_hash().unwrap().into(),
             target_address: Path::from("foo.bar").path_entry_hash().unwrap().into(),
-            zome_id: ZomeId(0),
+            zome_id: ZomeIndex(0),
             link_type: LinkType(0),
             tag: Path::from("bar").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
@@ -99,7 +99,7 @@ fn parent_path_committed() {
         .with(eq(CreateLinkInput {
             base_address: root_hash().unwrap(),
             target_address: Path::from("foo").path_entry_hash().unwrap().into(),
-            zome_id: ZomeId(0),
+            zome_id: ZomeIndex(0),
             link_type: LinkType(0),
             tag: Path::from("foo").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
@@ -127,7 +127,7 @@ fn parent_path_committed() {
         .with(eq(CreateLinkInput {
             base_address: Path::from("foo.bar").path_entry_hash().unwrap().into(),
             target_address: Path::from("foo.bar.baz").path_entry_hash().unwrap().into(),
-            zome_id: ZomeId(0),
+            zome_id: ZomeIndex(0),
             link_type: LinkType(0),
             tag: Path::from("baz").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
@@ -138,7 +138,7 @@ fn parent_path_committed() {
         .with(eq(CreateLinkInput {
             base_address: Path::from("foo").path_entry_hash().unwrap().into(),
             target_address: Path::from("foo.bar").path_entry_hash().unwrap().into(),
-            zome_id: ZomeId(0),
+            zome_id: ZomeIndex(0),
             link_type: LinkType(0),
             tag: Path::from("bar").make_tag().unwrap(),
             chain_top_ordering: Default::default(),
@@ -149,7 +149,7 @@ fn parent_path_committed() {
         .with(eq(CreateLinkInput {
             base_address: root_hash().unwrap(),
             target_address: Path::from("foo").path_entry_hash().unwrap().into(),
-            zome_id: ZomeId(0),
+            zome_id: ZomeIndex(0),
             link_type: LinkType(0),
             tag: Path::from("foo").make_tag().unwrap(),
             chain_top_ordering: Default::default(),

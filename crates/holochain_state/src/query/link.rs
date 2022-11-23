@@ -42,7 +42,7 @@ impl LinksQuery {
         s
     }
 
-    pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeId>) -> Self {
+    pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeIndex>) -> Self {
         Self::new(base, LinkTypeFilter::Dependencies(dependencies), None)
     }
 
@@ -139,7 +139,7 @@ impl GetLinksQuery {
         }
     }
 
-    pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeId>) -> Self {
+    pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeIndex>) -> Self {
         Self {
             query: LinksQuery::base(base, dependencies),
         }
