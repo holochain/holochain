@@ -14,8 +14,8 @@ edition = "2021"
 [dependencies]
 derive_more = "0.99"
 futures = "0.3"
-kitsune_p2p_types = { version = "^0.0.38", path = "../types" }
-kitsune_p2p_timestamp = { version = "^0.0.14", path = "../timestamp", features = ["now"]}
+kitsune_p2p_types = { version = "^0.0.39", path = "../types" }
+kitsune_p2p_timestamp = { version = "^0.0.15", path = "../timestamp", features = ["now"]}
 must_future = "0.1"
 num-traits = "0.2.14"
 serde = { version = "1.0", features = [ "derive" ] }
