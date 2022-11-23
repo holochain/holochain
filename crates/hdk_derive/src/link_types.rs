@@ -110,10 +110,10 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
             fn try_from(value: &#ident) -> Result<Self, Self::Error> {
                 let ScopedLinkType {
-                    zome_id,
+                    zome_index,
                     zome_type,
                 } = value.try_into()?;
-                Ok(LinkTypeFilter::single_type(zome_id, zome_type))
+                Ok(LinkTypeFilter::single_type(zome_index, zome_type))
             }
         }
 
@@ -133,19 +133,19 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         impl LinkTypesHelper for #ident {
             type Error = WasmError;
 
-            fn from_type<Z, I>(zome_id: Z, link_type: I) -> Result<Option<Self>, Self::Error>
+            fn from_type<Z, I>(zome_index: Z, link_type: I) -> Result<Option<Self>, Self::Error>
             where
                 Z: Into<ZomeIndex>,
                 I: Into<LinkType>
             {
                 let link_type = ScopedLinkType {
-                    zome_id: zome_id.into(),
+                    zome_index: zome_index.into(),
                     zome_type: link_type.into(),
                 };
                 let links = zome_info()?.zome_types.links;
                 match links.find(#ident::iter(), link_type) {
                     Some(l) => Ok(Some(l)),
-                    None => if links.dependencies().any(|z| z == link_type.zome_id) {
+                    None => if links.dependencies().any(|z| z == link_type.zome_index) {
                         Err(wasm_error!(WasmErrorInner::Guest(format!(
                             "Link type: {:?} is out of range for this zome.",
                             link_type

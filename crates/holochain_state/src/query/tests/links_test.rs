@@ -11,7 +11,7 @@ struct TestData {
     link_add: CreateLink,
     link_remove: DeleteLink,
     base_hash: EntryHash,
-    zome_id: ZomeIndex,
+    zome_index: ZomeIndex,
     link_type: LinkType,
     tag: LinkTag,
     expected_link: Link,
@@ -32,13 +32,13 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
         let target_address = target_hash_fixt.next().unwrap();
 
         let tag = LinkTag::new(tag_fix.next().unwrap());
-        let zome_id = ZomeIndex(i as u8);
+        let zome_index = ZomeIndex(i as u8);
         let link_type = LinkType(i as u8);
 
         let link_add = KnownCreateLink {
             base_address: base_address.clone().into(),
             target_address: target_address.clone().into(),
-            zome_id,
+            zome_index,
             link_type,
             tag: tag.clone(),
         };
@@ -52,7 +52,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
         let expected_link = Link {
             create_link_hash: link_add_hash.clone(),
             target: target_address.clone().into(),
-            zome_id,
+            zome_index,
             link_type,
             timestamp: link_add.timestamp.clone().into(),
             tag: tag.clone(),
@@ -65,16 +65,16 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
         let link_remove = DeleteLinkFixturator::new(link_remove).next().unwrap();
         let query = GetLinksQuery::new(
             link_add.base_address.clone(),
-            LinkTypeFilter::single_dep(zome_id),
+            LinkTypeFilter::single_dep(zome_index),
             Some(link_add.tag.clone()),
         );
-        let query_no_tag = GetLinksQuery::base(link_add.base_address.clone(), vec![zome_id]);
+        let query_no_tag = GetLinksQuery::base(link_add.base_address.clone(), vec![zome_index]);
 
         let td = TestData {
             link_add,
             link_remove,
             base_hash: base_address.clone(),
-            zome_id,
+            zome_index,
             link_type,
             tag,
             expected_link,
@@ -145,7 +145,7 @@ impl TestData {
     fn is_on_type<'a>(&'a self, test: &'static str) {
         let query = GetLinksQuery::new(
             self.base_hash.clone().into(),
-            LinkTypeFilter::single_type(self.zome_id, self.link_type),
+            LinkTypeFilter::single_type(self.zome_index, self.link_type),
             None,
         );
         let val = fresh_reader_test(self.env.clone(), |txn| {
@@ -183,7 +183,7 @@ impl TestData {
         let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
         let query = GetLinksQuery::new(
             self.base_hash.clone().into(),
-            LinkTypeFilter::single_type(self.zome_id, self.link_type),
+            LinkTypeFilter::single_type(self.zome_index, self.link_type),
             Some(half_tag),
         );
         let val = fresh_reader_test(self.env.clone(), |txn| {
@@ -199,7 +199,7 @@ impl TestData {
         let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
         let query = GetLinksQuery::new(
             self.base_hash.clone().into(),
-            LinkTypeFilter::single_type(self.zome_id, self.link_type),
+            LinkTypeFilter::single_type(self.zome_index, self.link_type),
             Some(half_tag),
         );
         let val = fresh_reader_test(self.env.clone(), |txn| {
@@ -276,7 +276,7 @@ impl TestData {
         for d in td {
             let query = GetLinksQuery::new(
                 base_hash.clone().into(),
-                LinkTypeFilter::single_type(d.zome_id, d.link_type),
+                LinkTypeFilter::single_type(d.zome_index, d.link_type),
                 None,
             );
             fresh_reader_test(d.env.clone(), |txn| {
@@ -323,7 +323,7 @@ impl TestData {
             assert_eq!(d.tag, td[0].tag, "{}", test);
         }
         let base_hash = td[0].base_hash.clone();
-        let zome_id = td[0].zome_id;
+        let zome_index = td[0].zome_index;
         let tag = td[0].tag.clone();
         let expected = td
             .iter()
@@ -331,7 +331,7 @@ impl TestData {
             .collect::<Vec<_>>();
         let query = GetLinksQuery::new(
             base_hash.into(),
-            LinkTypeFilter::single_dep(zome_id),
+            LinkTypeFilter::single_dep(zome_index),
             Some(tag),
         );
         let mut val = Vec::new();
@@ -353,21 +353,21 @@ impl TestData {
         // Make sure there is at least some tag
         let tag_len = if tag_len > 1 { tag_len / 2 } else { tag_len };
         let half_tag = LinkTag::new(&td[0].tag.0[..tag_len]);
-        // Check all base hash, zome_id, half tag are the same
+        // Check all base hash, zome_index, half tag are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
             assert_eq!(d.link_type, td[0].link_type, "{}", test);
             assert_eq!(&d.tag.0[..tag_len], &half_tag.0[..], "{}", test);
         }
         let base_hash = td[0].base_hash.clone();
-        let zome_id = td[0].zome_id;
+        let zome_index = td[0].zome_index;
         let expected = td
             .iter()
             .map(|d| d.expected_link.clone())
             .collect::<Vec<_>>();
         let query = GetLinksQuery::new(
             base_hash.into(),
-            LinkTypeFilter::single_dep(zome_id),
+            LinkTypeFilter::single_dep(zome_index),
             Some(half_tag),
         );
         let mut val = Vec::new();
@@ -607,10 +607,10 @@ async fn links_on_same_base() {
         d.link_remove.base_address = base_hash.clone().into();
         d.query = GetLinksQuery::new(
             base_hash.clone().into(),
-            LinkTypeFilter::single_dep(d.zome_id),
+            LinkTypeFilter::single_dep(d.zome_index),
             Some(d.tag.clone()),
         );
-        d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), vec![d.zome_id]);
+        d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), vec![d.zome_index]);
     }
     {
         // Add
@@ -686,16 +686,16 @@ async fn links_on_same_tag() {
     let mut td = fixtures(arc.clone(), 10);
     let base_hash = td[0].base_hash.clone();
     let link_type = td[0].link_type;
-    let zome_id = td[0].zome_id;
+    let zome_index = td[0].zome_index;
     let tag = td[0].tag.clone();
 
     for d in td.iter_mut() {
         d.base_hash = base_hash.clone();
-        d.zome_id = zome_id;
+        d.zome_index = zome_index;
         d.link_type = link_type;
         d.tag = tag.clone();
         d.link_add.base_address = base_hash.clone().into();
-        d.link_add.zome_id = zome_id;
+        d.link_add.zome_index = zome_index;
         d.link_add.link_type = link_type;
         d.link_add.tag = tag.clone();
         d.link_remove.base_address = base_hash.clone().into();
@@ -705,16 +705,16 @@ async fn links_on_same_tag() {
             ActionHashed::from_content_sync(Action::CreateLink(d.link_add.clone())).into();
         d.expected_link.create_link_hash = link_add_hash.clone();
         d.expected_link.tag = tag.clone();
-        d.expected_link.zome_id = zome_id;
+        d.expected_link.zome_index = zome_index;
         d.expected_link.link_type = link_type;
         d.link_remove.link_add_address = link_add_hash;
 
         d.query = GetLinksQuery::new(
             base_hash.clone().into(),
-            LinkTypeFilter::single_dep(d.zome_id),
+            LinkTypeFilter::single_dep(d.zome_index),
             Some(tag.clone()),
         );
-        d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), vec![d.zome_id]);
+        d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), vec![d.zome_index]);
     }
     {
         // Add
@@ -777,11 +777,11 @@ async fn links_on_same_type() {
     for d in &td {
         d.is_on_type(here!("Each link is returned for a type"));
         d.is_on_type_query(
-            LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_id).collect()),
+            LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_index).collect()),
             here!("Each link is returned for a type"),
         );
         d.is_on_type_query(
-            LinkTypeFilter::single_type(d.zome_id, d.link_type),
+            LinkTypeFilter::single_type(d.zome_index, d.link_type),
             here!("Each link is returned for a type"),
         );
     }
@@ -791,15 +791,15 @@ async fn links_on_same_type() {
     for d in &td {
         d.is_on_type(here!("Each link is returned for a type"));
         d.is_on_type_query(
-            LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_id).collect()),
+            LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_index).collect()),
             here!("Each link is returned for a type"),
         );
         d.is_on_type_query(
-            LinkTypeFilter::single_type(d.zome_id, d.link_type),
+            LinkTypeFilter::single_type(d.zome_index, d.link_type),
             here!("Each link is returned for a type"),
         );
         d.is_on_type_query(
-            LinkTypeFilter::Types(vec![(d.zome_id, vec![d.link_type])]),
+            LinkTypeFilter::Types(vec![(d.zome_index, vec![d.link_type])]),
             here!("Each link is returned for a type"),
         );
     }
@@ -833,7 +833,7 @@ async fn link_type_ranges() {
     TestData::only_these_on_query(
         &td,
         &scratch,
-        LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_id).collect()),
+        LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_index).collect()),
         here!("all return on full range"),
     );
     TestData::only_these_on_query(
@@ -895,7 +895,7 @@ async fn link_type_ranges() {
     TestData::only_these_on_query(
         &td,
         &Scratch::new(),
-        LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_id).collect()),
+        LinkTypeFilter::Dependencies(td.iter().map(|d| d.zome_index).collect()),
         here!("all return on full range"),
     );
     TestData::only_these_on_query(

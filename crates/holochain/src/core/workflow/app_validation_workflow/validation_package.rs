@@ -62,11 +62,11 @@ pub fn get_as_author_custom(
         _ => return Ok(None),
     };
 
-    let zome = match ribosome.get_integrity_zome(&app_entry_type.zome_id()) {
+    let zome = match ribosome.get_integrity_zome(&app_entry_type.zome_index()) {
         Some(zome_tuple) => zome_tuple,
         None => {
             warn!(
-                msg = "Tried to get custom validation package for action with invalid zome_id",
+                msg = "Tried to get custom validation package for action with invalid zome_index",
                 ?action
             );
             return Ok(None);

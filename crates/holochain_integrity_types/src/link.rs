@@ -84,7 +84,7 @@ pub trait LinkTypesHelper: Sized {
     /// Check if the [`ZomeIndex`] and [`LinkType`] matches one of the
     /// `ZomeLinkTypeKey::from(Self::variant)` and if
     /// it does return that type.
-    fn from_type<Z, I>(zome_id: Z, link_type: I) -> Result<Option<Self>, Self::Error>
+    fn from_type<Z, I>(zome_index: Z, link_type: I) -> Result<Option<Self>, Self::Error>
     where
         Z: Into<ZomeIndex>,
         I: Into<LinkType>;
@@ -93,7 +93,7 @@ pub trait LinkTypesHelper: Sized {
 impl LinkTypesHelper for () {
     type Error = core::convert::Infallible;
 
-    fn from_type<Z, I>(_zome_id: Z, _link_type: I) -> Result<Option<Self>, Self::Error>
+    fn from_type<Z, I>(_zome_index: Z, _link_type: I) -> Result<Option<Self>, Self::Error>
     where
         Z: Into<ZomeIndex>,
         I: Into<LinkType>,
@@ -107,21 +107,21 @@ impl LinkTypeFilter {
         link_type.try_into().map(LinkTypeFilter::single_dep)
     }
 
-    pub fn contains(&self, zome_id: &ZomeIndex, link_type: &LinkType) -> bool {
+    pub fn contains(&self, zome_index: &ZomeIndex, link_type: &LinkType) -> bool {
         match self {
             LinkTypeFilter::Types(types) => types
                 .iter()
-                .any(|(z, types)| z == zome_id && types.contains(link_type)),
-            LinkTypeFilter::Dependencies(deps) => deps.contains(zome_id),
+                .any(|(z, types)| z == zome_index && types.contains(link_type)),
+            LinkTypeFilter::Dependencies(deps) => deps.contains(zome_index),
         }
     }
 
-    pub fn single_type(zome_id: ZomeIndex, link_type: LinkType) -> Self {
-        Self::Types(vec![(zome_id, vec![link_type])])
+    pub fn single_type(zome_index: ZomeIndex, link_type: LinkType) -> Self {
+        Self::Types(vec![(zome_index, vec![link_type])])
     }
 
-    pub fn single_dep(zome_id: ZomeIndex) -> Self {
-        Self::Dependencies(vec![zome_id])
+    pub fn single_dep(zome_index: ZomeIndex) -> Self {
+        Self::Dependencies(vec![zome_index])
     }
 }
 

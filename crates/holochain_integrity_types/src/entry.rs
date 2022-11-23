@@ -50,7 +50,7 @@ pub trait EntryTypesHelper: Sized {
     /// `ZomeEntryTypesKey::from(Self::variant)` and if
     /// it does deserialize the [`Entry`] into that type.
     fn deserialize_from_type<Z, I>(
-        zome_id: Z,
+        zome_index: Z,
         entry_def_index: I,
         entry: &Entry,
     ) -> Result<Option<Self>, Self::Error>
@@ -63,7 +63,7 @@ impl EntryTypesHelper for () {
     type Error = core::convert::Infallible;
 
     fn deserialize_from_type<Z, I>(
-        _zome_id: Z,
+        _zome_index: Z,
         _entry_def_index: I,
         _entry: &Entry,
     ) -> Result<Option<Self>, Self::Error>

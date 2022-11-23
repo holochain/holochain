@@ -42,12 +42,12 @@ impl GlobalZomeTypes {
     {
         let r = ordered_iterator.into_iter().enumerate().try_fold(
             Self::default(),
-            |mut zome_types, (zome_id, (num_entry_types, num_link_types))| {
-                let zome_id: ZomeIndex = u8::try_from(zome_id)
+            |mut zome_types, (zome_index, (num_entry_types, num_link_types))| {
+                let zome_index: ZomeIndex = u8::try_from(zome_index)
                     .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?
                     .into();
-                zome_types.entries.insert(zome_id, num_entry_types.0);
-                zome_types.links.insert(zome_id, num_link_types.0);
+                zome_types.entries.insert(zome_index, num_entry_types.0);
+                zome_types.links.insert(zome_index, num_link_types.0);
                 Ok(zome_types)
             },
         )?;
@@ -58,11 +58,11 @@ impl GlobalZomeTypes {
     pub fn in_scope_subset(&self, zomes: &[ZomeIndex]) -> ScopedZomeTypesSet {
         let entries = zomes
             .iter()
-            .filter_map(|zome_id| self.entries.get_key_value(zome_id).map(|(z, l)| (*z, *l)));
+            .filter_map(|zome_index| self.entries.get_key_value(zome_index).map(|(z, l)| (*z, *l)));
         let entries = new_scope(entries);
         let links = zomes
             .iter()
-            .filter_map(|zome_id| self.links.get_key_value(zome_id).map(|(z, l)| (*z, *l)));
+            .filter_map(|zome_index| self.links.get_key_value(zome_index).map(|(z, l)| (*z, *l)));
         let links = new_scope(links);
         ScopedZomeTypesSet { entries, links }
     }
@@ -73,7 +73,7 @@ where
     T: From<u8>,
 {
     let iter = iter
-        .map(|(zome_id, len)| (zome_id, (0..len).map(Into::into).collect()))
+        .map(|(zome_index, len)| (zome_index, (0..len).map(Into::into).collect()))
         .collect();
     ScopedZomeTypes(iter)
 }

@@ -90,7 +90,7 @@
 //! #                 prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
 //! #                 base_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
 //! #                 target_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
-//! #                 zome_id: 0.into(),
+//! #                 zome_index: 0.into(),
 //! #                 link_type: 0.into(),
 //! #                 tag: ().into(),
 //! #                 weight: Default::default(),

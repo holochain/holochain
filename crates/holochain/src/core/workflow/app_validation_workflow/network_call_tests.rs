@@ -382,7 +382,7 @@ async fn get_custom_package_test() {
                 .entry_type()
                 .map(|et| {
                     if let EntryType::App(aet) = et {
-                        aet.id().index() == 1
+                        aet.index().index() == 1
                     } else {
                         false
                     }

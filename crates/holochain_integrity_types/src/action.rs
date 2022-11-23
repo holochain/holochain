@@ -445,7 +445,7 @@ pub struct CreateLink<W = RateWeight> {
 
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
-    pub zome_id: ZomeIndex,
+    pub zome_index: ZomeIndex,
     pub link_type: LinkType,
     pub tag: LinkTag,
 
@@ -619,7 +619,7 @@ impl std::fmt::Display for EntryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EntryType::AgentPubKey => writeln!(f, "AgentPubKey"),
-            EntryType::App(aet) => writeln!(f, "App({:?}, {:?})", aet.id(), aet.visibility()),
+            EntryType::App(aet) => writeln!(f, "App({:?}, {:?})", aet.index(), aet.visibility()),
             EntryType::CapClaim => writeln!(f, "CapClaim"),
             EntryType::CapGrant => writeln!(f, "CapGrant"),
         }
@@ -632,28 +632,28 @@ impl std::fmt::Display for EntryType {
 pub struct AppEntryType {
     /// A unique u8 identifier within a zome for this
     /// entry type.
-    pub id: EntryDefIndex,
+    pub index: EntryDefIndex,
     /// The id of the zome that defines this entry type.
-    pub zome_id: ZomeIndex,
+    pub zome_index: ZomeIndex,
     // @todo don't do this, use entry defs instead
     /// The visibility of this app entry.
     pub visibility: EntryVisibility,
 }
 
 impl AppEntryType {
-    pub fn new(id: EntryDefIndex, zome_id: ZomeIndex, visibility: EntryVisibility) -> Self {
+    pub fn new(index: EntryDefIndex, zome_index: ZomeIndex, visibility: EntryVisibility) -> Self {
         Self {
-            id,
-            zome_id,
+            index,
+            zome_index,
             visibility,
         }
     }
 
-    pub fn id(&self) -> EntryDefIndex {
-        self.id
+    pub fn index(&self) -> EntryDefIndex {
+        self.index
     }
-    pub fn zome_id(&self) -> ZomeIndex {
-        self.zome_id
+    pub fn zome_index(&self) -> ZomeIndex {
+        self.zome_index
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility

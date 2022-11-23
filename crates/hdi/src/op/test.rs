@@ -43,11 +43,11 @@ pub enum LinkTypes {
 #[test_case(0, 1 => matches Ok(Some(UnitEntryTypes::B)) ; "unit b")]
 #[test_case(0, 2 => matches Ok(Some(UnitEntryTypes::C)) ; "unit c")]
 fn test_get_unit_entry_type(
-    zome_id: u8,
+    zome_index: u8,
     entry_type: u8,
 ) -> Result<Option<UnitEntryTypes>, WasmErrorInner> {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
-    get_unit_entry_type::<EntryTypes>(zome_id.into(), entry_type.into()).map_err(|e| e.error)
+    get_unit_entry_type::<EntryTypes>(zome_index.into(), entry_type.into()).map_err(|e| e.error)
 }
 
 #[test_case(
@@ -186,9 +186,9 @@ fn test_map_entry(
 #[test_case(0, 2 => matches Ok(LinkTypes::C) ; "c")]
 #[test_case(0, 3 => matches Err(WasmErrorInner::Guest(_)) ; "link type out of scope")]
 #[test_case(1, 0 => matches Err(WasmErrorInner::Host(_)) ; "zome out of scope")]
-fn test_in_scope_link_type(zome_id: u8, link_type: u8) -> Result<LinkTypes, WasmErrorInner> {
+fn test_in_scope_link_type(zome_index: u8, link_type: u8) -> Result<LinkTypes, WasmErrorInner> {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
-    in_scope_link_type::<LinkTypes>(zome_id.into(), link_type.into()).map_err(|e| e.error)
+    in_scope_link_type::<LinkTypes>(zome_index.into(), link_type.into()).map_err(|e| e.error)
 }
 
 #[test_case(0, 0 => matches Ok(Some(LinkTypes::A)) ; "a")]
@@ -197,9 +197,9 @@ fn test_in_scope_link_type(zome_id: u8, link_type: u8) -> Result<LinkTypes, Wasm
 #[test_case(0, 3 => matches Err(WasmErrorInner::Guest(_)); "link type out of scope")]
 #[test_case(1, 0 => matches Ok(None) ; "zome out of scope is none")]
 fn test_activity_link_type(
-    zome_id: u8,
+    zome_index: u8,
     link_type: u8,
 ) -> Result<Option<LinkTypes>, WasmErrorInner> {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
-    activity_link_type::<LinkTypes>(zome_id.into(), link_type.into()).map_err(|e| e.error)
+    activity_link_type::<LinkTypes>(zome_index.into(), link_type.into()).map_err(|e| e.error)
 }

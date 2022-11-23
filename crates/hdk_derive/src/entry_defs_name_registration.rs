@@ -195,13 +195,13 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
             fn try_from(value: #unit_ident) -> Result<Self, Self::Error> {
                 let ScopedEntryDefIndex {
-                    zome_id,
-                    zome_type: id,
+                    zome_index,
+                    zome_type: index,
                 } = value.try_into()?;
                 let def: EntryDef = value.into();
                 Ok(Self {
-                    id,
-                    zome_id,
+                    index,
+                    zome_index,
                     visibility: def.visibility,
                 })
             }
@@ -227,7 +227,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         impl EntryTypesHelper for #ident {
             type Error = WasmError;
             fn deserialize_from_type<Z, I>(
-                zome_id: Z,
+                zome_index: Z,
                 entry_def_index: I,
                 entry: &Entry,
             ) -> std::result::Result<Option<Self>, Self::Error>
@@ -235,13 +235,13 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 Z: Into<ZomeIndex>,
                 I: Into<EntryDefIndex>
             {
-                let s = ScopedEntryDefIndex{ zome_id: zome_id.into(), zome_type: entry_def_index.into() };
+                let s = ScopedEntryDefIndex{ zome_index: zome_index.into(), zome_type: entry_def_index.into() };
                 let entries = zome_info()?.zome_types.entries;
                 match entries.find(#unit_ident::iter(), s) {
                     Some(unit) => {
                         Ok(Some((unit, entry).try_into()?))
                     }
-                    None => if entries.dependencies().any(|z| z == s.zome_id) {
+                    None => if entries.dependencies().any(|z| z == s.zome_index) {
                         Err(wasm_error!(WasmErrorInner::Guest(format!(
                             "Entry type: {:?} is out of range for this zome. \
                             This happens when an Action is created with a ZomeIndex for a dependency \

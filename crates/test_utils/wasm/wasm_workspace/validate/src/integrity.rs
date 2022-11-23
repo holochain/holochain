@@ -95,13 +95,13 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 },
             entry,
         }) => match action.app_entry_type() {
-            Some(AppEntryType { id, zome_id, .. }) => {
+            Some(AppEntryType { index, zome_index, .. }) => {
                 if zome_info()?
                     .zome_types
                     .entries
                     .find_key(ScopedZomeType {
-                        zome_id: *zome_id,
-                        zome_type: *id,
+                        zome_index: *zome_index,
+                        zome_type: *index,
                     })
                     .is_some()
                 {

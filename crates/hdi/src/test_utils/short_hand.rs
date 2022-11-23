@@ -114,11 +114,11 @@ pub fn r_delete(original_entry_type: EntryType, original_entry: Option<Entry>) -
 }
 
 /// Create [`Op::RegisterCreateLink`].
-pub fn r_create_link(zome_id: u8, link_type: u8) -> Op {
+pub fn r_create_link(zome_index: u8, link_type: u8) -> Op {
     Op::RegisterCreateLink(RegisterCreateLink {
         create_link: SignedHashed {
             hashed: HoloHashed {
-                content: cl(zome_id, link_type),
+                content: cl(zome_index, link_type),
                 hash: ah(0),
             },
             signature: Signature([0u8; 64]),
@@ -127,7 +127,7 @@ pub fn r_create_link(zome_id: u8, link_type: u8) -> Op {
 }
 
 /// Create [`Op::RegisterDeleteLink`].
-pub fn r_delete_link(zome_id: u8, link_type: u8) -> Op {
+pub fn r_delete_link(zome_index: u8, link_type: u8) -> Op {
     Op::RegisterDeleteLink(RegisterDeleteLink {
         delete_link: SignedHashed {
             hashed: HoloHashed {
@@ -143,7 +143,7 @@ pub fn r_delete_link(zome_id: u8, link_type: u8) -> Op {
             },
             signature: Signature([0u8; 64]),
         },
-        create_link: cl(zome_id, link_type),
+        create_link: cl(zome_index, link_type),
     })
 }
 
@@ -176,13 +176,13 @@ pub fn u(entry_type: EntryType) -> Update {
 }
 
 /// Create [`CreateLink`].
-pub fn cl(zome_id: u8, link_type: u8) -> CreateLink {
+pub fn cl(zome_index: u8, link_type: u8) -> CreateLink {
     CreateLink {
         author: ak(0),
         timestamp: Timestamp(0),
         action_seq: 1,
         prev_action: ah(0),
-        zome_id: zome_id.into(),
+        zome_index: zome_index.into(),
         link_type: link_type.into(),
         weight: Default::default(),
         base_address: eh(0).into(),
@@ -194,8 +194,8 @@ pub fn cl(zome_id: u8, link_type: u8) -> CreateLink {
 /// Create public app [`Action::Create`].
 pub fn create_entry(z: u8, et: u8) -> Action {
     Action::Create(c(EntryType::App(AppEntryType {
-        id: et.into(),
-        zome_id: z.into(),
+        index: et.into(),
+        zome_index: z.into(),
         visibility: EntryVisibility::Public,
     })))
 }
@@ -203,8 +203,8 @@ pub fn create_entry(z: u8, et: u8) -> Action {
 /// Create private app [`Action::Create`].
 pub fn create_hidden_entry(z: u8, et: u8) -> Action {
     Action::Create(c(EntryType::App(AppEntryType {
-        id: et.into(),
-        zome_id: z.into(),
+        index: et.into(),
+        zome_index: z.into(),
         visibility: EntryVisibility::Private,
     })))
 }
@@ -225,8 +225,8 @@ pub fn e(e: impl TryInto<Entry>) -> Entry {
 /// Create public [`AppEntryType`].
 pub fn public_aet(z: u8, et: u8) -> AppEntryType {
     AppEntryType {
-        id: et.into(),
-        zome_id: z.into(),
+        index: et.into(),
+        zome_index: z.into(),
         visibility: EntryVisibility::Public,
     }
 }
@@ -234,8 +234,8 @@ pub fn public_aet(z: u8, et: u8) -> AppEntryType {
 /// Create private [`AppEntryType`].
 pub fn private_aet(z: u8, et: u8) -> AppEntryType {
     AppEntryType {
-        id: et.into(),
-        zome_id: z.into(),
+        index: et.into(),
+        zome_index: z.into(),
         visibility: EntryVisibility::Private,
     }
 }

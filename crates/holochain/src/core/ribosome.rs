@@ -504,7 +504,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         }
     }
 
-    fn get_integrity_zome(&self, zome_id: &ZomeIndex) -> Option<IntegrityZome>;
+    fn get_integrity_zome(&self, zome_index: &ZomeIndex) -> Option<IntegrityZome>;
 
     fn call_iterator<I: Invocation + 'static>(
         &self,

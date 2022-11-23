@@ -46,7 +46,7 @@ where
             .into_iter()
             .try_fold(HashMap::new(), |mut map: HashMap<_, Vec<_>>, t| {
                 let scoped = TryInto::<ScopedLinkType>::try_into(t)?;
-                map.entry(scoped.zome_id)
+                map.entry(scoped.zome_index)
                     .or_default()
                     .push(scoped.zome_type);
                 Ok(map)

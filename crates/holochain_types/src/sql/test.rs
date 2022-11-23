@@ -14,12 +14,12 @@ fn make_multi(types: &[(u8, &[u8])]) -> LinkTypeFilter {
 }
 
 #[test_case(make_multi(&[]) => "".to_string())]
-#[test_case(make_multi(&[(0, &[0])]) => " AND zome_id = 0 AND link_type = 0 ".to_string())]
-#[test_case(make_multi(&[(0, &[0]), (1, &[0, 1])]) => " AND ( ( zome_id = 0 AND ( link_type = 0 ) ) OR ( zome_id = 1 AND ( link_type = 0 OR link_type = 1 ) ) ) ".to_string())]
-#[test_case(make_multi(&[(0, &[0, 2, 5])]) => " AND ( ( zome_id = 0 AND ( link_type = 0 OR link_type = 2 OR link_type = 5 ) ) ) ".to_string())]
+#[test_case(make_multi(&[(0, &[0])]) => " AND zome_index = 0 AND link_type = 0 ".to_string())]
+#[test_case(make_multi(&[(0, &[0]), (1, &[0, 1])]) => " AND ( ( zome_index = 0 AND ( link_type = 0 ) ) OR ( zome_index = 1 AND ( link_type = 0 OR link_type = 1 ) ) ) ".to_string())]
+#[test_case(make_multi(&[(0, &[0, 2, 5])]) => " AND ( ( zome_index = 0 AND ( link_type = 0 OR link_type = 2 OR link_type = 5 ) ) ) ".to_string())]
 #[test_case(LinkTypeFilter::Dependencies(vec![]) => "".to_string())]
-#[test_case(LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]) => " AND ( zome_id = 0 ) ".to_string())]
-#[test_case(LinkTypeFilter::Dependencies(vec![ZomeIndex(0), ZomeIndex(3)]) => " AND ( zome_id = 0 OR zome_id = 3 ) ".to_string())]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]) => " AND ( zome_index = 0 ) ".to_string())]
+#[test_case(LinkTypeFilter::Dependencies(vec![ZomeIndex(0), ZomeIndex(3)]) => " AND ( zome_index = 0 OR zome_index = 3 ) ".to_string())]
 fn link_type_filter_to_sql(filter: LinkTypeFilter) -> String {
     filter.to_sql_statement()
 }

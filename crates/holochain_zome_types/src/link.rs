@@ -24,7 +24,7 @@ pub struct Link {
     /// When the link was added
     pub timestamp: crate::Timestamp,
     /// The [`ZomeIndex`] for where this link is defined.
-    pub zome_id: ZomeIndex,
+    pub zome_index: ZomeIndex,
     /// The [`LinkType`] for this link.
     pub link_type: LinkType,
     /// A tag used to find this link
@@ -38,7 +38,7 @@ pub struct Link {
 pub struct CreateLinkInput {
     pub base_address: holo_hash::AnyLinkableHash,
     pub target_address: holo_hash::AnyLinkableHash,
-    pub zome_id: ZomeIndex,
+    pub zome_index: ZomeIndex,
     pub link_type: LinkType,
     pub tag: LinkTag,
     pub chain_top_ordering: ChainTopOrdering,
@@ -48,7 +48,7 @@ impl CreateLinkInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
         target_address: holo_hash::AnyLinkableHash,
-        zome_id: ZomeIndex,
+        zome_index: ZomeIndex,
         link_type: LinkType,
         tag: LinkTag,
         chain_top_ordering: ChainTopOrdering,
@@ -56,7 +56,7 @@ impl CreateLinkInput {
         Self {
             base_address,
             target_address,
-            zome_id,
+            zome_index,
             link_type,
             tag,
             chain_top_ordering,

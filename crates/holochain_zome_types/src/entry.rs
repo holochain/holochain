@@ -42,7 +42,7 @@ pub enum EntryDefLocation {
 /// The location of an app entry definition.
 pub struct AppEntryDefLocation {
     /// The zome that defines this entry type.
-    pub zome_id: ZomeIndex,
+    pub zome_index: ZomeIndex,
     /// The entry type within the zome.
     pub entry_def_index: EntryDefIndex,
 }
@@ -216,9 +216,9 @@ impl From<holo_hash::ActionHash> for DeleteInput {
 
 impl EntryDefLocation {
     /// Create an [`EntryDefLocation::App`].
-    pub fn app(zome_id: impl Into<ZomeIndex>, entry_def_index: impl Into<EntryDefIndex>) -> Self {
+    pub fn app(zome_index: impl Into<ZomeIndex>, entry_def_index: impl Into<EntryDefIndex>) -> Self {
         Self::App(AppEntryDefLocation {
-            zome_id: zome_id.into(),
+            zome_index: zome_index.into(),
             entry_def_index: entry_def_index.into(),
         })
     }
@@ -227,7 +227,7 @@ impl EntryDefLocation {
 impl From<ScopedEntryDefIndex> for AppEntryDefLocation {
     fn from(s: ScopedEntryDefIndex) -> Self {
         Self {
-            zome_id: s.zome_id,
+            zome_index: s.zome_index,
             entry_def_index: s.zome_type,
         }
     }

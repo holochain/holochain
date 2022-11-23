@@ -679,8 +679,8 @@ impl RibosomeT for RealRibosome {
                     EntryDefsResult::Defs(defs) => {
                         let vec = zome_dependencies
                             .iter()
-                            .filter_map(|zome_id| {
-                                self.dna_def().integrity_zomes.get(zome_id.0 as usize)
+                            .filter_map(|zome_index| {
+                                self.dna_def().integrity_zomes.get(zome_index.0 as usize)
                             })
                             .flat_map(|(zome_name, _)| {
                                 defs.get(zome_name).map(|e| e.0.clone()).unwrap_or_default()
@@ -942,11 +942,11 @@ impl RibosomeT for RealRibosome {
         &self.dna_file
     }
 
-    fn get_integrity_zome(&self, zome_id: &ZomeIndex) -> Option<IntegrityZome> {
+    fn get_integrity_zome(&self, zome_index: &ZomeIndex) -> Option<IntegrityZome> {
         self.dna_file
             .dna_def()
             .integrity_zomes
-            .get(zome_id.0 as usize)
+            .get(zome_index.0 as usize)
             .cloned()
             .map(|(name, def)| IntegrityZome::new(name, def))
     }

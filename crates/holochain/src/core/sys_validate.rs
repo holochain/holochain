@@ -284,12 +284,12 @@ pub async fn check_app_entry_type(
 
     // Check if the zome is found
     let zome = ribosome
-        .get_integrity_zome(&entry_type.zome_id())
+        .get_integrity_zome(&entry_type.zome_index())
         .ok_or_else(|| ValidationOutcome::ZomeIndex(entry_type.clone()))?
         .into_inner()
         .1;
 
-    let entry_def = get_entry_def(entry_type.id(), zome, dna_hash, conductor).await?;
+    let entry_def = get_entry_def(entry_type.index(), zome, dna_hash, conductor).await?;
 
     // Check the visibility and return
     match entry_def {

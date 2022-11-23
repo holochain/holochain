@@ -87,14 +87,14 @@ impl OpHelper for Op {
                     }
                     Action::InitZomesComplete(_) => OpRecord::InitZomesComplete,
                     Action::CreateLink(CreateLink {
-                        zome_id,
+                        zome_index,
                         link_type,
                         base_address,
                         target_address,
                         tag,
                         ..
                     }) => {
-                        let link_type = in_scope_link_type(*zome_id, *link_type)?;
+                        let link_type = in_scope_link_type(*zome_index, *link_type)?;
                         OpRecord::CreateLink {
                             base_address: base_address.clone(),
                             target_address: target_address.clone(),
@@ -290,12 +290,12 @@ impl OpHelper for Op {
                     Action::CreateLink(CreateLink {
                         base_address,
                         target_address,
-                        zome_id,
+                        zome_index,
                         link_type,
                         tag,
                         ..
                     }) => {
-                        let link_type = activity_link_type(*zome_id, *link_type)?;
+                        let link_type = activity_link_type(*zome_index, *link_type)?;
                         OpActivity::CreateLink {
                             base_address: base_address.clone(),
                             target_address: target_address.clone(),
@@ -367,12 +367,12 @@ impl OpHelper for Op {
                 let CreateLink {
                     base_address,
                     target_address,
-                    zome_id,
+                    zome_index,
                     link_type,
                     tag,
                     ..
                 } = &create_link.hashed.content;
-                let link_type = in_scope_link_type(*zome_id, *link_type)?;
+                let link_type = in_scope_link_type(*zome_index, *link_type)?;
                 Ok(OpType::RegisterCreateLink {
                     base_address: base_address.clone(),
                     target_address: target_address.clone(),
@@ -387,12 +387,12 @@ impl OpHelper for Op {
                 let CreateLink {
                     base_address,
                     target_address,
-                    zome_id,
+                    zome_index,
                     link_type,
                     tag,
                     ..
                 } = create_link;
-                let link_type = in_scope_link_type(*zome_id, *link_type)?;
+                let link_type = in_scope_link_type(*zome_index, *link_type)?;
                 Ok(OpType::RegisterDeleteLink {
                     original_link_hash: delete_link.hashed.link_add_address.clone(),
                     base_address: base_address.clone(),
@@ -486,8 +486,8 @@ where
     match entry {
         RecordEntryRef::Present(entry) => match entry_type {
             EntryType::App(AppEntryType {
-                zome_id,
-                id: entry_def_index,
+                zome_index,
+                index: entry_def_index,
                 visibility: EntryVisibility::Public,
                 ..
             }) => {
@@ -497,7 +497,7 @@ where
                     )));
                 }
                 let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
-                    *zome_id,
+                    *zome_index,
                     *entry_def_index,
                     entry,
                 )?;
@@ -521,10 +521,10 @@ where
         },
         RecordEntryRef::Hidden => match entry_type {
             EntryType::App(AppEntryType {
-                zome_id,
-                id: entry_def_index,
+                zome_index,
+                index: entry_def_index,
                 visibility: EntryVisibility::Private,
-            }) => match get_unit_entry_type::<ET>(*zome_id, *entry_def_index)? {
+            }) => match get_unit_entry_type::<ET>(*zome_index, *entry_def_index)? {
                 Some(unit) => Ok(InScopeEntry::PrivateApp(unit)),
                 None => Err(deny_other_zome()),
             },
@@ -567,11 +567,11 @@ where
 {
     match entry_type {
         EntryType::App(AppEntryType {
-            zome_id,
-            id: entry_def_index,
+            zome_index,
+            index: entry_def_index,
             visibility,
         }) => {
-            let unit = get_unit_entry_type::<ET>(*zome_id, *entry_def_index)?;
+            let unit = get_unit_entry_type::<ET>(*zome_index, *entry_def_index)?;
             match visibility {
                 EntryVisibility::Public => Ok(ActivityEntry::App {
                     entry_hash: entry_hash.clone(),
@@ -591,12 +591,12 @@ where
 
 /// Get the app defined link type from a [`ZomeIndex`] and [`LinkType`].
 /// If the [`ZomeIndex`] is not a dependency of this zome then return a host error.
-fn in_scope_link_type<LT>(zome_id: ZomeIndex, link_type: LinkType) -> Result<LT, WasmError>
+fn in_scope_link_type<LT>(zome_index: ZomeIndex, link_type: LinkType) -> Result<LT, WasmError>
 where
     LT: LinkTypesHelper,
     WasmError: From<<LT as LinkTypesHelper>::Error>,
 {
-    match <LT as LinkTypesHelper>::from_type(*zome_id, *link_type)? {
+    match <LT as LinkTypesHelper>::from_type(*zome_index, *link_type)? {
         Some(link_type) => Ok(link_type),
         None => Err(deny_other_zome()),
     }
@@ -604,12 +604,12 @@ where
 
 /// Get the app defined link type from a [`ZomeIndex`] and [`LinkType`].
 /// If the [`ZomeIndex`] is not a dependency of this zome then return a host error.
-fn activity_link_type<LT>(zome_id: ZomeIndex, link_type: LinkType) -> Result<Option<LT>, WasmError>
+fn activity_link_type<LT>(zome_index: ZomeIndex, link_type: LinkType) -> Result<Option<LT>, WasmError>
 where
     LT: LinkTypesHelper,
     WasmError: From<<LT as LinkTypesHelper>::Error>,
 {
-    Ok(<LT as LinkTypesHelper>::from_type(*zome_id, *link_type)?)
+    Ok(<LT as LinkTypesHelper>::from_type(*zome_index, *link_type)?)
 }
 
 /// Produce the unit variant given a zome id and entry def index.
@@ -617,7 +617,7 @@ where
 /// Returns a [`WasmErrorInner::Guest`] error if the zome id is a
 /// dependency but the [`EntryDefIndex`] is out of range.
 fn get_unit_entry_type<ET>(
-    zome_id: ZomeIndex,
+    zome_index: ZomeIndex,
     entry_def_index: EntryDefIndex,
 ) -> Result<Option<<ET as UnitEnum>::Unit>, WasmError>
 where
@@ -628,14 +628,14 @@ where
     let unit = entries.find(
         <ET as UnitEnum>::unit_iter(),
         ScopedEntryDefIndex {
-            zome_id,
+            zome_index,
             zome_type: entry_def_index,
         },
     );
     let unit = match unit {
         Some(unit) => Some(unit),
         None => {
-            if entries.dependencies().any(|z| z == zome_id) {
+            if entries.dependencies().any(|z| z == zome_index) {
                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
                     "Entry type: {:?} is out of range for this zome.",
                     entry_def_index

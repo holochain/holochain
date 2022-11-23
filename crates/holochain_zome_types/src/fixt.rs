@@ -72,8 +72,8 @@ impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
     fn next(&mut self) -> Option<Self::Item> {
         let app_entry = AppEntryTypeFixturator::new(Unpredictable).next().unwrap();
         Some(AppEntryType::new(
-            app_entry.id(),
-            app_entry.zome_id(),
+            app_entry.index(),
+            app_entry.zome_index(),
             self.0.curve,
         ))
     }
@@ -109,7 +109,7 @@ pub struct KnownCreateLink {
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
-    pub zome_id: ZomeIndex,
+    pub zome_index: ZomeIndex,
     pub link_type: LinkType,
 }
 
@@ -125,7 +125,7 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
-        f.zome_id = self.0.curve.zome_id;
+        f.zome_index = self.0.curve.zome_index;
         f.link_type = self.0.curve.link_type;
         Some(f)
     }
@@ -544,7 +544,7 @@ fixturator! {
     };
     curve PublicCurve {
         let aet = fixt!(AppEntryType);
-        EntryType::App(AppEntryType::new(aet.id(), aet.zome_id(), EntryVisibility::Public))
+        EntryType::App(AppEntryType::new(aet.index(), aet.zome_index(), EntryVisibility::Public))
     };
 }
 

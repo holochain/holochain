@@ -177,12 +177,12 @@ impl Query for GetLinksQuery {
             Action::CreateLink(CreateLink {
                 base_address,
                 tag,
-                zome_id,
+                zome_index,
                 link_type,
                 ..
             }) => {
                 *base_address == *base_filter
-                    && type_query_filter.contains(zome_id, link_type)
+                    && type_query_filter.contains(zome_index, link_type)
                     && tag_filter
                         .as_ref()
                         .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
@@ -230,7 +230,7 @@ fn link_from_action(action: Action) -> StateQueryResult<Link> {
         Action::CreateLink(action) => Ok(Link {
             target: action.target_address,
             timestamp: action.timestamp,
-            zome_id: action.zome_id,
+            zome_index: action.zome_index,
             link_type: action.link_type,
             tag: action.tag,
             create_link_hash: hash,

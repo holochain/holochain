@@ -318,7 +318,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         }) => {
             let t = ScopedLinkType::try_from(&lt).unwrap();
             let mut c = CreateLink::arbitrary(&mut ud).unwrap();
-            c.zome_id = t.zome_id;
+            c.zome_index = t.zome_index;
             c.link_type = t.zome_type;
             c.base_address = base_address;
             c.target_address = target_address;
@@ -468,7 +468,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         } => {
             let t = ScopedLinkType::try_from(&lt).unwrap();
             let mut c = CreateLink::arbitrary(&mut ud).unwrap();
-            c.zome_id = t.zome_id;
+            c.zome_index = t.zome_index;
             c.link_type = t.zome_type;
             c.base_address = base_address;
             c.target_address = target_address;
@@ -491,7 +491,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             let mut c = CreateLink::arbitrary(&mut ud).unwrap();
             let mut d = DeleteLink::arbitrary(&mut ud).unwrap();
             d.link_add_address = original_link_hash;
-            c.zome_id = t.zome_id;
+            c.zome_index = t.zome_index;
             c.link_type = t.zome_type;
             c.base_address = base_address;
             c.target_address = target_address;
@@ -847,11 +847,11 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                     match lt {
                         Some(lt) => {
                             let t = ScopedLinkType::try_from(&lt).unwrap();
-                            c.zome_id = t.zome_id;
+                            c.zome_index = t.zome_index;
                             c.link_type = t.zome_type;
                         }
                         None => {
-                            c.zome_id = 200.into();
+                            c.zome_index = 200.into();
                             c.link_type = 0.into();
                         }
                     }
@@ -965,8 +965,8 @@ fn create(
 ) -> Create {
     let mut c = Create::arbitrary(ud).unwrap();
     c.entry_type = EntryType::App(AppEntryType {
-        id: t.zome_type,
-        zome_id: t.zome_id,
+        index: t.zome_type,
+        zome_index: t.zome_index,
         visibility,
     });
     c.entry_hash = entry_hash;
@@ -982,8 +982,8 @@ fn update(
 ) -> Update {
     let mut u = Update::arbitrary(ud).unwrap();
     u.entry_type = EntryType::App(AppEntryType {
-        id: t.zome_type,
-        zome_id: t.zome_id,
+        index: t.zome_type,
+        zome_index: t.zome_index,
         visibility,
     });
     u.entry_hash = entry_hash;
@@ -1007,16 +1007,16 @@ where
     match t {
         Some(t) => {
             c.entry_type = EntryType::App(AppEntryType {
-                id: t.zome_type,
-                zome_id: t.zome_id,
+                index: t.zome_type,
+                zome_index: t.zome_index,
                 visibility,
             })
         }
         None => {
             // Make sure this is out of range for this test.
             c.entry_type = EntryType::App(AppEntryType {
-                id: 0.into(),
-                zome_id: 200.into(),
+                index: 0.into(),
+                zome_index: 200.into(),
                 visibility,
             })
         }
@@ -1033,8 +1033,8 @@ fn op_match_sanity() {
             action_seq: 1,
             prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
             entry_type: EntryType::App(AppEntryType {
-                id: 0.into(),
-                zome_id: 0.into(),
+                index: 0.into(),
+                zome_index: 0.into(),
                 visibility: EntryVisibility::Public,
             }),
             entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
@@ -1047,8 +1047,8 @@ fn op_match_sanity() {
                 hashed: ActionHashed {
                     content: Action::Create(Create {
                         entry_type: EntryType::App(AppEntryType {
-                            id: 0.into(),
-                            zome_id: 0.into(),
+                            index: 0.into(),
+                            zome_index: 0.into(),
                             visibility: EntryVisibility::Public,
                         }),
                         ..empty_create()

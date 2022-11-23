@@ -28,10 +28,10 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
         Op::StoreEntry(StoreEntry{ action, entry }) => match action.hashed.app_entry_type() {
             Some(AppEntryType {
-                id: entry_def_index,
-                zome_id,
+                index: entry_def_index,
+                zome_index,
                 ..
-            }) => match EntryTypes::deserialize_from_type(*zome_id, *entry_def_index, &entry)? {
+            }) => match EntryTypes::deserialize_from_type(*zome_index, *entry_def_index, &entry)? {
                 Some(EntryTypes::Post(Post(p))) => {
                     if p != "foo" {
                         return Ok(ValidateCallbackResult::Invalid("because".into()));

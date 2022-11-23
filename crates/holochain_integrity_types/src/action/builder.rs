@@ -235,7 +235,7 @@ builder_variant!(InitZomesComplete {});
 builder_variant!(CreateLink<RateWeight> {
     base_address: AnyLinkableHash,
     target_address: AnyLinkableHash,
-    zome_id: ZomeIndex,
+    zome_index: ZomeIndex,
     link_type: LinkType,
     tag: LinkTag,
 });

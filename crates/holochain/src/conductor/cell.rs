@@ -702,13 +702,13 @@ impl Cell {
         // If the action has an app entry type get the entry def
         // from the conductor.
         let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
-            Some(EntryType::App(AppEntryType { zome_id, id, .. })) => {
+            Some(EntryType::App(AppEntryType { zome_index, index, .. })) => {
                 let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                let zome = ribosome.get_integrity_zome(zome_id);
+                let zome = ribosome.get_integrity_zome(zome_index);
                 match zome {
                     Some(zome) => self
                         .conductor_api
-                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *id))
+                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *index))
                         .map(|e| u8::from(e.required_validations)),
                     None => None,
                 }
