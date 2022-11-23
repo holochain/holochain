@@ -29,7 +29,7 @@ fn malformed_toml_error_is_friendly() {
         .stdout(predicate::str::is_match("[Pp]lease").unwrap());
     cmd.assert()
         .append_context("reason", "output contains the wrong reason for error")
-        .stdout(predicate::str::contains("did not find expected"));
+        .stdout(predicate::str::contains("invalid type"));
 }
 
 #[test]
