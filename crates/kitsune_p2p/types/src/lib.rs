@@ -342,6 +342,8 @@ pub type KBasis = Arc<bin_types::KitsuneBasis>;
 pub type KOpHash = Arc<bin_types::KitsuneOpHash>;
 /// KitsuneSpace in an Arc
 pub type KSpace = Arc<bin_types::KitsuneSpace>;
+/// KitsuneOpData in an Arc
+pub type KOpData = Arc<bin_types::KitsuneOpData>;
 
 use metrics::metric_task;
 

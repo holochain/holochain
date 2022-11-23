@@ -4,7 +4,7 @@ use crate::actor::BroadcastTo;
 use crate::agent_store::AgentInfoSigned;
 use crate::types::*;
 use derive_more::*;
-use kitsune_p2p_fetch::FetchRequest;
+use kitsune_p2p_fetch::FetchKey;
 use kitsune_p2p_types::dht_arc::DhtLocation;
 use std::sync::Arc;
 
@@ -129,15 +129,13 @@ kitsune_p2p_types::write_codec_enum! {
         /// This is sent as a fire-and-forget Notify message.
         /// The "response" is "PushOpData" below.
         FetchOp(0x60) {
-            space.0: Arc<KitsuneSpace>,
-            fetch_list.1: Vec<FetchRequest>,
+            fetch_list.0: Vec<(Arc<KitsuneSpace>, Vec<FetchKey>)>,
         },
 
         /// This is a fire-and-forget "response" to the
         /// fire-and-forget "FetchOp" request, also sent via Notify.
         PushOpData(0x61) {
-            space.0: Arc<KitsuneSpace>,
-            op_data_list.1: Vec<WireData>,
+            op_data_list.1: Vec<(Arc<KitsuneSpace>, Vec<Arc<KitsuneOpData>>)>,
         },
 
         /// MetricsExchangeMessage

@@ -1,4 +1,4 @@
-use kitsune_p2p_types::{KAgent, KSpace};
+use kitsune_p2p_types::{KOpData, KSpace};
 use std::sync::Arc;
 
 /// Drop this when response sending is complete.
@@ -6,6 +6,9 @@ pub struct FetchResponseGuard(tokio::sync::oneshot::Sender<()>);
 
 /// Customization by code making use of the FetchResponseQueue.
 pub trait FetchResponseConfig: 'static + Send + Sync {
+    /// Data that is forwarded.
+    type User: 'static + Send;
+
     /// Byte count allowed to be outstanding.
     /// Any ops requested to be enqueued over this amount
     /// will be dropped without responding.
@@ -22,29 +25,27 @@ pub trait FetchResponseConfig: 'static + Send + Sync {
     fn respond(
         &self,
         space: KSpace,
-        agent: KAgent,
+        user: Self::User,
         completion_guard: FetchResponseGuard,
-        op: Vec<u8>,
+        op: KOpData,
     );
 }
 
-type DynFetchResponseConfig = Arc<dyn FetchResponseConfig + 'static + Send + Sync>;
-
 /// Manage responding to requests for data.
-pub struct FetchResponseQueue {
+pub struct FetchResponseQueue<C: FetchResponseConfig> {
     byte_limit: Arc<tokio::sync::Semaphore>,
     concurrent_send_limit: Arc<tokio::sync::Semaphore>,
-    config: DynFetchResponseConfig,
+    config: Arc<C>,
 }
 
-impl FetchResponseQueue {
+impl<C: FetchResponseConfig> FetchResponseQueue<C> {
     /// Construct a new response queue.
-    pub fn new<Config: FetchResponseConfig>(config: Config) -> Self {
+    pub fn new(config: C) -> Self {
         let byte_limit = Arc::new(tokio::sync::Semaphore::new(config.byte_limit() as usize));
         let concurrent_send_limit = Arc::new(tokio::sync::Semaphore::new(
             config.concurrent_send_limit() as usize,
         ));
-        let config: DynFetchResponseConfig = Arc::new(config);
+        let config = Arc::new(config);
         Self {
             byte_limit,
             concurrent_send_limit,
@@ -53,8 +54,8 @@ impl FetchResponseQueue {
     }
 
     /// Enqueue an op to be sent to a remote.
-    pub fn enqueue_op(&self, space: KSpace, agent: KAgent, op: Vec<u8>) {
-        let len = op.len();
+    pub fn enqueue_op(&self, space: KSpace, user: C::User, op: KOpData) {
+        let len = op.size();
 
         if len > u32::MAX as usize {
             tracing::warn!("op size > u32::MAX");
@@ -85,7 +86,7 @@ impl FetchResponseQueue {
 
             let guard = FetchResponseGuard(s);
 
-            config.respond(space, agent, guard, op);
+            config.respond(space, user, guard, op);
 
             // we don't care about the response... in fact
             // it's *always* an error, because we drop it.
@@ -97,13 +98,13 @@ impl FetchResponseQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneSpace};
+    use kitsune_p2p_types::bin_types::{KitsuneBinType, KitsuneSpace};
     use std::sync::Mutex;
 
     struct TestConfInner {
         pub byte_limit: u32,
         pub concurrent_send_limit: u32,
-        pub responds: Vec<(KSpace, KAgent, FetchResponseGuard, Vec<u8>)>,
+        pub responds: Vec<(KSpace, &'static str, FetchResponseGuard, KOpData)>,
     }
 
     struct TestConf(Mutex<TestConfInner>);
@@ -117,12 +118,14 @@ mod tests {
             }))
         }
 
-        pub fn drain_responds(&self) -> Vec<(KSpace, KAgent, FetchResponseGuard, Vec<u8>)> {
+        pub fn drain_responds(&self) -> Vec<(KSpace, &'static str, FetchResponseGuard, KOpData)> {
             std::mem::take(&mut self.0.lock().unwrap().responds)
         }
     }
 
     impl FetchResponseConfig for Arc<TestConf> {
+        type User = &'static str;
+
         fn byte_limit(&self) -> u32 {
             self.0.lock().unwrap().byte_limit
         }
@@ -131,8 +134,8 @@ mod tests {
             self.0.lock().unwrap().concurrent_send_limit
         }
 
-        fn respond(&self, space: KSpace, agent: KAgent, g: FetchResponseGuard, op: Vec<u8>) {
-            self.0.lock().unwrap().responds.push((space, agent, g, op));
+        fn respond(&self, space: KSpace, user: Self::User, g: FetchResponseGuard, op: KOpData) {
+            self.0.lock().unwrap().responds.push((space, user, g, op));
         }
     }
 
@@ -145,8 +148,8 @@ mod tests {
 
         q.enqueue_op(
             Arc::new(KitsuneSpace::new(vec![0; 36])),
-            Arc::new(KitsuneAgent::new(vec![1; 36])),
-            b"hello".to_vec(),
+            "noodle",
+            Arc::new(b"hello".to_vec().into()),
         );
 
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;

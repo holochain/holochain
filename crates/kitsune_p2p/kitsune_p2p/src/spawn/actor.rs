@@ -11,6 +11,7 @@ use crate::wire::MetricExchangeMsg;
 use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
+use kitsune_p2p_fetch::FetchKey;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
@@ -220,12 +221,45 @@ impl KitsuneP2pActor {
         // capture endpoint handle
         let ep_hnd = ep.handle().clone();
 
+        struct FetchResponseConfig(kitsune_p2p_types::config::KitsuneP2pTuningParams);
+
+        impl kitsune_p2p_fetch::FetchResponseConfig for FetchResponseConfig {
+            type User = (Tx2ConHnd<wire::Wire>, TxUrl);
+
+            fn respond(
+                &self,
+                space: KSpace,
+                user: Self::User,
+                completion_guard: kitsune_p2p_fetch::FetchResponseGuard,
+                op: KOpData,
+            ) {
+                let timeout = self.0.implicit_timeout();
+                tokio::task::spawn(async move {
+                    let _completion_guard = completion_guard;
+
+                    let payload = wire::Wire::push_op_data(vec![(space, vec![op])]);
+
+                    // MAYBE: open a new connection if the con was closed??
+                    let (con, _url) = user;
+
+                    if let Err(err) = con.notify(&payload, timeout).await {
+                        tracing::warn!(?err, "error responding to op fetch");
+                    }
+                });
+            }
+        }
+
+        let fetch_response_queue = kitsune_p2p_fetch::FetchResponseQueue::new(FetchResponseConfig(
+            config.tuning_params.clone(),
+        ));
+
         let i_s = internal_sender.clone();
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
             let host = host.clone();
             let tuning_params = config.tuning_params.clone();
             async move {
+                let fetch_response_queue = &fetch_response_queue;
                 ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                     let evt_sender = evt_sender.clone();
                     let host = host.clone();
@@ -428,13 +462,36 @@ impl KitsuneP2pActor {
                                         }
                                     }
                                     wire::Wire::FetchOp(wire::FetchOp {
-                                        space: _,
-                                        fetch_list: _,
+                                        fetch_list,
                                     }) => {
-                                        todo!("RECEIVED a fetch op, see if we have it, add it to the push op data queue");
+                                        for (space, key_list) in fetch_list {
+                                            let mut hashes = Vec::new();
+                                            //let mut regions = Vec::new();
+
+                                            for key in key_list {
+                                                match key {
+                                                    FetchKey::Region { region_coords: _ } => {
+                                                        todo!()
+                                                    }
+                                                    FetchKey::Op { op_hash } => {
+                                                        hashes.push(op_hash);
+                                                    }
+                                                }
+                                            }
+
+                                            if !hashes.is_empty() {
+                                                if let Ok(list) = evt_sender.fetch_op_data(FetchOpDataEvt {
+                                                    space: space.clone(),
+                                                    query: FetchOpDataEvtQuery::Hashes(hashes),
+                                                }).await {
+                                                    for (_hash, op) in list {
+                                                        fetch_response_queue.enqueue_op(space.clone(), (con.clone(), url.clone()), op);
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                     wire::Wire::PushOpData(wire::PushOpData {
-                                        space: _,
                                         op_data_list: _,
                                     }) => {
                                         todo!("RECEIVED op data, hopefully we asked for it : ) - send it for integration");

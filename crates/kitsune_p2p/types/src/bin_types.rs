@@ -160,6 +160,12 @@ impl KitsuneOpData {
     }
 }
 
+impl From<Vec<u8>> for KitsuneOpData {
+    fn from(d: Vec<u8>) -> Self {
+        Self(d)
+    }
+}
+
 /// Helpful pattern for debug formatting many bytes.
 /// If the size is > 32 bytes, only the first 8 and last 8 bytes will be displayed.
 pub fn fmt_many_bytes(
