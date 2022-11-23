@@ -396,7 +396,7 @@ mod tests {
                 // Make them private
                 let visibility = EntryVisibility::Private;
                 let mut entry_type_fixt =
-                    AppEntryTypeFixturator::new(visibility.clone()).map(EntryType::App);
+                    AppEntryDefFixturator::new(visibility.clone()).map(EntryType::App);
                 let ec_entry_type = entry_type_fixt.next().unwrap();
                 let eu_entry_type = entry_type_fixt.next().unwrap();
 

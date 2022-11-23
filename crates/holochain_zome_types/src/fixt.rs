@@ -63,16 +63,16 @@ fixturator!(
 );
 
 fixturator!(
-    AppEntryType;
+    AppEntryDef;
     constructor fn new(U8, U8, EntryVisibility);
 );
 
-impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
-    type Item = AppEntryType;
+impl Iterator for AppEntryDefFixturator<EntryVisibility> {
+    type Item = AppEntryDef;
     fn next(&mut self) -> Option<Self::Item> {
-        let app_entry = AppEntryTypeFixturator::new(Unpredictable).next().unwrap();
-        Some(AppEntryType::new(
-            app_entry.index(),
+        let app_entry = AppEntryDefFixturator::new(Unpredictable).next().unwrap();
+        Some(AppEntryDef::new(
+            app_entry.entry_index(),
             app_entry.zome_index(),
             self.0.curve,
         ))
@@ -532,19 +532,19 @@ fixturator! {
     curve Empty EntryType::AgentPubKey;
     curve Unpredictable match EntryTypeVariant::random() {
         EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
-        EntryTypeVariant::App => EntryType::App(fixt!(AppEntryType)),
+        EntryTypeVariant::App => EntryType::App(fixt!(AppEntryDef)),
         EntryTypeVariant::CapClaim => EntryType::CapClaim,
         EntryTypeVariant::CapGrant => EntryType::CapGrant,
     };
     curve Predictable match EntryTypeVariant::nth(get_fixt_index!()) {
         EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
-        EntryTypeVariant::App => EntryType::App(AppEntryTypeFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
+        EntryTypeVariant::App => EntryType::App(AppEntryDefFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
         EntryTypeVariant::CapClaim => EntryType::CapClaim,
         EntryTypeVariant::CapGrant => EntryType::CapGrant,
     };
     curve PublicCurve {
-        let aet = fixt!(AppEntryType);
-        EntryType::App(AppEntryType::new(aet.index(), aet.zome_index(), EntryVisibility::Public))
+        let app_entry_def = fixt!(AppEntryDef);
+        EntryType::App(AppEntryDef::new(app_entry_def.entry_index(), app_entry_def.zome_index(), EntryVisibility::Public))
     };
 }
 
@@ -584,7 +584,7 @@ fixturator!(
     };
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryDefFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
@@ -620,7 +620,7 @@ fixturator!(
 
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryDefFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,

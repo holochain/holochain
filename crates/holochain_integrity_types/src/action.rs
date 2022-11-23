@@ -596,8 +596,8 @@ pub struct DeleteAction {
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
-    /// An app-provided entry, along with its app-provided AppEntryType
-    App(AppEntryType),
+    /// An app-provided entry, along with its app-provided AppEntryDef
+    App(AppEntryDef),
     /// A Capability claim
     CapClaim,
     /// A Capability grant.
@@ -608,7 +608,7 @@ impl EntryType {
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
             EntryType::AgentPubKey => &EntryVisibility::Public,
-            EntryType::App(t) => t.visibility(),
+            EntryType::App(app_entry_def) => app_entry_def.visibility(),
             EntryType::CapClaim => &EntryVisibility::Private,
             EntryType::CapGrant => &EntryVisibility::Private,
         }
@@ -619,7 +619,7 @@ impl std::fmt::Display for EntryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EntryType::AgentPubKey => writeln!(f, "AgentPubKey"),
-            EntryType::App(aet) => writeln!(f, "App({:?}, {:?})", aet.index(), aet.visibility()),
+            EntryType::App(app_entry_def) => writeln!(f, "App({:?}, {:?})", app_entry_def.entry_index(), app_entry_def.visibility()),
             EntryType::CapClaim => writeln!(f, "CapClaim"),
             EntryType::CapGrant => writeln!(f, "CapGrant"),
         }
@@ -629,10 +629,10 @@ impl std::fmt::Display for EntryType {
 /// Information about a class of Entries provided by the DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct AppEntryType {
+pub struct AppEntryDef {
     /// A unique u8 identifier within a zome for this
     /// entry type.
-    pub index: EntryDefIndex,
+    pub entry_index: EntryDefIndex,
     /// The id of the zome that defines this entry type.
     pub zome_index: ZomeIndex,
     // @todo don't do this, use entry defs instead
@@ -640,17 +640,17 @@ pub struct AppEntryType {
     pub visibility: EntryVisibility,
 }
 
-impl AppEntryType {
-    pub fn new(index: EntryDefIndex, zome_index: ZomeIndex, visibility: EntryVisibility) -> Self {
+impl AppEntryDef {
+    pub fn new(entry_index: EntryDefIndex, zome_index: ZomeIndex, visibility: EntryVisibility) -> Self {
         Self {
-            index,
+            entry_index,
             zome_index,
             visibility,
         }
     }
 
-    pub fn index(&self) -> EntryDefIndex {
-        self.index
+    pub fn entry_index(&self) -> EntryDefIndex {
+        self.entry_index
     }
     pub fn zome_index(&self) -> ZomeIndex {
         self.zome_index

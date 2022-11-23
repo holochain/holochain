@@ -113,7 +113,7 @@ pub async fn fake_unique_record(
     let content: SerializedBytes =
         UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
     let entry = Entry::App(content.try_into().unwrap()).into_hashed();
-    let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
+    let app_entry_type = AppEntryDefFixturator::new(visibility).next().unwrap();
     let action_1 = Action::Create(Create {
         author: agent_key,
         timestamp: Timestamp::now(),

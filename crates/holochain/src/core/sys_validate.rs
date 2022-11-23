@@ -269,11 +269,11 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
     }
 }
 
-/// Check the AppEntryType is valid for the zome.
+/// Check the AppEntryDef is valid for the zome.
 /// Check the EntryDefId and ZomeIndex are in range.
 pub async fn check_app_entry_type(
     dna_hash: &DnaHash,
-    entry_type: &AppEntryType,
+    entry_type: &AppEntryDef,
     conductor: &Conductor,
 ) -> SysValidationResult<EntryDef> {
     // We want to be careful about holding locks open to the conductor api

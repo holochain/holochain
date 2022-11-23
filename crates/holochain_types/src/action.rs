@@ -485,7 +485,7 @@ mod tests {
             ActionBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
-            EntryType::App(AppEntryType::new(
+            EntryType::App(AppEntryDef::new(
                 0.into(),
                 0.into(),
                 EntryVisibility::Public,
@@ -505,7 +505,7 @@ mod tests {
             ActionBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
-            EntryType::App(AppEntryType::new(
+            EntryType::App(AppEntryDef::new(
                 0.into(),
                 0.into(),
                 EntryVisibility::Public,

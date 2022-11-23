@@ -545,7 +545,7 @@ async fn generate_fixt_store() -> (
     let entry = EntryFixturator::new(AppEntry).next().unwrap();
     let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
     let mut record_create = fixt!(Create);
-    let entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
+    let entry_type = AppEntryDefFixturator::new(EntryVisibility::Public)
         .map(EntryType::App)
         .next()
         .unwrap();

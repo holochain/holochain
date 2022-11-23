@@ -186,21 +186,21 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             type Error = WasmError;
 
             fn try_from(value: #unit_ident) -> Result<Self, Self::Error> {
-                Ok(EntryType::App(AppEntryType::try_from(value)?))
+                Ok(EntryType::App(AppEntryDef::try_from(value)?))
             }
         }
 
-        impl TryFrom<#unit_ident> for AppEntryType {
+        impl TryFrom<#unit_ident> for AppEntryDef {
             type Error = WasmError;
 
             fn try_from(value: #unit_ident) -> Result<Self, Self::Error> {
                 let ScopedEntryDefIndex {
                     zome_index,
-                    zome_type: index,
+                    zome_type: entry_index,
                 } = value.try_into()?;
                 let def: EntryDef = value.into();
                 Ok(Self {
-                    index,
+                    entry_index,
                     zome_index,
                     visibility: def.visibility,
                 })

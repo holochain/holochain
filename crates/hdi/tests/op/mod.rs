@@ -67,60 +67,60 @@ pub enum LinkTypes {
 #[test_case(s_record(create_link(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(create_link(100, 0), RecordEntry::NotApplicable) => matches WasmErrorInner::Host(_))]
 // Store Entry
-#[test_case(s_entry(c(EntryType::App(public_aet(0, 100))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
-#[test_case(s_entry(c(EntryType::App(public_aet(100, 0))).into(), e(A{})) => matches WasmErrorInner::Host(_))]
-#[test_case(s_entry(c(EntryType::App(public_aet(0, 0))).into(), e(D::default())) => matches WasmErrorInner::Serialize(_))]
-#[test_case(s_entry(c(EntryType::App(private_aet(0, 0))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_entry(c(EntryType::App(public_app_entry_def(0, 100))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_entry(c(EntryType::App(public_app_entry_def(100, 0))).into(), e(A{})) => matches WasmErrorInner::Host(_))]
+#[test_case(s_entry(c(EntryType::App(public_app_entry_def(0, 0))).into(), e(D::default())) => matches WasmErrorInner::Serialize(_))]
+#[test_case(s_entry(c(EntryType::App(private_app_entry_def(0, 0))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_entry(c(EntryType::CapClaim).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_entry(c(EntryType::CapGrant).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
 // RegisterUpdate
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), Some(e(D::default())),
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), Some(e(D::default())),
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Serialize(_) ; "Register Update: original entry fails to deserialize")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(0, 0))), Some(e(D::default())))
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(D::default())))
     => matches WasmErrorInner::Serialize(_) ; "Register Update: new entry fails to deserialize")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), None,
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), None,
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: original entry is missing")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(0, 0))), None)
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(public_app_entry_def(0, 0))), None)
     => matches WasmErrorInner::Guest(_) ; "Register Update: new entry is missing")]
 #[test_case(r_update(
-    c(EntryType::App(private_aet(0, 0))).into(), Some(e(A{})),
-    u(EntryType::App(private_aet(0, 0))), None)
+    c(EntryType::App(private_app_entry_def(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(private_app_entry_def(0, 0))), None)
     => matches WasmErrorInner::Guest(_) ; "Register Update: original entry is private but also present")]
 #[test_case(r_update(
-    c(EntryType::App(private_aet(0, 0))).into(), None,
-    u(EntryType::App(private_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(private_app_entry_def(0, 0))).into(), None,
+    u(EntryType::App(private_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: new entry is private but also present")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 100))).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(0, 100))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(0, 100))).into(), Some(e(A{})),
+    u(EntryType::App(public_app_entry_def(0, 100))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: entry type is out of range")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(100, 0))).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(100, 0))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(100, 0))).into(), Some(e(A{})),
+    u(EntryType::App(public_app_entry_def(100, 0))), Some(e(A{})))
     => matches WasmErrorInner::Host(_) ; "Register Update: zome id is out of range")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), Some(e(A{})),
-    u(EntryType::App(private_aet(0, 0))), None)
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(private_app_entry_def(0, 0))), None)
     => matches WasmErrorInner::Guest(_) ; "Register Update: public to private type mismatch")]
 #[test_case(r_update(
-    c(EntryType::App(private_aet(0, 0))).into(), None,
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(private_app_entry_def(0, 0))).into(), None,
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: private to public type mismatch")]
 #[test_case(r_update(
     c(EntryType::AgentPubKey).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: agent to app mismatch")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 1))).into(), None,
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(0, 1))).into(), None,
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: entry type mismatch")]
 #[test_case(r_create_link(0, 100) => matches WasmErrorInner::Guest(_) ; "Register Create Link: link type out of range")]
 #[test_case(r_create_link(100, 0) => matches WasmErrorInner::Host(_) ; "Register Create Link: zome id out of range")]
@@ -964,8 +964,8 @@ fn create(
     entry_hash: EntryHash,
 ) -> Create {
     let mut c = Create::arbitrary(ud).unwrap();
-    c.entry_type = EntryType::App(AppEntryType {
-        index: t.zome_type,
+    c.entry_type = EntryType::App(AppEntryDef {
+        entry_index: t.zome_type,
         zome_index: t.zome_index,
         visibility,
     });
@@ -981,7 +981,7 @@ fn update(
     original_entry_hash: EntryHash,
 ) -> Update {
     let mut u = Update::arbitrary(ud).unwrap();
-    u.entry_type = EntryType::App(AppEntryType {
+    u.entry_type = EntryType::App(AppEntryDef {
         index: t.zome_type,
         zome_index: t.zome_index,
         visibility,
@@ -1006,7 +1006,7 @@ where
     c.entry_hash = entry_hash;
     match t {
         Some(t) => {
-            c.entry_type = EntryType::App(AppEntryType {
+            c.entry_type = EntryType::App(AppEntryDef {
                 index: t.zome_type,
                 zome_index: t.zome_index,
                 visibility,
@@ -1014,7 +1014,7 @@ where
         }
         None => {
             // Make sure this is out of range for this test.
-            c.entry_type = EntryType::App(AppEntryType {
+            c.entry_type = EntryType::App(AppEntryDef {
                 index: 0.into(),
                 zome_index: 200.into(),
                 visibility,
@@ -1032,7 +1032,7 @@ fn op_match_sanity() {
             timestamp: Timestamp(0),
             action_seq: 1,
             prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
-            entry_type: EntryType::App(AppEntryType {
+            entry_type: EntryType::App(AppEntryDef {
                 index: 0.into(),
                 zome_index: 0.into(),
                 visibility: EntryVisibility::Public,
@@ -1046,7 +1046,7 @@ fn op_match_sanity() {
             signed_action: SignedHashed {
                 hashed: ActionHashed {
                     content: Action::Create(Create {
-                        entry_type: EntryType::App(AppEntryType {
+                        entry_type: EntryType::App(AppEntryDef {
                             index: 0.into(),
                             zome_index: 0.into(),
                             visibility: EntryVisibility::Public,

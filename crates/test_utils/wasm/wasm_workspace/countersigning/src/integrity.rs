@@ -32,7 +32,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 },
         }) => {
             match signed_action.action().entry_type().and_then(|et| match et {
-                EntryType::App(AppEntryType { index, zome_index, .. }) => Some((zome_index, index)),
+                EntryType::App(AppEntryDef { index, zome_index, .. }) => Some((zome_index, index)),
                 _ => None,
             }) {
                 Some((zome_index, id)) => {

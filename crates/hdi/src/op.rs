@@ -485,9 +485,9 @@ where
 {
     match entry {
         RecordEntryRef::Present(entry) => match entry_type {
-            EntryType::App(AppEntryType {
+            EntryType::App(AppEntryDef {
                 zome_index,
-                index: entry_def_index,
+                entry_index: entry_def_index,
                 visibility: EntryVisibility::Public,
                 ..
             }) => {
@@ -520,15 +520,15 @@ where
             ))),
         },
         RecordEntryRef::Hidden => match entry_type {
-            EntryType::App(AppEntryType {
+            EntryType::App(AppEntryDef {
                 zome_index,
-                index: entry_def_index,
+                entry_index: entry_def_index,
                 visibility: EntryVisibility::Private,
             }) => match get_unit_entry_type::<ET>(*zome_index, *entry_def_index)? {
                 Some(unit) => Ok(InScopeEntry::PrivateApp(unit)),
                 None => Err(deny_other_zome()),
             },
-            EntryType::App(AppEntryType {
+            EntryType::App(AppEntryDef {
                 visibility: EntryVisibility::Public,
                 ..
             }) => Err(wasm_error!(WasmErrorInner::Guest(
@@ -566,9 +566,9 @@ where
     <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
 {
     match entry_type {
-        EntryType::App(AppEntryType {
+        EntryType::App(AppEntryDef {
             zome_index,
-            index: entry_def_index,
+            entry_index: entry_def_index,
             visibility,
         }) => {
             let unit = get_unit_entry_type::<ET>(*zome_index, *entry_def_index)?;

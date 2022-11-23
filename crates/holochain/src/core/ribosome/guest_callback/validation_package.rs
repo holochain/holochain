@@ -13,14 +13,14 @@ use holochain_types::prelude::*;
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
     zome: IntegrityZome,
-    app_entry_type: AppEntryType,
+    app_entry_type: AppEntryDef,
 }
 
 impl ValidationPackageInvocation {
-    pub fn new(zome: IntegrityZome, app_entry_type: AppEntryType) -> Self {
+    pub fn new(zome: IntegrityZome, app_entry_def: AppEntryDef) -> Self {
         Self {
             zome,
-            app_entry_type,
+            app_entry_def,
         }
     }
 }

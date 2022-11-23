@@ -42,7 +42,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         entry,
     }) = op
     {
-        if let Some(AppEntryType {
+        if let Some(AppEntryDef {
             index: entry_def_index,
             zome_index,
             ..

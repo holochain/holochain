@@ -14,7 +14,7 @@ use tracing::*;
 
 pub async fn get_as_author_sub_chain(
     action_seq: u32,
-    app_entry_type: AppEntryType,
+    app_entry_def: AppEntryDef,
     source_chain: &SourceChainRead,
 ) -> SourceChainResult<ValidationPackage> {
     // Collect and return the sub chain
@@ -22,7 +22,7 @@ pub async fn get_as_author_sub_chain(
         .query(
             ChainQueryFilter::default()
                 .include_entries(true)
-                .entry_type(EntryType::App(app_entry_type))
+                .entry_type(EntryType::App(app_entry_def))
                 .sequence_range(ChainQueryFilterRange::ActionSeqRange(
                     0,
                     action_seq.saturating_sub(1),

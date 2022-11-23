@@ -105,16 +105,16 @@ pub enum ValidationOutcome {
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
-    #[error("The app entry type {0:?} entry def id was out of range")]
-    EntryDefId(AppEntryType),
+    #[error("The app entry def {0:?} entry def id was out of range")]
+    EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
     EntryHash,
     #[error("The entry size {0} was bigger then the MAX_ENTRY_SIZE {1}")]
     EntryTooLarge(usize, usize),
     #[error("The entry has a different type to the action's entry type")]
     EntryType,
-    #[error("The app entry type {0:?} visibility didn't match the zome")]
-    EntryVisibility(AppEntryType),
+    #[error("The app entry def {0:?} visibility didn't match the zome")]
+    EntryVisibility(AppEntryDef),
     #[error("The link tag size {0} was bigger then the MAX_TAG_SIZE {1}")]
     TagTooLarge(usize, usize),
     #[error("The action {0:?} was expected to be a link add action")]
@@ -133,8 +133,8 @@ pub enum ValidationOutcome {
     UpdateTypeMismatch(EntryType, EntryType),
     #[error("Signature {0:?} failed to verify for Action {1:?}")]
     VerifySignature(Signature, Action),
-    #[error("The app entry type {0:?} zome index was out of range")]
-    ZomeIndex(AppEntryType),
+    #[error("The app entry def {0:?} zome index was out of range")]
+    ZomeIndex(AppEntryDef),
 }
 
 impl ValidationOutcome {

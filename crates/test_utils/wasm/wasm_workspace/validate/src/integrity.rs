@@ -95,7 +95,7 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 },
             entry,
         }) => match action.app_entry_type() {
-            Some(AppEntryType { index, zome_index, .. }) => {
+            Some(AppEntryDef { index, zome_index, .. }) => {
                 if zome_info()?
                     .zome_types
                     .entries

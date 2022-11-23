@@ -380,9 +380,9 @@ async fn get_custom_package_test() {
             Ok(shh
                 .action()
                 .entry_type()
-                .map(|et| {
-                    if let EntryType::App(aet) = et {
-                        aet.index().index() == 1
+                .map(|entry_type| {
+                    if let EntryType::App(app_entry_def) = entry_type {
+                        app_entry_def.entry_index().index() == 1
                     } else {
                         false
                     }

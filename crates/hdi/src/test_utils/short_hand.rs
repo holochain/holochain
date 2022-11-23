@@ -192,19 +192,19 @@ pub fn cl(zome_index: u8, link_type: u8) -> CreateLink {
 }
 
 /// Create public app [`Action::Create`].
-pub fn create_entry(z: u8, et: u8) -> Action {
-    Action::Create(c(EntryType::App(AppEntryType {
-        index: et.into(),
-        zome_index: z.into(),
+pub fn create_entry(zome_index: u8, entry_index: u8) -> Action {
+    Action::Create(c(EntryType::App(AppEntryDef {
+        entry_index: entry_index.into(),
+        zome_index: zome_index.into(),
         visibility: EntryVisibility::Public,
     })))
 }
 
 /// Create private app [`Action::Create`].
-pub fn create_hidden_entry(z: u8, et: u8) -> Action {
-    Action::Create(c(EntryType::App(AppEntryType {
-        index: et.into(),
-        zome_index: z.into(),
+pub fn create_hidden_entry(zome_index: u8, entry_index: u8) -> Action {
+    Action::Create(c(EntryType::App(AppEntryDef {
+        entry_index: entry_index.into(),
+        zome_index: zome_index.into(),
         visibility: EntryVisibility::Private,
     })))
 }
@@ -222,20 +222,20 @@ pub fn e(e: impl TryInto<Entry>) -> Entry {
     }
 }
 
-/// Create public [`AppEntryType`].
-pub fn public_aet(z: u8, et: u8) -> AppEntryType {
-    AppEntryType {
-        index: et.into(),
-        zome_index: z.into(),
+/// Create public [`AppEntryDef`].
+pub fn public_app_entry_def(zome_index: u8, entry_index: u8) -> AppEntryDef {
+    AppEntryDef {
+        entry_index: entry_index.into(),
+        zome_index: zome_index.into(),
         visibility: EntryVisibility::Public,
     }
 }
 
-/// Create private [`AppEntryType`].
-pub fn private_aet(z: u8, et: u8) -> AppEntryType {
-    AppEntryType {
-        index: et.into(),
-        zome_index: z.into(),
+/// Create private [`AppEntryDef`].
+pub fn private_app_entry_def(zome_index: u8, entry_index: u8) -> AppEntryDef {
+    AppEntryDef {
+        entry_index: entry_index.into(),
+        zome_index: zome_index.into(),
         visibility: EntryVisibility::Private,
     }
 }

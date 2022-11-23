@@ -1,7 +1,7 @@
 //! # Dht Operations
 
 use crate::{
-    Action, ActionRef, ActionType, AppEntryType, Create, CreateLink, Delete, DeleteLink, Entry,
+    Action, ActionRef, ActionType, AppEntryDef, Create, CreateLink, Delete, DeleteLink, Entry,
     EntryType, LinkTag, MembraneProof, Record, SignedActionHashed, SignedHashed, UnitEnum, Update,
 };
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent};
@@ -370,9 +370,9 @@ impl EntryCreationAction {
             | EntryCreationAction::Update(Update { entry_hash, .. }) => entry_hash,
         }
     }
-    /// The [`AppEntryType`] of the [`Entry`] being created if it
+    /// The [`AppEntryDef`] of the [`Entry`] being created if it
     /// is an application defined [`Entry`].
-    pub fn app_entry_type(&self) -> Option<&AppEntryType> {
+    pub fn app_entry_type(&self) -> Option<&AppEntryDef> {
         match self.entry_type() {
             EntryType::App(app_entry_type) => Some(app_entry_type),
             _ => None,

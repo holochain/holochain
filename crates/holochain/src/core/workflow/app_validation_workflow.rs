@@ -513,15 +513,15 @@ pub fn entry_creation_zomes_to_invoke(
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match action {
         EntryCreationAction::Create(Create {
-            entry_type: EntryType::App(aet),
+            entry_type: EntryType::App(app_entry_def),
             ..
         })
         | EntryCreationAction::Update(Update {
-            entry_type: EntryType::App(aet),
+            entry_type: EntryType::App(app_entry_def),
             ..
         }) => {
-            let zome = ribosome.get_integrity_zome(&aet.zome_index()).ok_or_else(|| {
-                Outcome::rejected(&format!("Zome does not exist for {:?}", aet.zome_index()))
+            let zome = ribosome.get_integrity_zome(&app_entry_def.zome_index()).ok_or_else(|| {
+                Outcome::rejected(&format!("Zome does not exist for {:?}", app_entry_def.zome_index()))
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }
@@ -552,11 +552,11 @@ fn store_record_zomes_to_invoke(
     match action {
         Action::CreateLink(create_link) => create_link_zomes_to_invoke(create_link, ribosome),
         Action::Create(Create {
-            entry_type: EntryType::App(AppEntryType { zome_index, .. }),
+            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
             ..
         })
         | Action::Update(Update {
-            entry_type: EntryType::App(AppEntryType { zome_index, .. }),
+            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
             ..
         }) => {
             let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {

@@ -9,7 +9,7 @@ const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub enum EntryDefId {
-    App(AppEntryDefName),
+    App(AppEntryName),
     CapClaim,
     CapGrant,
 }
@@ -19,7 +19,7 @@ pub enum EntryDefId {
 )]
 /// Identifier for an entry definition.
 /// This may be removed.
-pub struct AppEntryDefName(pub Cow<'static, str>);
+pub struct AppEntryName(pub Cow<'static, str>);
 
 /// Trait for binding static [`EntryDef`] property access for a type.
 /// This trait maps a type to its corresponding [`EntryDef`] property
@@ -85,12 +85,12 @@ pub enum EntryDefsCallbackResult {
     Defs(EntryDefs),
 }
 
-impl AppEntryDefName {
-    /// Create a new [`AppEntryDefName`] from a string or `&'static str`.
+impl AppEntryName {
+    /// Create a new [`AppEntryName`] from a string or `&'static str`.
     pub fn new(s: impl Into<Cow<'static, str>>) -> Self {
         Self(s.into())
     }
-    /// Create a new [`AppEntryDefName`] from a `&'static str`.
+    /// Create a new [`AppEntryName`] from a `&'static str`.
     pub const fn from_str(s: &'static str) -> Self {
         Self(Cow::Borrowed(s))
     }
@@ -190,31 +190,31 @@ impl From<&str> for EntryDefId {
     }
 }
 
-impl From<&'static str> for AppEntryDefName {
+impl From<&'static str> for AppEntryName {
     fn from(s: &'static str) -> Self {
         Self(Cow::Borrowed(s))
     }
 }
 
-impl From<String> for AppEntryDefName {
+impl From<String> for AppEntryName {
     fn from(s: String) -> Self {
         Self(Cow::Owned(s))
     }
 }
 
-impl From<AppEntryDefName> for EntryDefId {
-    fn from(name: AppEntryDefName) -> Self {
+impl From<AppEntryName> for EntryDefId {
+    fn from(name: AppEntryName) -> Self {
         EntryDefId::App(name)
     }
 }
 
-impl Borrow<str> for AppEntryDefName {
+impl Borrow<str> for AppEntryName {
     fn borrow(&self) -> &str {
         self.0.borrow()
     }
 }
 
-impl std::fmt::Display for AppEntryDefName {
+impl std::fmt::Display for AppEntryName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
@@ -224,7 +224,7 @@ impl std::fmt::Display for AppEntryDefName {
 impl Default for EntryDef {
     fn default() -> Self {
         Self {
-            id: EntryDefId::App(AppEntryDefName(Default::default())),
+            id: EntryDefId::App(AppEntryName(Default::default())),
             visibility: Default::default(),
             required_validations: Default::default(),
             cache_at_agent_activity: false,
