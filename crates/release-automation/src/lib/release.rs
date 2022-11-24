@@ -68,7 +68,7 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
         // read the workspace after every step in case it was mutated
         let ws = ReleaseWorkspace::try_new_with_criteria(
             args.workspace_path.clone(),
-            cmd_args.check_args.to_selection_criteria(),
+            cmd_args.check_args.to_selection_criteria(args),
         )?;
 
         macro_rules! _skip_on_empty_selection {
