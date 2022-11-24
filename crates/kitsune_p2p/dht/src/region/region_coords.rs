@@ -12,6 +12,8 @@ use crate::spacetime::{SpaceSegment, SpacetimeQuantumCoords, TimeSegment, Topolo
     Debug,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     derive_more::Constructor,
     serde::Deserialize,
