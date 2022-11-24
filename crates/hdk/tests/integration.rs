@@ -451,7 +451,12 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
             entries: ScopedZomeTypes(
                 entries
                     .iter()
-                    .map(|(z, types)| (ZomeIndex(*z), (0..*types).map(|t| EntryDefIndex(t)).collect()))
+                    .map(|(z, types)| {
+                        (
+                            ZomeIndex(*z),
+                            (0..*types).map(|t| EntryDefIndex(t)).collect(),
+                        )
+                    })
                     .collect(),
             ),
             links: ScopedZomeTypes(
@@ -517,7 +522,9 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
                 .expect_create_link()
                 .withf(
                     move |CreateLinkInput {
-                              link_type, zome_index, ..
+                              link_type,
+                              zome_index,
+                              ..
                           }| *link_type == l && *zome_index == z,
                 )
                 .returning(|_| Ok(ActionHash::from_raw_36(vec![0u8; 36])));

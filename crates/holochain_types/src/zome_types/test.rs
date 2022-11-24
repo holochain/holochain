@@ -2,8 +2,14 @@ use super::*;
 use test_case::test_case;
 
 fn make_set(entries: &[(u8, u8)], links: &[(u8, u8)]) -> GlobalZomeTypes {
-    let entries = entries.into_iter().map(|(z, l)| (ZomeIndex(*z), *l)).collect();
-    let links = links.into_iter().map(|(z, l)| (ZomeIndex(*z), *l)).collect();
+    let entries = entries
+        .into_iter()
+        .map(|(z, l)| (ZomeIndex(*z), *l))
+        .collect();
+    let links = links
+        .into_iter()
+        .map(|(z, l)| (ZomeIndex(*z), *l))
+        .collect();
     GlobalZomeTypes { entries, links }
 }
 

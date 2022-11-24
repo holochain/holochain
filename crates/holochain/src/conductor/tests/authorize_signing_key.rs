@@ -1,6 +1,6 @@
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{RoleName, CapSecret, GrantZomeCallCapabilityPayload};
+use holochain_zome_types::{CapSecret, GrantZomeCallCapabilityPayload, RoleName};
 use std::collections::BTreeSet;
 
 use crate::fixt::AgentPubKeyFixturator;

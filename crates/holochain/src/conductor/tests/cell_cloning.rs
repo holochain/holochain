@@ -5,7 +5,7 @@ use holochain_types::{
     prelude::{ArchiveCloneCellPayload, CloneCellId, DeleteArchivedCloneCellsPayload},
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{RoleName, CloneId, DnaModifiersOpt};
+use holochain_zome_types::{CloneId, DnaModifiersOpt, RoleName};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_without_modifiers_fails() {

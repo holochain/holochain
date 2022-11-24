@@ -6,8 +6,8 @@ use std::{
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain_types::{dht_op::DhtOpType, inline_zome::InlineZomeSet};
 use holochain_zome_types::{
-    op::*, Action, ActionType, AppEntryDef, BoxApi, ChainTopOrdering, CreateInput, Entry,
-    EntryDef, EntryDefIndex, EntryVisibility, TryInto, ZomeIndex,
+    op::*, Action, ActionType, AppEntryDef, BoxApi, ChainTopOrdering, CreateInput, Entry, EntryDef,
+    EntryDefIndex, EntryVisibility, TryInto, ZomeIndex,
 };
 
 use crate::{
@@ -219,7 +219,11 @@ async fn app_validation_ops() {
                     Op::StoreEntry(StoreEntry { action, .. }) => {
                         let (with_entry_def_index, with_zome_index) =
                             match action.hashed.content.app_entry_def().cloned() {
-                                Some(AppEntryDef { entry_index, zome_index, .. }) => (Some(entry_index), Some(zome_index)),
+                                Some(AppEntryDef {
+                                    entry_index,
+                                    zome_index,
+                                    ..
+                                }) => (Some(entry_index), Some(zome_index)),
                                 _ => (None, None),
                             };
                         Event {
@@ -237,7 +241,11 @@ async fn app_validation_ops() {
                     }) => {
                         let (with_entry_def_index, with_zome_index) =
                             match original_action.app_entry_def().cloned() {
-                                Some(AppEntryDef { entry_index, zome_index, .. }) => (Some(entry_index), Some(zome_index)),
+                                Some(AppEntryDef {
+                                    entry_index,
+                                    zome_index,
+                                    ..
+                                }) => (Some(entry_index), Some(zome_index)),
                                 _ => (None, None),
                             };
                         Event {
@@ -255,7 +263,11 @@ async fn app_validation_ops() {
                     }) => {
                         let (with_entry_def_index, with_zome_index) =
                             match original_action.app_entry_def().cloned() {
-                                Some(AppEntryDef { entry_index, zome_index, .. }) => (Some(entry_index), Some(zome_index)),
+                                Some(AppEntryDef {
+                                    entry_index,
+                                    zome_index,
+                                    ..
+                                }) => (Some(entry_index), Some(zome_index)),
                                 _ => (None, None),
                             };
                         Event {

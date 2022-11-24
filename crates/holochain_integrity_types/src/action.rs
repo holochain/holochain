@@ -619,7 +619,12 @@ impl std::fmt::Display for EntryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EntryType::AgentPubKey => writeln!(f, "AgentPubKey"),
-            EntryType::App(app_entry_def) => writeln!(f, "App({:?}, {:?})", app_entry_def.entry_index(), app_entry_def.visibility()),
+            EntryType::App(app_entry_def) => writeln!(
+                f,
+                "App({:?}, {:?})",
+                app_entry_def.entry_index(),
+                app_entry_def.visibility()
+            ),
             EntryType::CapClaim => writeln!(f, "CapClaim"),
             EntryType::CapGrant => writeln!(f, "CapGrant"),
         }
@@ -641,7 +646,11 @@ pub struct AppEntryDef {
 }
 
 impl AppEntryDef {
-    pub fn new(entry_index: EntryDefIndex, zome_index: ZomeIndex, visibility: EntryVisibility) -> Self {
+    pub fn new(
+        entry_index: EntryDefIndex,
+        zome_index: ZomeIndex,
+        visibility: EntryVisibility,
+    ) -> Self {
         Self {
             entry_index,
             zome_index,

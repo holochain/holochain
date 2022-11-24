@@ -520,9 +520,14 @@ pub fn entry_creation_zomes_to_invoke(
             entry_type: EntryType::App(app_entry_def),
             ..
         }) => {
-            let zome = ribosome.get_integrity_zome(&app_entry_def.zome_index()).ok_or_else(|| {
-                Outcome::rejected(&format!("Zome does not exist for {:?}", app_entry_def.zome_index()))
-            })?;
+            let zome = ribosome
+                .get_integrity_zome(&app_entry_def.zome_index())
+                .ok_or_else(|| {
+                    Outcome::rejected(&format!(
+                        "Zome does not exist for {:?}",
+                        app_entry_def.zome_index()
+                    ))
+                })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }
         _ => Ok(ZomesToInvoke::AllIntegrity),

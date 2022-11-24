@@ -80,7 +80,12 @@ pub fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
         entries: ScopedZomeTypes(
             entries
                 .into_iter()
-                .map(|(z, types)| (ZomeIndex(*z), (0..*types).map(|t| EntryDefIndex(t)).collect()))
+                .map(|(z, types)| {
+                    (
+                        ZomeIndex(*z),
+                        (0..*types).map(|t| EntryDefIndex(t)).collect(),
+                    )
+                })
                 .collect(),
         ),
         links: ScopedZomeTypes(

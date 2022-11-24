@@ -1107,7 +1107,8 @@ mod tests {
 
         // Archive and delete a clone cell
         app.archive_clone_cell(&clone_id_0).unwrap();
-        app.delete_archived_clone_cells_for_role(&role_name).unwrap();
+        app.delete_archived_clone_cells_for_role(&role_name)
+            .unwrap();
         // Assert the deleted cell cannot be restored
         assert!(app.restore_clone_cell(&clone_id_0).is_err());
     }

@@ -216,7 +216,10 @@ impl From<holo_hash::ActionHash> for DeleteInput {
 
 impl EntryDefLocation {
     /// Create an [`EntryDefLocation::App`].
-    pub fn app(zome_index: impl Into<ZomeIndex>, entry_def_index: impl Into<EntryDefIndex>) -> Self {
+    pub fn app(
+        zome_index: impl Into<ZomeIndex>,
+        entry_def_index: impl Into<EntryDefIndex>,
+    ) -> Self {
         Self::App(AppEntryDefLocation {
             zome_index: zome_index.into(),
             entry_def_index: entry_def_index.into(),
