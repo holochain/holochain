@@ -6,7 +6,7 @@ use super::*;
 pub(crate) fn cmd(args: &cli::Args, cmd_args: &cli::CheckArgs) -> CommandResult {
     let ws = crate_selection::ReleaseWorkspace::try_new_with_criteria(
         args.workspace_path.clone(),
-        cmd_args.to_selection_criteria(),
+        cmd_args.to_selection_criteria(&args),
     )?;
 
     let release_candidates = common::selection_check(cmd_args, &ws)?;

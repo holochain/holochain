@@ -746,12 +746,12 @@ fn multiple_subsequent_releases() {
             let cmd = cmd.args(&[
                 &format!("--workspace-path={}", workspace.root().display()),
                 "--log-level=trace",
+                "--match-filter=crate_(a|b|e)",
                 "release",
                 &format!(
                     "--cargo-target-dir={}",
                     workspace.root().join("target").display()
                 ),
-                "--match-filter=crate_(a|b|e)",
                 "--allowed-matched-blockers=UnreleasableViaChangelogFrontmatter",
                 "--steps=CreateReleaseBranch,BumpReleaseVersions",
                 &format!(
@@ -909,9 +909,9 @@ fn release_dry_run_fails_on_unallowed_conditions() {
         let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
         let cmd = cmd.args(&[
             &format!("--workspace-path={}", workspace.root().display()),
+            &format!("--match-filter={}", member),
             "--log-level=debug",
             "release",
-            &format!("--match-filter={}", member),
             "--dry-run",
             "--steps=BumpReleaseVersions",
         ]);

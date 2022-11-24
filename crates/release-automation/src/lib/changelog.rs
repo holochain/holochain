@@ -1139,7 +1139,14 @@ pub(crate) fn cmd(
 ) -> crate::CommandResult {
     debug!("cmd_args: {:#?}", cmd_args);
 
-    let ws = ReleaseWorkspace::try_new(args.workspace_path.clone())?;
+    let ws = ReleaseWorkspace::try_new_with_criteria(
+        args.workspace_path.clone(),
+        crate::release::SelectionCriteria {
+            match_filter: args.match_filter.clone(),
+
+            ..Default::default()
+        },
+    )?;
 
     match &cmd_args.command {
         // todo: respect selection filter
@@ -1148,6 +1155,41 @@ pub(crate) fn cmd(
             .changelog()
             .ok_or_else(|| anyhow::anyhow!("workspace doesn't have a changelog"))?
             .aggregate(ws.members()?)?,
+        crate::cli::ChangelogCommands::SetFrontmatter(set_frontmatter_args) => {
+            let file = std::fs::File::open(&set_frontmatter_args.frontmatter_yaml_path)?;
+            let fm = serde_yaml::from_reader(file)?;
+
+            let errors = ws
+                .members_matched()?
+                .into_iter()
+                .filter_map(|crt| crt.changelog())
+                .filter_map(|changelog| {
+                    debug!(
+                        "[{}] setting frontmatter",
+                        changelog.path().to_string_lossy()
+                    );
+                    if !set_frontmatter_args.dry_run {
+                        match changelog.set_front_matter(&fm) {
+                            Ok(_) => None,
+                            Err(e) => Some(format!(
+                                "{}: {}",
+                                changelog.path().to_string_lossy(),
+                                e.to_string()
+                            )),
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            if errors.len() > 0 {
+                bail!(
+                    "encountered errors while processing the changelogs\n{}",
+                    errors.join("\n")
+                )
+            }
+        }
     };
 
     Ok(())
