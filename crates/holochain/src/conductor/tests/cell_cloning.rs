@@ -5,7 +5,7 @@ use holochain_types::{
     prelude::{ArchiveCloneCellPayload, CloneCellId, DeleteArchivedCloneCellsPayload},
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{AppRoleId, CloneId, DnaModifiersOpt};
+use holochain_zome_types::{RoleName, CloneId, DnaModifiersOpt};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_without_modifiers_fails() {
@@ -26,7 +26,7 @@ async fn create_clone_cell_without_modifiers_fails() {
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let role_id: AppRoleId = "dna_1".to_string();
+    let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
@@ -38,7 +38,7 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: "wrong_app_id".to_string(),
-            role_id: role_id.clone(),
+            role_name: role_id.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
             name: None,
@@ -62,7 +62,7 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let role_id: AppRoleId = "dna_1".to_string();
+    let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
@@ -106,7 +106,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_creates_callable_cell() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let role_id: AppRoleId = "dna_1".to_string();
+    let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
@@ -138,7 +138,7 @@ async fn create_clone_cell_creates_callable_cell() {
 #[tokio::test(flavor = "multi_thread")]
 async fn app_info_includes_cloned_cells() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let role_id: AppRoleId = "dna_1".to_string();
+    let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app_id = "app";
@@ -171,7 +171,7 @@ async fn app_info_includes_cloned_cells() {
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_cell_deletion() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let role_id: AppRoleId = "dna_1".to_string();
+    let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app_id = "app";
@@ -310,7 +310,7 @@ async fn clone_cell_deletion() {
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_can_startup_with_cloned_cell() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let role_id: AppRoleId = "dna_1".to_string();
+    let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor

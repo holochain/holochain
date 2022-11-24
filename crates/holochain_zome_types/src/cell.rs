@@ -6,7 +6,7 @@ use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use std::fmt;
 
-use crate::AppRoleId;
+use crate::RoleName;
 
 /// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
@@ -29,23 +29,23 @@ pub struct CellId(DnaHash, AgentPubKey);
 /// clone index.
 pub const CLONE_ID_DELIMITER: &str = ".";
 
-/// Identifier of a clone cell, composed of the DNA's role id and the index
+/// Identifier of a clone cell, composed of the DNA's role name and the index
 /// of the clone, starting at 0.
 ///
 /// Example: `profiles.0`
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct CloneId(pub AppRoleId);
+pub struct CloneId(pub RoleName);
 
 impl CloneId {
-    /// Construct a clone id from role id and clone index.
-    pub fn new(role_id: &AppRoleId, clone_index: u32) -> Self {
-        CloneId(format!("{}{}{}", role_id, CLONE_ID_DELIMITER, clone_index))
+    /// Construct a clone id from role name and clone index.
+    pub fn new(role_name: &RoleName, clone_index: u32) -> Self {
+        CloneId(format!("{}{}{}", role_name, CLONE_ID_DELIMITER, clone_index))
     }
 
-    /// Get the clone's base cell's role id.
-    pub fn as_base_role_id(&self) -> AppRoleId {
-        let (role_id, _) = self.0.split_once(CLONE_ID_DELIMITER).unwrap();
-        role_id.into()
+    /// Get the clone's base cell's role name.
+    pub fn as_base_role_name(&self) -> RoleName {
+        let (role_name, _) = self.0.split_once(CLONE_ID_DELIMITER).unwrap();
+        role_name.into()
     }
 
     /// Get the index of the clone cell.
@@ -55,7 +55,7 @@ impl CloneId {
     }
 
     /// Get an app role id representation of the clone id.
-    pub fn as_app_role_id(&self) -> &AppRoleId {
+    pub fn as_app_role_name(&self) -> &RoleName {
         &self.0
     }
 }
@@ -65,30 +65,30 @@ impl fmt::Display for CloneId {
         write!(
             f,
             "{}{}{}",
-            self.as_base_role_id(),
+            self.as_base_role_name(),
             CLONE_ID_DELIMITER,
             self.as_clone_index()
         )
     }
 }
 
-/// Errors during conversion from [`AppRoleId`] to [`CloneId`].
+/// Errors during conversion from [`RoleName`] to [`CloneId`].
 #[derive(Debug, thiserror::Error)]
 pub enum CloneIdError {
     /// Multiple clone id delimiters found in app role id. There must only be one delimiter.
-    #[error("Multiple occurrences of reserved character '{CLONE_ID_DELIMITER}' found in app role id: {0}")]
-    MultipleDelimiters(AppRoleId),
+    #[error("Multiple occurrences of reserved character '{CLONE_ID_DELIMITER}' found in app role name: {0}")]
+    MultipleDelimiters(RoleName),
     /// The clone index could not be parsed into a u32.
-    #[error("Malformed clone index in app role id: {0}")]
-    MalformedCloneIndex(AppRoleId),
+    #[error("Malformed clone index in app role name: {0}")]
+    MalformedCloneIndex(RoleName),
     /// The role id is not composed of two parts separated by the clone id delimiter.
     #[error("The role id is not composed of two parts separated by the clone id delimiter: {0}")]
-    MalformedCloneId(AppRoleId),
+    MalformedCloneId(RoleName),
 }
 
-impl TryFrom<AppRoleId> for CloneId {
+impl TryFrom<RoleName> for CloneId {
     type Error = CloneIdError;
-    fn try_from(value: AppRoleId) -> Result<Self, Self::Error> {
+    fn try_from(value: RoleName) -> Result<Self, Self::Error> {
         let parts: Vec<&str> = value.split(CLONE_ID_DELIMITER).collect();
         if parts.len() > 2 {
             return Err(CloneIdError::MultipleDelimiters(value));

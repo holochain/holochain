@@ -14,13 +14,13 @@ pub enum AppError {
     #[error("Could not find clone cell with id '{0}'")]
     CloneCellNotFound(CloneCellId),
 
-    #[error("Illegal character '{CLONE_ID_DELIMITER}' used in role id: {0}")]
-    IllegalRoleId(AppRoleId),
+    #[error("Illegal character '{CLONE_ID_DELIMITER}' used in role name: {0}")]
+    IllegalRoleName(RoleName),
 
-    #[error("Tried to access missing role id: '{0}'")]
-    AppRoleIdMissing(AppRoleId),
+    #[error("Tried to access missing role name: '{0}'")]
+    RoleNameMissing(RoleName),
 
-    #[error("Tried to install app '{0}' which contains duplicate role ids. The following role ids have duplicates: {1:?}")]
-    DuplicateAppRoleIds(InstalledAppId, Vec<AppRoleId>),
+    #[error("Tried to install app '{0}' which contains duplicate role names. The following role names have duplicates: {1:?}")]
+    DuplicateRoleNames(InstalledAppId, Vec<RoleName>),
 }
 pub type AppResult<T> = Result<T, AppError>;

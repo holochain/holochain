@@ -1170,7 +1170,7 @@ mod app_impls {
         pub async fn find_cell_with_role_alongside_cell(
             &self,
             cell_id: &CellId,
-            role_id: &AppRoleId,
+            role_name: &RoleName,
         ) -> ConductorResult<Option<CellId>> {
             Ok(self
                 .get_state()
@@ -2292,7 +2292,7 @@ impl Conductor {
     async fn add_clone_cell_to_app(
         &self,
         app_id: InstalledAppId,
-        role_id: AppRoleId,
+        role_name: RoleName,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
     ) -> ConductorResult<InstalledCell> {
@@ -2301,13 +2301,13 @@ impl Conductor {
         let (_, base_cell_dna_hash) = self
             .update_state_prime({
                 let app_id = app_id.clone();
-                let role_id = role_id.clone();
+                let role_name = role_name.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
                     let app_role_assignment = app
                         .roles()
-                        .get(&role_id)
-                        .ok_or_else(|| AppError::AppRoleIdMissing(role_id.to_owned()))?;
+                        .get(&role_name)
+                        .ok_or_else(|| AppError::RoleNameMissing(role_name.to_owned()))?;
                     if app_role_assignment.is_clone_limit_reached() {
                         return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
                             app_role_assignment.clone_limit(),

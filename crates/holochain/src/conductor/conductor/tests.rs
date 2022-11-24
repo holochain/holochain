@@ -122,9 +122,9 @@ async fn app_ids_are_unique() {
     );
 }
 
-/// App can't be installed if it contains duplicate AppRoleIds
+/// App can't be installed if it contains duplicate RoleNames
 #[tokio::test(flavor = "multi_thread")]
-async fn app_role_ids_are_unique() {
+async fn role_names_are_unique() {
     let cells = vec![
         InstalledCell::new(fixt!(CellId), "1".into()),
         InstalledCell::new(fixt!(CellId), "1".into()),
@@ -133,7 +133,7 @@ async fn app_role_ids_are_unique() {
     let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
         result,
-        Err(AppError::DuplicateAppRoleIds(_, role_ids)) if role_ids == vec!["1".to_string()]
+        Err(AppError::DuplicateRoleName(_, role_names)) if role_names == vec!["1".to_string()]
     );
 }
 
