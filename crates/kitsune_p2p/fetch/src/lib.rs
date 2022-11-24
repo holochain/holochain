@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
-#![deny(warnings)]
+// #![deny(warnings)]
 //! Kitsune P2p Fetch Queue Logic
 
 use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash};
@@ -14,7 +14,9 @@ pub use queue::*;
 pub use respond::*;
 
 /// Determine what should be fetched.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize,
+)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum FetchKey {
     /// Fetch via region.
