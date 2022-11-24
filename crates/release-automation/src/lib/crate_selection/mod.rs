@@ -391,6 +391,7 @@ pub(crate) struct ReleaseWorkspace<'a> {
     cargo_workspace: OnceCell<CargoWorkspace<'a>>,
     members_unsorted: OnceCell<Vec<Crate<'a>>>,
     members_sorted: OnceCell<Vec<&'a Crate<'a>>>,
+    members_matched: OnceCell<Vec<&'a Crate<'a>>>,
     members_states: OnceCell<MemberStates>,
     #[debug(skip)]
     git_repo: git2::Repository,
@@ -732,6 +733,7 @@ impl<'a> ReleaseWorkspace<'a> {
             cargo_workspace: Default::default(),
             members_unsorted: Default::default(),
             members_sorted: Default::default(),
+            members_matched: Default::default(),
             members_states: Default::default(),
         };
 
@@ -1018,6 +1020,26 @@ impl<'a> ReleaseWorkspace<'a> {
             }
 
             Ok(members)
+        })
+    }
+
+    /// Return all member crates matched by `SelectionCriteria::match_filter`
+    pub(crate) fn members_matched(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
+        self.members_matched.get_or_try_init(|| {
+            let states = self.members_states()?;
+
+            self.members().map(|members| {
+                members
+                    .into_iter()
+                    .filter(|crt| {
+                        states
+                            .get(&crt.name())
+                            .unwrap()
+                            .contains(CrateStateFlags::Matched)
+                    })
+                    .map(|crt| *crt)
+                    .collect::<Vec<_>>()
+            })
         })
     }
 
