@@ -26,9 +26,9 @@ pub fn msg() -> EntryTypes {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
-        Op::StoreEntry(StoreEntry{ action, entry }) => match action.hashed.app_entry_type() {
+        Op::StoreEntry(StoreEntry{ action, entry }) => match action.hashed.app_entry_def() {
             Some(AppEntryDef {
-                index: entry_def_index,
+                entry_index: entry_def_index,
                 zome_index,
                 ..
             }) => match EntryTypes::deserialize_from_type(*zome_index, *entry_def_index, &entry)? {

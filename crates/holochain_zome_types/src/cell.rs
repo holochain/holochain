@@ -96,11 +96,11 @@ impl TryFrom<RoleName> for CloneId {
         if parts.len() < 2 {
             return Err(CloneIdError::MalformedCloneId(value));
         }
-        let role_id = parts[0];
+        let role_name = parts[0];
         let clone_index = parts[1]
             .parse::<u32>()
             .map_err(|_| CloneIdError::MalformedCloneIndex(value.clone()))?;
-        Ok(Self::new(&role_id.into(), clone_index))
+        Ok(Self::new(&role_name.into(), clone_index))
     }
 }
 

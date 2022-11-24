@@ -43,10 +43,10 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }) = op
     {
         if let Some(AppEntryDef {
-            index: entry_def_index,
+            entry_index: entry_def_index,
             zome_index,
             ..
-        }) = action.app_entry_type()
+        }) = action.app_entry_def()
         {
             match EntryTypes::deserialize_from_type(*zome_index, *entry_def_index, &entry)? {
                 Some(EntryTypes::Post(_)) => (),

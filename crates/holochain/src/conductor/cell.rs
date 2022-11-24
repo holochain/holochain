@@ -708,7 +708,7 @@ impl Cell {
                 match zome {
                     Some(zome) => self
                         .conductor_api
-                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *index))
+                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *entry_index))
                         .map(|e| u8::from(e.required_validations)),
                     None => None,
                 }

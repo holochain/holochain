@@ -318,7 +318,7 @@ async fn check_link_tag_size_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn check_app_entry_type_test() {
+async fn check_app_entry_def_test() {
     observability::test_run().ok();
     let TestWasmPair::<DnaWasm> {
         integrity,
@@ -327,7 +327,7 @@ async fn check_app_entry_type_test() {
     // Setup test data
     let dna_file = DnaFile::new(
         DnaDef {
-            name: "app_entry_type_test".to_string(),
+            name: "app_entry_def_test".to_string(),
             modifiers: DnaModifiers {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
@@ -352,7 +352,7 @@ async fn check_app_entry_type_test() {
     // ## Dna is missing
     let app_entry_def_0 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &app_entry_def_0, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_0, &conductor_handle).await,
         Err(SysValidationError::DnaMissing(_))
     );
 
@@ -363,7 +363,7 @@ async fn check_app_entry_type_test() {
     // ## EntryId is out of range
     let app_entry_def_1 = AppEntryDef::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &app_entry_def_1, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_1, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryDefId(_)
         ))
@@ -371,7 +371,7 @@ async fn check_app_entry_type_test() {
 
     let app_entry_def_2 = AppEntryDef::new(0.into(), 100.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &app_entry_def_2, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_2, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ZomeIndex(_)
         ))
@@ -380,12 +380,12 @@ async fn check_app_entry_type_test() {
     // ## EntryId is in range for dna
     let app_entry_def_3 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &app_entry_def_3, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_3, &conductor_handle).await,
         Ok(_)
     );
     let app_entry_def_4 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &app_entry_def_4, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_4, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryVisibility(_)
         ))
@@ -394,7 +394,7 @@ async fn check_app_entry_type_test() {
     // ## Can get the entry from the entry def
     let app_entry_def_5 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &app_entry_def_5, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_5, &conductor_handle).await,
         Ok(_)
     );
 }

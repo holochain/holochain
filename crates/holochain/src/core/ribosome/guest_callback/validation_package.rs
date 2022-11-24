@@ -13,7 +13,7 @@ use holochain_types::prelude::*;
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
     zome: IntegrityZome,
-    app_entry_type: AppEntryDef,
+    app_entry_def: AppEntryDef,
 }
 
 impl ValidationPackageInvocation {
@@ -60,7 +60,7 @@ impl Invocation for ValidationPackageInvocation {
         vec!["validation_package".into()].into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
-        ExternIO::encode(self.app_entry_type)
+        ExternIO::encode(self.app_entry_def)
     }
     fn auth(&self) -> InvocationAuth {
         InvocationAuth::LocalCallback
@@ -72,7 +72,7 @@ impl TryFrom<ValidationPackageInvocation> for ExternIO {
     fn try_from(
         validation_package_invocation: ValidationPackageInvocation,
     ) -> Result<Self, Self::Error> {
-        Self::encode(&validation_package_invocation.app_entry_type)
+        Self::encode(&validation_package_invocation.app_entry_def)
     }
 }
 
@@ -236,7 +236,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternIO::encode(&validation_package_invocation.app_entry_type).unwrap(),
+            ExternIO::encode(&validation_package_invocation.app_entry_def).unwrap(),
         );
     }
 }

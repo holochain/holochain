@@ -982,7 +982,7 @@ fn update(
 ) -> Update {
     let mut u = Update::arbitrary(ud).unwrap();
     u.entry_type = EntryType::App(AppEntryDef {
-        index: t.zome_type,
+        entry_index: t.zome_type,
         zome_index: t.zome_index,
         visibility,
     });
@@ -1007,7 +1007,7 @@ where
     match t {
         Some(t) => {
             c.entry_type = EntryType::App(AppEntryDef {
-                index: t.zome_type,
+                entry_index: t.zome_type,
                 zome_index: t.zome_index,
                 visibility,
             })
@@ -1015,7 +1015,7 @@ where
         None => {
             // Make sure this is out of range for this test.
             c.entry_type = EntryType::App(AppEntryDef {
-                index: 0.into(),
+                entry_index: 0.into(),
                 zome_index: 200.into(),
                 visibility,
             })
@@ -1033,7 +1033,7 @@ fn op_match_sanity() {
             action_seq: 1,
             prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
             entry_type: EntryType::App(AppEntryDef {
-                index: 0.into(),
+                entry_index: 0.into(),
                 zome_index: 0.into(),
                 visibility: EntryVisibility::Public,
             }),
@@ -1047,7 +1047,7 @@ fn op_match_sanity() {
                 hashed: ActionHashed {
                     content: Action::Create(Create {
                         entry_type: EntryType::App(AppEntryDef {
-                            index: 0.into(),
+                            entry_index: 0.into(),
                             zome_index: 0.into(),
                             visibility: EntryVisibility::Public,
                         }),

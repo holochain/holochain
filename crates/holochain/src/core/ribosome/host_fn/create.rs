@@ -54,9 +54,9 @@ pub fn create<'a>(
                             zome_index,
                             entry_def_index,
                         }) => {
-                            let app_entry_type =
+                            let app_entry_def =
                             AppEntryDef::new(entry_def_index, zome_index, entry_visibility);
-                            EntryType::App(app_entry_type)
+                            EntryType::App(app_entry_def)
                         }
                         EntryDefLocation::CapGrant => EntryType::CapGrant,
                         EntryDefLocation::CapClaim => EntryType::CapClaim,

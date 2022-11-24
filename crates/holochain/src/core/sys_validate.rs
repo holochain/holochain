@@ -271,7 +271,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 
 /// Check the AppEntryDef is valid for the zome.
 /// Check the EntryDefId and ZomeIndex are in range.
-pub async fn check_app_entry_type(
+pub async fn check_app_entry_def(
     dna_hash: &DnaHash,
     entry_type: &AppEntryDef,
     conductor: &Conductor,
@@ -289,7 +289,7 @@ pub async fn check_app_entry_type(
         .into_inner()
         .1;
 
-    let entry_def = get_entry_def(entry_type.index(), zome, dna_hash, conductor).await?;
+    let entry_def = get_entry_def(entry_type.entry_index(), zome, dna_hash, conductor).await?;
 
     // Check the visibility and return
     match entry_def {

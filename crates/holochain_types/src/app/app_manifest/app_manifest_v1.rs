@@ -212,7 +212,7 @@ impl AppManifestV1 {
             .into_iter()
             .map(
                 |AppRoleManifest {
-                     id,
+                     role_name,
                      provisioning,
                      dna,
                  }| {
@@ -263,7 +263,7 @@ impl AppManifestV1 {
                             version: Self::require(version, "roles.dna.version")?,
                         },
                     };
-                    AppManifestResult::Ok((id, validated))
+                    AppManifestResult::Ok((role_name, validated))
                 },
             )
             .collect::<Result<HashMap<_, _>, _>>()?;
@@ -316,7 +316,7 @@ pub mod tests {
         let version = DnaVersionSpec::from(hashes.clone()).into();
 
         let roles = vec![AppRoleManifest {
-            id: "role_id".into(),
+            role_name: "role_name".into(),
             dna: AppRoleDnaManifest {
                 location,
                 modifiers,
@@ -357,7 +357,7 @@ manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
 roles:
-  - id: "role_id"
+  - id: "role_name"
     provisioning:
       strategy: "create"
       deferred: false

@@ -218,7 +218,7 @@ async fn app_validation_ops() {
                     },
                     Op::StoreEntry(StoreEntry { action, .. }) => {
                         let (with_entry_def_index, with_zome_index) =
-                            match action.hashed.content.app_entry_type().cloned() {
+                            match action.hashed.content.app_entry_def().cloned() {
                                 Some(AppEntryDef { entry_index, zome_index, .. }) => (Some(entry_index), Some(zome_index)),
                                 _ => (None, None),
                             };
@@ -236,7 +236,7 @@ async fn app_validation_ops() {
                         ..
                     }) => {
                         let (with_entry_def_index, with_zome_index) =
-                            match original_action.app_entry_type().cloned() {
+                            match original_action.app_entry_def().cloned() {
                                 Some(AppEntryDef { entry_index, zome_index, .. }) => (Some(entry_index), Some(zome_index)),
                                 _ => (None, None),
                             };
@@ -254,7 +254,7 @@ async fn app_validation_ops() {
                         ..
                     }) => {
                         let (with_entry_def_index, with_zome_index) =
-                            match original_action.app_entry_type().cloned() {
+                            match original_action.app_entry_def().cloned() {
                                 Some(AppEntryDef { entry_index, zome_index, .. }) => (Some(entry_index), Some(zome_index)),
                                 _ => (None, None),
                             };

@@ -1180,7 +1180,7 @@ mod app_impls {
                 .and_then(|(_, running_app)| {
                     running_app
                         .into_common()
-                        .role(role_id)
+                        .role(role_name)
                         .ok()
                         .map(|role| role.cell_id())
                         .cloned()
@@ -1279,7 +1279,7 @@ mod clone_cell_impls {
         ) -> ConductorResult<InstalledCell> {
             let CreateCloneCellPayload {
                 app_id,
-                role_id,
+                role_name,
                 modifiers,
                 membrane_proof,
                 name,
@@ -1293,7 +1293,7 @@ mod clone_cell_impls {
             let state = self.get_state().await?;
             let app = state.get_app(&app_id)?;
             app.provisioned_cells()
-                .find(|(app_role_id, _)| **app_role_id == role_id)
+                .find(|(app_role_name, _)| **app_role_name == role_name)
                 .ok_or_else(|| {
                     ConductorError::CloneCellError(
                         "no base cell found for provided role id".to_string(),
@@ -1304,7 +1304,7 @@ mod clone_cell_impls {
             let installed_clone_cell = self
                 .add_clone_cell_to_app(
                     app_id.clone(),
-                    role_id.clone(),
+                    role_name.clone(),
                     modifiers.serialized()?,
                     name,
                 )
@@ -1369,14 +1369,14 @@ mod clone_cell_impls {
         /// Remove a clone cell from an app.
         pub(crate) async fn delete_archived_clone_cells(
             &self,
-            DeleteArchivedCloneCellsPayload { app_id, role_id }: &DeleteArchivedCloneCellsPayload,
+            DeleteArchivedCloneCellsPayload { app_id, role_name }: &DeleteArchivedCloneCellsPayload,
         ) -> ConductorResult<()> {
             self.update_state_prime({
                 let app_id = app_id.clone();
-                let role_id = role_id.clone();
+                let role_name = role_name.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    app.delete_archived_clone_cells_for_role(&role_id)?;
+                    app.delete_archived_clone_cells_for_role(&role_name)?;
                     Ok((state, ()))
                 }
             })
@@ -2335,11 +2335,11 @@ impl Conductor {
         let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
                 let app = state.get_app_mut(&app_id)?;
-                let agent_key = app.role(&role_id)?.agent_key().to_owned();
+                let agent_key = app.role(&role_name)?.agent_key().to_owned();
                 let cell_id = CellId::new(clone_dna_hash, agent_key);
-                let clone_id = app.add_clone(&role_id, &cell_id)?;
+                let clone_id = app.add_clone(&role_name, &cell_id)?;
                 let installed_clone_cell =
-                    InstalledCell::new(cell_id, clone_id.as_app_role_id().clone());
+                    InstalledCell::new(cell_id, clone_id.as_app_role_name().clone());
                 Ok((state, installed_clone_cell))
             })
             .await?;

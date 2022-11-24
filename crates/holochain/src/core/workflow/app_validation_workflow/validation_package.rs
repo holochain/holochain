@@ -57,12 +57,12 @@ pub fn get_as_author_custom(
 ) -> RibosomeResult<Option<ValidationPackageResult>> {
     let action = action_hashed.as_content();
     let access = ValidationPackageHostAccess::new(workspace_lock, network.clone());
-    let app_entry_type = match action.entry_type() {
-        Some(EntryType::App(a)) => a.clone(),
+    let app_entry_def = match action.entry_type() {
+        Some(EntryType::App(app_entry_def)) => app_entry_def.clone(),
         _ => return Ok(None),
     };
 
-    let zome = match ribosome.get_integrity_zome(&app_entry_type.zome_index()) {
+    let zome = match ribosome.get_integrity_zome(&app_entry_def.zome_index()) {
         Some(zome_tuple) => zome_tuple,
         None => {
             warn!(
@@ -73,7 +73,7 @@ pub fn get_as_author_custom(
         }
     };
 
-    let invocation = ValidationPackageInvocation::new(zome, app_entry_type);
+    let invocation = ValidationPackageInvocation::new(zome, app_entry_def);
 
     Ok(Some(ribosome.run_validation_package(access, invocation)?))
 }

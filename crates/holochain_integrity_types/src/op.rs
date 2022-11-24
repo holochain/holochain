@@ -372,9 +372,9 @@ impl EntryCreationAction {
     }
     /// The [`AppEntryDef`] of the [`Entry`] being created if it
     /// is an application defined [`Entry`].
-    pub fn app_entry_type(&self) -> Option<&AppEntryDef> {
+    pub fn app_entry_def(&self) -> Option<&AppEntryDef> {
         match self.entry_type() {
-            EntryType::App(app_entry_type) => Some(app_entry_type),
+            EntryType::App(app_entry_def) => Some(app_entry_def),
             _ => None,
         }
     }

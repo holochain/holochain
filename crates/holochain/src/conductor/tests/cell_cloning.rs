@@ -14,7 +14,7 @@ async fn create_clone_cell_without_modifiers_fails() {
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: "".to_string(),
-            role_id: "".to_string(),
+            role_name: "".to_string(),
             modifiers: DnaModifiersOpt::none(),
             membrane_proof: None,
             name: None,
@@ -24,13 +24,13 @@ async fn create_clone_cell_without_modifiers_fails() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
+async fn create_clone_cell_with_wrong_app_or_role_name_fails() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_id.clone(), dna)])
+        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna)])
         .await
         .unwrap();
 
@@ -38,7 +38,7 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: "wrong_app_id".to_string(),
-            role_name: role_id.clone(),
+            role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
             name: None,
@@ -50,7 +50,7 @@ async fn create_clone_cell_with_wrong_app_or_role_id_fails() {
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
-            role_id: "wrong_role_id".to_string(),
+            role_name: "wrong_role_name".to_string(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
             name: None,
@@ -66,7 +66,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_id.clone(), dna)])
+        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna)])
         .await
         .unwrap();
 
@@ -74,7 +74,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
-            role_id: role_id.clone(),
+            role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
             name: None,
@@ -82,15 +82,15 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .await
         .unwrap();
     assert_eq!(
-        installed_clone_cell_0.into_role_id(),
-        *CloneId::new(&role_id, 0).as_app_role_id()
+        installed_clone_cell_0.into_role_name(),
+        *CloneId::new(&role_name, 0).as_app_role_name()
     ); // clone index starts at 0
 
     let installed_clone_cell_1 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
-            role_id: role_id.clone(),
+            role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_2".to_string()),
             membrane_proof: None,
             name: None,
@@ -98,8 +98,8 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .await
         .unwrap();
     assert_eq!(
-        installed_clone_cell_1.into_role_id(),
-        *CloneId::new(&role_id, 1).as_app_role_id()
+        installed_clone_cell_1.into_role_name(),
+        *CloneId::new(&role_name, 1).as_app_role_name()
     );
 }
 
@@ -110,7 +110,7 @@ async fn create_clone_cell_creates_callable_cell() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_id.clone(), dna.clone())])
+        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna.clone())])
         .await
         .unwrap();
 
@@ -118,7 +118,7 @@ async fn create_clone_cell_creates_callable_cell() {
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
-            role_id: role_id.clone(),
+            role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
             name: None,
@@ -143,14 +143,14 @@ async fn app_info_includes_cloned_cells() {
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app_id = "app";
     conductor
-        .setup_app_for_agent(app_id, alice.clone(), [&(role_id.clone(), dna)])
+        .setup_app_for_agent(app_id, alice.clone(), [&(role_name.clone(), dna)])
         .await
         .unwrap();
     let installed_clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.to_string(),
-            role_id: role_id.clone(),
+            role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
             name: None,
@@ -176,14 +176,14 @@ async fn clone_cell_deletion() {
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app_id = "app";
     conductor
-        .setup_app_for_agent(app_id, alice.clone(), [&(role_id.clone(), dna)])
+        .setup_app_for_agent(app_id, alice.clone(), [&(role_name.clone(), dna)])
         .await
         .unwrap();
     let installed_clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.to_string(),
-            role_id: role_id.clone(),
+            role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
             name: None,
@@ -197,7 +197,7 @@ async fn clone_cell_deletion() {
         .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
+                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
             ),
         })
         .await
@@ -227,7 +227,7 @@ async fn clone_cell_deletion() {
         .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
+                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
             ),
         })
         .await
@@ -256,7 +256,7 @@ async fn clone_cell_deletion() {
         .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
+                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
             ),
         })
         .await
@@ -281,7 +281,7 @@ async fn clone_cell_deletion() {
         .archive_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.to_string(),
             clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
+                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
             ),
         })
         .await
@@ -290,7 +290,7 @@ async fn clone_cell_deletion() {
         .raw_handle()
         .delete_archived_clone_cells(&DeleteArchivedCloneCellsPayload {
             app_id: app_id.into(),
-            role_id: role_id.clone(),
+            role_name: role_name.clone(),
         })
         .await
         .unwrap();
@@ -300,7 +300,7 @@ async fn clone_cell_deletion() {
         .restore_archived_clone_cell(&ArchiveCloneCellPayload {
             app_id: app_id.into(),
             clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_id()).unwrap(),
+                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
             ),
         })
         .await;
@@ -314,7 +314,7 @@ async fn conductor_can_startup_with_cloned_cell() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_id.clone(), dna)])
+        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna)])
         .await
         .unwrap();
 
@@ -322,7 +322,7 @@ async fn conductor_can_startup_with_cloned_cell() {
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
-            role_id: role_id.clone(),
+            role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
             name: None,

@@ -31,12 +31,12 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     entry: RecordEntry::Present(entry),
                 },
         }) => {
-            match signed_action.action().entry_type().and_then(|et| match et {
-                EntryType::App(AppEntryDef { index, zome_index, .. }) => Some((zome_index, index)),
+            match signed_action.action().entry_type().and_then(|entry_type| match entry_type {
+                EntryType::App(AppEntryDef { entry_index, zome_index, .. }) => Some((zome_index, entry_index)),
                 _ => None,
             }) {
-                Some((zome_index, id)) => {
-                    match EntryTypes::deserialize_from_type(*zome_index, *id, &entry) {
+                Some((zome_index, entry_index)) => {
+                    match EntryTypes::deserialize_from_type(*zome_index, *entry_index, &entry) {
                         Ok(Some(EntryTypes::Thing(thing))) => Ok(thing.into()),
                         Ok(None) => Ok(ValidateCallbackResult::Valid),
                         Err(WasmError {
