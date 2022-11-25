@@ -1,4 +1,4 @@
-use crate::ZomeId;
+use crate::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(
@@ -62,14 +62,14 @@ impl LinkTag {
 /// Filter on a set of [`LinkType`]s.
 pub enum LinkTypeFilter {
     /// Return links that match any of these types.
-    Types(Vec<(ZomeId, Vec<LinkType>)>),
+    Types(Vec<(ZomeIndex, Vec<LinkType>)>),
     /// Return links that match any types defined
     /// in any of this zomes dependencies.
-    Dependencies(Vec<ZomeId>),
+    Dependencies(Vec<ZomeIndex>),
 }
 
 /// A helper trait for finding the app defined link type
-/// from a [`ZomeId`] and [`LinkType`].
+/// from a [`ZomeIndex`] and [`LinkType`].
 ///
 /// If the zome id is a dependency of the calling zome and
 /// the link type is out of range (greater than the number of defined
@@ -81,21 +81,21 @@ pub enum LinkTypeFilter {
 pub trait LinkTypesHelper: Sized {
     /// The error associated with this conversion.
     type Error;
-    /// Check if the [`ZomeId`] and [`LinkType`] matches one of the
+    /// Check if the [`ZomeIndex`] and [`LinkType`] matches one of the
     /// `ZomeLinkTypeKey::from(Self::variant)` and if
     /// it does return that type.
-    fn from_type<Z, I>(zome_id: Z, link_type: I) -> Result<Option<Self>, Self::Error>
+    fn from_type<Z, I>(zome_index: Z, link_type: I) -> Result<Option<Self>, Self::Error>
     where
-        Z: Into<ZomeId>,
+        Z: Into<ZomeIndex>,
         I: Into<LinkType>;
 }
 
 impl LinkTypesHelper for () {
     type Error = core::convert::Infallible;
 
-    fn from_type<Z, I>(_zome_id: Z, _link_type: I) -> Result<Option<Self>, Self::Error>
+    fn from_type<Z, I>(_zome_index: Z, _link_type: I) -> Result<Option<Self>, Self::Error>
     where
-        Z: Into<ZomeId>,
+        Z: Into<ZomeIndex>,
         I: Into<LinkType>,
     {
         Ok(Some(()))
@@ -103,25 +103,25 @@ impl LinkTypesHelper for () {
 }
 
 impl LinkTypeFilter {
-    pub fn zome_for<E>(link_type: impl TryInto<ZomeId, Error = E>) -> Result<Self, E> {
+    pub fn zome_for<E>(link_type: impl TryInto<ZomeIndex, Error = E>) -> Result<Self, E> {
         link_type.try_into().map(LinkTypeFilter::single_dep)
     }
 
-    pub fn contains(&self, zome_id: &ZomeId, link_type: &LinkType) -> bool {
+    pub fn contains(&self, zome_index: &ZomeIndex, link_type: &LinkType) -> bool {
         match self {
             LinkTypeFilter::Types(types) => types
                 .iter()
-                .any(|(z, types)| z == zome_id && types.contains(link_type)),
-            LinkTypeFilter::Dependencies(deps) => deps.contains(zome_id),
+                .any(|(z, types)| z == zome_index && types.contains(link_type)),
+            LinkTypeFilter::Dependencies(deps) => deps.contains(zome_index),
         }
     }
 
-    pub fn single_type(zome_id: ZomeId, link_type: LinkType) -> Self {
-        Self::Types(vec![(zome_id, vec![link_type])])
+    pub fn single_type(zome_index: ZomeIndex, link_type: LinkType) -> Self {
+        Self::Types(vec![(zome_index, vec![link_type])])
     }
 
-    pub fn single_dep(zome_id: ZomeId) -> Self {
-        Self::Dependencies(vec![zome_id])
+    pub fn single_dep(zome_index: ZomeIndex) -> Self {
+        Self::Dependencies(vec![zome_index])
     }
 }
 
@@ -157,14 +157,14 @@ impl From<u8> for LinkType {
     }
 }
 
-impl From<(ZomeId, LinkType)> for LinkType {
-    fn from((_, l): (ZomeId, LinkType)) -> Self {
+impl From<(ZomeIndex, LinkType)> for LinkType {
+    fn from((_, l): (ZomeIndex, LinkType)) -> Self {
         l
     }
 }
 
-impl From<(ZomeId, LinkType)> for ZomeId {
-    fn from((z, _): (ZomeId, LinkType)) -> Self {
+impl From<(ZomeIndex, LinkType)> for ZomeIndex {
+    fn from((z, _): (ZomeIndex, LinkType)) -> Self {
         z
     }
 }

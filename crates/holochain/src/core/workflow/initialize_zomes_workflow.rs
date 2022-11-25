@@ -231,7 +231,6 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn commit_during_init() {
-        // SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create, TestWasm::InitFail])
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
         let mut conductor = SweetConductor::from_standard_config().await;
         let keystore = conductor.keystore();

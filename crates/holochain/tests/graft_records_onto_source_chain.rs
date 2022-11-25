@@ -66,7 +66,7 @@ async fn grafting() {
         timestamp: Timestamp::now(),
         action_seq: 4,
         prev_action: chain.last().unwrap().0.clone(),
-        entry_type: EntryType::App(AppEntryType::new(
+        entry_type: EntryType::App(AppEntryDef::new(
             1.into(),
             0.into(),
             EntryVisibility::Public,

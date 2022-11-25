@@ -18,12 +18,12 @@ where
     ScopedLinkType: TryFrom<T, Error = WasmError>,
 {
     let t: ScopedLinkType = t.try_into().unwrap();
-    (t.zome_id.0, t.zome_type.0)
+    (t.zome_index.0, t.zome_type.0)
 }
 
-fn scoped_link_type(zome_id: u8, zome_type: u8) -> ScopedLinkType {
+fn scoped_link_type(zome_index: u8, zome_type: u8) -> ScopedLinkType {
     ScopedLinkType {
-        zome_id: zome_id.into(),
+        zome_index: zome_index.into(),
         zome_type: zome_type.into(),
     }
 }
@@ -33,7 +33,7 @@ where
     ScopedEntryDefIndex: TryFrom<T, Error = WasmError>,
 {
     let t: ScopedEntryDefIndex = t.try_into().unwrap();
-    (t.zome_id.0, t.zome_type.0)
+    (t.zome_index.0, t.zome_type.0)
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn to_local_types_test_nested() {
 }
 
 #[test]
-fn to_zome_id_test_unit() {
+fn to_zome_index_test_unit() {
     mod integrity_a {
         use super::*;
         #[hdk_link_types(skip_no_mangle = true)]

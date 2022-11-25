@@ -49,7 +49,7 @@ pub mod test {
 
         let zome_info: ZomeInfo = conductor.call(&alice, "zome_info", ()).await;
         assert_eq!(zome_info.name, "entry_defs".into());
-        assert_eq!(zome_info.id, ZomeId::new(1));
+        assert_eq!(zome_info.id, ZomeIndex::new(1));
         assert_eq!(
             zome_info.entry_defs,
             vec![
@@ -84,8 +84,8 @@ pub mod test {
                 FunctionName::new("zome_info"),
             ],
         );
-        let entries = vec![(ZomeId(0), vec![EntryDefIndex(0), EntryDefIndex(1)])];
-        let links = vec![(ZomeId(0), vec![])];
+        let entries = vec![(ZomeIndex(0), vec![EntryDefIndex(0), EntryDefIndex(1)])];
+        let links = vec![(ZomeIndex(0), vec![])];
         assert_eq!(
             zome_info.zome_types,
             ScopedZomeTypesSet {

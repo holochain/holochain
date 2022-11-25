@@ -5,7 +5,7 @@ mod tests {
     use holo_hash::*;
     use holochain_types::action::NewEntryAction;
     use holochain_types::fixt::ActionBuilderCommonFixturator;
-    use holochain_types::{env::DbWrite, fixt::AppEntryTypeFixturator};
+    use holochain_types::{env::DbWrite, fixt::AppEntryDefFixturator};
     use holochain_zome_types::action;
     use holochain_zome_types::action::builder;
     use holochain_zome_types::action::ActionBuilder;
@@ -29,7 +29,7 @@ mod tests {
                 action_hashes: Box::new(ActionHashFixturator::new(Unpredictable)),
                 entry_hashes: Box::new(EntryHashFixturator::new(Unpredictable).map(Into::into)),
                 entry_types: Box::new(
-                    AppEntryTypeFixturator::new(Unpredictable).map(EntryType::App),
+                    AppEntryDefFixturator::new(Unpredictable).map(EntryType::App),
                 ),
                 commons: Box::new(ActionBuilderCommonFixturator::new(Unpredictable)),
             }

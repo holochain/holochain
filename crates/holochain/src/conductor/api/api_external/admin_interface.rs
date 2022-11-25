@@ -155,7 +155,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     let InstallAppDnaPayload {
                         hash,
                         membrane_proof,
-                        role_id,
+                        role_name,
                     } = dna_payload;
 
                     // confirm that hash has been installed
@@ -167,7 +167,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                         )));
                     }
                     let cell_id = CellId::from((hash, agent_key.clone()));
-                    ConductorApiResult::Ok((InstalledCell::new(cell_id, role_id), membrane_proof))
+                    ConductorApiResult::Ok((InstalledCell::new(cell_id, role_name), membrane_proof))
                 });
 
                 // Join all the install tasks

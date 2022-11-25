@@ -50,7 +50,7 @@ async fn can_update_state() {
     assert_eq!(state, expect_state);
 
     let cell_id = fake_cell_id(1);
-    let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
+    let installed_cell = InstalledCell::new(cell_id.clone(), "role_name".to_string());
     let app = InstalledAppCommon::new_legacy("fake app", vec![installed_cell]).unwrap();
 
     conductor
@@ -122,9 +122,9 @@ async fn app_ids_are_unique() {
     );
 }
 
-/// App can't be installed if it contains duplicate AppRoleIds
+/// App can't be installed if it contains duplicate RoleNames
 #[tokio::test(flavor = "multi_thread")]
-async fn app_role_ids_are_unique() {
+async fn role_names_are_unique() {
     let cells = vec![
         InstalledCell::new(fixt!(CellId), "1".into()),
         InstalledCell::new(fixt!(CellId), "1".into()),
@@ -133,7 +133,7 @@ async fn app_role_ids_are_unique() {
     let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
         result,
-        Err(AppError::DuplicateAppRoleIds(_, role_ids)) if role_ids == vec!["1".to_string()]
+        Err(AppError::DuplicateRoleNames(_, role_names)) if role_names == vec!["1".to_string()]
     );
 }
 
@@ -406,7 +406,7 @@ async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
             installed_app_id: "app3".into(),
             agent_key: agent3.clone(),
             dnas: vec![InstallAppDnaPayload {
-                role_id: "whatever".into(),
+                role_name: "whatever".into(),
                 hash: dna.dna_hash().clone(),
                 membrane_proof: None,
             }],
@@ -559,7 +559,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             .function("integrity", "validate", |_api, op: Op| match op {
                 Op::StoreEntry(StoreEntry { action, .. })
-                    if action.hashed.content.app_entry_type().is_some() =>
+                    if action.hashed.content.app_entry_def().is_some() =>
                 {
                     Ok(ValidateResult::Invalid(
                         "intentional invalid result for testing".into(),
@@ -621,7 +621,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
             .function("integrity", "validate", |_api, op: Op| {
                 match op {
                     Op::StoreEntry(StoreEntry { action, .. })
-                        if action.hashed.content.app_entry_type().is_some() =>
+                        if action.hashed.content.app_entry_def().is_some() =>
                     {
                         // Trigger a deserialization error
                         let _: Entry = SerializedBytes::try_from(())?.try_into()?;

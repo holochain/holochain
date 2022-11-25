@@ -1,13 +1,13 @@
 use holochain_util::ffs;
 use mr_bundle::error::MrBundleError;
 
-use crate::prelude::{AppManifestError, AppRoleId, DnaError};
+use crate::prelude::{AppManifestError, DnaError, RoleName};
 
 /// Errors occurring while installing an AppBundle
 #[derive(thiserror::Error, Debug)]
 pub enum AppBundleError {
     #[error("Could not resolve the app role '{0}'")]
-    CellResolutionFailure(AppRoleId),
+    CellResolutionFailure(RoleName),
 
     #[error(transparent)]
     AppManifestError(#[from] AppManifestError),
