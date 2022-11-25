@@ -5,6 +5,7 @@ use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
     dht::{region::Region, region_set::RegionSetLtcs, spacetime::Topology},
     dht_arc::DhtArcSet,
+    KOpData, KOpHash,
 };
 
 use crate::event::{GetAgentInfoSignedEvt, MetricRecord};
@@ -22,14 +23,14 @@ pub trait KitsuneHost: 'static + Send + Sync {
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>>;
 
-    /// Extrapolated Peer Coverage
+    /// Extrapolated Peer Coverage.
     fn peer_extrapolated_coverage(
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>>;
 
-    /// Query aggregate dht op data to form an LTCS set of region data
+    /// Query aggregate dht op data to form an LTCS set of region data.
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
@@ -46,15 +47,18 @@ pub trait KitsuneHost: 'static + Send + Sync {
         regions: Vec<Region>,
     ) -> KitsuneHostResult<Vec<Region>>;
 
-    /// Record a set of metric records
+    /// Record a set of metric records.
     fn record_metrics(
         &self,
         space: Arc<KitsuneSpace>,
         records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()>;
 
-    /// Get the quantum Topology associated with this Space
+    /// Get the quantum Topology associated with this Space.
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology>;
+
+    /// Hashing function to get an op_hash from op_data.
+    fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash>;
 }
 
 /// Trait object for the host interface

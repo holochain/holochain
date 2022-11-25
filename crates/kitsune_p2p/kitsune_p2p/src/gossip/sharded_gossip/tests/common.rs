@@ -95,6 +95,10 @@ impl KitsuneHost for StandardResponsesHostApi {
     ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
         box_fut(Ok(self.topology.clone()))
     }
+
+    fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
+        todo!()
+    }
 }
 
 // TODO: integrate with `HandlerBuilder`

@@ -569,6 +569,14 @@ impl Spaces {
                             out.push(r);
                             total_bytes += bytes;
                             // pair(maackle, freesig): be sure to add this limit in the region fetch case too
+                            // TODO (david.b) - I think this could be causing
+                            // some of our current issues... if we decide
+                            // we need a list of hashes in a gossip round
+                            // and just randomly don't get some of them
+                            // we're probably waiting the full minute
+                            // before trying again with that peer.
+                            // Luckilly, we want to stop using this and
+                            // just publish / gossip hashes.
                             if total_bytes > OPS_IN_MEMORY_BOUND_BYTES {
                                 break;
                             }

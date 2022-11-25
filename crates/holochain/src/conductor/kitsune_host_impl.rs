@@ -12,11 +12,15 @@ use holochain_p2p::{
     dht::{spacetime::Topology, ArqStrat},
     DnaHashExt,
 };
-use holochain_types::{db::PermittedConn, prelude::DnaError, share::RwShare};
+use holochain_types::{
+    db::PermittedConn,
+    prelude::{DhtOpHash, DnaError},
+    share::RwShare,
+};
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::{config::KitsuneP2pTuningParams, KOpData, KOpHash};
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
@@ -143,5 +147,19 @@ impl KitsuneHost for KitsuneHostImpl {
             .ok_or(DnaError::DnaMissing(dna_hash));
         let cutoff = self.tuning_params.danger_gossip_recent_threshold();
         async move { Ok(dna_def?.topology(cutoff)) }.boxed().into()
+    }
+
+    fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {
+        use holochain_p2p::DhtOpHashExt;
+
+        async move {
+            let op = holochain_p2p::WireDhtOpData::decode(op_data.0.clone())?;
+
+            let op_hash = DhtOpHash::with_data_sync(&op.op_data).into_kitsune();
+
+            Ok(op_hash)
+        }
+        .boxed()
+        .into()
     }
 }

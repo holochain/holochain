@@ -510,7 +510,17 @@ impl KitsuneP2pActor {
                                         op_data_list,
                                     }) => {
                                         for (space, op_list) in op_data_list {
-                                            let _ = evt_sender.gossip(space.clone(), op_list).await;
+                                            for op in op_list {
+                                                let _op_hash = host.op_hash(op.clone());
+                                                // TODO - check op_hash against
+                                                //        active fetch queue
+
+                                                // TODO - remove this in favor
+                                                //        of a publish/gossip
+                                                //        combo event
+                                                //        yet to be added
+                                                let _ = evt_sender.gossip(space.clone(), vec![op]).await;
+                                            }
                                         }
                                     }
                                     wire::Wire::MetricExchange(wire::MetricExchange {

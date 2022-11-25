@@ -1036,15 +1036,9 @@ impl HolochainP2pHandler for HolochainP2pActor {
             .with_request_validation_receipt(request_validation_receipt)
             .with_countersigning_session(countersigning_session);
 
-        use kitsune_p2p::KitsuneBinType;
         let pub_hashes = ops
             .iter()
-            .map(|op| {
-                // TODO @maackle this seems wrong, is this the right hash??
-                Arc::new(kitsune_p2p::KitsuneOpHash::new(
-                    op.dht_basis().get_raw_36().to_vec(),
-                ))
-            })
+            .map(|op| DhtOpHash::with_data_sync(op).into_kitsune())
             .collect::<Vec<_>>();
 
         let payload = crate::wire::WireMessage::publish(

@@ -165,6 +165,10 @@ impl KitsuneHost for SwitchboardEventHandler {
     ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
         box_fut(Ok(self.sb.topology.clone()))
     }
+
+    fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
+        todo!()
+    }
 }
 
 #[allow(warnings)]
