@@ -79,6 +79,7 @@ type KBasis = Arc<super::KitsuneBasis>;
 type Payload = Vec<u8>;
 type OptU64 = Option<u64>;
 type OptArc = Option<crate::dht_arc::DhtArc>;
+use kitsune_p2p_types::KOpHash;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
@@ -114,6 +115,16 @@ ghost_actor::ghost_chan! {
             timeout: KitsuneTimeout,
             destination: BroadcastTo,
             payload: Payload
+        ) -> ();
+
+        /// Sub-type of broadcast. Notifies a "neighborhood" of availability
+        /// of an op hash. Delegates will await successful fetch of op data
+        /// before proceeding to do the actual delegation.
+        fn publish(
+            space: KSpace,
+            timeout: KitsuneTimeout,
+            op_hash: KOpHash,
+            fetch_context: kitsune_p2p_fetch::FetchContext,
         ) -> ();
 
         /// Broadcast data to a specific set of agents without

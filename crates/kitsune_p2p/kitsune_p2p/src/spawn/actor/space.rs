@@ -929,6 +929,16 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
+    fn handle_publish(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        _timeout: KitsuneTimeout,
+        _op_hash: Arc<KitsuneOpHash>,
+        _fetch_context: kitsune_p2p_fetch::FetchContext,
+    ) -> KitsuneP2pHandlerResult<()> {
+        todo!()
+    }
+
     fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,

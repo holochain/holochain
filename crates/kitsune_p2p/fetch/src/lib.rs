@@ -85,8 +85,10 @@ pub struct FetchOptions {
 
 /// Usage agnostic context data.
 #[derive(
+    Default,
     Debug,
     Clone,
+    Copy,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -94,4 +96,4 @@ pub struct FetchOptions {
     derive_more::Deref,
     derive_more::From,
 )]
-pub struct FetchContext(u32);
+pub struct FetchContext(pub u32);

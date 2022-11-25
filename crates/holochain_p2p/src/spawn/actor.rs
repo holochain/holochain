@@ -5,6 +5,7 @@ use crate::*;
 
 use futures::future::FutureExt;
 use kitsune_p2p::actor::BroadcastTo;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch;
 use kitsune_p2p::event::*;
 use kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics;
 use kitsune_p2p::KOp;
@@ -36,6 +37,50 @@ macro_rules! timing_trace {
             __out
         }
     }};
+}
+
+/// Holochain-specific FetchContext extension trait.
+pub trait FetchContextExt {
+    /// Set or unset the "request_validation_receipt" flag.
+    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self;
+
+    /// Returns true if the "request_validation_receipt" flag is set.
+    fn has_request_validation_receipt(&self) -> bool;
+
+    /// Set or unset the "countersigning_session" flag.
+    fn with_countersigning_session(&self, countersigning_session: bool) -> Self;
+
+    /// Returns true if the "countersigning_session" flag is set.
+    fn has_countersigning_session(&self) -> bool;
+}
+
+const FLAG_REQ_VAL_RCPT: u32 = 1 << 0;
+const FLAG_CNTR_SSN: u32 = 1 << 1;
+
+impl FetchContextExt for kitsune_p2p_fetch::FetchContext {
+    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self {
+        if request_validation_receipt {
+            kitsune_p2p_fetch::FetchContext(self.0 | FLAG_REQ_VAL_RCPT)
+        } else {
+            kitsune_p2p_fetch::FetchContext(self.0 & !FLAG_REQ_VAL_RCPT)
+        }
+    }
+
+    fn has_request_validation_receipt(&self) -> bool {
+        self.0 & FLAG_REQ_VAL_RCPT > 0
+    }
+
+    fn with_countersigning_session(&self, countersigning_session: bool) -> Self {
+        if countersigning_session {
+            kitsune_p2p_fetch::FetchContext(self.0 | FLAG_CNTR_SSN)
+        } else {
+            kitsune_p2p_fetch::FetchContext(self.0 & !FLAG_CNTR_SSN)
+        }
+    }
+
+    fn has_countersigning_session(&self) -> bool {
+        self.0 & FLAG_CNTR_SSN > 0
+    }
 }
 
 #[derive(Clone)]
@@ -985,6 +1030,21 @@ impl HolochainP2pHandler for HolochainP2pActor {
             None => self.tuning_params.implicit_timeout(),
         };
 
+        let fetch_context = kitsune_p2p_fetch::FetchContext::default()
+            .with_request_validation_receipt(request_validation_receipt)
+            .with_countersigning_session(countersigning_session);
+
+        use kitsune_p2p::KitsuneBinType;
+        let pub_hashes = ops
+            .iter()
+            .map(|op| {
+                // TODO @maackle this seems wrong, is this the right hash??
+                Arc::new(kitsune_p2p::KitsuneOpHash::new(
+                    op.dht_basis().get_raw_36().to_vec(),
+                ))
+            })
+            .collect::<Vec<_>>();
+
         let payload = crate::wire::WireMessage::publish(
             request_validation_receipt,
             countersigning_session,
@@ -996,6 +1056,13 @@ impl HolochainP2pHandler for HolochainP2pActor {
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
+            for op_hash in pub_hashes {
+                kitsune_p2p
+                    .publish(space.clone(), timeout, op_hash, fetch_context)
+                    .await?;
+            }
+
+            // TODO - DELETE THIS OLD PUBLISH METHOD:
             kitsune_p2p
                 .broadcast(space, basis, timeout, BroadcastTo::Notify, payload)
                 .await?;

@@ -904,6 +904,25 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .into())
     }
 
+    fn handle_publish(
+        &mut self,
+        space: Arc<KitsuneSpace>,
+        timeout: KitsuneTimeout,
+        op_hash: KOpHash,
+        fetch_context: kitsune_p2p_fetch::FetchContext,
+    ) -> KitsuneP2pHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender.publish(space, timeout, op_hash, fetch_context).await
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_targeted_broadcast(
         &mut self,
         space: Arc<KitsuneSpace>,
