@@ -5,7 +5,7 @@ name: fixture-app
 description: it's an app
 
 roles:
-  - role_name: role-1
+  - name: role-1
     provisioning:
       strategy: create
       deferred: false
@@ -15,7 +15,7 @@ roles:
         network_seed: 0123456
         properties: ~
       clone_limit: 0
-  - role_name: role-2
+  - name: role-2
     provisioning:
       strategy: create
       deferred: true
