@@ -41,13 +41,15 @@ macro_rules! timing_trace {
 
 /// Holochain-specific FetchContext extension trait.
 pub trait FetchContextExt {
-    /// Set or unset the "request_validation_receipt" flag.
+    /// Applies the "request_validation_receipt" flag *if* the param is true
+    /// otherwise, leaves the flag unchanged.
     fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self;
 
     /// Returns true if the "request_validation_receipt" flag is set.
     fn has_request_validation_receipt(&self) -> bool;
 
-    /// Set or unset the "countersigning_session" flag.
+    /// Applies the "countersigning_session" flag *if* the param is true
+    /// otherwise, leaves the flag unchanged.
     fn with_countersigning_session(&self, countersigning_session: bool) -> Self;
 
     /// Returns true if the "countersigning_session" flag is set.
@@ -62,7 +64,7 @@ impl FetchContextExt for kitsune_p2p_fetch::FetchContext {
         if request_validation_receipt {
             kitsune_p2p_fetch::FetchContext(self.0 | FLAG_REQ_VAL_RCPT)
         } else {
-            kitsune_p2p_fetch::FetchContext(self.0 & !FLAG_REQ_VAL_RCPT)
+            *self
         }
     }
 
@@ -74,7 +76,7 @@ impl FetchContextExt for kitsune_p2p_fetch::FetchContext {
         if countersigning_session {
             kitsune_p2p_fetch::FetchContext(self.0 | FLAG_CNTR_SSN)
         } else {
-            kitsune_p2p_fetch::FetchContext(self.0 & !FLAG_CNTR_SSN)
+            *self
         }
     }
 
