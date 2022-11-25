@@ -224,7 +224,11 @@ impl KitsuneP2pActor {
         struct FetchResponseConfig(kitsune_p2p_types::config::KitsuneP2pTuningParams);
 
         impl kitsune_p2p_fetch::FetchResponseConfig for FetchResponseConfig {
-            type User = (Tx2ConHnd<wire::Wire>, TxUrl);
+            type User = (
+                Tx2ConHnd<wire::Wire>,
+                TxUrl,
+                Option<(dht::prelude::RegionCoords, bool)>,
+            );
 
             fn respond(
                 &self,
@@ -237,10 +241,16 @@ impl KitsuneP2pActor {
                 tokio::task::spawn(async move {
                     let _completion_guard = completion_guard;
 
-                    let payload = wire::Wire::push_op_data(vec![(space, vec![op])]);
-
                     // MAYBE: open a new connection if the con was closed??
-                    let (con, _url) = user;
+                    let (con, _url, region) = user;
+
+                    let payload = wire::Wire::push_op_data(vec![(
+                        space,
+                        vec![wire::PushOpItem {
+                            op_data: op,
+                            region,
+                        }],
+                    )]);
 
                     if let Err(err) = con.notify(&payload, timeout).await {
                         tracing::warn!(?err, "error responding to op fetch");
@@ -475,7 +485,10 @@ impl KitsuneP2pActor {
                                             for key in key_list {
                                                 match key {
                                                     FetchKey::Region { region_coords } => {
-                                                        regions.push(region_coords.to_bounds(&topo));
+                                                        regions.push((
+                                                            region_coords,
+                                                            region_coords.to_bounds(&topo),
+                                                        ));
                                                     }
                                                     FetchKey::Op { op_hash } => {
                                                         hashes.push(op_hash);
@@ -489,18 +502,19 @@ impl KitsuneP2pActor {
                                                     query: FetchOpDataEvtQuery::Hashes(hashes),
                                                 }).await {
                                                     for (_hash, op) in list {
-                                                        fetch_response_queue.enqueue_op(space.clone(), (con.clone(), url.clone()), op);
+                                                        fetch_response_queue.enqueue_op(space.clone(), (con.clone(), url.clone(), None), op);
                                                     }
                                                 }
                                             }
 
-                                            if !regions.is_empty() {
+                                            for (coord, bound) in regions {
                                                 if let Ok(list) = evt_sender.fetch_op_data(FetchOpDataEvt {
                                                     space: space.clone(),
-                                                    query: FetchOpDataEvtQuery::Regions(regions),
+                                                    query: FetchOpDataEvtQuery::Regions(vec![bound]),
                                                 }).await {
-                                                    for (_hash, op) in list {
-                                                        fetch_response_queue.enqueue_op(space.clone(), (con.clone(), url.clone()), op);
+                                                    let last_idx = list.len() - 1;
+                                                    for (idx, (_hash, op)) in list.into_iter().enumerate() {
+                                                        fetch_response_queue.enqueue_op(space.clone(), (con.clone(), url.clone(), Some((coord, idx == last_idx))), op);
                                                     }
                                                 }
                                             }
@@ -511,7 +525,7 @@ impl KitsuneP2pActor {
                                     }) => {
                                         for (space, op_list) in op_data_list {
                                             for op in op_list {
-                                                let _op_hash = host.op_hash(op.clone());
+                                                let _op_hash = host.op_hash(op.op_data.clone());
                                                 // TODO - check op_hash against
                                                 //        active fetch queue
 
@@ -519,7 +533,7 @@ impl KitsuneP2pActor {
                                                 //        of a publish/gossip
                                                 //        combo event
                                                 //        yet to be added
-                                                let _ = evt_sender.gossip(space.clone(), vec![op]).await;
+                                                let _ = evt_sender.gossip(space.clone(), vec![op.op_data]).await;
                                             }
                                         }
                                     }
