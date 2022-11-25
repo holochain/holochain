@@ -34,10 +34,10 @@
 
 /// re-exported dependencies
 pub mod dependencies {
+    pub use ::kitsune_p2p_fetch;
     pub use ::kitsune_p2p_proxy;
     pub use ::kitsune_p2p_timestamp;
     pub use ::kitsune_p2p_types;
-    pub use ::kitsune_p2p_fetch;
     pub use ::url2;
 }
 

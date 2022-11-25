@@ -917,7 +917,9 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         };
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.publish(space, timeout, op_hash, fetch_context).await
+            space_sender
+                .publish(space, timeout, op_hash, fetch_context)
+                .await
         }
         .boxed()
         .into())
