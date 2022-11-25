@@ -240,7 +240,7 @@ impl InlineZomeSet {
             .get(index)
             .unwrap();
         EntryDefLocation::App(AppEntryDefLocation {
-            zome_id: scoped_type.zome_id,
+            zome_index: scoped_type.zome_index,
             entry_def_index: scoped_type.zome_type,
         })
     }
@@ -254,19 +254,19 @@ impl InlineZomeSet {
             .links
             .get(index)
             .unwrap();
-        LinkTypeFilter::single_type(scoped_type.zome_id, scoped_type.zome_type)
+        LinkTypeFilter::single_type(scoped_type.zome_index, scoped_type.zome_type)
     }
 
     /// Generate a link type filter for all dependencies of the this zome.
     pub fn dep_link_filter(api: &BoxApi) -> LinkTypeFilter {
-        let zome_ids = api
+        let zome_indexes = api
             .zome_info(())
             .unwrap()
             .zome_types
             .links
             .dependencies()
             .collect();
-        LinkTypeFilter::Dependencies(zome_ids)
+        LinkTypeFilter::Dependencies(zome_indexes)
     }
 }
 

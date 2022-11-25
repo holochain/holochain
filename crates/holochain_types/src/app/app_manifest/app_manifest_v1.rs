@@ -7,7 +7,7 @@ use super::{
     app_manifest_validated::{AppManifestValidated, AppRoleManifestValidated},
     error::{AppManifestError, AppManifestResult},
 };
-use crate::prelude::{AppRoleId, YamlProperties};
+use crate::prelude::{RoleName, YamlProperties};
 use holo_hash::{DnaHash, DnaHashB64};
 use holochain_zome_types::{DnaModifiersOpt, NetworkSeed};
 use std::collections::HashMap;
@@ -40,7 +40,7 @@ pub struct AppRoleManifest {
     /// - this role,
     /// - the DNA which fills it,
     /// - and the cell(s) created from that DNA
-    pub id: AppRoleId,
+    pub name: RoleName,
 
     /// Determines if, how, and when a Cell will be provisioned.
     pub provisioning: Option<CellProvisioning>,
@@ -52,9 +52,9 @@ pub struct AppRoleManifest {
 
 impl AppRoleManifest {
     /// Create a sample AppRoleManifest as a template to be followed
-    pub fn sample(id: AppRoleId) -> Self {
+    pub fn sample(name: RoleName) -> Self {
         Self {
-            id,
+            name,
             provisioning: Some(CellProvisioning::default()),
             dna: AppRoleDnaManifest::sample(),
         }
@@ -212,7 +212,7 @@ impl AppManifestV1 {
             .into_iter()
             .map(
                 |AppRoleManifest {
-                     id,
+                     name,
                      provisioning,
                      dna,
                  }| {
@@ -263,7 +263,7 @@ impl AppManifestV1 {
                             version: Self::require(version, "roles.dna.version")?,
                         },
                     };
-                    AppManifestResult::Ok((id, validated))
+                    AppManifestResult::Ok((name, validated))
                 },
             )
             .collect::<Result<HashMap<_, _>, _>>()?;
@@ -316,7 +316,7 @@ pub mod tests {
         let version = DnaVersionSpec::from(hashes.clone()).into();
 
         let roles = vec![AppRoleManifest {
-            id: "role_id".into(),
+            name: "name".into(),
             dna: AppRoleDnaManifest {
                 location,
                 modifiers,
@@ -357,7 +357,7 @@ manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
 roles:
-  - id: "role_id"
+  - id: "role_name"
     provisioning:
       strategy: "create"
       deferred: false

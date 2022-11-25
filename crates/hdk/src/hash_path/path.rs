@@ -311,7 +311,7 @@ impl Path {
 }
 
 impl TypedPath {
-    /// Create a new [`TypedPath`] by attaching a [`ZomeId`] and [`LinkType`] to a [`Path`].
+    /// Create a new [`TypedPath`] by attaching a [`ZomeIndex`] and [`LinkType`] to a [`Path`].
     pub fn new(link_type: impl Into<ScopedLinkType>, path: Path) -> Self {
         Self {
             link_type: link_type.into(),
@@ -326,7 +326,7 @@ impl TypedPath {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
                 root_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
                 Some(self.make_tag()?),
             )?
             .iter()
@@ -339,7 +339,7 @@ impl TypedPath {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
                 parent.path_entry_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
                 Some(self.make_tag()?),
             )?
             .iter()
@@ -388,7 +388,7 @@ impl TypedPath {
         Self::ensure(self)?;
         let mut unwrapped = get_links(
             self.path_entry_hash()?,
-            LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
             None,
         )?;
         // Only need one of each hash to build the tree.
@@ -437,7 +437,7 @@ impl TypedPath {
         Self::ensure(self)?;
         get_link_details(
             self.path_entry_hash()?,
-            LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
             Some(holochain_zome_types::link::LinkTag::new([])),
         )
     }

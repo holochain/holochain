@@ -1465,7 +1465,7 @@ pub mod tests {
         let entry_1 = Entry::App(fixt!(AppEntryBytes));
         let eh1 = EntryHash::with_data_sync(&entry_1);
         let create = builder::Create {
-            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_type: EntryType::App(fixt!(AppEntryDef)),
             entry_hash: eh1.clone(),
         };
         let h1 = chain_1
@@ -1476,7 +1476,7 @@ pub mod tests {
         let entry_err = Entry::App(fixt!(AppEntryBytes));
         let entry_hash_err = EntryHash::with_data_sync(&entry_err);
         let create = builder::Create {
-            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_type: EntryType::App(fixt!(AppEntryDef)),
             entry_hash: entry_hash_err.clone(),
         };
         chain_2
@@ -1487,7 +1487,7 @@ pub mod tests {
         let entry_2 = Entry::App(fixt!(AppEntryBytes));
         let eh2 = EntryHash::with_data_sync(&entry_2);
         let create = builder::Create {
-            entry_type: EntryType::App(AppEntryType::new(
+            entry_type: EntryType::App(AppEntryDef::new(
                 EntryDefIndex(0),
                 0.into(),
                 EntryVisibility::Private,
@@ -1875,7 +1875,7 @@ pub mod tests {
         .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let create = builder::Create {
-            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_type: EntryType::App(fixt!(AppEntryDef)),
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h1 = source_chain
@@ -1884,7 +1884,7 @@ pub mod tests {
             .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let create = builder::Create {
-            entry_type: EntryType::App(fixt!(AppEntryType)),
+            entry_type: EntryType::App(fixt!(AppEntryDef)),
             entry_hash: EntryHash::with_data_sync(&entry),
         };
         let h2 = source_chain

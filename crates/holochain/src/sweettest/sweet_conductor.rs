@@ -49,7 +49,7 @@ pub fn standard_config() -> ConductorConfig {
 
 /// A DnaFile with a role name assigned
 pub struct DnaWithRole {
-    role: AppRoleId,
+    role: RoleName,
     dna: DnaFile,
 }
 
@@ -63,8 +63,8 @@ impl From<DnaFile> for DnaWithRole {
     }
 }
 
-impl From<(AppRoleId, DnaFile)> for DnaWithRole {
-    fn from((role, dna): (AppRoleId, DnaFile)) -> Self {
+impl From<(RoleName, DnaFile)> for DnaWithRole {
+    fn from((role, dna): (RoleName, DnaFile)) -> Self {
         Self { role, dna }
     }
 }
@@ -316,11 +316,11 @@ impl SweetConductor {
 
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
-    /// All InstalledAppIds and AppRoleIds are auto-generated. In tests driven directly
+    /// All InstalledAppIds and RoleNames are auto-generated. In tests driven directly
     /// by Rust, you typically won't care what these values are set to, but in case you
     /// do, they are set as so:
     /// - InstalledAppId: {app_id_prefix}-{agent_pub_key}
-    /// - AppRoleId: {dna_hash}
+    /// - RoleName: {dna_hash}
     ///
     /// Returns a batch of SweetApps, sorted in the same order as Agents passed in.
     pub async fn setup_app_for_agents<'a, A, R, D>(
