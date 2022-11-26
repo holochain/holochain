@@ -452,12 +452,12 @@ async fn commit_invalid(
     let entry = ThisWasmEntry::NeverValidates;
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data.get_entry_type(TestWasm::Validate, 0).zome_id;
+    let zome_index = call_data.get_entry_type(TestWasm::Validate, 0).zome_index;
     // 4
     let invalid_action_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, 0),
+            EntryDefLocation::app(zome_index, 0),
             EntryVisibility::Public,
         )
         .await;
@@ -480,14 +480,14 @@ async fn commit_invalid_post(
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
     let call_data = HostFnCaller::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
-    let zome_id = call_data
+    let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_id;
+        .zome_index;
     // 9
     let invalid_action_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;

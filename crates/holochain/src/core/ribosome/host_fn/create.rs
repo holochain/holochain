@@ -51,12 +51,12 @@ pub fn create<'a>(
                     // extract the entry defs for a zome
                     let entry_type = match entry_location {
                         EntryDefLocation::App(AppEntryDefLocation {
-                            zome_id,
+                            zome_index,
                             entry_def_index,
                         }) => {
-                            let app_entry_type =
-                                AppEntryType::new(entry_def_index, zome_id, entry_visibility);
-                            EntryType::App(app_entry_type)
+                            let app_entry_def =
+                            AppEntryDef::new(entry_def_index, zome_index, entry_visibility);
+                            EntryType::App(app_entry_def)
                         }
                         EntryDefLocation::CapGrant => EntryType::CapGrant,
                         EntryDefLocation::CapClaim => EntryType::CapClaim,

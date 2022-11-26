@@ -441,7 +441,7 @@ pub fn insert_action(
                 "author": author,
                 "prev_hash": prev_hash,
                 "base_hash": create_link.base_address,
-                "zome_id": create_link.zome_id.0,
+                "zome_index": create_link.zome_index.0,
                 "link_type": create_link.link_type.0,
                 "tag": create_link.tag.as_sql(),
                 "blob": to_blob(&signed_action)?,

@@ -410,7 +410,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageInvocation;
-    constructor fn new(IntegrityZome, AppEntryType);
+    constructor fn new(IntegrityZome, AppEntryDef);
 );
 
 fixturator!(

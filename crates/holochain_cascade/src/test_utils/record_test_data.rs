@@ -69,7 +69,7 @@ impl RecordTestData {
         let update_entry_hash = EntryHash::with_data_sync(&update_entry);
 
         let mut entry_type_fixt =
-            AppEntryTypeFixturator::new(EntryVisibility::Public).map(EntryType::App);
+            AppEntryDefFixturator::new(EntryVisibility::Public).map(EntryType::App);
 
         create.entry_hash = entry_hash.clone();
         create.entry_type = entry_type_fixt.next().unwrap();

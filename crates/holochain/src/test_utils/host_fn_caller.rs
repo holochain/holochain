@@ -216,7 +216,7 @@ impl HostFnCaller {
         index: impl Into<EntryDefIndex>,
     ) -> ScopedEntryDefIndex {
         let TestWasmPair { integrity, .. } = zome.into();
-        let zome_id = self
+        let zome_index = self
             .ribosome
             .dna_def()
             .integrity_zomes
@@ -226,7 +226,7 @@ impl HostFnCaller {
         let zome_types = self
             .ribosome
             .zome_types()
-            .in_scope_subset(&[ZomeId(zome_id as u8)]);
+            .in_scope_subset(&[ZomeIndex(zome_index as u8)]);
         zome_types
             .entries
             .get(ZomeTypesKey {
@@ -241,7 +241,7 @@ impl HostFnCaller {
         index: impl Into<LinkType>,
     ) -> ScopedLinkType {
         let TestWasmPair { integrity, .. } = zome.into();
-        let zome_id = self
+        let zome_index = self
             .ribosome
             .dna_def()
             .integrity_zomes
@@ -251,7 +251,7 @@ impl HostFnCaller {
         let zome_types = self
             .ribosome
             .zome_types()
-            .in_scope_subset(&[ZomeId(zome_id as u8)]);
+            .in_scope_subset(&[ZomeIndex(zome_index as u8)]);
         zome_types
             .links
             .get(ZomeTypesKey {
@@ -338,7 +338,7 @@ impl HostFnCaller {
         &self,
         base: AnyLinkableHash,
         target: AnyLinkableHash,
-        zome_id: impl Into<ZomeId>,
+        zome_index: impl Into<ZomeIndex>,
         link_type: impl Into<LinkType>,
         link_tag: LinkTag,
     ) -> ActionHash {
@@ -346,7 +346,7 @@ impl HostFnCaller {
         let input = CreateLinkInput::new(
             base,
             target,
-            zome_id.into(),
+            zome_index.into(),
             link_type.into(),
             link_tag,
             ChainTopOrdering::default(),

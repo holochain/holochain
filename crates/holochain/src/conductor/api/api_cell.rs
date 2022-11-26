@@ -203,7 +203,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn find_cell_with_role_alongside_cell(
         &self,
         cell_id: &CellId,
-        role_id: &AppRoleId,
+        role_name: &RoleName,
     ) -> ConductorResult<Option<CellId>>;
 }
 
@@ -250,10 +250,10 @@ impl CellConductorReadHandleT for CellConductorApi {
     async fn find_cell_with_role_alongside_cell(
         &self,
         cell_id: &CellId,
-        role_id: &AppRoleId,
+        role_name: &RoleName,
     ) -> ConductorResult<Option<CellId>> {
         self.conductor_handle
-            .find_cell_with_role_alongside_cell(cell_id, role_id)
+            .find_cell_with_role_alongside_cell(cell_id, role_name)
             .await
     }
 }

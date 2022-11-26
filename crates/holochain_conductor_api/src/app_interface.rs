@@ -231,10 +231,10 @@ impl InstalledAppInfo {
         let status = app.status().clone().into();
         let clone_cells = app
             .clone_cells()
-            .map(|cell| (cell.0.as_app_role_id(), cell.1));
+            .map(|cell| (cell.0.as_app_role_name(), cell.1));
         let cells = app.provisioned_cells().chain(clone_cells);
         let cell_data = cells
-            .map(|(role_id, id)| InstalledCell::new(id.clone(), role_id.clone()))
+            .map(|(role_name, id)| InstalledCell::new(id.clone(), role_name.clone()))
             .collect();
         Self {
             installed_app_id,

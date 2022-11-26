@@ -1,6 +1,6 @@
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{AppRoleId, CapSecret, GrantZomeCallCapabilityPayload};
+use holochain_zome_types::{CapSecret, GrantZomeCallCapabilityPayload, RoleName};
 use std::collections::BTreeSet;
 
 use crate::fixt::AgentPubKeyFixturator;
@@ -19,14 +19,14 @@ async fn signed_zome_call() {
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
-    let role_id: AppRoleId = "dna".to_string();
+    let role_name: RoleName = "dna".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
         .setup_app_for_agent(
             "app",
             agent_pub_key.clone(),
-            [&(role_id.clone(), dna.clone())],
+            [&(role_name.clone(), dna.clone())],
         )
         .await
         .unwrap();

@@ -51,13 +51,13 @@ impl AppBundle {
         self,
         agent: AgentPubKey,
         _gamut: DnaGamut,
-        membrane_proofs: HashMap<AppRoleId, MembraneProof>,
+        membrane_proofs: HashMap<RoleName, MembraneProof>,
     ) -> AppBundleResult<AppRoleResolution> {
         let AppManifestValidated { name: _, roles } = self.manifest().clone().validate()?;
         let bundle = Arc::new(self);
-        let tasks = roles.into_iter().map(|(role_id, role)| async {
+        let tasks = roles.into_iter().map(|(role_name, role)| async {
             let bundle = bundle.clone();
-            Ok((role_id, bundle.resolve_cell(role).await?))
+            Ok((role_name, bundle.resolve_cell(role).await?))
         });
         let resolution = futures::future::join_all(tasks)
             .await
@@ -66,7 +66,7 @@ impl AppBundle {
             .into_iter()
             .fold(
                 Ok(AppRoleResolution::new(agent.clone())),
-                |acc: AppBundleResult<AppRoleResolution>, (role_id, op)| {
+                |acc: AppBundleResult<AppRoleResolution>, (role_name, op)| {
                     if let Ok(mut resolution) = acc {
                         match op {
                             CellProvisioningOp::Create(dna, clone_limit) => {
@@ -75,17 +75,17 @@ impl AppBundle {
                                 let cell_id = CellId::new(dna_hash, agent);
                                 let role = AppRoleAssignment::new(cell_id, true, clone_limit);
                                 // TODO: could sequentialize this to remove the clone
-                                let proof = membrane_proofs.get(&role_id).cloned();
+                                let proof = membrane_proofs.get(&role_name).cloned();
                                 resolution.dnas_to_register.push((dna, proof));
-                                resolution.role_assignments.push((role_id, role));
+                                resolution.role_assignments.push((role_name, role));
                             }
                             CellProvisioningOp::Existing(cell_id, clone_limit) => {
                                 let role = AppRoleAssignment::new(cell_id, true, clone_limit);
-                                resolution.role_assignments.push((role_id, role));
+                                resolution.role_assignments.push((role_name, role));
                             }
                             CellProvisioningOp::Noop(cell_id, clone_limit) => {
                                 resolution.role_assignments.push((
-                                    role_id,
+                                    role_name,
                                     AppRoleAssignment::new(cell_id, false, clone_limit),
                                 ));
                             }
@@ -206,7 +206,7 @@ pub fn we_must_remember_to_rework_cell_panic_handling_after_implementing_use_exi
 pub struct AppRoleResolution {
     pub agent: AgentPubKey,
     pub dnas_to_register: Vec<(DnaFile, Option<MembraneProof>)>,
-    pub role_assignments: Vec<(AppRoleId, AppRoleAssignment)>,
+    pub role_assignments: Vec<(RoleName, AppRoleAssignment)>,
 }
 
 #[allow(missing_docs)]

@@ -54,7 +54,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     let cache_at_agent_activity = cache_at_agent_activity.unwrap_or(false);
                     quote::quote! {
                         EntryDef {
-                            id: EntryDefId::App(AppEntryDefName::from_str(#id)),
+                            id: EntryDefId::App(AppEntryName::from_str(#id)),
                             visibility: #visibility,
                             required_validations: RequiredValidations(#required_validations),
                             cache_at_agent_activity: #cache_at_agent_activity,

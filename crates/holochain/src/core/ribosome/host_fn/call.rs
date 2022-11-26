@@ -105,7 +105,7 @@ pub fn call(
                             CallTarget::ConductorCell(target_cell) => {
                                 let cell_id_result: Result<CellId, RuntimeError> = match target_cell
                                 {
-                                    CallTargetCell::OtherRole(role_id) => {
+                                    CallTargetCell::OtherRole(role_name) => {
                                         let this_cell_id = call_context
                                             .host_context()
                                             .call_zome_handle()
@@ -116,7 +116,7 @@ pub fn call(
                                             .call_zome_handle()
                                             .find_cell_with_role_alongside_cell(
                                                 &this_cell_id,
-                                                &role_id,
+                                                &role_name,
                                             )
                                             .await
                                             .map_err(|e| -> RuntimeError {

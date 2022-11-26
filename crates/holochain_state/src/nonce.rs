@@ -40,7 +40,7 @@ pub async fn witness_nonce(
                 sql_conductor::DELETE_EXPIRED_NONCE,
                 named_params! {":now": now},
             )?;
-            if nonce_already_seen(txn, &agent, nonce.clone(), now)? {
+            if nonce_already_seen(txn, &agent, nonce, now)? {
                 Ok(WitnessNonceResult::Duplicate)
             } else {
                 mutations::insert_nonce(txn, &agent, nonce, expires)?;

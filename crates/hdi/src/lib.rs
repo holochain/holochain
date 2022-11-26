@@ -90,7 +90,7 @@
 //! #                 prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
 //! #                 base_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
 //! #                 target_address: EntryHash::from_raw_36(vec![0u8; 36]).into(),
-//! #                 zome_id: 0.into(),
+//! #                 zome_index: 0.into(),
 //! #                 link_type: 0.into(),
 //! #                 tag: ().into(),
 //! #                 weight: Default::default(),
@@ -105,7 +105,7 @@
 //! # hdi::test_utils::set_zome_types(&[(0, 2)], &[(0, 2)]);
 //! # let result: Result<hdi::prelude::ValidateCallbackResult, Box<dyn std::error::Error>> =
 //! match op.to_type()? {
-//!     OpType::StoreEntry(OpEntry::CreateEntry { entry_type, .. }) => match entry_type {
+//!     OpType::StoreEntry(OpEntry::CreateEntry { entry_def, .. }) => match entry_def {
 //!         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
 //!         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
 //!             "No Bs allowed in this app".to_string(),

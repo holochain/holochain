@@ -177,13 +177,13 @@ mod tests {
         action.entry_hash = EntryHash::with_data_sync(&entry);
         if facts.private {
             // - Private: true
-            action.entry_type = AppEntryTypeFixturator::new(EntryVisibility::Private)
+            action.entry_type = AppEntryDefFixturator::new(EntryVisibility::Private)
                 .map(EntryType::App)
                 .next()
                 .unwrap();
         } else {
             // - Private: false
-            action.entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
+            action.entry_type = AppEntryDefFixturator::new(EntryVisibility::Public)
                 .map(EntryType::App)
                 .next()
                 .unwrap();

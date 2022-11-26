@@ -70,7 +70,7 @@ async fn provisioning_1_create() {
     let expected = AppRoleResolution {
         agent,
         dnas_to_register: vec![(dna, None)],
-        role_assignments: vec![("role_id".into(), role)],
+        role_assignments: vec![("name".into(), role)],
     };
     assert_eq!(resolution, expected);
 }

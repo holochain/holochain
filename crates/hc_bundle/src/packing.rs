@@ -113,6 +113,7 @@ mod tests {
             .unwrap();
         let dir = tmpdir.path().join("test-dna");
         std::fs::create_dir(&dir).unwrap();
+        let dir = dir.canonicalize().unwrap();
 
         let manifest_yaml = r#"
 ---
@@ -147,7 +148,6 @@ integrity:
             pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string())
                 .await
                 .unwrap();
-
         // Ensure the bundle path was generated as expected
         assert!(bundle_path.is_file());
         assert_eq!(bundle_path, dir.join("test_dna.dna"));

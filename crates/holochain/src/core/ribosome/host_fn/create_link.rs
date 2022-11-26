@@ -21,7 +21,7 @@ pub fn create_link<'a>(
             let CreateLinkInput {
                 base_address,
                 target_address,
-                zome_id,
+                zome_index,
                 link_type,
                 tag,
                 chain_top_ordering,
@@ -29,7 +29,7 @@ pub fn create_link<'a>(
 
             // Construct the link add
             let action_builder =
-                builder::CreateLink::new(base_address, target_address, zome_id, link_type, tag);
+                builder::CreateLink::new(base_address, target_address, zome_index, link_type, tag);
 
             let action_hash = tokio_helper::block_forever_on(tokio::task::spawn(async move {
                 // push the action into the source chain
