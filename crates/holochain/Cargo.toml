@@ -34,6 +34,7 @@ holochain_state = { version = "^0.0.70", path = "../holochain_state" }
 holochain_types = { version = "^0.0.67", path = "../holochain_types" }
 holochain_wasmer_host = "=0.0.82"
 holochain_websocket = { version = "0.0.39", path = "../holochain_websocket" }
+holochain_integrity_types = { path = "../holochain_integrity_types", version = "^0.0.23"}
 holochain_zome_types = { version = "^0.0.56", path = "../holochain_zome_types", features = ["full"] }
 human-panic = "1.0.3"
 kitsune_p2p = { version = "^0.0.51", path = "../kitsune_p2p/kitsune_p2p" }

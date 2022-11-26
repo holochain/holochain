@@ -1,5 +1,5 @@
 use holo_hash::AgentPubKey;
-use holochain_zome_types::Signature;
+use holochain_integrity_types::Signature;
 use kitsune_p2p_types::dependencies::{lair_keystore_api, url2};
 use lair_keystore_api::prelude::*;
 use parking_lot::Mutex;
