@@ -109,32 +109,51 @@ pub trait CallbackResult: Sized {
 /// simple way to implement serialization so that we can send these types between the host/guest.
 macro_rules! fixed_array_serialization {
     ($t:ty, $len:expr) => {
-        impl serde::ser::Serialize for $t {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: serde::ser::Serializer,
-            {
-                serializer.serialize_bytes(&self.0)
-            }
-        }
-
-        impl<'de> serde::de::Deserialize<'de> for $t {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: serde::de::Deserializer<'de>,
-            {
-                use serde::de::Error;
-                let bytes: &[u8] = serde::de::Deserialize::deserialize(deserializer)?;
-                if bytes.len() != $len {
-                    let exp_msg = format!("expected {} bytes got: {} bytes", $len, bytes.len());
-                    return Err(D::Error::invalid_value(
-                        serde::de::Unexpected::Bytes(bytes),
-                        &exp_msg.as_str(),
-                    ));
+        paste::paste! {
+            impl serde::ser::Serialize for $t {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where
+                    S: serde::ser::Serializer,
+                {
+                    serializer.serialize_bytes(&self.0)
                 }
-                let mut inner: [u8; $len] = [0; $len];
-                inner.clone_from_slice(bytes);
-                Ok(Self(inner))
+            }
+
+            struct [<Visitor$t>];
+
+            impl<'de> serde::de::Visitor<'de> for [<Visitor$t>] {
+                type Value = [u8; $len];
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str(format!("a byte array of length {}", $len).as_str())
+                }
+
+                fn visit_bytes<E>(self, value: &[u8]) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    if value.len() == $len {
+                        let mut bytes = [0 as u8; $len];
+                        bytes.clone_from_slice(value);
+                        Ok(bytes)
+                    } else {
+                        let error_message = format!("{} bytes, got {} bytes", $len, value.len());
+                        Err(E::invalid_value(
+                            serde::de::Unexpected::Bytes(value),
+                            &error_message.as_str(),
+                        ))
+                    }
+                }
+            }
+
+            impl<'de> serde::de::Deserialize<'de> for $t {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where
+                    D: serde::de::Deserializer<'de>,
+                {
+                    let bytes = deserializer.deserialize_bytes([<Visitor$t>])?;
+                    Ok(Self(bytes))
+                }
             }
         }
     };
