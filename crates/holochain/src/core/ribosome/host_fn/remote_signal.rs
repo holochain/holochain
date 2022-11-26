@@ -59,7 +59,7 @@ pub fn remote_signal(
                             fn_name: fn_name.clone(),
                             cap_secret: None,
                             payload: signal.clone(),
-                            nonce: nonce.clone(),
+                            nonce,
                             expires_at,
                         };
                         let potentially_signature = zome_call_unsigned.provenance.sign_raw(call_context.host_context.keystore(), match zome_call_unsigned.data_to_sign() {

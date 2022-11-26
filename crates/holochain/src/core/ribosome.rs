@@ -364,7 +364,7 @@ impl ZomeCallInvocation {
                 .call_zome_handle
                 .witness_nonce_from_calling_agent(
                     self.provenance.clone(),
-                    self.nonce.clone(),
+                    self.nonce,
                     self.expires_at,
                 )
                 .await
