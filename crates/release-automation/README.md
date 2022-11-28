@@ -141,10 +141,10 @@ Automated steps still require running the tool manually ;-).
     nix-shell --run '
       hc-ra \
         --workspace-path=$PWD \
+        --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
         --log-level=info \
         release \
           --dry-run \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
           --disallowed-version-reqs=">=0.1" \
           --steps=BumpReleaseVersions
       '
