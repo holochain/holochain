@@ -84,7 +84,9 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    SecurePrimitive(#[from] holochain_zome_types::SecurePrimitiveError),
+    SecurePrimitive(
+        #[from] holochain_zome_types::dependencies::holochain_integrity_types::SecurePrimitiveError,
+    ),
 
     /// Zome function doesn't have permissions to call a Host function.
     #[error("Host function {2} cannot be called from zome function {1} in zome {0}")]

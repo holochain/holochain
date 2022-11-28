@@ -2209,6 +2209,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "subtle",
+ "subtle-encoding",
  "tracing",
 ]
 
