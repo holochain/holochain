@@ -16,6 +16,9 @@ use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchError, FetchKey, FetchOptions, FetchRequest, FetchResult};
 
+/// Max number of queue items to check on each `next()` poll
+const NUM_ITEMS_PER_POLL: usize = 100;
+
 #[derive(Clone)]
 pub struct FetchQueue {
     config: Arc<dyn FetchQueueConfig>,
@@ -30,7 +33,7 @@ pub trait FetchQueueConfig {
     fn merge_contexts(&self, a: u32, b: u32) -> u32;
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct State {
     /// Items ready to be fetched
     queue: LinkedHashMap<FetchKey, FetchQueueItem>,
@@ -92,7 +95,7 @@ impl State {
         config: &dyn FetchQueueConfig,
         request: FetchRequest,
         space: KSpace,
-        source: KAgent,
+        agent: KAgent,
     ) {
         let FetchRequest {
             key,
@@ -104,9 +107,9 @@ impl State {
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
                 let sources = if let Some(author) = author {
-                    Sources(vec![Source::new(source), Source::new(author)])
+                    Sources(vec![Source::new(agent), Source::new(author)])
                 } else {
-                    Sources(vec![Source::new(source)])
+                    Sources(vec![Source::new(agent)])
                 };
                 let item = FetchQueueItem {
                     sources,
@@ -118,7 +121,7 @@ impl State {
             }
             Entry::Occupied(mut e) => {
                 let v = e.get_mut();
-                v.sources.0.insert(0, Source::new(source));
+                v.sources.0.insert(0, Source::new(agent));
                 v.options = options;
                 v.context = match (v.context.take(), context) {
                     (Some(a), Some(b)) => Some(config.merge_contexts(*a, *b).into()),
@@ -126,19 +129,28 @@ impl State {
                 }
             }
         }
-        // - [ ] is the key already in the queue? If so, update the item in the queue with any extra info, like an additional source, or an update to the FetchOptions.
-        // - [ ] is the key already being fetched? If so, update its info in the `in_flight` set, for instance if the key is already waiting to be fetched due to gossip, but then a publish request comes in for the same data.
+        // TODO:
+        // - [x] is the key already in the queue? If so, update the item in the queue with any extra info, like an additional source, or an update to the FetchOptions.
+        // - [x] is the key already being fetched? If so, update its info in the `in_flight` set, for instance if the key is already waiting to be fetched due to gossip, but then a publish request comes in for the same data.
         // - [ ] is the key in limbo? if so, register any extra post-integration instructions (like publishing author)
         // - [ ] is the key integrated? then go straight to the post-integration phase.
     }
 
     fn next(&mut self, interval: Duration) -> Option<(FetchKey, KSpace, KAgent)> {
-        let (key, mut item) = self.queue.pop_front()?;
-        if let Some(agent) = item.sources.next(interval) {
-            Some((key, item.space.clone(), agent))
-        } else {
-            None
+        let keys: Vec<_> = self
+            .queue
+            .keys()
+            .take(NUM_ITEMS_PER_POLL)
+            .cloned()
+            .collect();
+        for key in keys {
+            let item = self.queue.get_refresh(&key)?;
+            if let Some(agent) = item.sources.next(interval) {
+                let space = item.space.clone();
+                return Some((key, space, agent));
+            }
         }
+        None
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
@@ -233,8 +245,9 @@ mod tests {
         let mut q = State::default();
         let c = Config;
 
-        q.push(&c, req(1, ctx(0)), space(0), agent(0));
+        // note: new sources get added to the front of the list
         q.push(&c, req(1, ctx(1)), space(0), agent(1));
+        q.push(&c, req(1, ctx(0)), space(0), agent(0));
 
         q.push(&c, req(2, ctx(0)), space(0), agent(0));
 
@@ -246,25 +259,39 @@ mod tests {
         .collect();
 
         assert_eq!(q.queue, expected_ready);
-
-        // let now = Timestamp::now();
-
-        // q.fetch(key_op(2));
-        // q.fetch(key_op(1));
     }
 
     #[test]
-    fn queue_fetch() {
-        let q = {
-            let queue = [
+    fn queue_next() {
+        let mut q = {
+            let mut queue = [
                 (key_op(1), item(agents(0..=2), ctx(1))),
                 (key_op(2), item(agents(1..=3), ctx(1))),
                 (key_op(3), item(agents(2..=4), ctx(1))),
-            ]
-            .into_iter()
-            .collect();
+            ];
+            // Set the last_fetch time of one of the sources, so it won't show up in next() right away
+            queue[1].1.sources.0[1].last_fetch = Some(Instant::now() - Duration::from_secs(3));
+
+            let queue = queue.into_iter().collect();
             State { queue }
         };
+        let items: Vec<_> = std::iter::from_fn(|| q.next(Duration::from_secs(10))).collect();
+        assert_eq!(items.len(), 8);
+
+        // The next item will be the one with the timestamp explicitly set
+        assert_eq!(
+            q.next(Duration::from_secs(1)),
+            Some((key_op(2), space(0), agent(2)))
+        );
+        // No more items to fetch for now
+        assert_eq!(q.next(Duration::from_secs(1)), None);
+
+        // When traversing the entire queue again, the "special" item is still the last one.
+        let items: Vec<_> = std::iter::from_fn(|| q.next(Duration::from_millis(0)))
+            .take(9)
+            .collect();
+        assert_eq!(items[8], (key_op(2), space(0), agent(2)));
+
         let c = Config;
     }
 }
