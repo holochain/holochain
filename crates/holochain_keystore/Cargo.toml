@@ -21,8 +21,8 @@ base64 = "0.13.0"
 futures = "0.3.23"
 holo_hash = { version = "^0.0.35", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.51"
-holochain_integrity_types = { path = "../holochain_integrity_types", version = "^0.0.24"}
 kitsune_p2p_types = { version = "^0.0.39", path = "../kitsune_p2p/types" }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.0.57"}
 lair_keystore = { version = "0.2.1", default-features = false }
 must_future = "0.1.2"
 nanoid = "0.4.0"

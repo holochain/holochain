@@ -1,5 +1,5 @@
 use crate::*;
-use holochain_integrity_types::prelude::*;
+use holochain_zome_types::prelude::*;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::LairResult;
 use must_future::MustBoxFuture;
