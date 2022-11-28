@@ -1,7 +1,3 @@
-#![allow(unused_variables)]
-#![allow(dead_code)]
-#![warn(missing_docs)]
-
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -33,8 +29,6 @@ pub struct FetchQueue {
     state: Share<State>,
 }
 
-type ContextMergeFn = Box<dyn Fn(u32, u32) -> u32 + Send + Sync + 'static>;
-
 /// Host-defined details about how the fetch queue should function
 pub trait FetchQueueConfig {
     /// When a fetch key is added twice, this determines how the two different contexts
@@ -42,13 +36,15 @@ pub trait FetchQueueConfig {
     fn merge_contexts(&self, a: u32, b: u32) -> u32;
 }
 
+/// The actual inner state of the FetchQueue, from which items can be obtained
 #[derive(Default, Debug)]
-struct State {
+pub struct State {
     /// Items ready to be fetched
     queue: LinkedHashMap<FetchKey, FetchQueueItem>,
 }
 
-struct StateIter<'a> {
+/// A mutable iterator over the FetchQueue State
+pub struct StateIter<'a> {
     state: &'a mut State,
     interval: Duration,
 }
@@ -76,35 +72,31 @@ struct Source {
     last_fetch: Option<Instant>,
 }
 
-impl Source {
-    fn new(agent: KAgent) -> Self {
-        Self {
-            agent,
-            last_fetch: None,
-        }
+impl FetchQueue {
+    /// Add an item to the queue.
+    /// If the FetchKey does not already exist, add it to the end of the queue.
+    /// If the FetchKey exists, add the new source and merge the context in, without
+    /// changing the position in the queue.
+    pub fn push(&mut self, request: FetchRequest, space: KSpace, agent: KAgent) {
+        self.state
+            .share_mut(|s, _| Ok(s.push(&*self.config, request, space, agent)))
+            .expect("no error");
     }
-}
 
-impl Sources {
-    fn next(&mut self, interval: Duration) -> Option<KAgent> {
-        if let Some((i, agent)) = self
-            .0
-            .iter()
-            .enumerate()
-            .find(|(_, s)| s.last_fetch.map(|t| t.elapsed() > interval).unwrap_or(true))
-            .map(|(i, s)| (i, s.agent.clone()))
-        {
-            self.0[i].last_fetch = Some(Instant::now());
-            self.0.rotate_left(i + 1);
-            Some(agent)
-        } else {
-            None
-        }
+    /// When an item has been successfully fetched, we can remove it from the queue.
+    pub fn remove(&mut self, key: &FetchKey) {
+        self.state
+            .share_mut(|s, _| Ok(s.remove(key)))
+            .expect("no error");
     }
 }
 
 impl State {
-    fn push(
+    /// Add an item to the queue.
+    /// If the FetchKey does not already exist, add it to the end of the queue.
+    /// If the FetchKey exists, add the new source and merge the context in, without
+    /// changing the position in the queue.
+    pub fn push(
         &mut self,
         config: &dyn FetchQueueConfig,
         request: FetchRequest,
@@ -143,14 +135,13 @@ impl State {
                 }
             }
         }
-        // TODO:
-        // - [x] is the key already in the queue? If so, update the item in the queue with any extra info, like an additional source, or an update to the FetchOptions.
-        // - [x] is the key already being fetched? If so, update its info in the `in_flight` set, for instance if the key is already waiting to be fetched due to gossip, but then a publish request comes in for the same data.
-        // - [ ] is the key in limbo? if so, register any extra post-integration instructions (like publishing author)
-        // - [ ] is the key integrated? then go straight to the post-integration phase.
     }
 
-    fn iter_mut(&mut self, interval: Duration) -> StateIter {
+    /// Access queue items through mutable iteration. Items accessed will be moved
+    /// to the end of the queue.
+    ///
+    /// Only items whose `last_fetch` is more than `interval` ago will be returned.
+    pub fn iter_mut(&mut self, interval: Duration) -> StateIter {
         StateIter {
             state: self,
             interval,
@@ -158,7 +149,7 @@ impl State {
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    fn remove(&mut self, key: &FetchKey) {
+    pub fn remove(&mut self, key: &FetchKey) {
         self.queue.remove(key);
     }
 }
@@ -182,6 +173,33 @@ impl<'a> Iterator for StateIter<'a> {
             }
         }
         None
+    }
+}
+
+impl Source {
+    fn new(agent: KAgent) -> Self {
+        Self {
+            agent,
+            last_fetch: None,
+        }
+    }
+}
+
+impl Sources {
+    fn next(&mut self, interval: Duration) -> Option<KAgent> {
+        if let Some((i, agent)) = self
+            .0
+            .iter()
+            .enumerate()
+            .find(|(_, s)| s.last_fetch.map(|t| t.elapsed() > interval).unwrap_or(true))
+            .map(|(i, s)| (i, s.agent.clone()))
+        {
+            self.0[i].last_fetch = Some(Instant::now());
+            self.0.rotate_left(i + 1);
+            Some(agent)
+        } else {
+            None
+        }
     }
 }
 
@@ -306,7 +324,5 @@ mod tests {
         // When traversing the entire queue again, the "special" item is still the last one.
         let items: Vec<_> = q.iter_mut(Duration::from_millis(0)).take(9).collect();
         assert_eq!(items[8], (key_op(2), space(0), agent(2)));
-
-        let c = Config;
     }
 }
