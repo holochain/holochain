@@ -745,7 +745,6 @@ mod dna_impls {
 /// Network-related methods
 mod network_impls {
     use holochain_conductor_api::DnaGossipInfo;
-    use holochain_p2p::HolochainP2pSender;
 
     use super::*;
 
@@ -802,18 +801,10 @@ mod network_impls {
             &self,
             dnas: &[DnaHash],
         ) -> ConductorResult<Vec<DnaGossipInfo>> {
-            futures::future::join_all(dnas.iter().map(|dna| async move {
-                let m = self
-                    .holochain_p2p()
-                    .get_diagnostics(dna.clone())
-                    .await?
-                    .metrics;
-                let total_historical_gossip_throughput =
-                    m.read().total_current_historical_throughput().into();
-                ConductorResult::Ok(DnaGossipInfo {
-                    total_historical_gossip_throughput,
-                })
-            }))
+            futures::future::join_all(
+                dnas.iter()
+                    .map(|_| async move { ConductorResult::Ok(DnaGossipInfo {}) }),
+            )
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()

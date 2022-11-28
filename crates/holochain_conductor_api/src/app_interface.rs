@@ -3,7 +3,6 @@
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_types::prelude::*;
-use kitsune_p2p::gossip::sharded_gossip::{InOut, RoundThroughput};
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -218,36 +217,8 @@ impl From<InstalledAppInfoStatus> for AppStatus {
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct DnaGossipInfo {
-    pub total_historical_gossip_throughput: HistoricalGossipThroughput,
-}
-
-/// Throughput info specific to historical rounds
-#[derive(
-    Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes,
-)]
-pub struct HistoricalGossipThroughput {
-    /// Total number of bytes expected to be sent for region data (historical only)
-    pub expected_op_bytes: InOut,
-
-    /// Total number of ops expected to be sent for region data (historical only)
-    pub expected_op_count: InOut,
-
-    /// Total number of bytes sent for op data
-    pub op_bytes: InOut,
-
-    /// Total number of ops sent
-    pub op_count: InOut,
-}
-
-impl From<RoundThroughput> for HistoricalGossipThroughput {
-    fn from(r: RoundThroughput) -> Self {
-        Self {
-            expected_op_bytes: r.expected_op_bytes,
-            expected_op_count: r.expected_op_count,
-            op_count: r.op_count,
-            op_bytes: r.op_bytes,
-        }
-    }
+    // TODO: rewrite using fetch queue
+    // pub total_historical_gossip_throughput: HistoricalGossipThroughput,
 }
 
 #[test]

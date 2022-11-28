@@ -114,14 +114,6 @@ impl ShardedGossipLocal {
 
             self.inner.share_mut(|i, _| {
                 if let Some(round) = i.round_map.get_mut(peer_cert) {
-                    round.throughput.expected_op_bytes.outgoing +=
-                        our_region_diff.iter().map(|r| r.data.size).sum::<u32>();
-                    round.throughput.expected_op_count.outgoing +=
-                        our_region_diff.iter().map(|r| r.data.count).sum::<u32>();
-                    round.throughput.expected_op_bytes.incoming +=
-                        their_region_diff.iter().map(|r| r.data.size).sum::<u32>();
-                    round.throughput.expected_op_count.incoming +=
-                        their_region_diff.iter().map(|r| r.data.count).sum::<u32>();
                     round.region_diffs = Some((our_region_diff.clone(), their_region_diff));
                     round.regions_are_queued = true;
                     i.metrics.write().update_current_round(

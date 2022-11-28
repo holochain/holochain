@@ -23,7 +23,6 @@ use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
-use std::iter::Sum;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -245,43 +244,6 @@ impl ShardedGossip {
                 }
             }
         };
-
-        // Record size metrics
-        self.gossip
-            .inner
-            .share_mut(|i, _| {
-                if let Some(state) = i.round_map.get_mut(&cert) {
-                    match &gossip {
-                        ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
-                            state.throughput.op_bloom_count.outgoing += 1;
-                            state.throughput.op_bloom_bytes.outgoing +=
-                                missing_hashes.size() as u32;
-                        }
-                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => (),
-                        ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
-                            state.throughput.op_count.outgoing += ops.len() as u32;
-                            state.throughput.op_bytes.outgoing +=
-                                ops.iter().map(|op| op.size() as u32).sum::<u32>();
-                        }
-                        ShardedGossipWire::Initiate(_) => {}
-                        ShardedGossipWire::Accept(_) => {}
-                        ShardedGossipWire::Agents(_) => {}
-                        ShardedGossipWire::MissingAgents(_) => {}
-                        ShardedGossipWire::OpBatchReceived(_) => {}
-                        ShardedGossipWire::Error(_) => {}
-                        ShardedGossipWire::Busy(_) => {}
-                        ShardedGossipWire::NoAgents(_) => {}
-                        ShardedGossipWire::AlreadyInProgress(_) => {}
-                    }
-                    i.metrics.write().update_current_round(
-                        &cert,
-                        self.gossip.gossip_type.into(),
-                        state,
-                    );
-                }
-                Ok(())
-            })
-            .ok();
 
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
         let bytes = gossip.len();
@@ -684,8 +646,6 @@ pub struct RoundState {
     /// The RegionSet we will send to our gossip partner during Historical
     /// gossip (will be None for Recent).
     region_set_sent: Option<Arc<RegionSetLtcs>>,
-    /// Stats about ops, regions, bloom filter, and bytes sent and received,
-    pub(crate) throughput: RoundThroughput,
     /// Region diffs, if doing Historical gossip
     pub(crate) region_diffs: RegionDiffs,
     /// Unique string ID for this round
@@ -716,33 +676,8 @@ impl RoundState {
             last_touch: Instant::now(),
             round_timeout,
             region_set_sent,
-            throughput: Default::default(),
             region_diffs: Default::default(),
         }
-    }
-}
-
-/// Stats about ops, regions, and blooms sent and received
-#[derive(Debug, Clone, Default, PartialEq, Eq, derive_more::Add)]
-pub struct RoundThroughput {
-    /// Number of ops blooms we have sent for this round, which is also the
-    /// number of MissingOps sets we expect in response
-    pub op_bloom_count: InOut,
-    /// Total number of bytes sent for bloom filters
-    pub op_bloom_bytes: InOut,
-    /// Total number of bytes expected to be sent for region data (historical only)
-    pub expected_op_bytes: InOut,
-    /// Total number of ops expected to be sent for region data (historical only)
-    pub expected_op_count: InOut,
-    /// Total number of ops sent
-    pub op_count: InOut,
-    /// Total number of bytes sent for op data
-    pub op_bytes: InOut,
-}
-
-impl Sum for RoundThroughput {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self::default(), |a, r| a + r)
     }
 }
 
@@ -910,44 +845,6 @@ impl ShardedGossipLocal {
                 }
             },
         };
-
-        // Record size metrics
-        self.inner
-            .share_mut(|i, _| {
-                if let Some(state) = i.round_map.get_mut(&peer_cert) {
-                    match &msg {
-                        ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
-                            state.throughput.op_bloom_count.incoming += 1;
-                            state.throughput.op_bloom_bytes.incoming +=
-                                missing_hashes.size() as u32;
-                        }
-                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => {}
-                        ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
-                            state.throughput.op_count.incoming += ops.len() as u32;
-                            state.throughput.op_bytes.incoming +=
-                                ops.iter().map(|op| op.size() as u32).sum::<u32>();
-                        }
-                        ShardedGossipWire::Initiate(_) => {}
-                        ShardedGossipWire::Accept(_) => {}
-                        ShardedGossipWire::Agents(_) => {}
-                        ShardedGossipWire::MissingAgents(_) => {}
-                        ShardedGossipWire::OpBatchReceived(_) => {}
-                        ShardedGossipWire::Error(_) => {}
-                        ShardedGossipWire::Busy(_) => {}
-                        ShardedGossipWire::NoAgents(_) => {}
-                        ShardedGossipWire::AlreadyInProgress(_) => {}
-                    }
-
-                    i.metrics.write().update_current_round(
-                        &peer_cert,
-                        self.gossip_type.into(),
-                        state,
-                    );
-                    // println!("throughput IN {:?}", state.throughput);
-                }
-                Ok(())
-            })
-            .ok();
 
         // If we don't have the state for a message then the other node will need to timeout.
         let r = match msg {
