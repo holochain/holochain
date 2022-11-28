@@ -376,9 +376,9 @@ impl_hashable_content_for_ref!(Delete);
     SerializedBytes,
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct ZomeId(pub u8);
+pub struct ZomeIndex(pub u8);
 
-impl ZomeId {
+impl ZomeIndex {
     pub fn new(u: u8) -> Self {
         Self(u)
     }
@@ -445,7 +445,7 @@ pub struct CreateLink<W = RateWeight> {
 
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
-    pub zome_id: ZomeId,
+    pub zome_index: ZomeIndex,
     pub link_type: LinkType,
     pub tag: LinkTag,
 
@@ -596,8 +596,8 @@ pub struct DeleteAction {
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
-    /// An app-provided entry, along with its app-provided AppEntryType
-    App(AppEntryType),
+    /// An app-provided entry, along with its app-provided AppEntryDef
+    App(AppEntryDef),
     /// A Capability claim
     CapClaim,
     /// A Capability grant.
@@ -608,7 +608,7 @@ impl EntryType {
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
             EntryType::AgentPubKey => &EntryVisibility::Public,
-            EntryType::App(t) => t.visibility(),
+            EntryType::App(app_entry_def) => app_entry_def.visibility(),
             EntryType::CapClaim => &EntryVisibility::Private,
             EntryType::CapGrant => &EntryVisibility::Private,
         }
@@ -619,7 +619,12 @@ impl std::fmt::Display for EntryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EntryType::AgentPubKey => writeln!(f, "AgentPubKey"),
-            EntryType::App(aet) => writeln!(f, "App({:?}, {:?})", aet.id(), aet.visibility()),
+            EntryType::App(app_entry_def) => writeln!(
+                f,
+                "App({:?}, {:?})",
+                app_entry_def.entry_index(),
+                app_entry_def.visibility()
+            ),
             EntryType::CapClaim => writeln!(f, "CapClaim"),
             EntryType::CapGrant => writeln!(f, "CapGrant"),
         }
@@ -629,31 +634,35 @@ impl std::fmt::Display for EntryType {
 /// Information about a class of Entries provided by the DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct AppEntryType {
+pub struct AppEntryDef {
     /// A unique u8 identifier within a zome for this
     /// entry type.
-    pub id: EntryDefIndex,
+    pub entry_index: EntryDefIndex,
     /// The id of the zome that defines this entry type.
-    pub zome_id: ZomeId,
+    pub zome_index: ZomeIndex,
     // @todo don't do this, use entry defs instead
     /// The visibility of this app entry.
     pub visibility: EntryVisibility,
 }
 
-impl AppEntryType {
-    pub fn new(id: EntryDefIndex, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
+impl AppEntryDef {
+    pub fn new(
+        entry_index: EntryDefIndex,
+        zome_index: ZomeIndex,
+        visibility: EntryVisibility,
+    ) -> Self {
         Self {
-            id,
-            zome_id,
+            entry_index,
+            zome_index,
             visibility,
         }
     }
 
-    pub fn id(&self) -> EntryDefIndex {
-        self.id
+    pub fn entry_index(&self) -> EntryDefIndex {
+        self.entry_index
     }
-    pub fn zome_id(&self) -> ZomeId {
-        self.zome_id
+    pub fn zome_index(&self) -> ZomeIndex {
+        self.zome_index
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility
@@ -666,14 +675,14 @@ impl From<EntryDefIndex> for u8 {
     }
 }
 
-impl ZomeId {
+impl ZomeIndex {
     /// Use as an index into a slice
     pub fn index(&self) -> usize {
         self.0 as usize
     }
 }
 
-impl std::ops::Deref for ZomeId {
+impl std::ops::Deref for ZomeIndex {
     type Target = u8;
 
     fn deref(&self) -> &Self::Target {
@@ -681,7 +690,7 @@ impl std::ops::Deref for ZomeId {
     }
 }
 
-impl Borrow<u8> for ZomeId {
+impl Borrow<u8> for ZomeIndex {
     fn borrow(&self) -> &u8 {
         &self.0
     }

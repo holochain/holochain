@@ -57,7 +57,7 @@ fixturator!(
 fn new_entry_record(entry: Entry, action_type: ActionType, index: usize) -> Record {
     let et = match entry {
         Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(
-            AppEntryTypeFixturator::new_indexed(Unpredictable, index)
+            AppEntryDefFixturator::new_indexed(Unpredictable, index)
                 .next()
                 .unwrap(),
         ),
@@ -98,7 +98,7 @@ fixturator!(
     };
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryDefFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,

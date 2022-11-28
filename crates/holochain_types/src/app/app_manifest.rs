@@ -90,8 +90,8 @@ pub mod tests {
     fn app_manifest_v1_helper_functions() {
         let app_name = String::from("sample-app");
 
-        let role_id = String::from("sample-dna");
-        let role_manifest = AppRoleManifest::sample(role_id);
+        let role_name = String::from("sample-dna");
+        let role_manifest = AppRoleManifest::sample(role_name);
 
         let sample_app_manifest_v1 = AppManifestV1Builder::default()
             .name(app_name.clone())

@@ -332,7 +332,7 @@ impl ChainQueryFilter {
 mod tests {
     use super::ChainQueryFilter;
     use crate::action::EntryType;
-    use crate::fixt::AppEntryTypeFixturator;
+    use crate::fixt::AppEntryDefFixturator;
     use crate::fixt::*;
     use crate::ActionHashed;
     use crate::ChainQueryFilterRange;
@@ -342,7 +342,7 @@ mod tests {
     /// Create three Actions with various properties.
     /// Also return the EntryTypes used to construct the first two actions.
     fn fixtures() -> [ActionHashed; 7] {
-        let entry_type_1 = EntryType::App(fixt!(AppEntryType));
+        let entry_type_1 = EntryType::App(fixt!(AppEntryDef));
         let entry_type_2 = EntryType::AgentPubKey;
 
         let entry_hash_0 = fixt!(EntryHash);

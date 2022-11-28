@@ -569,8 +569,14 @@ impl Spaces {
                             out.push(r);
                             total_bytes += bytes;
                             // pair(maackle, freesig): be sure to add this limit in the region fetch case too
+                            // david.b: No! actually, we don't even want to
+                            // do this here!
                             if total_bytes > OPS_IN_MEMORY_BOUND_BYTES {
-                                break;
+                                // david.b: disabling this. We're tracking
+                                //          memory bounds in the fetch handler
+                                //          so we don't want to limit it in
+                                //          two places!
+                                //break;
                             }
                         }
                         Err(holochain_state::query::StateQueryError::Sql(

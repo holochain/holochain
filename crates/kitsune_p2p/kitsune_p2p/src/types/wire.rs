@@ -43,6 +43,21 @@ pub enum MetricExchangeMsg {
     UnknownMessage,
 }
 
+/// An individual op item within a "PushOpData" wire message.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub struct PushOpItem {
+    /// The payload of this op.
+    pub op_data: Arc<KitsuneOpData>,
+
+    /// If this op is a response to a "region" request,
+    /// includes the region coords and a bool that, if true,
+    /// indicates this is the final op in the region list.
+    /// NOTE: we may want to just ignore this bool, as out-of-order
+    /// messages could lead us to ignore valid ops coming in for the region.
+    pub region: Option<(dht::prelude::RegionCoords, bool)>,
+}
+
 kitsune_p2p_types::write_codec_enum! {
     /// KitsuneP2p Wire Protocol Top-Level Enum.
     codec Wire {
@@ -135,7 +150,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// This is a fire-and-forget "response" to the
         /// fire-and-forget "FetchOp" request, also sent via Notify.
         PushOpData(0x61) {
-            op_data_list.1: Vec<(Arc<KitsuneSpace>, Vec<Arc<KitsuneOpData>>)>,
+            op_data_list.1: Vec<(Arc<KitsuneSpace>, Vec<PushOpItem>)>,
         },
 
         /// MetricsExchangeMessage

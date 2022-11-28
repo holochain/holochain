@@ -87,6 +87,15 @@ pub trait KitsuneHostDefaultError: KitsuneHost {
         )
         .into()))
     }
+
+    fn op_hash(&self, _op_data: KOpData) -> KitsuneHostResult<KOpHash> {
+        box_fut(Err(format!(
+            "error for unimlpemented KitsuneHost test behavior: method {} of {}",
+            "op_hash",
+            Self::NAME
+        )
+        .into()))
+    }
 }
 
 impl<T: KitsuneHostDefaultError> KitsuneHost for T {
@@ -132,5 +141,9 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
 
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
         KitsuneHostDefaultError::get_topology(self, space)
+    }
+
+    fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {
+        KitsuneHostDefaultError::op_hash(self, op_data)
     }
 }

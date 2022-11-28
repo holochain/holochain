@@ -80,12 +80,12 @@ where
     WasmError: From<E2>,
 {
     let ScopedEntryDefIndex {
-        zome_id,
+        zome_index,
         zome_type: entry_def_index,
     } = (&input).try_into()?;
     let visibility = EntryVisibility::from(&input);
     let create_input = CreateInput::new(
-        EntryDefLocation::app(zome_id, entry_def_index),
+        EntryDefLocation::app(zome_index, entry_def_index),
         visibility,
         input.try_into()?,
         ChainTopOrdering::default(),

@@ -14,7 +14,7 @@ use tracing::*;
 
 pub async fn get_as_author_sub_chain(
     action_seq: u32,
-    app_entry_type: AppEntryType,
+    app_entry_def: AppEntryDef,
     source_chain: &SourceChainRead,
 ) -> SourceChainResult<ValidationPackage> {
     // Collect and return the sub chain
@@ -22,7 +22,7 @@ pub async fn get_as_author_sub_chain(
         .query(
             ChainQueryFilter::default()
                 .include_entries(true)
-                .entry_type(EntryType::App(app_entry_type))
+                .entry_type(EntryType::App(app_entry_def))
                 .sequence_range(ChainQueryFilterRange::ActionSeqRange(
                     0,
                     action_seq.saturating_sub(1),
@@ -57,23 +57,23 @@ pub fn get_as_author_custom(
 ) -> RibosomeResult<Option<ValidationPackageResult>> {
     let action = action_hashed.as_content();
     let access = ValidationPackageHostAccess::new(workspace_lock, network.clone());
-    let app_entry_type = match action.entry_type() {
-        Some(EntryType::App(a)) => a.clone(),
+    let app_entry_def = match action.entry_type() {
+        Some(EntryType::App(app_entry_def)) => app_entry_def.clone(),
         _ => return Ok(None),
     };
 
-    let zome = match ribosome.get_integrity_zome(&app_entry_type.zome_id()) {
+    let zome = match ribosome.get_integrity_zome(&app_entry_def.zome_index()) {
         Some(zome_tuple) => zome_tuple,
         None => {
             warn!(
-                msg = "Tried to get custom validation package for action with invalid zome_id",
+                msg = "Tried to get custom validation package for action with invalid zome_index",
                 ?action
             );
             return Ok(None);
         }
     };
 
-    let invocation = ValidationPackageInvocation::new(zome, app_entry_type);
+    let invocation = ValidationPackageInvocation::new(zome, app_entry_def);
 
     Ok(Some(ribosome.run_validation_package(access, invocation)?))
 }

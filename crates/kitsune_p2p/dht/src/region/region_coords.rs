@@ -65,7 +65,7 @@ impl RegionCoords {
 /// This type should only be used in the host, which deals in absolute coords.
 /// Kitsune itself should only use [`RegionCoords`] to ensure proper quantum
 /// alignment.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct RegionBounds {
     /// The inclusive min and max locations
     pub x: (Loc, Loc),

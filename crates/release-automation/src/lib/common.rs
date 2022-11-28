@@ -242,6 +242,7 @@ mod test {
     #[test_case(Minor, "0.0.1", "0.1.0")]
     #[test_case(Minor, "0.0.1-dev.0", "0.1.0")]
     #[test_case(Minor, "0.1.1-dev.0", "0.2.0")]
+    #[test_case(Minor, "0.1.0-beta-rc.1", "0.1.0")]
     //
     // Patch
     //
@@ -275,6 +276,8 @@ mod test {
     #[test_case(PreMinor("rc".to_string()), "0.1.0-rc", "0.1.0-rc.0")]
     // TODO: check with someone else if this seems counter-intuitive
     #[test_case(PreMinor("rc".to_string()), "0.1.0-rc.0", "0.1.0-rc.1")]
+    #[test_case(PreMinor("beta-rc".to_string()), "0.0.170", "0.1.0-beta-rc.0")]
+    #[test_case(PreMinor("beta-rc".to_string()), "0.1.0-beta-rc.0", "0.1.0-beta-rc.1")]
     //
     // PrePatch
     //

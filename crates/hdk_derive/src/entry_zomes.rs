@@ -107,7 +107,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                 match zome_info()?.zome_types.entries.get(value) {
                     Some(t) => Ok(t),
                     _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "{:?} does not map to any ZomeId and EntryDefIndex that is in scope for this zome.",
+                        "{:?} does not map to any ZomeIndex and EntryDefIndex that is in scope for this zome.",
                         value
                     )))),
                 }
@@ -147,16 +147,16 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
         impl EntryTypesHelper for #ident {
             type Error = WasmError;
             fn deserialize_from_type<Z, I>(
-                zome_id: Z,
+                zome_index: Z,
                 entry_def_index: I,
                 entry: &Entry,
             ) -> Result<Option<Self>, Self::Error>
             where
-                Z: Into<ZomeId>,
+                Z: Into<ZomeIndex>,
                 I: Into<EntryDefIndex>
             {
                 let scoped_type = ScopedEntryDefIndex {
-                    zome_id: zome_id.into(),
+                    zome_index: zome_index.into(),
                     zome_type: entry_def_index.into(),
                 };
                 let entries = zome_info()?.zome_types.entries;
@@ -167,7 +167,7 @@ pub fn build(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                             _ => Ok(None),
                         }
                     }
-                    None => if entries.dependencies().any(|z| z == scoped_type.zome_id) {
+                    None => if entries.dependencies().any(|z| z == scoped_type.zome_index) {
                         Err(wasm_error!(WasmErrorInner::Guest(format!(
                             "Entry type: {:?} is out of range for this zome.",
                             scoped_type
