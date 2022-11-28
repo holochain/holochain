@@ -3,22 +3,30 @@
 #![warn(missing_docs)]
 
 use std::{
-    collections::BTreeSet,
-    ops::Add,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use futures::{stream::FuturesUnordered, Future, FutureExt};
-use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace, KitsuneError, KitsuneResult};
+use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace};
 use linked_hash_map::{Entry, LinkedHashMap};
 
-use crate::{FetchContext, FetchError, FetchKey, FetchOptions, FetchRequest, FetchResult};
+use crate::{FetchContext, FetchKey, FetchOptions, FetchRequest};
 
 /// Max number of queue items to check on each `next()` poll
 const NUM_ITEMS_PER_POLL: usize = 100;
 
+/// A FetchQueue tracks a set of [`FetchKey`]s (op hashes or regions) to be fetched,
+/// each of which can have multiple sources associated with it.
+///
+/// When adding the same key twice, the sources are merged by appending the newest
+/// source to the front of the list of sources, and the contexts are merged by the
+/// method defined in [`FetchQueueConfig`].
+///
+/// The queue items can be accessed only through its Iterator implementation.
+/// Each item contains a FetchKey and one Source agent from which to fetch it.
+/// Each time an item is obtained in this way, it is moved to the end of the list.
+/// It is important to use the iterator lazily, and only take what is needed.
+/// Accessing any item through iteration implies that a fetch was attempted.
 #[derive(Clone)]
 pub struct FetchQueue {
     config: Arc<dyn FetchQueueConfig>,
@@ -27,9 +35,10 @@ pub struct FetchQueue {
 
 type ContextMergeFn = Box<dyn Fn(u32, u32) -> u32 + Send + Sync + 'static>;
 
+/// Host-defined details about how the fetch queue should function
 pub trait FetchQueueConfig {
-    fn fetch(&self, key: FetchKey, source: KAgent);
-
+    /// When a fetch key is added twice, this determines how the two different contexts
+    /// get reconciled.
     fn merge_contexts(&self, a: u32, b: u32) -> u32;
 }
 
@@ -37,6 +46,11 @@ pub trait FetchQueueConfig {
 struct State {
     /// Items ready to be fetched
     queue: LinkedHashMap<FetchKey, FetchQueueItem>,
+}
+
+struct StateIter<'a> {
+    state: &'a mut State,
+    interval: Duration,
 }
 
 /// Fetch item within the fetch queue state.
@@ -136,29 +150,39 @@ impl State {
         // - [ ] is the key integrated? then go straight to the post-integration phase.
     }
 
-    fn next(&mut self, interval: Duration) -> Option<(FetchKey, KSpace, KAgent)> {
-        let keys: Vec<_> = self
-            .queue
-            .keys()
-            .take(NUM_ITEMS_PER_POLL)
-            .cloned()
-            .collect();
-        for key in keys {
-            let item = self.queue.get_refresh(&key)?;
-            if let Some(agent) = item.sources.next(interval) {
-                let space = item.space.clone();
-                return Some((key, space, agent));
-            }
+    fn iter_mut(&mut self, interval: Duration) -> StateIter {
+        StateIter {
+            state: self,
+            interval,
         }
-        None
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
     fn remove(&mut self, key: &FetchKey) {
         self.queue.remove(key);
     }
+}
 
-    fn poll(&mut self) {}
+impl<'a> Iterator for StateIter<'a> {
+    type Item = (FetchKey, KSpace, KAgent);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let keys: Vec<_> = self
+            .state
+            .queue
+            .keys()
+            .take(NUM_ITEMS_PER_POLL)
+            .cloned()
+            .collect();
+        for key in keys {
+            let item = self.state.queue.get_refresh(&key)?;
+            if let Some(agent) = item.sources.next(self.interval) {
+                let space = item.space.clone();
+                return Some((key, space, agent));
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -174,10 +198,6 @@ mod tests {
     struct Config;
 
     impl FetchQueueConfig for Config {
-        fn fetch(&self, key: FetchKey, source: KAgent) {
-            // noop
-        }
-
         fn merge_contexts(&self, a: u32, b: u32) -> u32 {
             (a + b).min(1)
         }
@@ -275,21 +295,16 @@ mod tests {
             let queue = queue.into_iter().collect();
             State { queue }
         };
-        let items: Vec<_> = std::iter::from_fn(|| q.next(Duration::from_secs(10))).collect();
-        assert_eq!(items.len(), 8);
+        assert_eq!(q.iter_mut(Duration::from_secs(10)).count(), 8);
 
-        // The next item will be the one with the timestamp explicitly set
+        // The next (and only) item will be the one with the timestamp explicitly set
         assert_eq!(
-            q.next(Duration::from_secs(1)),
-            Some((key_op(2), space(0), agent(2)))
+            q.iter_mut(Duration::from_secs(1)).collect::<Vec<_>>(),
+            vec![(key_op(2), space(0), agent(2))]
         );
-        // No more items to fetch for now
-        assert_eq!(q.next(Duration::from_secs(1)), None);
 
         // When traversing the entire queue again, the "special" item is still the last one.
-        let items: Vec<_> = std::iter::from_fn(|| q.next(Duration::from_millis(0)))
-            .take(9)
-            .collect();
+        let items: Vec<_> = q.iter_mut(Duration::from_millis(0)).take(9).collect();
         assert_eq!(items[8], (key_op(2), space(0), agent(2)));
 
         let c = Config;
