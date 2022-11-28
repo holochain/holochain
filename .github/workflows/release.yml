@@ -511,7 +511,7 @@ jobs:
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
 
   finalize:
-    if: ${{ github.event_name != 'pull_request' && needs.prepare.outputs.releasable_crates == 'true' }}
+    if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && needs.prepare.outputs.releasable_crates == 'true' }}
     needs: [vars, prepare, test]
     env:
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}

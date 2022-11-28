@@ -48,6 +48,12 @@ pub(crate) mod cli {
 
         #[structopt(long, default_value = "")]
         pub(crate) log_filters: String,
+
+        /// Allows filtering to a subset of crates that will be processed for the given command.
+        /// This string will be used as a regex to filter the package names.
+        /// By default, all crates will be considered.
+        #[structopt(long, default_value = ".*")]
+        pub(crate) match_filter: fancy_regex::Regex,
     }
 
     #[derive(Debug, StructOpt)]
@@ -61,20 +67,25 @@ pub(crate) mod cli {
 
     #[derive(Debug, StructOpt)]
     pub(crate) struct ChangelogAggregateArgs {
-        /// Allows a specified subset of crates that will haveh their changelog aggregated in the workspace changelog.
-        /// This string will be used as a regex to filter the package names.
-        /// By default, all crates will be considered.
-        #[structopt(long, default_value = ".*")]
-        pub(crate) match_filter: fancy_regex::Regex,
-
         /// Output path, relative to the workspace root.
         #[structopt(long, default_value = "CHANGELOG.md")]
         pub(crate) output_path: PathBuf,
     }
 
     #[derive(Debug, StructOpt)]
+    pub(crate) struct ChangelogSetFrontmatterArgs {
+        /// Activate dry-run mode which avoid changing any files
+        #[structopt(long)]
+        pub(crate) dry_run: bool,
+
+        /// YAML file that defines the new frontmatter content. (will be validated by parsing)
+        pub(crate) frontmatter_yaml_path: PathBuf,
+    }
+
+    #[derive(Debug, StructOpt)]
     pub(crate) enum ChangelogCommands {
         Aggregate(ChangelogAggregateArgs),
+        SetFrontmatter(ChangelogSetFrontmatterArgs),
     }
 
     #[derive(StructOpt, Debug)]
@@ -97,12 +108,6 @@ pub(crate) mod cli {
         /// See https://docs.rs/semver/0.11.0/semver/?search=#requirements
         #[structopt(long)]
         pub(crate) disallowed_version_reqs: Vec<semver::VersionReq>,
-
-        /// Allows a specified subset of crates to be released by regex matches on the crates' package name.
-        /// This string will be used as a regex to filter the package names.
-        /// By default, all crates will be considered release candidates.
-        #[structopt(long, default_value = ".*")]
-        pub(crate) match_filter: fancy_regex::Regex,
 
         /// Allow these blocking states for dev dependency crates.
         /// Comma separated.
@@ -159,9 +164,9 @@ pub(crate) mod cli {
 
     impl CheckArgs {
         /// Boilerplate to instantiate `SelectionCriteria` from `CheckArgs`
-        pub(crate) fn to_selection_criteria(&self) -> SelectionCriteria {
+        pub(crate) fn to_selection_criteria(&self, args: &Args) -> SelectionCriteria {
             SelectionCriteria {
-                match_filter: self.match_filter.clone(),
+                match_filter: args.match_filter.clone(),
                 disallowed_version_reqs: self.disallowed_version_reqs.clone(),
                 enforced_version_reqs: self.enforced_version_reqs.clone(),
                 allowed_dev_dependency_blockers: self.allowed_dev_dependency_blockers,

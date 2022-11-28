@@ -75,12 +75,12 @@ rec {
         ${releaseAutomation} \
             --workspace-path=''${TEST_WORKSPACE:?} \
             --log-level=${logLevel} \
+            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
           release \
             --no-verify-pre \
             --force-branch-creation \
             --disallowed-version-reqs=">=0.1" \
             --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
             --steps=CreateReleaseBranch,BumpReleaseVersions
       '';
     in
