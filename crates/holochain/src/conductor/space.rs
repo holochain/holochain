@@ -569,16 +569,14 @@ impl Spaces {
                             out.push(r);
                             total_bytes += bytes;
                             // pair(maackle, freesig): be sure to add this limit in the region fetch case too
-                            // TODO (david.b) - I think this could be causing
-                            // some of our current issues... if we decide
-                            // we need a list of hashes in a gossip round
-                            // and just randomly don't get some of them
-                            // we're probably waiting the full minute
-                            // before trying again with that peer.
-                            // Luckilly, we want to stop using this and
-                            // just publish / gossip hashes.
+                            // david.b: No! actually, we don't even want to
+                            // do this here!
                             if total_bytes > OPS_IN_MEMORY_BOUND_BYTES {
-                                break;
+                                // david.b: disabling this. We're tracking
+                                //          memory bounds in the fetch handler
+                                //          so we don't want to limit it in
+                                //          two places!
+                                //break;
                             }
                         }
                         Err(holochain_state::query::StateQueryError::Sql(
