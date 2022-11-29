@@ -25,15 +25,18 @@ const NUM_ITEMS_PER_POLL: usize = 100;
 /// Accessing any item through iteration implies that a fetch was attempted.
 #[derive(Clone)]
 pub struct FetchQueue {
-    config: Arc<dyn FetchQueueConfig>,
+    config: FetchConfig,
     state: Share<State>,
 }
 
+/// Alias
+pub type FetchConfig = Arc<dyn FetchQueueConfig>;
+
 /// Host-defined details about how the fetch queue should function
-pub trait FetchQueueConfig {
+pub trait FetchQueueConfig: 'static + Send + Sync {
     /// When a fetch key is added twice, this determines how the two different contexts
     /// get reconciled.
-    fn merge_contexts(&self, a: u32, b: u32) -> u32;
+    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32;
 }
 
 /// The actual inner state of the FetchQueue, from which items can be obtained
@@ -73,6 +76,14 @@ struct Source {
 }
 
 impl FetchQueue {
+    /// Constructor
+    pub fn new(config: FetchConfig) -> Self {
+        Self {
+            config,
+            state: Share::new(State::default()),
+        }
+    }
+
     /// Add an item to the queue.
     /// If the FetchKey does not already exist, add it to the end of the queue.
     /// If the FetchKey exists, add the new source and merge the context in, without
@@ -130,7 +141,7 @@ impl State {
                 v.sources.0.insert(0, Source::new(agent));
                 v.options = options;
                 v.context = match (v.context.take(), context) {
-                    (Some(a), Some(b)) => Some(config.merge_contexts(*a, *b).into()),
+                    (Some(a), Some(b)) => Some(config.merge_fetch_contexts(*a, *b).into()),
                     (a, b) => a.and(b),
                 }
             }
@@ -216,7 +227,7 @@ mod tests {
     struct Config;
 
     impl FetchQueueConfig for Config {
-        fn merge_contexts(&self, a: u32, b: u32) -> u32 {
+        fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
             (a + b).min(1)
         }
     }

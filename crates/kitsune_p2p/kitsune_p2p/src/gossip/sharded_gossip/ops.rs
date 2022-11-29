@@ -1,3 +1,4 @@
+use futures::FutureExt;
 use kitsune_p2p_types::{combinators::second, dht::region::Region};
 
 use super::*;

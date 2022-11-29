@@ -1,11 +1,16 @@
+use kitsune_p2p_fetch::FetchQueueConfig;
 use must_future::MustBoxFuture;
 use std::sync::Arc;
 
 use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
-    dht::{region::Region, region_set::RegionSetLtcs, spacetime::Topology},
+    dht::{
+        region::{Region, RegionBounds, RegionCoords},
+        region_set::RegionSetLtcs,
+        spacetime::Topology,
+    },
     dht_arc::DhtArcSet,
-    KOpData, KOpHash,
+    KOpData, KOpHash, KitsuneResult,
 };
 
 use crate::event::{GetAgentInfoSignedEvt, MetricRecord};
@@ -16,7 +21,7 @@ pub type KitsuneHostResult<'a, T> =
 
 /// The interface to be implemented by the host, which handles various requests
 /// for data
-pub trait KitsuneHost: 'static + Send + Sync {
+pub trait KitsuneHost: 'static + Send + Sync + FetchQueueConfig {
     /// We need to get previously stored agent info.
     fn get_agent_info_signed(
         &self,
@@ -75,7 +80,7 @@ pub trait KitsuneHost: 'static + Send + Sync {
 }
 
 /// Trait object for the host interface
-pub type HostApi = std::sync::Arc<dyn KitsuneHost + Send + Sync>;
+pub type HostApi = std::sync::Arc<dyn KitsuneHost>;
 
 // Test-only stub which mostly panics
 #[cfg(any(test, feature = "test_utils"))]

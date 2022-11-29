@@ -16,6 +16,12 @@ pub struct StandardResponsesHostApi {
     with_data: bool,
 }
 
+impl FetchQueueConfig for StandardResponsesHostApi {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        todo!()
+    }
+}
+
 impl KitsuneHost for StandardResponsesHostApi {
     fn get_agent_info_signed(
         &self,

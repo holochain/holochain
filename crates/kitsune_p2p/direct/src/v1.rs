@@ -5,6 +5,7 @@ use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueConfig;
 use kitsune_p2p::test_util::hash_op_data;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
@@ -301,6 +302,12 @@ impl KitsuneHostDefaultError for Kd1 {
         }
         .boxed()
         .into()
+    }
+}
+
+impl FetchQueueConfig for Kd1 {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        todo!()
     }
 }
 

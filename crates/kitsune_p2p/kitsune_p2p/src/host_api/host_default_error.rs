@@ -7,7 +7,7 @@ use super::*;
 /// Allows only specifying the methods you care about, and letting all the rest
 /// throw errors if called
 #[allow(missing_docs)]
-pub trait KitsuneHostDefaultError: KitsuneHost {
+pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
     /// Name to be printed out on unimplemented error
     const NAME: &'static str;
 
