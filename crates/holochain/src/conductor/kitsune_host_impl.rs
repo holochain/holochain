@@ -201,4 +201,12 @@ impl KitsuneHost for KitsuneHostImpl {
         .boxed()
         .into()
     }
+
+    fn query_op_hashes_by_region(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        region: holochain_p2p::dht::region::RegionCoords,
+    ) -> KitsuneHostResult<Vec<KOpHash>> {
+        todo!("implement query")
+    }
 }

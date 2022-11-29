@@ -633,24 +633,12 @@ async fn mock_network_sharded_gossip() {
                                                         data.op_to_loc[&data.op_kit_to_hash[*hash]],
                                                     )
                                                 })
+                                                .cloned()
                                                 .collect(),
                                             None => vec![],
                                         };
                                         gossiped_ops.extend(missing_hashes.iter().cloned());
 
-                                        let missing_ops: Vec<_> = missing_hashes
-                                            .into_iter()
-                                            .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
-                                            .map(|op| {
-                                                kitsune_p2p::KitsuneOpData::new(
-                                                    holochain_p2p::WireDhtOpData {
-                                                        op_data: op.into_content(),
-                                                    }
-                                                    .encode()
-                                                    .unwrap(),
-                                                )
-                                            })
-                                            .collect();
                                         let num_gossiped = gossiped_ops.len();
                                         let p_done = num_gossiped as f64
                                             / num_hashes_alice_should_hold as f64
@@ -688,7 +676,7 @@ async fn mock_network_sharded_gossip() {
                                         debug!(
                                             "Gossiped with {}, got {} of {} ops, overlap: {:.2}%, max could get {}, {:.2}% done, avg freq of gossip {:?}, est finish in {:?}",
                                             agent,
-                                            missing_ops.len(),
+                                            missing_hashes.len(),
                                             num_this_agent_hashes,
                                             overlap,
                                             max_could_get,
@@ -700,15 +688,18 @@ async fn mock_network_sharded_gossip() {
                                             dna,
                                             module,
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(
-                                                    missing_ops,
+                                                ShardedGossipWire::missing_op_hashes(
+                                                    missing_hashes,
                                                     MissingOpsStatus::AllComplete as u8,
                                                 ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
                                     }
-                                    ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
+                                    ShardedGossipWire::MissingOpHashes(MissingOpHashes {
+                                        ops,
+                                        ..
+                                    }) => {
                                         debug!(
                                             "Gossiped with {} {} out of {}, who sent {} ops and gossiped with {} nodes outside of arc",
                                             agent,
@@ -1168,29 +1159,19 @@ async fn mock_network_sharding() {
                                                         data.op_to_loc[&data.op_kit_to_hash[*hash]],
                                                     )
                                                 })
+                                                .cloned()
                                                 .collect(),
                                             None => vec![],
                                         };
-
-                                        let missing_ops: Vec<_> = missing_hashes
-                                            .into_iter()
-                                            .map(|h| data.ops[&data.op_kit_to_hash[h]].clone())
-                                            .map(|op| {
-                                                kitsune_p2p::KitsuneOpData::new(
-                                                    holochain_p2p::WireDhtOpData {
-                                                        op_data: op.into_content(),
-                                                    }
-                                                    .encode()
-                                                    .unwrap(),
-                                                )
-                                            })
-                                            .collect();
 
                                         let msg = HolochainP2pMockMsg::Gossip {
                                             dna,
                                             module,
                                             gossip: GossipProtocol::Sharded(
-                                                ShardedGossipWire::missing_ops(missing_ops, 2),
+                                                ShardedGossipWire::missing_op_hashes(
+                                                    missing_hashes,
+                                                    2,
+                                                ),
                                             ),
                                         };
                                         channel.send(msg.addressed((*agent).clone())).await;
@@ -1225,7 +1206,7 @@ async fn mock_network_sharding() {
 
                                     ShardedGossipWire::MissingAgents(_) => {}
                                     ShardedGossipWire::Accept(_) => (),
-                                    ShardedGossipWire::MissingOps(_) => (),
+                                    ShardedGossipWire::MissingOpHashes(_) => (),
                                     ShardedGossipWire::NoAgents(_) => (),
                                     ShardedGossipWire::AlreadyInProgress(_) => (),
                                     ShardedGossipWire::Busy(_) => (),

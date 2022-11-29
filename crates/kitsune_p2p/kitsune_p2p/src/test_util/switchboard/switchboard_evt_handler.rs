@@ -15,6 +15,7 @@ use kitsune_p2p_types::dht::hash::RegionHash;
 use kitsune_p2p_types::dht::prelude::{
     array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetLtcs, RegionData,
 };
+use kitsune_p2p_types::dht::region::RegionCoords;
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, TimeQuantum};
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
 use kitsune_p2p_types::*;
@@ -174,6 +175,14 @@ impl KitsuneHost for SwitchboardEventHandler {
     }
 
     fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
+        todo!()
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: RegionCoords,
+    ) -> crate::KitsuneHostResult<Vec<kitsune_p2p_types::KOpHash>> {
         todo!()
     }
 }

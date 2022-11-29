@@ -163,7 +163,7 @@ async fn partial_missing_doesnt_finish() {
     .await;
 
     // - Send a missing ops message that isn't marked as finished.
-    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+    let incoming = ShardedGossipWire::MissingOpHashes(MissingOpHashes {
         ops: vec![],
         finished: MissingOpsStatus::ChunkComplete as u8,
     });
@@ -216,7 +216,7 @@ async fn missing_ops_finishes() {
     .await;
 
     // Send a message marked as finished.
-    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+    let incoming = ShardedGossipWire::MissingOpHashes(MissingOpHashes {
         ops: vec![],
         finished: MissingOpsStatus::AllComplete as u8,
     });
@@ -270,7 +270,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     .await;
 
     // - Send a message marked as finished.
-    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+    let incoming = ShardedGossipWire::MissingOpHashes(MissingOpHashes {
         ops: vec![],
         finished: MissingOpsStatus::AllComplete as u8,
     });

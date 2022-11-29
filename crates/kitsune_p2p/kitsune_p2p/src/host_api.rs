@@ -52,6 +52,13 @@ pub trait KitsuneHost: 'static + Send + Sync + FetchQueueConfig {
         regions: Vec<Region>,
     ) -> KitsuneHostResult<Vec<Region>>;
 
+    /// Get all op hashes within a region
+    fn query_op_hashes_by_region(
+        &self,
+        space: Arc<KitsuneSpace>,
+        region: RegionCoords,
+    ) -> KitsuneHostResult<Vec<KOpHash>>;
+
     /// Record a set of metric records.
     fn record_metrics(
         &self,

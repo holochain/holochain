@@ -105,6 +105,14 @@ impl KitsuneHost for StandardResponsesHostApi {
     fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
         todo!()
     }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: dht::region::RegionCoords,
+    ) -> crate::KitsuneHostResult<Vec<KOpHash>> {
+        todo!()
+    }
 }
 
 // TODO: integrate with `HandlerBuilder`

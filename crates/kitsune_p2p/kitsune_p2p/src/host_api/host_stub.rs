@@ -17,7 +17,7 @@ impl HostStub {
 }
 
 impl FetchQueueConfig for HostStub {
-    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         todo!()
     }
 }

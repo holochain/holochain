@@ -90,11 +90,28 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
 
     fn op_hash(&self, _op_data: KOpData) -> KitsuneHostResult<KOpHash> {
         box_fut(Err(format!(
-            "error for unimlpemented KitsuneHost test behavior: method {} of {}",
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
             "op_hash",
             Self::NAME
         )
         .into()))
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: RegionCoords,
+    ) -> KitsuneHostResult<Vec<KOpHash>> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "query_op_hashes_by_region",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        0
     }
 }
 
@@ -145,5 +162,13 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
 
     fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {
         KitsuneHostDefaultError::op_hash(self, op_data)
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        space: Arc<KitsuneSpace>,
+        region: RegionCoords,
+    ) -> KitsuneHostResult<Vec<KOpHash>> {
+        KitsuneHostDefaultError::query_op_hashes_by_region(self, space, region)
     }
 }

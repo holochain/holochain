@@ -11,7 +11,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
-use kitsune_p2p_fetch::{FetchConfig, FetchQueue, FetchQueueConfig};
+use kitsune_p2p_fetch::FetchQueueConfig;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -230,7 +230,7 @@ impl ShardedGossip {
             GossipType::Historical => {
                 let s = tracing::trace_span!("process_outgoing_historical", cert = ?cert, agents = ?self.gossip.show_local_agents());
                 match &gossip {
-                    ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
+                    ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished }) => {
                         s.in_scope(|| {
                             tracing::trace!(
                                 num_ops = %ops.len(),
@@ -629,7 +629,7 @@ pub struct RoundState {
     /// If historic gossip, we calculated and queued our region diff (will be true for Recent)
     regions_are_queued: bool,
     /// Number of ops blooms we have sent for this round, which is also the
-    /// number of MissingOps sets we expect in response
+    /// number of MissingOpHashes sets we expect in response
     num_expected_op_blooms: u16,
     /// Received all responses to OpRegions, which is the batched set of Op data
     /// in the diff of regions
@@ -834,8 +834,8 @@ impl ShardedGossipLocal {
                 s
             }
             GossipType::Historical => match &msg {
-                ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
-                    let s = tracing::trace_span!("process_incoming_historical", ?peer_cert, agents = ?self.show_local_agents(), msg = %"MissingOps", num_ops = %ops.len(), ?finished);
+                ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished }) => {
+                    let s = tracing::trace_span!("process_incoming_historical", ?peer_cert, agents = ?self.show_local_agents(), msg = %"MissingOpHashes", num_ops = %ops.len(), ?finished);
                     s.in_scope(|| self.log_state());
                     s
                 }
@@ -919,7 +919,7 @@ impl ShardedGossipLocal {
                     vec![]
                 }
             }
-            ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
+            ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished }) => {
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
 
@@ -1002,7 +1002,7 @@ impl ShardedGossipLocal {
             let ops_s = r
                 .iter()
                 .map(|g| match &g {
-                    ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
+                    ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished }) => {
                         format!("num_ops = {}, finished = {}", ops.len(), finished)
                     }
                     _ => {
@@ -1187,9 +1187,9 @@ kitsune_p2p_types::write_codec_enum! {
         },
 
         /// Any ops that were missing from the remote bloom.
-        MissingOps(0x60) {
-            /// The missing ops
-            ops.0: Vec<KOp>,
+        MissingOpHashes(0x60) {
+            /// The missing op hashes
+            ops.0: Vec<KOpHash>,
             /// Ops that are missing from a bloom that you have sent.
             /// These will be chunked into a maximum size of about 16MB.
             /// If the amount of missing ops is larger then the
