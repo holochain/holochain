@@ -14,7 +14,6 @@ use futures::stream::StreamExt;
 use kitsune_p2p_fetch::FetchKey;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_transport_quic::tx2::*;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
@@ -59,8 +58,7 @@ ghost_actor::ghost_chan! {
             to_agent: KAgent,
             mod_idx: u32,
             mod_cnt: u32,
-            destination: BroadcastTo,
-            data: crate::wire::WireData,
+            data: BroadcastData,
         ) -> ();
 
         /// Incoming Gossip
@@ -288,22 +286,13 @@ impl KitsuneP2pActor {
                         use tx2_api::Tx2EpEvent::*;
                         #[allow(clippy::single_match)]
                         match event {
-                            OutgoingConnection(Tx2EpConnection {
-                                con,
-                                url,
-                            }) => {
+                            OutgoingConnection(Tx2EpConnection { con, url }) => {
                                 let _ = i_s.new_con(url, con).await;
                             }
-                            IncomingConnection(Tx2EpConnection {
-                                con,
-                                url,
-                            }) => {
+                            IncomingConnection(Tx2EpConnection { con, url }) => {
                                 let _ = i_s.new_con(url, con).await;
                             }
-                            ConnectionClosed(Tx2EpConnectionClosed {
-                                url,
-                                ..
-                            }) => {
+                            ConnectionClosed(Tx2EpConnectionClosed { url, .. }) => {
                                 let _ = i_s.del_con(url).await;
                             }
                             IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
@@ -377,7 +366,6 @@ impl KitsuneP2pActor {
                                         mod_idx,
                                         mod_cnt,
                                         data,
-                                        destination,
                                     }) => {
                                         // one might be tempted to notify here
                                         // as in Broadcast below... but we
@@ -386,13 +374,7 @@ impl KitsuneP2pActor {
                                         // handler.
                                         if let Err(err) = i_s
                                             .incoming_delegate_broadcast(
-                                                space,
-                                                basis,
-                                                to_agent,
-                                                mod_idx,
-                                                mod_cnt,
-                                                destination,
-                                                data,
+                                                space, basis, to_agent, mod_idx, mod_cnt, data,
                                             )
                                             .await
                                         {
@@ -406,19 +388,13 @@ impl KitsuneP2pActor {
                                         space,
                                         to_agent,
                                         data,
-                                        destination,
                                         ..
-                                    }) => match destination {
-                                        BroadcastTo::Notify => {
+                                    }) => match data {
+                                        BroadcastData::User(data) => {
                                             // TODO: Should we check if the basis is
                                             // held before calling notify?
-                                            if let Err(err) = evt_sender
-                                                .notify(
-                                                    space,
-                                                    to_agent,
-                                                    data.into(),
-                                                )
-                                                .await
+                                            if let Err(err) =
+                                                evt_sender.notify(space, to_agent, data).await
                                             {
                                                 tracing::warn!(
                                                     ?err,
@@ -426,33 +402,24 @@ impl KitsuneP2pActor {
                                                 );
                                             }
                                         }
-                                        BroadcastTo::PublishAgentInfo => {
+                                        BroadcastData::AgentInfo(agent_info) => {
                                             // TODO: Should we check if the basis is
                                             // held before calling put_agent_info_signed?
-                                            match AgentInfoSigned::decode(&data[..]) {
-                                                Ok(info) => {
-                                                    if let Err(err) = evt_sender
-                                                        .put_agent_info_signed(
-                                                            PutAgentInfoSignedEvt {
-                                                                space,
-                                                                peer_data: vec![info],
-                                                            },
-                                                        )
-                                                        .await
-                                                    {
-                                                        tracing::warn!(
-                                                            ?err,
-                                                            "error processing incoming agent info broadcast"
-                                                        );
-                                                    }
-                                                }
-                                                Err(err) => {
-                                                    tracing::warn!(
-                                                        ?err,
-                                                        "error processing incoming agent info broadcast"
-                                                    );
-                                                }
+                                            if let Err(err) = evt_sender
+                                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                                    space,
+                                                    peer_data: vec![agent_info],
+                                                })
+                                                .await
+                                            {
+                                                tracing::warn!(
+                                                    ?err,
+                                                    "error processing incoming agent info broadcast"
+                                                );
                                             }
+                                        }
+                                        BroadcastData::Publish(_op_hash, _context) => {
+                                            todo!()
                                         }
                                     },
                                     wire::Wire::Gossip(wire::Gossip {
@@ -471,12 +438,11 @@ impl KitsuneP2pActor {
                                             );
                                         }
                                     }
-                                    wire::Wire::FetchOp(wire::FetchOp {
-                                        fetch_list,
-                                    }) => {
+                                    wire::Wire::FetchOp(wire::FetchOp { fetch_list }) => {
                                         for (space, key_list) in fetch_list {
                                             let mut hashes = Vec::new();
-                                            let topo = match host.get_topology(space.clone()).await {
+                                            let topo = match host.get_topology(space.clone()).await
+                                            {
                                                 Err(_) => continue,
                                                 Ok(topo) => topo,
                                             };
@@ -497,32 +463,52 @@ impl KitsuneP2pActor {
                                             }
 
                                             if !hashes.is_empty() {
-                                                if let Ok(list) = evt_sender.fetch_op_data(FetchOpDataEvt {
-                                                    space: space.clone(),
-                                                    query: FetchOpDataEvtQuery::Hashes(hashes),
-                                                }).await {
+                                                if let Ok(list) = evt_sender
+                                                    .fetch_op_data(FetchOpDataEvt {
+                                                        space: space.clone(),
+                                                        query: FetchOpDataEvtQuery::Hashes(hashes),
+                                                    })
+                                                    .await
+                                                {
                                                     for (_hash, op) in list {
-                                                        fetch_response_queue.enqueue_op(space.clone(), (con.clone(), url.clone(), None), op);
+                                                        fetch_response_queue.enqueue_op(
+                                                            space.clone(),
+                                                            (con.clone(), url.clone(), None),
+                                                            op,
+                                                        );
                                                     }
                                                 }
                                             }
 
                                             for (coord, bound) in regions {
-                                                if let Ok(list) = evt_sender.fetch_op_data(FetchOpDataEvt {
-                                                    space: space.clone(),
-                                                    query: FetchOpDataEvtQuery::Regions(vec![bound]),
-                                                }).await {
+                                                if let Ok(list) = evt_sender
+                                                    .fetch_op_data(FetchOpDataEvt {
+                                                        space: space.clone(),
+                                                        query: FetchOpDataEvtQuery::Regions(vec![
+                                                            bound,
+                                                        ]),
+                                                    })
+                                                    .await
+                                                {
                                                     let last_idx = list.len() - 1;
-                                                    for (idx, (_hash, op)) in list.into_iter().enumerate() {
-                                                        fetch_response_queue.enqueue_op(space.clone(), (con.clone(), url.clone(), Some((coord, idx == last_idx))), op);
+                                                    for (idx, (_hash, op)) in
+                                                        list.into_iter().enumerate()
+                                                    {
+                                                        fetch_response_queue.enqueue_op(
+                                                            space.clone(),
+                                                            (
+                                                                con.clone(),
+                                                                url.clone(),
+                                                                Some((coord, idx == last_idx)),
+                                                            ),
+                                                            op,
+                                                        );
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    wire::Wire::PushOpData(wire::PushOpData {
-                                        op_data_list,
-                                    }) => {
+                                    wire::Wire::PushOpData(wire::PushOpData { op_data_list }) => {
                                         for (space, op_list) in op_data_list {
                                             for op in op_list {
                                                 let _op_hash = host.op_hash(op.op_data.clone());
@@ -533,7 +519,9 @@ impl KitsuneP2pActor {
                                                 //        of a publish/gossip
                                                 //        combo event
                                                 //        yet to be added
-                                                let _ = evt_sender.gossip(space.clone(), vec![op.op_data]).await;
+                                                let _ = evt_sender
+                                                    .gossip(space.clone(), vec![op.op_data])
+                                                    .await;
                                             }
                                         }
                                     }
@@ -619,8 +607,7 @@ impl InternalHandler for KitsuneP2pActor {
         to_agent: Arc<KitsuneAgent>,
         mod_idx: u32,
         mod_cnt: u32,
-        destination: BroadcastTo,
-        data: crate::wire::WireData,
+        data: BroadcastData,
     ) -> InternalHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => {
@@ -635,15 +622,7 @@ impl InternalHandler for KitsuneP2pActor {
         Ok(async move {
             let (_, space_inner) = space_sender.await;
             space_inner
-                .incoming_delegate_broadcast(
-                    space,
-                    basis,
-                    to_agent,
-                    mod_idx,
-                    mod_cnt,
-                    destination,
-                    data,
-                )
+                .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
                 .await
         }
         .boxed()
@@ -911,8 +890,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         space: Arc<KitsuneSpace>,
         basis: Arc<KitsuneBasis>,
         timeout: KitsuneTimeout,
-        destination: BroadcastTo,
-        payload: Vec<u8>,
+        data: BroadcastData,
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
@@ -920,30 +898,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         };
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender
-                .broadcast(space, basis, timeout, destination, payload)
-                .await
-        }
-        .boxed()
-        .into())
-    }
-
-    fn handle_publish(
-        &mut self,
-        space: Arc<KitsuneSpace>,
-        timeout: KitsuneTimeout,
-        op_hash: KOpHash,
-        fetch_context: kitsune_p2p_fetch::FetchContext,
-    ) -> KitsuneP2pHandlerResult<()> {
-        let space_sender = match self.spaces.get_mut(&space) {
-            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
-            Some(space) => space.get(),
-        };
-        Ok(async move {
-            let (space_sender, _) = space_sender.await;
-            space_sender
-                .publish(space, timeout, op_hash, fetch_context)
-                .await
+            space_sender.broadcast(space, basis, timeout, data).await
         }
         .boxed()
         .into())

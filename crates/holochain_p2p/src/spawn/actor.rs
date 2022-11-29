@@ -4,7 +4,7 @@ use crate::event::*;
 use crate::*;
 
 use futures::future::FutureExt;
-use kitsune_p2p::actor::BroadcastTo;
+use kitsune_p2p::actor::BroadcastData;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch;
 use kitsune_p2p::event::*;
 use kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics;
@@ -1020,8 +1020,12 @@ impl HolochainP2pHandler for HolochainP2pActor {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
+        // TODO - don't include the full op data here!
+        //        it should only be the hashes
         ops: Vec<holochain_types::dht_op::DhtOp>,
         timeout_ms: Option<u64>,
+        // TODO - delete the return size - it's irrelevant if we're
+        //        just publishing the hashes...
     ) -> HolochainP2pHandlerResult<usize> {
         use kitsune_p2p_types::KitsuneTimeout;
 
@@ -1041,6 +1045,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
             .map(|op| DhtOpHash::with_data_sync(op).into_kitsune())
             .collect::<Vec<_>>();
 
+        /*
         let payload = crate::wire::WireMessage::publish(
             request_validation_receipt,
             countersigning_session,
@@ -1049,20 +1054,28 @@ impl HolochainP2pHandler for HolochainP2pActor {
         )
         .encode()?;
         let payload_size = payload.len();
+        */
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            for op_hash in pub_hashes {
-                kitsune_p2p
-                    .publish(space.clone(), timeout, op_hash, fetch_context)
-                    .await?;
-            }
+            kitsune_p2p
+                .broadcast(
+                    space.clone(),
+                    basis.clone(),
+                    timeout,
+                    BroadcastData::Publish(pub_hashes, fetch_context),
+                )
+                .await?;
 
+            /*
             // TODO - DELETE THIS OLD PUBLISH METHOD:
             kitsune_p2p
                 .broadcast(space, basis, timeout, BroadcastTo::Notify, payload)
                 .await?;
             Ok(payload_size)
+            */
+
+            Ok(0)
         }
         .boxed()
         .into())

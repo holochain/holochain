@@ -8,7 +8,7 @@ use ghost_actor::GhostControlSender;
 use kitsune_p2p::test_util::hash_op_data;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
-use kitsune_p2p::actor::{BroadcastTo, KitsuneP2pSender};
+use kitsune_p2p::actor::{BroadcastData, KitsuneP2pSender};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::event::*;
 use kitsune_p2p::*;
@@ -561,8 +561,7 @@ async fn handle_srv_events(
                                             root.to_kitsune_space(),
                                             basis,
                                             timeout,
-                                            BroadcastTo::Notify,
-                                            payload,
+                                            BroadcastData::User(payload),
                                         ))
                                     }).map_err(KdError::other)?;
                                     tokio::task::spawn(async move {

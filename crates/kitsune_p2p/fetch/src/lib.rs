@@ -1,6 +1,11 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
+// TODO - RE-ENABLE THIS!!!!
 // #![deny(warnings)]
+
+// TODO - DELETE THIS!!!!
+#![allow(clippy::unit_arg)]
+
 //! Kitsune P2p Fetch Queue Logic
 
 use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash};

@@ -62,13 +62,18 @@ pub struct RpcMultiResponse {
     pub response: Vec<u8>,
 }
 
-#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-/// The destination of a broadcast message.
-pub enum BroadcastTo {
-    /// Send to notify.
-    Notify,
-    /// Send to publish agent info.
-    PublishAgentInfo,
+/// Data to broadcast to the remote.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BroadcastData {
+    /// User broadcast.
+    User(#[serde(with = "serde_bytes")] Vec<u8>),
+
+    /// Agent info.
+    AgentInfo(kitsune_p2p_types::agent_info::AgentInfoSigned),
+
+    /// Publish broadcast.
+    Publish(Vec<KOpHash>, kitsune_p2p_fetch::FetchContext),
 }
 
 type KSpace = Arc<super::KitsuneSpace>;
@@ -113,18 +118,7 @@ ghost_actor::ghost_chan! {
             space: KSpace,
             basis: KBasis,
             timeout: KitsuneTimeout,
-            destination: BroadcastTo,
-            payload: Payload
-        ) -> ();
-
-        /// Sub-type of broadcast. Notifies a "neighborhood" of availability
-        /// of an op hash. Delegates will await successful fetch of op data
-        /// before proceeding to do the actual delegation.
-        fn publish(
-            space: KSpace,
-            timeout: KitsuneTimeout,
-            op_hash: KOpHash,
-            fetch_context: kitsune_p2p_fetch::FetchContext,
+            data: BroadcastData,
         ) -> ();
 
         /// Broadcast data to a specific set of agents without
