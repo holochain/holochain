@@ -139,6 +139,121 @@ pub mod wasm_test {
         };
     }
 
+    /// Allow LockExpired error, panic on anything else
+    fn expect_chain_lock_expired<T>(
+        result: Result<T, ConductorApiError>,
+    ) where T: std::fmt::Debug {
+        match result {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
+                match *workflow_error {
+                    WorkflowError::SourceChainError(SourceChainError::LockExpired) => {}
+                    _ => panic!("{:?}", workflow_error),
+                }
+            }
+            something_else => panic!("{:?}", something_else),
+        };
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "slow_tests")]
+    async fn unlock_timeout_session() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
+        // Before preflight everyone commits some stuff.
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+
+        // Everyone accepts a short lived session.
+        let preflight_request: PreflightRequest = conductor
+            .call(
+                &alice,
+                "generate_countersigning_preflight_request_fast",
+                vec![
+                    (alice_pubkey.clone(), vec![Role(0)]),
+                    (bob_pubkey.clone(), vec![]),
+                ],
+            ).await;
+        let alice_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &alice,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+            let alice_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+        let bob_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &bob,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+            let bob_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+
+        // Alice commits the session entry.
+        let countersigned_action_hash_alice: ActionHash = conductor
+            .call(
+                &alice,
+                "create_a_countersigned_thing",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await;
+
+        // Bob tries to do the same thing but after timeout.
+        tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+        let bob_result: Result<ActionHash, _> = conductor
+        .call_fallible(
+            &bob,
+            "create_a_countersigned_thing",
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await;
+        expect_chain_lock_expired(bob_result);
+
+        // At this point Alice's session entry is a liability so can't exist.
+        let alice_agent_activity_alice_observed: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let alice_agent_activity_bob_observed: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey,
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        dbg!(countersigned_action_hash_alice);
+        dbg!(alice_agent_activity_alice_observed);
+        dbg!(alice_agent_activity_bob_observed);
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn unlock_invalid_session() {

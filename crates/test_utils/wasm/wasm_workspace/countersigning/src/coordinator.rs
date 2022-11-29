@@ -1,6 +1,9 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
+const STANDARD_TIMEOUT_MILLIS: u64 = 5000;
+const FAST_TIMEOUT_MILLIS: u64 = 1300;
+
 #[hdk_extern]
 fn create_a_thing(_: ()) -> ExternResult<ActionHash> {
     create_entry(&EntryTypes::Thing(Thing::Valid))
@@ -57,7 +60,8 @@ fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResu
 fn generate_preflight_request(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
     thing: Thing,
-    enzymatic: bool
+    enzymatic: bool,
+    session_timeout: u64,
 ) -> ExternResult<PreflightRequest> {
     let hash = hash_entry(&thing)?;
     let thing = EntryTypes::Thing(thing);
@@ -68,7 +72,7 @@ fn generate_preflight_request(
         vec![],
         0,
         enzymatic,
-        session_times_from_millis(5000)?,
+        session_times_from_millis(session_timeout)?,
         ActionBase::Create(CreateBase::new(entry_type)),
         PreflightBytes(vec![]),
     )
@@ -79,28 +83,35 @@ fn generate_preflight_request(
 fn generate_countersigning_preflight_request(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Valid, false)
+    generate_preflight_request(agents, Thing::Valid, false, STANDARD_TIMEOUT_MILLIS)
+}
+
+#[hdk_extern]
+fn generate_countersigning_preflight_request_fast(
+    agents: Vec<(AgentPubKey, Vec<Role>)>,
+) -> ExternResult<PreflightRequest> {
+    generate_preflight_request(agents, Thing::Valid, false, FAST_TIMEOUT_MILLIS)
 }
 
 #[hdk_extern]
 fn generate_countersigning_preflight_request_enzymatic(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Valid, true)
+    generate_preflight_request(agents, Thing::Valid, true, STANDARD_TIMEOUT_MILLIS)
 }
 
 #[hdk_extern]
 fn generate_invalid_countersigning_preflight_request(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Invalid, false)
+    generate_preflight_request(agents, Thing::Invalid, false, STANDARD_TIMEOUT_MILLIS)
 }
 
 #[hdk_extern]
 fn generate_invalid_countersigning_preflight_request_enzymatic(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Invalid, true)
+    generate_preflight_request(agents, Thing::Invalid, true, STANDARD_TIMEOUT_MILLIS)
 }
 
 #[hdk_extern]
