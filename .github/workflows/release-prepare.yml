@@ -279,6 +279,7 @@ jobs:
 
           # TODO: find out why this is required
           git fetch --all
+          git branch --list ${HOLOCHAIN_TARGET_BRANCH}
           if [[ $(git branch --list ${HOLOCHAIN_TARGET_BRANCH} | wc -l) -eq 0 ]]; then
             git checkout -B ${HOLOCHAIN_TARGET_BRANCH} "${RELEASE_BRANCH}"
           else
