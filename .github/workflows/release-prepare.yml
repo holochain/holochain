@@ -279,8 +279,8 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           # TODO: find out why this is required
-          git branch --list | grep origin/${HOLOCHAIN_TARGET_BRANCH}
-          if [[ $(git branch --list | grep origin/${HOLOCHAIN_TARGET_BRANCH} | wc -l) -eq 0 ]]; then
+          git branch --list | grep origin/${HOLOCHAIN_TARGET_BRANCH} || :
+          if ! (git branch --list | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
             git checkout -B ${HOLOCHAIN_TARGET_BRANCH} "${RELEASE_BRANCH}"
           else
             git checkout --force -B ${HOLOCHAIN_TARGET_BRANCH} origin/${HOLOCHAIN_TARGET_BRANCH}
