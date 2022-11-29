@@ -62,9 +62,9 @@ impl HolochainP2pHandler for StubNetwork {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        op_hash_list: Vec<DhtOpHash>,
         timeout_ms: Option<u64>,
-    ) -> HolochainP2pHandlerResult<usize> {
+    ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
 

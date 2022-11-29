@@ -245,9 +245,9 @@ ghost_actor::ghost_chan! {
             request_validation_receipt: bool,
             countersigning_session: bool,
             basis_hash: holo_hash::OpBasis,
-            ops: Vec<holochain_types::dht_op::DhtOp>,
+            op_hash_list: Vec<DhtOpHash>,
             timeout_ms: Option<u64>,
-        ) -> usize;
+        ) -> ();
 
         /// Get an entry from the DHT.
         fn get(

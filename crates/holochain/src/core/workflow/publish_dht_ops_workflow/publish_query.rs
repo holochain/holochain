@@ -7,8 +7,8 @@ use holochain_sqlite::db::DbKindAuthored;
 use holochain_state::query::prelude::*;
 use holochain_types::db::DbRead;
 use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
+use holochain_types::prelude::OpBasis;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::SignedAction;
@@ -26,7 +26,7 @@ use super::MIN_PUBLISH_INTERVAL;
 pub async fn get_ops_to_publish(
     agent: AgentPubKey,
     db: &DbRead<DbKindAuthored>,
-) -> WorkflowResult<Vec<DhtOpHashed>> {
+) -> WorkflowResult<Vec<(OpBasis, DhtOpHash)>> {
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
@@ -80,10 +80,9 @@ pub async fn get_ops_to_publish(
                         }
                         _ => None,
                     };
-                    WorkflowResult::Ok(DhtOpHashed::with_pre_hashed(
-                        DhtOp::from_type(op_type, action, entry)?,
-                        hash,
-                    ))
+                    let op = DhtOp::from_type(op_type, action, entry)?;
+                    let basis = op.dht_basis();
+                    WorkflowResult::Ok((basis, hash))
                 },
             )?;
             WorkflowResult::Ok(r.collect())
