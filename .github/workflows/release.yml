@@ -130,7 +130,8 @@ jobs:
                 echo "::set-output name=holochain_target_branch::$(echo ${holochain_source_branch} | sed 's/^develop/main/')"
                 ;;
               *)
-                echo "::set-output name=holochain_target_branch::main"
+                echo "::set-output name=holochain_target_branch::release-target-${holochain_source_branch}"
+                export enforce_dry_run="true"
                 ;;
             esac
           fi
@@ -147,7 +148,9 @@ jobs:
             echo "::set-output name=holonix_source_branch::main"
           fi
 
-          if [[ ${input_dry_run} != "" ]]; then
+          if [[ "${enforce_dry_run:-false}" == "true" ]]; then
+            echo "::set-output name=dry_run::true"
+          elif [[ ${input_dry_run} != "" ]]; then
             echo "::set-output name=dry_run::${input_dry_run}"
           elif [[ "${{ github.event_name }}" == "schedule" ]]; then
             echo "::set-output name=dry_run::false"
