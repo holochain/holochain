@@ -149,6 +149,7 @@ jobs:
           fi
 
           if [[ "${enforce_dry_run:-false}" == "true" ]]; then
+            echo dry-run enforced
             echo "::set-output name=dry_run::true"
           elif [[ ${input_dry_run} != "" ]]; then
             echo "::set-output name=dry_run::${input_dry_run}"
