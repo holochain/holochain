@@ -25,6 +25,11 @@ on:
         required: false
         default: ""
         type: string
+      holochain_target_branch:
+        description: "target branch for the release"
+        required: false
+        default: ""
+        type: string
       holochain-nixpkgs_source_branch:
         description: "source branch for the release"
         required: false
@@ -36,7 +41,7 @@ on:
         default: ""
         type: string
       dry_run:
-        description: "prevent tag creation and pushing to main and develop branches"
+        description: "prevent, publishing and pushing to the tags and the target branch"
         required: false
         default: "true"
         type: string
@@ -81,6 +86,7 @@ jobs:
       holochain_nixpkgs_source_branch: ${{ steps.eval.outputs.holochain_nixpkgs_source_branch }}
       holonix_source_branch: ${{ steps.eval.outputs.holonix_source_branch }}
       holochain_source_branch: ${{ steps.eval.outputs.holochain_source_branch }}
+      holochain_target_branch: ${{ steps.eval.outputs.holochain_target_branch }}
       dry_run: ${{ steps.eval.outputs.dry_run }}
       debug: ${{ steps.eval.outputs.debug }}
       skip_test: ${{ steps.eval.outputs.skip_test }}
@@ -95,12 +101,13 @@ jobs:
           input_holochain_nixpkgs_source_branch: ${{ github.event.inputs.holochain-nixpkgs_source_branch }}
           input_holonix_source_branch: ${{ github.event.inputs.holonix_source_branch }}
           input_holochain_source_branch: ${{ github.event.inputs.holochain_source_branch }}
+          input_holochain_target_branch: ${{ github.event.inputs.holochain_target_branch }}
           input_dry_run: ${{ github.event.inputs.dry_run}}
           input_debug: ${{ github.event.inputs.debug }}
           input_skip_test: ${{ github.event.inputs.skip_test }}
           input_skip_prepare_logic: ${{ github.event.inputs.skip_prepare_logic }}
         run: |
-          set -x
+          set -xeu
 
           # if [[ ${input_holochain_url} != "" ]]; then
           #   echo "::set-output name=holochain_url::${input_holochain_url}"
@@ -109,9 +116,24 @@ jobs:
           # fi
 
           if [[ ${input_holochain_source_branch} != "" ]]; then
-            echo "::set-output name=holochain_source_branch::${input_holochain_source_branch}"
+            export holochain_source_branch="${input_holochain_source_branch}"
           else
-            echo "::set-output name=holochain_source_branch::${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+            export holochain_source_branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          fi
+          echo "::set-output name=holochain_source_branch::${holochain_source_branch}"
+
+          if [[ ${input_holochain_target_branch} != "" ]]; then
+            echo "::set-output name=holochain_target_branch::${input_holochain_target_branch}"
+          else
+            case "${holochain_source_branch}" in
+              develop*)
+                echo "::set-output name=holochain_target_branch::$(echo ${holochain_source_branch} | sed 's/^develop/main/')"
+                ;;
+              *)
+                echo "::set-output name=holochain_target_branch::release-target-${holochain_source_branch}"
+                export enforce_dry_run="true"
+                ;;
+            esac
           fi
 
           if [[ ${input_holochain_nixpkgs_source_branch} != "" ]]; then
@@ -126,7 +148,10 @@ jobs:
             echo "::set-output name=holonix_source_branch::main"
           fi
 
-          if [[ ${input_dry_run} != "" ]]; then
+          if [[ "${enforce_dry_run:-false}" == "true" ]]; then
+            echo dry-run enforced
+            echo "::set-output name=dry_run::true"
+          elif [[ ${input_dry_run} != "" ]]; then
             echo "::set-output name=dry_run::${input_dry_run}"
           elif [[ "${{ github.event_name }}" == "schedule" ]]; then
             echo "::set-output name=dry_run::false"
@@ -167,6 +192,7 @@ jobs:
       debug: ${{ needs.vars.outputs.debug }}
       skip_prepare_logic: ${{ needs.vars.outputs.skip_prepare_logic }}
       HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
+      HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
       HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
@@ -568,16 +594,18 @@ jobs:
             ${{ runner.os }}-prepare-
           required: true
 
-      - name: Push the main branch
+      - name: Push the target branch
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        env:
+          HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
         run: |
-          set -e
+          set -eu
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git status
 
-          git push origin main
+          git push origin ${HOLOCHAIN_TARGET_BRANCH}
 
       - name: Push the release branch
         run: |
@@ -586,7 +614,7 @@ jobs:
           git checkout ${RELEASE_BRANCH}
           git push origin ${RELEASE_BRANCH}
 
-      - name: Create a pull-request towards the develop branch
+      - name: Create a pull-request towards the source branch
         id: cpr
         env:
           GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
@@ -643,25 +671,27 @@ jobs:
       - name: Push the tags
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         run: |
-          set -e
+          set -eu
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git status
 
-          git push origin main --tags
+          git push origin ${HOLOCHAIN_TARGET_BRANCH} --tags
 
       - name: Create a github release
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
         run: |
+          set -eu
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
-          gh release create "${TAG:?}" \
-            --title "holochain ${VERSION:?}" \
-            --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/main/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH:?}")) to see the full list of crates that were released together.***"
+          gh release create "${TAG}" \
+            --title "holochain ${VERSION}" \
+            --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***"
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
