@@ -5,6 +5,8 @@
 
 , holonix
 , holonixPath
+, hcToplevelDir
+, releaseAutomation
 }:
 
 rec {
@@ -12,111 +14,127 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
-
-    # alas, we cannot specify --features in the virtual workspace
-    # run the specific slow tests in the holochain crate
-    cargo test --no-run --all-targets --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption -- --nocapture --test-threads 1
-    cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption -- --nocapture --test-threads 1
-    # run all the remaining cargo tests
-    cargo test --no-run --all-targets --workspace --exclude holochain -- --nocapture --test-threads 1
-    cargo test --workspace --exclude holochain -- --nocapture --test-threads 1
-    # run all the wasm tests (within wasm) with the conductor mocked
-    cargo test --no-run --all-targets --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture --test-threads 1
-    cargo test --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture --test-threads 1
+    hc-test-standard
+    hc-test-slow
+    hc-test-wasm
   '';
 
-  hcReleaseAutomationTest = let
-    releaseAutomationCmd = logLevel: ''
-      cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
-          --workspace-path=$PWD \
-          --log-level=${logLevel} \
-        check \
-          --disallowed-version-reqs=">=0.1" \
-          --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$"
-    '';
-        # --allowed-dev-dependency-blockers=UnreleasableViaChangelogFrontmatter,MissingReadme \
-        # todo: verify why this was needed and isn't any longer
-        #  --exclude-optional-deps
-    in writeShellScriptBin "hc-release-automation-test" ''
-    set -euxo pipefail
-
-    # make sure the binary is built
-    cargo build --manifest-path=crates/release-automation/Cargo.toml
-    # run the release-automation tests
-    cargo test --manifest-path=crates/release-automation/Cargo.toml ''${@}
-
-    # check the state of the repository
-    (
-      ${releaseAutomationCmd "info"}
-    ) || (
-      ${releaseAutomationCmd "trace"}
-    )
-  '';
-
-  hcReleaseAutmoation = writeShellScriptBin "hc-release-automation" ''
-    set -euxo pipefail
-
-    cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
-      ''${@}
-  '';
-
-  hcReleaseAutmoationRelease = writeShellScriptBin "hc-release-automation-release" ''
-    set -euxo pipefail
-
-    cargo run --manifest-path=crates/release-automation/Cargo.toml -- \
-        --workspace-path=$PWD \
-        --log-level=trace \
-      release \
-        ''${@} \
-        --disallowed-version-reqs=">=0.1" \
-        --allowed-dev-dependency-blockers=UnreleasableViaChangelogFrontmatter,MissingReadme \
-        --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-  '';
-      # todo: verify why this was needed and isn't any longer
-      #  --exclude-optional-deps
-
-  hcStaticChecks = let
-      pathPrefix = lib.makeBinPath
-        (builtins.attrValues { inherit (holonix.pkgs)
-          hnRustClippy
-          hnRustFmtCheck
-          hnRustFmtFmt
-          ;
-        })
-      ;
-    in writeShellScriptBin "hc-static-checks" ''
-    export PATH=${pathPrefix}:$PATH
-
+  hcStandardTests = writeShellScriptBin "hc-test-standard" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-    hn-rust-fmt-check
-    hn-rust-clippy
+
+    # run all the non-slow cargo tests
+    cargo build --features 'build' -p holochain_wasm_test_utils
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --profile fast-test ''${1-} -- --nocapture
   '';
+
+  hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    # run all the cargo tests
+    cargo build --features 'build' -p holochain_wasm_test_utils
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test ''${1-}
+  '';
+
+  hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    # run all the wasm tests (within wasm) with the conductor mocked
+    cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
+  '';
+
+  hcReleaseAutomationTest = writeShellScriptBin "hc-test-release-automation" ''
+    set -euxo pipefail
+    export RUST_BACKTRACE=1
+
+    # make sure the binary is built
+    cargo build --locked --manifest-path=crates/release-automation/Cargo.toml
+    # run the release-automation tests
+    cargo test ''${CARGO_TEST_ARGS:-} --locked --manifest-path=crates/release-automation/Cargo.toml ''${@}
+  '';
+
+  hcReleaseAutomationTestRepo =
+    let
+      prepareWorkspaceCmd = ''
+        rm -rf ''${TEST_WORKSPACE:?}
+        git clone $PWD ''${TEST_WORKSPACE:?}
+      '';
+
+      crateCmd = logLevel: ''
+        ${releaseAutomation} \
+            --workspace-path=''${TEST_WORKSPACE:?} \
+            --log-level=${logLevel} \
+          crate \
+            apply-dev-versions \
+            --commit \
+            --no-verify
+      '';
+      releaseCmd = logLevel: ''
+        ${releaseAutomation} \
+            --workspace-path=''${TEST_WORKSPACE:?} \
+            --log-level=${logLevel} \
+            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+          release \
+            --no-verify-pre \
+            --force-branch-creation \
+            --disallowed-version-reqs=">=0.1" \
+            --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
+            --steps=CreateReleaseBranch,BumpReleaseVersions
+      '';
+    in
+    writeShellScriptBin "hc-test-release-automation-repo" ''
+      set -euxo pipefail
+
+      export TEST_WORKSPACE=$(mktemp -d)
+      if [[ "''${KEEP_TEST_WORKSPACE:-false}" != "true" ]]; then
+        trap "rm -rf ''${TEST_WORKSPACE:?}" EXIT
+      fi
+
+      # check the state of the repository
+      (
+        ${prepareWorkspaceCmd}
+        ${crateCmd "debug"}
+        ${releaseCmd "debug"}
+      )
+    '';
+
+  hcStaticChecks =
+    let
+      pathPrefix = lib.makeBinPath
+        (builtins.attrValues {
+          inherit (holonix.pkgs)
+            hnRustClippy
+            hnRustFmtCheck
+            hnRustFmtFmt
+            ;
+        })
+      ;
+    in
+    writeShellScriptBin "hc-static-checks" ''
+      export PATH=${pathPrefix}:$PATH
+
+      set -euxo pipefail
+      export RUST_BACKTRACE=1
+      hn-rust-fmt-check
+      hn-rust-clippy
+    '';
 
   hcMergeTest = writeShellScriptBin "hc-merge-test" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
-    hc-release-automation-test
     hc-static-checks
     hc-test
   '';
 
-  hcReleaseTest = writeShellScriptBin "hc-release-test" ''
+  hcReleaseTest = writeShellScriptBin "hc-test-release" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
-
-    hc-merge-test
-    cargo build --no-default-features --locked --frozen
+    ${hcReleaseAutomationTest}/bin/hc-test-release-automation
+    ${hcReleaseAutomationTestRepo}/bin/hc-test-release-automation-repo
   '';
-
 
   hcSpeedTest = writeShellScriptBin "hc-speed-test" ''
     cargo test speed_test_prep --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored
@@ -129,7 +147,7 @@ rec {
 
     for i in {0..100}
     do
-      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,glacial_tests,build_wasms -- --nocapture
     done
     for i in {0..100}
     do
@@ -236,6 +254,15 @@ rec {
 
   hcRegenReadmes = writeShellScriptBin "hc-regen-readmes" ''
     cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
+  '';
+
+  hcRegenNixExpressions = writeShellScriptBin "hc-regen-nix-expressions" ''
+    set -xe
+    pushd ${hcToplevelDir}
+    crate2nix generate \
+        -f crates/release-automation/Cargo.toml \
+        -o crates/release-automation/Cargo.nix
+    git commit crates/release-automation/Cargo.nix -m "chore: hc-regen-nix-expressions"
   '';
 } // (if stdenv.isLinux then {
   hcCoverageTest = writeShellScriptBin "hc-coverage-test" ''

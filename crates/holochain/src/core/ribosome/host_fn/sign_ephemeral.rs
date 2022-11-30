@@ -1,110 +1,127 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
-use ring::rand::SecureRandom;
-use ring::rand::SystemRandom;
-use ring::signature::Ed25519KeyPair;
-use ring::signature::KeyPair;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 
 pub fn sign_ephemeral(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: SignEphemeral,
-) -> Result<EphemeralSignatures, WasmError> {
+) -> Result<EphemeralSignatures, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ keystore: Permission::Allow, .. } => {
-            let rng = SystemRandom::new();
-            let mut seed = [0; 32];
-            rng.fill(&mut seed)
-                .map_err(|e| WasmError::Guest(e.to_string()))?;
-            let ephemeral_keypair =
-                Ed25519KeyPair::from_seed_unchecked(&seed).map_err(|e| WasmError::Host(e.to_string()))?;
+        HostFnAccess {
+            keystore: Permission::Allow,
+            ..
+        } => tokio_helper::block_forever_on(async move {
+            let pk = sodoken::BufWriteSized::new_no_lock();
+            let sk = sodoken::BufWriteSized::new_mem_locked()?;
+            sodoken::sign::keypair(pk.clone(), sk.clone()).await?;
+            let pk = pk.read_lock_sized().to_vec();
+            let sk = sk.to_read_sized();
 
-            let signatures: Result<Vec<Signature>, _> = input
-                .into_inner()
-                .into_iter()
-                .map(|data| ephemeral_keypair.sign(&data).as_ref().try_into())
-                .collect();
+            let mut signatures = Vec::new();
 
-            Ok(EphemeralSignatures {
-                signatures: signatures.map_err(|e| WasmError::Host(e.to_string()))?,
-                key: AgentPubKey::from_raw_32(ephemeral_keypair.public_key().as_ref().to_vec()),
+            let sig = sodoken::BufWriteSized::new_no_lock();
+            for data in input.into_inner().into_iter() {
+                sodoken::sign::detached(
+                    sig.clone(),
+                    data.to_vec(),
+                    sk.clone(),
+                ).await?;
+                signatures.push((*sig.read_lock_sized()).into());
+            }
+
+            sodoken::SodokenResult::Ok(EphemeralSignatures {
+                signatures,
+                key: AgentPubKey::from_raw_32(pk),
             })
-        },
-        _ => unreachable!(),
+        })
+        .map_err(|error| -> RuntimeError {
+            wasm_error!(WasmErrorInner::Host(error.to_string())).into()
+        }),
+        _ => Err(wasm_error!(WasmErrorInner::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "sign_ephemeral".into(),
+            )
+            .to_string(),
+        ))
+        .into()),
     }
-
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_keystore::AgentPubKeyExt;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_sign_ephemeral_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Sign).await;
 
-        let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
-        host_access.workspace = workspace;
-
-        let output: Vec<EphemeralSignatures> =
-            crate::call_test_ribosome!(host_access, TestWasm::Sign, "sign_ephemeral", ()).unwrap();
+        let output: Vec<EphemeralSignatures> = conductor.call(&alice, "sign_ephemeral", ()).await;
 
         #[derive(Serialize, Deserialize, Debug)]
         struct One([u8; 2]);
         #[derive(Serialize, Deserialize, Debug)]
         struct Two([u8; 2]);
 
-        assert!(output[0]
-            .key
-            .verify_signature_raw(
-                &output[0].signatures[0],
-                &holochain_serialized_bytes::encode(&One([1, 2])).unwrap()
-            )
-            .await
-            .unwrap());
+        assert!(
+            output[0]
+                .key
+                .verify_signature_raw(
+                    &output[0].signatures[0],
+                    holochain_serialized_bytes::encode(&One([1, 2]))
+                        .unwrap()
+                        .into()
+                )
+                .await
+        );
 
-        assert!(output[0]
-            .key
-            .verify_signature_raw(
-                &output[0].signatures[1],
-                &holochain_serialized_bytes::encode(&One([3, 4])).unwrap()
-            )
-            .await
-            .unwrap());
+        assert!(
+            output[0]
+                .key
+                .verify_signature_raw(
+                    &output[0].signatures[1],
+                    holochain_serialized_bytes::encode(&One([3, 4]))
+                        .unwrap()
+                        .into()
+                )
+                .await
+        );
 
-        assert!(output[1]
-            .key
-            .verify_signature_raw(
-                &output[1].signatures[0],
-                &holochain_serialized_bytes::encode(&One([1, 2])).unwrap()
-            )
-            .await
-            .unwrap());
+        assert!(
+            output[1]
+                .key
+                .verify_signature_raw(
+                    &output[1].signatures[0],
+                    holochain_serialized_bytes::encode(&One([1, 2]))
+                        .unwrap()
+                        .into()
+                )
+                .await
+        );
 
-        assert!(output[1]
-            .key
-            .verify_signature_raw(
-                &output[1].signatures[1],
-                &holochain_serialized_bytes::encode(&Two([2, 3])).unwrap()
-            )
-            .await
-            .unwrap());
+        assert!(
+            output[1]
+                .key
+                .verify_signature_raw(
+                    &output[1].signatures[1],
+                    holochain_serialized_bytes::encode(&Two([2, 3]))
+                        .unwrap()
+                        .into()
+                )
+                .await
+        );
     }
 }

@@ -60,7 +60,7 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
         self.visit_bytes(&vec)
     }
 
-    #[cfg(feature = "string-encoding")]
+    #[cfg(feature = "encoding")]
     fn visit_str<E>(self, b64: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
@@ -116,7 +116,7 @@ mod tests {
     struct TestByteArray(#[serde(with = "serde_bytes")] Vec<u8>);
 
     #[test]
-    #[cfg(feature = "serialized-bytes")]
+    #[cfg(feature = "serialization")]
     fn test_serialized_bytes_roundtrip() {
         use holochain_serialized_bytes::SerializedBytes;
         use std::convert::TryInto;
@@ -156,12 +156,12 @@ mod tests {
         {
             let h_orig = AnyDhtHash::from_raw_36_and_type(
                 vec![0xdb; HOLO_HASH_UNTYPED_LEN],
-                hash_type::AnyDht::Header,
+                hash_type::AnyDht::Action,
             );
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
-            assert_eq!(*h.hash_type(), hash_type::AnyDht::Header);
+            assert_eq!(*h.hash_type(), hash_type::AnyDht::Action);
         }
         {
             let h_orig = AnyDhtHash::from_raw_36_and_type(
@@ -196,9 +196,9 @@ mod tests {
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
         {
-            let h_orig = HeaderHash::from_raw_36_and_type(
+            let h_orig = ActionHash::from_raw_36_and_type(
                 vec![0xdb; HOLO_HASH_UNTYPED_LEN],
-                hash_type::Header,
+                hash_type::Action,
             );
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
@@ -223,12 +223,12 @@ mod tests {
         #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
         struct TestData {
             e: EntryHash,
-            h: HeaderHash,
+            h: ActionHash,
         }
 
         let orig = TestData {
             e: EntryHash::from_raw_36_and_type(vec![0xdb; HOLO_HASH_UNTYPED_LEN], hash_type::Entry),
-            h: HeaderHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
+            h: ActionHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         };
 
         let sb: SerializedBytes = (&orig).try_into().unwrap();
@@ -236,7 +236,7 @@ mod tests {
 
         assert_eq!(orig, res);
         assert_eq!(*orig.e.hash_type(), hash_type::Entry);
-        assert_eq!(*orig.h.hash_type(), hash_type::Header);
+        assert_eq!(*orig.h.hash_type(), hash_type::Action);
     }
 
     #[test]
@@ -249,17 +249,17 @@ mod tests {
 
         let any_hash = AnyDhtHash::from_raw_36_and_type(
             b"000000000000000000000000000000000000".to_vec(),
-            hash_type::AnyDht::Header,
+            hash_type::AnyDht::Action,
         );
         let hash_type_sb: SerializedBytes = any_hash.hash_type().try_into().unwrap();
-        let hash_type_json = r#"{"Header":[132,41,36]}"#;
+        let hash_type_json = r#"{"Action":[132,41,36]}"#;
         assert_eq!(format!("{:?}", hash_type_sb), hash_type_json.to_string());
 
         let hash_type_from_sb: hash_type::AnyDht = hash_type_sb.try_into().unwrap();
-        assert_eq!(hash_type_from_sb, hash_type::AnyDht::Header);
+        assert_eq!(hash_type_from_sb, hash_type::AnyDht::Action);
 
         let hash_type_from_json: hash_type::AnyDht = serde_json::from_str(&hash_type_json).unwrap();
-        assert_eq!(hash_type_from_json, hash_type::AnyDht::Header);
+        assert_eq!(hash_type_from_json, hash_type::AnyDht::Action);
     }
 
     #[test]
@@ -291,8 +291,8 @@ mod tests {
             }
         }
 
-        let mut g: Generic<HeaderHash> = Generic::new();
-        let h = HeaderHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
+        let mut g: Generic<ActionHash> = Generic::new();
+        let h = ActionHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
         g.put(&h);
         assert_eq!(h, g.get());
     }

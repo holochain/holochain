@@ -1,0 +1,20 @@
+[profile.default]
+
+# "retries" defines the number of times a test should be retried. If set to a
+# non-zero value, tests that succeed on a subsequent attempt will be marked as
+# non-flaky. Can be overridden through the `--retries` option.
+retries = 2
+
+status-level = "all"
+
+# Treat a test that takes longer than this period as slow, and print a message.
+# Given a non-zero positive integer, shutdown the tests when the number periods
+# have passed.
+slow-timeout = { period = "30s", terminate-after = 8 }
+
+# * "immediate-final": output failures as soon as they happen and at the end of
+#   the test run
+failure-output = "immediate-final"
+
+# Do not cancel the test run on the first failure.
+fail-fast = false

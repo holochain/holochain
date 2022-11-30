@@ -7,15 +7,17 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for validation receipt workflow
-#[instrument(skip(env, conductor_handle, stop, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, network))]
 pub fn spawn_validation_receipt_consumer(
-    env: EnvWrite,
+    dna_hash: Arc<DnaHash>,
+    env: DbWrite<DbKindDht>,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    mut cell_network: HolochainP2pCell,
+    network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    let trigger_self = tx.clone();
+    let keystore = conductor_handle.keystore().clone();
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -27,17 +29,20 @@ pub fn spawn_validation_receipt_consumer(
             }
 
             // Run the workflow
-            match validation_receipt_workflow(env.clone(), &mut cell_network).await {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => {
-                    handle_workflow_error(
-                        conductor_handle.clone(),
-                        cell_network.cell_id(),
-                        err,
-                        "validation_receipt_workflow failure",
-                    )
-                    .await?
+            match validation_receipt_workflow(
+                dna_hash.clone(),
+                env.clone(),
+                &network,
+                keystore.clone(),
+                conductor_handle.clone(),
+            )
+            .await
+            {
+                Ok(WorkComplete::Incomplete) => {
+                    tracing::debug!("Work incomplete, retriggering workflow");
+                    trigger_self.trigger(&"retrigger")
                 }
+                Err(err) => handle_workflow_error(err)?,
                 _ => (),
             };
         }

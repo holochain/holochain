@@ -8,8 +8,6 @@ use kitsune_p2p_types::dependencies::ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::tx2::tx2_adapter::Uniq;
 use kitsune_p2p_types::KitsuneError;
 
-use sodoken::Buffer;
-
 use std::sync::Arc;
 
 pub mod types;
@@ -53,6 +51,3 @@ pub mod prelude {
 }
 
 use prelude::*;
-
-#[cfg(test)]
-mod test;

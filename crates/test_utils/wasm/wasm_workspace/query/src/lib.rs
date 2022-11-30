@@ -1,15 +1,16 @@
 use hdk::prelude::*;
+use integrity::*;
 
-entry_defs![Path::entry_def()];
+mod integrity;
 
 fn path(s: &str) -> ExternResult<EntryHash> {
-    let path = Path::from(s);
+    let path = Path::from(s).typed(LinkTypes::Query)?;
     path.ensure()?;
-    path.hash()
+    path.path_entry_hash()
 }
 
 #[hdk_extern]
-fn query(args: QueryFilter) -> ExternResult<Vec<Element>> {
+fn query(args: QueryFilter) -> ExternResult<Vec<Record>> {
     hdk::prelude::query(args)
 }
 

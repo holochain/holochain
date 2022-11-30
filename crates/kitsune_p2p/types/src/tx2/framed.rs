@@ -127,6 +127,7 @@ impl std::fmt::Debug for MsgId {
 type RR = (MsgId, PoolBuf);
 
 /// Efficiently read framed data.
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait AsFramedReader: 'static + Send + Unpin {
     /// Read a frame of data from this AsFramedReader instance.
     /// This returns a Vec in case the first read contains multiple small items.
@@ -172,10 +173,10 @@ impl AsFramedReader for FramedReader {
             };
 
             let out = match timeout
-                .mix(async {
+                .mix("FramedReader::read", async {
                     let mut read = 0;
-
-                    while read < MSG_SIZE_BYTES + MSG_ID_BYTES {
+                    let want = MSG_SIZE_BYTES + MSG_ID_BYTES;
+                    while read < want {
                         let sub_read = inner
                             .sub
                             .read(&mut inner.local_buf[read..MSG_SIZE_BYTES + MSG_ID_BYTES])
@@ -196,7 +197,6 @@ impl AsFramedReader for FramedReader {
 
                     let mut buf = PoolBuf::new();
                     buf.reserve(want_size);
-
                     while buf.len() < want_size {
                         let to_read = std::cmp::min(inner.local_buf.len(), want_size - buf.len());
                         read = match inner
@@ -232,6 +232,7 @@ impl AsFramedReader for FramedReader {
 }
 
 /// Efficiently write framed data.
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait AsFramedWriter: 'static + Send + Unpin {
     /// Write a frame of data to this FramedWriter instance.
     /// If timeout is exceeded, a timeout error is returned,
@@ -275,7 +276,7 @@ impl AsFramedWriter for FramedWriter {
             };
 
             if let Err(e) = timeout
-                .mix(async {
+                .mix("FramedWriter::write", async {
                     let total = (data.len() + MSG_SIZE_BYTES + MSG_ID_BYTES) as u32;
 
                     data.reserve_front(MSG_SIZE_BYTES + MSG_ID_BYTES);
@@ -292,6 +293,7 @@ impl AsFramedWriter for FramedWriter {
                 })
                 .await
             {
+                tracing::error!(?e, "writer closing due to error");
                 let _ = inner.sub.close().await;
                 return Err(e);
             }
@@ -381,5 +383,32 @@ mod tests {
         }
 
         wt.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "test_utils")]
+    async fn test_mock_framed() {
+        let mut f = MockAsFramedReader::new();
+        f.expect_read().returning(|_t| {
+            async move {
+                let mut buf = PoolBuf::new();
+                buf.extend_from_slice(b"test");
+                Ok((0.into(), buf))
+            }
+            .boxed()
+        });
+        let (_, buf) = f.read(KitsuneTimeout::from_millis(100)).await.unwrap();
+        assert_eq!(b"test", buf.as_ref());
+
+        let mut f = MockAsFramedWriter::new();
+        f.expect_write().returning(|_, buf, _| {
+            assert_eq!(b"test2", buf.as_ref());
+            async move { Ok(()) }.boxed()
+        });
+        let mut buf = PoolBuf::new();
+        buf.extend_from_slice(b"test2");
+        f.write(0.into(), buf, KitsuneTimeout::from_millis(100))
+            .await
+            .unwrap();
     }
 }

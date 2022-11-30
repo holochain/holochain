@@ -1,137 +1,243 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
-use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
-use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 use futures::future::join_all;
+use holochain_p2p::HolochainP2pDnaT;
+use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::*;
+use std::sync::Arc;
 
 pub fn call(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<Call>,
-) -> Result<Vec<ZomeCallResponse>, WasmError> {
-    match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ write_workspace: Permission::Allow, .. } => {
-            let results: Vec<Result<Result<ZomeCallResponse, _>, _>> = tokio_helper::block_forever_on(async move {
-                join_all(inputs.into_iter().map(|input| {
-                    async {
-                        let Call {
-                            to_cell,
-                            zome_name,
-                            fn_name,
-                            cap,
-                            payload,
-                            provenance,
-                        } = input;
-                        let cell_id = to_cell.unwrap_or_else(|| call_context.host_context().call_zome_handle().cell_id().clone());
-                        let invocation = ZomeCall {
-                            cell_id,
-                            zome_name,
-                            fn_name,
-                            payload,
-                            cap,
-                            provenance,
+) -> Result<Vec<ZomeCallResponse>, RuntimeError> {
+    let results: Vec<Result<ZomeCallResponse, RuntimeError>> =
+        tokio_helper::block_forever_on(async move {
+            join_all(inputs.into_iter().map(|input| async {
+                // The line below was added when migrating to rust edition 2021, per
+                // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+                let _ = &input;
+                let Call {
+                    target,
+                    zome_name,
+                    fn_name,
+                    cap_secret,
+                    payload,
+                } = input;
+
+                match (&target, HostFnAccess::from(&call_context.host_context())) {
+                    (
+                        CallTarget::ConductorCell(_),
+                        HostFnAccess {
+                            write_workspace: Permission::Allow,
+                            agent_info: Permission::Allow,
+                            ..
+                        },
+                    )
+                    | (
+                        CallTarget::NetworkAgent(_),
+                        HostFnAccess {
+                            write_network: Permission::Allow,
+                            agent_info: Permission::Allow,
+                            ..
+                        },
+                    ) => {
+                        let provenance = call_context
+                            .host_context
+                            .workspace()
+                            .source_chain()
+                            .as_ref()
+                            .expect("Must have source chain to know provenance")
+                            .agent_pubkey()
+                            .clone();
+
+                        let result: Result<ZomeCallResponse, RuntimeError> = match target {
+                            CallTarget::NetworkAgent(target_agent) => {
+                                match call_context
+                                    .host_context()
+                                    .network()
+                                    .call_remote(
+                                        provenance,
+                                        target_agent,
+                                        zome_name,
+                                        fn_name,
+                                        cap_secret,
+                                        payload,
+                                    )
+                                    .await
+                                {
+                                    Ok(serialized_bytes) => ZomeCallResponse::try_from(
+                                        serialized_bytes,
+                                    )
+                                    .map_err(|e| -> RuntimeError { wasm_error!(e).into() }),
+                                    Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
+                                }
+                            }
+                            CallTarget::ConductorCell(target_cell) => {
+                                let cell_id_result: Result<CellId, RuntimeError> = match target_cell
+                                {
+                                    CallTargetCell::OtherRole(role_name) => {
+                                        let this_cell_id = call_context
+                                            .host_context()
+                                            .call_zome_handle()
+                                            .cell_id()
+                                            .clone();
+                                        call_context
+                                            .host_context()
+                                            .call_zome_handle()
+                                            .find_cell_with_role_alongside_cell(
+                                                &this_cell_id,
+                                                &role_name,
+                                            )
+                                            .await
+                                            .map_err(|e| -> RuntimeError {
+                                                wasm_error!(e).into()
+                                            })
+                                            .and_then(|c| {
+                                                c.ok_or_else(|| {
+                                                    RuntimeError::from(wasm_error!(
+                                                        WasmErrorInner::Host(
+                                                            "Role not found.".to_string()
+                                                        )
+                                                    ))
+                                                })
+                                            })
+                                    }
+                                    CallTargetCell::OtherCell(cell_id) => Ok(cell_id),
+                                    CallTargetCell::Local => Ok(call_context
+                                        .host_context()
+                                        .call_zome_handle()
+                                        .cell_id()
+                                        .clone()),
+                                };
+                                match cell_id_result {
+                                    Ok(cell_id) => {
+                                        let invocation = ZomeCall {
+                                            cell_id,
+                                            zome_name,
+                                            fn_name,
+                                            payload,
+                                            cap_secret,
+                                            provenance,
+                                        };
+                                        match call_context
+                                            .host_context()
+                                            .call_zome_handle()
+                                            .call_zome(
+                                                invocation,
+                                                call_context
+                                                    .host_context()
+                                                    .workspace_write()
+                                                    .clone()
+                                                    .try_into()
+                                                    .expect(
+                                                        "Must have source chain to make zome call",
+                                                    ),
+                                            )
+                                            .await
+                                        {
+                                            Ok(Ok(zome_call_response)) => Ok(zome_call_response),
+                                            Ok(Err(ribosome_error)) => Err(wasm_error!(
+                                                WasmErrorInner::Host(ribosome_error.to_string())
+                                            )
+                                            .into()),
+                                            Err(conductor_api_error) => {
+                                                Err(wasm_error!(WasmErrorInner::Host(
+                                                    conductor_api_error.to_string()
+                                                ))
+                                                .into())
+                                            }
+                                        }
+                                    }
+                                    Err(e) => Err(e),
+                                }
+                            }
                         };
-                        call_context.host_context().call_zome_handle().call_zome(
-                            invocation,
-                            call_context.host_context().workspace().clone()
-                        ).await
+                        result
                     }
-                })).await
-            });
-            let results: Result<Vec<_>, _> = results.into_iter().map(|result| match result {
-                Ok(v) => match v {
-                    Ok(v) => Ok(v),
-                    Err(ribosome_error) => Err(WasmError::Host(ribosome_error.to_string())),
-                },
-                Err(conductor_api_error) => Err(WasmError::Host(conductor_api_error.to_string())),
-            }).collect();
-            Ok(results?)
-        },
-        _ => unreachable!(),
-    }
+                    _ => Err(wasm_error!(WasmErrorInner::Host(
+                        RibosomeError::HostFnPermissions(
+                            call_context.zome.zome_name().clone(),
+                            call_context.function_name().clone(),
+                            "call".into(),
+                        )
+                        .to_string(),
+                    ))
+                    .into()),
+                }
+            }))
+            .await
+        });
+    let results: Result<Vec<_>, _> = results.into_iter().collect();
+    results
 }
 
 #[cfg(test)]
 pub mod wasm_test {
-    use std::convert::TryFrom;
-
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
-    use hdk::prelude::CellId;
-    use holo_hash::HeaderHash;
-    use holochain_serialized_bytes::SerializedBytes;
+    use holo_hash::ActionHash;
     use holochain_state::prelude::fresh_reader_test;
-    use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use holochain_zome_types::ExternIO;
     use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
     use rusqlite::named_params;
 
-    use crate::conductor::{api::ZomeCall, ConductorHandle};
+    use crate::sweettest::SweetAgents;
     use crate::test_utils::conductor_setup::ConductorTestData;
-    use crate::test_utils::install_app;
     use crate::test_utils::new_zome_call;
+
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
         observability::test_run().ok();
+        let test_wasm = TestWasm::WhoAmI;
+        let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
-        let zomes = vec![TestWasm::WhoAmI];
-        let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
-        let handle = conductor_test.handle();
-        let bob_cell_id = conductor_test.bob_call_data().unwrap().cell_id.clone();
-        let alice_call_data = conductor_test.alice_call_data();
-        let alice_cell_id = &alice_call_data.cell_id;
-        let alice_agent_id = alice_cell_id.agent_pubkey();
-        let bob_agent_id = bob_cell_id.agent_pubkey();
+        let dna_file_2 = dna_file_1
+            .clone()
+            .with_network_seed("CLONE".to_string())
+            .await;
 
-        // BOB INIT (to do cap grant)
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (alice_pubkey, _) = SweetAgents::alice_and_bob();
 
-        let _ = handle
-            .call_zome(ZomeCall {
-                cell_id: bob_cell_id.clone(),
-                zome_name: TestWasm::WhoAmI.into(),
-                cap: None,
-                fn_name: "set_access".into(),
-                payload: ExternIO::encode(()).unwrap(),
-                provenance: bob_agent_id.clone(),
-            })
+        let apps = conductor
+            .setup_app_for_agents(
+                "app-",
+                &[alice_pubkey.clone()],
+                &[
+                    ("role1".to_string(), dna_file_1),
+                    ("role2".to_string(), dna_file_2),
+                ],
+            )
             .await
             .unwrap();
 
-        // ALICE DOING A CALL
+        let ((cell1, cell2),) = apps.into_tuples();
 
-        let output = handle
-            .call_zome(ZomeCall {
-                cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::WhoAmI.into(),
-                cap: None,
-                fn_name: "who_are_they_local".into(),
-                payload: ExternIO::encode(&bob_cell_id).unwrap(),
-                provenance: alice_agent_id.clone(),
-            })
-            .await
-            .unwrap()
-            .unwrap();
+        let zome1 = cell1.zome(test_wasm);
+        let zome2 = cell2.zome(test_wasm);
 
-        match output {
-            ZomeCallResponse::Ok(guest_output) => {
-                let agent_info: AgentInfo = guest_output.decode().unwrap();
-                assert_eq!(
-                    agent_info,
-                    AgentInfo {
-                        agent_initial_pubkey: bob_agent_id.clone(),
-                        agent_latest_pubkey: bob_agent_id.clone(),
-                    },
-                );
-            }
-            _ => unreachable!(),
+        let _: () = conductor.call(&zome2, "set_access", ()).await;
+
+        {
+            let agent_info: AgentInfo = conductor
+                .call(&zome1, "who_are_they_local", cell2.cell_id())
+                .await;
+            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
         }
-        conductor_test.shutdown_conductor().await;
+        {
+            let agent_info: AgentInfo = conductor.call(&zome1, "who_are_they_role", "role2").await;
+            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
+        }
     }
 
     /// When calling the same cell we need to make sure
@@ -152,18 +258,18 @@ pub mod wasm_test {
         let result = handle.call_zome(invocation).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
 
-        // Get the header hash of that entry
-        let header_hash: HeaderHash =
+        // Get the action hash of that entry
+        let action_hash: ActionHash =
             unwrap_to::unwrap_to!(result.unwrap().unwrap() => ZomeCallResponse::Ok)
                 .decode()
                 .unwrap();
 
         // Check alice's source chain contains the new value
-        let has_hash: bool = fresh_reader_test(alice_call_data.env.clone(), |txn| {
+        let has_hash: bool = fresh_reader_test(alice_call_data.authored_db.clone(), |txn| {
             txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash AND is_authored = 1)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
                 named_params! {
-                    ":hash": header_hash
+                    ":hash": action_hash
                 },
                 |row| row.get(0),
             )
@@ -176,74 +282,69 @@ pub mod wasm_test {
 
     /// test calling a different zome
     /// in a different cell.
+    // FIXME: we should NOT be able to do a "bridge" call to another cell in a different app, by a different agent!
+    //        Local bridge calls are always within the same app. So this test is testing something that should
+    //        not be supported.
     #[tokio::test(flavor = "multi_thread")]
     async fn bridge_call() {
         observability::test_run().ok();
 
-        let zomes = vec![TestWasm::Create];
-        let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-        let handle = conductor_test.handle();
-        let alice_call_data = conductor_test.alice_call_data();
-        let alice_cell_id = &alice_call_data.cell_id;
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        // Install a different dna for bob
-        let zomes = vec![TestWasm::WhoAmI];
-        let bob_cell_id = install_new_app("bobs_dna", zomes, &handle).await;
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
 
-        // Call create_entry in the create_entry zome from the whoami zome
-        let invocation = new_zome_call(
-            &bob_cell_id,
-            "call_create_entry",
-            alice_cell_id.clone(),
-            TestWasm::WhoAmI,
-        )
-        .unwrap();
-        let result = handle.call_zome(invocation).await;
-        assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
+        let apps = conductor
+            .setup_app_for_agents("app", &[alice.clone(), bob.clone()], &[dna_file])
+            .await
+            .unwrap();
+        let ((alice,), (_bobbo,)) = apps.into_tuples();
 
-        // Get the header hash of that entry
-        let header_hash: HeaderHash =
-            unwrap_to::unwrap_to!(result.unwrap().unwrap() => ZomeCallResponse::Ok)
-                .decode()
-                .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
+        let apps = conductor
+            .setup_app_for_agents("app2", &[bob.clone()], &[dna_file])
+            .await
+            .unwrap();
+        let ((bobbo2,),) = apps.into_tuples();
+        let action_hash: ActionHash = conductor
+            .call(
+                &bobbo2.zome(TestWasm::WhoAmI),
+                "call_create_entry",
+                alice.cell_id().clone(),
+            )
+            .await;
 
         // Check alice's source chain contains the new value
-        let has_hash: bool = fresh_reader_test(alice_call_data.env.clone(), |txn| {
+        let has_hash: bool = fresh_reader_test(alice.dht_db().clone(), |txn| {
             txn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE header_hash = :hash AND is_authored = 1)",
+                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
                 named_params! {
-                    ":hash": header_hash
+                    ":hash": action_hash
                 },
                 |row| row.get(0),
             )
             .unwrap()
         });
         assert!(has_hash);
-
-        conductor_test.shutdown_conductor().await;
     }
 
-    async fn install_new_app(
-        dna_name: &str,
-        zomes: Vec<TestWasm>,
-        handle: &ConductorHandle,
-    ) -> CellId {
-        let dna_file = DnaFile::new(
-            DnaDef {
-                name: dna_name.to_string(),
-                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
-                zomes: zomes.clone().into_iter().map(Into::into).collect(),
-            },
-            zomes.into_iter().map(Into::into),
-        )
-        .await
-        .unwrap();
-        let bob_agent_id = fake_agent_pubkey_2();
-        let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
-        let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
-        let cell_data = vec![(bob_installed_cell, None)];
-        install_app("bob_app", cell_data, vec![dna_file], handle.clone()).await;
-        bob_cell_id
+    #[tokio::test(flavor = "multi_thread")]
+    /// we can call a fn on a remote
+    async fn call_remote_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::WhoAmI).await;
+
+        let _: () = conductor.call(&bob, "set_access", ()).await;
+        let agent_info: AgentInfo = conductor
+            .call(&alice, "whoarethey", bob_pubkey.clone())
+            .await;
+        assert_eq!(agent_info.agent_initial_pubkey, bob_pubkey);
+        assert_eq!(agent_info.agent_latest_pubkey, bob_pubkey);
     }
 }

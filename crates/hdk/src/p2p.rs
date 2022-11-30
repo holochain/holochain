@@ -11,27 +11,25 @@ use crate::prelude::*;
 /// - fn_name: The name of the function in the zome you are calling.
 /// - cap_secret: The capability secret if required.
 /// - payload: The arguments to the function you are calling.
-pub fn call<I>(
-    to_cell: Option<CellId>,
-    zome_name: ZomeName,
+pub fn call<I, Z>(
+    to_cell: CallTargetCell,
+    zome_name: Z,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
     I: serde::Serialize + std::fmt::Debug,
+    Z: Into<ZomeName>,
 {
-    // @todo is this secure to set this in the wasm rather than have the host inject it?
-    let provenance = agent_info()?.agent_latest_pubkey;
     Ok(HDK
         .with(|h| {
             h.borrow().call(vec![Call::new(
-                to_cell,
-                zome_name,
+                CallTarget::ConductorCell(to_cell),
+                zome_name.into(),
                 fn_name,
                 cap_secret,
-                ExternIO::encode(payload)?,
-                provenance,
+                ExternIO::encode(payload).map_err(|e| wasm_error!(e))?,
             )])
         })?
         .into_iter()
@@ -62,24 +60,25 @@ where
 /// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serializable_payload)?;
 /// ...
 /// ```
-pub fn call_remote<I>(
+pub fn call_remote<I, Z>(
     agent: AgentPubKey,
-    zome: ZomeName,
+    zome: Z,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
     I: serde::Serialize + std::fmt::Debug,
+    Z: Into<ZomeName>,
 {
     Ok(HDK
         .with(|h| {
-            h.borrow().call_remote(vec![CallRemote::new(
-                agent,
-                zome,
+            h.borrow().call(vec![Call::new(
+                CallTarget::NetworkAgent(agent),
+                zome.into(),
                 fn_name,
                 cap_secret,
-                ExternIO::encode(payload)?,
+                ExternIO::encode(payload).map_err(|e| wasm_error!(e))?,
             )])
         })?
         .into_iter()
@@ -101,8 +100,9 @@ where
     I: serde::Serialize + std::fmt::Debug,
 {
     HDK.with(|h| {
-        h.borrow()
-            .emit_signal(AppSignal::new(ExternIO::encode(input)?))
+        h.borrow().emit_signal(AppSignal::new(
+            ExternIO::encode(input).map_err(|e| wasm_error!(e))?,
+        ))
     })
 }
 
@@ -139,7 +139,7 @@ where
 {
     HDK.with(|h| {
         h.borrow().remote_signal(RemoteSignal {
-            signal: ExternIO::encode(input)?,
+            signal: ExternIO::encode(input).map_err(|e| wasm_error!(e))?,
             agents,
         })
     })

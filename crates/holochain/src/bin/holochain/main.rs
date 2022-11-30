@@ -5,6 +5,7 @@ use holochain::conductor::paths::ConfigFilePath;
 use holochain::conductor::Conductor;
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_util::tokio_helper;
 use observability::Output;
 #[cfg(unix)]
@@ -38,6 +39,14 @@ struct Opt {
     )]
     config_path: Option<PathBuf>,
 
+    /// Instead of the normal "interactive" method of passphrase
+    /// retreival, read the passphrase from stdin. Be careful
+    /// how you make use of this, as it could be less secure,
+    /// for example, make sure it is not saved in your
+    /// `~/.bash_history`.
+    #[structopt(short = "p", long)]
+    pub piped: bool,
+
     #[structopt(
         short = "i",
         long,
@@ -45,6 +54,12 @@ struct Opt {
     useful when running a conductor for the first time"
     )]
     interactive: bool,
+
+    #[structopt(
+        long,
+        help = "Display version information such as git revision and HDK version"
+    )]
+    build_info: bool,
 }
 
 fn main() {
@@ -59,13 +74,18 @@ async fn async_main() {
     human_panic::setup_panic!();
 
     let opt = Opt::from_args();
-    observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
+
+    if opt.build_info {
+        println!("{}", option_env!("BUILD_INFO").unwrap_or("{}"));
+        return;
+    }
+
+    observability::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("observability initialized");
 
     kitsune_p2p_types::metrics::init_sys_info_poll();
 
-    let conductor =
-        conductor_handle_from_config_path(opt.config_path.clone(), opt.interactive).await;
+    let conductor = conductor_handle_from_config_path(&opt).await;
 
     info!("Conductor successfully initialized.");
 
@@ -84,7 +104,6 @@ async fn async_main() {
     // Conductor activity has ceased
     let result = conductor
         .take_shutdown_handle()
-        .await
         .expect("The shutdown handle has already been taken.")
         .await;
 
@@ -94,15 +113,13 @@ async fn async_main() {
     // conductor.kill().await
 }
 
-async fn conductor_handle_from_config_path(
-    config_path: Option<PathBuf>,
-    interactive: bool,
-) -> ConductorHandle {
+async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
+    let config_path = opt.config_path.clone();
     let config_path_default = config_path.is_none();
     let config_path: ConfigFilePath = config_path.map(Into::into).unwrap_or_default();
     debug!("config_path: {}", config_path);
 
-    let config: ConductorConfig = if interactive {
+    let config: ConductorConfig = if opt.interactive {
         // Load config, offer to create default config if missing
         interactive::load_config_or_prompt_for_default(config_path)
             .expect("Could not load conductor config")
@@ -114,11 +131,23 @@ async fn conductor_handle_from_config_path(
         load_config(&config_path, config_path_default)
     };
 
+    // read the passphrase to prepare for usage
+    let passphrase = match &config.keystore {
+        KeystoreConfig::DangerTestKeystore => None,
+        KeystoreConfig::LairServer { .. } | KeystoreConfig::LairServerInProc { .. } => {
+            if opt.piped {
+                holochain_util::pw::pw_set_piped(true);
+            }
+
+            Some(holochain_util::pw::pw_get().unwrap())
+        }
+    };
+
     // Check if database is present
     // In interactive mode give the user a chance to create it, otherwise create it automatically
     let env_path = PathBuf::from(config.environment_path.clone());
     if !env_path.is_dir() {
-        let result = if interactive {
+        let result = if opt.interactive {
             interactive::prompt_for_database_dir(&env_path)
         } else {
             std::fs::create_dir_all(&env_path)
@@ -135,6 +164,7 @@ async fn conductor_handle_from_config_path(
     // Initialize the Conductor
     Conductor::builder()
         .config(config)
+        .passphrase(passphrase)
         .build()
         .await
         .expect("Could not initialize Conductor from configuration")

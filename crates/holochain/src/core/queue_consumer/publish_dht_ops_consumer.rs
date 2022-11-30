@@ -8,16 +8,23 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
-#[instrument(skip(env, conductor_handle, stop, cell_network))]
+#[instrument(skip(env, conductor_handle, stop, network))]
 pub fn spawn_publish_dht_ops_consumer(
-    env: EnvWrite,
+    agent: AgentPubKey,
+    env: DbWrite<DbKindAuthored>,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
-    cell_network: HolochainP2pCell,
+    network: Box<dyn HolochainP2pDnaT + Send + Sync>,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
-    let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    // Create a trigger with an exponential back off starting at 1 minute
+    // and maxing out at 5 minutes.
+    // The back off is reset any time the trigger is called (when new data is committed)
+
+    let (tx, mut rx) =
+        TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
+    let trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
+        let network = network;
         loop {
             // Wait for next job
             if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
@@ -27,18 +34,30 @@ pub fn spawn_publish_dht_ops_consumer(
                 break;
             }
 
+            if conductor_handle
+                .get_config()
+                .network
+                .as_ref()
+                .map(|c| c.tuning_params.disable_publish)
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
             // Run the workflow
-            match publish_dht_ops_workflow(env.clone(), cell_network.clone()).await {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => {
-                    handle_workflow_error(
-                        conductor_handle.clone(),
-                        cell_network.cell_id(),
-                        err,
-                        "publish_dht_ops failure",
-                    )
-                    .await?
+            match publish_dht_ops_workflow(
+                env.clone(),
+                network.as_ref(),
+                &trigger_self,
+                agent.clone(),
+            )
+            .await
+            {
+                Ok(WorkComplete::Incomplete) => {
+                    tracing::debug!("Work incomplete, retriggering workflow");
+                    trigger_self.trigger(&"retrigger")
                 }
+                Err(err) => handle_workflow_error(err)?,
                 _ => (),
             };
         }

@@ -1,62 +1,62 @@
-use crate::conductor::manager::spawn_task_manager;
-use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
-use crate::core::ribosome::MockRibosomeT;
+use crate::conductor::space::TestSpaces;
+use crate::conductor::{manager::spawn_task_manager, Conductor};
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
-use crate::fixt::DnaFileFixturator;
-use crate::fixt::SignatureFixturator;
-use crate::test_utils::test_network;
-use ::fixt::prelude::*;
+use crate::test_utils::{fake_valid_dna_file, test_network};
 use holo_hash::HasHash;
-use holochain_state::prelude::*;
+use holochain_state::test_utils::{test_db_dir, test_keystore};
 use holochain_types::prelude::*;
-use holochain_zome_types::header;
-use holochain_zome_types::HeaderHashed;
-use std::sync::Arc;
+use holochain_zome_types::action;
 use tokio::sync;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
-    let cell_env = test_cell_env();
-    let cache_env = test_cache_env();
-    let env = cell_env.env();
-    let cache = cache_env.env();
+    let keystore = test_keystore();
 
-    let cell_id = fake_cell_id(1);
+    let agent_key = keystore.new_sign_keypair_random().await.unwrap();
+    let dna_file = fake_valid_dna_file("test_cell_handle_publish");
+    let cell_id = CellId::new(dna_file.dna_hash().clone(), agent_key);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
+    let spaces = TestSpaces::new([dna.clone()]);
+    let db = spaces.test_spaces[&dna].space.authored_db.clone();
+    let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
+    let dht_db_cache = spaces.test_spaces[&dna].space.dht_query_cache.clone();
+
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
-    let holochain_p2p_cell = test_network.cell_network();
+    let holochain_p2p_cell = test_network.dna_network();
 
-    let mut mock_handle = crate::conductor::handle::MockConductorHandleT::new();
-    mock_handle
-        .expect_get_dna()
-        .returning(|_| Some(fixt!(DnaFile)));
+    let db_dir = test_db_dir();
+    let handle = Conductor::builder()
+        .with_keystore(keystore.clone())
+        .test(db_dir.path(), &[])
+        .await
+        .unwrap();
+    handle.register_dna(dna_file.clone()).await.unwrap();
 
-    let mock_handle: crate::conductor::handle::ConductorHandle = Arc::new(mock_handle);
-    let mut mock_ribosome = MockRibosomeT::new();
-    mock_ribosome
-        .expect_run_genesis_self_check()
-        .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
+    let ribosome = RealRibosome::new(dna_file).unwrap();
 
     super::Cell::genesis(
         cell_id.clone(),
-        mock_handle.clone(),
-        env.clone(),
-        mock_ribosome,
+        handle.clone(),
+        db.clone(),
+        dht_db.clone(),
+        dht_db_cache.clone(),
+        ribosome,
+        None,
         None,
     )
     .await
     .unwrap();
 
-    let (add_task_sender, shutdown) = spawn_task_manager(mock_handle.clone());
+    let (add_task_sender, shutdown) = spawn_task_manager(handle.clone());
     let (stop_tx, _) = sync::broadcast::channel(1);
 
-    let (cell, _) = super::Cell::create(
+    let (_cell, _) = super::Cell::create(
         cell_id,
-        mock_handle,
-        env.clone(),
-        cache.clone(),
+        handle,
+        spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,
         add_task_sender,
         stop_tx.clone(),
@@ -64,26 +64,23 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let sig = fixt!(Signature);
-    let header = header::Header::Dna(header::Dna {
+    let action = action::Action::Dna(action::Dna {
         author: agent.clone(),
-        timestamp: timestamp::now().into(),
+        timestamp: Timestamp::now().into(),
         hash: dna.clone(),
     });
-    let op = DhtOp::StoreElement(sig, header.clone(), None);
+    let hh = ActionHashed::from_content_sync(action.clone());
+    let shh = SignedActionHashed::sign(&keystore, hh).await.unwrap();
+    let op = DhtOp::StoreRecord(shh.signature().clone(), action.clone(), None);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
-    let header_hash = HeaderHashed::from_content_sync(header.clone()).into_hash();
 
-    cell.handle_publish(
-        fake_agent_pubkey_2(),
-        true,
-        header_hash.clone().into(),
-        vec![(op_hash.clone(), op.clone())],
-    )
-    .await
-    .unwrap();
+    spaces
+        .spaces
+        .handle_publish(&dna, true, false, vec![op.clone()])
+        .await
+        .unwrap();
 
-    op_exists(&cell.env, &op_hash).unwrap();
+    op_exists(&dht_db, op_hash).await.unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap().unwrap();

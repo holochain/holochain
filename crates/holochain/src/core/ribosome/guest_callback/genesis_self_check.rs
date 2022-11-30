@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
@@ -8,10 +11,10 @@ use holochain_types::prelude::*;
 
 #[derive(Clone)]
 pub struct GenesisSelfCheckInvocation {
-    pub payload: GenesisSelfCheckData,
+    pub payload: Arc<GenesisSelfCheckData>,
 }
 
-#[derive(Clone, Constructor)]
+#[derive(Clone, Constructor, Debug)]
 pub struct GenesisSelfCheckHostAccess;
 
 impl From<GenesisSelfCheckHostAccess> for HostContext {
@@ -24,13 +27,14 @@ impl From<&GenesisSelfCheckHostAccess> for HostFnAccess {
     fn from(_: &GenesisSelfCheckHostAccess) -> Self {
         let mut access = Self::none();
         access.keystore_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
         access
     }
 }
 
 impl Invocation for GenesisSelfCheckInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::All
+        ZomesToInvoke::AllIntegrity
     }
     fn fn_components(&self) -> FnComponents {
         vec!["genesis_self_check".into()].into()
@@ -38,11 +42,8 @@ impl Invocation for GenesisSelfCheckInvocation {
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.payload)
     }
-}
-
-impl From<GenesisSelfCheckInvocation> for GenesisSelfCheckData {
-    fn from(i: GenesisSelfCheckInvocation) -> Self {
-        i.payload
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 
@@ -81,25 +82,32 @@ impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResult {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
+    use std::sync::Arc;
+
     use super::GenesisSelfCheckInvocation;
-    use crate::core::ribosome::{
-        guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckResult},
-        RibosomeT,
-    };
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
+    use crate::{
+        core::ribosome::{
+            guest_callback::genesis_self_check::{
+                GenesisSelfCheckHostAccess, GenesisSelfCheckResult,
+            },
+            RibosomeT,
+        },
+        sweettest::*,
+    };
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_types::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::{TestCoordinatorWasm, TestIntegrityWasm, TestWasm};
 
     fn invocation_fixture() -> GenesisSelfCheckInvocation {
         GenesisSelfCheckInvocation {
-            payload: GenesisSelfCheckData {
-                dna_def: fixt!(DnaDef),
-                membrane_proof: Some(().try_into().unwrap()),
+            payload: Arc::new(GenesisSelfCheckData {
+                dna_info: fixt!(DnaInfo),
+                membrane_proof: Some(Arc::new(().try_into().unwrap())),
                 agent_key: fixt!(AgentPubKey),
-            },
+            }),
         }
     }
 
@@ -144,5 +152,27 @@ mod slow_tests {
             result,
             GenesisSelfCheckResult::Invalid("esoteric edge case".into()),
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_integrity_zome_can_run_self_check() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (dna, _, _) = SweetDnaFile::unique_from_zomes(
+            vec![TestIntegrityWasm::IntegrityZome],
+            Vec::<TestCoordinatorWasm>::new(),
+            vec![TestIntegrityWasm::IntegrityZome],
+        )
+        .await;
+
+        let app = conductor.setup_app("app", &[dna]).await.unwrap();
+        let cells = app.into_cells();
+
+        let _: EntryHashed = conductor
+            .call(
+                &cells[0].zome(TestIntegrityWasm::IntegrityZome),
+                "call_must_get_entry",
+                EntryHash::from(cells[0].cell_id().agent_pubkey().clone()),
+            )
+            .await;
     }
 }

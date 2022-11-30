@@ -90,16 +90,17 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky due to dependence on sensitive timing"]
     async fn test_reverse_semaphore() {
         let rs = ReverseSemaphore::new();
 
-        let s = std::time::Instant::now();
+        let s = tokio::time::Instant::now();
         rs.wait_on_zero_permits().await;
         let es = s.elapsed().as_secs_f64();
         assert!(es < 0.00015);
         println!("zero wait, after {} s", es);
 
-        let s = std::time::Instant::now();
+        let s = tokio::time::Instant::now();
         for t in 10..15 {
             let permit = rs.acquire();
             tokio::task::spawn(async move {

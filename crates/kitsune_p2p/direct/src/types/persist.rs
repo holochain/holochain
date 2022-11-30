@@ -2,10 +2,8 @@
 
 use crate::*;
 use futures::future::BoxFuture;
-use kitsune_p2p::event::MetricDatum;
-use kitsune_p2p::event::MetricQuery;
-use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p::dht_arc::DhtArcSet;
+use kitsune_p2p::event::TimeWindow;
 use kitsune_p2p_types::tls::TlsConfig;
 use std::future::Future;
 
@@ -50,11 +48,12 @@ pub trait AsKdPersist: 'static + Send + Sync {
         limit: u32,
     ) -> BoxFuture<'static, KdResult<Vec<KdAgentInfo>>>;
 
-    /// Store agent info
-    fn put_metric_datum(&self, datum: MetricDatum) -> BoxFuture<'static, KdResult<()>>;
-
-    /// Store agent info
-    fn query_metrics(&self, query: MetricQuery) -> BoxFuture<'static, KdResult<MetricQueryAnswer>>;
+    /// Query the peer density of a space for a given [`DhtArc`].
+    fn query_peer_density(
+        &self,
+        root: KdHash,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht::PeerView>>;
 
     /// Store entry
     fn store_entry(
@@ -77,9 +76,8 @@ pub trait AsKdPersist: 'static + Send + Sync {
         &self,
         root: KdHash,
         agent: KdHash,
-        created_at_start_s: f32,
-        created_at_end_s: f32,
-        dht_arc: DhtArc,
+        window: TimeWindow,
+        dht_arc: DhtArcSet,
     ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>>;
 
     /// Get ui file
@@ -173,20 +171,13 @@ impl KdPersist {
         AsKdPersist::query_agent_info_near_basis(&*self.0, root, basis_loc, limit)
     }
 
-    /// Store agent info
-    pub fn store_metric_datum(
+    /// Query the peer density of a space for a given [`DhtArc`].
+    pub fn query_peer_density(
         &self,
-        datum: MetricDatum,
-    ) -> impl Future<Output = KdResult<()>> + 'static + Send {
-        AsKdPersist::put_metric_datum(&*self.0, datum)
-    }
-
-    /// "Query" metric info
-    pub async fn fetch_metrics(
-        &self,
-        query: MetricQuery,
-    ) -> impl Future<Output = KdResult<MetricQueryAnswer>> + 'static + Send {
-        AsKdPersist::query_metrics(&*self.0, query)
+        root: KdHash,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> impl Future<Output = KdResult<kitsune_p2p_types::dht::PeerView>> + 'static + Send {
+        AsKdPersist::query_peer_density(&*self.0, root, dht_arc)
     }
 
     /// Store entry
@@ -214,18 +205,10 @@ impl KdPersist {
         &self,
         root: KdHash,
         agent: KdHash,
-        created_at_start_s: f32,
-        created_at_end_s: f32,
-        dht_arc: DhtArc,
+        window: TimeWindow,
+        dht_arc: DhtArcSet,
     ) -> impl Future<Output = KdResult<Vec<KdEntrySigned>>> + 'static + Send {
-        AsKdPersist::query_entries(
-            &*self.0,
-            root,
-            agent,
-            created_at_start_s,
-            created_at_end_s,
-            dht_arc,
-        )
+        AsKdPersist::query_entries(&*self.0, root, agent, window, dht_arc)
     }
 
     /// Get ui file

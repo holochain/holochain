@@ -1,75 +1,68 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: ChainQueryFilter,
-) -> Result<Vec<Element>, WasmError> {
+) -> Result<Vec<Record>, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ read_workspace: Permission::Allow, .. } => {
-            tokio_helper::block_forever_on(async move {
-                let elements: Vec<Element> = call_context
-                    .host_context
-                    .workspace()
-                    .source_chain()
-                    .query(input)
-                    .await
-                    .map_err(|source_chain_error| WasmError::Host(source_chain_error.to_string()))?;
-                Ok(elements)
-            })
-        },
-        _ => unreachable!(),
+        HostFnAccess {
+            read_workspace: Permission::Allow,
+            ..
+        } => tokio_helper::block_forever_on(async move {
+            let records: Vec<Record> = call_context
+                .host_context
+                .workspace()
+                .source_chain()
+                .as_ref()
+                .expect("Must have source chain to query the source chain")
+                .query(input)
+                .await
+                .map_err(|source_chain_error| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
+                })?;
+            Ok(records)
+        }),
+        _ => Err(wasm_error!(WasmErrorInner::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "query".into(),
+            )
+            .to_string(),
+        ))
+        .into()),
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
-    use ::fixt::prelude::*;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
-    use holochain_state::prelude::TestEnv;
-    use query::ChainQueryFilter;
-
     use holochain_wasm_test_utils::TestWasm;
-
-    // TODO: use this setup function to DRY up a lot of duplicated code
-    async fn setup() -> (TestEnv, ZomeCallHostAccess) {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
-        (test_env, host_access)
-    }
+    use query::ChainQueryFilter;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn query_smoke_test() {
-        let (_test_env, host_access) = setup().await;
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Query).await;
 
-        let _hash_a: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "a".to_string()).unwrap();
-        let _hash_b: EntryHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Query, "add_path", "b".to_string()).unwrap();
+        let _hash_a: EntryHash = conductor.call(&alice, "add_path", "a".to_string()).await;
+        let _hash_b: EntryHash = conductor.call(&alice, "add_path", "b".to_string()).await;
 
-        let elements: Vec<Element> = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Query,
-            "query",
-            ChainQueryFilter::default()
-        ).unwrap();
+        let records: Vec<Record> = conductor
+            .call(&alice, "query", ChainQueryFilter::default())
+            .await;
 
-        assert_eq!(elements.len(), 5);
+        assert_eq!(records.len(), 6);
     }
 }

@@ -26,13 +26,13 @@ Each primitive HashType has a unique 3-byte prefix associated with it, to easily
 | DhtOp     | DhtOpHash      | uhCQk  |
 | Dna       | DnaHash        | uhC0k  |
 | NetId     | NetIdHash      | uhCIk  |
-| Header    | HeaderHash     | uhCkk  |
+| Action    | ActionHash     | uhCkk  |
 | Wasm      | DnaWasmHash    | uhCok  |
 
-The "HoloHash alias" column lists the type aliases provided to refer to each type of HoloHash. For instance, `HeaderHash` is the following type alias:
+The "HoloHash alias" column lists the type aliases provided to refer to each type of HoloHash. For instance, `ActionHash` is the following type alias:
 
 ```rust
-pub type HeaderHash = HoloHash<hash_type::Header>;
+pub type ActionHash = HoloHash<hash_type::Action>;
 ```
 
 (the prefixes listed are the base64 representations)
@@ -43,7 +43,7 @@ Composite hash types are used in contexts when one of several primitive hash typ
 
 `EntryHash`: used to hash Entries. An Entry can hash to either a `ContentHash` or an `AgentPubKey`.
 
-`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either a Header or an Entry, therefore AnyDhtHash can refer to either a `HeaderHash` or an `EntryHash`.
+`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either an action or an Entry, therefore AnyDhtHash can refer to either an `ActionHash` or an `EntryHash`.
 
 ## Serialization
 
@@ -116,7 +116,7 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Copyright (C) 2019 - 2021, Holochain Foundation
+Copyright (C) 2019 - 2022, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,

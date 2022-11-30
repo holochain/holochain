@@ -1,10 +1,14 @@
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use std::sync::Arc;
+
+use holochain_keystore::MetaLairClient;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::TryInto;
 use tracing::*;
 
+use crate::conductor::conductor::CellStatus;
+use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::WorkComplete;
 
 use super::error::WorkflowResult;
@@ -12,36 +16,55 @@ use super::error::WorkflowResult;
 #[cfg(test)]
 mod tests;
 
-#[instrument(skip(vault, network))]
+#[instrument(skip(vault, network, keystore, conductor))]
 /// Send validation receipts to their authors in serial and without waiting for
 /// responses.
 /// TODO: Currently still waiting for responses because we don't have a network call
 /// that doesn't.
 pub async fn validation_receipt_workflow(
-    vault: EnvWrite,
-    network: &mut HolochainP2pCell,
+    dna_hash: Arc<DnaHash>,
+    vault: DbWrite<DbKindDht>,
+    network: &HolochainP2pDna,
+    keystore: MetaLairClient,
+    conductor: ConductorHandle,
 ) -> WorkflowResult<WorkComplete> {
-    // Get the env and keystore
-    let keystore = vault.keystore();
     // Who we are.
-    let validator = network.from_agent();
+    // TODO: I think this is right but maybe we need to make sure these cells are in
+    // running apps?.
+    let cell_ids = conductor.list_cell_ids(Some(CellStatus::Joined));
+
+    if cell_ids.is_empty() {
+        return Ok(WorkComplete::Complete);
+    }
+
+    let validators = cell_ids
+        .into_iter()
+        .filter_map(|id| {
+            let (d, a) = id.into_dna_and_agent();
+            if d == *dna_hash {
+                Some(a)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
     // Get out all ops that are marked for sending receipt.
     // FIXME: Test this query.
     let receipts = vault
         .async_reader({
-            let validator = validator.clone();
+            let validators = validators.clone();
             move |txn| {
                 let mut stmt = txn.prepare(
                     "
-            SELECT Header.author, DhtOp.hash, DhtOp.validation_status,
-            DhtOp.when_integrated_ns
+            SELECT Action.author, DhtOp.hash, DhtOp.validation_status,
+            DhtOp.when_integrated
             From DhtOp
-            JOIN Header ON DhtOp.header_hash = Header.hash
+            JOIN Action ON DhtOp.action_hash = Action.hash
             WHERE
             DhtOp.require_receipt = 1
             AND
-            DhtOp.when_integrated_ns IS NOT NULL
+            DhtOp.when_integrated IS NOT NULL
             AND
             DhtOp.validation_status IS NOT NULL
             ",
@@ -51,12 +74,13 @@ pub async fn validation_receipt_workflow(
                         let author: AgentPubKey = r.get("author")?;
                         let dht_op_hash = r.get("hash")?;
                         let validation_status = r.get("validation_status")?;
-                        let when_integrated = from_blob::<Timestamp>(r.get("when_integrated_ns")?)?;
+                        // NB: timestamp will never be null, so this is OK
+                        let when_integrated = r.get("when_integrated")?;
                         StateQueryResult::Ok((
                             ValidationReceipt {
                                 dht_op_hash,
                                 validation_status,
-                                validator: validator.clone(),
+                                validators: validators.clone(),
                                 when_integrated,
                             },
                             author,
@@ -71,21 +95,33 @@ pub async fn validation_receipt_workflow(
     // Send the validation receipts
     for (receipt, author) in receipts {
         // Don't send receipt to self.
-        if author == validator {
+        if validators.iter().any(|validator| *validator == author) {
             continue;
         }
 
         let op_hash = receipt.dht_op_hash.clone();
 
         // Sign on the dotted line.
-        let receipt = receipt.sign(&keystore).await?;
+        let receipt = match ValidationReceipt::sign(receipt, &keystore).await {
+            Ok(Some(r)) => r,
+            Ok(None) => {
+                return Ok(WorkComplete::Incomplete);
+            }
+            Err(e) => {
+                info!(failed_to_sign_receipt = ?e);
+                return Ok(WorkComplete::Incomplete);
+            }
+        };
 
         // Send it and don't wait for response.
         // TODO: When networking has a send without response we can use that
         // instead of waiting for response.
-        if let Err(e) = network
-            .send_validation_receipt(author, receipt.try_into()?)
-            .await
+        if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipt(
+            network,
+            author,
+            receipt.try_into()?,
+        )
+        .await
         {
             // No one home, they will need to publish again.
             info!(failed_send_receipt = ?e);
@@ -93,7 +129,7 @@ pub async fn validation_receipt_workflow(
         // Attempted to send the receipt so we now mark
         // it to not send in the future.
         vault
-            .async_commit(|txn| set_require_receipt(txn, op_hash, false))
+            .async_commit(move |txn| set_require_receipt(txn, &op_hash, false))
             .await?;
     }
 

@@ -4,6 +4,7 @@
 
 use crate::error::{HcBundleError, HcBundleResult};
 use holochain_util::ffs;
+use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
@@ -25,6 +26,30 @@ pub async fn unpack<M: Manifest>(
     };
 
     bundle.unpack_yaml(&target_dir, force).await?;
+
+    Ok(target_dir)
+}
+
+/// Unpack a DNA bundle into a working directory, returning the directory path used.
+pub async fn unpack_raw(
+    extension: &'static str,
+    bundle_path: &std::path::Path,
+    target_dir: Option<PathBuf>,
+    manifest_path: &Path,
+    force: bool,
+) -> HcBundleResult<PathBuf> {
+    let bundle_path = ffs::canonicalize(bundle_path).await?;
+    let bundle: RawBundle<serde_yaml::Value> = RawBundle::read_from_file(&bundle_path).await?;
+
+    let target_dir = if let Some(d) = target_dir {
+        d
+    } else {
+        bundle_path_to_dir(&bundle_path, extension)?
+    };
+
+    bundle
+        .unpack_yaml(&target_dir, manifest_path, force)
+        .await?;
 
     Ok(target_dir)
 }
@@ -75,32 +100,38 @@ fn dir_to_bundle_path(dir_path: &Path, name: String, extension: &str) -> HcBundl
 
 #[cfg(test)]
 mod tests {
-    use holochain_types::prelude::DnaManifest;
+    use holochain_types::prelude::ValidatedDnaManifest;
     use mr_bundle::error::{MrBundleError, UnpackingError};
 
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_roundtrip() {
-        let tmpdir = tempdir::TempDir::new("hc-bundle-test").unwrap();
+        let tmpdir = tempfile::Builder::new()
+            .prefix("hc-bundle-test")
+            .tempdir()
+            .unwrap();
         let dir = tmpdir.path().join("test-dna");
         std::fs::create_dir(&dir).unwrap();
+        let dir = dir.canonicalize().unwrap();
 
         let manifest_yaml = r#"
 ---
 manifest_version: "1"
 name: test_dna
-uid: blablabla
-properties:
-  some: 42
-  props: yay
-zomes:
-  - name: zome1
-    bundled: zome-1.wasm
-  - name: zome2
-    bundled: nested/zome-2.wasm
-  - name: zome3
-    path: ../zome-3.wasm
+integrity:
+    network_seed: blablabla
+    origin_time: 2022-02-11T23:29:00.789576Z
+    properties:
+      some: 42
+      props: yay
+    zomes:
+      - name: zome1
+        bundled: zome-1.wasm
+      - name: zome2
+        bundled: nested/zome-2.wasm
+      - name: zome3
+        path: ../zome-3.wasm
         "#;
 
         // Create files in working directory
@@ -113,10 +144,10 @@ zomes:
         // in the parent directory
         std::fs::write(tmpdir.path().join("zome-3.wasm"), &[7, 8, 9]).unwrap();
 
-        let (bundle_path, bundle) = pack::<DnaManifest>(&dir, None, "test_dna".to_string())
-            .await
-            .unwrap();
-
+        let (bundle_path, bundle) =
+            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string())
+                .await
+                .unwrap();
         // Ensure the bundle path was generated as expected
         assert!(bundle_path.is_file());
         assert_eq!(bundle_path, dir.join("test_dna.dna"));
@@ -126,7 +157,7 @@ zomes:
 
         // Unpack without forcing, which will fail
         matches::assert_matches!(
-            unpack::<DnaManifest>(
+            unpack::<ValidatedDnaManifest>(
                 "dna",
                 &bundle_path,
                 Some(bundle_path.parent().unwrap().to_path_buf()),
@@ -138,7 +169,7 @@ zomes:
             ),),)
         );
         // Now unpack with forcing to overwrite original directory
-        unpack::<DnaManifest>(
+        unpack::<ValidatedDnaManifest>(
             "dna",
             &bundle_path,
             Some(bundle_path.parent().unwrap().to_path_buf()),
@@ -147,7 +178,7 @@ zomes:
         .await
         .unwrap();
 
-        let (bundle_path, bundle) = pack::<DnaManifest>(
+        let (bundle_path, bundle) = pack::<ValidatedDnaManifest>(
             &dir,
             Some(dir.parent().unwrap().to_path_buf()),
             "test_dna".to_string(),
@@ -158,7 +189,7 @@ zomes:
         // Now remove the directory altogether, unpack again, and check that
         // all of the same files are present
         std::fs::remove_dir_all(&dir).unwrap();
-        unpack::<DnaManifest>("dna", &bundle_path, Some(dir.to_owned()), false)
+        unpack::<ValidatedDnaManifest>("dna", &bundle_path, Some(dir.to_owned()), false)
             .await
             .unwrap();
         assert!(dir.join("zome-1.wasm").is_file());

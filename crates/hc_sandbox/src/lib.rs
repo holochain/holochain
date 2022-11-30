@@ -108,8 +108,6 @@
 //! ```
 //! and the examples.
 
-#![allow(deprecated)]
-
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -170,7 +168,7 @@ impl CmdRunner {
     pub async fn from_sandbox(
         sandbox_path: PathBuf,
     ) -> anyhow::Result<(Self, tokio::process::Child)> {
-        Self::from_sandbox_with_bin_path(&Path::new(Self::HOLOCHAIN_PATH), sandbox_path).await
+        Self::from_sandbox_with_bin_path(Path::new(Self::HOLOCHAIN_PATH), sandbox_path).await
     }
 
     /// Create a command runner from a sandbox path and

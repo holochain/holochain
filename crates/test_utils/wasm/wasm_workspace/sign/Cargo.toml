@@ -2,17 +2,23 @@
 name = "test_wasm_sign"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "test_wasm_sign"
 crate-type = [ "cdylib", "rlib" ]
+
+[[example]]
+name = "integrity_test_wasm_sign"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 hdk = { path = "../../../../hdk" }
 serde = "1.0"
 
 [dev-dependencies]
+hdk = { path = "../../../../hdk", features = ["fixturators"] }
 fixt = { path = "../../../../fixt" }
 
 [features]

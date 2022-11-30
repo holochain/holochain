@@ -12,6 +12,7 @@ use futures::stream::FuturesUnordered;
 use holochain_types::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 use tokio::sync::broadcast;
@@ -42,8 +43,11 @@ pub enum TaskKind {
     /// If the task returns an error, "freeze" the cell which caused the error,
     /// but continue running the rest of the conductor and other managed tasks.
     CellCritical(CellId),
+    /// If the task returns an error, "freeze" all cells with this dna hash,
+    /// but continue running the rest of the conductor and other managed tasks.
+    DnaCritical(Arc<DnaHash>),
     /// A generic callback for handling the result
-    // TODO: B-01455: reevaluate whether this should be a callback
+    // MAYBE: B-01455: reevaluate whether this should be a callback
     Generic(OnDeath),
 }
 
@@ -77,6 +81,11 @@ impl ManagedTaskAdd {
     /// If this task fails, only the Cell which it runs under must be stopped
     pub fn cell_critical(handle: ManagedTaskHandle, cell_id: CellId, name: &str) -> Self {
         Self::new(handle, TaskKind::CellCritical(cell_id), name)
+    }
+
+    /// If this task fails, only the Cells with this DnaHash must be stopped
+    pub fn dna_critical(handle: ManagedTaskHandle, dna_hash: Arc<DnaHash>, name: &str) -> Self {
+        Self::new(handle, TaskKind::DnaCritical(dna_hash), name)
     }
 
     /// Handle a task's completion with a generic callback
@@ -114,12 +123,15 @@ pub enum TaskOutcome {
     /// Log an info trace and take no other action.
     LogInfo(String),
     /// Log an error and take no other action.
-    MinorError(ManagedTaskError, String),
+    MinorError(Box<ManagedTaskError>, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
     /// Either pause or disable all apps which contain the problematic Cell,
     /// depending upon the specific error.
     StopApps(CellId, Box<ManagedTaskError>, String),
+    /// Either pause or disable all apps which contain the problematic Dna,
+    /// depending upon the specific error.
+    StopAppsWithDna(Arc<DnaHash>, Box<ManagedTaskError>, String),
 }
 
 struct TaskManager {
@@ -164,14 +176,14 @@ async fn run(
         tokio::select! {
             Some(new_task) = new_task_channel.recv() => {
                 task_manager.stream.push(new_task);
-                tracing::info!("Task added. Total tasks: {}", task_manager.stream.len());
+                tracing::debug!("Task added. Total tasks: {}", task_manager.stream.len());
             }
             result = task_manager.stream.next() => {
-                tracing::info!("Task completed. Total tasks: {}", task_manager.stream.len());
+                tracing::debug!("Task completed. Total tasks: {}", task_manager.stream.len());
                 match result {
                 Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
                 Some(TaskOutcome::LogInfo(context)) => {
-                    info!("Managed task completed: {}", context)
+                    debug!("Managed task completed: {}", context)
                 }
                 Some(TaskOutcome::MinorError(error, context)) => {
                     error!("Minor error during managed task: {:?}\nContext: {}", error, context)
@@ -190,11 +202,11 @@ async fn run(
                         error => error,
                     };
                     error!("Shutting down conductor due to unrecoverable error: {:?}\nContext: {}", error, context);
-                    return Err(TaskManagerError::Unrecoverable(error));
+                    return Err(TaskManagerError::Unrecoverable(Box::new(error)));
                 },
                 Some(TaskOutcome::StopApps(cell_id, error, context)) => {
                     tracing::error!("About to automatically stop apps");
-                    let app_ids = conductor.list_running_apps_for_required_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor.list_running_apps_for_dependent_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
                         conductor.remove_cells(&[cell_id]).await;
 
@@ -207,7 +219,7 @@ async fn run(
                             context
                         );
 
-                        // TODO: it could be helpful to modify this function so that when providing Some(app_ids),
+                        // MAYBE: it could be helpful to modify this function so that when providing Some(app_ids),
                         //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
                         //   can be set to the specific error message encountered here, rather than having to read it from
                         //   the logs.
@@ -225,7 +237,46 @@ async fn run(
                             context
                         );
                         for app_id in app_ids.iter() {
-                            conductor.clone().disable_app(&app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                            conductor.clone().disable_app(app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                        }
+                        tracing::error!("Apps disabled.");
+                    }
+                },
+                Some(TaskOutcome::StopAppsWithDna(dna_hash, error, context)) => {
+                    tracing::error!("About to automatically stop apps with dna {}", dna_hash);
+                    let app_ids = conductor.list_running_apps_for_dependent_dna_hash(dna_hash.as_ref()).await.map_err(TaskManagerError::internal)?;
+                    if error.is_recoverable() {
+                        let cells_with_same_dna: Vec<_> = conductor.list_cell_ids(None).into_iter().filter(|id| id.dna_hash() == dna_hash.as_ref()).collect();
+                        conductor.remove_cells(&cells_with_same_dna).await;
+
+                        // The following message assumes that only the app_ids calculated will be paused, but other apps
+                        // may have been paused as well.
+                        tracing::error!(
+                            "PAUSING the following apps due to a recoverable error: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+
+                        // MAYBE: it could be helpful to modify this function so that when providing Some(app_ids),
+                        //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
+                        //   can be set to the specific error message encountered here, rather than having to read it from
+                        //   the logs.
+                        let delta = conductor.reconcile_app_status_with_cell_status(None).await.map_err(TaskManagerError::internal)?;
+                        tracing::debug!(delta = ?delta);
+
+                        tracing::error!("Apps paused.");
+                    } else {
+                        // Since the error is unrecoverable, we don't expect to be able to use this Cell anymore.
+                        // Therefore, we disable every app which requires that cell.
+                        tracing::error!(
+                            "DISABLING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
+                            app_ids,
+                            error,
+                            context
+                        );
+                        for app_id in app_ids.iter() {
+                            conductor.clone().disable_app(app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
                         }
                         tracing::error!("Apps disabled.");
                     }
@@ -242,7 +293,7 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
     match kind {
         TaskKind::Ignore => match result {
             Ok(_) => LogInfo(name),
-            Err(err) => MinorError(err, name),
+            Err(err) => MinorError(Box::new(err), name),
         },
         TaskKind::Unrecoverable => match result {
             Ok(_) => LogInfo(name),
@@ -251,6 +302,10 @@ fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: Strin
         TaskKind::CellCritical(cell_id) => match result {
             Ok(_) => LogInfo(name),
             Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
+        },
+        TaskKind::DnaCritical(dna_hash) => match result {
+            Ok(_) => LogInfo(name),
+            Err(err) => StopAppsWithDna(dna_hash.to_owned(), Box::new(err), name),
         },
         TaskKind::Generic(f) => f(result),
     }
@@ -328,25 +383,30 @@ impl TaskManagerClient {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::error::ConductorError;
-    use crate::conductor::handle::MockConductorHandleT;
+    use crate::conductor::{error::ConductorError, Conductor};
     use anyhow::Result;
+    use holochain_state::test_utils::test_db_dir;
     use observability;
-    use std::sync::Arc;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn spawn_and_handle_dying_task() -> Result<()> {
         observability::test_run().ok();
-        let mock_handle = MockConductorHandleT::new();
-        let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
+        let db_dir = test_db_dir();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let (send_task_handle, main_task) = spawn_task_manager(handle);
         let handle = tokio::spawn(async {
-            Err(ConductorError::Todo("This task gotta die".to_string()).into())
+            Err(Box::new(ConductorError::Other(
+                anyhow::anyhow!("This task gotta die").into(),
+            ))
+            .into())
         });
         let handle = ManagedTaskAdd::generic(
             handle,
             Box::new(|result| match result {
                 Ok(_) => panic!("Task should have died"),
-                Err(ManagedTaskError::Conductor(ConductorError::Todo(_))) => {
+                Err(ManagedTaskError::Conductor(err))
+                    if matches!(*err, ConductorError::Other(_)) =>
+                {
                     let handle = tokio::spawn(async { Ok(()) });
                     let handle = ManagedTaskAdd::ignore(handle, "respawned task");
                     TaskOutcome::NewTask(handle)
@@ -367,13 +427,12 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic]
-    #[ignore = "panics in tokio break other tests"]
     async fn unrecoverable_error() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
-        let mock_handle = MockConductorHandleT::new();
-        let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
+        let db_dir = test_db_dir();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let (send_task_handle, main_task) = spawn_task_manager(handle);
         send_task_handle
             .send(ManagedTaskAdd::ignore(
                 tokio::spawn(keep_alive_task(rx)),
@@ -386,24 +445,30 @@ mod test {
             .send(ManagedTaskAdd::unrecoverable(
                 tokio::spawn(async {
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    Err(ConductorError::Todo("Unrecoverable task failed".to_string()).into())
+                    Err(Box::new(ConductorError::Other(
+                        anyhow::anyhow!("Unrecoverable task failed").into(),
+                    ))
+                    .into())
                 }),
                 "",
             ))
             .await
             .unwrap();
 
-        handle_shutdown(main_task.await);
+        main_task
+            .await
+            .expect("Failed to join the main task")
+            .expect_err("The main task should return an error");
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic]
-    #[ignore = "panics in tokio break other tests"]
+    #[ignore = "panics in tokio break other tests, this test is here to confirm behavior but cannot be run on ci"]
     async fn unrecoverable_panic() {
         observability::test_run().ok();
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
-        let mock_handle = MockConductorHandleT::new();
-        let (send_task_handle, main_task) = spawn_task_manager(Arc::new(mock_handle));
+        let db_dir = test_db_dir();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let (send_task_handle, main_task) = spawn_task_manager(handle);
         send_task_handle
             .send(ManagedTaskAdd::ignore(
                 tokio::spawn(keep_alive_task(rx)),

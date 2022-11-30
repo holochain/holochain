@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use crate::config;
 use crate::config::CONDUCTOR_CONFIG;
+use once_cell::sync::Lazy;
 
 /// Save all sandboxes to the `.hc` file in the `hc_dir` directory.
 pub fn save(mut hc_dir: PathBuf, paths: Vec<PathBuf>) -> anyhow::Result<()> {
@@ -111,9 +112,8 @@ pub fn list(hc_dir: PathBuf, verbose: usize) -> anyhow::Result<()> {
     Ok(())
 }
 
-lazy_static::lazy_static! {
-    static ref FILE_LOCKS: tokio::sync::Mutex<Vec<usize>> = tokio::sync::Mutex::new(Vec::new());
-}
+static FILE_LOCKS: Lazy<tokio::sync::Mutex<Vec<usize>>> =
+    Lazy::new(|| tokio::sync::Mutex::new(Vec::new()));
 
 /// Lock this setup as running live and advertise the port
 pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::Result<()> {

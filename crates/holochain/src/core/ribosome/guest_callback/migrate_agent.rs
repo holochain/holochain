@@ -1,6 +1,7 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
@@ -9,6 +10,7 @@ use holochain_types::prelude::*;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
+    #[allow(dead_code)]
     dna_def: DnaDef,
     migrate_agent: MigrateAgent,
 }
@@ -25,6 +27,12 @@ impl MigrateAgentInvocation {
 #[derive(Clone, Constructor)]
 pub struct MigrateAgentHostAccess {
     pub workspace: HostFnWorkspace,
+}
+
+impl std::fmt::Debug for MigrateAgentHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MigrateAgentHostAccess").finish()
+    }
 }
 
 impl From<MigrateAgentHostAccess> for HostContext {
@@ -61,6 +69,9 @@ impl Invocation for MigrateAgentInvocation {
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.migrate_agent)
+    }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 
@@ -146,7 +157,7 @@ mod test {
             results.shuffle(&mut rng);
 
             // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
+            let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
                 match maybe_extra {

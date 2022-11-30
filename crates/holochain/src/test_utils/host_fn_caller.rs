@@ -9,31 +9,33 @@ use crate::core::ribosome::host_fn;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
-use hdk::prelude::EntryError;
+use hdk::prelude::*;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_p2p::HolochainP2pCell;
-use holochain_serialized_bytes::prelude::*;
+use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
+use holochain_wasm_test_utils::TestWasmPair;
 use holochain_zome_types::AgentActivity;
 use std::sync::Arc;
-use tracing::*;
 use unwrap_to::unwrap_to;
 
 // Commit entry types //
 // Useful for when you want to commit something
 // that will match entry defs
 pub const POST_ID: &str = "post";
+pub const POST_INDEX: EntryDefIndex = EntryDefIndex(0);
 pub const MSG_ID: &str = "msg";
+pub const MSG_INDEX: EntryDefIndex = EntryDefIndex(1);
 pub const VALID_ID: &str = "always_validates";
 pub const INVALID_ID: &str = "never_validates";
 
@@ -83,12 +85,14 @@ pub enum MaybeLinkable {
 /// can be called from Rust instead of Wasm
 #[derive(Clone)]
 pub struct HostFnCaller {
-    pub env: EnvWrite,
-    pub cache: EnvWrite,
+    pub authored_db: DbWrite<DbKindAuthored>,
+    pub dht_db: DbWrite<DbKindDht>,
+    pub dht_db_cache: DhtDbQueryCache,
+    pub cache: DbWrite<DbKindCache>,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
-    pub network: HolochainP2pCell,
-    pub keystore: KeystoreSender,
+    pub network: HolochainP2pDna,
+    pub keystore: MetaLairClient,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
 }
@@ -111,24 +115,34 @@ impl HostFnCaller {
         dna_file: &DnaFile,
         zome_index: usize,
     ) -> HostFnCaller {
-        let env = handle.get_cell_env(cell_id).await.unwrap();
-        let cache = handle.get_cache_env(cell_id).await.unwrap();
-        let keystore = env.keystore().clone();
+        let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
+        let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
+        let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
+        let cache = handle.get_cache_db(cell_id).unwrap();
+        let keystore = handle.keystore().clone();
         let network = handle
             .holochain_p2p()
-            .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+            .to_dna(cell_id.dna_hash().clone(), None);
 
         let zome_path = (
             cell_id.clone(),
-            dna_file.dna().zomes.get(zome_index).unwrap().0.clone(),
+            dna_file
+                .dna()
+                .integrity_zomes
+                .get(zome_index)
+                .unwrap()
+                .0
+                .clone(),
         )
             .into();
-        let ribosome = RealRibosome::new(dna_file.clone());
-        let signal_tx = handle.signal_broadcaster().await;
+        let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
+        let signal_tx = handle.signal_broadcaster();
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {
-            env,
+            authored_db,
+            dht_db,
+            dht_db_cache,
             cache,
             ribosome,
             zome_path,
@@ -139,20 +153,18 @@ impl HostFnCaller {
         }
     }
 
-    pub fn env(&self) -> EnvWrite {
-        self.env.clone()
+    pub fn authored_db(&self) -> DbWrite<DbKindAuthored> {
+        self.authored_db.clone()
     }
 
-    pub async fn unpack(
-        &self,
-    ) -> (
-        EnvWrite,
-        Arc<RealRibosome>,
-        Arc<CallContext>,
-        HostFnWorkspace,
-    ) {
+    pub fn dht_db(&self) -> DbWrite<DbKindDht> {
+        self.dht_db.clone()
+    }
+
+    pub async fn unpack(&self) -> (Arc<RealRibosome>, Arc<CallContext>, HostFnWorkspace) {
         let HostFnCaller {
-            env,
+            authored_db,
+            dht_db,
             cache,
             network,
             keystore,
@@ -160,49 +172,118 @@ impl HostFnCaller {
             signal_tx,
             zome_path,
             call_zome_handle,
+            dht_db_cache,
         } = self.clone();
 
         let (cell_id, zome_name) = zome_path.into();
 
-        let workspace_lock =
-            HostFnWorkspace::new(env.clone(), cache, cell_id.agent_pubkey().clone())
-                .await
-                .unwrap();
+        let workspace_lock = HostFnWorkspace::new(
+            authored_db,
+            dht_db,
+            dht_db_cache,
+            cache,
+            keystore.clone(),
+            Some(cell_id.agent_pubkey().clone()),
+            Arc::new(ribosome.dna_def().as_content().clone()),
+        )
+        .await
+        .unwrap();
         let host_access = ZomeCallHostAccess::new(
             workspace_lock.clone(),
             keystore,
             network,
             signal_tx,
             call_zome_handle,
-            cell_id,
         );
         let ribosome = Arc::new(ribosome);
         let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
-        let call_context = Arc::new(CallContext::new(zome, host_access.into()));
-        (env, ribosome, call_context, workspace_lock)
+        let call_context = Arc::new(CallContext::new(
+            zome,
+            FunctionName::new("not_sure_what_should_be_here"),
+            host_access.into(),
+            // Auth as the author.
+            InvocationAuth::Cap(cell_id.agent_pubkey().clone(), None),
+        ));
+        (ribosome, call_context, workspace_lock)
     }
 }
 
 impl HostFnCaller {
-    pub async fn commit_entry<E: Into<entry_def::EntryDefId>>(
+    pub fn get_entry_type(
+        &self,
+        zome: impl Into<TestWasmPair<ZomeName>>,
+        index: impl Into<EntryDefIndex>,
+    ) -> ScopedEntryDefIndex {
+        let TestWasmPair { integrity, .. } = zome.into();
+        let zome_index = self
+            .ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .position(|(z, _)| *z == integrity)
+            .unwrap();
+        let zome_types = self
+            .ribosome
+            .zome_types()
+            .in_scope_subset(&[ZomeIndex(zome_index as u8)]);
+        zome_types
+            .entries
+            .get(ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: index.into(),
+            })
+            .unwrap()
+    }
+    pub fn get_entry_link(
+        &self,
+        zome: impl Into<TestWasmPair<ZomeName>>,
+        index: impl Into<LinkType>,
+    ) -> ScopedLinkType {
+        let TestWasmPair { integrity, .. } = zome.into();
+        let zome_index = self
+            .ribosome
+            .dna_def()
+            .integrity_zomes
+            .iter()
+            .position(|(z, _)| *z == integrity)
+            .unwrap();
+        let zome_types = self
+            .ribosome
+            .zome_types()
+            .in_scope_subset(&[ZomeIndex(zome_index as u8)]);
+        zome_types
+            .links
+            .get(ZomeTypesKey {
+                zome_index: 0.into(),
+                type_index: index.into(),
+            })
+            .unwrap()
+    }
+    pub async fn commit_entry<E: Into<EntryDefLocation>>(
         &self,
         entry: Entry,
         entry_def_id: E,
-    ) -> HeaderHash {
-        let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = EntryWithDefId::new(entry_def_id.into(), entry);
+        visibility: EntryVisibility,
+    ) -> ActionHash {
+        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let input = CreateInput::new(
+            entry_def_id.into(),
+            visibility,
+            entry,
+            ChainTopOrdering::default(),
+        );
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
 
-    pub async fn delete_entry<'env>(&self, hash: HeaderHash) -> HeaderHash {
-        let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
+    pub async fn delete_entry<'env>(&self, input: DeleteInput) -> ActionHash {
+        let (ribosome, call_context, workspace_lock) = self.unpack().await;
         let output = {
-            let r = host_fn::delete::delete(ribosome, call_context, hash);
+            let r = host_fn::delete::delete(ribosome, call_context, input);
             let r = r.map_err(|e| {
                 debug!(%e);
                 e
@@ -211,32 +292,33 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
 
-    pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
+    pub async fn update_entry(
         &self,
         entry: Entry,
-        entry_def_id: E,
-        original_header_hash: HeaderHash,
-    ) -> HeaderHash {
-        let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = UpdateInput::new(
-            original_header_hash,
-            EntryWithDefId::new(entry_def_id.into(), entry),
-        );
+        original_action_address: ActionHash,
+    ) -> ActionHash {
+        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let input = UpdateInput {
+            original_action_address,
+            entry,
+            chain_top_ordering: Default::default(),
+        };
+
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
 
-    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Vec<Option<Element>> {
-        let (_, ribosome, call_context, _) = self.unpack().await;
+    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Vec<Option<Record>> {
+        let (ribosome, call_context, _) = self.unpack().await;
         let input = GetInput::new(entry_hash, options);
         host_fn::get::get(ribosome, call_context, vec![input]).unwrap()
     }
@@ -246,46 +328,62 @@ impl HostFnCaller {
         entry_hash: AnyDhtHash,
         options: GetOptions,
     ) -> Vec<Option<Details>> {
-        let (_, ribosome, call_context, _) = self.unpack().await;
+        let (ribosome, call_context, _) = self.unpack().await;
         let input = GetInput::new(entry_hash, options);
         host_fn::get_details::get_details(ribosome, call_context, vec![input]).unwrap()
     }
 
     pub async fn create_link<'env>(
         &self,
-        base: EntryHash,
-        target: EntryHash,
+        base: AnyLinkableHash,
+        target: AnyLinkableHash,
+        zome_index: impl Into<ZomeIndex>,
+        link_type: impl Into<LinkType>,
         link_tag: LinkTag,
-    ) -> HeaderHash {
-        let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = CreateLinkInput::new(base, target, link_tag);
+    ) -> ActionHash {
+        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let input = CreateLinkInput::new(
+            base,
+            target,
+            zome_index.into(),
+            link_type.into(),
+            link_tag,
+            ChainTopOrdering::default(),
+        );
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
 
-    pub async fn delete_link<'env>(&self, link_add_hash: HeaderHash) -> HeaderHash {
-        let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let output =
-            { host_fn::delete_link::delete_link(ribosome, call_context, link_add_hash).unwrap() };
+    pub async fn delete_link<'env>(&self, link_add_hash: ActionHash) -> ActionHash {
+        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let output = {
+            host_fn::delete_link::delete_link(
+                ribosome,
+                call_context,
+                DeleteLinkInput::new(link_add_hash, ChainTopOrdering::default()),
+            )
+            .unwrap()
+        };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output
     }
 
     pub async fn get_links<'env>(
         &self,
-        base: EntryHash,
+        base: AnyLinkableHash,
+        type_query: LinkTypeFilter,
         link_tag: Option<LinkTag>,
         _options: GetLinksOptions,
     ) -> Vec<Link> {
-        let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, link_tag);
+        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let input = GetLinksInput::new(base, type_query, link_tag);
         let output = {
             host_fn::get_links::get_links(ribosome, call_context, vec![input])
                 .unwrap()
@@ -295,19 +393,20 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
-        output.into()
+        output
     }
 
     pub async fn get_link_details<'env>(
         &self,
-        base: EntryHash,
+        base: AnyLinkableHash,
+        type_query: LinkTypeFilter,
         tag: LinkTag,
         _options: GetLinksOptions,
-    ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
-        let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, Some(tag));
+    ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {
+        let (ribosome, call_context, workspace_lock) = self.unpack().await;
+        let input = GetLinksInput::new(base, type_query, Some(tag));
         let output = {
             host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
                 .unwrap()
@@ -317,7 +416,7 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
 
         output.into()
     }
@@ -328,13 +427,13 @@ impl HostFnCaller {
         query: &ChainQueryFilter,
         request: ActivityRequest,
     ) -> AgentActivity {
-        let (_, ribosome, call_context, _) = self.unpack().await;
+        let (ribosome, call_context, _) = self.unpack().await;
         let input = GetAgentActivityInput::new(agent.clone(), query.clone(), request);
         host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap()
     }
 
     pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> ExternIO {
-        let (_, ribosome, call_context, workspace_lock) = self.unpack().await;
+        let (ribosome, call_context, workspace_lock) = self.unpack().await;
 
         let output = {
             let host_access = call_context.host_context();
@@ -343,11 +442,12 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace_lock.flush().await.unwrap();
+        workspace_lock.flush(&self.network).await.unwrap();
         unwrap_to!(output => ZomeCallResponse::Ok).to_owned()
     }
 }
 
+#[macro_export]
 macro_rules! test_entry_impl {
     ($type:ident) => {
         impl TryFrom<$type> for Entry {

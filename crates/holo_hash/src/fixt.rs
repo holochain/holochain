@@ -2,18 +2,20 @@
 
 use crate::encode::holo_dht_location_bytes;
 use crate::hash_type;
+use crate::ActionHash;
+use crate::ActionHashB64;
 use crate::AgentPubKey;
 use crate::AgentPubKeyB64;
 use crate::AnyDhtHash;
 use crate::AnyDhtHashB64;
+use crate::AnyLinkableHash;
+use crate::AnyLinkableHashB64;
 use crate::DhtOpHash;
 use crate::DhtOpHashB64;
 use crate::DnaHash;
 use crate::DnaHashB64;
 use crate::EntryHash;
 use crate::EntryHashB64;
-use crate::HeaderHash;
-use crate::HeaderHashB64;
 use crate::NetIdHash;
 use crate::NetIdHashB64;
 use crate::WasmHash;
@@ -23,6 +25,7 @@ use std::convert::TryFrom;
 
 pub type HashTypeEntry = hash_type::Entry;
 pub type HashTypeAnyDht = hash_type::AnyDht;
+pub type HashTypeAnyLinkable = hash_type::AnyLinkable;
 
 // TODO: use strum to do this:
 //
@@ -33,9 +36,16 @@ pub type HashTypeAnyDht = hash_type::AnyDht;
 
 fixturator!(
     HashTypeAnyDht;
-    curve Empty HashTypeAnyDht::Header;
-    curve Unpredictable HashTypeAnyDht::Header;
-    curve Predictable HashTypeAnyDht::Header;
+    curve Empty HashTypeAnyDht::Action;
+    curve Unpredictable HashTypeAnyDht::Action;
+    curve Predictable HashTypeAnyDht::Action;
+);
+
+fixturator!(
+    HashTypeAnyLinkable;
+    curve Empty HashTypeAnyLinkable::External;
+    curve Unpredictable HashTypeAnyLinkable::Action;
+    curve Predictable HashTypeAnyLinkable::Entry;
 );
 
 /// A type alias for a Vec<u8> whose fixturator is expected to only return
@@ -74,7 +84,7 @@ fn append_location(mut base: Vec<u8>) -> Vec<u8> {
 }
 
 fixturator!(
-    // with_vec 0 5;
+    with_vec 0 5;
     AgentPubKey;
     curve Empty AgentPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap());
     curve Unpredictable AgentPubKey::from_raw_36(ThirtySixHashBytesFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap());
@@ -82,9 +92,9 @@ fixturator!(
         // these agent keys match what the mock keystore spits out for the first two agents
         // don't mess with this unless you also update the keystore!!!
         let agents = vec![
-            AgentPubKey::try_from("uhCAkmrkoAHPVf_eufG7eC5fm6QKrW5pPMoktvG5LOC0SnJ4vV1Uv")
+            AgentPubKey::try_from("uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo")
             .unwrap(),
-            AgentPubKey::try_from("uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-")
+            AgentPubKey::try_from("uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH")
                 .unwrap(),
         ];
         agents[get_fixt_index!() % agents.len()].clone()
@@ -124,12 +134,13 @@ fixturator!(
 );
 
 fixturator!(
-    HeaderHash;
+    with_vec 0 5;
+    ActionHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
 );
 fixturator!(
-    HeaderHashB64;
-    constructor fn new(HeaderHash);
+    ActionHashB64;
+    constructor fn new(ActionHash);
 );
 
 fixturator!(
@@ -157,4 +168,13 @@ fixturator!(
 fixturator!(
     AnyDhtHashB64;
     constructor fn new(AnyDhtHash);
+);
+
+fixturator!(
+    AnyLinkableHash;
+    constructor fn from_raw_36_and_type(ThirtySixHashBytes, HashTypeAnyLinkable);
+);
+fixturator!(
+    AnyLinkableHashB64;
+    constructor fn new(AnyLinkableHash);
 );

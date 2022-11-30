@@ -9,25 +9,25 @@ use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
 #[instrument(skip(
-    env,
-    cache,
+    workspace,
+    space,
     conductor_handle,
     stop,
     trigger_app_validation,
     network,
-    conductor_api
 ))]
 pub fn spawn_sys_validation_consumer(
-    env: EnvWrite,
-    cache: EnvWrite,
+    workspace: SysValidationWorkspace,
+    space: Space,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_app_validation: TriggerSender,
-    network: HolochainP2pCell,
-    conductor_api: impl CellConductorApiT + 'static,
+    network: HolochainP2pDna,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    let trigger_self = tx.clone();
+    let workspace = Arc::new(workspace);
+    let space = Arc::new(space);
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -39,26 +39,21 @@ pub fn spawn_sys_validation_consumer(
             }
 
             // Run the workflow
-            let workspace = SysValidationWorkspace::new(env.clone(), cache.clone());
             match sys_validation_workflow(
-                workspace,
+                workspace.clone(),
+                space.clone(),
                 trigger_app_validation.clone(),
                 trigger_self.clone(),
                 network.clone(),
-                conductor_api.clone(),
+                conductor_handle.clone(),
             )
             .await
             {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => {
-                    handle_workflow_error(
-                        conductor_handle.clone(),
-                        network.cell_id(),
-                        err,
-                        "sys_validation failure",
-                    )
-                    .await?
+                Ok(WorkComplete::Incomplete) => {
+                    tracing::debug!("Work incomplete, retriggering workflow");
+                    trigger_self.trigger(&"retrigger")
                 }
+                Err(err) => handle_workflow_error(err)?,
                 _ => (),
             };
         }

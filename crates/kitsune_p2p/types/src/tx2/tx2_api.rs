@@ -1,4 +1,4 @@
-#![allow(clippy::mem_discriminant_non_enum)] // these actually *are* enums...
+#![allow(enum_intrinsics_non_enums)] // these actually *are* enums...
 //! Usability api for tx2 kitsune transports.
 
 use crate::codec::*;
@@ -23,7 +23,7 @@ type ShareRMap<C> = Arc<Share<RMap<C>>>;
 
 struct RMapItem<C: Codec + 'static + Send + Unpin> {
     sender: RSend<C>,
-    start: std::time::Instant,
+    start: tokio::time::Instant,
     timeout: std::time::Duration,
     dbg_name: &'static str,
     req_byte_count: usize,
@@ -55,7 +55,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             (uniq, msg_id),
             RMapItem {
                 sender: s_res,
-                start: std::time::Instant::now(),
+                start: tokio::time::Instant::now(),
                 timeout,
                 dbg_name,
                 req_byte_count,
@@ -81,7 +81,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
             crate::metrics::metric_push_api_req_res_elapsed_ms(elapsed.as_millis() as u64);
             let elapsed_s = elapsed.as_secs_f64();
 
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 %req_byte_count,
                 %resp_dbg_name,
@@ -129,7 +129,7 @@ impl<C: Codec + 'static + Send + Unpin> RMap<C> {
         }) = self.0.remove(&(uniq, msg_id))
         {
             let elapsed_s = start.elapsed().as_secs_f64();
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 %req_byte_count,
                 ?local_cert,
@@ -208,6 +208,7 @@ fn rmap_insert<C: Codec + 'static + Send + Unpin>(
 pub struct Tx2ConHnd<C: Codec + 'static + Send + Unpin> {
     local_cert: Tx2Cert,
     con: ConHnd,
+    #[allow(dead_code)]
     url: TxUrl,
     rmap: ShareRMap<C>,
     metrics: Arc<Tx2ApiMetrics>,
@@ -292,11 +293,10 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
             let msg_id = MsgId::new_notify();
             let len = data.len();
             this.con.write(msg_id, data, timeout).await?;
-
             this.metrics.write_len(dbg_name, len);
 
             let peer_cert = this.peer_cert();
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 req_byte_count=%len,
                 local_cert=?this.local_cert,
@@ -344,7 +344,12 @@ impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
 
             this.metrics.write_len(dbg_name, len);
 
-            timeout.mix(r_res.map_err(KitsuneError::other)).await?
+            timeout
+                .mix(
+                    "Tx2ConHnd::priv_request",
+                    r_res.map_err(KitsuneError::other),
+                )
+                .await?
         }
     }
 
@@ -404,6 +409,14 @@ impl<C: Codec + 'static + Send + Unpin> Eq for Tx2EpHnd<C> {}
 impl<C: Codec + 'static + Send + Unpin> std::hash::Hash for Tx2EpHnd<C> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.uniq().hash(state);
+    }
+}
+
+impl<C: Codec + 'static + Send + Unpin> std::fmt::Debug for Tx2EpHnd<C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Tx2EpHnd")
+            .field("uniq", &self.0.uniq())
+            .finish()
     }
 }
 
@@ -511,7 +524,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2EpHnd<C> {
 pub struct Tx2Respond<C: Codec + 'static + Send + Unpin> {
     local_cert: Tx2Cert,
     peer_cert: Tx2Cert,
-    time: std::time::Instant,
+    time: tokio::time::Instant,
     dbg_name: &'static str,
     req_byte_count: usize,
     con: ConHnd,
@@ -534,7 +547,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Respond<C> {
         con: ConHnd,
         msg_id: u64,
     ) -> Self {
-        let time = std::time::Instant::now();
+        let time = tokio::time::Instant::now();
         Self {
             local_cert,
             peer_cert,
@@ -570,7 +583,7 @@ impl<C: Codec + 'static + Send + Unpin> Tx2Respond<C> {
             let elapsed_s = time.elapsed().as_secs_f64();
             let resp_dbg_name = data.variant_type();
             let resp_byte_count = buf.len();
-            tracing::debug!(
+            tracing::trace!(
                 %dbg_name,
                 %req_byte_count,
                 %resp_dbg_name,
@@ -713,7 +726,6 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                         let len = data.len();
                         let (_, c) = match C::decode_ref(&data) {
                             Err(e) => {
-                                // TODO - close connection?
                                 return std::task::Poll::Ready(Some(Tx2EpEvent::Error(
                                     KitsuneError::other(e),
                                 )));
@@ -772,7 +784,7 @@ impl<C: Codec + 'static + Send + Unpin> Stream for Tx2Ep<C> {
                             Tx2EpEvent::Tick
                         }
                         _ => {
-                            // TODO - should this be a connection-specific
+                            // MAYBE - should this be a connection-specific
                             // error type, so we can give the con handle?
                             Tx2EpEvent::Error(err)
                         }

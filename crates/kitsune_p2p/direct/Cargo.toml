@@ -4,11 +4,11 @@ version = "0.0.1"
 description = "Kitsune P2p Direct Application Framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
-documentation = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/kitsune_p2p_direct"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
 categories = [ "network-programming" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 arrayref = "0.3.6"
@@ -17,18 +17,18 @@ derive_more = "0.99"
 futures = "0.3.14"
 hyper = { version = "0.14", features = ["server","http1","http2","tcp"] }
 if-addrs = "0.6"
-kitsune_p2p_bootstrap = { version = "0.0.1", path = "../bootstrap" }
+kitsune_p2p_bootstrap = { version = "0.0.12-dev.0", path = "../bootstrap" }
 kitsune_p2p_direct_api = { version = "0.0.1", path = "../direct_api" }
-kitsune_p2p_types = { version = "0.0.2", path = "../types" }
-kitsune_p2p = { version = "0.0.2", path = "../kitsune_p2p" }
-kitsune_p2p_transport_quic = { version = "0.0.2", path = "../transport_quic" }
-kitsune_p2p_proxy = { version = "0.0.2", path = "../proxy" }
-rand = "0.8.3"
+kitsune_p2p_types = { version = "^0.0.39", path = "../types" }
+kitsune_p2p = { version = "^0.0.52", path = "../kitsune_p2p", features = ["test_utils"] }
+kitsune_p2p_transport_quic = { version = "^0.0.39", path = "../transport_quic" }
+kitsune_p2p_proxy = { version = "^0.0.39", path = "../proxy" }
+rand = "0.8.5"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 structopt = "0.3.21"
-sodoken = "=0.0.1-alpha.3"
-tokio = { version = "1.5", features = ["full"] }
+sodoken = "=0.0.6"
+tokio = { version = "1.11", features = ["full"] }
 tokio-tungstenite = "0.14"
 tungstenite = "0.13"
 url2 = "0.0.6"

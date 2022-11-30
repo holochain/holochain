@@ -1,18 +1,22 @@
 [package]
 name = "test_wasm_debug"
 version = "0.0.1"
-authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+authors = ["thedavidmeister", "thedavidmeister@gmail.com"]
+edition = "2021"
 
 [lib]
 name = "test_wasm_debug"
-crate-type = [ "cdylib", "rlib" ]
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "integrity_test_wasm_debug"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = "1.0"
 tracing = "0.1"
 tracing-core = "0.1"
-tracing-subscriber = "0.2"
 hdk = { path = "../../../../hdk" }
 
 [features]

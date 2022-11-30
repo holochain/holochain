@@ -2,11 +2,16 @@
 name = "test_wasm_hdk_extern"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "test_wasm_hdk_extern"
 crate-type = [ "cdylib", "rlib" ]
+
+[[example]]
+name = "integrity_test_wasm_hdk_extern"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = "1.0"

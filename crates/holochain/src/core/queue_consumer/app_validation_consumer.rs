@@ -5,30 +5,31 @@ use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
 use holochain_p2p::*;
+use holochain_types::db_cache::DhtDbQueryCache;
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
 #[instrument(skip(
-    env,
-    cache,
+    workspace,
     conductor_handle,
     stop,
     trigger_integration,
-    conductor_api,
-    network
+    network,
+    dht_query_cache
 ))]
 pub fn spawn_app_validation_consumer(
-    env: EnvWrite,
-    cache: EnvWrite,
+    dna_hash: Arc<DnaHash>,
+    workspace: AppValidationWorkspace,
     conductor_handle: ConductorHandle,
     mut stop: sync::broadcast::Receiver<()>,
     trigger_integration: TriggerSender,
-    conductor_api: impl CellConductorApiT + 'static,
-    network: HolochainP2pCell,
+    network: HolochainP2pDna,
+    dht_query_cache: DhtDbQueryCache,
 ) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
     let (tx, mut rx) = TriggerSender::new();
-    let mut trigger_self = tx.clone();
+    let trigger_self = tx.clone();
+    let workspace = Arc::new(workspace);
     let handle = tokio::spawn(async move {
         loop {
             // Wait for next job
@@ -40,25 +41,21 @@ pub fn spawn_app_validation_consumer(
             }
 
             // Run the workflow
-            let workspace = AppValidationWorkspace::new(env.clone(), cache.clone());
             let result = app_validation_workflow(
-                workspace,
+                dna_hash.clone(),
+                workspace.clone(),
                 trigger_integration.clone(),
-                conductor_api.clone(),
+                conductor_handle.clone(),
                 network.clone(),
+                dht_query_cache.clone(),
             )
             .await;
             match result {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => {
-                    handle_workflow_error(
-                        conductor_handle.clone(),
-                        network.cell_id(),
-                        err,
-                        "app_validation failure",
-                    )
-                    .await?
+                Ok(WorkComplete::Incomplete) => {
+                    tracing::debug!("Work incomplete, retriggering workflow");
+                    trigger_self.trigger(&"retrigger")
                 }
+                Err(err) => handle_workflow_error(err)?,
                 _ => (),
             };
         }

@@ -15,7 +15,7 @@ pub enum DnaError {
     #[error("DNA is invalid: {0}")]
     Invalid(String),
 
-    /// DNA not found in a DnaStore
+    /// DNA not found in a RibosomeStore
     #[error("The DNA of the following hash was not found in the store: {0}")]
     DnaMissing(DnaHash),
 
@@ -31,6 +31,10 @@ pub enum DnaError {
     #[error(transparent)]
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
 
+    /// serde_yaml Error
+    #[error(transparent)]
+    YamlSerializationError(#[from] serde_yaml::Error),
+
     /// SerializedBytesError
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
@@ -40,7 +44,7 @@ pub enum DnaError {
     ZomeError(#[from] ZomeError),
 
     /// std::io::Error
-    /// we don't #[from] the std::io::Error directly because it doesn't implement Clone
+    /// we don't `#[from]` the std::io::Error directly because it doesn't implement Clone
     #[error("std::io::Error: {0}")]
     StdIoError(String),
 
@@ -59,6 +63,12 @@ pub enum DnaError {
     /// DnaFileToBundleConversionError
     #[error("Error converting DnaFile to DnaBundle: {0}")]
     DnaFileToBundleConversionError(String),
+
+    #[error("All zome names must be unique within a DNA. Found duplicate: {0}")]
+    DuplicateZomeNames(String),
+
+    #[error("Zome dependency {0} for {1} is not pointing at an existing integrity zome that is not itself")]
+    DanglingZomeDependency(String, String),
 }
 
 impl From<std::io::Error> for DnaError {

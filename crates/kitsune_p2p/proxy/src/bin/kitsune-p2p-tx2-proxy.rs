@@ -52,7 +52,7 @@ impl From<TlsConfig> for TlsFileCert {
     fn from(f: TlsConfig) -> Self {
         Self {
             cert: f.cert.to_vec(),
-            priv_key: f.cert_priv_key.to_vec(),
+            priv_key: f.cert_priv_key.read_lock().to_vec(),
             digest: f.cert_digest.to_vec(),
         }
     }
@@ -63,7 +63,7 @@ impl From<TlsFileCert> for TlsConfig {
         Self {
             cert: f.cert.into(),
             cert_priv_key: f.priv_key.into(),
-            cert_digest: f.digest.into(),
+            cert_digest: CertDigest::from_slice(&f.digest),
         }
     }
 }
@@ -117,7 +117,7 @@ async fn inner() -> KitsuneResult<()> {
     let f = tx2_proxy(f, conf)?;
 
     let ep = f
-        .bind(opt.bind_to.into(), KitsuneTimeout::from_millis(30 * 1000))
+        .bind(opt.bind_to.into(), KitsuneTimeout::from_millis(60 * 1000))
         .await?;
     println!("{}", ep.handle().local_addr()?);
 
@@ -140,7 +140,7 @@ async fn inner() -> KitsuneResult<()> {
                 let debug = serde_json::to_string_pretty(&debug).unwrap();
                 data.clear();
                 data.extend_from_slice(debug.as_bytes());
-                let t = KitsuneTimeout::from_millis(30 * 3000);
+                let t = KitsuneTimeout::from_millis(60 * 1000);
                 let msg_id = if msg_id.is_notify() {
                     0.into()
                 } else {

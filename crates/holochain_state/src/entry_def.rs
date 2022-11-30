@@ -85,7 +85,7 @@ pub fn contains(txn: &Transaction<'_>, key: EntryDefBufferKey) -> StateQueryResu
 pub fn put(
     txn: &mut Transaction,
     key: EntryDefBufferKey,
-    entry_def: EntryDef,
+    entry_def: &EntryDef,
 ) -> StateMutationResult<()> {
     let key: EntryDefStoreKey = key.into();
     mutations::insert_entry_def(txn, key, entry_def)

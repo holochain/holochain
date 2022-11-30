@@ -31,7 +31,7 @@ pub use rng::rng;
 /// their inner types by constructing an inner Fixturator directly with the outer index passed in.
 /// If we can always assume the inner fixturators can be efficiently constructed at any index this
 /// allows us to efficiently compose fixturators.
-/// See [ `newtype_fixturator!` ] macro defined below for an example of this.
+/// See [ `newtype_fixturator!` ](newtype_fixturator) macro defined below for an example of this.
 ///
 /// Fixturator implements Clone for convenience but note that this will clone the current index.
 ///
@@ -62,7 +62,7 @@ impl<Curve, Item> Fixturator<Item, Curve> {
     /// raw calls are a little verbose, e.g. `Fixturator::<u32, Predictable>::new(Predictable, 0)`
     /// the starting index is exposed to facilitate wrapper structs to delegate their indexes to
     /// internal Fixturators
-    /// See [ `newtype_fixturator!` ] macro below for an example of this
+    /// See [`newtype_fixturator!`](newtype_fixturator) macro below for an example of this
     pub fn new(curve: Curve, start: usize) -> Self {
         Fixturator::<Item, Curve> {
             curve,
@@ -166,7 +166,7 @@ macro_rules! fixturator {
                 curve Unpredictable {
                     let mut index = get_fixt_index!();
                     let mut rng = $crate::rng();
-                    let len = rng.gen_range($min, $max);
+                    let len = rng.gen_range($min..$max);
                     let mut fixturator = [<$type:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, index);
                     let mut v = vec![];
                     for _ in 0..len {
@@ -562,7 +562,7 @@ macro_rules! fixt {
     ( $name:tt, $curve:expr ) => {
         $crate::fixt!($name, $curve, 0)
     };
-    ( $name:tt, $curve:expr, $index:literal ) => {
+    ( $name:tt, $curve:expr, $index:expr ) => {
         $crate::prelude::paste! { [< $name:camel Fixturator>]::new_indexed($curve, $index).next().unwrap() }
     }
 }
@@ -627,7 +627,7 @@ macro_rules! newtype_fixturator {
             $outer(vec![]),
             {
                 let mut rng = $crate::rng();
-                let vec_len = rng.gen_range(0, 5);
+                let vec_len = rng.gen_range(0..5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
                     $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, get_fixt_index!()) };
@@ -639,7 +639,7 @@ macro_rules! newtype_fixturator {
             },
             {
                 let mut rng = $crate::rng();
-                let vec_len = rng.gen_range(0, 5);
+                let vec_len = rng.gen_range(0..5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
                     $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Predictable, get_fixt_index!()) };
@@ -713,17 +713,17 @@ macro_rules! wasm_io_fixturator {
 
 #[macro_export]
 /// Creates a simple way to generate enums that use the strum way of iterating
-/// https://docs.rs/strum/0.18.0/strum/
+/// <https://docs.rs/strum/0.18.0/strum/>
 /// iterates over all the variants (Predictable) or selects random variants (Unpredictable)
 /// You do still need to BYO "empty" variant as the macro doesn't know what to use there
 macro_rules! enum_fixturator {
     ( $enum:ident, $empty:expr ) => {
         use rand::seq::IteratorRandom;
-        use $crate::prelude::strum::IntoEnumIterator;
+        use $crate::prelude::IntoEnumIterator;
         fixturator!(
             $enum,
             $empty,
-            { $enum::iter().choose(&mut crate::rng()).unwrap() },
+            { $enum::iter().choose(&mut $crate::rng()).unwrap() },
             {
                 let ret = $enum::iter().cycle().nth(self.0.index).unwrap();
                 set_fixt_index!(get_fixt_index!() + 1);
@@ -839,7 +839,7 @@ mod tests {
             match empty_fixturator.next().unwrap() {
                 VariantFoo::A(s) => assert_eq!(s, ""),
                 VariantFoo::B(n) => assert_eq!(n, 0),
-                VariantFoo::C(b) => assert_eq!(b, false),
+                VariantFoo::C(b) => assert!(!b),
             }
         }
     }

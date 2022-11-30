@@ -45,7 +45,7 @@ struct Thing(String);
 
 #[tokio::test]
 async fn resource_resolution() {
-    let dir = tempdir::TempDir::new("mr_bundle").unwrap();
+    let dir = tempfile::tempdir().unwrap();
 
     // Write a ResourceBytes to disk
     let local_thing = Thing("local".into());
@@ -123,11 +123,12 @@ async fn resource_resolution() {
 #[cfg(feature = "packing")]
 #[tokio::test]
 async fn unpack_roundtrip() {
-    let dir = tempdir::TempDir::new("mr_bundle").unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let dir_path = dir.path().canonicalize().unwrap();
 
     // Write a ResourceBytes to disk
     let local_thing = Thing("local".into());
-    let local_path = dir.path().join("deeply/nested/local.thing");
+    let local_path = dir_path.join("deeply/nested/local.thing");
     std::fs::create_dir_all(local_path.parent().unwrap()).unwrap();
     std::fs::write(&local_path, mr_bundle::encode(&local_thing).unwrap()).unwrap();
 
@@ -150,7 +151,7 @@ async fn unpack_roundtrip() {
         ],
     });
 
-    let unpacked_dir = dir.path().join("unpacked");
+    let unpacked_dir = dir_path.join("unpacked");
 
     // Put the bundled resource into a Bundle (excluding the local resource)
     let bundle = Bundle::new(

@@ -1,6 +1,8 @@
 use crate::HasHash;
 use crate::HashableContent;
 use crate::HoloHashOf;
+
+#[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 
 #[cfg(feature = "arbitrary")]
@@ -9,13 +11,13 @@ use crate::PrimitiveHashType;
 /// Represents some piece of content along with its hash representation, so that
 /// hashes need not be calculated multiple times.
 /// Provides an easy constructor which consumes the content.
-// TODO: consider making lazy with OnceCell
-#[derive(Debug, Serialize, Deserialize)]
+// MAYBE: consider making lazy with OnceCell
+#[cfg_attr(feature = "serialization", derive(Debug, Serialize, Deserialize))]
 pub struct HoloHashed<C: HashableContent> {
-    /// Whatever type C is as data.
-    pub(crate) content: C,
+    /// The content which is hashed of type C.
+    pub content: C,
     /// The hash of the content C.
-    pub(crate) hash: HoloHashOf<C>,
+    pub hash: HoloHashOf<C>,
 }
 
 impl<C: HashableContent> HasHash<C::HashType> for HoloHashed<C> {
@@ -40,6 +42,7 @@ where
         Ok(Self { content, hash })
     }
 }
+
 impl<C> HoloHashed<C>
 where
     C: HashableContent,
@@ -142,5 +145,23 @@ where
 {
     fn hash<StdH: std::hash::Hasher>(&self, state: &mut StdH) {
         std::hash::Hash::hash(&self.hash, state)
+    }
+}
+
+impl<C> std::cmp::PartialOrd for HoloHashed<C>
+where
+    C: HashableContent + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.content.partial_cmp(&other.content)
+    }
+}
+
+impl<C> std::cmp::Ord for HoloHashed<C>
+where
+    C: HashableContent + Ord,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.content.cmp(&other.content)
     }
 }

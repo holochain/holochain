@@ -1,28 +1,39 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
-use ring::rand::SecureRandom;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
 pub fn random_bytes(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: u32,
-) -> Result<Bytes, WasmError> {
+) -> Result<holochain_types::prelude::Bytes, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ non_determinism: Permission::Allow, .. } => {
-            let system_random = ring::rand::SystemRandom::new();
+        HostFnAccess {
+            non_determinism: Permission::Allow,
+            ..
+        } => {
             let mut bytes = vec![0; input as _];
-            system_random
-                .fill(&mut bytes)
-                .map_err(|ring_unspecified_error| WasmError::Host(ring_unspecified_error.to_string()))?;
+            getrandom::getrandom(&mut bytes)
+                .map_err(|error| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Host(error.to_string())).into()
+                })?;
 
-            Ok(Bytes::from(bytes))
-        },
-        _ => unreachable!(),
+            Ok(holochain_types::prelude::Bytes::from(bytes))
+        }
+        _ => Err(wasm_error!(WasmErrorInner::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "random_bytes".into()
+            )
+            .to_string()
+        ))
+        .into()),
     }
 }
 
@@ -31,15 +42,14 @@ pub fn random_bytes(
 pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::core::ribosome::HostContext;
     use crate::fixt::CallContextFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::fake_agent_pubkey_1;
     use std::sync::Arc;
-    use crate::core::ribosome::HostContext;
 
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn directly
@@ -64,20 +74,25 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::RandomBytes).await;
         const LEN: u32 = 5;
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
-        let output: hdk::prelude::Bytes =
-            crate::call_test_ribosome!(host_access, TestWasm::RandomBytes, "random_bytes", LEN).unwrap();
+        let output: hdk::prelude::Bytes = conductor.call(&alice, "random_bytes", LEN).await;
+
+        assert_ne!(&vec![0; LEN as usize], &output.to_vec());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    /// we can get some random data out of the fn via. a wasm call
+    async fn ribosome_rand_random_bytes_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::RandomBytes).await;
+        const LEN: u32 = 5;
+        let output: hdk::prelude::Bytes = conductor.call(&alice, "rand_random_bytes", LEN).await;
 
         assert_ne!(&vec![0; LEN as usize], &output.to_vec());
     }

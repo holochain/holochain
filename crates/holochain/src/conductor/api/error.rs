@@ -1,5 +1,4 @@
-//! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
-
+//! Errors occurring during a [`CellConductorApi`](super::CellConductorApi) or [`InterfaceApi`](super::InterfaceApi) call
 use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::CellError;
@@ -14,7 +13,7 @@ use holochain_zome_types::cell::CellId;
 use mr_bundle::error::MrBundleError;
 use thiserror::Error;
 
-/// Errors occurring during a [CellConductorApi] or [InterfaceApi] call
+/// Errors occurring during a [`CellConductorApi`](super::CellConductorApi) or [`InterfaceApi`](super::InterfaceApi) call
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
     /// The Dna for this Cell is not installed in the conductor.
@@ -49,14 +48,12 @@ pub enum ConductorApiError {
     DatabaseError(#[from] DatabaseError),
 
     /// Workspace error.
-    // TODO: Can be avoided if we can move workspace creation into the workflow
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
 
     /// Workflow error.
-    // TODO: perhaps this Box can be avoided with further reorganization
     #[error(transparent)]
-    WorkflowError(#[from] Box<WorkflowError>),
+    WorkflowError(#[from] WorkflowError),
 
     /// ZomeError
     #[error("ZomeError: {0}")]
@@ -107,6 +104,9 @@ pub enum ConductorApiError {
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
 
+    #[error(transparent)]
+    ChcError(#[from] ChcError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -116,6 +116,12 @@ impl ConductorApiError {
     /// promote a custom error type to a KitsuneP2pError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self::Other(e.into())
+    }
+}
+
+impl From<one_err::OneErr> for ConductorApiError {
+    fn from(e: one_err::OneErr) -> Self {
+        Self::other(e)
     }
 }
 

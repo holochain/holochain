@@ -1,13 +1,12 @@
 //! in-memory persistence module for kitsune direct
 
-use crate::types::metric_store::KdMetricStore;
 use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
-use kitsune_p2p::event::MetricDatum;
-use kitsune_p2p::event::MetricQuery;
-use kitsune_p2p::event::MetricQueryAnswer;
-use kitsune_p2p_types::dht_arc::DhtArc;
+use kitsune_p2p::dht::spacetime::Topology;
+use kitsune_p2p::dht_arc::{DhtArcSet, DhtLocation};
+use kitsune_p2p::event::TimeWindow;
+use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::collections::hash_map::Entry;
@@ -165,7 +164,7 @@ impl UiStore {
         use kitsune_p2p_direct_api::kd_sys_kind::*;
 
         if entry.kind() == "s.file" {
-            return match KdSysKind::from_kind(&entry.kind(), entry.raw_data().clone()) {
+            return match KdSysKind::from_kind(entry.kind(), entry.raw_data().clone()) {
                 Ok(KdSysKind::File(file)) => {
                     let path = format!("/{}/{}", root, file.name);
                     println!("caching ui file: {}", path);
@@ -202,11 +201,10 @@ impl UiStore {
 
 struct PersistMemInner {
     tls: Option<TlsConfig>,
-    priv_keys: HashMap<KdHash, sodoken::Buffer>,
+    priv_keys: HashMap<KdHash, sodoken::BufReadSized<64>>,
     agent_info: HashMap<KdHash, Arc<AgentStore>>,
     entries: HashMap<KdHash, Arc<AgentEntryStore>>,
     ui_cache: Arc<UiStore>,
-    metric_store: KdMetricStore,
 }
 
 struct PersistMem(Share<PersistMemInner>, Uniq);
@@ -220,7 +218,6 @@ impl PersistMem {
                 agent_info: HashMap::new(),
                 entries: HashMap::new(),
                 ui_cache: UiStore::new(),
-                metric_store: KdMetricStore::default(),
             }),
             Uniq::default(),
         ))
@@ -270,11 +267,10 @@ impl AsKdPersist for PersistMem {
     fn generate_signing_keypair(&self) -> BoxFuture<'static, KdResult<KdHash>> {
         let inner = self.0.clone();
         async move {
-            let mut pk = Buffer::new(sodoken::sign::SIGN_PUBLICKEYBYTES);
-            let mut sk = Buffer::new_memlocked(sodoken::sign::SIGN_SECRETKEYBYTES)
-                .map_err(KdError::other)?;
+            let pk = sodoken::BufWriteSized::new_no_lock();
+            let sk = sodoken::BufWriteSized::new_mem_locked().map_err(KdError::other)?;
 
-            sodoken::sign::sign_keypair(&mut pk, &mut sk)
+            sodoken::sign::keypair(pk.clone(), sk.clone())
                 .await
                 .map_err(KdError::other)?;
 
@@ -287,7 +283,7 @@ impl AsKdPersist for PersistMem {
             let pk_hash_clone = pk_hash.clone();
             inner
                 .share_mut(move |i, _| {
-                    i.priv_keys.insert(pk_hash_clone, sk);
+                    i.priv_keys.insert(pk_hash_clone, sk.to_read_sized());
                     Ok(())
                 })
                 .map_err(KdError::other)?;
@@ -298,7 +294,7 @@ impl AsKdPersist for PersistMem {
     }
 
     fn sign(&self, pub_key: KdHash, data: &[u8]) -> BoxFuture<'static, KdResult<Arc<[u8; 64]>>> {
-        let data = Buffer::from_ref(data);
+        let data = sodoken::BufRead::new_no_lock(data);
         let sk = self
             .0
             .share_mut(|i, _| Ok(i.priv_keys.get(&pub_key).cloned()));
@@ -308,8 +304,8 @@ impl AsKdPersist for PersistMem {
                 None => return Err(format!("invalid agent: {:?}", pub_key).into()),
                 Some(sk) => sk,
             };
-            let mut sig = Buffer::new(64);
-            sodoken::sign::sign_detached(&mut sig, &data, &sk)
+            let sig = <sodoken::BufWriteSized<64>>::new_no_lock();
+            sodoken::sign::detached(sig.clone(), data, sk)
                 .await
                 .map_err(KdError::other)?;
             let mut out = [0; 64];
@@ -375,7 +371,7 @@ impl AsKdPersist for PersistMem {
             let mut with_dist = store
                 .get_all()?
                 .into_iter()
-                .map(|info| (info.basis_distance_to_storage(basis_loc), info))
+                .map(|info| (info.basis_distance_to_storage(basis_loc.into()), info))
                 .collect::<Vec<_>>();
             with_dist.sort_by(|a, b| a.0.cmp(&b.0));
             Ok(with_dist
@@ -387,26 +383,32 @@ impl AsKdPersist for PersistMem {
         .boxed()
     }
 
-    fn put_metric_datum(&self, datum: MetricDatum) -> BoxFuture<'static, KdResult<()>> {
-        let inner = self.0.clone();
+    fn query_peer_density(
+        &self,
+        root: KdHash,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht::PeerView>> {
+        let topo = Topology::standard_epoch_full();
+        let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
+            Some(store) => Ok(store.clone()),
+            None => Err("root not found".into()),
+        });
         async move {
-            inner
-                .share_mut(|inner, _| {
-                    inner.metric_store.put_metric_datum(datum);
-                    Ok(())
+            let store = match store {
+                Err(_) => return Ok(PeerStrat::default().view(topo.clone(), dht_arc, &[])),
+                Ok(store) => store,
+            };
+            let arcs: Vec<_> = store
+                .get_all()?
+                .into_iter()
+                .map(|v| {
+                    let loc = DhtLocation::from(v.agent().as_loc());
+                    DhtArc::from_parts(*v.storage_arc(), loc)
                 })
-                .map_err(KdError::other)?;
-            Ok(())
-        }
-        .boxed()
-    }
+                .collect();
 
-    fn query_metrics(&self, query: MetricQuery) -> BoxFuture<'static, KdResult<MetricQueryAnswer>> {
-        let inner = self.0.clone();
-        async move {
-            inner
-                .share_mut(|inner, _| Ok(inner.metric_store.query_metrics(query)))
-                .map_err(KdError::other)
+            // contains is already checked in the iterator
+            Ok(PeerStrat::default().view(topo, dht_arc, arcs.as_slice()))
         }
         .boxed()
     }
@@ -452,9 +454,8 @@ impl AsKdPersist for PersistMem {
         &self,
         root: KdHash,
         agent: KdHash,
-        _created_at_start_s: f32,
-        _created_at_end_s: f32,
-        _dht_arc: DhtArc,
+        _window: TimeWindow,
+        _dht_arc: DhtArcSet,
     ) -> BoxFuture<'static, KdResult<Vec<KdEntrySigned>>> {
         // TODO - actually filter
 

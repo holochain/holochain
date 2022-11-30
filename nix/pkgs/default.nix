@@ -1,9 +1,10 @@
 { callPackage
-, hcRustPlatform
 , writeShellScriptBin
 
 , hcToplevelDir
 , nixEnvPrefixEval
+
+, jq
 }:
 
 let
@@ -13,16 +14,55 @@ let
 
     crate=''${1:?The first argument needs to define the crate name}
     shift
-    cargo run --target-dir=''${CARGO_TARGET_DIR:?} --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml -- $@
+
+    binary=$(cargo build \
+      --locked \
+      --target-dir=''${NIX_ENV_PREFIX:-?}/target \
+      --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
+      --bin=$crate --message-format=json | \
+        ${jq}/bin/jq \
+          --slurp \
+          --raw-output \
+          'map(select(.executable != null))[0].executable' \
+      )
+
+    $binary $@
+  '';
+
+  hcCrateBinaryPath = writeShellScriptBin "hc-crate-binary-path" ''
+    set -x
+    ${nixEnvPrefixEval}
+
+    crate=''${1:?The first argument needs to define the crate name}
+
+    echo $(cargo build \
+      --locked \
+      --target-dir=''${NIX_ENV_PREFIX:-?}/target \
+      --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
+      --bin=$crate --message-format=json | \
+        ${jq}/bin/jq \
+          --slurp \
+          --raw-output \
+          'map(select(.executable != null))[0].executable' \
+      )
+  '';
+
+  mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''
+    exec ${hcRunCrate}/bin/hc-run-crate ${crate} $@
+  '';
+
+  hcReleaseAutomation = writeShellScriptBin "hc-ra" ''
+    exec ${hcRunCrate}/bin/hc-run-crate "release-automation" $@
   '';
 
   ci = callPackage ./ci.nix { };
-  core = callPackage ./core.nix { };
-  happ = let
-    mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''
-      exec ${hcRunCrate}/bin/hc-run-crate ${crate} $@
-    '';
-  in {
+  core = callPackage ./core.nix {
+    inherit hcToplevelDir;
+    releaseAutomation = "${hcReleaseAutomation}/bin/hc-ra";
+  } // {
+    inherit hcReleaseAutomation;
+  };
+  happ = {
     holochain = mkHolochainBinaryScript "holochain";
     hc = mkHolochainBinaryScript "hc";
   };

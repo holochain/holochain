@@ -36,7 +36,7 @@ pub trait KdHashExt: Sized {
     /// verify the given data / signature
     fn verify_signature(
         &self,
-        data: sodoken::Buffer,
+        data: sodoken::BufRead,
         signature: Arc<[u8; 64]>,
     ) -> BoxFuture<'static, bool>;
 
@@ -82,15 +82,15 @@ impl KdHashExt for KdHash {
 
     fn verify_signature(
         &self,
-        data: sodoken::Buffer,
+        data: sodoken::BufRead,
         signature: Arc<[u8; 64]>,
     ) -> BoxFuture<'static, bool> {
-        let pk = Buffer::from_ref(self.as_core_bytes());
+        let pk = sodoken::BufReadSized::new_no_lock(*self.as_core_bytes());
         async move {
             async {
-                let sig = Buffer::from_ref(&signature[..]);
+                let sig = sodoken::BufReadSized::new_no_lock(*signature);
                 KdResult::Ok(
-                    sodoken::sign::sign_verify_detached(&sig, &data, &pk)
+                    sodoken::sign::verify_detached(sig, data, pk)
                         .await
                         .map_err(KdError::other)?,
                 )
@@ -102,10 +102,10 @@ impl KdHashExt for KdHash {
     }
 
     fn from_data(data: &[u8]) -> BoxFuture<'static, KdResult<Self>> {
-        let r = Buffer::from_ref(data);
+        let r = sodoken::BufRead::new_no_lock(data);
         async move {
-            let mut hash = Buffer::new(32);
-            sodoken::hash::generichash(&mut hash, &r, None)
+            let hash = <sodoken::BufWriteSized<32>>::new_no_lock();
+            sodoken::hash::blake2b::hash(hash.clone(), r)
                 .await
                 .map_err(KdError::other)?;
             let mut out = [0; 32];
@@ -120,7 +120,7 @@ impl KdHashExt for KdHash {
 
     fn from_coerced_pubkey(data: [u8; 32]) -> BoxFuture<'static, KdResult<Self>> {
         async move {
-            let r = Buffer::from_ref(data);
+            let r = sodoken::BufReadSized::new_no_lock(data);
             let loc = loc_hash(r).await?;
 
             let mut out = [0; 36];
@@ -133,11 +133,11 @@ impl KdHashExt for KdHash {
     }
 }
 
-async fn loc_hash(d: Buffer) -> KdResult<[u8; 4]> {
+async fn loc_hash(d: sodoken::BufReadSized<32>) -> KdResult<[u8; 4]> {
     let mut out = [0; 4];
 
-    let mut hash = Buffer::new(16);
-    sodoken::hash::generichash(&mut hash, &d, None)
+    let hash = <sodoken::BufWriteSized<16>>::new_no_lock();
+    sodoken::hash::blake2b::hash(hash.clone(), d)
         .await
         .map_err(KdError::other)?;
 

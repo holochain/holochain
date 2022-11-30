@@ -6,13 +6,9 @@ use criterion::Criterion;
 use holo_hash::EntryHash;
 use holo_hash::EntryHashes;
 use holochain::sweettest::*;
-use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::AdminInterfaceConfig;
-use holochain_conductor_api::InterfaceDriver;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_test_wasm_common::ManyAnchorInput;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneP2pConfig;
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
 
@@ -45,24 +41,29 @@ fn consistency(bench: &mut Criterion) {
                 .and_then(|s| s.to_string_lossy().parse::<usize>().ok())
                 .unwrap_or(100);
             holochain::test_utils::consistency(
-                &cells,
+                cells,
                 num_tries,
                 std::time::Duration::from_millis(500),
             )
             .await;
-            holochain_state::prelude::dump_tmp(consumer.cell.env());
+            // holochain_state::prelude::dump_tmp(consumer.cell.env());
         });
     }
+    let mut cells = vec![consumer.cell.clone(), producer.cell.clone()];
+    cells.extend(others.cells.clone());
     runtime.spawn(async move {
         producer.run().await;
         producer.conductor.shutdown_and_wait().await;
     });
     group.bench_function(BenchmarkId::new("test", format!("test")), |b| {
         b.iter(|| {
-            runtime.block_on(async { consumer.run().await });
+            runtime.block_on(async { consumer.run(&cells[..]).await });
         });
     });
     runtime.block_on(async move {
+        // The line below was added when migrating to rust edition 2021, per
+        // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+        let _ = &others;
         consumer.conductor.shutdown_and_wait().await;
         drop(consumer);
         for c in others.conductors {
@@ -124,7 +125,8 @@ impl Producer {
 }
 
 impl Consumer {
-    async fn run(&mut self) {
+    async fn run(&mut self, cells: &[SweetCell]) {
+        let start = std::time::Instant::now();
         let mut num = self.last;
         while num <= self.last {
             let hashes: EntryHashes = self
@@ -136,33 +138,30 @@ impl Consumer {
                 )
                 .await;
             num = hashes.0.len();
+            if start.elapsed().as_secs() > 1 {
+                for cell in cells {
+                    holochain::test_utils::consistency(
+                        [cell],
+                        1,
+                        std::time::Duration::from_millis(10),
+                    )
+                    .await;
+                }
+            }
+            // dump_tmp(self.cell.env());
+            // dump_tmp(prod.env());
         }
         self.last = num;
+        dbg!(start.elapsed());
         self.tx.send(num).await.unwrap();
     }
 }
 
 async fn setup() -> (Producer, Consumer, Others) {
     let (tx, rx) = tokio::sync::mpsc::channel(1);
-    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor])
-        .await
-        .unwrap();
-    let config = || {
-        let mut network = KitsuneP2pConfig::default();
-        network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-            bind_to: None,
-            override_host: None,
-            override_port: None,
-        }];
-        ConductorConfig {
-            network: Some(network),
-            admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
-            }]),
-            ..Default::default()
-        }
-    };
-    let configs = vec![config(), config(), config(), config(), config()];
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
+    let config = SweetConductorConfig::standard().no_publish();
+    let configs = vec![config; 5];
     let mut conductors = SweetConductorBatch::from_configs(configs.clone()).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let mut cells = apps

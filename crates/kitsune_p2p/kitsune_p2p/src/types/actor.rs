@@ -5,15 +5,14 @@ use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
 
+use crate::gossip::sharded_gossip::GossipDiagnostics;
+
 /// Make a request to multiple destination agents - awaiting/aggregating the responses.
 /// The remote sides will see these messages as "RequestEvt" events.
 #[derive(Clone, Debug)]
 pub struct RpcMulti {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
-
-    /// The agent making the request.
-    pub from_agent: Arc<super::KitsuneAgent>,
 
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
@@ -40,13 +39,11 @@ impl RpcMulti {
     pub fn new(
         tuning_params: &KitsuneP2pTuningParams,
         space: Arc<super::KitsuneSpace>,
-        from_agent: Arc<super::KitsuneAgent>,
         basis: Arc<super::KitsuneBasis>,
         payload: Vec<u8>,
     ) -> Self {
         Self {
             space,
-            from_agent,
             basis,
             payload,
             max_remote_agent_count: tuning_params.default_rpc_multi_remote_agent_count,
@@ -65,6 +62,24 @@ pub struct RpcMultiResponse {
     pub response: Vec<u8>,
 }
 
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+/// The destination of a broadcast message.
+pub enum BroadcastTo {
+    /// Send to notify.
+    Notify,
+    /// Send to publish agent info.
+    PublishAgentInfo,
+}
+
+type KSpace = Arc<super::KitsuneSpace>;
+type KSpaceOpt = Option<Arc<super::KitsuneSpace>>;
+type KAgent = Arc<super::KitsuneAgent>;
+type KAgents = Vec<Arc<super::KitsuneAgent>>;
+type KBasis = Arc<super::KitsuneBasis>;
+type Payload = Vec<u8>;
+type OptU64 = Option<u64>;
+type OptArc = Option<crate::dht_arc::DhtArc>;
+
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
     pub chan KitsuneP2p<super::KitsuneP2pError> {
@@ -72,17 +87,20 @@ ghost_actor::ghost_chan! {
         fn list_transport_bindings() -> Vec<Url2>;
 
         /// Announce a space/agent pair on this network.
-        fn join(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>) -> ();
+        fn join(space: KSpace, agent: KAgent, initial_arc: OptArc) -> ();
 
         /// Withdraw this space/agent pair from this network.
-        fn leave(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>) -> ();
+        fn leave(space: KSpace, agent: KAgent) -> ();
 
         /// Make a request of a single remote agent, expecting a response.
         /// The remote side will receive a "Call" event.
-        fn rpc_single(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>, timeout_ms: Option<u64>) -> Vec<u8>;
+        fn rpc_single(space: KSpace, to_agent: KAgent, payload: Payload, timeout_ms: OptU64) -> Vec<u8>;
 
         /// Make a request to multiple destination agents - awaiting/aggregating the responses.
         /// The remote sides will see these messages as "Call" events.
+        /// NOTE: We've currently disabled the "multi" part of this.
+        /// It will still pick appropriate peers by basis, but will only
+        /// make requests one at a time, returning the first success.
         fn rpc_multi(input: RpcMulti) -> Vec<RpcMultiResponse>;
 
         /// Publish data to a "neighborhood" of remote nodes surrounding the
@@ -91,10 +109,45 @@ ghost_actor::ghost_chan! {
         /// least one connection with a node in the target neighborhood.
         /// The remote sides will see these messages as "Notify" events.
         fn broadcast(
-            space: Arc<super::KitsuneSpace>,
-            basis: Arc<super::KitsuneBasis>,
+            space: KSpace,
+            basis: KBasis,
             timeout: KitsuneTimeout,
-            payload: Vec<u8>
+            destination: BroadcastTo,
+            payload: Payload
         ) -> ();
+
+        /// Broadcast data to a specific set of agents without
+        /// expecting a response.
+        /// An Ok(()) result only means that we were able to establish at
+        /// least one connection with a node in the agent set.
+        fn targeted_broadcast(
+            space: KSpace,
+            agents: KAgents,
+            timeout: KitsuneTimeout,
+            payload: Payload,
+
+            // If we have reached the maximum concurrent notify requests limit
+            // (specified by tuning param `concurrent_limit_per_thread`)
+            // This message will be dropped / not sent, but still return an
+            // Ok() response.
+            drop_at_limit: bool,
+        ) -> ();
+
+        /// New data has been integrated and is ready for gossiping.
+        fn new_integrated_data(space: KSpace) -> ();
+
+        /// Check if an agent is an authority for a hash.
+        fn authority_for_hash(
+            space: KSpace,
+            basis: KBasis,
+        ) -> bool;
+
+        /// dump network metrics
+        fn dump_network_metrics(
+            space: KSpaceOpt,
+        ) -> serde_json::Value;
+
+        /// Get data for diagnostics
+        fn get_diagnostics(space: KSpace) -> GossipDiagnostics;
     }
 }

@@ -6,12 +6,14 @@ use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::validation::OutcomeOrError;
 use crate::core::workflow::error::WorkflowError;
 use crate::from_sub_error;
+use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
-use holo_hash::HeaderHash;
 use holochain_keystore::KeystoreError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
+use holochain_zome_types::countersigning::CounterSigningError;
+use holochain_zome_types::countersigning::CounterSigningSessionData;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -21,7 +23,7 @@ use thiserror::Error;
 /// It is a lot cleaner to express this using
 /// ? try's unfortunately try for custom types is
 /// unstable but when it lands we should use:
-/// https://docs.rs/try-guard/0.2.0/try_guard/
+/// <https://docs.rs/try-guard/0.2.0/try_guard/>
 #[derive(Error, Debug)]
 pub enum SysValidationError {
     #[error(transparent)]
@@ -34,9 +36,9 @@ pub enum SysValidationError {
     KeystoreError(#[from] KeystoreError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
-    #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
-    DnaMissing(CellId),
-    // TODO: Remove this when SysValidationResult is replace with SysValidationOutcome
+    #[error("Dna is missing for this hash {0:?}. Cannot validate without dna.")]
+    DnaMissing(DnaHash),
+    // NOTE: can remove this if SysValidationResult is replaced with SysValidationOutcome
     #[error(transparent)]
     ValidationOutcome(#[from] ValidationOutcome),
     #[error(transparent)]
@@ -45,9 +47,19 @@ pub enum SysValidationError {
     WorkspaceError(#[from] WorkspaceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
+    #[error("Expected Entry-based Action, but got: {0:?}")]
+    NonEntryAction(Action),
 }
 
-#[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
+impl From<CounterSigningError> for SysValidationError {
+    fn from(counter_signing_error: CounterSigningError) -> Self {
+        SysValidationError::ValidationOutcome(ValidationOutcome::CounterSigningError(
+            counter_signing_error,
+        ))
+    }
+}
+
+// #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
 
 /// Return either:
@@ -85,38 +97,44 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 /// failed validation.
 #[derive(Error, Debug)]
 pub enum ValidationOutcome {
-    #[error("The element with signature {0:?} and header {1:?} was found to be counterfeit")]
-    Counterfeit(Signature, Header),
+    #[error("The record with signature {0:?} and action {1:?} was found to be counterfeit")]
+    Counterfeit(Signature, Action),
+    #[error("The action {1:?} is not found in the countersigning session data {0:?}")]
+    ActionNotInCounterSigningSession(CounterSigningSessionData, NewEntryAction),
+    #[error(transparent)]
+    CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
-    #[error("The app entry type {0:?} entry def id was out of range")]
-    EntryDefId(AppEntryType),
-    #[error("The entry has a different hash to the header's entry hash")]
+    #[error("The app entry def {0:?} entry def id was out of range")]
+    EntryDefId(AppEntryDef),
+    #[error("The entry has a different hash to the action's entry hash")]
     EntryHash,
     #[error("The entry size {0} was bigger then the MAX_ENTRY_SIZE {1}")]
     EntryTooLarge(usize, usize),
-    #[error("The entry has a different type to the header's entry type")]
+    #[error("The entry has a different type to the action's entry type")]
     EntryType,
-    #[error("The app entry type {0:?} visibility didn't match the zome")]
-    EntryVisibility(AppEntryType),
+    #[error("The app entry def {0:?} visibility didn't match the zome")]
+    EntryVisibility(AppEntryDef),
     #[error("The link tag size {0} was bigger then the MAX_TAG_SIZE {1}")]
     TagTooLarge(usize, usize),
-    #[error("The header {0:?} was expected to be a link add header")]
-    NotCreateLink(HeaderHash),
-    #[error("The header was expected to be a new entry header but was a {0:?}")]
-    NotNewEntry(Header),
+    #[error("The action {0:?} was expected to be a link add action")]
+    NotCreateLink(ActionHash),
+    #[error("The action was expected to be a new entry action but was a {0:?}")]
+    NotNewEntry(Action),
     #[error("The dependency {0:?} is not held")]
     NotHoldingDep(AnyDhtHash),
+    #[error("The PreflightResponse signature was not valid {0:?}")]
+    PreflightResponseSignature(PreflightResponse),
     #[error(transparent)]
-    PrevHeaderError(#[from] PrevHeaderError),
+    PrevActionError(#[from] PrevActionError),
     #[error("StoreEntry should not be gossiped for private entries")]
     PrivateEntry,
     #[error("Update original EntryType: {0:?} doesn't match new EntryType {1:?}")]
     UpdateTypeMismatch(EntryType, EntryType),
-    #[error("Signature {0:?} failed to verify for Header {1:?}")]
-    VerifySignature(Signature, Header),
-    #[error("The app entry type {0:?} zome id was out of range")]
-    ZomeId(AppEntryType),
+    #[error("Signature {0:?} failed to verify for Action {1:?}")]
+    VerifySignature(Signature, Action),
+    #[error("The app entry def {0:?} zome index was out of range")]
+    ZomeIndex(AppEntryDef),
 }
 
 impl ValidationOutcome {
@@ -135,15 +153,19 @@ impl ValidationOutcome {
 }
 
 #[derive(Error, Debug)]
-pub enum PrevHeaderError {
+pub enum PrevActionError {
+    #[error("The previous action hash specified in an action doesn't match the actual previous action. Seq: {0}")]
+    HashMismatch(u32),
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
-    #[error("Previous header sequence number {1} != ({0} - 1)")]
+    #[error("Root of source chain must have a timestamp greater than the Dna's origin_time")]
+    InvalidRootOriginTime,
+    #[error("Previous action sequence number {1} != ({0} - 1)")]
     InvalidSeq(u32, u32),
-    #[error("Previous header was missing from the metadata store")]
-    MissingMeta(HeaderHash),
-    #[error("Header is not Dna so needs previous header")]
+    #[error("Previous action was missing from the metadata store")]
+    MissingMeta(ActionHash),
+    #[error("Action is not the first, so needs previous action")]
     MissingPrev,
-    #[error("The previous header's timestamp is not before the current header's timestamp")]
-    Timestamp,
+    #[error("The previous action's timestamp is not before the current action's timestamp: {0:?} >= {1:?}")]
+    Timestamp(Timestamp, Timestamp),
 }

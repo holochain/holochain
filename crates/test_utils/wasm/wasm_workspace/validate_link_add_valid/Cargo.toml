@@ -2,15 +2,21 @@
 name = "test_wasm_validate_link_add_valid"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "test_wasm_validate_link_add_valid"
 crate-type = [ "cdylib", "rlib" ]
 
+[[example]]
+name = "integrity_test_wasm_validate_link_add_valid"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 serde = "1.0"
 hdk = { path = "../../../../hdk" }
+hdi = { path = "../../../../hdi" }
 
 [features]
 default = []

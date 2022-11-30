@@ -3,9 +3,9 @@
 , mkShell
 , rustup
 , coreutils
+, cargo-nextest
 
 , holonix
-, hcRustPlatform
 , hcToplevelDir
 , nixEnvPrefixEval
 , pkgs
@@ -17,17 +17,25 @@ let
     inputsFrom = lib.reverseList [
       { shellHook = nixEnvPrefixEval; }
 
-      holonix.shell
+      holonix.main
 
-      { shellHook = ''
-        echo Using "$NIX_ENV_PREFIX" as target prefix...
+      {
+        shellHook = ''
+          >&2 echo Using "$NIX_ENV_PREFIX" as target prefix...
 
-        export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
-        mkdir -p $HC_TEST_WASM_DIR
+          export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
+          mkdir -p $HC_TEST_WASM_DIR
 
-        export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
-        mkdir -p $HC_WASM_CACHE_PATH
-      ''; }
+          export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
+          mkdir -p $HC_WASM_CACHE_PATH
+        ''
+        # workaround to make cargo-nextest work on darwin
+        # see: https://github.com/nextest-rs/nextest/issues/267
+        + (lib.strings.optionalString stdenv.isDarwin ''
+          export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
+        '')
+        ;
+      }
 
       input
     ];
@@ -40,8 +48,28 @@ rec {
   # * CI scripts
   coreDev = hcMkShell {
     nativeBuildInputs = builtins.attrValues (pkgs.core)
-      ++ [ holonix.pkgs.sqlcipher ];
+      ++ [
+      cargo-nextest
+    ]
+      ++ (with holonix.pkgs;[
+      sqlcipher
+      gdb
+      gh
+      nixpkgs-fmt
+      cargo-sweep
+      crate2nix
+    ]);
   };
+
+  release = coreDev.overrideAttrs (attrs: {
+    nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
+      niv
+      cargo-readme
+      (import ../crates/release-automation/default.nix { })
+    ]);
+  });
+
+
 
   ci = hcMkShell {
     inputsFrom = [
@@ -56,11 +84,11 @@ rec {
     ];
     nativeBuildInputs = builtins.attrValues pkgs.happ
       ++ (with holonix.pkgs; [
-        lair-keystore
-        sqlcipher
-        binaryen
-      ])
-      ;
+      sqlcipher
+      binaryen
+      gdb
+    ])
+    ;
   };
 
   coreDevRustup = coreDev.overrideAttrs (attrs: {

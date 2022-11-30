@@ -1,6 +1,7 @@
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
+use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
@@ -17,7 +18,7 @@ impl EntryDefsInvocation {
     }
 }
 
-#[derive(Clone, Constructor)]
+#[derive(Clone, Constructor, Debug)]
 pub struct EntryDefsHostAccess;
 
 impl From<&HostContext> for EntryDefsHostAccess {
@@ -40,13 +41,16 @@ impl From<&EntryDefsHostAccess> for HostFnAccess {
 
 impl Invocation for EntryDefsInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::All
+        ZomesToInvoke::AllIntegrity
     }
     fn fn_components(&self) -> FnComponents {
         vec!["entry_defs".into()].into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(())
+    }
+    fn auth(&self) -> InvocationAuth {
+        InvocationAuth::LocalCallback
     }
 }
 
@@ -144,7 +148,7 @@ mod test {
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(ZomesToInvoke::All, entry_defs_invocation.zomes(),);
+        assert_eq!(ZomesToInvoke::AllIntegrity, entry_defs_invocation.zomes(),);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -176,13 +180,11 @@ mod test {
 mod slow_tests {
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;
@@ -205,24 +207,12 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_index_lookup() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
 
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone()).await.unwrap();
-
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author)
-            .await
-            .unwrap();
-
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
-        let output: () =
-            crate::call_test_ribosome!(host_access, TestWasm::EntryDefs, "assert_indexes", ())
-                .unwrap();
-
-        assert_eq!(&(), &output);
+        let _: () = conductor.call(&alice, "assert_indexes", ()).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -241,21 +231,19 @@ mod slow_tests {
             result,
             EntryDefsResult::Defs({
                 let mut tree = BTreeMap::new();
-                let zome_name: ZomeName = "entry_defs".into();
+                let zome_name: ZomeName = "integrity_entry_defs".into();
                 let defs: EntryDefs = vec![
                     EntryDef {
                         id: "post".into(),
                         visibility: EntryVisibility::Public,
-                        crdt_type: CrdtType,
                         required_validations: 5.into(),
-                        required_validation_type: Default::default(),
+                        ..Default::default()
                     },
                     EntryDef {
                         id: "comment".into(),
                         visibility: EntryVisibility::Private,
-                        crdt_type: CrdtType,
                         required_validations: 5.into(),
-                        required_validation_type: Default::default(),
+                        ..Default::default()
                     },
                 ]
                 .into();

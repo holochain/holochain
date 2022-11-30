@@ -1,6 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -9,120 +9,66 @@ pub fn capability_grants(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     _input: (),
-) -> Result<(), WasmError> {
+) -> Result<(), RuntimeError> {
     unimplemented!();
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::{conductor::ConductorBuilder, sweettest::SweetConductor};
-    use crate::{sweettest::SweetDnaFile};
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
     use holochain_types::fixt::CapSecretFixturator;
-    use holochain_types::prelude::*;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
 
     use matches::assert_matches;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_capability_secret_test<'a>() {
+    async fn ribosome_capability_secret_test() {
         observability::test_run().ok();
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace.clone();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
-        let _output: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ()).unwrap();
+        let _: CapSecret = conductor.call(&alice, "cap_secret", ()).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_transferable_cap_grant<'a>() {
+    async fn ribosome_transferable_cap_grant() {
         observability::test_run().ok();
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace.clone();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
-        let secret: CapSecret =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ()).unwrap();
-        let header: HeaderHash = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Capability,
-            "transferable_cap_grant",
-            secret
-        ).unwrap();
-        let maybe_element: Option<Element> =
-            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header).unwrap();
-
-        let entry_secret: CapSecret = match maybe_element {
-            Some(element) => {
-                let cap_grant_entry: CapGrantEntry = element.entry().to_grant_option().unwrap();
+        let secret: CapSecret = conductor.call(&alice, "cap_secret", ()).await;
+        let action: ActionHash = conductor
+            .call(&alice, "transferable_cap_grant", secret)
+            .await;
+        let maybe_record: Option<Record> = conductor.call(&alice, "get_entry", action).await;
+        let entry_secret: CapSecret = maybe_record
+            .and_then(|record| {
+                let cap_grant_entry = record.entry().to_grant_option().unwrap();
                 match cap_grant_entry.access {
-                    CapAccess::Transferable { secret, .. } => secret,
-                    _ => unreachable!(),
+                    CapAccess::Transferable { secret, .. } => Some(secret),
+                    _ => None,
                 }
-            }
-            _ => unreachable!(),
-        };
-        assert_eq!(entry_secret, secret,);
+            })
+            .unwrap();
+        assert_eq!(entry_secret, secret);
     }
 
-    // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
+    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RibosomeStore)
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();
-        let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
-            .await
-            .unwrap();
-
-        let alice_agent_id = fake_agent_pubkey_1();
-        let bob_agent_id = fake_agent_pubkey_2();
-
-        let mut dna_store = MockDnaStore::new();
-        dna_store
-            .expect_get()
-            .return_const(Some(dna_file.clone().into()));
-        dna_store.expect_add_dna().return_const(());
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-
-        let mut conductor =
-            SweetConductor::from_builder(ConductorBuilder::with_mock_dna_store(dna_store)).await;
-
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_agent_id.clone(), bob_agent_id.clone()],
-                &[dna_file.into()],
-            )
-            .await
-            .unwrap();
-
-        let ((alice,), (bobbo,)) = apps.into_tuples();
-        // There's only one zome to call, so let's peel that off now.
-        let alice = alice.zome(TestWasm::Capability);
-        let bobbo = bobbo.zome(TestWasm::Capability);
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         // ALICE FAILING AN UNAUTHED CALL
 
@@ -135,7 +81,7 @@ pub mod wasm_test {
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(original_secret, bob_agent_id.clone().try_into().unwrap()),
+                CapFor(original_secret, bob_pubkey.clone().try_into().unwrap()),
             )
             .await;
 
@@ -143,8 +89,8 @@ pub mod wasm_test {
 
         // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
 
-        let original_grant_hash: HeaderHash = conductor
-            .call(&bobbo, "transferable_cap_grant", original_secret)
+        let original_grant_hash: ActionHash = conductor
+            .call(&bob, "transferable_cap_grant", original_secret)
             .await;
 
         // ALICE CAN NOW CALL THE AUTHED REMOTE FN
@@ -153,7 +99,7 @@ pub mod wasm_test {
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(original_secret, bob_agent_id.clone()),
+                CapFor(original_secret, bob_pubkey.clone()),
             )
             .await;
 
@@ -164,30 +110,30 @@ pub mod wasm_test {
 
         // BOB ROLLS THE GRANT SO ONLY THE NEW ONE WILL WORK FOR ALICE
 
-        let new_grant_header_hash: HeaderHash = conductor
-            .call(&bobbo, "roll_cap_grant", original_grant_hash)
+        let new_grant_action_hash: ActionHash = conductor
+            .call(&bob, "roll_cap_grant", original_grant_hash)
             .await;
 
-        let output: Option<Element> = conductor
-            .call(&bobbo, "get_entry", new_grant_header_hash.clone())
+        let output: Option<Record> = conductor
+            .call(&bob, "get_entry", new_grant_action_hash.clone())
             .await;
 
         let new_secret: CapSecret = match output {
-            Some(element) => match element.entry().to_grant_option() {
+            Some(record) => match record.entry().to_grant_option() {
                 Some(zome_call_cap_grant) => match zome_call_cap_grant.access {
                     CapAccess::Transferable { secret, .. } => secret,
                     _ => unreachable!(),
                 },
                 _ => unreachable!(),
             },
-            _ => unreachable!("Couldn't get {:?}", new_grant_header_hash),
+            _ => unreachable!("Couldn't get {:?}", new_grant_action_hash),
         };
 
         let output: ZomeCallResponse = conductor
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(original_secret, bob_agent_id.clone().try_into().unwrap()),
+                CapFor(original_secret, bob_pubkey.clone().try_into().unwrap()),
             )
             .await;
 
@@ -197,22 +143,22 @@ pub mod wasm_test {
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(new_secret, bob_agent_id.clone().try_into().unwrap()),
+                CapFor(new_secret, bob_pubkey.clone().try_into().unwrap()),
             )
             .await;
         assert_eq!(output, ZomeCallResponse::Ok(ExternIO::encode(()).unwrap()),);
 
         // BOB DELETES THE GRANT SO NO SECRETS WORK
 
-        let _: HeaderHash = conductor
-            .call(&bobbo, "delete_cap_grant", new_grant_header_hash)
+        let _: ActionHash = conductor
+            .call(&bob, "delete_cap_grant", new_grant_action_hash)
             .await;
 
         let output: ZomeCallResponse = conductor
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(original_secret, bob_agent_id.clone().try_into().unwrap()),
+                CapFor(original_secret, bob_pubkey.clone().try_into().unwrap()),
             )
             .await;
 
@@ -222,7 +168,7 @@ pub mod wasm_test {
             .call(
                 &alice,
                 "try_cap_claim",
-                CapFor(new_secret, bob_agent_id.clone().try_into().unwrap()),
+                CapFor(new_secret, bob_pubkey.clone().try_into().unwrap()),
             )
             .await;
 

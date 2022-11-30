@@ -1,15 +1,36 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
+use crate::actor::BroadcastTo;
 use crate::agent_store::AgentInfoSigned;
 use crate::types::*;
 use derive_more::*;
+use kitsune_p2p_types::dht_arc::DhtLocation;
 use std::sync::Arc;
 
 /// Type used for content data of wire messages.
 #[derive(
-    Debug, Clone, PartialEq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
+    Debug, Clone, PartialEq, Eq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
 )]
 pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
+
+/// Enum containing the individual metric exchange messages used by clients
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum MetricExchangeMsg {
+    /// To start off, let's use a naive single message sending
+    /// everything we care about.
+    V1UniBlast {
+        /// The extrapolated coverage calculated by this node
+        /// note this is NOT the aggregate the node has collected,
+        /// just the direct extrapolation based on known peer infos.
+        extrap_cov_f32_le: WireData,
+    },
+
+    /// Future proof by having an unknown message catch-all variant
+    /// that we can ignore for any future variants that are added
+    #[serde(other)]
+    UnknownMessage,
+}
 
 kitsune_p2p_types::write_codec_enum! {
     /// KitsuneP2p Wire Protocol Top-Level Enum.
@@ -22,9 +43,8 @@ kitsune_p2p_types::write_codec_enum! {
         /// "Call" to the remote.
         Call(0x010) {
             space.0: Arc<KitsuneSpace>,
-            from_agent.1: Arc<KitsuneAgent>,
-            to_agent.2: Arc<KitsuneAgent>,
-            data.3: WireData,
+            to_agent.1: Arc<KitsuneAgent>,
+            data.2: WireData,
         },
 
         /// "Call" response from the remote.
@@ -48,15 +68,17 @@ kitsune_p2p_types::write_codec_enum! {
             /// see mod_idx description
             mod_cnt.4: u32,
 
-            data.5: WireData,
+            destination.5: BroadcastTo,
+
+            data.6: WireData,
         },
 
         /// Fire-and-forget broadcast message.
         /// uses low-level notify, not request
         Broadcast(0x23) {
             space.0: Arc<KitsuneSpace>,
-            basis.1: Arc<KitsuneBasis>,
-            to_agent.2: Arc<KitsuneAgent>,
+            to_agent.1: Arc<KitsuneAgent>,
+            destination.2: BroadcastTo,
             data.3: WireData,
         },
 
@@ -66,6 +88,7 @@ kitsune_p2p_types::write_codec_enum! {
         Gossip(0x42) {
             space.0: Arc<KitsuneSpace>,
             data.1: WireData,
+            module.2: gossip::GossipModuleType,
         },
 
         /// Ask a remote node if they know about a specific agent
@@ -83,12 +106,18 @@ kitsune_p2p_types::write_codec_enum! {
         /// or nearest to holding a u32 location.
         PeerQuery(0x52) {
             space.0: Arc<KitsuneSpace>,
-            basis_loc.1: u32,
+            basis_loc.1: DhtLocation,
         },
 
         /// Response to a peer query
         PeerQueryResp(0x53) {
             peer_list.0: Vec<AgentInfoSigned>,
+        },
+
+        /// MetricsExchangeMessage
+        MetricExchange(0xa0) {
+            space.0: Arc<KitsuneSpace>,
+            msgs.1: Vec<MetricExchangeMsg>,
         },
     }
 }

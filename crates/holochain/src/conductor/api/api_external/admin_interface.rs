@@ -9,7 +9,6 @@ use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
-use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::*;
@@ -22,7 +21,7 @@ use tracing::*;
 pub use holochain_conductor_api::*;
 
 /// A trait for the interface that a Conductor exposes to the outside world to use for administering the conductor.
-/// This trait has a one mock implementation and one "Real" implementation
+/// This trait has one mock implementation and one "real" implementation
 #[async_trait::async_trait]
 pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
     /// Call an admin function to modify this Conductor's behavior
@@ -35,12 +34,14 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 
     /// Deal with error cases produced by `handle_admin_request_inner`
     async fn handle_admin_request(&self, request: AdminRequest) -> AdminResponse {
-        let res = self.handle_admin_request_inner(request).await;
+        debug!("admin request: {:?}", request);
 
-        match res {
+        let res = match self.handle_admin_request_inner(request).await {
             Ok(response) => response,
             Err(e) => AdminResponse::Error(e.into()),
-        }
+        };
+        debug!("admin response: {:?}", res);
+        res
     }
 }
 
@@ -54,7 +55,8 @@ pub struct RealAdminInterfaceApi {
 }
 
 impl RealAdminInterfaceApi {
-    pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
+    /// Create an admin interface api.
+    pub fn new(conductor_handle: ConductorHandle) -> Self {
         RealAdminInterfaceApi { conductor_handle }
     }
 }
@@ -76,65 +78,69 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
             RegisterDna(payload) => {
                 trace!(register_dna_payload = ?payload);
-                let RegisterDnaPayload {
-                    uid,
-                    properties,
-                    source,
-                } = *payload;
-                // uid and properties from the register call will override any in the bundle
+                let RegisterDnaPayload { modifiers, source } = *payload;
+                let modifiers = modifiers.serialized().map_err(SerializationError::Bytes)?;
+                // network seed and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
-                        if properties.is_none() && uid.is_none() {
+                        if !modifiers.has_some_option_set() {
                             return Err(ConductorApiError::DnaReadError(
-                                "Hash Dna source requires properties or uid to create a derived Dna"
+                                "DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
                                     .to_string(),
                             ));
                         }
-                        let mut dna =
-                            self.conductor_handle.get_dna(hash).await.ok_or_else(|| {
+                        self.conductor_handle
+                            .get_dna_file(hash)
+                            .ok_or_else(|| {
                                 ConductorApiError::DnaReadError(format!(
                                     "Unable to create derived Dna: {} not registered",
                                     hash
                                 ))
-                            })?;
-                        if let Some(props) = properties {
-                            let properties = SerializedBytes::try_from(props)
-                                .map_err(SerializationError::from)?;
-                            dna = dna.with_properties(properties).await?;
-                        }
-                        if let Some(uid) = uid {
-                            dna = dna.with_uid(uid).await?;
-                        }
-                        dna
+                            })?
+                            .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
                         let bundle = Bundle::read_from_file(path).await?;
                         let bundle: DnaBundle = bundle.into();
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(uid, properties).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                     DnaSource::Bundle(bundle) => {
-                        let (dna_file, _original_hash) =
-                            bundle.into_dna_file(uid, properties).await?;
+                        let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
                 };
 
                 let hash = dna.dna_hash().clone();
-                let dna_list = self.conductor_handle.list_dnas().await?;
+                let dna_list = self.conductor_handle.list_dnas();
                 if !dna_list.contains(&hash) {
                     self.conductor_handle.register_dna(dna).await?;
                 }
                 Ok(AdminResponse::DnaRegistered(hash))
             }
-            CreateCloneCell(payload) => {
-                let cell_id = payload.cell_id();
+            GetDnaDefinition(dna_hash) => {
+                let dna_def = self
+                    .conductor_handle
+                    .get_dna_def(&dna_hash)
+                    .ok_or(ConductorApiError::DnaMissing(*dna_hash))?;
+                Ok(AdminResponse::DnaDefinitionReturned(dna_def))
+            }
+            UpdateCoordinators(payload) => {
+                let UpdateCoordinatorsPayload { dna_hash, source } = *payload;
+                let (coordinator_zomes, wasms) = match source {
+                    CoordinatorSource::Path(ref path) => {
+                        let bundle = Bundle::read_from_file(path).await?;
+                        let bundle: CoordinatorBundle = bundle.into();
+                        bundle.into_zomes().await?
+                    }
+                    CoordinatorSource::Bundle(bundle) => bundle.into_zomes().await?,
+                };
+
                 self.conductor_handle
-                    .clone()
-                    .create_clone_cell(*payload)
+                    .update_coordinators(&dna_hash, coordinator_zomes, wasms)
                     .await?;
-                Ok(AdminResponse::CloneCellCreated(cell_id))
+
+                Ok(AdminResponse::CoordinatorsUpdated)
             }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
@@ -149,19 +155,19 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     let InstallAppDnaPayload {
                         hash,
                         membrane_proof,
-                        nick,
+                        role_name,
                     } = dna_payload;
 
                     // confirm that hash has been installed
-                    let dna_list = self.conductor_handle.list_dnas().await?;
+                    let dna_list = self.conductor_handle.list_dnas();
                     if !dna_list.contains(&hash) {
                         return Err(ConductorApiError::DnaReadError(format!(
                             "Given dna has not been registered: {}",
                             hash
                         )));
                     }
-                    let cell_id = CellId::from((hash.clone(), agent_key.clone()));
-                    ConductorApiResult::Ok((InstalledCell::new(cell_id, nick), membrane_proof))
+                    let cell_id = CellId::from((hash, agent_key.clone()));
+                    ConductorApiResult::Ok((InstalledCell::new(cell_id, role_name), membrane_proof))
                 });
 
                 // Join all the install tasks
@@ -198,8 +204,15 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     InstalledAppInfo::from_installed_app(&app),
                 ))
             }
+            UninstallApp { installed_app_id } => {
+                self.conductor_handle
+                    .clone()
+                    .uninstall_app(&installed_app_id)
+                    .await?;
+                Ok(AdminResponse::AppUninstalled)
+            }
             ListDnas => {
-                let dna_list = self.conductor_handle.list_dnas().await?;
+                let dna_list = self.conductor_handle.list_dnas();
                 Ok(AdminResponse::DnasListed(dna_list))
             }
             GenerateAgentPubKey => {
@@ -207,15 +220,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .conductor_handle
                     .keystore()
                     .clone()
-                    .generate_sign_keypair_from_pure_entropy()
+                    .new_sign_keypair_random()
                     .await?;
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
             }
             ListCellIds => {
                 let cell_ids = self
                     .conductor_handle
-                    .list_cell_ids(Some(CellStatus::Joined))
-                    .await?;
+                    .list_cell_ids(Some(CellStatus::Joined));
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
             ListEnabledApps => {
@@ -235,7 +247,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let (app, errors) = self
                     .conductor_handle
                     .clone()
-                    .enable_app(&installed_app_id)
+                    .enable_app(installed_app_id.clone())
                     .await?;
 
                 let app_cells: HashSet<_> = app.required_cells().collect();
@@ -261,7 +273,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // Disable app
                 self.conductor_handle
                     .clone()
-                    .disable_app(&installed_app_id, DisabledAppReason::User)
+                    .disable_app(installed_app_id, DisabledAppReason::User)
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
@@ -270,7 +282,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let app = self
                     .conductor_handle
                     .clone()
-                    .start_app(&installed_app_id)
+                    .start_app(installed_app_id)
                     .await?;
                 Ok(AdminResponse::AppStarted(app.status().is_running()))
             }
@@ -279,7 +291,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let port = self
                     .conductor_handle
                     .clone()
-                    .add_app_interface(port)
+                    .add_app_interface(either::Either::Left(port))
                     .await?;
                 Ok(AdminResponse::AppInterfaceAttached { port })
             }
@@ -291,6 +303,20 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::StateDumped(state))
             }
+            DumpFullState {
+                cell_id,
+                dht_ops_cursor,
+            } => {
+                let state = self
+                    .conductor_handle
+                    .dump_full_cell_state(&cell_id, dht_ops_cursor)
+                    .await?;
+                Ok(AdminResponse::FullStateDumped(state))
+            }
+            DumpNetworkMetrics { dna_hash } => {
+                let dump = self.conductor_handle.dump_network_metrics(dna_hash).await?;
+                Ok(AdminResponse::NetworkMetricsDumped(dump))
+            }
             AddAgentInfo { agent_infos } => {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
                 Ok(AdminResponse::AgentInfoAdded)
@@ -299,17 +325,53 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
                 Ok(AdminResponse::AgentInfoRequested(r))
             }
+            GraftRecords {
+                cell_id,
+                validate,
+                records,
+            } => {
+                self.conductor_handle
+                    .clone()
+                    .graft_records_onto_source_chain(cell_id, validate, records)
+                    .await?;
+                Ok(AdminResponse::RecordsGrafted)
+            }
+            GrantZomeCallCapability(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .grant_zome_call_capability(*payload)
+                    .await?;
+                Ok(AdminResponse::ZomeCallCapabilityGranted)
+            }
+            RestoreCloneCell(payload) => {
+                let restored_cell = self
+                    .conductor_handle
+                    .clone()
+                    .restore_archived_clone_cell(&*payload)
+                    .await?;
+                Ok(AdminResponse::CloneCellRestored(restored_cell))
+            }
+            DeleteArchivedCloneCells(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .delete_archived_clone_cells(&*payload)
+                    .await?;
+                Ok(AdminResponse::ArchivedCloneCellsDeleted)
+            }
 
             // deprecated aliases
+            #[allow(deprecated)]
             ListActiveApps => {
                 tracing::warn!("Admin method ListActiveApps is deprecated: use ListApps instead.");
                 self.handle_admin_request_inner(ListEnabledApps).await
             }
+            #[allow(deprecated)]
             ActivateApp { installed_app_id } => {
                 tracing::warn!("Admin method ActivateApp is deprecated: use EnableApp instead (functionality is identical).");
                 self.handle_admin_request_inner(EnableApp { installed_app_id })
                     .await
             }
+            #[allow(deprecated)]
             DeactivateApp { installed_app_id } => {
                 tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
                 self.handle_admin_request_inner(DisableApp { installed_app_id })
@@ -317,28 +379,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             }
         }
     }
-}
-
-/// Return the proper phenotype for a Dna, given a manifest and some optional
-/// overrides
-fn _resolve_phenotype(
-    manifest: &DnaManifest,
-    payload_uid: Option<&Uid>,
-    payload_properties: Option<&YamlProperties>,
-) -> (Option<Uid>, Option<YamlProperties>) {
-    let bundle_uid = manifest.uid();
-    let bundle_properties = manifest.properties();
-    let properties = if payload_properties.is_some() {
-        payload_properties.cloned()
-    } else {
-        bundle_properties
-    };
-    let uid = if payload_uid.is_some() {
-        payload_uid.cloned()
-    } else {
-        bundle_uid
-    };
-    (uid, properties)
 }
 
 #[async_trait::async_trait]
@@ -354,7 +394,6 @@ impl InterfaceApi for RealAdminInterfaceApi {
         {
             self.conductor_handle
                 .check_running()
-                .await
                 .map_err(Box::new)
                 .map_err(InterfaceError::RequestHandler)?;
         }
@@ -383,20 +422,19 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn register_list_dna_app() -> Result<()> {
         observability::test_run().ok();
-        let envs = test_environments();
-        let handle = Conductor::builder().test(&envs.into(), &[]).await?;
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let env_dir = test_db_dir();
+        let handle = Conductor::builder().test(env_dir.path(), &[]).await?;
+        let shutdown = handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
-        let uid = Uuid::new_v4();
+        let network_seed = Uuid::new_v4();
         let dna = fake_dna_zomes(
-            &uid.to_string(),
+            &network_seed.to_string(),
             vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
         let dna_hash = dna.dna_hash().clone();
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let path_payload = RegisterDnaPayload {
-            uid: None,
-            properties: None,
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path_install_response = admin_api
@@ -409,8 +447,7 @@ mod test {
 
         // re-register idempotent
         let path_payload = RegisterDnaPayload {
-            uid: None,
-            properties: None,
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path1_install_response = admin_api
@@ -427,25 +464,23 @@ mod test {
 
         // register by hash
         let hash_payload = RegisterDnaPayload {
-            uid: None,
-            properties: None,
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Hash(dna_hash.clone()),
         };
 
-        // without properties or uid should throw error
+        // without modifiers seed should throw error
         let hash_install_response = admin_api
             .handle_admin_request(AdminRequest::RegisterDna(Box::new(hash_payload)))
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("Hash Dna source requires properties or uid to create a derived Dna")
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == String::from("DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna")
         );
 
         // with a property should install and produce a different hash
         let json: serde_yaml::Value = serde_yaml::from_str("some prop: \"foo\"").unwrap();
         let hash_payload = RegisterDnaPayload {
-            uid: None,
-            properties: Some(YamlProperties::new(json.clone())),
+            modifiers: DnaModifiersOpt::none().with_properties(YamlProperties::new(json.clone())),
             source: DnaSource::Hash(dna_hash.clone()),
         };
         let install_response = admin_api
@@ -456,10 +491,10 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
-        // with a uid should install and produce a different hash
+        // with a network seed should install and produce a different hash
         let hash_payload = RegisterDnaPayload {
-            uid: Some(String::from("12345678900000000000000")),
-            properties: None,
+            modifiers: DnaModifiersOpt::none()
+                .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Hash(dna_hash.clone()),
         };
         let hash2_install_response = admin_api
@@ -477,10 +512,10 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
-        // from a path with a same uid should return the already registered hash so it's idempotent
+        // from a path with a same network seed should return the already registered hash so it's idempotent
         let path_payload = RegisterDnaPayload {
-            uid: Some(String::from("12345678900000000000000")),
-            properties: None,
+            modifiers: DnaModifiersOpt::none()
+                .with_network_seed(String::from("12345678900000000000000")),
             source: DnaSource::Path(dna_path.clone()),
         };
         let path2_install_response = admin_api
@@ -491,10 +526,9 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash == new_hash
         );
 
-        // from a path with different uid should produce different hash
+        // from a path with different network seed should produce different hash
         let path_payload = RegisterDnaPayload {
-            uid: Some(String::from("foo")),
-            properties: None,
+            modifiers: DnaModifiersOpt::none().with_network_seed(String::from("foo")),
             source: DnaSource::Path(dna_path),
         };
         let path3_install_response = admin_api
@@ -505,7 +539,7 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
-        handle.shutdown().await;
+        handle.shutdown();
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
             .await
             .ok();
@@ -515,13 +549,13 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn install_list_dna_app() {
         observability::test_run().ok();
-        let envs = test_environments();
-        let handle = Conductor::builder().test(&envs.into(), &[]).await.unwrap();
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let db_dir = test_db_dir();
+        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        let shutdown = handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
-        let uid = Uuid::new_v4();
+        let network_seed = Uuid::new_v4();
         let dna = fake_dna_zomes(
-            &uid.to_string(),
+            &network_seed.to_string(),
             vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
         );
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
@@ -547,8 +581,7 @@ mod test {
 
         // now register a DNA
         let path_payload = RegisterDnaPayload {
-            uid: None,
-            properties: None,
+            modifiers: DnaModifiersOpt::none(),
             source: DnaSource::Path(dna_path),
         };
         let path_install_response = admin_api
@@ -627,7 +660,7 @@ mod test {
         assert_matches!(res, AdminResponse::EnabledAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
         );
 
-        handle.shutdown().await;
+        handle.shutdown();
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
             .await
             .ok();

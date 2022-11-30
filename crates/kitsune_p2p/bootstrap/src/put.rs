@@ -8,7 +8,6 @@ pub(crate) fn put(
     store: Store,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::header::exact("content-type", "application/octet"))
         .and(warp::header::exact("X-Op", "put"))
         .and(warp::body::content_length_limit(SIZE_LIMIT))
         .and(warp::body::bytes())
@@ -49,7 +48,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() {
-        let store = Store::new();
+        let store = Store::new(vec![]);
         let filter = put(store.clone());
 
         let info = AgentInfoSigned::sign(

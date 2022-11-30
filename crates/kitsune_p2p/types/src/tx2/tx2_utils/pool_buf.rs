@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-// TODO - expirement with these values for efficiency.
+// MAYBE - expirement with these values for efficiency.
 
 /// The max capacity of in-pool stored PoolBufs per thread.
 /// See how this affects max mem usage in doc of POOL_BUF_SHRINK_TO_CAPACITY.
@@ -195,6 +195,7 @@ impl PoolBuf {
         inner.1.extend_from_slice(src);
     }
 
+    #[allow(clippy::uninit_vec)]
     /// Ensure we have enough front space to prepend the given byte count.
     /// If not, shift all data over to the right, making more prepend space.
     pub fn reserve_front(&mut self, mut len: usize) {

@@ -1,61 +1,77 @@
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
+use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
-use crate::core::ribosome::HostFnAccess;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn agent_info<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<AgentInfo, WasmError> {
+) -> Result<AgentInfo, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
-        HostFnAccess{ agent_info: Permission::Allow, .. } => {
+        HostFnAccess {
+            agent_info: Permission::Allow,
+            ..
+        } => {
             let agent_pubkey = call_context
                 .host_context
                 .workspace()
                 .source_chain()
+                .as_ref()
+                .expect("Must have source chain if agent_info access is given")
                 .agent_pubkey()
                 .clone();
             Ok(AgentInfo {
                 agent_initial_pubkey: agent_pubkey.clone(),
                 agent_latest_pubkey: agent_pubkey,
+                chain_head: call_context
+                    .host_context
+                    .workspace()
+                    .source_chain()
+                    .as_ref()
+                    .expect("Must have source chain if agent_info access is given")
+                    .chain_head()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?,
             })
-        },
-        _ => unreachable!(),
+        }
+        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
+            call_context.zome.zome_name().clone(),
+            call_context.function_name().clone(),
+            "agent_info".into()
+        ).to_string())).into())
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-
-    use holochain_state::host_fn_workspace::HostFnWorkspace;
-    use holochain_types::prelude::*;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use hdk::prelude::*;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn invoke_import_agent_info_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let test_cache = holochain_state::test_utils::test_cache_env();
-        let env = test_env.env();
-        let author = fake_agent_pubkey_1();
-        crate::test_utils::fake_genesis(env.clone())
-            .await
-            .unwrap();
-        let workspace = HostFnWorkspace::new(env.clone(), test_cache.env(), author).await.unwrap();
+    async fn agent_info_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::AgentInfo).await;
 
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace;
+        let call_info: CallInfo = conductor.call(&alice, "call_info", ()).await;
+        let agent_info: AgentInfo = conductor.call(&alice, "agent_info", ()).await;
+        assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
+        assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
 
-        let agent_info: AgentInfo =
-            crate::call_test_ribosome!(host_access, TestWasm::AgentInfo, "agent_info", ()).unwrap();
-        assert_eq!(agent_info.agent_initial_pubkey, fake_agent_pubkey_1(),);
-        assert_eq!(agent_info.agent_latest_pubkey, fake_agent_pubkey_1(),);
+        assert_eq!(agent_info.chain_head.1, call_info.as_at.1 + 1,);
+
+        let call_info_1: CallInfo = conductor.call(&alice, "call_info", ()).await;
+        let agent_info_1: AgentInfo = conductor.call(&alice, "agent_info", ()).await;
+        assert_eq!(agent_info_1.chain_head.1, call_info_1.as_at.1 + 1,);
     }
 }

@@ -12,16 +12,21 @@ async fn exists() {
         .unwrap();
 
     let td = EntryTestData::new();
-    insert_op_scratch(&mut scratch, td.store_entry_op.clone()).unwrap();
-    insert_op(&mut txn, td.store_entry_op.clone(), true).unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.store_entry_op.clone(),
+        ChainTopOrdering::default(),
+    )
+    .unwrap();
+    insert_op(&mut txn, &td.store_entry_op).unwrap();
     assert!(Txn::from(&txn)
         .contains_hash(&td.hash.clone().into())
         .unwrap());
     assert!(Txn::from(&txn)
-        .contains_hash(&td.header.as_hash().clone().into())
+        .contains_hash(&td.action.as_hash().clone().into())
         .unwrap());
     assert!(scratch.contains_hash(&td.hash.clone().into()).unwrap());
     assert!(scratch
-        .contains_hash(&td.header.as_hash().clone().into())
+        .contains_hash(&td.action.as_hash().clone().into())
         .unwrap());
 }

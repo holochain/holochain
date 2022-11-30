@@ -2,7 +2,7 @@
 use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::{dht_op::DhtOp, header::NewEntryHeader};
+use holochain_types::{action::NewEntryAction, dht_op::DhtOp};
 use holochain_zome_types::*;
 
 use super::link::*;
@@ -20,39 +20,40 @@ pub struct LinkTestData {
     pub base_query: GetLinksQuery,
     pub tag_query: GetLinksQuery,
     pub details_tag_query: GetLinkDetailsQuery,
-    pub create_link_header: SignedHeaderHashed,
-    pub later_create_link_header: SignedHeaderHashed,
+    pub create_link_action: SignedActionHashed,
+    pub later_create_link_action: SignedActionHashed,
 }
 
 pub struct EntryTestData {
     pub store_entry_op: DhtOpHashed,
     pub update_store_entry_op: DhtOpHashed,
-    pub delete_entry_header_op: DhtOpHashed,
+    pub delete_entry_action_op: DhtOpHashed,
     pub entry: Entry,
     pub hash: EntryHash,
     pub query: GetLiveEntryQuery,
-    pub header: SignedHeaderHashed,
-    pub update_header: SignedHeaderHashed,
+    pub action: SignedActionHashed,
+    pub update_action: SignedActionHashed,
 }
 
-pub struct ElementTestData {
-    pub store_element_op: DhtOpHashed,
-    pub update_store_element_op: DhtOpHashed,
+pub struct RecordTestData {
+    pub store_record_op: DhtOpHashed,
+    pub update_store_record_op: DhtOpHashed,
     pub delete_by_op: DhtOpHashed,
     pub entry: Entry,
-    pub header: SignedHeaderHashed,
-    pub update_header: SignedHeaderHashed,
-    pub create_hash: HeaderHash,
-    pub update_hash: HeaderHash,
+    pub action: SignedActionHashed,
+    pub update_action: SignedActionHashed,
+    pub create_hash: ActionHash,
+    pub update_hash: ActionHash,
 }
 
 impl LinkTestData {
     pub fn new() -> Self {
         let mut create_link = fixt!(CreateLink);
+        create_link.zome_index = 0.into();
         let mut later_create_link = create_link.clone();
         let mut delete_link = fixt!(DeleteLink);
 
-        let now = holochain_types::timestamp::now();
+        let now = holochain_zome_types::Timestamp::now();
         let before = (now - std::time::Duration::from_secs(10)).unwrap();
 
         create_link.timestamp = before;
@@ -68,71 +69,75 @@ impl LinkTestData {
         let target_hash = EntryHash::with_data_sync(&target);
         create_target.entry_hash = target_hash.clone();
 
-        create_link.base_address = base_hash.clone();
-        later_create_link.base_address = base_hash.clone();
-        create_link.target_address = target_hash.clone();
-        later_create_link.target_address = target_hash.clone();
+        create_link.base_address = base_hash.clone().into();
+        later_create_link.base_address = base_hash.clone().into();
+        create_link.target_address = target_hash.clone().into();
+        later_create_link.target_address = target_hash.clone().into();
 
         let create_link_sig = fixt!(Signature);
         let create_link_op = DhtOp::RegisterAddLink(create_link_sig.clone(), create_link.clone());
-        let create_link_header = SignedHeaderHashed::with_presigned(
-            HeaderHashed::from_content_sync(Header::CreateLink(create_link.clone())),
+        let create_link_action = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(Action::CreateLink(create_link.clone())),
             create_link_sig,
         );
         let later_create_link_sig = fixt!(Signature);
         let later_create_link_op =
             DhtOp::RegisterAddLink(later_create_link_sig.clone(), later_create_link.clone());
 
-        let later_create_link_header = SignedHeaderHashed::with_presigned(
-            HeaderHashed::from_content_sync(Header::CreateLink(later_create_link.clone())),
+        let later_create_link_action = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(Action::CreateLink(later_create_link.clone())),
             later_create_link_sig,
         );
 
-        let create_link_hash = HeaderHash::with_data_sync(&Header::CreateLink(create_link.clone()));
+        let create_link_hash = ActionHash::with_data_sync(&Action::CreateLink(create_link.clone()));
         let later_create_link_hash =
-            HeaderHash::with_data_sync(&Header::CreateLink(later_create_link.clone()));
+            ActionHash::with_data_sync(&Action::CreateLink(later_create_link.clone()));
 
         delete_link.link_add_address = create_link_hash.clone();
-        delete_link.base_address = base_hash.clone();
+        delete_link.base_address = base_hash.clone().into();
 
         let delete_link_op = DhtOp::RegisterRemoveLink(fixt!(Signature), delete_link.clone());
 
         let base_op = DhtOp::StoreEntry(
             fixt!(Signature),
-            NewEntryHeader::Create(create_base.clone()),
+            NewEntryAction::Create(create_base.clone()),
             Box::new(base.clone()),
         );
 
         let target_op = DhtOp::StoreEntry(
             fixt!(Signature),
-            NewEntryHeader::Create(create_target.clone()),
+            NewEntryAction::Create(create_target.clone()),
             Box::new(target.clone()),
         );
 
         let link = Link {
-            target: target_hash.clone(),
+            target: target_hash.clone().into(),
             timestamp: create_link.timestamp,
             tag: create_link.tag.clone(),
+            zome_index: create_link.zome_index,
+            link_type: create_link.link_type,
             create_link_hash: create_link_hash.clone(),
         };
 
         let later_link = Link {
-            target: target_hash.clone(),
+            target: target_hash.clone().into(),
             timestamp: later_create_link.timestamp,
             tag: later_create_link.tag.clone(),
+            zome_index: later_create_link.zome_index,
+            link_type: later_create_link.link_type,
             create_link_hash: later_create_link_hash.clone(),
         };
 
-        let base_query = GetLinksQuery::base(base_hash.clone(), create_link.zome_id);
-        let tag_query = GetLinksQuery::tag(
-            base_hash.clone(),
-            create_link.zome_id,
-            create_link.tag.clone(),
+        let base_query = GetLinksQuery::base(base_hash.clone().into(), vec![ZomeIndex(0)]);
+        let tag_query = GetLinksQuery::new(
+            base_hash.clone().into(),
+            LinkTypeFilter::single_dep(0.into()),
+            Some(create_link.tag.clone()),
         );
-        let details_tag_query = GetLinkDetailsQuery::tag(
-            base_hash.clone(),
-            create_link.zome_id,
-            create_link.tag.clone(),
+        let details_tag_query = GetLinkDetailsQuery::new(
+            base_hash.clone().into(),
+            LinkTypeFilter::single_dep(0.into()),
+            Some(create_link.tag.clone()),
         );
 
         Self {
@@ -146,8 +151,8 @@ impl LinkTestData {
             tag_query,
             later_link,
             details_tag_query,
-            create_link_header,
-            later_create_link_header,
+            create_link_action,
+            later_create_link_action,
         }
     }
 }
@@ -161,8 +166,18 @@ impl EntryTestData {
         let entry_hash = EntryHash::with_data_sync(&entry);
         create.entry_hash = entry_hash.clone();
         update.entry_hash = entry_hash.clone();
+        create.entry_type = EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        ));
+        update.entry_type = EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        ));
 
-        let create_hash = HeaderHash::with_data_sync(&Header::Create(create.clone()));
+        let create_hash = ActionHash::with_data_sync(&Action::Create(create.clone()));
 
         delete.deletes_entry_address = entry_hash.clone();
         delete.deletes_address = create_hash.clone();
@@ -170,47 +185,47 @@ impl EntryTestData {
         let signature = fixt!(Signature);
         let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
-            NewEntryHeader::Create(create.clone()),
+            NewEntryAction::Create(create.clone()),
             Box::new(entry.clone()),
         ));
 
-        let header = SignedHeaderHashed::with_presigned(
-            HeaderHashed::from_content_sync(Header::Create(create.clone())),
+        let action = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(Action::Create(create.clone())),
             signature.clone(),
         );
 
         let signature = fixt!(Signature);
-        let delete_entry_header_op = DhtOpHashed::from_content_sync(
-            DhtOp::RegisterDeletedEntryHeader(signature.clone(), delete.clone()),
+        let delete_entry_action_op = DhtOpHashed::from_content_sync(
+            DhtOp::RegisterDeletedEntryAction(signature.clone(), delete.clone()),
         );
 
         let signature = fixt!(Signature);
         let update_store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
-            NewEntryHeader::Update(update.clone()),
+            NewEntryAction::Update(update.clone()),
             Box::new(entry.clone()),
         ));
 
-        let update_header = SignedHeaderHashed::with_presigned(
-            HeaderHashed::from_content_sync(Header::Update(update.clone())),
+        let update_action = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(Action::Update(update.clone())),
             signature.clone(),
         );
         let query = GetLiveEntryQuery::new(entry_hash.clone());
 
         Self {
             store_entry_op,
-            header,
+            action,
             update_store_entry_op,
-            update_header,
+            update_action,
             entry,
             query,
-            delete_entry_header_op,
+            delete_entry_action_op,
             hash: entry_hash,
         }
     }
 }
 
-impl ElementTestData {
+impl RecordTestData {
     pub fn new() -> Self {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
@@ -220,21 +235,21 @@ impl ElementTestData {
         create.entry_hash = entry_hash.clone();
         update.entry_hash = entry_hash.clone();
 
-        let create_hash = HeaderHash::with_data_sync(&Header::Create(create.clone()));
-        let update_hash = HeaderHash::with_data_sync(&Header::Update(update.clone()));
+        let create_hash = ActionHash::with_data_sync(&Action::Create(create.clone()));
+        let update_hash = ActionHash::with_data_sync(&Action::Update(update.clone()));
 
         delete.deletes_entry_address = entry_hash.clone();
         delete.deletes_address = create_hash.clone();
 
         let signature = fixt!(Signature);
-        let store_element_op = DhtOpHashed::from_content_sync(DhtOp::StoreElement(
+        let store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature.clone(),
-            Header::Create(create.clone()),
+            Action::Create(create.clone()),
             Some(Box::new(entry.clone())),
         ));
 
-        let header = SignedHeaderHashed::with_presigned(
-            HeaderHashed::from_content_sync(Header::Create(create.clone())),
+        let action = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(Action::Create(create.clone())),
             signature.clone(),
         );
 
@@ -245,22 +260,22 @@ impl ElementTestData {
         ));
 
         let signature = fixt!(Signature);
-        let update_store_element_op = DhtOpHashed::from_content_sync(DhtOp::StoreElement(
+        let update_store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature.clone(),
-            Header::Update(update.clone()),
+            Action::Update(update.clone()),
             Some(Box::new(entry.clone())),
         ));
 
-        let update_header = SignedHeaderHashed::with_presigned(
-            HeaderHashed::from_content_sync(Header::Update(update.clone())),
+        let update_action = SignedActionHashed::with_presigned(
+            ActionHashed::from_content_sync(Action::Update(update.clone())),
             signature.clone(),
         );
 
         Self {
-            store_element_op,
-            header,
-            update_store_element_op,
-            update_header,
+            store_record_op,
+            action,
+            update_store_record_op,
+            update_action,
             entry,
             delete_by_op,
             create_hash,

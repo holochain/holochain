@@ -149,9 +149,8 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
         .for_each_concurrent(4096, move |msg| {
             let api = api.clone();
             async move {
-                match handle_incoming_message(msg, api.clone()).await {
-                    Err(e) => error!(error = &e as &dyn std::error::Error),
-                    Ok(()) => {}
+                if let Err(e) = handle_incoming_message(msg, api.clone()).await {
+                    error!(error = &e as &dyn std::error::Error)
                 }
             }
         })
@@ -219,61 +218,10 @@ where
 
 /// Test items needed by other crates
 #[cfg(any(test, feature = "test_utils"))]
-pub mod test_utils {
-    use crate::conductor::api::RealAppInterfaceApi;
-    use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::ConductorHandle;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_state::prelude::*;
-    use holochain_types::prelude::*;
-    use std::sync::Arc;
-    use tempdir::TempDir;
-
-    /// One of various ways to setup an app, used somewhere...
-    pub async fn setup_app(
-        cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-        dna_store: MockDnaStore,
-    ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-        let envs = test_environments();
-
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs, &[])
-            .await
-            .unwrap();
-
-        conductor_handle
-            .clone()
-            .install_app("test app".to_string(), cell_data)
-            .await
-            .unwrap();
-
-        conductor_handle
-            .clone()
-            .enable_app(&"test app".to_string())
-            .await
-            .unwrap();
-
-        let errors = conductor_handle
-            .clone()
-            .reconcile_cell_status_with_app_status()
-            .await
-            .unwrap();
-
-        assert!(errors.is_empty());
-
-        let handle = conductor_handle.clone();
-
-        (
-            Arc::new(envs.into_tempdir()),
-            RealAppInterfaceApi::new(conductor_handle, Default::default()),
-            handle,
-        )
-    }
-}
+pub use crate::test_utils::setup_app;
 
 #[cfg(test)]
 pub mod test {
-    use super::test_utils::setup_app;
     use super::*;
     use crate::conductor::api::error::ExternalApiWireError;
     use crate::conductor::api::AdminRequest;
@@ -290,13 +238,14 @@ pub mod test {
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::prelude::*;
-    use holochain_state::prelude::test_environments;
+    use holochain_state::prelude::test_db_dir;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::{app::InstallAppDnaPayload, prelude::InstallAppPayload};
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_wasm_test_utils::TestZomes;
     use holochain_websocket::Respond;
     use holochain_zome_types::cell::CellId;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
@@ -305,11 +254,10 @@ pub mod test {
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
-    use mockall::predicate;
     use observability;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
     use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -320,20 +268,24 @@ pub mod test {
     }
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
-        let envs = test_environments();
-        let conductor_handle = Conductor::builder().test(&envs, &[]).await.unwrap();
-        (Arc::new(envs.into_tempdir()), conductor_handle)
+        let db_dir = test_db_dir();
+        let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+        (Arc::new(db_dir), conductor_handle)
     }
 
     async fn setup_admin_fake_cells(
-        cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
-        dna_store: MockDnaStore,
+        dnas: Vec<DnaFile>,
+        cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
-        let envs = test_environments();
-        let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(&envs, &[])
+        let db_dir = test_db_dir();
+        let conductor_handle = ConductorBuilder::new()
+            .test(db_dir.path(), &[])
             .await
             .unwrap();
+
+        for dna in dnas {
+            conductor_handle.register_dna(dna).await.unwrap();
+        }
 
         let cell_data = cell_ids_with_proofs
             .into_iter()
@@ -346,13 +298,13 @@ pub mod test {
             .await
             .unwrap();
 
-        (Arc::new(envs.into_tempdir()), conductor_handle)
+        (Arc::new(db_dir), conductor_handle)
     }
 
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
         conductor_handle
             .clone()
-            .enable_app(&"test app".to_string())
+            .enable_app("test app".to_string())
             .await
             .unwrap();
 
@@ -384,7 +336,7 @@ pub mod test {
         let respond = Respond::Request(Box::new(respond));
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown().await;
+        conductor_handle.shutdown();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -412,15 +364,7 @@ pub mod test {
         let respond = Respond::Request(Box::new(respond));
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown().await;
-    }
-
-    #[ignore = "stub"]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn deserialization_failure() {
-        // TODO: B-01440: this can't be done easily yet
-        // because we can't serialize something that
-        // doesn't deserialize
+        conductor_handle.shutdown();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -441,22 +385,7 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store
-            .expect_get()
-            .with(predicate::eq(dna_hash))
-            .returning(move |_| Some(dna.clone()));
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(1)
-            .return_const(());
-
-        let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)], dna_store).await;
+        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
         let mut request: ZomeCall =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 cell_id.clone(),
@@ -468,11 +397,11 @@ pub mod test {
             .unwrap()
             .into();
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeCallInvocation(Box::new(request));
+        let msg = AppRequest::ZomeCall(Box::new(request));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeCallInvocation { .. });
+            assert_matches!(response, AppResponse::ZomeCall { .. });
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));
@@ -480,8 +409,59 @@ pub mod test {
         handle_incoming_message(msg, app_api).await.unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
-        handle.shutdown().await;
+        let shutdown = handle.take_shutdown_handle().unwrap();
+        handle.shutdown();
+        shutdown.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn gossip_info_request() {
+        observability::test_run().ok();
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+
+        // warm the zome
+        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+
+        let dna_hash = dna.dna_hash().clone();
+        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
+
+        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
+        let request = GossipInfoRequestPayload {
+            dnas: vec![dna_hash],
+        };
+
+        let msg = AppRequest::GossipInfo(Box::new(request));
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AppResponse = bytes.try_into().unwrap();
+            match response {
+                AppResponse::GossipInfo(info) => {
+                    assert_eq!(
+                        info,
+                        vec![DnaGossipInfo {
+                            total_historical_gossip_throughput: HistoricalGossipThroughput::default(
+                            )
+                        }]
+                    )
+                }
+                other => panic!("unexpected response {:?}", other),
+            }
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, app_api).await.unwrap();
+        // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
+        // the overhead of a websocket request locally is small
+        let shutdown = handle.take_shutdown_handle().unwrap();
+        handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 
@@ -492,8 +472,8 @@ pub mod test {
         let mut dnas = Vec::new();
         for _i in 0..2 as u32 {
             let zomes = vec![TestWasm::Foo.into()];
-            let def = DnaDef::unique_from_zomes(zomes.clone());
-            dnas.push(DnaFile::new(def, vec![TestWasm::Foo.into()]).await.unwrap());
+            let def = DnaDef::unique_from_zomes(zomes.clone(), Vec::new());
+            dnas.push(DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo)).await);
         }
         let dna_map = dnas
             .iter()
@@ -506,21 +486,9 @@ pub mod test {
             .cloned()
             .map(|hash| (CellId::from((hash, agent_key.clone())), None))
             .collect::<Vec<_>>();
-        let mut dna_store = MockDnaStore::new();
-        dna_store
-            .expect_get()
-            .returning(move |hash| dna_map.get(&hash).cloned());
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        let (_tmpdir, conductor_handle) =
-            setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
-        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+
+        let (_tmpdir, conductor_handle) = setup_admin_fake_cells(dnas, cell_ids_with_proofs).await;
+        let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let app_id = "test app".to_string();
 
         // Activate the app
@@ -573,7 +541,7 @@ pub mod test {
         }
 
         // Now deactivate app
-        let msg = AdminRequest::DeactivateApp {
+        let msg = AdminRequest::DisableApp {
             installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
@@ -615,7 +583,7 @@ pub mod test {
             assert!(false);
         }
 
-        conductor_handle.shutdown().await;
+        conductor_handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 
@@ -623,7 +591,7 @@ pub mod test {
     async fn attach_app_interface() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
@@ -635,7 +603,7 @@ pub mod test {
         let respond = Respond::Request(Box::new(respond));
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown().await;
+        conductor_handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 
@@ -649,21 +617,10 @@ pub mod test {
         );
         let cell_id = CellId::from((dna.dna_hash().clone(), fake_agent_pubkey_1()));
 
-        let mut dna_store = MockDnaStore::new();
-        dna_store.expect_get().returning(move |_| Some(dna.clone()));
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(1)
-            .return_const(());
-        dna_store
-            .expect_add_entry_defs::<Vec<_>>()
-            .times(1)
-            .return_const(());
-
         let (_tmpdir, conductor_handle) =
-            setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
+            setup_admin_fake_cells(vec![dna], vec![(cell_id.clone(), None)]).await;
         let conductor_handle = activate(conductor_handle).await;
-        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
+        let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         // Allow agents time to join
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
@@ -683,22 +640,36 @@ pub mod test {
         let respond = Respond::Request(Box::new(respond));
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown().await;
+        conductor_handle.shutdown();
         shutdown.await.unwrap().unwrap();
     }
 
-    async fn make_dna(uid: &str, zomes: Vec<TestWasm>) -> DnaFile {
+    async fn make_dna(network_seed: &str, zomes: Vec<TestWasm>) -> DnaFile {
         DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                uid: uid.to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
-                zomes: zomes.clone().into_iter().map(Into::into).collect(),
+                modifiers: DnaModifiers {
+                    network_seed: network_seed.to_string(),
+                    properties: SerializedBytes::try_from(()).unwrap(),
+                    origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                    quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
+                },
+                integrity_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.integrity.into_inner())
+                    .collect(),
+                coordinator_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.coordinator.into_inner())
+                    .collect(),
             },
-            zomes.into_iter().map(Into::into),
+            zomes.into_iter().flat_map(|t| Vec::<DnaWasm>::from(t)),
         )
         .await
-        .unwrap()
     }
 
     /// Check that we can add and get agent info for a conductor
@@ -706,18 +677,22 @@ pub mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
         observability::test_run().ok();
-        let test_envs = test_environments();
-        let p2p = test_envs.p2p();
+        let test_db_dir = test_db_dir();
         let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![
             make_dna("1", vec![TestWasm::Anchor]).await,
             make_dna("2", vec![TestWasm::Anchor]).await,
         ];
-        let mut conductor_test =
-            ConductorTestData::new(test_envs, dnas.clone(), agents.clone(), Default::default())
-                .await
-                .0;
+        let mut conductor_test = ConductorTestData::new(
+            test_db_dir,
+            dnas.clone(),
+            agents.clone(),
+            Default::default(),
+        )
+        .await
+        .0;
         let handle = conductor_test.handle();
+        let spaces = handle.get_spaces();
         let dnas = dnas
             .into_iter()
             .map(|d| d.dna_hash().clone())
@@ -727,8 +702,10 @@ pub mod test {
         crate::assert_eq_retry_10s!(
             {
                 let mut count = 0;
-                for env in p2p.lock().values() {
-                    count += env.conn().unwrap().p2p_list_agents().unwrap().len();
+                for env in spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+                    let mut conn = env.conn().unwrap();
+                    let txn = conn.transaction().unwrap();
+                    count += txn.p2p_list_agents().unwrap().len();
                 }
                 count
             },

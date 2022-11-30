@@ -5,9 +5,11 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
+use holochain_zome_types::DnaModifiersOpt;
+
 use super::error::{AppManifestError, AppManifestResult};
 use crate::app::app_manifest::current::{DnaLocation, DnaVersionSpec};
-use crate::prelude::{CellNick, YamlProperties};
+use crate::prelude::RoleName;
 use std::collections::HashMap;
 
 /// Normalized, validated representation of the App Manifest.
@@ -16,8 +18,8 @@ pub struct AppManifestValidated {
     /// Name of the App. This may be used as the installed_app_id.
     pub(in crate::app) name: String,
 
-    /// The slot descriptions that make up this app.
-    pub(in crate::app) slots: HashMap<CellNick, AppSlotManifestValidated>,
+    /// The role descriptions that make up this app.
+    pub(in crate::app) roles: HashMap<RoleName, AppRoleManifestValidated>,
 }
 
 impl AppManifestValidated {
@@ -27,39 +29,40 @@ impl AppManifestValidated {
     /// the only way to instantiate this type.
     pub(in crate::app) fn new(
         name: String,
-        slots: HashMap<CellNick, AppSlotManifestValidated>,
+        roles: HashMap<RoleName, AppRoleManifestValidated>,
     ) -> AppManifestResult<Self> {
-        for (nick, cell) in slots.iter() {
-            if let AppSlotManifestValidated::Disabled { clone_limit, .. } = cell {
+        for (role_name, role) in roles.iter() {
+            if let AppRoleManifestValidated::Disabled { clone_limit, .. } = role {
                 if *clone_limit == 0 {
-                    return Err(AppManifestError::InvalidStrategyDisabled(nick.to_owned()));
+                    return Err(AppManifestError::InvalidStrategyDisabled(
+                        role_name.to_owned(),
+                    ));
                 }
             }
         }
-        Ok(AppManifestValidated { name, slots })
+        Ok(AppManifestValidated { name, roles })
     }
 }
 
 /// Rules to determine if and how a Cell will be created for this Dna
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AppSlotManifestValidated {
+pub enum AppRoleManifestValidated {
     /// Always create a new Cell when installing this App
     Create {
         clone_limit: u32,
         deferred: bool,
         location: DnaLocation,
-        properties: Option<YamlProperties>,
-        uid: Option<String>,
+        modifiers: DnaModifiersOpt,
         version: Option<DnaVersionSpec>,
     },
     /// Always create a new Cell when installing the App,
-    /// and use a unique UID to ensure a distinct DHT network
+    /// and use a unique network seed to ensure a distinct DHT network
     CreateClone {
         clone_limit: u32,
         deferred: bool,
         location: DnaLocation,
-        properties: Option<YamlProperties>,
+        modifiers: DnaModifiersOpt,
         version: Option<DnaVersionSpec>,
     },
     /// Require that a Cell is already installed which matches the DNA version
@@ -75,8 +78,7 @@ pub enum AppSlotManifestValidated {
         clone_limit: u32,
         deferred: bool,
         location: DnaLocation,
-        properties: Option<YamlProperties>,
-        uid: Option<String>,
+        modifiers: DnaModifiersOpt,
         version: DnaVersionSpec,
     },
     /// Disallow provisioning altogether. In this case, we expect

@@ -1,289 +1,12 @@
 //! A type for indicating ranges on the dht arc
 
-use derive_more::From;
-use derive_more::Into;
-use std::num::Wrapping;
 use std::ops::Bound;
 use std::ops::RangeBounds;
 
-#[cfg(test)]
-use std::ops::RangeInclusive;
+use crate::*;
 
-#[cfg(test)]
-mod tests;
-
-mod dht_arc_set;
-pub use dht_arc_set::{ArcInterval, DhtArcSet};
-
-mod dht_arc_bucket;
-pub use dht_arc_bucket::*;
-
-#[cfg(any(test, feature = "test_utils"))]
-pub mod gaps;
-
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, From, Into)]
-/// Type for representing a location that can wrap around
-/// a u32 dht arc
-pub struct DhtLocation(pub Wrapping<u32>);
-
-/// The maximum you can hold either side of the hash location
-/// is half the circle.
-/// This is half of the furthest index you can hold
-/// 1 is added for rounding
-/// 1 more is added to represent the middle point of an odd length array
-pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
-
-/// Maximum number of values that a u32 can represent.
-const U32_LEN: u64 = u32::MAX as u64 + 1;
-
-/// Number of copies of a given hash available at any given time.
-const REDUNDANCY_TARGET: usize = 50;
-
-/// If the redundancy drops due to inaccurate estimation we can't
-/// go lower then this level of redundancy.
-/// Note this can only be tested and not proved.
-const REDUNDANCY_FLOOR: usize = 20;
-
-/// Default assumed up time for nodes.
-const DEFAULT_UPTIME: f64 = 0.5;
-
-/// The minimum number of peers before sharding can begin.
-/// This factors in the expected uptime to reach the redundancy target.
-pub const MIN_PEERS: usize = (REDUNDANCY_TARGET as f64 / DEFAULT_UPTIME) as usize;
-
-/// The minimum number of peers we can consider acceptable to see in our arc
-/// during testing.
-pub const MIN_REDUNDANCY: usize = (REDUNDANCY_FLOOR as f64 / DEFAULT_UPTIME) as usize;
-
-/// The amount "change in arc" is scaled to prevent rapid changes.
-/// This also represents the maximum coverage change in a single update
-/// as a difference of 1.0 would scale to 0.2.
-const DELTA_SCALE: f64 = 0.2;
-
-/// The minimal "change in arc" before we stop scaling.
-/// This prevents never reaching the target arc coverage.
-const DELTA_THRESHOLD: f64 = 0.01;
-
-/// Due to estimation noise we don't want a very small difference
-/// between observed coverage and estimated coverage to
-/// amplify when scaled to by the estimated total peers.
-/// This threshold must be reached before an estimated coverage gap
-/// is calculated.
-const NOISE_THRESHOLD: f64 = 0.01;
-
-// TODO: Use the [`f64::clamp`] when we switch to rustc 1.50
-fn clamp(min: f64, max: f64, mut x: f64) -> f64 {
-    if x < min {
-        x = min;
-    }
-    if x > max {
-        x = max;
-    }
-    x
-}
-
-/// The ideal coverage if all peers were holding the same sized
-/// arcs and our estimated total peers is close.
-fn coverage_target(est_total_peers: usize) -> f64 {
-    if est_total_peers <= REDUNDANCY_TARGET {
-        1.0
-    } else {
-        REDUNDANCY_TARGET as f64 / est_total_peers as f64
-    }
-}
-
-/// Calculate the target arc length given a peer density.
-fn target(density: PeerDensity) -> f64 {
-    // Get the estimated coverage gap based on our observed peer density.
-    let est_gap = density.est_gap();
-    // If we haven't observed at least our redundancy target number
-    // of peers (adjusted for expected uptime) then we know that the data
-    // in our arc is under replicated and we should start aiming for full coverage.
-    if density.expected_count() < REDUNDANCY_TARGET {
-        1.0
-    } else {
-        // Get the estimated gap. We don't care about negative gaps
-        // or gaps we can't fill (> 1.0)
-        let est_gap = clamp(0.0, 1.0, est_gap);
-        // Get the ideal coverage target for the size of that we estimate
-        // the network to be.
-        let ideal_target = coverage_target(density.est_total_peers());
-        // Take whichever is larger. We prefer nodes to target the ideal
-        // coverage but if there is a larger gap then it needs to be filled.
-        let target = est_gap.max(ideal_target);
-
-        clamp(0.0, 1.0, target)
-    }
-}
-
-/// The convergence algorithm that moves an arc towards
-/// our estimated target.
-///
-/// Note the rate of convergence is dependant of the rate
-/// that [`DhtArc::update_length`] is called.
-fn converge(current: f64, density: PeerDensity) -> f64 {
-    let target = target(density);
-    // The change in arc we'd need to make to get to the target.
-    let delta = target - current;
-    // If this is below our threshold then apply that delta.
-    if delta.abs() < DELTA_THRESHOLD {
-        current + delta
-    // Other wise scale the delta to avoid rapid change.
-    } else {
-        current + (delta * DELTA_SCALE)
-    }
-}
-
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-/// Represents how much of a dht arc is held
-/// center_loc is where the hash is.
-/// The center_loc is the center of the arc
-/// The half length is the length of items held
-/// from the center in both directions
-/// half_length 0 means nothing is held
-/// half_length 1 means just the center_loc is held
-/// half_length n where n > 1 will hold those positions out
-/// half_length u32::MAX / 2 + 1 covers all positions
-/// on either side of center_loc.
-/// Imagine an bidirectional array:
-/// ```text
-/// [4][3][2][1][0][1][2][3][4]
-// half length of 3 will give you
-///       [2][1][0][1][2]
-/// ```
-pub struct DhtArc {
-    /// The center location of this dht arc
-    pub center_loc: DhtLocation,
-
-    /// The "half-length" of this dht arc
-    pub half_length: u32,
-}
-
-impl DhtArc {
-    /// Create an Arc from a hash location plus a length on either side
-    /// half length is (0..(u32::Max / 2 + 1))
-    pub fn new<I: Into<DhtLocation>>(center_loc: I, half_length: u32) -> Self {
-        let half_length = std::cmp::min(half_length, MAX_HALF_LENGTH);
-        Self {
-            center_loc: center_loc.into(),
-            half_length,
-        }
-    }
-
-    /// Update the half length based on a density reading.
-    /// This will converge on a new target instead of jumping directly
-    /// to the new target and is designed to be called at a given rate
-    /// with more recent peer density readings.
-    pub fn update_length(&mut self, density: PeerDensity) {
-        self.half_length = (MAX_HALF_LENGTH as f64 * converge(self.coverage(), density)) as u32;
-    }
-
-    /// Check if a location is contained in this arc
-    pub fn contains<I: Into<DhtLocation>>(&self, other_location: I) -> bool {
-        let other_location = other_location.into();
-        let do_hold_something = self.half_length != 0;
-        let only_hold_self = self.half_length == 1 && self.center_loc == other_location;
-        // Add one to convert to "array length" from math distance
-        let dist_as_array_len = shortest_arc_distance(self.center_loc, other_location.0) + 1;
-        // Check for any other dist and the special case of the maximum array len
-        let within_range = self.half_length > 1 && dist_as_array_len <= self.half_length;
-        // Have to hold something and hold ourself or something within range
-        do_hold_something && (only_hold_self || within_range)
-    }
-
-    pub fn interval(&self) -> ArcInterval {
-        let range = self.range();
-        match (range.start_bound(), range.end_bound()) {
-            (Bound::Excluded(_), Bound::Excluded(_)) => ArcInterval::Empty,
-            (Bound::Included(start), Bound::Included(end)) => ArcInterval::new(*start, *end),
-            _ => unreachable!(),
-        }
-    }
-
-    /// Get the range of the arc
-    pub fn range(&self) -> ArcRange {
-        if self.half_length == 0 {
-            ArcRange {
-                start: Bound::Excluded(self.center_loc.into()),
-                end: Bound::Excluded(self.center_loc.into()),
-            }
-        } else if self.half_length == 1 {
-            ArcRange {
-                start: Bound::Included(self.center_loc.into()),
-                end: Bound::Included(self.center_loc.into()),
-            }
-        // In order to make sure the arc covers the full range we need some overlap at the
-        // end to account for division rounding.
-        } else if self.half_length == MAX_HALF_LENGTH || self.half_length == MAX_HALF_LENGTH - 1 {
-            ArcRange {
-                start: Bound::Included(
-                    (self.center_loc.0 - DhtLocation::from(MAX_HALF_LENGTH - 1).0).0,
-                ),
-                end: Bound::Included(
-                    (self.center_loc.0 + DhtLocation::from(MAX_HALF_LENGTH).0 - Wrapping(2)).0,
-                ),
-            }
-        } else {
-            ArcRange {
-                start: Bound::Included(
-                    (self.center_loc.0 - DhtLocation::from(self.half_length - 1).0).0,
-                ),
-                end: Bound::Included(
-                    (self.center_loc.0 + DhtLocation::from(self.half_length).0 - Wrapping(1)).0,
-                ),
-            }
-        }
-    }
-
-    /// Represent an arc as an optional range of inclusive endpoints.
-    /// If none, the arc length is 0
-    pub fn primitive_range_grouped(&self) -> Option<(u32, u32)> {
-        let ArcRange { start, end } = self.range();
-        match (start, end) {
-            (Bound::Included(a), Bound::Included(b)) => Some((a, b)),
-            (Bound::Excluded(_), Bound::Excluded(_)) => None,
-            _ => unreachable!(),
-        }
-    }
-
-    /// Same as primitive_range, but with the return type "inside-out"
-    pub fn primitive_range_detached(&self) -> (Option<u32>, Option<u32>) {
-        self.primitive_range_grouped()
-            .map(|(a, b)| (Some(a), Some(b)))
-            .unwrap_or_default()
-    }
-
-    /// The absolute length that this arc will hold.
-    pub fn absolute_length(&self) -> u64 {
-        self.range().len()
-    }
-
-    /// The percentage of the full circle that is covered
-    /// by this arc.
-    pub fn coverage(&self) -> f64 {
-        self.absolute_length() as f64 / U32_LEN as f64
-    }
-}
-
-impl From<u32> for DhtLocation {
-    fn from(a: u32) -> Self {
-        Self(Wrapping(a))
-    }
-}
-
-impl From<DhtLocation> for u32 {
-    fn from(l: DhtLocation) -> Self {
-        (l.0).0
-    }
-}
-
-/// Finds the shortest distance between two points on a circle
-fn shortest_arc_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
-    // Turn into wrapped u32s
-    let a = a.into().0;
-    let b = b.into().0;
-    std::cmp::min(a - b, b - a).0
-}
+pub const FULL_LEN: u64 = 2u64.pow(32);
+pub const FULL_LEN_F: f64 = FULL_LEN as f64;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 /// This represents the range of values covered by an arc
@@ -316,21 +39,6 @@ impl ArcRange {
             _ => unreachable!("Ranges are either completely inclusive or completely exclusive"),
         }
     }
-
-    #[cfg(test)]
-    fn into_inc(self: ArcRange) -> RangeInclusive<usize> {
-        match self {
-            ArcRange {
-                start: Bound::Included(a),
-                end: Bound::Included(b),
-            } if a <= b => RangeInclusive::new(a as usize, b as usize),
-            arc => panic!(
-                "This range goes all the way around the arc from {:?} to {:?}",
-                arc.start_bound(),
-                arc.end_bound()
-            ),
-        }
-    }
 }
 
 impl RangeBounds<u32> for ArcRange {
@@ -355,27 +63,459 @@ impl RangeBounds<u32> for ArcRange {
         u32: PartialOrd<U>,
         U: ?Sized + PartialOrd<u32>,
     {
-        unimplemented!("Contains doesn't make sense for this type of range due to redundant holding near the bounds. Use DhtArc::contains")
+        unimplemented!("Contains doesn't make sense for this type of range due to redundant holding near the bounds. Use DhtArcRange::contains")
     }
 }
 
-impl std::fmt::Display for DhtArc {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut out = ["_"; 100];
-        let half_cov = (self.coverage() * 50.0) as isize;
-        let center = self.center_loc.0 .0 as f64 / U32_LEN as f64;
-        let center = (center * 100.0) as isize;
-        for mut i in (center - half_cov)..(center + half_cov) {
-            if i >= 100 {
-                i -= 100;
-            }
-            if i < 0 {
-                i += 100;
-            }
-            out[i as usize] = "#";
+/// The main DHT arc type. Represents an Agent's storage Arc on the DHT,
+/// preserving the agent's DhtLocation even in the case of a Full or Empty arc.
+/// Contrast to [`DhtArcRange`], which is used for cases where the arc is not
+/// associated with any particular Agent, and so the agent's Location cannot be known.
+#[derive(Copy, Clone, Debug, derive_more::Deref, serde::Serialize, serde::Deserialize)]
+pub struct DhtArc(#[deref] DhtArcRange, Option<DhtLocation>);
+
+impl DhtArc {
+    pub fn bounded(a: DhtArcRange) -> Self {
+        Self(a, None)
+    }
+
+    pub fn empty(loc: DhtLocation) -> Self {
+        Self(DhtArcRange::Empty, Some(loc))
+    }
+
+    pub fn full(loc: DhtLocation) -> Self {
+        Self(DhtArcRange::Full, Some(loc))
+    }
+
+    pub fn start_loc(&self) -> DhtLocation {
+        match (self.0, self.1) {
+            (DhtArcRange::Empty, Some(loc)) => loc,
+            (DhtArcRange::Full, Some(loc)) => loc,
+            (DhtArcRange::Bounded(lo, _), _) => lo,
+            _ => unreachable!(),
         }
-        out[center as usize] = "|";
-        let out: String = out.iter().map(|a| a.chars()).flatten().collect();
-        writeln!(f, "[{}]", out)
+    }
+
+    pub fn inner(self) -> DhtArcRange {
+        self.0
+    }
+
+    /// Construct from an arc range and a location.
+    /// The location is only used if the arc range is full or empty.
+    pub fn from_parts(a: DhtArcRange, loc: DhtLocation) -> Self {
+        if a.is_bounded() {
+            Self::bounded(a)
+        } else {
+            Self(a, Some(loc))
+        }
+    }
+
+    pub fn from_start_and_half_len<L: Into<DhtLocation>>(start: L, half_len: u32) -> Self {
+        let start = start.into();
+        let a = DhtArcRange::from_start_and_half_len(start, half_len);
+        Self::from_parts(a, start)
+    }
+
+    pub fn from_start_and_len<L: Into<DhtLocation>>(start: L, len: u64) -> Self {
+        let start = start.into();
+        let a = DhtArcRange::from_start_and_len(start, len);
+        Self::from_parts(a, start)
+    }
+
+    pub fn from_bounds<L: Into<DhtLocation>>(start: L, end: L) -> Self {
+        let start = start.into();
+        let end = end.into();
+        let a = DhtArcRange::from_bounds(start, end);
+        Self::from_parts(a, start)
+    }
+
+    pub fn update_length(&mut self, new_length: u64) {
+        *self = Self::from_start_and_len(self.start_loc(), new_length)
+    }
+
+    /// Get the range of the arc
+    pub fn range(&self) -> ArcRange {
+        match (self.0, self.1) {
+            (DhtArcRange::Empty, Some(loc)) => ArcRange {
+                start: Bound::Excluded(loc.as_u32()),
+                end: Bound::Excluded(loc.as_u32()),
+            },
+            (DhtArcRange::Full, Some(loc)) => ArcRange {
+                start: Bound::Included(loc.as_u32()),
+                end: Bound::Included(loc.as_u32().wrapping_sub(1)),
+            },
+            (DhtArcRange::Bounded(lo, hi), _) => ArcRange {
+                start: Bound::Included(lo.as_u32()),
+                end: Bound::Included(hi.as_u32()),
+            },
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn to_ascii(&self, len: usize) -> String {
+        let mut s = self.0.to_ascii(len);
+        let start = loc_downscale(len, self.start_loc());
+        s.replace_range(start..start + 1, "@");
+        s
+    }
+}
+
+impl From<DhtArc> for DhtArcRange {
+    fn from(a: DhtArc) -> Self {
+        a.inner()
+    }
+}
+
+impl From<&DhtArc> for DhtArcRange {
+    fn from(a: &DhtArc) -> Self {
+        a.inner()
+    }
+}
+
+/// A variant of DHT arc which is intentionally forgetful of the Agent's location.
+/// This type is used in places where set logic (union and intersection)
+/// is performed on arcs, which splits and joins arcs in such a way that it
+/// doesn't make sense to claim that the arc belongs to any particular agent or
+/// location.
+///
+/// This type exists to make sure we don't accidentally intepret the starting
+/// point of such a "derived" arc as a legitimate agent location.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum DhtArcRange<T = DhtLocation> {
+    Empty,
+    Full,
+    Bounded(T, T),
+}
+
+impl<T: PartialOrd + num_traits::Num> DhtArcRange<T> {
+    pub fn contains<B: std::borrow::Borrow<T>>(&self, t: B) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Full => true,
+            Self::Bounded(lo, hi) => {
+                let t = t.borrow();
+                if lo <= hi {
+                    lo <= t && t <= hi
+                } else {
+                    lo <= t || t <= hi
+                }
+            }
+        }
+    }
+}
+
+impl<T> DhtArcRange<T> {
+    pub fn map<U, F: Fn(T) -> U>(self, f: F) -> DhtArcRange<U> {
+        match self {
+            Self::Empty => DhtArcRange::Empty,
+            Self::Full => DhtArcRange::Full,
+            Self::Bounded(lo, hi) => DhtArcRange::Bounded(f(lo), f(hi)),
+        }
+    }
+}
+
+impl<T: num_traits::AsPrimitive<u32>> DhtArcRange<T> {
+    pub fn from_bounds(start: T, end: T) -> DhtArcRange<DhtLocation> {
+        let start = start.as_();
+        let end = end.as_();
+        if is_full(start, end) {
+            DhtArcRange::Full
+        } else {
+            DhtArcRange::Bounded(DhtLocation::new(start), DhtLocation::new(end))
+        }
+    }
+
+    pub fn from_start_and_len(start: T, len: u64) -> DhtArcRange<DhtLocation> {
+        let start = start.as_();
+        if len == 0 {
+            DhtArcRange::Empty
+        } else {
+            let end = start.wrapping_add(((len - 1) as u32).min(u32::MAX));
+            DhtArcRange::from_bounds(start, end)
+        }
+    }
+
+    /// Convenience for our legacy code which defined arcs in terms of half-lengths
+    /// rather than full lengths
+    pub fn from_start_and_half_len(start: T, half_len: u32) -> DhtArcRange<DhtLocation> {
+        Self::from_start_and_len(start, half_to_full_len(half_len))
+    }
+
+    pub fn new_generic(start: T, end: T) -> Self {
+        if is_full(start.as_(), end.as_()) {
+            Self::Full
+        } else {
+            Self::Bounded(start, end)
+        }
+    }
+}
+
+impl DhtArcRange<u32> {
+    pub fn canonical(self) -> DhtArcRange {
+        match self {
+            DhtArcRange::Empty => DhtArcRange::Empty,
+            DhtArcRange::Full => DhtArcRange::Full,
+            DhtArcRange::Bounded(lo, hi) => {
+                DhtArcRange::from_bounds(DhtLocation::new(lo), DhtLocation::new(hi))
+            }
+        }
+    }
+}
+
+impl DhtArcRange<DhtLocation> {
+    /// Constructor
+    pub fn new_empty() -> Self {
+        Self::Empty
+    }
+
+    /// Represent an arc as an optional range of inclusive endpoints.
+    /// If none, the arc length is 0
+    pub fn to_bounds_grouped(&self) -> Option<(DhtLocation, DhtLocation)> {
+        match self {
+            Self::Empty => None,
+            Self::Full => Some((DhtLocation::MIN, DhtLocation::MAX)),
+            &Self::Bounded(lo, hi) => Some((lo, hi)),
+        }
+    }
+
+    /// Same as to_bounds_grouped, but with the return type "inside-out"
+    pub fn to_primitive_bounds_detached(&self) -> (Option<u32>, Option<u32>) {
+        self.to_bounds_grouped()
+            .map(|(a, b)| (Some(a.as_u32()), Some(b.as_u32())))
+            .unwrap_or_default()
+    }
+
+    /// Check if this arc is empty.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    /// Check if this arc is full.
+    pub fn is_full(&self) -> bool {
+        matches!(self, Self::Full)
+    }
+
+    /// Check if this arc is bounded.
+    pub fn is_bounded(&self) -> bool {
+        matches!(self, Self::Bounded(_, _))
+    }
+
+    /// Check if arcs overlap
+    pub fn overlaps(&self, other: &Self) -> bool {
+        let a = DhtArcSet::from(self);
+        let b = DhtArcSet::from(other);
+        a.overlap(&b)
+    }
+
+    /// Amount of intersection between two arcs
+    pub fn overlap_coverage(&self, other: &Self) -> f64 {
+        let a = DhtArcSet::from(self);
+        let b = DhtArcSet::from(other);
+        let c = a.intersection(&b);
+        c.size() as f64 / a.size() as f64
+    }
+
+    /// The percentage of the full circle that is covered
+    /// by this arc.
+    pub fn coverage(&self) -> f64 {
+        self.length() as f64 / 2f64.powf(32.0)
+    }
+
+    pub fn length(&self) -> u64 {
+        match self {
+            DhtArcRange::Empty => 0,
+            DhtArcRange::Full => 2u64.pow(32),
+            DhtArcRange::Bounded(lo, hi) => {
+                (hi.as_u32().wrapping_sub(lo.as_u32()) as u64).wrapping_add(1)
+            }
+        }
+    }
+
+    // #[deprecated = "leftover from refactor"]
+    pub fn half_length(&self) -> u32 {
+        full_to_half_len(self.length())
+    }
+
+    /// Handy ascii representation of an arc, especially useful when
+    /// looking at several arcs at once to get a sense of their overlap
+    pub fn to_ascii(&self, len: usize) -> String {
+        let empty = || " ".repeat(len);
+        let full = || "-".repeat(len);
+
+        // If lo and hi are less than one bucket's width apart when scaled down,
+        // decide whether to interpret this as empty or full
+        let decide = |lo: &DhtLocation, hi: &DhtLocation| {
+            let mid = loc_upscale(len, (len / 2) as i32);
+            if lo < hi {
+                if hi.as_u32() - lo.as_u32() < mid {
+                    empty()
+                } else {
+                    full()
+                }
+            } else if lo.as_u32() - hi.as_u32() < mid {
+                full()
+            } else {
+                empty()
+            }
+        };
+
+        match self {
+            Self::Full => full(),
+            Self::Empty => empty(),
+            Self::Bounded(lo0, hi0) => {
+                let lo = loc_downscale(len, *lo0);
+                let hi = loc_downscale(len, *hi0);
+                if lo0 <= hi0 {
+                    if lo >= hi {
+                        vec![decide(lo0, hi0)]
+                    } else {
+                        vec![
+                            " ".repeat(lo),
+                            "-".repeat(hi - lo + 1),
+                            " ".repeat((len - hi).saturating_sub(1)),
+                        ]
+                    }
+                } else if lo <= hi {
+                    vec![decide(lo0, hi0)]
+                } else {
+                    vec![
+                        "-".repeat(hi + 1),
+                        " ".repeat((lo - hi).saturating_sub(1)),
+                        "-".repeat(len - lo),
+                    ]
+                }
+                .join("")
+            }
+        }
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    /// Ascii representation of an arc, with a histogram of op locations superimposed.
+    /// Each character of the string, if an op falls in that "bucket", will be represented
+    /// by a hexadecimal digit representing the number of ops in that bucket,
+    /// with a max of 0xF (15)
+    pub fn to_ascii_with_ops<L: Into<crate::loc8::Loc8>, I: IntoIterator<Item = L>>(
+        &self,
+        len: usize,
+        ops: I,
+    ) -> String {
+        use crate::loc8::Loc8;
+
+        let mut buf = vec![0; len];
+        let mut s = self.to_ascii(len);
+        for o in ops {
+            let o: Loc8 = o.into();
+            let o: DhtLocation = o.into();
+            let loc = loc_downscale(len, o);
+            buf[loc] += 1;
+        }
+        for (i, v) in buf.into_iter().enumerate() {
+            if v > 0 {
+                // add hex representation of number of ops in this bucket
+                let c = format!("{:x}", v.min(0xf));
+                s.replace_range(i..i + 1, &c);
+            }
+        }
+        s
+    }
+
+    pub fn canonical(self) -> DhtArcRange {
+        self
+    }
+}
+
+/// Check whether a bounded interval is equivalent to the Full interval
+pub fn is_full(start: u32, end: u32) -> bool {
+    (start == super::dht_arc_set::MIN && end >= super::dht_arc_set::MAX)
+        || end == start.wrapping_sub(1)
+}
+
+pub fn full_to_half_len(full_len: u64) -> u32 {
+    if full_len == 0 {
+        0
+    } else {
+        ((full_len / 2) as u32).wrapping_add(1).min(MAX_HALF_LENGTH)
+    }
+}
+
+pub fn half_to_full_len(half_len: u32) -> u64 {
+    if half_len == 0 {
+        0
+    } else if half_len >= MAX_HALF_LENGTH {
+        U32_LEN
+    } else {
+        (half_len as u64 * 2).wrapping_sub(1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arc_contains() {
+        let convergent = DhtArcRange::Bounded(10, 20);
+        let divergent = DhtArcRange::Bounded(20, 10);
+
+        assert!(!convergent.contains(0));
+        assert!(!convergent.contains(5));
+        assert!(convergent.contains(10));
+        assert!(convergent.contains(15));
+        assert!(convergent.contains(20));
+        assert!(!convergent.contains(25));
+        assert!(!convergent.contains(u32::MAX));
+
+        assert!(divergent.contains(0));
+        assert!(divergent.contains(5));
+        assert!(divergent.contains(10));
+        assert!(!divergent.contains(15));
+        assert!(divergent.contains(20));
+        assert!(divergent.contains(25));
+        assert!(divergent.contains(u32::MAX));
+    }
+
+    #[test]
+    fn test_length() {
+        let full = 2u64.pow(32);
+        assert_eq!(DhtArcRange::Empty.length(), 0);
+        assert_eq!(DhtArcRange::from_bounds(0, 0).length(), 1);
+        assert_eq!(DhtArcRange::from_bounds(0, 1).length(), 2);
+        assert_eq!(DhtArcRange::from_bounds(1, 0).length(), full);
+        assert_eq!(DhtArcRange::from_bounds(2, 0).length(), full - 1);
+    }
+
+    #[test]
+    fn test_ascii() {
+        let cent = u32::MAX / 100 + 1;
+        assert_eq!(
+            DhtArc::from_bounds(cent * 30, cent * 60).to_ascii(10),
+            "   @---   ".to_string()
+        );
+        assert_eq!(
+            DhtArc::from_bounds(cent * 33, cent * 63).to_ascii(10),
+            "   @---   ".to_string()
+        );
+        assert_eq!(
+            DhtArc::from_bounds(cent * 29, cent * 59).to_ascii(10),
+            "  @---    ".to_string()
+        );
+
+        assert_eq!(
+            DhtArc::from_bounds(cent * 60, cent * 30).to_ascii(10),
+            "----  @---".to_string()
+        );
+        assert_eq!(
+            DhtArc::from_bounds(cent * 63, cent * 33).to_ascii(10),
+            "----  @---".to_string()
+        );
+        assert_eq!(
+            DhtArc::from_bounds(cent * 59, cent * 29).to_ascii(10),
+            "---  @----".to_string()
+        );
+
+        assert_eq!(
+            DhtArc::from_bounds(cent * 99, cent * 0).to_ascii(10),
+            "-        @".to_string()
+        );
     }
 }

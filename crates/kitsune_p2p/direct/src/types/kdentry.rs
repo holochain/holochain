@@ -28,8 +28,7 @@ pub trait KdEntrySignedExt: Sized {
 }
 
 async fn check_sig_and_hash(e: &KdEntrySigned) -> KdResult<()> {
-    let data = e.as_data_to_sign_ref();
-    let data = Buffer::from_ref(data);
+    let data = sodoken::BufRead::new_no_lock(e.as_data_to_sign_ref());
 
     let sig = e.as_signature_ref();
     let sig = Arc::new(*sig);
@@ -80,6 +79,9 @@ impl KdEntrySignedExt for KdEntrySigned {
         let binary_len = binary.len();
         let data_to_sign = content.to_data_to_sign(binary.to_vec());
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &content;
             let data_to_sign = data_to_sign?;
             let hash = KdHash::from_data(&data_to_sign).await?;
             let signature = persist

@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// Create a new KitsuneDirect controller handle over the websocket channel.
 pub async fn new_handle_ws(
     ws_addr: std::net::SocketAddr,
-    _connect_passphrase: sodoken::Buffer,
+    _connect_passphrase: sodoken::BufRead,
 ) -> KdResult<(KdHnd, KdHndEvtStream)> {
     let url = format!("ws://{}", ws_addr);
 
@@ -234,6 +234,29 @@ impl AsKdHnd for Hnd {
         .boxed()
     }
 
+    fn is_authority(
+        &self,
+        root: KdHash,
+        agent: KdHash,
+        basis: KdHash,
+    ) -> BoxFuture<'static, KdResult<bool>> {
+        let msg_id = new_msg_id();
+        let api = KdApi::IsAuthorityReq {
+            msg_id,
+            root,
+            agent,
+            basis,
+        };
+        let api = self.request(api);
+        async move {
+            match api.await {
+                Ok(KdApi::IsAuthorityRes { is_authority, .. }) => Ok(is_authority),
+                oth => Err(format!("unexpected: {:?}", oth).into()),
+            }
+        }
+        .boxed()
+    }
+
     fn message_send(
         &self,
         root: KdHash,
@@ -370,16 +393,15 @@ async fn handle_ws_recv(
                 if let KdApi::MessageRecvEvt {
                     root,
                     to_agent,
-                    from_agent,
                     content,
                     binary,
+                    ..
                 } = api
                 {
                     if let Err(err) = lhnd
                         .emit(KdHndEvt::Message {
                             root,
                             to_agent,
-                            from_agent,
                             content,
                             binary,
                         })

@@ -5,9 +5,10 @@ use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
+use kitsune_p2p::test_util::hash_op_data;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
-use kitsune_p2p::actor::KitsuneP2pSender;
+use kitsune_p2p::actor::{BroadcastTo, KitsuneP2pSender};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::event::*;
 use kitsune_p2p::*;
@@ -44,13 +45,13 @@ pub type CloseCb = Box<dyn FnOnce(u32, &str) -> BoxFuture<'static, ()> + 'static
 pub async fn new_quick_bootstrap_v1(
     _tuning_params: KitsuneP2pTuningParams,
 ) -> KdResult<(TxUrl, KitsuneDirectDriver, CloseCb)> {
-    let (driver, addr) = kitsune_p2p_bootstrap::run(([0, 0, 0, 0], 0))
+    let (driver, addr, shutdown) = kitsune_p2p_bootstrap::run(([0, 0, 0, 0], 0), vec![])
         .await
         .map_err(KdError::other)?;
 
-    let close_cb: CloseCb = Box::new(|_code, _reason| {
+    let close_cb: CloseCb = Box::new(move |_code, _reason| {
         async move {
-            // TODO - figure out how to shut down bootstrap server
+            shutdown();
         }
         .boxed()
     });
@@ -152,15 +153,18 @@ pub fn new_kitsune_direct_v1(
 
         let tls = persist.singleton_tls_config().await?;
 
-        let (p2p, evt) = spawn_kitsune_p2p(sub_config, tls)
-            .await
-            .map_err(KdError::other)?;
+        let (_, evt, (kdirect, srv, srv_evt)) = spawn_kitsune_p2p_with_fn(sub_config, tls, |p2p| {
+            async move {
+                let (srv, srv_evt) = new_srv(Default::default(), ui_port).await.unwrap();
+                let kdirect = Kd1::new(srv.clone(), persist, p2p);
+                ((kdirect.clone(), srv, srv_evt), kdirect as HostApi)
+            }
+            .boxed()
+        })
+        .await
+        .map_err(KdError::other)?;
 
         let mut logic_chan = <LogicChan<()>>::new(tuning_params.concurrent_limit_per_thread);
-
-        let (srv, srv_evt) = new_srv(Default::default(), ui_port).await?;
-        let kdirect = Kd1::new(srv.clone(), persist, p2p);
-
         let cc = logic_chan.handle().clone();
 
         cc.capture_logic(handle_events(tuning_params.clone(), kdirect.clone(), evt))
@@ -265,10 +269,38 @@ impl AsKitsuneDirect for Kd1 {
         let ws_addr = self.get_ui_addr().unwrap();
 
         // TODO - this should also be configured in v1 conf
-        let pass = sodoken::Buffer::new_memlocked(4).unwrap();
+        let pass = sodoken::BufWrite::new_mem_locked(4).unwrap();
         pass.write_lock().copy_from_slice(&[1, 2, 3, 4]);
 
-        async move { new_handle_ws(ws_addr, pass).await.map_err(KdError::other) }.boxed()
+        async move {
+            new_handle_ws(ws_addr, pass.to_read())
+                .await
+                .map_err(KdError::other)
+        }
+        .boxed()
+    }
+}
+
+impl KitsuneHostDefaultError for Kd1 {
+    const NAME: &'static str = "Kd1";
+
+    fn get_agent_info_signed(
+        &self,
+        input: GetAgentInfoSignedEvt,
+    ) -> KitsuneHostResult<Option<AgentInfoSigned>> {
+        let GetAgentInfoSignedEvt { space, agent } = input;
+
+        let root = KdHash::from_kitsune_space(&space);
+        let agent = KdHash::from_kitsune_agent(&agent);
+
+        async move {
+            Ok(match self.persist.get_agent_info(root, agent).await {
+                Ok(i) => Some(i.to_kitsune()),
+                Err(_) => None,
+            })
+        }
+        .boxed()
+        .into()
     }
 }
 
@@ -387,7 +419,7 @@ async fn handle_srv_events(
                             } => {
                                 exec(msg_id.clone(), async {
                                     kdirect.inner.share_mut(|i, _| {
-                                        Ok(i.p2p.join(root.to_kitsune_space(), agent.to_kitsune_agent()))
+                                        Ok(i.p2p.join(root.to_kitsune_space(), agent.to_kitsune_agent(), None))
                                     }).map_err(KdError::other)?.await.map_err(KdError::other)?;
                                     Ok(KdApi::AppJoinRes {
                                         msg_id,
@@ -448,11 +480,28 @@ async fn handle_srv_events(
                                     })
                                 }.boxed()).await;
                             }
+                            KdApi::IsAuthorityReq {
+                                msg_id,
+                                root,
+                                basis,
+                                ..
+                            } => {
+                                exec(msg_id.clone(), async {
+                                    let space = root.to_kitsune_space();
+                                    let basis = basis.to_kitsune_basis();
+                                    let is_authority = kdirect.inner.share_mut(move |i, _| {
+                                        Ok(i.p2p.authority_for_hash(space, basis))
+                                    }).map_err(KdError::other)?.await.map_err(KdError::other)?;
+                                    Ok(KdApi::IsAuthorityRes {
+                                        msg_id,
+                                        is_authority,
+                                    })
+                                }.boxed()).await;
+                            }
                             KdApi::MessageSendReq {
                                 msg_id,
                                 root,
                                 to_agent,
-                                from_agent,
                                 content,
                                 binary,
                                 ..
@@ -460,7 +509,6 @@ async fn handle_srv_events(
                                 exec(msg_id.clone(), async {
                                     let space = root.to_kitsune_space();
                                     let to_agent = to_agent.to_kitsune_agent();
-                                    let from_agent = from_agent.to_kitsune_agent();
                                     let content = content.to_string().into_bytes();
                                     let mut payload = Vec::with_capacity(4 + content.len() + binary.len());
                                     let binary_len = (binary.len() as u32).to_le_bytes();
@@ -468,7 +516,7 @@ async fn handle_srv_events(
                                     payload.extend_from_slice(&binary);
                                     payload.extend_from_slice(&content);
                                     let res = kdirect.inner.share_mut(move |i, _| {
-                                        Ok(i.p2p.rpc_single(space, to_agent, from_agent, payload, None))
+                                        Ok(i.p2p.rpc_single(space, to_agent, payload, None))
                                     }).map_err(KdError::other)?.await.map_err(KdError::other)?;
                                     if res != b"success" {
                                         return Err(format!("unexpected: {}", String::from_utf8_lossy(&res)).into());
@@ -513,6 +561,7 @@ async fn handle_srv_events(
                                             root.to_kitsune_space(),
                                             basis,
                                             timeout,
+                                            BroadcastTo::Notify,
                                             payload,
                                         ))
                                     }).map_err(KdError::other)?;
@@ -561,6 +610,7 @@ async fn handle_srv_events(
                             oth @ KdApi::AgentInfoStoreRes { .. } |
                             oth @ KdApi::AgentInfoGetRes { .. } |
                             oth @ KdApi::AgentInfoQueryRes { .. } |
+                            oth @ KdApi::IsAuthorityRes { .. } |
                             oth @ KdApi::MessageSendRes { .. } |
                             oth @ KdApi::MessageRecvEvt { .. } |
                             oth @ KdApi::EntryAuthorRes { .. } |
@@ -600,65 +650,38 @@ async fn handle_events(
                         .boxed()
                         .into()));
                 }
-                event::KitsuneP2pEvent::GetAgentInfoSigned { respond, input, .. } => {
-                    respond.r(Ok(handle_get_agent_info_signed(kdirect.clone(), input)
+                event::KitsuneP2pEvent::QueryAgents { respond, input, .. } => {
+                    respond.r(Ok(handle_query_agents(kdirect.clone(), input)
                         .map_err(KitsuneP2pError::other)
                         .boxed()
                         .into()));
                 }
-                event::KitsuneP2pEvent::QueryAgentInfoSigned { respond, input, .. } => {
-                    respond.r(Ok(handle_query_agent_info_signed(kdirect.clone(), input)
-                        .map_err(KitsuneP2pError::other)
-                        .boxed()
-                        .into()));
-                }
-                event::KitsuneP2pEvent::QueryAgentInfoSignedNearBasis {
+                event::KitsuneP2pEvent::QueryPeerDensity {
                     respond,
                     space,
-                    basis_loc,
-                    limit,
+                    dht_arc,
                     ..
                 } => {
-                    respond.r(Ok(handle_query_agent_info_signed_near_basis(
+                    respond.r(Ok(handle_query_peer_density(
                         kdirect.clone(),
                         space,
-                        basis_loc,
-                        limit,
+                        dht_arc,
                     )
                     .map_err(KitsuneP2pError::other)
                     .boxed()
                     .into()));
-                }
-                event::KitsuneP2pEvent::PutMetricDatum { respond, datum, .. } => {
-                    respond.r(Ok(handle_put_metric_datum(kdirect.clone(), datum)
-                        .map_err(KitsuneP2pError::other)
-                        .boxed()
-                        .into()));
-                }
-                event::KitsuneP2pEvent::QueryMetrics { respond, query, .. } => {
-                    respond.r(Ok(handle_query_metrics(kdirect.clone(), query)
-                        .map_err(KitsuneP2pError::other)
-                        .boxed()
-                        .into()));
                 }
                 event::KitsuneP2pEvent::Call {
                     respond,
                     space,
                     to_agent,
-                    from_agent,
                     payload,
                     ..
                 } => {
-                    respond.r(Ok(handle_call(
-                        kdirect.clone(),
-                        space,
-                        to_agent,
-                        from_agent,
-                        payload,
-                    )
-                    .map_err(KitsuneP2pError::other)
-                    .boxed()
-                    .into()));
+                    respond.r(Ok(handle_call(kdirect.clone(), space, to_agent, payload)
+                        .map_err(KitsuneP2pError::other)
+                        .boxed()
+                        .into()));
                 }
                 event::KitsuneP2pEvent::Notify {
                     respond,
@@ -686,35 +709,22 @@ async fn handle_events(
                 event::KitsuneP2pEvent::Gossip {
                     respond,
                     space,
-                    to_agent,
-                    from_agent,
-                    op_hash,
-                    op_data,
+                    ops,
                     ..
                 } => {
-                    respond.r(Ok(handle_gossip(
-                        kdirect.clone(),
-                        space,
-                        to_agent,
-                        from_agent,
-                        op_hash,
-                        op_data,
-                    )
-                    .map_err(KitsuneP2pError::other)
-                    .boxed()
-                    .into()));
+                    respond.r(Ok(handle_gossip(kdirect.clone(), space, ops)
+                        .map_err(KitsuneP2pError::other)
+                        .boxed()
+                        .into()));
                 }
-                event::KitsuneP2pEvent::FetchOpHashesForConstraints { respond, input, .. } => {
-                    respond.r(Ok(handle_fetch_op_hashes_for_constraints(
-                        kdirect.clone(),
-                        input,
-                    )
-                    .map_err(KitsuneP2pError::other)
-                    .boxed()
-                    .into()));
+                event::KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
+                    respond.r(Ok(handle_query_op_hashes(kdirect.clone(), input)
+                        .map_err(KitsuneP2pError::other)
+                        .boxed()
+                        .into()));
                 }
-                event::KitsuneP2pEvent::FetchOpHashData { respond, input, .. } => {
-                    respond.r(Ok(handle_fetch_op_hash_data(kdirect.clone(), input)
+                event::KitsuneP2pEvent::FetchOpData { respond, input, .. } => {
+                    respond.r(Ok(handle_fetch_op_data(kdirect.clone(), input)
                         .map_err(KitsuneP2pError::other)
                         .boxed()
                         .into()));
@@ -735,37 +745,22 @@ async fn handle_put_agent_info_signed(
     kdirect: Arc<Kd1>,
     input: PutAgentInfoSignedEvt,
 ) -> KdResult<()> {
-    let PutAgentInfoSignedEvt {
-        agent_info_signed, ..
-    } = input;
+    let PutAgentInfoSignedEvt { peer_data, .. } = input;
 
-    let agent_info = KdAgentInfo::from_kitsune(&agent_info_signed)?;
+    for agent_info_signed in peer_data {
+        let agent_info = KdAgentInfo::from_kitsune(&agent_info_signed)?;
 
-    kdirect.persist.store_agent_info(agent_info).await?;
+        kdirect.persist.store_agent_info(agent_info).await?;
+    }
 
     Ok(())
 }
 
-async fn handle_get_agent_info_signed(
+async fn handle_query_agents(
     kdirect: Arc<Kd1>,
-    input: GetAgentInfoSignedEvt,
-) -> KdResult<Option<AgentInfoSigned>> {
-    let GetAgentInfoSignedEvt { space, agent } = input;
-
-    let root = KdHash::from_kitsune_space(&space);
-    let agent = KdHash::from_kitsune_agent(&agent);
-
-    Ok(match kdirect.persist.get_agent_info(root, agent).await {
-        Ok(i) => Some(i.to_kitsune()),
-        Err(_) => None,
-    })
-}
-
-async fn handle_query_agent_info_signed(
-    kdirect: Arc<Kd1>,
-    input: QueryAgentInfoSignedEvt,
+    input: QueryAgentsEvt,
 ) -> KdResult<Vec<AgentInfoSigned>> {
-    let QueryAgentInfoSignedEvt { space, .. } = input;
+    let QueryAgentsEvt { space, .. } = input;
 
     let root = KdHash::from_kitsune_space(&space);
 
@@ -773,42 +768,24 @@ async fn handle_query_agent_info_signed(
     Ok(map.into_iter().map(|a| a.to_kitsune()).collect())
 }
 
-async fn handle_query_agent_info_signed_near_basis(
+async fn handle_query_peer_density(
     kdirect: Arc<Kd1>,
     space: Arc<KitsuneSpace>,
-    basis_loc: u32,
-    limit: u32,
-) -> KdResult<Vec<AgentInfoSigned>> {
+    dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+) -> KdResult<kitsune_p2p_types::dht::PeerView> {
     let root = KdHash::from_kitsune_space(&space);
-    let map = kdirect
-        .persist
-        .query_agent_info_near_basis(root, basis_loc, limit)
-        .await?;
-    Ok(map.into_iter().map(|a| a.to_kitsune()).collect())
-}
-
-async fn handle_put_metric_datum(kdirect: Arc<Kd1>, datum: MetricDatum) -> KdResult<()> {
-    kdirect.persist.store_metric_datum(datum).await
-}
-
-async fn handle_query_metrics(
-    kdirect: Arc<Kd1>,
-    query: MetricQuery,
-) -> KdResult<MetricQueryAnswer> {
-    // Why are there two nested futures here?
-    kdirect.persist.fetch_metrics(query).await.await
+    let density = kdirect.persist.query_peer_density(root, dht_arc).await?;
+    Ok(density)
 }
 
 async fn handle_call(
     kdirect: Arc<Kd1>,
     space: Arc<KitsuneSpace>,
     to_agent: Arc<KitsuneAgent>,
-    from_agent: Arc<KitsuneAgent>,
     payload: Vec<u8>,
 ) -> KdResult<Vec<u8>> {
     let root = KdHash::from_kitsune_space(&space);
     let to_agent = KdHash::from_kitsune_agent(&to_agent);
-    let from_agent = KdHash::from_kitsune_agent(&from_agent);
 
     if payload.len() < 4 {
         return Err(format!("invalid msg size: {}", payload.len()).into());
@@ -840,7 +817,6 @@ async fn handle_call(
             Ok(i.srv.websocket_broadcast(KdApi::MessageRecvEvt {
                 root,
                 to_agent,
-                from_agent,
                 content,
                 binary,
             }))
@@ -851,87 +827,117 @@ async fn handle_call(
     Ok(b"success".to_vec())
 }
 
-async fn handle_gossip(
-    kdirect: Arc<Kd1>,
-    space: Arc<KitsuneSpace>,
-    to_agent: Arc<KitsuneAgent>,
-    _from_agent: Arc<KitsuneAgent>,
-    op_hash: Arc<KitsuneOpHash>,
-    op_data: Vec<u8>,
-) -> KdResult<()> {
-    let entry = KdEntrySigned::from_wire(op_data.into_boxed_slice())
+async fn handle_gossip(kdirect: Arc<Kd1>, space: Arc<KitsuneSpace>, ops: Vec<KOp>) -> KdResult<()> {
+    let root = KdHash::from_kitsune_space(&space);
+    let agent_info_list = kdirect
+        .persist
+        .query_agent_info(root.clone())
         .await
         .map_err(KdError::other)?;
-    let op_hash = KdHash::from_kitsune_op_hash(&op_hash);
-    if &op_hash != entry.hash() {
-        return Err("data did not hash to given hash".into());
-    }
-    let root = KdHash::from_kitsune_space(&space);
-    let to_agent = KdHash::from_kitsune_agent(&to_agent);
+    for info in agent_info_list {
+        let to_agent = info.agent();
+        for op_data in ops.clone() {
+            let op_hash = hash_op_data(&op_data.0);
+            let entry = KdEntrySigned::from_wire(op_data.0.clone().into_boxed_slice())
+                .await
+                .map_err(KdError::other)?;
+            let op_hash = KdHash::from_kitsune_op_hash(&op_hash);
+            if &op_hash != entry.hash() {
+                return Err("data did not hash to given hash".into());
+            }
 
-    kdirect.persist.store_entry(root, to_agent, entry).await?;
+            kdirect
+                .persist
+                .store_entry(root.clone(), to_agent.clone(), entry)
+                .await?;
+        }
+    }
 
     Ok(())
 }
 
-async fn handle_fetch_op_hashes_for_constraints(
+#[allow(warnings)]
+async fn handle_query_op_hashes(
     kdirect: Arc<Kd1>,
-    input: FetchOpHashesForConstraintsEvt,
-) -> KdResult<Vec<Arc<KitsuneOpHash>>> {
-    let FetchOpHashesForConstraintsEvt {
+    input: QueryOpHashesEvt,
+) -> KdResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
+    let QueryOpHashesEvt {
         space,
-        agent,
-        dht_arc,
-        since_utc_epoch_s,
-        until_utc_epoch_s,
+        window,
+        max_ops,
+        include_limbo: _,
+        arc_set,
         ..
     } = input;
 
     let root = KdHash::from_kitsune_space(&space);
-    let agent = KdHash::from_kitsune_agent(&agent);
-    let c_start = since_utc_epoch_s as f32;
-    let c_end = until_utc_epoch_s as f32;
 
     // TODO - it's ok for now to just get the full entries
     //        since they'll just get Arc::clone-d
     //        but once this is a persisted database
     //        we'll want an api to just get the hashes
-    let entries = kdirect
-        .persist
-        .query_entries(root, agent, c_start, c_end, dht_arc)
-        .await?;
+    let mut entries = vec![];
 
-    Ok(entries
+    let agent_info_list = kdirect
+        .persist
+        .query_agent_info(root.clone())
+        .await
+        .map_err(KdError::other)?;
+    for info in agent_info_list {
+        let agent = info.agent();
+        let es = kdirect
+            .persist
+            .query_entries(root.clone(), agent.clone(), window.clone(), arc_set.clone())
+            .await?;
+        entries.extend(es.into_iter());
+    }
+
+    let mut entries: Vec<_> = entries
         .into_iter()
         .map(|e| e.hash().clone().to_kitsune_op_hash())
-        .collect())
+        .collect();
+    entries.sort();
+    entries.dedup();
+
+    // TODO: produce proper time window of actual data returned
+    Ok(Some((entries, window.start..=window.end)))
 }
 
-async fn handle_fetch_op_hash_data(
+async fn handle_fetch_op_data(
     kdirect: Arc<Kd1>,
-    input: FetchOpHashDataEvt,
-) -> KdResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
-    let FetchOpHashDataEvt {
-        space,
-        agent,
-        op_hashes,
-        ..
-    } = input;
-
-    let root = KdHash::from_kitsune_space(&space);
-    let agent = KdHash::from_kitsune_agent(&agent);
+    input: FetchOpDataEvt,
+) -> KdResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
+    let FetchOpDataEvt { space, query, .. } = input;
 
     let mut out = Vec::new();
+    let root = KdHash::from_kitsune_space(&space);
 
-    for op_hash in op_hashes {
-        let hash = KdHash::from_kitsune_op_hash(&op_hash);
-        if let Ok(entry) = kdirect
-            .persist
-            .get_entry(root.clone(), agent.clone(), hash)
-            .await
-        {
-            out.push((op_hash, entry.as_wire_data_ref().to_vec()));
+    let agent_info_list = kdirect
+        .persist
+        .query_agent_info(root.clone())
+        .await
+        .map_err(KdError::other)?;
+
+    match query {
+        FetchOpDataEvtQuery::Hashes(hashes) => {
+            for op_hash in hashes {
+                for info in &agent_info_list {
+                    let agent = info.agent().clone();
+                    let hash = KdHash::from_kitsune_op_hash(&op_hash);
+                    if let Ok(entry) = kdirect
+                        .persist
+                        .get_entry(root.clone(), agent.clone(), hash)
+                        .await
+                    {
+                        out.push((
+                            op_hash.clone(),
+                            KitsuneOpData::new(entry.as_wire_data_ref().to_vec()),
+                        ));
+                    }
+                }
+            }
         }
+        FetchOpDataEvtQuery::Regions(_coords) => unimplemented!(),
     }
 
     Ok(out)

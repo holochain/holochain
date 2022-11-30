@@ -2,7 +2,7 @@
 
 //! Defines the hApp Manifest YAML format, including validation.
 
-use holochain_zome_types::Uid;
+use holochain_zome_types::NetworkSeed;
 use mr_bundle::{Location, Manifest};
 use std::path::PathBuf;
 
@@ -31,9 +31,9 @@ impl Manifest for AppManifest {
     fn locations(&self) -> Vec<Location> {
         match self {
             AppManifest::V1(m) => m
-                .slots
+                .roles
                 .iter()
-                .filter_map(|slot| slot.dna.location.clone())
+                .filter_map(|role| role.dna.location.clone())
                 .collect(),
         }
     }
@@ -62,11 +62,57 @@ impl AppManifest {
         }
     }
 
-    /// Update the UID for all DNAs used in Create-provisioned Cells.
+    /// Update the network seed for all DNAs used in Create-provisioned Cells.
     /// Cells with other provisioning strategies are not affected.
-    pub fn set_uid(&mut self, uid: Uid) {
+    pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         match self {
-            Self::V1(manifest) => manifest.set_uid(uid),
+            Self::V1(manifest) => manifest.set_network_seed(network_seed),
         }
+    }
+
+    /// Returns the list of app roles that this manifest declares
+    pub fn app_roles(&self) -> Vec<AppRoleManifest> {
+        match self {
+            Self::V1(manifest) => manifest.roles.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+
+    use mr_bundle::Manifest;
+
+    use crate::app::app_manifest::{AppManifest, AppManifestV1Builder, AppRoleManifest};
+
+    #[test]
+    /// Replicate this test for any new version of the manifest that gets created
+    fn app_manifest_v1_helper_functions() {
+        let app_name = String::from("sample-app");
+
+        let role_name = String::from("sample-dna");
+        let role_manifest = AppRoleManifest::sample(role_name);
+
+        let sample_app_manifest_v1 = AppManifestV1Builder::default()
+            .name(app_name.clone())
+            .description(Some(String::from("Some description")))
+            .roles(vec![role_manifest.clone()])
+            .build()
+            .unwrap();
+        let sample_app_manifest = AppManifest::V1(sample_app_manifest_v1.clone());
+
+        assert_eq!(app_name, sample_app_manifest.app_name());
+        assert_eq!(vec![role_manifest], sample_app_manifest.app_roles());
+        assert_eq!(
+            vec![sample_app_manifest_v1
+                .roles
+                .get(0)
+                .unwrap()
+                .dna
+                .location
+                .clone()
+                .unwrap()],
+            sample_app_manifest.locations()
+        );
     }
 }

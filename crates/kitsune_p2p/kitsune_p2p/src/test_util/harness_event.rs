@@ -58,13 +58,11 @@ pub enum HarnessEventType {
     Call {
         space: Slug,
         to_agent: Slug,
-        from_agent: Slug,
         payload: String,
     },
     Notify {
         space: Slug,
         to_agent: Slug,
-        from_agent: Slug,
         payload: String,
     },
     Gossip {
@@ -123,7 +121,7 @@ impl HarnessEventChannel {
     pub fn sub_clone(&self, sub_nick: impl AsRef<str>) -> Self {
         let mut new_nick = (*self.nick).clone();
         if !new_nick.is_empty() {
-            new_nick.push_str(".");
+            new_nick.push('.');
         }
         new_nick.push_str(sub_nick.as_ref());
         Self {
@@ -144,11 +142,7 @@ impl HarnessEventChannel {
         let mut chan = self.chan.subscribe();
         tokio::task::spawn(async move {
             while let Ok(msg) = chan.recv().await {
-                let is_close = if let HarnessEventType::Close = &msg.ty {
-                    true
-                } else {
-                    false
-                };
+                let is_close = matches!(&msg.ty, HarnessEventType::Close);
                 if s.send(msg).await.is_err() {
                     break;
                 }

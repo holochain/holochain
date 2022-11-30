@@ -4,6 +4,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased](https://github.com/holochain/holochain/compare/fixt-v0.0.2-alpha.1...HEAD)
 
+## 0.0.14
+
+## 0.0.13
+
+## 0.0.12
+
+## 0.0.11
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## 0.0.10
+
+## 0.0.9
+
+## 0.0.8
+
+## 0.0.7
+
+## 0.0.6
+
+## 0.0.5
+
 ## 0.0.4
 
 ## 0.0.3

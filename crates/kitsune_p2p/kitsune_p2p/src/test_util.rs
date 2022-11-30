@@ -1,5 +1,7 @@
 //! Utilities to make kitsune testing a little more sane.
 
+#![allow(dead_code)]
+
 use crate::types::actor::*;
 use crate::types::agent_store::*;
 use crate::types::event::*;
@@ -11,6 +13,7 @@ use std::sync::Arc;
 
 /// Utility trait for test values
 pub trait TestVal: Sized {
+    /// Create the test val
     fn test_val() -> Self;
 }
 
@@ -38,18 +41,44 @@ test_val! {
     Arc<KitsuneOpHash> => { rand36() },
 }
 
+/// Create a handler task and produce a Sender for interacting with it
+pub async fn spawn_handler<H: KitsuneP2pEventHandler + ghost_actor::GhostControlHandler>(
+    h: H,
+) -> (
+    futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+    tokio::task::JoinHandle<ghost_actor::GhostResult<()>>,
+) {
+    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
+    let (tx, rx) = futures::channel::mpsc::channel(4096);
+    builder.channel_factory().attach_receiver(rx).await.unwrap();
+    let driver = builder.spawn(h);
+    (tx, tokio::task::spawn(driver))
+}
+
+pub fn hash_op_data(data: &[u8]) -> Arc<KitsuneOpHash> {
+    Arc::new(KitsuneOpHash::new(
+        blake2b_simd::Params::new()
+            .hash_length(32)
+            .hash(data)
+            .as_bytes()
+            .to_vec(),
+    ))
+}
+
+mod switchboard;
+pub use switchboard::*;
+
 mod harness_event;
-pub use harness_event::*;
+pub(crate) use harness_event::*;
 
 mod harness_agent;
 pub(crate) use harness_agent::*;
 
 mod harness_actor;
-pub use harness_actor::*;
+#[allow(unused_imports)]
+pub(crate) use harness_actor::*;
 
-// NB: this is a copy of `KdMetricStore` from `kitsune_p2p_direct`, which
-//   is downstream of this crate.
-//   Since we plan to delete much of these tests, I opted to keep that type
-//   downstream, and just copy it upstream here for now.
-mod metric_store;
-pub use metric_store::*;
+pub(crate) mod scenario_def_local;
+
+#[cfg(feature = "mock_network")]
+pub mod mock_network;

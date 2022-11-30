@@ -1,38 +1,11 @@
-use crate::header::ZomeId;
-use crate::zome::ZomeName;
+use crate::CapGrant;
+use crate::FunctionName;
+use crate::Timestamp;
+use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 
-/// The properties of the current dna/zome being called.
-#[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
-pub struct ZomeInfo {
-    pub dna_name: String,
-    pub dna_hash: DnaHash,
-    pub zome_name: ZomeName,
-    /// The position of this zome in the `dna.json`
-    pub zome_id: ZomeId,
-    pub properties: SerializedBytes,
-}
-
-impl ZomeInfo {
-    pub fn new(
-        dna_name: String,
-        dna_hash: DnaHash,
-        zome_name: ZomeName,
-        zome_id: ZomeId,
-        properties: SerializedBytes,
-    ) -> Self {
-        Self {
-            dna_name,
-            dna_hash,
-            zome_name,
-            zome_id,
-            properties,
-        }
-    }
-}
+pub use holochain_integrity_types::info::*;
 
 /// The struct containing all information about the executing agent's identity.
 #[allow(missing_docs)]
@@ -45,13 +18,19 @@ pub struct AgentInfo {
     /// Same as the initial pubkey if it has never been changed.
     /// The agent can revoke an old key and replace it with a new one, the latest appears here.
     pub agent_latest_pubkey: AgentPubKey,
+    pub chain_head: (ActionHash, u32, Timestamp),
 }
 
 impl AgentInfo {
-    pub fn new(agent_initial_pubkey: AgentPubKey, agent_latest_pubkey: AgentPubKey) -> Self {
+    pub fn new(
+        agent_initial_pubkey: AgentPubKey,
+        agent_latest_pubkey: AgentPubKey,
+        chain_head: (ActionHash, u32, Timestamp),
+    ) -> Self {
         Self {
             agent_initial_pubkey,
             agent_latest_pubkey,
+            chain_head,
         }
     }
 }
@@ -60,7 +39,11 @@ impl AgentInfo {
 pub struct AppInfo;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DnaInfo;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CallInfo;
+pub struct CallInfo {
+    pub provenance: AgentPubKey,
+    pub function_name: FunctionName,
+    /// Chain head as at the call start.
+    /// This will not change within a call even if the chain is written to.
+    pub as_at: (ActionHash, u32, Timestamp),
+    pub cap_grant: CapGrant,
+}

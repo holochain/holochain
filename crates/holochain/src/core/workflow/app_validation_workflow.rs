@@ -3,41 +3,34 @@
 use std::convert::TryInto;
 use std::sync::Arc;
 
-use self::validation_package::get_as_author_custom;
-use self::validation_package::get_as_author_full;
-use self::validation_package::get_as_author_sub_chain;
-
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
-use crate::conductor::api::CellConductorApiT;
-use crate::conductor::entry_def_store::get_entry_def;
+use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateCreateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateDeleteLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
-use crate::core::ribosome::real_ribosome::RealRibosome;
-use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomesToInvoke;
 use error::AppValidationResult;
 pub use error::*;
+use futures::stream::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
-use holochain_p2p::actor::GetActivityOptions;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_keystore::MetaLairClient;
+use holochain_p2p::actor::GetOptions as NetworkGetOptions;
+use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
+use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
+use holochain_zome_types::op::EntryCreationAction;
+use holochain_zome_types::op::Op;
+use rusqlite::Transaction;
+use std::collections::HashSet;
 use tracing::*;
 pub use types::Outcome;
 
@@ -46,836 +39,706 @@ mod network_call_tests;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod validation_tests;
+
 mod error;
 mod types;
 pub mod validation_package;
 
-#[instrument(skip(workspace, trigger_integration, conductor_api, network))]
+const NUM_CONCURRENT_OPS: usize = 50;
+
+#[instrument(skip(
+    workspace,
+    trigger_integration,
+    conductor_handle,
+    network,
+    dht_query_cache
+))]
 pub async fn app_validation_workflow(
-    mut workspace: AppValidationWorkspace,
-    mut trigger_integration: TriggerSender,
-    conductor_api: impl CellConductorApiT,
-    network: HolochainP2pCell,
+    dna_hash: Arc<DnaHash>,
+    workspace: Arc<AppValidationWorkspace>,
+    trigger_integration: TriggerSender,
+    conductor_handle: ConductorHandle,
+    network: HolochainP2pDna,
+    dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = app_validation_workflow_inner(&mut workspace, conductor_api, &network).await?;
+    let complete = app_validation_workflow_inner(
+        dna_hash,
+        workspace,
+        conductor_handle,
+        &network,
+        dht_query_cache,
+    )
+    .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // trigger other workflows
-    trigger_integration.trigger();
+    trigger_integration.trigger(&"app_validation_workflow");
 
     Ok(complete)
 }
 
 async fn app_validation_workflow_inner(
-    workspace: &mut AppValidationWorkspace,
-    conductor_api: impl CellConductorApiT,
-    network: &HolochainP2pCell,
+    dna_hash: Arc<DnaHash>,
+    workspace: Arc<AppValidationWorkspace>,
+    conductor: ConductorHandle,
+    network: &HolochainP2pDna,
+    dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
-    let env = workspace.vault.clone().into();
-    let sorted_ops = validation_query::get_ops_to_app_validate(&env).await?;
+    let db = workspace.dht_db.clone().into();
+    let sorted_ops = validation_query::get_ops_to_app_validate(&db).await?;
+    let start_len = sorted_ops.len();
+    tracing::debug!("validating {} ops", start_len);
+    let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
+    let saturated = start.is_some();
 
     // Validate all the ops
-    for so in sorted_ops {
-        let (op, op_hash) = so.into_inner();
+    let iter = sorted_ops.into_iter().map({
+        let network = network.clone();
+        let workspace = workspace.clone();
+        move |so| {
+            let network = network.clone();
+            let conductor = conductor.clone();
+            let workspace = workspace.clone();
+            let dna_hash = dna_hash.clone();
+            async move {
+                let (op, op_hash) = so.into_inner();
+                let op_type = op.get_type();
+                let action = op.action();
+                let dependency = get_dependency(op_type, &action);
+                let op_light = op.to_light();
 
-        // Validate this op
-        let outcome = validate_op(op.clone(), &conductor_api, workspace, &network)
-            .await
-            // Get the outcome or return the error
-            .or_else(|outcome_or_err| outcome_or_err.try_into())?;
+                // If this is agent activity, track it for the cache.
+                let activity = matches!(op_type, DhtOpType::RegisterAgentActivity).then(|| {
+                    (
+                        action.author().clone(),
+                        action.action_seq(),
+                        matches!(dependency, Dependency::Null),
+                    )
+                });
 
-        if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
-            warn!(
-                agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
-                msg = "DhtOp has failed app validation",
-                outcome = ?outcome,
+                // Validate this op
+                let mut cascade = workspace.full_cascade(network.clone());
+                let r = match dhtop_to_op(op, &mut cascade).await {
+                    Ok(op) => {
+                        validate_op_outer(dna_hash, &op, &conductor, &(*workspace), &network).await
+                    }
+                    Err(e) => Err(e),
+                };
+                (op_hash, dependency, op_light, r, activity)
+            }
+        }
+    });
+
+    // Create a stream of concurrent validation futures.
+    // This will run NUM_CONCURRENT_OPS validation futures concurrently and
+    // return up to NUM_CONCURRENT_OPS * 100 results.
+    let mut iter = futures::stream::iter(iter)
+        .buffer_unordered(NUM_CONCURRENT_OPS)
+        .ready_chunks(NUM_CONCURRENT_OPS * 100);
+
+    // Spawn a task to actually drive the stream.
+    // This allows the stream to make progress in the background while
+    // we are committing previous results to the database.
+    let (tx, rx) = tokio::sync::mpsc::channel(NUM_CONCURRENT_OPS * 100);
+    let jh = tokio::spawn(async move {
+        while let Some(op) = iter.next().await {
+            // Send the result to task that will commit to the database.
+            if tx.send(op).await.is_err() {
+                tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
+                break;
+            }
+        }
+    });
+
+    // Create a stream that will chunk up to NUM_CONCURRENT_OPS * 100 ready results.
+    let mut iter =
+        tokio_stream::wrappers::ReceiverStream::new(rx).ready_chunks(NUM_CONCURRENT_OPS * 100);
+
+    let mut total = 0;
+    let mut round_time = start.is_some().then(std::time::Instant::now);
+    // Pull in a chunk of results.
+    while let Some(chunk) = iter.next().await {
+        tracing::debug!(
+            "Committing {} ops",
+            chunk.iter().map(|c| c.len()).sum::<usize>()
+        );
+        let (t, a, r, activity) = workspace
+            .dht_db
+            .async_commit(move |txn| {
+                let mut total = 0;
+                let mut awaiting = 0;
+                let mut rejected = 0;
+                let mut agent_activity = Vec::new();
+                for outcome in chunk.into_iter().flatten() {
+                    let (op_hash, dependency, op_light, outcome, activity) = outcome;
+                    // Get the outcome or return the error
+                    let outcome = outcome.or_else(|outcome_or_err| outcome_or_err.try_into())?;
+
+                    // Collect all agent activity.
+                    if let Some(activity) = activity {
+                        // If the activity is accepted or rejected then it's ready to integrate.
+                        if matches!(&outcome, Outcome::Accepted | Outcome::Rejected(_)) {
+                            agent_activity.push(activity);
+                        }
+                    }
+
+
+                    if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
+                        warn!(
+                            msg = "DhtOp has failed app validation",
+                            outcome = ?outcome,
+                        );
+                    }
+                    match outcome {
+                        Outcome::Accepted => {
+                            total += 1;
+                            if let Dependency::Null = dependency {
+                                put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
+                            } else {
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?;
+                            }
+                        }
+                        Outcome::AwaitingDeps(deps) => {
+                            awaiting += 1;
+                            let status = ValidationLimboStatus::AwaitingAppDeps(deps);
+                            put_validation_limbo(txn, &op_hash, status)?;
+                        }
+                        Outcome::Rejected(_) => {
+                            rejected += 1;
+                            tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
+                            if let Dependency::Null = dependency {
+                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
+                            } else {
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
+                            }
+                        }
+                    }
+                }
+                WorkflowResult::Ok((total, awaiting, rejected, agent_activity))
+            })
+            .await?;
+        // Once the database transaction is committed, add agent activity to the cache
+        // that is ready for integration.
+        for (author, seq, has_no_dependency) in activity {
+            // Any activity with no dependency is integrated in this workflow.
+            // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
+            if has_no_dependency {
+                dht_query_cache
+                    .set_activity_to_integrated(&author, seq)
+                    .await?;
+            } else {
+                dht_query_cache
+                    .set_activity_ready_to_integrate(&author, seq)
+                    .await?;
+            }
+        }
+        total += t;
+        if let (Some(start), Some(round_time)) = (start, &mut round_time) {
+            let round_el = round_time.elapsed();
+            *round_time = std::time::Instant::now();
+            let avg_ops_ps = total as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
+            let ops_ps = t as f64 / round_el.as_micros() as f64 * 1_000_000.0;
+            tracing::warn!(
+                "App validation is saturated. Util {:.2}%. OPS/s avg {:.2}, this round {:.2}",
+                (start_len - total) as f64 / NUM_CONCURRENT_OPS as f64 * 100.0,
+                avg_ops_ps,
+                ops_ps
             );
         }
+        tracing::debug!(
+            "{} committed, {} awaiting sys dep, {} rejected. {} committed this round",
+            t,
+            a,
+            r,
+            total
+        );
+    }
+    jh.await?;
+    tracing::debug!("accepted {} ops", total);
+    Ok(if saturated {
+        WorkComplete::Incomplete
+    } else {
+        WorkComplete::Complete
+    })
+}
 
-        match outcome {
-            Outcome::Accepted => {
-                workspace
-                    .put_integration_limbo(op_hash, ValidationStatus::Valid)
-                    .await?;
-            }
-            Outcome::AwaitingDeps(deps) => {
-                let status = ValidationLimboStatus::AwaitingAppDeps(deps);
-                workspace.put_validation_limbo(op_hash, status).await?;
-            }
-            Outcome::Rejected(_) => {
-                if *op.header().author() == network.from_agent() {
-                    tracing::warn!("Authored invalid op! If you didn't hack your node, this is a bug in Holochain.\nOp: {:?}", op.to_light());
-                } else {
-                    tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op.to_light());
-                }
-                workspace
-                    .put_integration_limbo(op_hash, ValidationStatus::Rejected)
-                    .await?;
-            }
+pub async fn record_to_op(
+    record: Record,
+    op_type: DhtOpType,
+    cascade: &mut Cascade,
+) -> AppValidationOutcome<(Op, Option<Entry>)> {
+    use DhtOpType::*;
+    let mut activity_entry = None;
+    let (shh, entry) = record.into_inner();
+    let mut entry = entry.into_option();
+    let action = shh.into();
+    // Register agent activity doesn't store the entry so we need to
+    // save it so we can reconstruct the record later.
+    if matches!(op_type, RegisterAgentActivity) {
+        activity_entry = entry.take();
+    }
+    let dht_op = DhtOp::from_type(op_type, action, entry)?;
+    Ok((dhtop_to_op(dht_op, cascade).await?, activity_entry))
+}
+
+pub fn op_to_record(op: Op, activity_entry: Option<Entry>) -> Record {
+    match op {
+        Op::StoreRecord(StoreRecord { record }) => record,
+        Op::StoreEntry(StoreEntry { action, entry }) => {
+            Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
+        }
+        Op::RegisterUpdate(RegisterUpdate {
+            update, new_entry, ..
+        }) => Record::new(SignedActionHashed::raw_from_same_hash(update), new_entry),
+        Op::RegisterDelete(RegisterDelete { delete, .. }) => {
+            Record::new(SignedActionHashed::raw_from_same_hash(delete), None)
+        }
+        Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(action),
+            activity_entry,
+        ),
+        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => {
+            Record::new(SignedActionHashed::raw_from_same_hash(create_link), None)
+        }
+        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
+            Record::new(SignedActionHashed::raw_from_same_hash(delete_link), None)
         }
     }
-    Ok(WorkComplete::Complete)
 }
 
-pub fn to_single_zome(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<Zome> {
-    match zomes_to_invoke {
-        ZomesToInvoke::All => Err(AppValidationError::LinkMultipleZomes),
-        ZomesToInvoke::One(z) => Ok(z),
-    }
+async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<Op> {
+    let op = match op {
+        DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
+            record: Record::new(
+                SignedActionHashed::with_presigned(
+                    ActionHashed::from_content_sync(action),
+                    signature,
+                ),
+                entry.map(|e| *e),
+            ),
+        }),
+        DhtOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
+            action: SignedHashed::new(action.into(), signature),
+            entry: *entry,
+        }),
+        DhtOp::RegisterAgentActivity(signature, action) => {
+            Op::RegisterAgentActivity(RegisterAgentActivity {
+                action: SignedActionHashed::with_presigned(
+                    ActionHashed::from_content_sync(action),
+                    signature,
+                ),
+                cached_entry: None,
+            })
+        }
+        DhtOp::RegisterUpdatedContent(signature, update, entry)
+        | DhtOp::RegisterUpdatedRecord(signature, update, entry) => {
+            let new_entry = match update.entry_type.visibility() {
+                EntryVisibility::Public => match entry {
+                    Some(entry) => Some(*entry),
+                    None => Some(
+                        cascade
+                            .retrieve_entry(update.entry_hash.clone(), Default::default())
+                            .await?
+                            .map(|e| e.into_content())
+                            .ok_or_else(|| Outcome::awaiting(&update.entry_hash))?,
+                    ),
+                },
+                _ => None,
+            };
+            let original_entry = if let EntryVisibility::Public = update.entry_type.visibility() {
+                Some(
+                    cascade
+                        .retrieve_entry(update.original_entry_address.clone(), Default::default())
+                        .await?
+                        .map(|e| e.into_content())
+                        .ok_or_else(|| Outcome::awaiting(&update.original_entry_address))?,
+                )
+            } else {
+                None
+            };
+
+            let original_action = cascade
+                .retrieve_action(update.original_action_address.clone(), Default::default())
+                .await?
+                .and_then(|sh| {
+                    NewEntryAction::try_from(sh.hashed.content)
+                        .ok()
+                        .map(|h| h.into())
+                })
+                .ok_or_else(|| Outcome::awaiting(&update.original_action_address))?;
+            Op::RegisterUpdate(RegisterUpdate {
+                update: SignedHashed::new(update, signature),
+                new_entry,
+                original_action,
+                original_entry,
+            })
+        }
+        DhtOp::RegisterDeletedBy(signature, delete)
+        | DhtOp::RegisterDeletedEntryAction(signature, delete) => {
+            let original_action: EntryCreationAction = cascade
+                .retrieve_action(delete.deletes_address.clone(), Default::default())
+                .await?
+                .and_then(|sh| {
+                    NewEntryAction::try_from(sh.hashed.content)
+                        .ok()
+                        .map(|h| h.into())
+                })
+                .ok_or_else(|| Outcome::awaiting(&delete.deletes_address))?;
+
+            let original_entry = if let EntryVisibility::Public =
+                original_action.entry_type().visibility()
+            {
+                Some(
+                    cascade
+                        .retrieve_entry(delete.deletes_entry_address.clone(), Default::default())
+                        .await?
+                        .map(|e| e.into_content())
+                        .ok_or_else(|| Outcome::awaiting(&delete.deletes_entry_address))?,
+                )
+            } else {
+                None
+            };
+            Op::RegisterDelete(RegisterDelete {
+                delete: SignedHashed::new(delete, signature),
+                original_action,
+                original_entry,
+            })
+        }
+        DhtOp::RegisterAddLink(signature, create_link) => {
+            Op::RegisterCreateLink(RegisterCreateLink {
+                create_link: SignedHashed::new(create_link, signature),
+            })
+        }
+        DhtOp::RegisterRemoveLink(signature, delete_link) => {
+            let create_link = cascade
+                .retrieve_action(delete_link.link_add_address.clone(), Default::default())
+                .await?
+                .and_then(|sh| CreateLink::try_from(sh.hashed.content).ok())
+                .ok_or_else(|| Outcome::awaiting(&delete_link.link_add_address))?;
+            Op::RegisterDeleteLink(RegisterDeleteLink {
+                delete_link: SignedHashed::new(delete_link, signature),
+                create_link,
+            })
+        }
+    };
+    Ok(op)
 }
 
-async fn validate_op(
-    op: DhtOp,
-    // from_agent: Option<AgentPubKey>,
-    conductor_api: &impl CellConductorApiT,
-    workspace: &mut AppValidationWorkspace,
-    network: &HolochainP2pCell,
+async fn validate_op_outer(
+    dna_hash: Arc<DnaHash>,
+    op: &Op,
+    conductor_handle: &ConductorHandle,
+    workspace: &AppValidationWorkspace,
+    network: &HolochainP2pDna,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
-    let workspace_lock = workspace.validation_workspace(network.from_agent()).await?;
+    let host_fn_workspace = workspace.validation_workspace().await?;
 
-    // Create the element
-    let element = get_element(op)?;
+    // Get the ribosome
+    let ribosome = conductor_handle
+        .get_ribosome(dna_hash.as_ref())
+        .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
-    // Check for caps
-    check_for_caps(&element)?;
+    validate_op(op, host_fn_workspace, network, &ribosome).await
+}
 
-    // Get the dna file
-    let dna_file = { conductor_api.get_this_dna().await };
-    let dna_file =
-        dna_file.map_err(|_| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
-
-    // Get the EntryDefId associated with this Element if there is one
-    let entry_def = {
-        let mut cascade = workspace.full_cascade(network.clone());
-        get_associated_entry_def(&element, dna_file.dna(), conductor_api, &mut cascade).await?
+pub async fn validate_op<R>(
+    op: &Op,
+    workspace: HostFnWorkspaceRead,
+    network: &HolochainP2pDna,
+    ribosome: &R,
+) -> AppValidationOutcome<Outcome>
+where
+    R: RibosomeT,
+{
+    let zomes_to_invoke = match op {
+        Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
+        Op::StoreRecord(StoreRecord { record }) => {
+            store_record_zomes_to_invoke(record.action(), ribosome)?
+        }
+        Op::StoreEntry(StoreEntry {
+            action:
+                SignedHashed {
+                    hashed:
+                        HoloHashed {
+                            content: action, ..
+                        },
+                    ..
+                },
+            ..
+        }) => entry_creation_zomes_to_invoke(action, ribosome)?,
+        Op::RegisterUpdate(RegisterUpdate {
+            original_action, ..
+        })
+        | Op::RegisterDelete(RegisterDelete {
+            original_action, ..
+        }) => entry_creation_zomes_to_invoke(original_action, ribosome)?,
+        Op::RegisterCreateLink(RegisterCreateLink {
+            create_link:
+                SignedHashed {
+                    hashed:
+                        HoloHashed {
+                            content: action, ..
+                        },
+                    ..
+                },
+            ..
+        }) => create_link_zomes_to_invoke(action, ribosome)?,
+        Op::RegisterDeleteLink(RegisterDeleteLink {
+            create_link: action,
+            ..
+        }) => create_link_zomes_to_invoke(action, ribosome)?,
     };
 
-    // Create the ribosome
-    let ribosome = RealRibosome::new(dna_file);
-
-    // Get the validation package
-    let validation_package = get_validation_package(
-        &element,
-        &entry_def,
-        Some(workspace),
-        &ribosome,
-        &workspace_lock,
-        network,
+    let invocation = ValidateInvocation::new(zomes_to_invoke, op)
+        .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
+    let outcome = run_validation_callback_inner(
+        invocation,
+        ribosome,
+        workspace,
+        network.clone(),
+        (HashSet::<AnyDhtHash>::new(), 0),
+        HashSet::new(),
     )
     .await?;
 
-    // Get the EntryDefId associated with this Element if there is one
-    let entry_def_id = entry_def.map(|ed| ed.id);
-
-    // Get the zome names
-    let mut cascade = workspace.full_cascade(network.clone());
-    let zomes_to_invoke = get_zomes_to_invoke(&element, ribosome.dna_def(), &mut cascade).await?;
-
-    let outcome = match element.header() {
-        Header::DeleteLink(delete_link) => {
-            let zome_name = to_single_zome(zomes_to_invoke)?;
-            // Run the link validation
-            run_delete_link_validation_callback(
-                zome_name,
-                delete_link.clone(),
-                &ribosome,
-                workspace_lock.clone(),
-                network.clone(),
-            )?
-        }
-        Header::CreateLink(link_add) => {
-            // Get the base and target for this link
-            let mut cascade = workspace.full_cascade(network.clone());
-            let base = cascade
-                .retrieve_entry(link_add.base_address.clone(), Default::default())
-                .await?
-                .map(|e| e.into_content())
-                .ok_or_else(|| Outcome::awaiting(&link_add.base_address))?;
-            let target = cascade
-                .retrieve_entry(link_add.target_address.clone(), Default::default())
-                .await?
-                .map(|e| e.into_content())
-                .ok_or_else(|| Outcome::awaiting(&link_add.target_address))?;
-
-            let link_add = Arc::new(link_add.clone());
-            let base = Arc::new(base);
-            let target = Arc::new(target);
-
-            let zome_name = to_single_zome(zomes_to_invoke)?;
-
-            // Run the link validation
-            run_create_link_validation_callback(
-                zome_name,
-                link_add,
-                base,
-                target,
-                &ribosome,
-                workspace_lock.clone(),
-                network.clone(),
-            )?
-        }
-        _ => {
-            // Element
-
-            // Call the callback
-            let element = Arc::new(element);
-            let validation_package = validation_package.map(Arc::new);
-            // Call the element validation
-            run_validation_callback_inner(
-                zomes_to_invoke,
-                element,
-                validation_package,
-                entry_def_id,
-                &ribosome,
-                workspace_lock.clone(),
-                network.clone(),
-            )?
-        }
-    };
     Ok(outcome)
 }
 
-/// Get the [EntryDef] associated with this
-/// element if there is one.
-///
-/// Create and Update will get the def from
-/// the AppEntryType on their header.
-///
-/// Delete will get the def from the
-/// header on the `deletes_address` field.
-///
-/// Other header types will None.
-async fn get_associated_entry_def(
-    element: &Element,
-    dna_def: &DnaDefHashed,
-    conductor_api: &impl CellConductorApiT,
-    cascade: &mut Cascade,
-) -> AppValidationOutcome<Option<EntryDef>> {
-    match get_app_entry_type(element, cascade).await? {
-        Some(aet) => {
-            let zome = get_zome_info(&aet, dna_def)?.1.clone();
-            Ok(get_entry_def(aet.id(), zome, dna_def, conductor_api).await?)
-        }
-        None => Ok(None),
-    }
-}
-
-/// Get the element from the op or
-/// return accepted because we don't app
-/// validate this op.
-fn get_element(op: DhtOp) -> AppValidationOutcome<Element> {
-    match op {
-        DhtOp::RegisterAgentActivity(_, _) => Outcome::accepted(),
-        DhtOp::StoreElement(s, h, e) => match h {
-            Header::Delete(_) | Header::CreateLink(_) | Header::DeleteLink(_) => Ok(Element::new(
-                SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
-                None,
-            )),
-            Header::Update(_) | Header::Create(_) => Ok(Element::new(
-                SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
-                e.map(|e| *e),
-            )),
-            _ => Outcome::accepted(),
-        },
-        DhtOp::StoreEntry(s, h, e) => Ok(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            Some(*e),
-        )),
-        DhtOp::RegisterUpdatedContent(s, h, e) => Ok(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            e.map(|e| *e),
-        )),
-        DhtOp::RegisterUpdatedElement(s, h, e) => Ok(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            e.map(|e| *e),
-        )),
-        DhtOp::RegisterDeletedEntryHeader(s, h) => Ok(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            None,
-        )),
-        DhtOp::RegisterDeletedBy(s, h) => Ok(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            None,
-        )),
-        DhtOp::RegisterAddLink(s, h) => Ok(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            None,
-        )),
-        DhtOp::RegisterRemoveLink(s, h) => Ok(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            None,
-        )),
-    }
-}
-
-/// Check for capability headers
-/// and exit as we don't want to validate them
-fn check_for_caps(element: &Element) -> AppValidationOutcome<()> {
-    match element.header().entry_type() {
-        Some(EntryType::CapClaim) | Some(EntryType::CapGrant) => Outcome::accepted(),
-        _ => Ok(()),
-    }
-}
-
-/// Get the zome name from the app entry type
-/// or get all zome names.
-pub async fn get_zomes_to_invoke(
-    element: &Element,
-    dna_def: &DnaDef,
-    cascade: &mut Cascade,
+pub fn entry_creation_zomes_to_invoke(
+    action: &EntryCreationAction,
+    ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
-    let aet = { get_app_entry_type(element, cascade).await? };
-    match aet {
-        Some(aet) => Ok(ZomesToInvoke::One(get_zome(&aet, &dna_def)?)),
-        None => match element.header() {
-            Header::CreateLink(_) | Header::DeleteLink(_) => {
-                get_link_zome(element, dna_def, cascade).await
-            }
-            _ => Ok(ZomesToInvoke::All),
-        },
-    }
-}
-
-fn get_zome_info<'a>(
-    entry_type: &AppEntryType,
-    dna_def: &'a DnaDef,
-) -> AppValidationResult<&'a (ZomeName, ZomeDef)> {
-    let zome_index = u8::from(entry_type.zome_id()) as usize;
-    dna_def
-        .zomes
-        .get(zome_index)
-        .ok_or_else(|| AppValidationError::ZomeId(entry_type.zome_id()))
-}
-
-fn get_zome(entry_type: &AppEntryType, dna_def: &DnaDef) -> AppValidationResult<Zome> {
-    zome_id_to_zome(entry_type.zome_id(), dna_def)
-}
-
-fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zome> {
-    let zome_index = u8::from(zome_id) as usize;
-    Ok(dna_def
-        .zomes
-        .get(zome_index)
-        .ok_or(AppValidationError::ZomeId(zome_id))?
-        .clone()
-        .into())
-}
-
-/// Either get the app entry type
-/// from this entry or from the dependency.
-async fn get_app_entry_type(
-    element: &Element,
-    cascade: &mut Cascade,
-) -> AppValidationOutcome<Option<AppEntryType>> {
-    match element.header().entry_data() {
-        Some((_, et)) => match et.clone() {
-            EntryType::App(aet) => Ok(Some(aet)),
-            EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => Ok(None),
-        },
-        None => get_app_entry_type_from_dep(element, cascade).await,
-    }
-}
-
-async fn get_link_zome(
-    element: &Element,
-    dna_def: &DnaDef,
-    cascade: &mut Cascade,
-) -> AppValidationOutcome<ZomesToInvoke> {
-    match element.header() {
-        Header::CreateLink(cl) => {
-            let zome = zome_id_to_zome(cl.zome_id, dna_def)?;
-            Ok(ZomesToInvoke::One(zome))
-        }
-        Header::DeleteLink(dl) => {
-            let shh = cascade
-                .retrieve_header(dl.link_add_address.clone(), Default::default())
-                .await?
-                .ok_or_else(|| Outcome::awaiting(&dl.link_add_address))?;
-
-            match shh.header() {
-                Header::CreateLink(cl) => {
-                    let zome = zome_id_to_zome(cl.zome_id, dna_def)?;
-                    Ok(ZomesToInvoke::One(zome))
-                }
-                // The header that was found was the wrong type
-                // so lets try again.
-                _ => Err(Outcome::awaiting(&dl.link_add_address)),
-            }
-        }
-        _ => unreachable!(),
-    }
-}
-
-/// Retrieve the dependency and extract
-/// the app entry type so we know which zome to call
-async fn get_app_entry_type_from_dep(
-    element: &Element,
-    cascade: &mut Cascade,
-) -> AppValidationOutcome<Option<AppEntryType>> {
-    match element.header() {
-        Header::Delete(ed) => {
-            let el = cascade
-                .retrieve(ed.deletes_address.clone().into(), Default::default())
-                .await?
-                .ok_or_else(|| Outcome::awaiting(&ed.deletes_address))?;
-            Ok(extract_app_type(&el))
-        }
-        _ => Ok(None),
-    }
-}
-
-fn extract_app_type(element: &Element) -> Option<AppEntryType> {
-    element
-        .header()
-        .entry_data()
-        .and_then(|(_, entry_type)| match entry_type {
-            EntryType::App(aet) => Some(aet.clone()),
-            _ => None,
+    match action {
+        EntryCreationAction::Create(Create {
+            entry_type: EntryType::App(app_entry_def),
+            ..
         })
-}
-
-/// Get the validation package based on
-/// the requirements set by the AppEntryType
-async fn get_validation_package(
-    element: &Element,
-    entry_def: &Option<EntryDef>,
-    // from_agent: Option<AgentPubKey>,
-    workspace: Option<&mut AppValidationWorkspace>,
-    ribosome: &impl RibosomeT,
-    workspace_lock: &HostFnWorkspace,
-    network: &HolochainP2pCell,
-) -> AppValidationOutcome<Option<ValidationPackage>> {
-    match entry_def {
-        Some(entry_def) => match workspace {
-            Some(workspace) => {
-                get_validation_package_remote(
-                    element,
-                    entry_def,
-                    // from_agent,
-                    workspace,
-                    ribosome,
-                    workspace_lock,
-                    network,
-                )
-                .await
-            }
-            None => {
-                get_validation_package_local(
-                    element,
-                    entry_def.required_validation_type,
-                    ribosome,
-                    workspace_lock,
-                    network,
-                )
-                .await
-            }
-        },
-        None => {
-            // Not an entry header type so no package
-            Ok(None)
+        | EntryCreationAction::Update(Update {
+            entry_type: EntryType::App(app_entry_def),
+            ..
+        }) => {
+            let zome = ribosome
+                .get_integrity_zome(&app_entry_def.zome_index())
+                .ok_or_else(|| {
+                    Outcome::rejected(&format!(
+                        "Zome does not exist for {:?}",
+                        app_entry_def.zome_index()
+                    ))
+                })?;
+            Ok(ZomesToInvoke::OneIntegrity(zome))
         }
+        _ => Ok(ZomesToInvoke::AllIntegrity),
     }
 }
 
-async fn get_validation_package_local(
-    element: &Element,
-    required_validation_type: RequiredValidationType,
+fn create_link_zomes_to_invoke(
+    create_link: &CreateLink,
     ribosome: &impl RibosomeT,
-    workspace_lock: &HostFnWorkspace,
-    network: &HolochainP2pCell,
-) -> AppValidationOutcome<Option<ValidationPackage>> {
-    let header_seq = element.header().header_seq();
-    match required_validation_type {
-        RequiredValidationType::Element => Ok(None),
-        RequiredValidationType::SubChain => {
-            let app_entry_type = match element.header().entry_type().cloned() {
-                Some(EntryType::App(aet)) => aet,
-                _ => return Ok(None),
-            };
-            Ok(Some(
-                get_as_author_sub_chain(header_seq, app_entry_type, workspace_lock.source_chain())
-                    .await?,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    let zome = ribosome
+        .get_integrity_zome(&create_link.zome_index)
+        .ok_or_else(|| {
+            Outcome::rejected(&format!(
+                "Zome does not exist for {:?}",
+                create_link.link_type
             ))
+        })?;
+    Ok(ZomesToInvoke::One(zome.erase_type()))
+}
+
+/// Get the zomes to invoke for an [`Op::StoreRecord`].
+fn store_record_zomes_to_invoke(
+    action: &Action,
+    ribosome: &impl RibosomeT,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    match action {
+        Action::CreateLink(create_link) => create_link_zomes_to_invoke(create_link, ribosome),
+        Action::Create(Create {
+            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
+            ..
+        })
+        | Action::Update(Update {
+            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
+            ..
+        }) => {
+            let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {
+                Outcome::rejected(&format!("Zome does not exist for {:?}", zome_index))
+            })?;
+            Ok(ZomesToInvoke::OneIntegrity(zome))
         }
-        RequiredValidationType::Full => Ok(Some(
-            get_as_author_full(header_seq, workspace_lock.source_chain()).await?,
-        )),
-        RequiredValidationType::Custom => {
-            {
-                let cascade = Cascade::from_workspace(workspace_lock);
-                if let Some(elements) =
-                    cascade.get_validation_package_local(element.header_address())?
-                {
-                    return Ok(Some(ValidationPackage::new(elements)));
-                }
-            }
-            let result = match get_as_author_custom(
-                element.header_hashed(),
-                ribosome,
-                network,
-                workspace_lock.clone(),
-            )? {
-                Some(result) => result,
-                None => return Ok(None),
-            };
-            match result {
-                ValidationPackageResult::Success(validation_package) => {
-                    Ok(Some(validation_package))
-                }
-                ValidationPackageResult::Fail(reason) => Outcome::exit_with_rejected(reason),
-                ValidationPackageResult::UnresolvedDependencies(deps) => {
-                    Outcome::exit_with_awaiting(deps)
-                }
-                ValidationPackageResult::NotImplemented => Outcome::exit_with_rejected(format!(
-                    "Entry definition specifies a custom validation package but the callback isn't defined for {:?}",
-                    element
-                )),
-            }
-        }
+        _ => Ok(ZomesToInvoke::AllIntegrity),
     }
 }
 
-async fn get_validation_package_remote(
-    element: &Element,
-    entry_def: &EntryDef,
-    // from_agent: Option<AgentPubKey>,
-    workspace: &mut AppValidationWorkspace,
-    ribosome: &impl RibosomeT,
-    workspace_lock: &HostFnWorkspace,
-    network: &HolochainP2pCell,
-) -> AppValidationOutcome<Option<ValidationPackage>> {
-    match entry_def.required_validation_type {
-        // Only needs the element
-        RequiredValidationType::Element => Ok(None),
-        RequiredValidationType::SubChain | RequiredValidationType::Full => {
-            let agent_id = element.header().author().clone();
-            {
-                let mut cascade = workspace.full_cascade(network.clone());
-                // Get from author
-                let header_hashed = element.header_hashed();
-                if let Some(validation_package) = cascade
-                    .get_validation_package(agent_id.clone(), header_hashed)
-                    .await?
-                {
-                    return Ok(Some(validation_package));
-                }
-
-                // TODO: When we implement validation package then we might need this again.
-                // Fallback to gossiper if author is unavailable
-                // if let Some(from_agent) = from_agent {
-                //     if let Some(validation_package) = cascade
-                //         .get_validation_package(from_agent, header_hashed)
-                //         .await?
-                //     {
-                //         return Ok(Some(validation_package));
-                //     }
-                // }
-            }
-
-            // Fallback to RegisterAgentActivity if gossiper is unavailable
-
-            // When getting agent activity we need to get all the elements from element authorities
-            // in parallel but if the network is small this could overwhelm the authorities and we
-            // might need to retry some of the gets.
-            // One consequence of this is the max timeout becomes the network timeout * NUM_RETRY_GETS
-            // if the data really isn't available.
-            // TODO: Another solution is to up the timeout for parallel gets.
-            const NUM_RETRY_GETS: u8 = 3;
-            let range = 0..element.header().header_seq().saturating_sub(1);
-
-            let mut query = holochain_zome_types::query::ChainQueryFilter::new()
-                .sequence_range(range)
-                .include_entries(true);
-            if let (RequiredValidationType::SubChain, Some(et)) = (
-                entry_def.required_validation_type,
-                element.header().entry_type(),
-            ) {
-                query = query.entry_type(et.clone());
-            }
-
-            // Get the activity from the agent authority
-            let options = GetActivityOptions {
-                include_full_headers: true,
-                include_valid_activity: true,
-                retry_gets: NUM_RETRY_GETS,
-                ..Default::default()
-            };
-            let activity = {
-                let mut cascade = workspace.full_cascade(network.clone());
-                cascade.get_agent_activity(agent_id, query, options).await?
-            };
-            match activity {
-                AgentActivityResponse {
-                    status: ChainStatus::Valid(_),
-                    valid_activity: ChainItems::Full(elements),
-                    ..
-                } => {
-                    // TODO: Are we going to cache validation packages?
-                    // Add this back in when we implement validation packages.
-                    // Cache this as a validation package
-                    // workspace.meta_cache.register_validation_package(
-                    //     element.header_address(),
-                    //     elements.iter().map(|el| el.header_address().clone()),
-                    // );
-                    Ok(Some(ValidationPackage::new(elements)))
-                }
-                // TODO: If the chain is invalid should we still return
-                // it as the validation package?
-                _ => Ok(None),
-            }
-        }
-        RequiredValidationType::Custom => {
-            let validation_package = {
-                let mut cascade = workspace.full_cascade(network.clone());
-                let agent_id = element.header().author().clone();
-                let header_hashed = element.header_hashed();
-                // Call the author
-                let validation_package = cascade
-                    .get_validation_package(agent_id, header_hashed)
-                    .await?;
-
-                // Fallback to gossiper
-                match &validation_package {
-                    Some(_) => validation_package,
-                    None => {
-                        // TODO: When we implement validation package then we might need this again.
-                        // if let Some(from_agent) = from_agent {
-                        //     cascade
-                        //         .get_validation_package(from_agent, header_hashed)
-                        //         .await?
-                        // } else {
-                        //     None
-                        // }
-                        None
-                    }
-                }
-            };
-
-            // Fallback to callback
-            match &validation_package {
-                Some(_) => Ok(validation_package),
-                None => {
-                    let access =
-                        ValidationPackageHostAccess::new(workspace_lock.clone(), network.clone());
-                    let app_entry_type = match element.header().entry_type() {
-                        Some(EntryType::App(a)) => a.clone(),
-                        _ => return Ok(None),
-                    };
-                    let zome: Zome = ribosome
-                        .dna_def()
-                        .zomes
-                        .get(app_entry_type.zome_id().index())
-                        .ok_or_else(|| AppValidationError::ZomeId(app_entry_type.zome_id()))?
-                        .clone()
-                        .into();
-                    let invocation = ValidationPackageInvocation::new(zome, app_entry_type);
-                    match ribosome.run_validation_package(access, invocation)? {
-                        ValidationPackageResult::Success(validation_package) => {
-                            Ok(Some(validation_package))
-                        }
-                        ValidationPackageResult::Fail(reason) => {
-                            Outcome::exit_with_rejected(reason)
-                        }
-                        ValidationPackageResult::UnresolvedDependencies(deps) => {
-                            Outcome::exit_with_awaiting(deps)
-                        }
-                        ValidationPackageResult::NotImplemented => {
-                            Outcome::exit_with_rejected(format!(
-                                "Entry definition specifies a custom validation package but the callback isn't defined for {:?}",
-                                element
-                            ))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-pub async fn run_validation_callback_direct(
-    zome: ZomesToInvoke,
-    element: Element,
-    ribosome: &impl RibosomeT,
-    workspace: HostFnWorkspace,
-    network: HolochainP2pCell,
-    conductor_api: &impl CellConductorApiT,
-) -> AppValidationResult<Outcome> {
-    let outcome = {
-        // TODO: Put this back to full cascade when we work out the cache contention.
-        // let mut cascade = Cascade::from_workspace_network(&workspace, network.clone());
-        let mut cascade = Cascade::from_workspace(&workspace);
-        get_associated_entry_def(&element, ribosome.dna_def(), conductor_api, &mut cascade).await
-    };
-
-    // The outcome could be awaiting a dependency to get the entry def
-    // so we need to check that here and exit early if that is the case
-    let entry_def = match outcome {
-        Ok(ed) => ed,
-        Err(outcome) => return outcome.try_into(),
-    };
-
-    let validation_package = {
-        let outcome = get_validation_package(
-            &element, &entry_def, // None,
-            None, ribosome, &workspace, &network,
-        )
-        .await;
-        match outcome {
-            Ok(vp) => vp.map(Arc::new),
-            Err(outcome) => return outcome.try_into(),
-        }
-    };
-    let entry_def_id = entry_def.map(|ed| ed.id);
-
-    let element = Arc::new(element);
-
-    run_validation_callback_inner(
-        zome,
-        element,
-        validation_package,
-        entry_def_id,
-        ribosome,
-        workspace,
-        network,
-    )
-}
-
-fn run_validation_callback_inner(
-    zomes_to_invoke: ZomesToInvoke,
-    element: Arc<Element>,
-    validation_package: Option<Arc<ValidationPackage>>,
-    entry_def_id: Option<EntryDefId>,
-    ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
-) -> AppValidationResult<Outcome> {
-    let validate: ValidateResult = ribosome.run_validate(
-        ValidateHostAccess::new(workspace_lock, network),
-        ValidateInvocation {
-            zomes_to_invoke,
-            element,
-            validation_package,
-            entry_def_id,
-        },
+#[async_recursion::async_recursion]
+async fn run_validation_callback_inner<R>(
+    invocation: ValidateInvocation,
+    ribosome: &R,
+    workspace_read: HostFnWorkspaceRead,
+    network: HolochainP2pDna,
+    (mut fetched_deps, recursion_depth): (HashSet<AnyDhtHash>, usize),
+    mut visited_activity: HashSet<ChainFilter>,
+) -> AppValidationResult<Outcome>
+where
+    R: RibosomeT,
+{
+    let validate_result = ribosome.run_validate(
+        ValidateHostAccess::new(workspace_read.clone(), network.clone()),
+        invocation.clone(),
     )?;
-    match validate {
+    match validate_result {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
-        ValidateResult::UnresolvedDependencies(hashes) => Ok(Outcome::AwaitingDeps(hashes)),
-    }
-}
-
-pub fn run_create_link_validation_callback(
-    zome: Zome,
-    link_add: Arc<CreateLink>,
-    base: Arc<Entry>,
-    target: Arc<Entry>,
-    ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
-) -> AppValidationResult<Outcome> {
-    let invocation = ValidateCreateLinkInvocation {
-        zome,
-        link_add,
-        base,
-        target,
-    };
-    let invocation = ValidateLinkInvocation::<ValidateCreateLinkInvocation>::new(invocation);
-    run_link_validation_callback(invocation, ribosome, workspace_lock, network)
-}
-
-pub fn run_delete_link_validation_callback(
-    zome: Zome,
-    delete_link: DeleteLink,
-    ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
-) -> AppValidationResult<Outcome> {
-    let invocation = ValidateDeleteLinkInvocation { zome, delete_link };
-    let invocation = ValidateLinkInvocation::<ValidateDeleteLinkInvocation>::new(invocation);
-    run_link_validation_callback(invocation, ribosome, workspace_lock, network)
-}
-
-pub fn run_link_validation_callback<I: Invocation + 'static>(
-    invocation: ValidateLinkInvocation<I>,
-    ribosome: &impl RibosomeT,
-    workspace_lock: HostFnWorkspace,
-    network: HolochainP2pCell,
-) -> AppValidationResult<Outcome> {
-    let access = ValidateLinkHostAccess::new(workspace_lock, network);
-    let validate = ribosome.run_validate_link(access, invocation)?;
-    match validate {
-        ValidateLinkResult::Valid => Ok(Outcome::Accepted),
-        ValidateLinkResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
-        ValidateLinkResult::UnresolvedDependencies(hashes) => Ok(Outcome::AwaitingDeps(hashes)),
+        ValidateResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(hashes)) => {
+            // This is the base case where we've been recursing and start seeing
+            // all the same hashes unresolved that we already tried to fetch.
+            // At this point we should just give up on the inline recursing and
+            // let some future background task attempt to fetch these hashes
+            // again. Hopefully by then the hashes are fetchable.
+            // 20 is a completely arbitrary max recursion depth.
+            if recursion_depth > 20 || hashes.iter().all(|hash| fetched_deps.contains(hash)) {
+                Ok(Outcome::AwaitingDeps(hashes))
+            } else {
+                let in_flight = hashes.into_iter().map(|hash| async {
+                    let cascade_workspace = workspace_read.clone();
+                    let mut cascade =
+                        Cascade::from_workspace_and_network(&cascade_workspace, network.clone());
+                    cascade
+                        .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
+                        .await?;
+                    Ok(hash)
+                });
+                let results: Vec<_> = futures::stream::iter(in_flight)
+                    // 10 is completely arbitrary.
+                    .buffered(10)
+                    .collect()
+                    .await;
+                let results: AppValidationResult<Vec<_>> = results.into_iter().collect();
+                for hash in results? {
+                    fetched_deps.insert(hash);
+                }
+                run_validation_callback_inner(
+                    invocation,
+                    ribosome,
+                    workspace_read,
+                    network,
+                    (fetched_deps, recursion_depth + 1),
+                    visited_activity,
+                )
+                .await
+            }
+        }
+        ValidateResult::UnresolvedDependencies(UnresolvedDependencies::AgentActivity(
+            author,
+            filter,
+        )) => {
+            if recursion_depth > 20 || visited_activity.contains(&filter) {
+                Ok(Outcome::AwaitingDeps(vec![author.into()]))
+            } else {
+                let cascade_workspace = workspace_read.clone();
+                let mut cascade =
+                    Cascade::from_workspace_and_network(&cascade_workspace, network.clone());
+                cascade
+                    .must_get_agent_activity(author.clone(), filter.clone())
+                    .await?;
+                visited_activity.insert(filter);
+                run_validation_callback_inner(
+                    invocation,
+                    ribosome,
+                    workspace_read,
+                    network,
+                    (fetched_deps, recursion_depth + 1),
+                    visited_activity,
+                )
+                .await
+            }
+        }
     }
 }
 
 pub struct AppValidationWorkspace {
-    vault: EnvWrite,
-    cache: EnvWrite,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
+    dht_db_cache: DhtDbQueryCache,
+    cache: DbWrite<DbKindCache>,
+    keystore: MetaLairClient,
+    dna_def: Arc<DnaDef>,
 }
 
 impl AppValidationWorkspace {
-    pub fn new(vault: EnvWrite, cache: EnvWrite) -> Self {
-        Self { vault, cache }
+    pub fn new(
+        authored_db: DbRead<DbKindAuthored>,
+        dht_db: DbWrite<DbKindDht>,
+        dht_db_cache: DhtDbQueryCache,
+        cache: DbWrite<DbKindCache>,
+        keystore: MetaLairClient,
+        dna_def: Arc<DnaDef>,
+    ) -> Self {
+        Self {
+            authored_db,
+            dht_db,
+            dht_db_cache,
+            cache,
+            keystore,
+            dna_def,
+        }
     }
 
-    pub async fn put_validation_limbo(
+    pub async fn validation_workspace(&self) -> AppValidationResult<HostFnWorkspaceRead> {
+        Ok(HostFnWorkspace::new(
+            self.authored_db.clone(),
+            self.dht_db.clone().into(),
+            self.dht_db_cache.clone(),
+            self.cache.clone(),
+            self.keystore.clone(),
+            None,
+            self.dna_def.clone(),
+        )
+        .await?)
+    }
+
+    pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
         &self,
-        hash: DhtOpHash,
-        status: ValidationLimboStatus,
-    ) -> WorkflowResult<()> {
-        self.vault
-            .async_commit(|txn| {
-                set_validation_stage(txn, hash, status)?;
-                WorkflowResult::Ok(())
-            })
-            .await?;
-        Ok(())
-    }
-
-    pub async fn put_integration_limbo(
-        &self,
-        hash: DhtOpHash,
-        status: ValidationStatus,
-    ) -> WorkflowResult<()> {
-        self.vault
-            .async_commit(move |txn| {
-                set_validation_status(txn, hash.clone(), status)?;
-                set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
-                WorkflowResult::Ok(())
-            })
-            .await?;
-        Ok(())
-    }
-
-    pub async fn validation_workspace(
-        &self,
-        author: AgentPubKey,
-    ) -> AppValidationResult<HostFnWorkspace> {
-        Ok(HostFnWorkspace::new(self.vault.clone(), self.cache.clone(), author).await?)
-    }
-
-    pub fn full_cascade<Network: HolochainP2pCellT + Clone + 'static + Send>(
-        &mut self,
-        _network: Network,
-    ) -> Cascade {
-        // TODO: Put this back to full cascade when we work out the cache contention.
+        network: Network,
+    ) -> Cascade<Network> {
         Cascade::empty()
-            .with_vault(self.vault.clone().into())
-            // .with_network(network, self.cache.clone())
-            .with_cache(self.cache.clone())
+            .with_authored(self.authored_db.clone())
+            .with_dht(self.dht_db.clone().into())
+            .with_network(network, self.cache.clone())
     }
 }
 
-impl From<&HostFnWorkspace> for AppValidationWorkspace {
-    fn from(h: &HostFnWorkspace) -> Self {
-        let (vault, cache) = h.databases();
-        Self {
-            vault: vault.into(),
-            cache,
-        }
-    }
+pub fn put_validation_limbo(
+    txn: &mut Transaction<'_>,
+    hash: &DhtOpHash,
+    status: ValidationLimboStatus,
+) -> WorkflowResult<()> {
+    set_validation_stage(txn, hash, status)?;
+    Ok(())
+}
+
+pub fn put_integration_limbo(
+    txn: &mut Transaction<'_>,
+    hash: &DhtOpHash,
+    status: ValidationStatus,
+) -> WorkflowResult<()> {
+    set_validation_status(txn, hash, status)?;
+    set_validation_stage(txn, hash, ValidationLimboStatus::AwaitingIntegration)?;
+    Ok(())
+}
+
+pub fn put_integrated(
+    txn: &mut Transaction<'_>,
+    hash: &DhtOpHash,
+    status: ValidationStatus,
+) -> WorkflowResult<()> {
+    set_validation_status(txn, hash, status)?;
+    // This set the validation stage to pending which is correct when
+    // it's integrated.
+    set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
+    set_when_integrated(txn, hash, Timestamp::now())?;
+    Ok(())
 }

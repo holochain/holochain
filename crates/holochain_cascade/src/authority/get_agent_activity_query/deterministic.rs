@@ -7,9 +7,9 @@
 //! and safely use it in your own validation. If you don't get a value back,
 //! you cannot proceed with validation.
 //!
-//! - The agent authority will fully validate Headers, so it's OK to pass the
-//!   full headers to Wasm
-//! - Must return a contiguous range of Headers so that the requestor can
+//! - The agent authority will fully validate Actions, so it's OK to pass the
+//!   full actions to Wasm
+//! - Must return a contiguous range of Actions so that the requestor can
 //!   ensure that the data is valid (TODO we're skipping the actual validation
 //!   on the requestor side for now).
 
@@ -18,12 +18,13 @@ use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::*;
 use holochain_state::{
     prelude::*,
-    query::{row_blob_and_hash_to_header, QueryData},
+    query::{row_blob_and_hash_to_action, QueryData},
 };
 use holochain_types::prelude::*;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct DeterministicGetAgentActivityQuery {
     agent: AgentPubKey,
     filter: DeterministicGetAgentActivityFilter,
@@ -46,26 +47,26 @@ impl DeterministicGetAgentActivityQuery {
 
 #[derive(Debug)]
 pub struct DeterministicGetAgentActivityQueryState {
-    chain: Vec<Judged<SignedHeader>>,
-    prev_header: Option<HeaderHash>,
+    chain: Vec<Judged<SignedAction>>,
+    prev_action: Option<ActionHash>,
 }
 
 impl Query for DeterministicGetAgentActivityQuery {
-    type Item = Judged<SignedHeaderHashed>;
+    type Item = Judged<SignedActionHashed>;
     type State = DeterministicGetAgentActivityQueryState;
     type Output = DeterministicGetAgentActivityResponse;
 
     fn query(&self) -> String {
         "
-            SELECT H.blob, H.hash, D.validation_status FROM Header AS H
+            SELECT H.blob, H.hash, D.validation_status FROM Action AS H
             JOIN DhtOp as D
-            ON D.header_hash = H.hash
+            ON D.action_hash = H.hash
             WHERE H.author = :author
             AND D.type = :op_type
             AND D.validation_status IS NOT NULL
             AND D.when_integrated IS NOT NULL
-            AND (:hash_low IS NULL OR H.seq >= (SELECT seq FROM Header WHERE hash = :hash_low))
-            AND H.seq <= (SELECT seq FROM Header WHERE hash = :hash_high)
+            AND (:hash_low IS NULL OR H.seq >= (SELECT seq FROM Action WHERE hash = :hash_low))
+            AND H.seq <= (SELECT seq FROM Action WHERE hash = :hash_high)
             ORDER BY H.seq DESC
         "
         .to_string()
@@ -84,7 +85,7 @@ impl Query for DeterministicGetAgentActivityQuery {
     fn init_fold(&self) -> StateQueryResult<Self::State> {
         Ok(DeterministicGetAgentActivityQueryState {
             chain: Vec::new(),
-            prev_header: Some(self.filter.range.1.clone()),
+            prev_action: Some(self.filter.range.1.clone()),
         })
     }
 
@@ -94,19 +95,27 @@ impl Query for DeterministicGetAgentActivityQuery {
 
     fn fold(&self, mut state: Self::State, item: Self::Item) -> StateQueryResult<Self::State> {
         let (shh, status) = item.into();
-        let (header, hash) = shh.into_inner();
-        // By tracking the prev_header of the last header we added to the chain,
+        let SignedActionHashed {
+            hashed:
+                ActionHashed {
+                    content: action,
+                    hash,
+                },
+            signature,
+        } = shh;
+        let sh = SignedAction(action, signature);
+        // By tracking the prev_action of the last action we added to the chain,
         // we can filter out branches. If we performed branch detection in this
         // query, it would not be deterministic.
         //
         // TODO: ensure that this still works with the scratch, and that we
         // never have to run this query including the Cache. That is, if we join
-        // results from multiple Stores, the ordering of header_seq will be
+        // results from multiple Stores, the ordering of action_seq will be
         // discontinuous, and we will have to collect into a sorted list before
         // doing this fold.
-        if Some(hash) == state.prev_header {
-            state.prev_header = header.header().prev_header().cloned();
-            state.chain.push((header, status).into());
+        if Some(hash) == state.prev_action {
+            state.prev_action = sh.action().prev_action().cloned();
+            state.chain.push((sh, status).into());
         }
         Ok(state)
     }
@@ -119,7 +128,7 @@ impl Query for DeterministicGetAgentActivityQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
-        let f = row_blob_and_hash_to_header("blob", "hash");
+        let f = row_blob_and_hash_to_action("blob", "hash");
         Arc::new(move |row| {
             let validation_status: ValidationStatus = row.get("validation_status")?;
             Ok(Judged::new(f(row)?, validation_status))
@@ -136,33 +145,33 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_activity_query() {
         observability::test_run().ok();
-        let test_env = test_cell_env();
-        let env = test_env.env();
+        let test_db = test_dht_db();
+        let db = test_db.to_db();
         let entry_type_1 = fixt!(EntryType);
         let agents = [fixt!(AgentPubKey), fixt!(AgentPubKey), fixt!(AgentPubKey)];
         let mut chains = vec![];
 
         for a in 0..3 {
-            let mut chain: Vec<HeaderHash> = Vec::new();
+            let mut chain: Vec<ActionHash> = Vec::new();
             for seq in 0..10 {
-                let header: Header = if let Some(top) = chain.last() {
-                    let mut header = fixt!(Create);
-                    header.entry_type = entry_type_1.clone();
-                    header.author = agents[a].clone();
-                    header.prev_header = top.clone();
-                    header.header_seq = seq;
+                let action: Action = if let Some(top) = chain.last() {
+                    let mut action = fixt!(Create);
+                    action.entry_type = entry_type_1.clone();
+                    action.author = agents[a].clone();
+                    action.prev_action = top.clone();
+                    action.action_seq = seq;
                     let entry = Entry::App(fixt!(AppEntryBytes));
-                    header.entry_hash = EntryHash::with_data_sync(&entry);
-                    header.into()
+                    action.entry_hash = EntryHash::with_data_sync(&entry);
+                    action.into()
                 } else {
-                    let mut header = fixt!(Dna);
-                    header.author = agents[a].clone();
-                    header.into()
+                    let mut action = fixt!(Dna);
+                    action.author = agents[a].clone();
+                    action.into()
                 };
-                chain.push(HeaderHash::with_data_sync(&header));
-                let op = DhtOp::RegisterAgentActivity(fixt!(Signature), header.into());
+                chain.push(ActionHash::with_data_sync(&action));
+                let op = DhtOp::RegisterAgentActivity(fixt!(Signature), action.into());
                 let op = DhtOpHashed::from_content_sync(op);
-                fill_db(&env, op);
+                fill_db(&db, op);
             }
             chains.push(chain);
         }
@@ -170,20 +179,20 @@ mod tests {
         let filter_full = DeterministicGetAgentActivityFilter {
             range: (None, chains[2].last().unwrap().clone()),
             entry_type: Some(entry_type_1.clone()),
-            header_type: None,
+            action_type: None,
             include_entries: false,
         };
 
         let filter_partial = DeterministicGetAgentActivityFilter {
             range: (Some(chains[2][4].clone()), chains[2][8].clone()),
             entry_type: Some(entry_type_1),
-            header_type: None,
+            action_type: None,
             include_entries: false,
         };
         let options = GetActivityOptions::default();
 
         let results_full = crate::authority::handle_get_agent_activity_deterministic(
-            env.clone().into(),
+            db.clone().into(),
             agents[2].clone(),
             filter_full,
             options.clone(),
@@ -192,7 +201,7 @@ mod tests {
         .unwrap();
 
         let results_partial = crate::authority::handle_get_agent_activity_deterministic(
-            env.clone().into(),
+            db.clone().into(),
             agents[2].clone(),
             filter_partial,
             options,

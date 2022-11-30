@@ -18,6 +18,7 @@ use std::sync::atomic;
 
 /// Configuration for MemBackendAdapt
 #[non_exhaustive]
+#[derive(Default)]
 pub struct MemConfig {
     /// Tls config
     /// Default: None = ephemeral.
@@ -26,15 +27,6 @@ pub struct MemConfig {
     /// Tuning Params
     /// Default: None = default.
     pub tuning_params: Option<KitsuneP2pTuningParams>,
-}
-
-impl Default for MemConfig {
-    fn default() -> Self {
-        Self {
-            tls: None,
-            tuning_params: None,
-        }
-    }
 }
 
 impl MemConfig {
@@ -47,7 +39,7 @@ impl MemConfig {
             Some(tls) => tls,
         };
 
-        let tuning_params = tuning_params.unwrap_or_else(KitsuneP2pTuningParams::default);
+        let tuning_params = tuning_params.unwrap_or_default();
 
         Ok((tls, tuning_params))
     }
@@ -307,19 +299,19 @@ impl EndpointAdapt for MemEndpointAdapt {
         async move {
             let con_id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
 
-            let bad_url = || Err(format!("invalid url: {}", url).into());
+            let bad_url = |reason: &str| Err(format!("invalid url {} : {}", url, reason).into());
 
             if url.scheme() != "kitsune-mem" {
-                return bad_url();
+                return bad_url("scheme must be kitsune-mem");
             }
 
             let id = match url.host_str() {
-                None => return bad_url(),
+                None => return bad_url("no host specified"),
                 Some(id) => id,
             };
 
             let id = match id.parse::<u64>() {
-                Err(_) => return bad_url(),
+                Err(_) => return bad_url("unable to parse id"),
                 Ok(id) => id,
             };
 
@@ -363,6 +355,7 @@ impl EndpointAdapt for MemEndpointAdapt {
             use futures::future::TryFutureExt;
             if timeout
                 .mix(
+                    "MemEndpointAdapt::connect",
                     c_send
                         .send((oth_con, oth_chan_recv))
                         .map_err(|_| KitsuneError::from(KitsuneErrorKind::Closed)),
@@ -412,8 +405,8 @@ impl BindAdapt for MemBackendAdapt {
     fn bind(&self, _url: TxUrl, timeout: KitsuneTimeout) -> EndpointFut {
         let local_cert = self.0.clone();
         timeout
-            .mix(async move {
-                let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::Relaxed);
+            .mix("MemBackendAdapt::bind", async move {
+                let id = NEXT_MEM_ID.fetch_add(1, atomic::Ordering::SeqCst);
                 let (c_send, c_recv) = t_chan(32);
                 let (ep, ep_active) = MemEndpointAdapt::new(c_send.clone(), id, local_cert.clone());
                 MEM_ENDPOINTS
@@ -426,6 +419,10 @@ impl BindAdapt for MemBackendAdapt {
                 Ok((ep, rc))
             })
             .boxed()
+    }
+
+    fn local_cert(&self) -> Tx2Cert {
+        self.0.clone()
     }
 }
 

@@ -2,20 +2,23 @@
 use std::path::PathBuf;
 
 use holochain_conductor_api::config::conductor::ConductorConfig;
+use holochain_conductor_api::config::conductor::KeystoreConfig;
 
 /// Name of the file that conductor config is written to.
 pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
 
 /// Create a new default [`ConductorConfig`] with environment path
 /// and keystore all in the same directory.
-pub fn create_config(environment_path: PathBuf) -> ConductorConfig {
+pub fn create_config(environment_path: PathBuf, con_url: url2::Url2) -> ConductorConfig {
     let mut conductor_config = ConductorConfig {
         environment_path: environment_path.clone().into(),
         ..Default::default()
     };
     let mut keystore_path = environment_path;
     keystore_path.push("keystore");
-    conductor_config.keystore_path = Some(keystore_path);
+    conductor_config.keystore = KeystoreConfig::LairServer {
+        connection_url: con_url,
+    };
     conductor_config
 }
 

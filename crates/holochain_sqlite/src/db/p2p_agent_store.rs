@@ -3,7 +3,7 @@
 use crate::prelude::*;
 use crate::sql::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::ArcInterval;
+use kitsune_p2p::dht_arc::DhtArcRange;
 use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::KitsuneAgent;
 use rusqlite::*;
@@ -24,7 +24,7 @@ pub trait AsP2pAgentStoreConExt {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
-    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>>;
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agents sorted by nearness to basis loc
     fn p2p_query_near_basis(
@@ -32,6 +32,9 @@ pub trait AsP2pAgentStoreConExt {
         basis: u32,
         limit: u32,
     ) -> DatabaseResult<Vec<AgentInfoSigned>>;
+
+    /// Extrapolate coverage from agents within our own storage arc
+    fn p2p_extrapolated_coverage(&mut self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>>;
 }
 
 /// Extension trait to treat transaction instances
@@ -49,13 +52,16 @@ pub trait AsP2pStateTxExt {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
-    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>>;
+    ) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
     /// Query agents sorted by nearness to basis loc
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>>;
+
+    /// Extrapolate coverage from agents within our own storage arc
+    fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>>;
 }
 
-impl AsP2pAgentStoreConExt for crate::db::PConn {
+impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
     fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_get_agent(agent))
     }
@@ -69,7 +75,7 @@ impl AsP2pAgentStoreConExt for crate::db::PConn {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
-    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>> {
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_gossip_query_agents(since_ms, until_ms, arcset))
     }
 
@@ -80,17 +86,24 @@ impl AsP2pAgentStoreConExt for crate::db::PConn {
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_query_near_basis(basis, limit))
     }
+
+    fn p2p_extrapolated_coverage(&mut self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
+        self.with_reader(move |reader| reader.p2p_extrapolated_coverage(dht_arc_set))
+    }
 }
 
 /// Put an AgentInfoSigned record into the p2p_store
-pub async fn p2p_put(db: &DbWrite, signed: &AgentInfoSigned) -> DatabaseResult<()> {
+pub async fn p2p_put(
+    db: &DbWrite<DbKindP2pAgents>,
+    signed: &AgentInfoSigned,
+) -> DatabaseResult<()> {
     let record = P2pRecord::from_signed(signed)?;
     db.async_commit(move |txn| tx_p2p_put(txn, record)).await
 }
 
 /// Put an iterator of AgentInfoSigned records into the p2p_store
 pub async fn p2p_put_all(
-    db: &DbWrite,
+    db: &DbWrite<DbKindP2pAgents>,
     signed: impl Iterator<Item = &AgentInfoSigned>,
 ) -> DatabaseResult<()> {
     let mut records = Vec::new();
@@ -104,6 +117,12 @@ pub async fn p2p_put_all(
         Ok(())
     })
     .await
+}
+
+/// Insert a p2p record from within a write transaction.
+pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> DatabaseResult<()> {
+    let record = P2pRecord::from_signed(signed)?;
+    tx_p2p_put(txn, record)
 }
 
 fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
@@ -128,14 +147,32 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
 }
 
 /// Prune all expired AgentInfoSigned records from the p2p_store
-pub async fn p2p_prune(db: &DbWrite) -> DatabaseResult<()> {
+pub async fn p2p_prune(
+    db: &DbWrite<DbKindP2pAgents>,
+    local_agents: Vec<Arc<KitsuneAgent>>,
+) -> DatabaseResult<()> {
+    let mut agent_list = Vec::with_capacity(local_agents.len() * 36);
+    for agent in local_agents.iter() {
+        agent_list.extend_from_slice(agent.as_ref());
+    }
+    if agent_list.is_empty() {
+        // this is a hack around an apparent bug in sqlite
+        // where the delete doesn't run if the subquery returns no rows
+        agent_list.extend_from_slice(&[0; 36]);
+    }
     db.async_commit(move |txn| {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
 
-        txn.execute(sql_p2p_agent_store::PRUNE, named_params! { ":now": now })?;
+        txn.execute(
+            sql_p2p_agent_store::PRUNE,
+            named_params! {
+                ":now": now,
+                ":agent_list": agent_list,
+            },
+        )?;
         DatabaseResult::Ok(())
     })
     .await?;
@@ -183,50 +220,37 @@ impl AsP2pStateTxExt for Transaction<'_> {
         since_ms: u64,
         until_ms: u64,
         arcset: DhtArcSet,
-    ) -> DatabaseResult<Vec<(KitsuneAgent, ArcInterval)>> {
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
         let mut stmt = self
             .prepare(sql_p2p_agent_store::GOSSIP_QUERY)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+        let mut out = Vec::new();
+        for r in stmt.query_map(
+            named_params! {
+                // TODO: just take i64 so we don't need to clamp (probably
+                //       should just do more Timestamp refactor)
+                ":since_ms": clamp64(since_ms),
+                ":until_ms": clamp64(until_ms),
+                // we filter by arc in memory, not in the db query
+                ":storage_start_loc": Some(u32::MIN),
+                ":storage_end_loc": Some(u32::MAX),
+            },
+            |r| {
+                let r = r.get_ref(0)?;
+                let r = r.as_blob()?;
+                let signed = AgentInfoSigned::decode(r)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
-        let query = stmt
-            .query_map(
-                named_params! {
-                    ":since_ms": clamp64(since_ms),
-                    ":until_ms": clamp64(until_ms),
-                    // we filter by arc in memory, not in the db query
-                    ":storage_start_loc": Some(u32::MIN),
-                    ":storage_end_loc": Some(u32::MAX),
-                },
-                |r| {
-                    let agent: Vec<u8> = r.get(0)?;
-                    let start: Option<u32> = r.get(1)?;
-                    let end: Option<u32> = r.get(2)?;
-                    let interval = match (start, end) {
-                        (Some(start), Some(end)) => Some(ArcInterval::new(start, end)),
-                        (None, None) => None,
-                        _ => {
-                            tracing::warn!(
-                            "Mismatch in arc bounds for an agent, treating as zero arc ({:?}, {:?})",
-                            start,
-                            end
-                        );
-                            None
-                        }
-                    };
-                    Ok(interval.map(|interval| (KitsuneAgent(agent), interval)))
-                },
-            )?;
-        query.fold(Ok(vec![]), |out, maybe_pair| {
-            if let Some((agent, interval)) = maybe_pair? {
-                if arcset.overlap(&interval.clone().into()) {
-                    return out.map(|mut out| {
-                        out.push((agent, interval));
-                        out
-                    });
-                }
+                Ok(signed)
+            },
+        )? {
+            let info = r?;
+            let interval = DhtArcRange::from(info.storage_arc);
+            if arcset.overlap(&interval.into()) {
+                out.push(info);
             }
-            out
-        })
+        }
+        Ok(out)
     }
 
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
@@ -245,6 +269,47 @@ impl AsP2pStateTxExt for Transaction<'_> {
         })? {
             out.push(r?);
         }
+        Ok(out)
+    }
+
+    fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
+        let mut stmt = self
+            .prepare(sql_p2p_agent_store::EXTRAPOLATED_COVERAGE)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+
+        let mut out = Vec::new();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        for interval in dht_arc_set.intervals() {
+            match interval {
+                DhtArcRange::Full => {
+                    out.push(stmt.query_row(
+                        named_params! {
+                            ":now": now,
+                            ":start_loc": 0,
+                            ":end_loc": u32::MAX,
+                        },
+                        |r| r.get(0),
+                    )?);
+                }
+                DhtArcRange::Bounded(start, end) => {
+                    out.push(stmt.query_row(
+                        named_params! {
+                            ":now": now,
+                            ":start_loc": (*start).0,
+                            ":end_loc": (*end).0,
+                        },
+                        |r| r.get(0),
+                    )?);
+                }
+                _ => (),
+            }
+        }
+
         Ok(out)
     }
 }
@@ -270,7 +335,8 @@ struct P2pRecord {
     storage_end_loc: Option<u32>,
 }
 
-fn clamp64(u: u64) -> i64 {
+/// Clamp a u64 to the range of a i64.
+pub fn clamp64(u: u64) -> i64 {
     if u > i64::MAX as u64 {
         i64::MAX
     } else {
@@ -288,11 +354,11 @@ impl P2pRecord {
         let expires_at_ms = signed.expires_at_ms;
         let arc = signed.storage_arc;
 
-        let storage_center_loc = arc.center_loc.into();
+        let storage_center_loc = arc.start_loc().into();
 
         let is_active = !signed.url_list.is_empty();
 
-        let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
+        let (storage_start_loc, storage_end_loc) = arc.to_primitive_bounds_detached();
 
         Ok(Self {
             agent,

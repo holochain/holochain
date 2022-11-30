@@ -7,35 +7,39 @@
 //! itself depends on.
 
 #![deny(missing_docs)]
-// Toggle this to see what needs to be eventually refactored (as warnings).
-#![allow(deprecated)]
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
 
 pub mod access;
+pub mod action;
 pub mod activity;
 pub mod app;
 pub mod autonomic;
 pub mod chain;
+pub mod chc;
 pub mod combinators;
 pub mod db;
+pub mod db_cache;
 pub mod dht_op;
 pub mod dna;
-pub mod element;
 pub mod entry;
-pub mod env;
 pub mod fixt;
-pub mod header;
+pub mod inline_zome;
 pub mod link;
 mod macros;
 pub mod metadata;
 pub mod prelude;
-pub mod properties;
+pub mod rate_limit;
+pub mod record;
+pub mod share;
 pub mod signal;
-pub mod timestamp;
+#[warn(missing_docs)]
+pub mod sql;
 pub mod validate;
+pub mod web_app;
+pub mod zome_types;
 
+#[cfg(feature = "test_utils")]
 pub mod test_utils;
 
 pub use holochain_zome_types::entry::EntryHashed;
-pub use timestamp::{Timestamp, TimestampKey};

@@ -1,0 +1,50 @@
+{
+    "crate2nix": {
+        "branch": "master",
+        "description": "nix build file generator for rust crates",
+        "homepage": "",
+        "owner": "kolloch",
+        "repo": "crate2nix",
+        "rev": "78258f27fc3121562a44eb02c652a5ec77cf8d02",
+        "sha256": "0l15czzn8ck315dlwza2gynhrbh2iqy2wm75f52g57cfr1ki4klf",
+        "type": "tarball",
+        "url": "https://github.com/kolloch/crate2nix/archive/78258f27fc3121562a44eb02c652a5ec77cf8d02.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "holonix": {
+        "branch": "develop",
+        "description": "NixOS && Holochain",
+        "homepage": "",
+        "owner": "holochain",
+        "repo": "holonix",
+        "rev": "2b874668324ae5a7804066f61afbed913ac0cb9c",
+        "sha256": "1brdayg4kaf0ybmgjli6z8v137apyyknq1w9i3cswy9n4yq5mqcv",
+        "type": "tarball",
+        "url": "https://github.com/holochain/holonix/archive/2b874668324ae5a7804066f61afbed913ac0cb9c.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nextest": {
+        "branch": "main",
+        "description": "A next-generation test runner for Rust.",
+        "homepage": "https://nexte.st",
+        "owner": "nextest-rs",
+        "repo": "nextest",
+        "rev": "cc1ebea104e5705097c9f8da69023bf80d03dd6a",
+        "sha256": "1in972hzhy2zrf18v7a5m2pgll4znk9ipyzv1nih9vp5m2sg5nlx",
+        "type": "tarball",
+        "url": "https://github.com/nextest-rs/nextest/archive/cc1ebea104e5705097c9f8da69023bf80d03dd6a.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixos-unstable": {
+        "branch": "nixos-unstable",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "1d7db1b9e4cf1ee075a9f52e5c36f7b9f4207502",
+        "sha256": "1w7nrdq5pgmyc5p8lb86ljb3by02dhcmrc008hvaa4s45mf6p8qn",
+        "type": "tarball",
+        "url": "https://github.com/nixos/nixpkgs/archive/1d7db1b9e4cf1ee075a9f52e5c36f7b9f4207502.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}

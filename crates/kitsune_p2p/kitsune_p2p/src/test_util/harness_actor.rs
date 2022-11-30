@@ -1,5 +1,8 @@
 use super::*;
 
+type KAgent = Arc<KitsuneAgent>;
+type KInfo = Arc<AgentInfoSigned>;
+
 ghost_actor::ghost_chan! {
     /// The api for the test harness controller
     pub chan HarnessControlApi<KitsuneP2pError> {
@@ -21,6 +24,13 @@ ghost_actor::ghost_chan! {
             ghost_actor::GhostSender<KitsuneP2p>,
         );
 
+        /// Create a new directly addressable agent that will
+        /// reject any proxy requests.
+        fn add_publish_only_agent(nick: String) -> (
+            Arc<KitsuneAgent>,
+            ghost_actor::GhostSender<KitsuneP2p>,
+        );
+
         /// Create a new agent that will connect via proxy.
         fn add_nat_agent(nick: String, proxy_url: url2::Url2) -> (
             Arc<KitsuneAgent>,
@@ -31,13 +41,16 @@ ghost_actor::ghost_chan! {
         fn magic_peer_info_exchange() -> ();
 
         /// Inject data for one specific agent to gossip to others
-        fn inject_gossip_data(agent: Arc<KitsuneAgent>, data: String) -> Arc<KitsuneOpHash>;
+        fn inject_gossip_data(agent: KAgent, data: String) -> Arc<KitsuneOpHash>;
+
+        /// Inject agent info for one agent.
+        fn inject_peer_info(agent: KAgent, info: KInfo) -> ();
 
         /// Dump all local gossip data from a specific agent
-        fn dump_local_gossip_data(agent: Arc<KitsuneAgent>) -> HashMap<Arc<KitsuneOpHash>, String>;
+        fn dump_local_gossip_data(agent: KAgent) -> HashMap<Arc<KitsuneOpHash>, String>;
 
         /// Dump all local peer data from a specific agent
-        fn dump_local_peer_data(agent: Arc<KitsuneAgent>) -> HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>;
+        fn dump_local_peer_data(agent: KAgent) -> HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>;
     }
 }
 
@@ -97,13 +110,16 @@ pub async fn spawn_test_harness(
     Ok((controller, harness_chan))
 }
 
+type KP2p = ghost_actor::GhostSender<KitsuneP2p>;
+type KCtl = ghost_actor::GhostSender<HarnessAgentControl>;
+
 ghost_actor::ghost_chan! {
     /// The api for the test harness controller
     chan HarnessInner<KitsuneP2pError> {
         fn finish_agent(
-            agent: Arc<KitsuneAgent>,
-            p2p: ghost_actor::GhostSender<KitsuneP2p>,
-            ctrl: ghost_actor::GhostSender<HarnessAgentControl>,
+            agent: KAgent,
+            p2p: KP2p,
+            ctrl: KCtl,
         ) -> ();
     }
 }
@@ -144,6 +160,9 @@ impl ghost_actor::GhostControlHandler for HarnessActor {
     ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, ()> {
         use ghost_actor::GhostControlSender;
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &self;
             self.harness_chan.close();
             for (_, (p2p, ctrl)) in self.agents.iter() {
                 let _ = p2p.ghost_actor_shutdown().await;
@@ -170,7 +189,7 @@ impl HarnessInnerHandler for HarnessActor {
         let space_list = self.space_list.clone();
         Ok(async move {
             for space in space_list {
-                p2p.join(space.clone(), agent.clone()).await?;
+                p2p.join(space.clone(), agent.clone(), None).await?;
 
                 harness_chan.publish(HarnessEventType::Join {
                     agent: (&agent).into(),
@@ -192,7 +211,7 @@ impl HarnessControlApiHandler for HarnessActor {
         self.space_list.push(space.clone());
         let mut all = Vec::new();
         for (agent, (p2p, _)) in self.agents.iter() {
-            all.push(p2p.join(space.clone(), agent.clone()));
+            all.push(p2p.join(space.clone(), agent.clone(), None));
         }
         Ok(async move {
             futures::future::try_join_all(all).await?;
@@ -236,6 +255,41 @@ impl HarnessControlApiHandler for HarnessActor {
     ) -> HarnessControlApiHandlerResult<(Arc<KitsuneAgent>, ghost_actor::GhostSender<KitsuneP2p>)>
     {
         let mut direct_agent_config = KitsuneP2pConfig::default();
+        direct_agent_config
+            .transport_pool
+            .push(TransportConfig::Proxy {
+                sub_transport: Box::new(self.sub_config.clone()),
+                proxy_config: ProxyConfig::LocalProxyServer {
+                    proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
+                },
+            });
+
+        let sub_harness = self.harness_chan.sub_clone(nick);
+        let i_s = self.i_s.clone();
+        Ok(async move {
+            let (agent, p2p, ctrl) = spawn_test_agent(sub_harness, direct_agent_config).await?;
+
+            i_s.finish_agent(agent.clone(), p2p.clone(), ctrl).await?;
+
+            Ok((agent, p2p))
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_add_publish_only_agent(
+        &mut self,
+        nick: String,
+    ) -> HarnessControlApiHandlerResult<(Arc<KitsuneAgent>, ghost_actor::GhostSender<KitsuneP2p>)>
+    {
+        let mut tp =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tp.gossip_strategy = "none".to_string();
+        let tp = Arc::new(tp);
+        let mut direct_agent_config = KitsuneP2pConfig {
+            tuning_params: tp,
+            ..Default::default()
+        };
         direct_agent_config
             .transport_pool
             .push(TransportConfig::Proxy {
@@ -319,6 +373,22 @@ impl HarnessControlApiHandler for HarnessActor {
             .get(&agent)
             .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
         let fut = ctrl.inject_gossip_data(data);
+        Ok(async move { fut.await }.boxed().into())
+    }
+
+    fn handle_inject_peer_info(
+        &mut self,
+        agent: KAgent,
+        info: KInfo,
+    ) -> HarnessControlApiHandlerResult<()> {
+        let (_, ctrl) = self
+            .agents
+            .get(&agent)
+            .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
+        let map = maplit::hashmap! {
+            info.agent.clone() => info
+        };
+        let fut = ctrl.inject_agent_info(map);
         Ok(async move { fut.await }.boxed().into())
     }
 

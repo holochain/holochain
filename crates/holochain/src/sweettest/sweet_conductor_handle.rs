@@ -1,4 +1,5 @@
 use super::SweetZome;
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::{api::error::ConductorApiResult, ConductorHandle};
 use holochain_conductor_api::ZomeCall;
 use holochain_types::prelude::*;
@@ -41,7 +42,7 @@ impl SweetConductorHandle {
     pub async fn call_from<I, O, F>(
         &self,
         provenance: &AgentPubKey,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         zome: &SweetZome,
         fn_name: F,
         payload: I,
@@ -51,7 +52,7 @@ impl SweetConductorHandle {
         I: Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        self.call_from_fallible(provenance, cap, zome, fn_name, payload)
+        self.call_from_fallible(provenance, cap_secret, zome, fn_name, payload)
             .await
             .unwrap()
     }
@@ -60,7 +61,7 @@ impl SweetConductorHandle {
     pub async fn call_from_fallible<I, O, F>(
         &self,
         provenance: &AgentPubKey,
-        cap: Option<CapSecret>,
+        cap_secret: Option<CapSecret>,
         zome: &SweetZome,
         fn_name: F,
         payload: I,
@@ -75,29 +76,31 @@ impl SweetConductorHandle {
             cell_id: zome.cell_id().clone(),
             zome_name: zome.name().clone(),
             fn_name: fn_name.into(),
-            cap,
+            cap_secret,
             provenance: provenance.clone(),
             payload,
         };
-        self.0.call_zome(call).await.map(|r| {
-            unwrap_to!(r.unwrap() => ZomeCallResponse::Ok)
+        match self.0.call_zome(call).await {
+            Ok(Ok(response)) => Ok(unwrap_to!(response => ZomeCallResponse::Ok)
                 .decode()
-                .expect("Couldn't deserialize zome call output")
-        })
+                .expect("Couldn't deserialize zome call output")),
+            Ok(Err(error)) => Err(ConductorApiError::Other(Box::new(error))),
+            Err(error) => Err(error),
+        }
     }
 
-    // /// Get a stream of all Signals emitted since the time of this function call.
-    // pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
-    //     self.0.signal_broadcaster().await.subscribe_merged()
-    // }
+    /// Get a stream of all Signals emitted since the time of this function call.
+    pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
+        self.0.signal_broadcaster().subscribe_merged()
+    }
 
     /// Manually await shutting down the conductor.
     /// Conductors are already cleaned up on drop but this
     /// is useful if you need to know when it's finished cleaning up.
     pub async fn shutdown_and_wait(&self) {
         let c = &self.0;
-        if let Some(shutdown) = c.take_shutdown_handle().await {
-            c.shutdown().await;
+        if let Some(shutdown) = c.take_shutdown_handle() {
+            c.shutdown();
             shutdown
                 .await
                 .expect("Failed to await shutdown handle")

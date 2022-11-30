@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use super::*;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::{agent_info::AgentInfoSigned, dht_arc::DhtLocation};
 use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
@@ -35,7 +35,7 @@ pub(crate) fn search_and_discover_peer_connect(
 
             // see if we already know how to reach the tgt agent
             if let Ok(Some(agent_info_signed)) = inner
-                .evt_sender
+                .host_api
                 .get_agent_info_signed(GetAgentInfoSignedEvt {
                     space: inner.space.clone(),
                     agent: to_agent.clone(),
@@ -66,13 +66,11 @@ pub(crate) fn search_and_discover_peer_connect(
                             Ok(wire::Wire::PeerGetResp(wire::PeerGetResp {
                                 agent_info_signed,
                             })) => {
-                                let agent = agent_info_signed.agent.clone();
                                 if let Err(err) = inner
                                     .evt_sender
                                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                                         space: inner.space.clone(),
-                                        agent,
-                                        agent_info_signed: agent_info_signed.clone(),
+                                        peer_data: vec![agent_info_signed.clone()],
                                     })
                                     .await
                                 {
@@ -87,7 +85,7 @@ pub(crate) fn search_and_discover_peer_connect(
                                 return peer_connect(inner, &agent_info_signed, timeout).await;
                             }
                             peer_resp => {
-                                tracing::warn!(?peer_resp, "unexpected peer resp");
+                                tracing::warn!(?peer_resp, "unexpected peer resp 1");
                             }
                         }
                     }
@@ -139,7 +137,7 @@ pub(crate) fn peer_connect(
 /// by requesting closer agents from remote nodes
 pub(crate) fn search_remotes_covering_basis(
     inner: Arc<SpaceReadOnlyInner>,
-    basis_loc: u32,
+    basis_loc: DhtLocation,
     timeout: KitsuneTimeout,
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
     const INITIAL_DELAY: u64 = 100;
@@ -149,6 +147,9 @@ pub(crate) fn search_remotes_covering_basis(
     async move {
         let backoff = timeout.backoff(INITIAL_DELAY, MAX_DELAY);
         loop {
+            //let s_remain = timeout.time_remaining().as_secs_f64();
+            //tracing::trace!(%s_remain, "search_remotes_covering_basis iteration");
+
             let mut cover_nodes = Vec::new();
             let mut near_nodes = Vec::new();
 
@@ -174,7 +175,7 @@ pub(crate) fn search_remotes_covering_basis(
             }
 
             // if we've exhausted our timeout, we should exit
-            timeout.ok()?;
+            timeout.ok("search_remotes_covering_basis")?;
 
             if near_nodes.is_empty() {
                 // maybe just wait and try again?
@@ -201,19 +202,15 @@ pub(crate) fn search_remotes_covering_basis(
                                 continue;
                             }
                             // if we got results, add them to our peer store
-                            for agent_info_signed in peer_list {
-                                let agent = agent_info_signed.agent.clone();
-                                if let Err(err) = inner
-                                    .evt_sender
-                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        space: inner.space.clone(),
-                                        agent,
-                                        agent_info_signed,
-                                    })
-                                    .await
-                                {
-                                    tracing::error!(?err, "error storing peer_queried agent_info");
-                                }
+                            if let Err(err) = inner
+                                .evt_sender
+                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                    space: inner.space.clone(),
+                                    peer_data: peer_list,
+                                })
+                                .await
+                            {
+                                tracing::error!(?err, "error storing peer_queried agent_info");
                             }
                             // then break, to pull up the local query
                             // that should now include these new results
@@ -221,7 +218,7 @@ pub(crate) fn search_remotes_covering_basis(
                             break;
                         }
                         peer_resp => {
-                            tracing::warn!(?peer_resp, "unexpected peer resp");
+                            tracing::warn!(?peer_resp, "unexpected peer resp 2");
                         }
                     }
                 }
@@ -237,7 +234,7 @@ pub(crate) fn search_remotes_covering_basis(
 /// local search for remote (non-local) agents closest to basis
 pub(crate) fn get_cached_remotes_near_basis(
     inner: Arc<SpaceReadOnlyInner>,
-    basis_loc: u32,
+    basis_loc: DhtLocation,
     _timeout: KitsuneTimeout,
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
     // as this is a local request, there isn't much cost to getting more
@@ -247,11 +244,10 @@ pub(crate) fn get_cached_remotes_near_basis(
     async move {
         let mut nodes = Vec::new();
 
-        for node in inner
-            .evt_sender
-            .query_agent_info_signed_near_basis(inner.space.clone(), basis_loc, LIMIT)
-            .await?
-        {
+        let query = QueryAgentsEvt::new(inner.space.clone())
+            .near_basis(basis_loc)
+            .limit(LIMIT);
+        for node in inner.evt_sender.query_agents(query).await? {
             if !inner
                 .i_s
                 .is_agent_local(node.agent.clone())

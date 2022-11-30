@@ -1,8 +1,7 @@
-use hdk::prelude::*;
+pub mod integrity;
 
-#[hdk_extern]
-pub fn validate_create_link(_: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult> {
-    Ok(ValidateLinkCallbackResult::Invalid(
-        "esoteric edge case (link version)".into(),
-    ))
-}
+#[cfg(not(feature = "integrity"))]
+pub mod coordinator;
+
+#[cfg(not(feature = "integrity"))]
+pub use coordinator::*;

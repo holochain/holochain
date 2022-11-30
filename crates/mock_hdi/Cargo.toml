@@ -1,0 +1,12 @@
+[package]
+name = "holochain_mock_hdi"
+version = "0.0.1"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2021"
+description = "A mock version of the holochain HDI"
+license = "Apache-2.0"
+documentation = "https://docs.rs/holochain_mock_hdi"
+
+[dependencies]
+hdi = { path = "../hdi" }
+mockall = { version = "0.11.0" }

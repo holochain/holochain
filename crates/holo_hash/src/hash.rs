@@ -23,11 +23,15 @@
 //!
 //! The complete 39 bytes together are known as the "full" hash
 
-use crate::encode;
+use kitsune_p2p_dht_arc::DhtLocation;
+
 use crate::error::HoloHashResult;
 use crate::has_hash::HasHash;
 use crate::HashType;
 use crate::PrimitiveHashType;
+
+#[cfg(feature = "hashing")]
+use crate::encode;
 
 /// Length of the prefix bytes (3)
 pub const HOLO_HASH_PREFIX_LEN: usize = 3;
@@ -142,8 +146,10 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Fetch the holo dht location for this hash
-    pub fn get_loc(&self) -> u32 {
-        bytes_to_loc(&self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..])
+    pub fn get_loc(&self) -> DhtLocation {
+        DhtLocation::new(bytes_to_loc(
+            &self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..],
+        ))
     }
 
     /// consume into the inner byte vector
@@ -151,8 +157,19 @@ impl<T: HashType> HoloHash<T> {
         assert_length!(HOLO_HASH_FULL_LEN, &self.hash);
         self.hash
     }
+
+    /// Get the hex representation of the hash bytes
+    pub fn to_hex(&self) -> String {
+        use std::fmt::Write;
+        let mut s = String::with_capacity(self.hash.len());
+        for b in &self.hash {
+            write!(&mut s, "{:02x}", b).ok();
+        }
+        s
+    }
 }
 
+#[cfg(feature = "hashing")]
 impl<T: HashType> HoloHash<T> {
     /// Construct a HoloHash from a 32-byte hash.
     /// The 3 prefix bytes will be added based on the provided HashType,
@@ -177,6 +194,8 @@ impl<P: PrimitiveHashType> HoloHash<P> {
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
         Self::from_raw_36_and_type(hash, P::new())
     }
+
+    #[cfg(feature = "hashing")]
     /// Construct a HoloHash from a prehashed raw 32-byte slice.
     /// The location bytes will be calculated.
     pub fn from_raw_32(hash: Vec<u8>) -> Self {
@@ -218,7 +237,7 @@ impl<T: HashType> IntoIterator for HoloHash<T> {
 
 impl<T: HashType> HasHash<T> for HoloHash<T> {
     fn as_hash(&self) -> &HoloHash<T> {
-        &self
+        self
     }
     fn into_hash(self) -> HoloHash<T> {
         self
@@ -245,7 +264,7 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 mod tests {
     use crate::*;
 
-    #[cfg(not(feature = "string-encoding"))]
+    #[cfg(not(feature = "encoding"))]
     fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
         assert_eq!(3_688_618_971, h.get_loc());
         assert_eq!(
@@ -255,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "string-encoding"))]
+    #[cfg(not(feature = "encoding"))]
     fn test_enum_types() {
         assert_type(
             "DnaHash",
@@ -276,6 +295,10 @@ mod tests {
         assert_type(
             "DhtOpHash",
             DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
+        );
+        assert_type!(
+            "ExternalHash",
+            ExternalHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
     }
 

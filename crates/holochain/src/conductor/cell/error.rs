@@ -25,7 +25,7 @@ pub enum CellError {
     #[error("Genesis failed: {0}")]
     Genesis(Box<ConductorApiError>),
     #[error(transparent)]
-    HeaderError(#[from] HeaderError),
+    ActionError(#[from] ActionError),
     #[error("This cell has not had a successful genesis and cannot be created")]
     CellWithoutGenesis(CellId),
     #[error(
@@ -53,6 +53,12 @@ pub enum CellError {
     InitTimeout,
     #[error("Failed to get or create the cache for this dna {0:?}")]
     FailedToCreateCache(Box<ConductorError>),
+    #[error("Failed to get or create the authored db for this dna {0:?}")]
+    FailedToCreateAuthoredDb(Box<ConductorError>),
+    #[error("Failed to get or create the DHT db for this dna {0:?}")]
+    FailedToCreateDhtDb(Box<ConductorError>),
+    #[error("Failed to get or create the dna space {0:?}")]
+    FailedToCreateDnaSpace(Box<ConductorError>),
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
     #[error(transparent)]

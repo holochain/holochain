@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use holo_hash::WasmHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
@@ -5,7 +7,6 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 
 use crate::mutations;
-use crate::prelude::from_blob;
 use crate::prelude::StateMutationResult;
 use crate::prelude::StateQueryResult;
 
@@ -18,13 +19,18 @@ pub fn get(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<Option<Dn
             },
             |row| {
                 let hash: WasmHash = row.get("hash")?;
-                let wasm = row.get("blob")?;
+                let wasm: Vec<u8> = row.get("blob")?;
                 Ok((hash, wasm))
             },
         )
         .optional()?;
     match item {
-        Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(from_blob(wasm)?, hash))),
+        Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(
+            DnaWasm {
+                code: Arc::new(wasm.into_boxed_slice()),
+            },
+            hash,
+        ))),
         None => Ok(None),
     }
 }
@@ -56,7 +62,7 @@ mod tests {
         observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let env = crate::test_utils::test_wasm_env();
+        let db = crate::test_utils::test_wasm_db();
 
         // a wasm
         let wasm =
@@ -64,10 +70,10 @@ mod tests {
                 .await;
 
         // Put wasm
-        env.conn()?
+        db.conn()?
             .with_commit_sync(|txn| put(txn, wasm.clone()))
             .unwrap();
-        fresh_reader_test!(env, |txn| {
+        fresh_reader_test!(db, |txn| {
             assert!(contains(&txn, &wasm.as_hash()).unwrap());
             // a wasm from the WasmBuf
             let ret = get(&txn, &wasm.as_hash()).unwrap().unwrap();

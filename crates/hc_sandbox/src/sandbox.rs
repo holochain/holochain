@@ -9,7 +9,7 @@ use crate::cmds::*;
 use crate::run::run_async;
 use crate::CmdRunner;
 
-/// Generates a new sandbox with a default [`ConductorConfig`]
+/// Generates a new sandbox with a default [`ConductorConfig`](holochain_conductor_api::config::conductor::ConductorConfig)
 /// and optional network.
 /// Then installs the dnas with a new app per dna.
 pub async fn default_with_network(
@@ -27,7 +27,7 @@ pub async fn default_with_network(
         app_id: Some(app_id),
         agent_key: None,
         path: happ,
-        uid: None,
+        network_seed: None,
     };
     crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
     Ok(path)

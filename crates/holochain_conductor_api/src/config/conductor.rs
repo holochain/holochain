@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
+use holochain_types::db::DbSyncStrategy;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -9,62 +10,66 @@ mod admin_interface_config;
 mod dpki_config;
 #[allow(missing_docs)]
 mod error;
-mod passphrase_service_config;
+mod keystore_config;
 pub mod paths;
 //mod logger_config;
 //mod signal_config;
-pub use paths::EnvironmentRootPath;
+pub use paths::DatabaseRootPath;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
 //pub use logger_config::LoggerConfig;
 pub use error::*;
-pub use passphrase_service_config::PassphraseServiceConfig;
+pub use keystore_config::KeystoreConfig;
 //pub use signal_config::SignalConfig;
 use std::path::Path;
-use std::path::PathBuf;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
-    /// The path to the database for this conductor.
-    /// If omitted, chooses a default path.
-    pub environment_path: EnvironmentRootPath,
+    /// The path to the database for this conductor;
+    /// if omitted, chooses a default path.
+    pub environment_path: DatabaseRootPath,
 
-    /// Enabling this will use a test keystore instead of lair.
-    /// This generates publicly accessible private keys.
-    /// DO NOT USE THIS IN PRODUCTION!
+    /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
-    pub use_dangerous_test_keystore: bool,
+    pub keystore: KeystoreConfig,
 
     /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
-    /// keys for new instances
+    /// keys for new instances.
     pub dpki: Option<DpkiConfig>,
 
-    /// Optional path for keystore directory.  If not specified will use the default provided
-    /// by the [ConfigBuilder]()https://docs.rs/lair_keystore_api/0.0.1-alpha.4/lair_keystore_api/struct.ConfigBuilder.html)
-    pub keystore_path: Option<PathBuf>,
-
-    /// Configure how the conductor should prompt the user for the passphrase to lock/unlock keystores.
-    /// The conductor is independent of the specialized implementation of the trait
-    /// PassphraseService. It just needs something to provide a passphrase when needed.
-    /// This config setting selects one of the available services (i.e. CLI prompt, IPC, FromConfig)
-    pub passphrase_service: Option<PassphraseServiceConfig>,
-
-    /// Setup admin interfaces to control this conductor through a websocket connection
+    /// Setup admin interfaces to control this conductor through a websocket connection.
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
-    /// Config options for the network module. Optional.
+    /// Optional config for the network module.
     pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+
+    /// **PLACEHOLDER**: Optional specification of the Cloudflare namespace to use in Chain Head Coordination
+    /// service URLs. This is a placeholder for future work and may even go away.
+    /// Setting this to anything other than `None` will surely lead to no good.
+    #[serde(default)]
+    pub chc_namespace: Option<String>,
+
+    /// Override the default database synchronous strategy.
+    ///
+    /// See [sqlite documentation] for information about database sync levels.
+    /// See [`DbSyncStrategy`] for details.
+    /// This is best left at its default value unless you know what you
+    /// are doing.
+    ///
+    /// [sqlite documentation]: https://www.sqlite.org/pragma.html#pragma_synchronous
+    #[serde(default)]
+    pub db_sync_strategy: DbSyncStrategy,
     //
     //
-    // /// Which signals to emit
+    // Which signals to emit
     // TODO: it's an open question whether signal config is stateful or not, i.e. whether it belongs here.
     // pub signals: SignalConfig,
 }
 
-/// helper fnction function to load a `Config` from a yaml string.
+/// Helper function to load a config from a YAML string.
 fn config_from_yaml<T>(yaml: &str) -> ConductorConfigResult<T>
 where
     T: DeserializeOwned,
@@ -73,7 +78,7 @@ where
 }
 
 impl ConductorConfig {
-    /// create a ConductorConfig struct from a yaml file path
+    /// Create a conductor config from a YAML file path.
     pub fn load_yaml(path: &Path) -> ConductorConfigResult<ConductorConfig> {
         let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {
             e @ std::io::Error { .. } if e.kind() == std::io::ErrorKind::NotFound => {
@@ -115,8 +120,8 @@ pub mod tests {
         let yaml = r#"---
     environment_path: /path/to/env
 
-    passphrase_service:
-      type: cmd
+    keystore:
+      type: danger_test_keystore
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(
@@ -125,10 +130,10 @@ pub mod tests {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
-                passphrase_service: Some(PassphraseServiceConfig::Cmd),
-                keystore_path: None,
+                keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
-                use_dangerous_test_keystore: false,
+                db_sync_strategy: DbSyncStrategy::default(),
+                chc_namespace: None,
             }
         );
     }
@@ -139,13 +144,12 @@ pub mod tests {
 
         let yaml = r#"---
     environment_path: /path/to/env
-    use_dangerous_test_keystore: true
     signing_service_uri: ws://localhost:9001
     encryption_service_uri: ws://localhost:9002
     decryption_service_uri: ws://localhost:9003
 
-    passphrase_service:
-      type: cmd
+    keystore:
+      type: lair_server_in_proc
 
     dpki:
       instance_id: some_id
@@ -164,8 +168,9 @@ pub mod tests {
             type: quic
             bind_to: kitsune-quic://0.0.0.0:0
           proxy_config:
-            type: local_proxy_server
-            proxy_accept_config: reject_all
+            type: remote_proxy_client_from_bootstrap
+            bootstrap_url: https://bootstrap.holo.host
+            fallback_proxy_url: ~
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -176,6 +181,8 @@ pub mod tests {
         proxy_keepalive_ms: 42
         proxy_to_expire_ms: 42
       network_type: quic_bootstrap
+
+    db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
@@ -187,8 +194,9 @@ pub mod tests {
                 override_host: None,
                 override_port: None,
             }),
-            proxy_config: ProxyConfig::LocalProxyServer {
-                proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
+            proxy_config: ProxyConfig::RemoteProxyClientFromBootstrap {
+                bootstrap_url: url2::url2!("https://bootstrap.holo.host"),
+                fallback_proxy_url: None,
             },
         });
         let mut tuning_params =
@@ -206,31 +214,30 @@ pub mod tests {
             result.unwrap(),
             ConductorConfig {
                 environment_path: PathBuf::from("/path/to/env").into(),
-                use_dangerous_test_keystore: true,
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
                 }),
-                passphrase_service: Some(PassphraseServiceConfig::Cmd),
-                keystore_path: None,
+                keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
                 network: Some(network_config),
+                db_sync_strategy: DbSyncStrategy::Fast,
+                chc_namespace: None,
             }
         );
     }
 
     #[test]
-    fn test_config_keystore() {
+    fn test_config_new_lair_keystore() {
         let yaml = r#"---
     environment_path: /path/to/env
-    use_dangerous_test_keystore: true
     keystore_path: /path/to/keystore
 
-    passphrase_service:
-      type: fromconfig
-      passphrase: foobar
+    keystore:
+      type: lair_server
+      connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         assert_eq!(
@@ -239,12 +246,12 @@ pub mod tests {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
-                passphrase_service: Some(PassphraseServiceConfig::FromConfig {
-                    passphrase: "foobar".into()
-                }),
-                keystore_path: Some(PathBuf::from("/path/to/keystore").into()),
+                keystore: KeystoreConfig::LairServer {
+                    connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ").into(),
+                },
                 admin_interfaces: None,
-                use_dangerous_test_keystore: true,
+                db_sync_strategy: DbSyncStrategy::Fast,
+                chc_namespace: None,
             }
         );
     }
