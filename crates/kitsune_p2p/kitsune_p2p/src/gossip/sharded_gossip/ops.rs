@@ -302,7 +302,11 @@ impl ShardedGossipLocal {
     }
 
     /// Incoming ops that were missing from this nodes bloom filter.
-    pub(super) async fn incoming_missing_ops(&self, ops: Vec<KOpHash>) -> KitsuneResult<()> {
+    pub(super) async fn incoming_missing_ops(
+        &self,
+        source: FetchSource,
+        ops: Vec<KOpHash>,
+    ) -> KitsuneResult<()> {
         for op_hash in ops {
             let request = FetchRequest {
                 key: FetchKey::Op { op_hash },
@@ -310,8 +314,7 @@ impl ShardedGossipLocal {
                 options: None,
                 context: None,
             };
-            self.fetch_queue
-                .push(request, self.space.clone(), todo!("get source"));
+            self.fetch_queue.push(request, self.space.clone(), source);
         }
         Ok(())
     }

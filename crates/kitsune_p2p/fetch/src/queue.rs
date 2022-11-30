@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace};
+use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace, Tx2Cert};
 use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchKey, FetchOptions, FetchRequest};
@@ -54,7 +54,7 @@ pub struct StateIter<'a> {
 
 /// Fetch item within the fetch queue state.
 #[derive(Debug, PartialEq, Eq)]
-struct Sources(Vec<Source>);
+struct Sources(Vec<SourceRecord>);
 
 #[derive(Debug, PartialEq, Eq)]
 struct FetchQueueItem {
@@ -70,9 +70,15 @@ struct FetchQueueItem {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct Source {
-    agent: KAgent,
+struct SourceRecord {
+    source: FetchSource,
     last_fetch: Option<Instant>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum FetchSource {
+    Agent(KAgent),
+    Node(Tx2Cert),
 }
 
 impl FetchQueue {
@@ -132,9 +138,9 @@ impl State {
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
                 let sources = if let Some(author) = author {
-                    Sources(vec![Source::new(agent), Source::new(author)])
+                    Sources(vec![SourceRecord::new(agent), SourceRecord::new(author)])
                 } else {
-                    Sources(vec![Source::new(agent)])
+                    Sources(vec![SourceRecord::new(agent)])
                 };
                 let item = FetchQueueItem {
                     sources,
@@ -146,7 +152,7 @@ impl State {
             }
             Entry::Occupied(mut e) => {
                 let v = e.get_mut();
-                v.sources.0.insert(0, Source::new(agent));
+                v.sources.0.insert(0, SourceRecord::new(agent));
                 v.options = options;
                 v.context = match (v.context.take(), context) {
                     (Some(a), Some(b)) => Some(config.merge_fetch_contexts(*a, *b).into()),
@@ -195,7 +201,7 @@ impl<'a> Iterator for StateIter<'a> {
     }
 }
 
-impl Source {
+impl SourceRecord {
     fn new(agent: KAgent) -> Self {
         Self {
             agent,
@@ -252,7 +258,7 @@ mod tests {
 
     fn item(sources: Vec<KAgent>, context: Option<FetchContext>) -> FetchQueueItem {
         FetchQueueItem {
-            sources: Sources(sources.into_iter().map(Source::new).collect()),
+            sources: Sources(sources.into_iter().map(SourceRecord::new).collect()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             options: Default::default(),
             context,
@@ -275,11 +281,11 @@ mod tests {
     #[test]
     fn sources() {
         let mut ss = Sources(vec![
-            Source {
+            SourceRecord {
                 agent: agent(1),
                 last_fetch: Some(Instant::now()),
             },
-            Source {
+            SourceRecord {
                 agent: agent(2),
                 last_fetch: None,
             },

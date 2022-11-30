@@ -976,7 +976,8 @@ impl ShardedGossipLocal {
                 if (self.gossip_type == GossipType::Historical || state.is_some())
                     && !ops.is_empty()
                 {
-                    self.incoming_missing_ops(ops).await?;
+                    let source = FetchSource::Node(peer_cert);
+                    self.incoming_missing_ops(source, ops).await?;
                 }
                 gossip
             }
