@@ -26,6 +26,8 @@ type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
+type OpHashList = Vec<KOpHash>;
+type MaybeDelegate = Option<(KBasis, u32, u32)>;
 
 ghost_actor::ghost_chan! {
     #[allow(clippy::too_many_arguments)]
@@ -60,6 +62,18 @@ ghost_actor::ghost_chan! {
             mod_idx: u32,
             mod_cnt: u32,
             data: BroadcastData,
+        ) -> ();
+
+        /// This should be invoked instead of incoming_delegate_broadcast
+        /// in the case of a publish data variant. It will, in turn, call
+        /// into incoming_delegate_broadcast once we have the data to act
+        /// as a fetch responder for the op data.
+        fn incoming_publish(
+            space: KSpace,
+            to_agent: KAgent,
+            op_hash_list: OpHashList,
+            context: kitsune_p2p_fetch::FetchContext,
+            maybe_delegate: MaybeDelegate,
         ) -> ();
 
         /// Incoming Gossip
@@ -336,7 +350,9 @@ impl SpaceInternalHandler for Space {
                 }
             }
             BroadcastData::Publish(_op_hash, _context) => {
-                todo!()
+                // Don't do anything here. This case is handled by the actor
+                // invoking incoming_publish instead of
+                // incoming_delegate_broadcast.
             }
         }
 
@@ -388,6 +404,53 @@ impl SpaceInternalHandler for Space {
             }
 
             futures::future::join_all(all).await;
+
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_incoming_publish(
+        &mut self,
+        space: KSpace,
+        to_agent: KAgent,
+        op_hash_list: OpHashList,
+        context: kitsune_p2p_fetch::FetchContext,
+        maybe_delegate: MaybeDelegate,
+    ) -> InternalHandlerResult<()> {
+        let ro_inner = self.ro_inner.clone();
+
+        Ok(async move {
+            let have_data_list = ro_inner
+                .host_api
+                .check_op_data(space.clone(), op_hash_list.clone())
+                .await
+                .map_err(KitsuneP2pError::other)?;
+
+            for (op_hash, have_data) in op_hash_list.into_iter().zip(have_data_list) {
+                if have_data {
+                    if let Some((basis, mod_idx, mod_cnt)) = &maybe_delegate {
+                        ro_inner
+                            .i_s
+                            .incoming_delegate_broadcast(
+                                space.clone(),
+                                basis.clone(),
+                                to_agent.clone(),
+                                *mod_idx,
+                                *mod_cnt,
+                                BroadcastData::Publish(vec![op_hash], context),
+                            )
+                            .await?;
+                    }
+                    continue;
+                } else {
+                    // TODO - Add this hash to the fetch queue.
+
+                    // TODO - Register a callback if maybe_delegate.is_some()
+                    //        to invoke the delegation on receipt of data.
+                }
+            }
 
             Ok(())
         }
@@ -813,7 +876,9 @@ impl KitsuneP2pHandler for Space {
                 }
             }
             BroadcastData::Publish(_op_hash, _context) => {
-                todo!()
+                // There is nothing to do here!
+                // *We* are the node publishing
+                // so we already have these hashes : )
             }
         }
 

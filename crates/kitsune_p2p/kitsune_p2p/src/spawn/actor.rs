@@ -40,6 +40,8 @@ type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
+type OpHashList = Vec<KOpHash>;
+type MaybeDelegate = Option<(KBasis, u32, u32)>;
 
 ghost_actor::ghost_chan! {
     #[allow(clippy::too_many_arguments)]
@@ -59,6 +61,18 @@ ghost_actor::ghost_chan! {
             mod_idx: u32,
             mod_cnt: u32,
             data: BroadcastData,
+        ) -> ();
+
+        /// This should be invoked instead of incoming_delegate_broadcast
+        /// in the case of a publish data variant. It will, in turn, call
+        /// into incoming_delegate_broadcast once we have the data to act
+        /// as a fetch responder for the op data.
+        fn incoming_publish(
+            space: KSpace,
+            to_agent: KAgent,
+            op_hash_list: OpHashList,
+            context: kitsune_p2p_fetch::FetchContext,
+            maybe_delegate: MaybeDelegate,
         ) -> ();
 
         /// Incoming Gossip
@@ -366,24 +380,43 @@ impl KitsuneP2pActor {
                                         mod_idx,
                                         mod_cnt,
                                         data,
-                                    }) => {
-                                        // one might be tempted to notify here
-                                        // as in Broadcast below... but we
-                                        // notify all relevent agents inside
-                                        // the space incoming_delegate_broadcast
-                                        // handler.
-                                        if let Err(err) = i_s
-                                            .incoming_delegate_broadcast(
-                                                space, basis, to_agent, mod_idx, mod_cnt, data,
-                                            )
-                                            .await
-                                        {
-                                            tracing::warn!(
-                                                ?err,
-                                                "failed to handle incoming delegate broadcast"
-                                            );
+                                    }) => match data {
+                                        BroadcastData::Publish(op_hash_list, context) => {
+                                            if let Err(err) = i_s
+                                                .incoming_publish(
+                                                    space,
+                                                    to_agent,
+                                                    op_hash_list,
+                                                    context,
+                                                    Some((basis, mod_idx, mod_cnt)),
+                                                )
+                                                .await
+                                            {
+                                                tracing::warn!(
+                                                    ?err,
+                                                    "failed to handle incoming delegate broadcast"
+                                                );
+                                            }
                                         }
-                                    }
+                                        data => {
+                                            // one might be tempted to notify here
+                                            // as in Broadcast below... but we
+                                            // notify all relevent agents inside
+                                            // the space incoming_delegate_broadcast
+                                            // handler.
+                                            if let Err(err) = i_s
+                                                .incoming_delegate_broadcast(
+                                                    space, basis, to_agent, mod_idx, mod_cnt, data,
+                                                )
+                                                .await
+                                            {
+                                                tracing::warn!(
+                                                    ?err,
+                                                    "failed to handle incoming delegate broadcast"
+                                                );
+                                            }
+                                        }
+                                    },
                                     wire::Wire::Broadcast(wire::Broadcast {
                                         space,
                                         to_agent,
@@ -418,8 +451,22 @@ impl KitsuneP2pActor {
                                                 );
                                             }
                                         }
-                                        BroadcastData::Publish(_op_hash, _context) => {
-                                            todo!()
+                                        BroadcastData::Publish(op_hash_list, context) => {
+                                            if let Err(err) = i_s
+                                                .incoming_publish(
+                                                    space,
+                                                    to_agent,
+                                                    op_hash_list,
+                                                    context,
+                                                    None,
+                                                )
+                                                .await
+                                            {
+                                                tracing::warn!(
+                                                    ?err,
+                                                    "failed to handle incoming broadcast"
+                                                );
+                                            }
                                         }
                                     },
                                     wire::Wire::Gossip(wire::Gossip {
@@ -623,6 +670,31 @@ impl InternalHandler for KitsuneP2pActor {
             let (_, space_inner) = space_sender.await;
             space_inner
                 .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
+                .await
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_incoming_publish(
+        &mut self,
+        space: KSpace,
+        to_agent: KAgent,
+        op_hash_list: OpHashList,
+        context: kitsune_p2p_fetch::FetchContext,
+        maybe_delegate: MaybeDelegate,
+    ) -> InternalHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => {
+                tracing::warn!("received publish for unhandled space: {:?}", space);
+                return unit_ok_fut();
+            }
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (_, space_inner) = space_sender.await;
+            space_inner
+                .incoming_publish(space, to_agent, op_hash_list, context, maybe_delegate)
                 .await
         }
         .boxed()

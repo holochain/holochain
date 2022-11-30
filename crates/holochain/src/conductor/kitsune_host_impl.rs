@@ -162,4 +162,36 @@ impl KitsuneHost for KitsuneHostImpl {
         .boxed()
         .into()
     }
+
+    fn check_op_data(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        op_hash_list: Vec<KOpHash>,
+    ) -> KitsuneHostResult<Vec<bool>> {
+        use holochain_p2p::DhtOpHashExt;
+
+        async move {
+            let db = self.spaces.dht_db(&DnaHash::from_kitsune(&space))?;
+            let results = db
+                .async_reader(move |txn| {
+                    let mut out = Vec::new();
+                    for op_hash in op_hash_list {
+                        match txn.query_row(
+                            "SELECT 1 FROM DhtOp WHERE hash = ?",
+                            [DhtOpHash::from_kitsune(&op_hash)],
+                            |_row| Ok(()),
+                        ) {
+                            Ok(_) => out.push(true),
+                            Err(_) => out.push(false),
+                        }
+                    }
+                    holochain_sqlite::prelude::DatabaseResult::Ok(out)
+                })
+                .await?;
+
+            Ok(results)
+        }
+        .boxed()
+        .into()
+    }
 }

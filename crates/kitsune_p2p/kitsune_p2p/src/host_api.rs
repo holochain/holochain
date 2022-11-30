@@ -59,6 +59,19 @@ pub trait KitsuneHost: 'static + Send + Sync {
 
     /// Hashing function to get an op_hash from op_data.
     fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash>;
+
+    /// Check which hashes we have data for.
+    fn check_op_data(
+        &self,
+        space: Arc<KitsuneSpace>,
+        op_hash_list: Vec<KOpHash>,
+    ) -> KitsuneHostResult<Vec<bool>> {
+        let _space = space;
+        futures::FutureExt::boxed(
+            async move { Ok(op_hash_list.into_iter().map(|_| false).collect()) },
+        )
+        .into()
+    }
 }
 
 /// Trait object for the host interface
