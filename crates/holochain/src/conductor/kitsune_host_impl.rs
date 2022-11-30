@@ -1,5 +1,6 @@
 //! Implementation of the Kitsune Host API
 
+mod query_region_op_hashes;
 mod query_region_set;
 mod query_size_limited_regions;
 
@@ -135,12 +136,28 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<Vec<holochain_p2p::dht::region::Region>> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
-            let topology = self.get_topology(space.clone()).await?;
+            let topology = self.get_topology(space).await?;
             let db = self.spaces.dht_db(&dna_hash)?;
             Ok(query_size_limited_regions::query_size_limited_regions(
                 db, topology, regions, size_limit,
             )
             .await?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        region: holochain_p2p::dht::region::RegionCoords,
+    ) -> KitsuneHostResult<Vec<KOpHash>> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        async move {
+            let db = self.spaces.dht_db(&dna_hash)?;
+            let topology = self.get_topology(space).await?;
+            let bounds = region.to_bounds(&topology);
+            Ok(query_region_op_hashes::query_region_op_hashes(db.clone(), bounds.clone()).await?)
         }
         .boxed()
         .into()
@@ -200,13 +217,5 @@ impl KitsuneHost for KitsuneHostImpl {
         }
         .boxed()
         .into()
-    }
-
-    fn query_op_hashes_by_region(
-        &self,
-        space: Arc<kitsune_p2p::KitsuneSpace>,
-        region: holochain_p2p::dht::region::RegionCoords,
-    ) -> KitsuneHostResult<Vec<KOpHash>> {
-        todo!("implement query")
     }
 }

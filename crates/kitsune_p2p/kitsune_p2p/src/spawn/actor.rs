@@ -11,7 +11,6 @@ use crate::wire::MetricExchangeMsg;
 use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
-use kitsune_p2p_fetch::FetchConfig;
 use kitsune_p2p_fetch::FetchKey;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_transport_quic::tx2::*;

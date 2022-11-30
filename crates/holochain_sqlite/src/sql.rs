@@ -24,6 +24,7 @@ pub mod sql_cell {
 
     pub const FETCH_OP_REGION: &str = include_str!("sql/cell/fetch_op_region.sql");
     pub const FETCH_OPS_BY_REGION: &str = include_str!("sql/cell/fetch_ops_by_region.sql");
+    pub const FETCH_REGION_OP_HASHES: &str = include_str!("sql/cell/fetch_region_op_hashes.sql");
 
     pub const FETCH_OP: &str = include_str!("sql/cell/fetch_op.sql");
 

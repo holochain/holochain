@@ -5,12 +5,12 @@ use std::sync::Arc;
 use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
     dht::{
-        region::{Region, RegionBounds, RegionCoords},
+        region::{Region, RegionCoords},
         region_set::RegionSetLtcs,
         spacetime::Topology,
     },
     dht_arc::DhtArcSet,
-    KOpData, KOpHash, KitsuneResult,
+    KOpData, KOpHash,
 };
 
 use crate::event::{GetAgentInfoSignedEvt, MetricRecord};

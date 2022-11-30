@@ -2,7 +2,6 @@ use super::*;
 use crate::metrics::*;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
-use kitsune_p2p_fetch::FetchConfig;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};

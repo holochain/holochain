@@ -1,0 +1,37 @@
+use holo_hash::DhtOpHash;
+use holochain_p2p::{dht::prelude::*, DhtOpHashExt};
+use holochain_sqlite::prelude::*;
+use kitsune_p2p_types::KOpHash;
+use rusqlite::named_params;
+
+use crate::conductor::error::ConductorResult;
+
+pub(super) async fn query_region_op_hashes(
+    db: DbWrite<DbKindDht>,
+    bounds: RegionBounds,
+) -> ConductorResult<Vec<KOpHash>> {
+    Ok(db
+        .async_reader(move |txn| {
+            let sql = holochain_sqlite::sql::sql_cell::FETCH_REGION_OP_HASHES;
+            let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
+            let (x0, x1) = bounds.x;
+            let (t0, t1) = bounds.t;
+            let hashes = stmt
+                .query_map(
+                    named_params! {
+                        ":storage_start_loc": x0,
+                        ":storage_end_loc": x1,
+                        ":timestamp_min": t0,
+                        ":timestamp_max": t1,
+                    },
+                    |row| {
+                        let hash: DhtOpHash = row.get("hash")?;
+                        Ok(hash.to_kitsune())
+                    },
+                )?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(DatabaseError::from);
+            hashes
+        })
+        .await?)
+}
