@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221130.011217
+
+## [holochain\_cli-0.0.70](crates/holochain_cli/CHANGELOG.md#0.0.70)
+
+## [holochain\_cli\_sandbox-0.0.66](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.66)
+
+## [holochain\_cli\_bundle-0.0.65](crates/holochain_cli_bundle/CHANGELOG.md#0.0.65)
+
+## [holochain-0.0.175](crates/holochain/CHANGELOG.md#0.0.175)
+
+- BREAKING CHANGE - `ZomeId` and `zome_id` renamed to `ZomeIndex` and `zome_index` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppEntryType.id` renamed to `AppEntryType.entry_index` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppEntryType` renamed to `AppEntryDef` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppEntryDefName` renamed to `AppEntryName` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppRoleId` renamed to `RoleName` [\#1667](https://github.com/holochain/holochain/pull/1667)
+
+## [holochain\_test\_wasm\_common-0.0.64](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.64)
+
+## [holochain\_conductor\_api-0.0.72](crates/holochain_conductor_api/CHANGELOG.md#0.0.72)
+
+## [holochain\_wasm\_test\_utils-0.0.71](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.71)
+
+## [holochain\_cascade-0.0.74](crates/holochain_cascade/CHANGELOG.md#0.0.74)
+
+## [holochain\_state-0.0.72](crates/holochain_state/CHANGELOG.md#0.0.72)
+
+## [holochain\_p2p-0.0.69](crates/holochain_p2p/CHANGELOG.md#0.0.69)
+
+## [holochain\_types-0.0.69](crates/holochain_types/CHANGELOG.md#0.0.69)
+
+## [holochain\_keystore-0.0.67](crates/holochain_keystore/CHANGELOG.md#0.0.67)
+
+## [holochain\_sqlite-0.0.66](crates/holochain_sqlite/CHANGELOG.md#0.0.66)
+
+## [mr\_bundle-0.0.20](crates/mr_bundle/CHANGELOG.md#0.0.20)
+
+## [hdk-0.0.163](crates/hdk/CHANGELOG.md#0.0.163)
+
+## [holochain\_zome\_types-0.0.58](crates/holochain_zome_types/CHANGELOG.md#0.0.58)
+
+## [hdi-0.1.10](crates/hdi/CHANGELOG.md#0.1.10)
+
+## [hdk\_derive-0.0.56](crates/hdk_derive/CHANGELOG.md#0.0.56)
+
+## [holochain\_integrity\_types-0.0.25](crates/holochain_integrity_types/CHANGELOG.md#0.0.25)
+
 # 20221123.011302
 
 ## [holochain\_cli-0.0.69](crates/holochain_cli/CHANGELOG.md#0.0.69)
