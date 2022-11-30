@@ -1,6 +1,5 @@
 use ::fixt::prelude::*;
 use anyhow::Result;
-use arbitrary::Arbitrary;
 use ed25519_dalek::Keypair;
 use futures::future;
 use hdk::prelude::RemoteSignal;
@@ -24,7 +23,6 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
 use observability;
-use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -172,29 +170,14 @@ async fn call_zome() {
     // Grant zome call capability for agent
     let zome_name = TestWasm::Foo.coordinator_zome_name();
     let fn_name = FunctionName("foo".into());
-    let mut functions = BTreeSet::new();
-    functions.insert((zome_name.clone(), fn_name.clone()));
-
-    let mut assignees = BTreeSet::new();
-    assignees.insert(signing_key.clone());
-
-    let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
-
-    let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
-        cell_id: cell_id.clone(),
-        cap_grant: ZomeCallCapGrant {
-            tag: "".into(),
-            access: CapAccess::Assigned {
-                secret: cap_secret,
-                assignees,
-            },
-            functions,
-        },
-    }));
-    let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
-    assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted);
+    let cap_secret = grant_zome_call_capability(
+        &mut admin_tx,
+        &cell_id,
+        zome_name.clone(),
+        fn_name.clone(),
+        signing_key,
+    )
+    .await;
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -376,29 +359,14 @@ async fn emit_signals() {
     // Grant zome call capability for agent
     let zome_name = TestWasm::EmitSignal.coordinator_zome_name();
     let fn_name = FunctionName("emit".into());
-    let mut functions = BTreeSet::new();
-    functions.insert((zome_name.clone(), fn_name.clone()));
-
-    let mut assignees = BTreeSet::new();
-    assignees.insert(signing_key.clone());
-
-    let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
-
-    let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
-        cell_id: cell_id.clone(),
-        cap_grant: ZomeCallCapGrant {
-            tag: "".into(),
-            access: CapAccess::Assigned {
-                secret: cap_secret,
-                assignees,
-            },
-            functions,
-        },
-    }));
-    let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await;
-    assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted);
+    let cap_secret = grant_zome_call_capability(
+        &mut admin_tx,
+        &cell_id,
+        zome_name.clone(),
+        fn_name.clone(),
+        signing_key,
+    )
+    .await;
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;

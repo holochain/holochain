@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
+use arbitrary::Arbitrary;
 use ed25519_dalek::{Keypair, Signer};
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::FullStateDump;
@@ -79,6 +80,39 @@ pub async fn start_holochain(
     let admin_port = spawn_output(&mut child);
     check_started(&mut child).await;
     (SupervisedChild("Holochain".to_string(), child), admin_port)
+}
+
+pub async fn grant_zome_call_capability(
+    admin_tx: &mut WebsocketSender,
+    cell_id: &CellId,
+    zome_name: ZomeName,
+    fn_name: FunctionName,
+    signing_key: AgentPubKey,
+) -> CapSecret {
+    let mut functions = BTreeSet::new();
+    functions.insert((zome_name, fn_name));
+
+    let mut assignees = BTreeSet::new();
+    assignees.insert(signing_key.clone());
+
+    let mut buf = arbitrary::Unstructured::new(&[]);
+    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
+
+    let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
+        cell_id: cell_id.clone(),
+        cap_grant: ZomeCallCapGrant {
+            tag: "".into(),
+            access: CapAccess::Assigned {
+                secret: cap_secret,
+                assignees,
+            },
+            functions,
+        },
+    }));
+    let response = admin_tx.request(request);
+    let response = check_timeout(response, 3000).await;
+    assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted);
+    cap_secret
 }
 
 pub async fn call_zome_fn<S>(
