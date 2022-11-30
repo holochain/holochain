@@ -11,7 +11,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
-use kitsune_p2p_fetch::FetchQueueConfig;
+use kitsune_p2p_fetch::{FetchQueue, FetchQueueConfig};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -186,6 +186,8 @@ impl ShardedGossip {
         #[cfg(not(feature = "test"))]
         let state = Default::default();
 
+        let fetch_queue = FetchQueue::new_bitwise_or();
+
         let this = Arc::new(Self {
             ep_hnd,
             state: Share::new(state),
@@ -197,6 +199,7 @@ impl ShardedGossip {
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
+                fetch_queue,
             },
             bandwidth,
         });
@@ -416,6 +419,16 @@ impl ShardedGossip {
     }
 }
 
+// TODO: move this to host, but for now, for convenience, we just use this one config
+// for every queue
+struct FetchQueueConfigBitwiseOr;
+
+impl FetchQueueConfig for FetchQueueConfigBitwiseOr {
+    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
+        a | b
+    }
+}
+
 /// The parts of sharded gossip which are concerned only with the gossiping node:
 /// - managing local state
 /// - making requests to the local backend
@@ -429,6 +442,7 @@ pub struct ShardedGossipLocal {
     host_api: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
+    fetch_queue: FetchQueue,
 }
 
 /// Incoming gossip.

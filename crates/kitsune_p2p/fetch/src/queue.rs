@@ -84,6 +84,14 @@ impl FetchQueue {
         }
     }
 
+    /// Constructor, using only the "hardcoded" config (TODO: remove)
+    pub fn new_bitwise_or() -> Self {
+        Self {
+            config: Arc::new(FetchQueueConfigBitwiseOr),
+            state: Share::new(State::default()),
+        }
+    }
+
     /// Add an item to the queue.
     /// If the FetchKey does not already exist, add it to the end of the queue.
     /// If the FetchKey exists, add the new source and merge the context in, without
