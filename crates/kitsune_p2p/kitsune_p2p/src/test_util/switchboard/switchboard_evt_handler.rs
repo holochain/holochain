@@ -49,7 +49,7 @@ impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
 
 impl FetchQueueConfig for SwitchboardEventHandler {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
-        todo!()
+        unimplemented!()
     }
 }
 

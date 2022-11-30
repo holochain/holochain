@@ -33,7 +33,7 @@ impl HarnessHost {
 
 impl FetchQueueConfig for HarnessHost {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
-        todo!()
+        unimplemented!()
     }
 }
 

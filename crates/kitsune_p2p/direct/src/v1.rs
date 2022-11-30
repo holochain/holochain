@@ -307,7 +307,7 @@ impl KitsuneHostDefaultError for Kd1 {
 
 impl FetchQueueConfig for Kd1 {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
-        todo!()
+        unimplemented!()
     }
 }
 

@@ -18,7 +18,7 @@ pub struct StandardResponsesHostApi {
 
 impl FetchQueueConfig for StandardResponsesHostApi {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
-        todo!()
+        unimplemented!()
     }
 }
 
