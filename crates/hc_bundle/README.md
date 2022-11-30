@@ -1,3 +1,7 @@
+---
+default_semver_increment_mode: !pre_minor a-minor-release-test
+---
+
 # hc_bundle
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
