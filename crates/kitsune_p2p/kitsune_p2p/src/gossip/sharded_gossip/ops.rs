@@ -1,3 +1,4 @@
+use kitsune_p2p_fetch::{FetchKey, FetchRequest};
 use kitsune_p2p_types::{combinators::second, dht::region::Region};
 
 use super::*;
@@ -302,8 +303,16 @@ impl ShardedGossipLocal {
 
     /// Incoming ops that were missing from this nodes bloom filter.
     pub(super) async fn incoming_missing_ops(&self, ops: Vec<KOpHash>) -> KitsuneResult<()> {
-        todo!("put hashes in FetchQueue");
-
+        for op_hash in ops {
+            let request = FetchRequest {
+                key: FetchKey::Op { op_hash },
+                author: None,
+                options: None,
+                context: None,
+            };
+            self.fetch_queue
+                .push(request, self.space.clone(), todo!("get source"));
+        }
         Ok(())
     }
 }
