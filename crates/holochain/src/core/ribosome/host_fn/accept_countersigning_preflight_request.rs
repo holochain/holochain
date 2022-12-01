@@ -171,6 +171,27 @@ pub mod wasm_test {
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
         let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
 
+        let alice_agent_activity_alice_observed_before: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let alice_agent_activity_bob_observed_before: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+
         // Everyone accepts a short lived session.
         let preflight_request: PreflightRequest = conductor
             .call(
@@ -229,7 +250,7 @@ pub mod wasm_test {
         expect_chain_lock_expired(bob_result);
 
         // At this point Alice's session entry is a liability so can't exist.
-        let alice_agent_activity_alice_observed: AgentActivity = conductor
+        let alice_agent_activity_alice_observed_after: AgentActivity = conductor
             .call(
                 &alice,
                 "get_agent_activity",
@@ -239,19 +260,47 @@ pub mod wasm_test {
                     activity_request: ActivityRequest::Full,
                 }
             ).await;
-        let alice_agent_activity_bob_observed: AgentActivity = conductor
+        let alice_agent_activity_bob_observed_after: AgentActivity = conductor
             .call(
                 &bob,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: alice_pubkey,
+                    agent_pubkey: alice_pubkey.clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 }
             ).await;
+        let bob_agent_activity_alice_observed_after: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let bob_agent_activity_bob_observed_after: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        dbg!(&alice_pubkey);
         dbg!(countersigned_action_hash_alice);
-        dbg!(alice_agent_activity_alice_observed);
-        dbg!(alice_agent_activity_bob_observed);
+        dbg!(&alice_agent_activity_alice_observed_before);
+        dbg!(&alice_agent_activity_bob_observed_before);
+        dbg!(&alice_agent_activity_alice_observed_after);
+        dbg!(&alice_agent_activity_bob_observed_after);
+        dbg!(&bob_agent_activity_alice_observed_after);
+        dbg!(&bob_agent_activity_bob_observed_after);
+
+        assert_eq!(alice_agent_activity_alice_observed_before, alice_agent_activity_alice_observed_after);
+        assert_eq!(alice_agent_activity_bob_observed_before, alice_agent_activity_bob_observed_after);
     }
 
     #[tokio::test(flavor = "multi_thread")]
