@@ -1,7 +1,6 @@
 use crate::metrics::*;
 use crate::types::*;
 use crate::HostApi;
-use kitsune_p2p_fetch::FetchConfig;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;

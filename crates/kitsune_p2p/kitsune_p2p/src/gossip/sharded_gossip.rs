@@ -11,7 +11,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
-use kitsune_p2p_fetch::{FetchQueue, FetchQueueConfig};
+use kitsune_p2p_fetch::{FetchQueue, FetchQueueConfig, FetchSource};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -416,16 +416,6 @@ impl ShardedGossip {
                 });
             *stats = Stats::reset();
         }
-    }
-}
-
-// TODO: move this to host, but for now, for convenience, we just use this one config
-// for every queue
-struct FetchQueueConfigBitwiseOr;
-
-impl FetchQueueConfig for FetchQueueConfigBitwiseOr {
-    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
-        a | b
     }
 }
 

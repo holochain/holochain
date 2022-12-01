@@ -75,10 +75,23 @@ struct SourceRecord {
     last_fetch: Option<Instant>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+/// A source to fetch from: either a node, or an agent on a node
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FetchSource {
+    /// An agent on a node
     Agent(KAgent),
+    /// A node, without agent specified
     Node(Tx2Cert),
+}
+
+// TODO: move this to host, but for now, for convenience, we just use this one config
+// for every queue
+struct FetchQueueConfigBitwiseOr;
+
+impl FetchQueueConfig for FetchQueueConfigBitwiseOr {
+    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
+        a | b
+    }
 }
 
 impl FetchQueue {
@@ -102,14 +115,14 @@ impl FetchQueue {
     /// If the FetchKey does not already exist, add it to the end of the queue.
     /// If the FetchKey exists, add the new source and merge the context in, without
     /// changing the position in the queue.
-    pub fn push(&mut self, request: FetchRequest, space: KSpace, agent: KAgent) {
+    pub fn push(&self, request: FetchRequest, space: KSpace, source: FetchSource) {
         self.state
-            .share_mut(|s, _| Ok(s.push(&*self.config, request, space, agent)))
+            .share_mut(|s, _| Ok(s.push(&*self.config, request, space, source)))
             .expect("no error");
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    pub fn remove(&mut self, key: &FetchKey) {
+    pub fn remove(&self, key: &FetchKey) {
         self.state
             .share_mut(|s, _| Ok(s.remove(key)))
             .expect("no error");
@@ -126,7 +139,7 @@ impl State {
         config: &dyn FetchQueueConfig,
         request: FetchRequest,
         space: KSpace,
-        agent: KAgent,
+        source: FetchSource,
     ) {
         let FetchRequest {
             key,
@@ -138,9 +151,9 @@ impl State {
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
                 let sources = if let Some(author) = author {
-                    Sources(vec![SourceRecord::new(agent), SourceRecord::new(author)])
+                    Sources(vec![SourceRecord::new(source), SourceRecord::agent(author)])
                 } else {
-                    Sources(vec![SourceRecord::new(agent)])
+                    Sources(vec![SourceRecord::new(source)])
                 };
                 let item = FetchQueueItem {
                     sources,
@@ -152,7 +165,7 @@ impl State {
             }
             Entry::Occupied(mut e) => {
                 let v = e.get_mut();
-                v.sources.0.insert(0, SourceRecord::new(agent));
+                v.sources.0.insert(0, SourceRecord::new(source));
                 v.options = options;
                 v.context = match (v.context.take(), context) {
                     (Some(a), Some(b)) => Some(config.merge_fetch_contexts(*a, *b).into()),
@@ -180,7 +193,7 @@ impl State {
 }
 
 impl<'a> Iterator for StateIter<'a> {
-    type Item = (FetchKey, KSpace, KAgent);
+    type Item = (FetchKey, KSpace, FetchSource);
 
     fn next(&mut self) -> Option<Self::Item> {
         let keys: Vec<_> = self
@@ -192,9 +205,9 @@ impl<'a> Iterator for StateIter<'a> {
             .collect();
         for key in keys {
             let item = self.state.queue.get_refresh(&key)?;
-            if let Some(agent) = item.sources.next(self.interval) {
+            if let Some(source) = item.sources.next(self.interval) {
                 let space = item.space.clone();
-                return Some((key, space, agent));
+                return Some((key, space, source));
             }
         }
         None
@@ -202,22 +215,29 @@ impl<'a> Iterator for StateIter<'a> {
 }
 
 impl SourceRecord {
-    fn new(agent: KAgent) -> Self {
+    fn new(source: FetchSource) -> Self {
         Self {
-            agent,
+            source,
+            last_fetch: None,
+        }
+    }
+
+    fn agent(agent: KAgent) -> Self {
+        Self {
+            source: FetchSource::Agent(agent),
             last_fetch: None,
         }
     }
 }
 
 impl Sources {
-    fn next(&mut self, interval: Duration) -> Option<KAgent> {
+    fn next(&mut self, interval: Duration) -> Option<FetchSource> {
         if let Some((i, agent)) = self
             .0
             .iter()
             .enumerate()
             .find(|(_, s)| s.last_fetch.map(|t| t.elapsed() > interval).unwrap_or(true))
-            .map(|(i, s)| (i, s.agent.clone()))
+            .map(|(i, s)| (i, s.source.clone()))
         {
             self.0[i].last_fetch = Some(Instant::now());
             self.0.rotate_left(i + 1);
@@ -258,7 +278,7 @@ mod tests {
 
     fn item(sources: Vec<KAgent>, context: Option<FetchContext>) -> FetchQueueItem {
         FetchQueueItem {
-            sources: Sources(sources.into_iter().map(SourceRecord::new).collect()),
+            sources: Sources(sources.into_iter().map(SourceRecord::agent).collect()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             options: Default::default(),
             context,

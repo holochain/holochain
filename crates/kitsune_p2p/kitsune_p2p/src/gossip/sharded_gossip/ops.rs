@@ -314,7 +314,8 @@ impl ShardedGossipLocal {
                 options: None,
                 context: None,
             };
-            self.fetch_queue.push(request, self.space.clone(), source);
+            self.fetch_queue
+                .push(request, self.space.clone(), source.clone());
         }
         Ok(())
     }
