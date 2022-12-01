@@ -161,7 +161,14 @@ mod tests {
         let r = get_ops_to_publish(expected.agent.clone(), &db.to_db().into())
             .await
             .unwrap();
-        assert_eq!(r, expected.results);
+        assert_eq!(
+            r.into_iter().map(|t| t.1).collect::<Vec<_>>(),
+            expected
+                .results
+                .into_iter()
+                .map(|op| op.into_inner().1)
+                .collect::<Vec<_>>(),
+        );
     }
 
     fn create_and_insert_op(

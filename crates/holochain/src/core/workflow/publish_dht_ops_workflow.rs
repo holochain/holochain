@@ -119,6 +119,7 @@ mod tests {
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
     use holochain_types::db_cache::DhtDbQueryCache;
+    use holochain_types::prelude::*;
     use observability;
     use rusqlite::Transaction;
     use std::collections::HashMap;
