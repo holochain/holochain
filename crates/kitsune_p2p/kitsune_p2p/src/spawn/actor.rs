@@ -75,6 +75,10 @@ ghost_actor::ghost_chan! {
             maybe_delegate: MaybeDelegate,
         ) -> ();
 
+        /// We just received data for an op_hash. Check if we had a pending
+        /// delegation action we need to continue now that we have the data.
+        fn resolve_publish_pending_delegates(space: KSpace, op_hash: KOpHash) -> ();
+
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: kitsune_p2p_types::tx2::tx2_utils::TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
 
@@ -558,14 +562,38 @@ impl KitsuneP2pActor {
                                     wire::Wire::PushOpData(wire::PushOpData { op_data_list }) => {
                                         for (space, op_list) in op_data_list {
                                             for op in op_list {
-                                                let _op_hash = host.op_hash(op.op_data.clone());
+                                                let op_hash =
+                                                    match host.op_hash(op.op_data.clone()).await {
+                                                        Ok(op_hash) => op_hash,
+                                                        Err(_) => continue,
+                                                    };
+
+                                                // trigger any delegation
+                                                // that is pending on
+                                                // having this data
+                                                let _ = i_s
+                                                    .resolve_publish_pending_delegates(
+                                                        space.clone(),
+                                                        op_hash.clone(),
+                                                    )
+                                                    .await;
+
                                                 // TODO - check op_hash against
                                                 //        active fetch queue
+
+                                                // TODO - if we have context,
+                                                //        make sure to pass
+                                                //        publish
+                                                //        countersigning
+                                                //        info on publish
 
                                                 // TODO - remove this in favor
                                                 //        of a publish/gossip
                                                 //        combo event
                                                 //        yet to be added
+                                                //        (or maybe just switch
+                                                //        between this and
+                                                //        publish via context?)
                                                 let _ = evt_sender
                                                     .gossip(space.clone(), vec![op.op_data])
                                                     .await;
@@ -695,6 +723,27 @@ impl InternalHandler for KitsuneP2pActor {
             let (_, space_inner) = space_sender.await;
             space_inner
                 .incoming_publish(space, to_agent, op_hash_list, context, maybe_delegate)
+                .await
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_resolve_publish_pending_delegates(
+        &mut self,
+        space: KSpace,
+        op_hash: KOpHash,
+    ) -> InternalHandlerResult<()> {
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => {
+                return unit_ok_fut();
+            }
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (_, space_inner) = space_sender.await;
+            space_inner
+                .resolve_publish_pending_delegates(space, op_hash)
                 .await
         }
         .boxed()

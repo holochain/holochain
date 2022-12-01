@@ -76,6 +76,10 @@ ghost_actor::ghost_chan! {
             maybe_delegate: MaybeDelegate,
         ) -> ();
 
+        /// We just received data for an op_hash. Check if we had a pending
+        /// delegation action we need to continue now that we have the data.
+        fn resolve_publish_pending_delegates(space: KSpace, op_hash: KOpHash) -> ();
+
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
 
@@ -447,8 +451,21 @@ impl SpaceInternalHandler for Space {
                 } else {
                     // TODO - Add this hash to the fetch queue.
 
-                    // TODO - Register a callback if maybe_delegate.is_some()
-                    //        to invoke the delegation on receipt of data.
+                    // Register a callback if maybe_delegate.is_some()
+                    // to invoke the delegation on receipt of data.
+                    if let Some((basis, mod_idx, mod_cnt)) = &maybe_delegate {
+                        ro_inner.clone().publish_pending_delegate(
+                            op_hash.clone(),
+                            PendingDelegate {
+                                space: space.clone(),
+                                basis: basis.clone(),
+                                to_agent: to_agent.clone(),
+                                mod_idx: *mod_idx,
+                                mod_cnt: *mod_cnt,
+                                data: BroadcastData::Publish(vec![op_hash], context),
+                            },
+                        );
+                    }
                 }
             }
 
@@ -456,6 +473,16 @@ impl SpaceInternalHandler for Space {
         }
         .boxed()
         .into())
+    }
+
+    fn handle_resolve_publish_pending_delegates(
+        &mut self,
+        _space: KSpace,
+        op_hash: KOpHash,
+    ) -> InternalHandlerResult<()> {
+        self.ro_inner.resolve_publish_pending_delegate(op_hash);
+
+        unit_ok_fut()
     }
 
     fn handle_incoming_gossip(
@@ -1128,6 +1155,15 @@ impl KitsuneP2pHandler for Space {
     }
 }
 
+pub(crate) struct PendingDelegate {
+    pub(crate) space: KSpace,
+    pub(crate) basis: KBasis,
+    pub(crate) to_agent: KAgent,
+    pub(crate) mod_idx: u32,
+    pub(crate) mod_cnt: u32,
+    pub(crate) data: BroadcastData,
+}
+
 pub(crate) struct SpaceReadOnlyInner {
     pub(crate) space: Arc<KitsuneSpace>,
     #[allow(dead_code)]
@@ -1140,6 +1176,54 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     pub(crate) metrics: MetricsSync,
     pub(crate) metric_exchange: MetricExchangeSync,
+    pub(crate) publish_pending_delegates: parking_lot::Mutex<HashMap<KOpHash, PendingDelegate>>,
+}
+
+impl SpaceReadOnlyInner {
+    pub(crate) fn publish_pending_delegate(
+        self: Arc<Self>,
+        op_hash: KOpHash,
+        pending_delegate: PendingDelegate,
+    ) {
+        {
+            let this = self.clone();
+            let op_hash = op_hash.clone();
+            tokio::task::spawn(async move {
+                tokio::time::sleep(
+                    this.config
+                        .tuning_params
+                        .implicit_timeout()
+                        .time_remaining(),
+                )
+                .await;
+
+                this.publish_pending_delegates.lock().remove(&op_hash);
+            });
+        }
+
+        self.publish_pending_delegates
+            .lock()
+            .insert(op_hash, pending_delegate);
+    }
+
+    pub(crate) fn resolve_publish_pending_delegate(&self, op_hash: KOpHash) {
+        if let Some(PendingDelegate {
+            space,
+            basis,
+            to_agent,
+            mod_idx,
+            mod_cnt,
+            data,
+        }) = self.publish_pending_delegates.lock().remove(&op_hash)
+        {
+            let i_s = self.i_s.clone();
+            tokio::task::spawn(async move {
+                let _ = i_s
+                    .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
+                    .await;
+            });
+        }
+    }
 }
 
 /// A Kitsune P2p Node can track multiple "spaces" -- Non-interacting namespaced
@@ -1336,6 +1420,7 @@ impl Space {
             parallel_notify_permit,
             metrics,
             metric_exchange,
+            publish_pending_delegates: parking_lot::Mutex::new(HashMap::new()),
         });
 
         Self {
