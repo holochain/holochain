@@ -690,7 +690,7 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           gh release create "${TAG}" \
-            --title "holochain ${VERSION}" \
+            --title "holochain ${VERSION} (${RELEASE_BRANCH#*-})" \
             --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***"
 
       - name: Setup SSH session
