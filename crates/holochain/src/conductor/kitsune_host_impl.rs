@@ -19,8 +19,7 @@ use holochain_types::{
     share::RwShare,
 };
 use kitsune_p2p::{
-    agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::FetchQueueConfig,
-    event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
+    agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
 use kitsune_p2p_types::{config::KitsuneP2pTuningParams, KOpData, KOpHash};
 
@@ -47,12 +46,6 @@ impl KitsuneHostImpl {
             tuning_params,
             strat,
         })
-    }
-}
-
-impl FetchQueueConfig for KitsuneHostImpl {
-    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
-        a | b
     }
 }
 
