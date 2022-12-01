@@ -276,9 +276,9 @@ mod tests {
         FetchRequest::with_key(key_op(n), c)
     }
 
-    fn item(sources: Vec<KAgent>, context: Option<FetchContext>) -> FetchQueueItem {
+    fn item(sources: Vec<FetchSource>, context: Option<FetchContext>) -> FetchQueueItem {
         FetchQueueItem {
-            sources: Sources(sources.into_iter().map(SourceRecord::agent).collect()),
+            sources: Sources(sources.into_iter().map(SourceRecord::new).collect()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             options: Default::default(),
             context,
@@ -288,36 +288,39 @@ mod tests {
     fn space(i: u8) -> KSpace {
         Arc::new(KitsuneSpace::new(vec![i; 36]))
     }
-    fn agent(i: u8) -> KAgent {
-        Arc::new(KitsuneAgent::new(vec![i; 36]))
+
+    fn source(i: u8) -> FetchSource {
+        FetchSource::Agent(Arc::new(KitsuneAgent::new(vec![i; 36])))
     }
-    fn agents(ix: impl IntoIterator<Item = u8>) -> Vec<KAgent> {
-        ix.into_iter().map(agent).collect()
+
+    fn sources(ix: impl IntoIterator<Item = u8>) -> Vec<FetchSource> {
+        ix.into_iter().map(source).collect()
     }
+
     fn ctx(c: u32) -> Option<FetchContext> {
         Some(c.into())
     }
 
     #[test]
-    fn sources() {
+    fn source_rotation() {
         let mut ss = Sources(vec![
             SourceRecord {
-                agent: agent(1),
+                source: source(1),
                 last_fetch: Some(Instant::now()),
             },
             SourceRecord {
-                agent: agent(2),
+                source: source(2),
                 last_fetch: None,
             },
         ]);
 
-        assert_eq!(ss.next(Duration::from_secs(10)), Some(agent(2)));
+        assert_eq!(ss.next(Duration::from_secs(10)), Some(source(2)));
         assert_eq!(ss.next(Duration::from_secs(10)), None);
-        assert_eq!(ss.next(Duration::from_nanos(1)), Some(agent(1)));
+        assert_eq!(ss.next(Duration::from_nanos(1)), Some(source(1)));
         assert_eq!(ss.next(Duration::from_secs(10)), None);
         assert_eq!(ss.next(Duration::from_secs(10)), None);
-        assert_eq!(ss.next(Duration::from_nanos(1)), Some(agent(2)));
-        assert_eq!(ss.next(Duration::from_nanos(1)), Some(agent(1)));
+        assert_eq!(ss.next(Duration::from_nanos(1)), Some(source(2)));
+        assert_eq!(ss.next(Duration::from_nanos(1)), Some(source(1)));
         assert_eq!(ss.next(Duration::from_secs(10)), None);
         assert_eq!(ss.next(Duration::from_secs(10)), None);
         assert_eq!(ss.next(Duration::from_secs(10)), None);
@@ -329,14 +332,14 @@ mod tests {
         let c = Config;
 
         // note: new sources get added to the front of the list
-        q.push(&c, req(1, ctx(1)), space(0), agent(1));
-        q.push(&c, req(1, ctx(0)), space(0), agent(0));
+        q.push(&c, req(1, ctx(1)), space(0), source(1));
+        q.push(&c, req(1, ctx(0)), space(0), source(0));
 
-        q.push(&c, req(2, ctx(0)), space(0), agent(0));
+        q.push(&c, req(2, ctx(0)), space(0), source(0));
 
         let expected_ready = [
-            (key_op(1), item(agents(0..=1), ctx(1))),
-            (key_op(2), item(agents([0]), ctx(0))),
+            (key_op(1), item(sources(0..=1), ctx(1))),
+            (key_op(2), item(sources([0]), ctx(0))),
         ]
         .into_iter()
         .collect();
@@ -348,9 +351,9 @@ mod tests {
     fn queue_next() {
         let mut q = {
             let mut queue = [
-                (key_op(1), item(agents(0..=2), ctx(1))),
-                (key_op(2), item(agents(1..=3), ctx(1))),
-                (key_op(3), item(agents(2..=4), ctx(1))),
+                (key_op(1), item(sources(0..=2), ctx(1))),
+                (key_op(2), item(sources(1..=3), ctx(1))),
+                (key_op(3), item(sources(2..=4), ctx(1))),
             ];
             // Set the last_fetch time of one of the sources, so it won't show up in next() right away
             queue[1].1.sources.0[1].last_fetch = Some(Instant::now() - Duration::from_secs(3));
@@ -363,11 +366,11 @@ mod tests {
         // The next (and only) item will be the one with the timestamp explicitly set
         assert_eq!(
             q.iter_mut(Duration::from_secs(1)).collect::<Vec<_>>(),
-            vec![(key_op(2), space(0), agent(2))]
+            vec![(key_op(2), space(0), source(2))]
         );
 
         // When traversing the entire queue again, the "special" item is still the last one.
         let items: Vec<_> = q.iter_mut(Duration::from_millis(0)).take(9).collect();
-        assert_eq!(items[8], (key_op(2), space(0), agent(2)));
+        assert_eq!(items[8], (key_op(2), space(0), source(2)));
     }
 }
