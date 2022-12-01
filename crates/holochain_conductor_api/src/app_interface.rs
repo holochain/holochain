@@ -215,9 +215,9 @@ impl From<InstalledAppInfoStatus> for AppStatus {
     }
 }
 
+// TODO: rewrite using fetch queue
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct DnaGossipInfo {
-    // TODO: rewrite using fetch queue
     // pub total_historical_gossip_throughput: HistoricalGossipThroughput,
 }
 
