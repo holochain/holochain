@@ -126,10 +126,10 @@ lazy_static! {
             .join("\n");
 
         let extensions_str = match extensions.len() {
-            0 => format!(""),
+            0 => String::from(""),
             _ => format!(
                 r#"
-CLI EXTENSIONS:
+EXTENSIONS:
 {extensions}"#
             ),
         };
