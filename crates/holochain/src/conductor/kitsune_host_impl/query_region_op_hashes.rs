@@ -26,7 +26,10 @@ pub(super) async fn query_region_op_hashes(
                     },
                     |row| {
                         let hash: DhtOpHash = row.get("hash")?;
-                        Ok(OpHashSized::new(hash.to_kitsune(), todo!("get size")))
+                        let action_size: usize = row.get("action_size")?;
+                        let entry_size: usize = row.get("entry_size")?;
+                        let op_size = (action_size + entry_size).into();
+                        Ok(OpHashSized::new(hash.to_kitsune(), Some(op_size)))
                     },
                 )?
                 .collect::<Result<Vec<_>, _>>()
