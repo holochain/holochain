@@ -21,22 +21,22 @@ on:
       #   default: ""
       #   type: string
       holochain_source_branch:
-        description: "source branch for the release"
+        description: "holochain source branch for the release"
         required: false
         default: ""
         type: string
       holochain_target_branch:
-        description: "target branch for the release"
+        description: "holochain target branch for the release"
         required: false
         default: ""
         type: string
       holochain-nixpkgs_source_branch:
-        description: "source branch for the release"
+        description: "holochain-nixpkgs source branch for the release"
         required: false
         default: ""
         type: string
       holonix_source_branch:
-        description: "source branch for the release"
+        description: "holonix source branch for the release"
         required: false
         default: ""
         type: string
@@ -641,7 +641,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN}}
           pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: merge
+          merge-method: squash
       - name: Auto approve Pull Request
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         uses: juliangruber/approve-pull-request-action@v1
