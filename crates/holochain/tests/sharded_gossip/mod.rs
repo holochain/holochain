@@ -18,7 +18,7 @@ use holochain::{
 use holochain_p2p::*;
 use holochain_sqlite::db::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_boom, create_agent_bloom};
+use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
@@ -624,7 +624,8 @@ async fn mock_network_sharded_gossip() {
                                             )
                                         });
 
-                                        let missing_hashes = check_ops_boom(hashes, missing_hashes);
+                                        let missing_hashes =
+                                            check_ops_bloom(hashes, missing_hashes);
                                         let missing_hashes = match &last_intervals {
                                             Some(intervals) => missing_hashes
                                                 .into_iter()
@@ -689,7 +690,10 @@ async fn mock_network_sharded_gossip() {
                                             module,
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::missing_op_hashes(
-                                                    missing_hashes,
+                                                    missing_hashes
+                                                        .into_iter()
+                                                        .map(|h| kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized::new(h, None))
+                                                        .collect(),
                                                     MissingOpsStatus::AllComplete as u8,
                                                 ),
                                             ),
@@ -1150,7 +1154,8 @@ async fn mock_network_sharding() {
                                             )
                                         });
 
-                                        let missing_hashes = check_ops_boom(hashes, missing_hashes);
+                                        let missing_hashes =
+                                            check_ops_bloom(hashes, missing_hashes);
                                         let missing_hashes = match &last_intervals {
                                             Some(intervals) => missing_hashes
                                                 .into_iter()
@@ -1169,7 +1174,10 @@ async fn mock_network_sharding() {
                                             module,
                                             gossip: GossipProtocol::Sharded(
                                                 ShardedGossipWire::missing_op_hashes(
-                                                    missing_hashes,
+                                                    missing_hashes
+                                                        .into_iter()
+                                                        .map(|h| kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized::new(h, None))
+                                                        .collect(),
                                                     2,
                                                 ),
                                             ),

@@ -6,7 +6,7 @@ use std::{
 use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace, Tx2Cert};
 use linked_hash_map::{Entry, LinkedHashMap};
 
-use crate::{FetchContext, FetchKey, FetchOptions, FetchRequest};
+use crate::{FetchContext, FetchKey, FetchOptions, FetchQueuePush, RoughInt};
 
 /// Max number of queue items to check on each `next()` poll
 const NUM_ITEMS_PER_POLL: usize = 100;
@@ -63,6 +63,8 @@ struct FetchQueueItem {
     sources: Sources,
     /// The space to retrieve this op from
     space: KSpace,
+    /// Approximate size of the item. If set, the item will be counted towards overall progress.
+    size: Option<RoughInt>,
     /// Options specified for this fetch job
     options: Option<FetchOptions>,
     /// Opaque user data specified by the host
@@ -115,9 +117,9 @@ impl FetchQueue {
     /// If the FetchKey does not already exist, add it to the end of the queue.
     /// If the FetchKey exists, add the new source and merge the context in, without
     /// changing the position in the queue.
-    pub fn push(&self, request: FetchRequest, space: KSpace, source: FetchSource) {
+    pub fn push(&self, args: FetchQueuePush) {
         self.state
-            .share_mut(|s, _| Ok(s.push(&*self.config, request, space, source)))
+            .share_mut(|s, _| Ok(s.push(&*self.config, args)))
             .expect("no error");
     }
 
@@ -134,19 +136,16 @@ impl State {
     /// If the FetchKey does not already exist, add it to the end of the queue.
     /// If the FetchKey exists, add the new source and merge the context in, without
     /// changing the position in the queue.
-    pub fn push(
-        &mut self,
-        config: &dyn FetchQueueConfig,
-        request: FetchRequest,
-        space: KSpace,
-        source: FetchSource,
-    ) {
-        let FetchRequest {
+    pub fn push(&mut self, config: &dyn FetchQueueConfig, args: FetchQueuePush) {
+        let FetchQueuePush {
             key,
             author,
             options,
             context,
-        } = request;
+            space,
+            source,
+            size,
+        } = args;
 
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
@@ -158,6 +157,7 @@ impl State {
                 let item = FetchQueueItem {
                     sources,
                     space,
+                    size,
                     options,
                     context,
                 };
@@ -267,13 +267,19 @@ mod tests {
     }
 
     fn key_op(n: u8) -> FetchKey {
-        FetchKey::Op {
-            op_hash: Arc::new(KitsuneOpHash::new(vec![n; 36])),
-        }
+        FetchKey::Op(Arc::new(KitsuneOpHash::new(vec![n; 36])))
     }
 
-    fn req(n: u8, c: Option<FetchContext>) -> FetchRequest {
-        FetchRequest::with_key(key_op(n), c)
+    fn req(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchQueuePush {
+        FetchQueuePush {
+            key: key_op(n),
+            author: None,
+            context,
+            options: Default::default(),
+            space: space(0),
+            source,
+            size: None,
+        }
     }
 
     fn item(sources: Vec<FetchSource>, context: Option<FetchContext>) -> FetchQueueItem {
@@ -282,6 +288,7 @@ mod tests {
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             options: Default::default(),
             context,
+            size: None,
         }
     }
 
@@ -332,10 +339,10 @@ mod tests {
         let c = Config;
 
         // note: new sources get added to the front of the list
-        q.push(&c, req(1, ctx(1)), space(0), source(1));
-        q.push(&c, req(1, ctx(0)), space(0), source(0));
+        q.push(&c, req(1, ctx(1), source(1)));
+        q.push(&c, req(1, ctx(0), source(0)));
 
-        q.push(&c, req(2, ctx(0)), space(0), source(0));
+        q.push(&c, req(2, ctx(0), source(0)));
 
         let expected_ready = [
             (key_op(1), item(sources(0..=1), ctx(1))),

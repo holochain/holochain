@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use crate::{event::*, KitsuneHost};
 use futures::FutureExt;
-use kitsune_p2p_fetch::FetchQueueConfig;
+use kitsune_p2p_fetch::{FetchQueueConfig, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::combinators::second;
@@ -182,7 +182,7 @@ impl KitsuneHost for SwitchboardEventHandler {
         &self,
         _space: Arc<KitsuneSpace>,
         _region: RegionCoords,
-    ) -> crate::KitsuneHostResult<Vec<kitsune_p2p_types::KOpHash>> {
+    ) -> crate::KitsuneHostResult<Vec<OpHashSized>> {
         todo!()
     }
 }

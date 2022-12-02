@@ -1,5 +1,6 @@
 SELECT
   DhtOp.hash,
+  -- TODO: get size
 FROM
   DhtOp
 WHERE

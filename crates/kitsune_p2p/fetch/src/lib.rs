@@ -8,15 +8,17 @@
 
 //! Kitsune P2p Fetch Queue Logic
 
-use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash};
+use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash, KSpace};
 
 mod error;
 mod queue;
 mod respond;
+mod rough_sized;
 
 pub use error::*;
 pub use queue::*;
 pub use respond::*;
+pub use rough_sized::*;
 
 /// Determine what should be fetched.
 #[derive(
@@ -25,24 +27,26 @@ pub use respond::*;
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum FetchKey {
     /// Fetch via region.
-    Region {
-        /// The region coordinates to fetch
-        region_coords: RegionCoords,
-    },
+    Region(RegionCoords),
 
     /// Fetch via op hash.
-    Op {
-        /// The hash of the op to fetch.
-        op_hash: KOpHash,
-    },
+    Op(KOpHash),
 }
 
 /// A fetch "unit" that can be de-duplicated.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub struct FetchRequest {
+#[derive(Debug, Clone, PartialEq)]
+pub struct FetchQueuePush {
     /// Description of what to fetch.
     pub key: FetchKey,
+
+    /// The space this op belongs to
+    pub space: KSpace,
+
+    /// The source to fetch the op from
+    pub source: FetchSource,
+
+    /// The approximate size of the item
+    pub size: Option<RoughInt>,
 
     /// If specified, the author of the op.
     /// NOTE: author is additive-only. That is, an op without an author
@@ -57,33 +61,6 @@ pub struct FetchRequest {
     /// Opaque "context" to be provided and interpreted by the host.
     pub context: Option<FetchContext>,
 }
-
-impl FetchRequest {
-    /// Construct a fetch request with key and context.
-    pub fn with_key(key: FetchKey, context: Option<FetchContext>) -> Self {
-        Self {
-            key,
-            author: None,
-            context,
-            options: Default::default(),
-        }
-    }
-
-    /// Construct a fetch request with key, context, and author.
-    pub fn with_key_and_author(
-        key: FetchKey,
-        context: Option<FetchContext>,
-        author: KAgent,
-    ) -> Self {
-        Self {
-            key,
-            author: Some(author),
-            context,
-            options: Default::default(),
-        }
-    }
-}
-
 /// Options which affect how the fetch is performed.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub struct FetchOptions {

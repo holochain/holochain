@@ -501,13 +501,13 @@ impl KitsuneP2pActor {
 
                                             for key in key_list {
                                                 match key {
-                                                    FetchKey::Region { region_coords } => {
+                                                    FetchKey::Region(region_coords) => {
                                                         regions.push((
                                                             region_coords,
                                                             region_coords.to_bounds(&topo),
                                                         ));
                                                     }
-                                                    FetchKey::Op { op_hash } => {
+                                                    FetchKey::Op(op_hash) => {
                                                         hashes.push(op_hash);
                                                     }
                                                 }
