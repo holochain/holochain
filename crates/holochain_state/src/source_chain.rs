@@ -46,7 +46,6 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::EntryRateWeight;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::GrantedFunction;
-use holochain_zome_types::InitZomesComplete;
 use holochain_zome_types::MembraneProof;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
