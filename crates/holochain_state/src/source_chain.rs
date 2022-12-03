@@ -46,6 +46,7 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::EntryRateWeight;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::GrantedFunction;
+use holochain_zome_types::InitZomesComplete;
 use holochain_zome_types::MembraneProof;
 use holochain_zome_types::PreflightRequest;
 use holochain_zome_types::QueryFilter;
@@ -555,8 +556,22 @@ where
         Ok(self.scratch.apply(|scratch| scratch.records().collect())?)
     }
 
-    pub fn has_initialized(&self) -> SourceChainResult<bool> {
-        Ok(self.len()? > 3)
+    pub async fn has_initialized(&self) -> SourceChainResult<bool> {
+        let has_initialized = self
+            .author_db()
+            .async_reader::<DatabaseError, _, _>(move |txn| {
+                let mut statement = txn.prepare(
+                    "SELECT count(*) AS init_count FROM Action WHERE type = :action_type;",
+                )?;
+                let mut rows = statement.query_and_then::<u32, DatabaseError, _, _>(
+                    &[(":action_type", "InitZomesComplete")],
+                    |row| Ok(row.get("init_count")?),
+                )?;
+                let init_count = rows.next().unwrap()?;
+                Ok(init_count == 1)
+            })
+            .await?;
+        Ok(has_initialized)
     }
 
     pub fn is_empty(&self) -> SourceChainResult<bool> {
@@ -2131,5 +2146,56 @@ pub mod tests {
         let mut desc_sorted = desc;
         desc_sorted.sort_by_key(|r| r.signed_action.action().action_seq());
         assert_eq!(asc, desc_sorted);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn init_zomes_complete() {
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
+        let keystore = test_keystore();
+        let vault = test_db.to_db();
+        let alice = keystore.new_sign_keypair_random().await.unwrap();
+        let dna_hash = fixt!(DnaHash);
+
+        genesis(
+            vault.clone().into(),
+            dht_db.to_db(),
+            &dht_db_cache,
+            keystore.clone(),
+            dna_hash.clone(),
+            alice.clone(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+            .await
+            .unwrap();
+
+        // has initialized should be false after genesis
+        let has_initialized = chain.has_initialized().await.unwrap();
+        assert_eq!(has_initialized, false);
+
+        // insert init marker into source chain
+        let result = chain
+            .put(
+                builder::InitZomesComplete {},
+                None,
+                ChainTopOrdering::Strict,
+            )
+            .await;
+        assert!(result.is_ok());
+
+        let mut mock = MockHolochainP2pDnaT::new();
+        mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
+        chain.flush(&mock).await.unwrap();
+
+        // has initialized should be true after init zomes has run
+        let has_initialized = chain.has_initialized().await.unwrap();
+        assert_eq!(has_initialized, true);
     }
 }
