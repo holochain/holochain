@@ -589,10 +589,8 @@ impl KitsuneP2pActor {
                                                 //        if there, use that
                                                 //        instead of the hashes
 
-                                                let _fetch_context =
-                                                    fetch_queue.remove(&FetchKey::Op {
-                                                        op_hash: op_hash.clone(),
-                                                    });
+                                                let _fetch_context = fetch_queue
+                                                    .remove(&FetchKey::Op(op_hash.clone()));
 
                                                 // TODO - check op_hash against
                                                 //        active fetch queue
