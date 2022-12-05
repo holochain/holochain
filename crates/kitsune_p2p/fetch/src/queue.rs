@@ -294,7 +294,7 @@ mod tests {
 
     use super::*;
 
-    struct Config;
+    pub(super) struct Config;
 
     impl FetchQueueConfig for Config {
         fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
@@ -302,11 +302,11 @@ mod tests {
         }
     }
 
-    fn key_op(n: u8) -> FetchKey {
+    pub(super) fn key_op(n: u8) -> FetchKey {
         FetchKey::Op(Arc::new(KitsuneOpHash::new(vec![n; 36])))
     }
 
-    fn req(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchQueuePush {
+    pub(super) fn req(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchQueuePush {
         FetchQueuePush {
             key: key_op(n),
             author: None,
@@ -318,7 +318,7 @@ mod tests {
         }
     }
 
-    fn item(sources: Vec<FetchSource>, context: Option<FetchContext>) -> FetchQueueItem {
+    pub(super) fn item(sources: Vec<FetchSource>, context: Option<FetchContext>) -> FetchQueueItem {
         FetchQueueItem {
             sources: Sources(sources.into_iter().map(SourceRecord::new).collect()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
@@ -328,19 +328,19 @@ mod tests {
         }
     }
 
-    fn space(i: u8) -> KSpace {
+    pub(super) fn space(i: u8) -> KSpace {
         Arc::new(KitsuneSpace::new(vec![i; 36]))
     }
 
-    fn source(i: u8) -> FetchSource {
+    pub(super) fn source(i: u8) -> FetchSource {
         FetchSource::Agent(Arc::new(KitsuneAgent::new(vec![i; 36])))
     }
 
-    fn sources(ix: impl IntoIterator<Item = u8>) -> Vec<FetchSource> {
+    pub(super) fn sources(ix: impl IntoIterator<Item = u8>) -> Vec<FetchSource> {
         ix.into_iter().map(source).collect()
     }
 
-    fn ctx(c: u32) -> Option<FetchContext> {
+    pub(super) fn ctx(c: u32) -> Option<FetchContext> {
         Some(c.into())
     }
 
