@@ -11,7 +11,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
-use kitsune_p2p_fetch::{FetchQueue, FetchQueueConfig, FetchSource, OpHashSized};
+use kitsune_p2p_fetch::{FetchQueue, FetchQueueConfig, FetchQueueReader, FetchSource, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -1426,8 +1426,10 @@ impl TryFrom<u8> for MissingOpsStatus {
 }
 
 /// Data and handlers for diagnostic info, to be used by the host.
-#[derive(Clone, Debug)]
-pub struct GossipDiagnostics {
+#[derive(Clone)]
+pub struct KitsuneDiagnostics {
     /// Access to metrics info
     pub metrics: MetricsSync,
+    /// Access to FetchQueue,
+    pub fetch_queue: FetchQueueReader,
 }

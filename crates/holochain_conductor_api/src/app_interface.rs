@@ -3,6 +3,7 @@
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfo;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -59,8 +60,8 @@ pub enum AppRequest {
     /// and was archived.
     ArchiveCloneCell(Box<ArchiveCloneCellPayload>),
 
-    /// Info about gossip
-    GossipInfo(Box<GossipInfoRequestPayload>),
+    /// Info about networking processes
+    NetworkInfo(Box<NetworkInfoRequestPayload>),
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ZomeCall>),
@@ -109,8 +110,8 @@ pub enum AppResponse {
     /// An existing clone cell has been archived.
     CloneCellArchived,
 
-    /// GossipInfo is returned
-    GossipInfo(Vec<DnaGossipInfo>),
+    /// NetworkInfo is returned
+    NetworkInfo(Vec<NetworkInfo>),
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ExternIO>),
@@ -215,10 +216,9 @@ impl From<InstalledAppInfoStatus> for AppStatus {
     }
 }
 
-// TODO: rewrite using fetch queue
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct DnaGossipInfo {
-    // pub total_historical_gossip_throughput: HistoricalGossipThroughput,
+pub struct NetworkInfo {
+    pub fetch_queue_info: FetchQueueInfo,
 }
 
 #[test]

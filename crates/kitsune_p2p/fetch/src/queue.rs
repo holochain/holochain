@@ -8,6 +8,9 @@ use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchKey, FetchOptions, FetchQueuePush, RoughInt};
 
+mod queue_reader;
+pub use queue_reader::*;
+
 /// Max number of queue items to check on each `next()` poll
 const NUM_ITEMS_PER_POLL: usize = 100;
 
@@ -27,6 +30,14 @@ const NUM_ITEMS_PER_POLL: usize = 100;
 pub struct FetchQueue {
     config: FetchConfig,
     state: Share<State>,
+}
+
+impl std::fmt::Debug for FetchQueue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.state
+            .share_ref(|state| Ok(f.debug_struct("FetchQueue").field("state", state).finish()))
+            .unwrap()
+    }
 }
 
 /// Alias
@@ -283,7 +294,7 @@ mod tests {
 
     use super::*;
 
-    struct Config;
+    pub(super) struct Config;
 
     impl FetchQueueConfig for Config {
         fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
@@ -291,11 +302,11 @@ mod tests {
         }
     }
 
-    fn key_op(n: u8) -> FetchKey {
+    pub(super) fn key_op(n: u8) -> FetchKey {
         FetchKey::Op(Arc::new(KitsuneOpHash::new(vec![n; 36])))
     }
 
-    fn req(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchQueuePush {
+    pub(super) fn req(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchQueuePush {
         FetchQueuePush {
             key: key_op(n),
             author: None,
@@ -307,7 +318,7 @@ mod tests {
         }
     }
 
-    fn item(sources: Vec<FetchSource>, context: Option<FetchContext>) -> FetchQueueItem {
+    pub(super) fn item(sources: Vec<FetchSource>, context: Option<FetchContext>) -> FetchQueueItem {
         FetchQueueItem {
             sources: Sources(sources.into_iter().map(SourceRecord::new).collect()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
@@ -317,19 +328,19 @@ mod tests {
         }
     }
 
-    fn space(i: u8) -> KSpace {
+    pub(super) fn space(i: u8) -> KSpace {
         Arc::new(KitsuneSpace::new(vec![i; 36]))
     }
 
-    fn source(i: u8) -> FetchSource {
+    pub(super) fn source(i: u8) -> FetchSource {
         FetchSource::Agent(Arc::new(KitsuneAgent::new(vec![i; 36])))
     }
 
-    fn sources(ix: impl IntoIterator<Item = u8>) -> Vec<FetchSource> {
+    pub(super) fn sources(ix: impl IntoIterator<Item = u8>) -> Vec<FetchSource> {
         ix.into_iter().map(source).collect()
     }
 
-    fn ctx(c: u32) -> Option<FetchContext> {
+    pub(super) fn ctx(c: u32) -> Option<FetchContext> {
         Some(c.into())
     }
 
@@ -387,7 +398,8 @@ mod tests {
                 (key_op(2), item(sources(1..=3), ctx(1))),
                 (key_op(3), item(sources(2..=4), ctx(1))),
             ];
-            // Set the last_fetch time of one of the sources, so it won't show up in next() right away
+            // Set the last_fetch time of one of the sources to something a bit earlier,
+            // so it won't show up in next() right away
             queue[1].1.sources.0[1].last_fetch = Some(Instant::now() - Duration::from_secs(3));
 
             let queue = queue.into_iter().collect();
@@ -404,5 +416,8 @@ mod tests {
         // When traversing the entire queue again, the "special" item is still the last one.
         let items: Vec<_> = q.iter_mut(Duration::from_millis(0)).take(9).collect();
         assert_eq!(items[8], (key_op(2), space(0), source(2)));
+
+        // We traversed all items in the last second, so this returns None
+        assert_eq!(q.iter_mut(Duration::from_secs(1)).next(), None);
     }
 }

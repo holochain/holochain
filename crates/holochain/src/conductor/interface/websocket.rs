@@ -251,6 +251,7 @@ pub mod test {
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use holochain_zome_types::ExternIO;
     use kitsune_p2p::agent_store::AgentInfoSigned;
+    use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfo;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
@@ -433,17 +434,22 @@ pub mod test {
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
         let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
-        let request = GossipInfoRequestPayload {
+        let request = NetworkInfoRequestPayload {
             dnas: vec![dna_hash],
         };
 
-        let msg = AppRequest::GossipInfo(Box::new(request));
+        let msg = AppRequest::NetworkInfo(Box::new(request));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
             match response {
-                AppResponse::GossipInfo(info) => {
-                    assert_eq!(info, vec![DnaGossipInfo {}])
+                AppResponse::NetworkInfo(info) => {
+                    assert_eq!(
+                        info,
+                        vec![NetworkInfo {
+                            fetch_queue_info: FetchQueueInfo::default()
+                        }]
+                    )
                 }
                 other => panic!("unexpected response {:?}", other),
             }
