@@ -60,8 +60,8 @@ pub enum AppRequest {
     /// and was archived.
     ArchiveCloneCell(Box<ArchiveCloneCellPayload>),
 
-    /// Info about gossip
-    GossipInfo(Box<GossipInfoRequestPayload>),
+    /// Info about networking processes
+    NetworkInfo(Box<NetworkInfoRequestPayload>),
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ZomeCall>),
@@ -110,8 +110,8 @@ pub enum AppResponse {
     /// An existing clone cell has been archived.
     CloneCellArchived,
 
-    /// GossipInfo is returned
-    GossipInfo(Vec<NetworkInfo>),
+    /// NetworkInfo is returned
+    NetworkInfo(Vec<NetworkInfo>),
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ExternIO>),

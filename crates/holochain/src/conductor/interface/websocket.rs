@@ -434,16 +434,16 @@ pub mod test {
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
         let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
-        let request = GossipInfoRequestPayload {
+        let request = NetworkInfoRequestPayload {
             dnas: vec![dna_hash],
         };
 
-        let msg = AppRequest::GossipInfo(Box::new(request));
+        let msg = AppRequest::NetworkInfo(Box::new(request));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
             match response {
-                AppResponse::GossipInfo(info) => {
+                AppResponse::NetworkInfo(info) => {
                     assert_eq!(
                         info,
                         vec![NetworkInfo {
