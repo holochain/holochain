@@ -1,4 +1,4 @@
-use kitsune_p2p_fetch::FetchQueueConfig;
+use kitsune_p2p_fetch::{FetchQueueConfig, OpHashSized};
 use must_future::MustBoxFuture;
 use std::sync::Arc;
 
@@ -57,7 +57,7 @@ pub trait KitsuneHost: 'static + Send + Sync {
         &self,
         space: Arc<KitsuneSpace>,
         region: RegionCoords,
-    ) -> KitsuneHostResult<Vec<KOpHash>>;
+    ) -> KitsuneHostResult<Vec<OpHashSized>>;
 
     /// Record a set of metric records.
     fn record_metrics(

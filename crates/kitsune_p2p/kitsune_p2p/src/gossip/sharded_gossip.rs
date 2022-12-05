@@ -11,7 +11,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
-use kitsune_p2p_fetch::{FetchQueue, FetchQueueConfig, FetchSource};
+use kitsune_p2p_fetch::{FetchQueue, FetchQueueConfig, FetchSource, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -1194,7 +1194,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Any ops that were missing from the remote bloom.
         MissingOpHashes(0x60) {
             /// The missing op hashes
-            ops.0: Vec<KOpHash>,
+            ops.0: Vec<OpHashSized>,
             /// Ops that are missing from a bloom that you have sent.
             /// These will be chunked into a maximum size of about 16MB.
             /// If the amount of missing ops is larger then the
