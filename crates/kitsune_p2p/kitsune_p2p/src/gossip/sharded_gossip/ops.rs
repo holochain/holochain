@@ -1,4 +1,4 @@
-use kitsune_p2p_fetch::{FetchKey, FetchRequest};
+use kitsune_p2p_fetch::{FetchKey, FetchQueuePush, OpHashSized};
 use kitsune_p2p_types::{combinators::second, dht::region::Region};
 
 use super::*;
@@ -179,7 +179,7 @@ impl ShardedGossipLocal {
                 .query_op_hashes_by_region(self.space.clone(), region.coords)
         });
 
-        let ops: Vec<KOpHash> = futures::future::join_all(queries)
+        let ops: Vec<OpHashSized> = futures::future::join_all(queries)
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
@@ -305,17 +305,20 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_missing_ops(
         &self,
         source: FetchSource,
-        ops: Vec<KOpHash>,
+        ops: Vec<OpHashSized>,
     ) -> KitsuneResult<()> {
         for op_hash in ops {
-            let request = FetchRequest {
-                key: FetchKey::Op { op_hash },
+            let (hash, size) = op_hash.into_inner();
+            let request = FetchQueuePush {
+                key: FetchKey::Op(hash),
                 author: None,
                 options: None,
                 context: None,
+                space: self.space.clone(),
+                source: source.clone(),
+                size,
             };
-            self.fetch_queue
-                .push(request, self.space.clone(), source.clone());
+            self.fetch_queue.push(request);
         }
         Ok(())
     }
@@ -340,7 +343,7 @@ fn into_chunks(gossip: &mut Vec<ShardedGossipWire>, hashes: Vec<KOpHash>, comple
         // Check if this op will fit without going over the max.
         if size + bytes <= MAX_SEND_BUF_BYTES {
             // Op will fit so add it to the chunk and update the size.
-            chunk.push(op);
+            chunk.push(OpHashSized::new(op, None));
             size += bytes;
         } else {
             // Op won't fit so flush the chunk.
@@ -352,7 +355,7 @@ fn into_chunks(gossip: &mut Vec<ShardedGossipWire>, hashes: Vec<KOpHash>, comple
             // Reset the size to this ops size.
             size = bytes;
             // Push this op onto the next chunk.
-            chunk.push(op);
+            chunk.push(OpHashSized::new(op, None));
         }
     }
     // If there is a final chunk to write then add it and set it to final.

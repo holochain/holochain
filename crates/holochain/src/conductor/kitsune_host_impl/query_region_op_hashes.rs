@@ -1,7 +1,7 @@
 use holo_hash::DhtOpHash;
 use holochain_p2p::{dht::prelude::*, DhtOpHashExt};
 use holochain_sqlite::prelude::*;
-use kitsune_p2p_types::KOpHash;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use rusqlite::named_params;
 
 use crate::conductor::error::ConductorResult;
@@ -9,7 +9,7 @@ use crate::conductor::error::ConductorResult;
 pub(super) async fn query_region_op_hashes(
     db: DbWrite<DbKindDht>,
     bounds: RegionBounds,
-) -> ConductorResult<Vec<KOpHash>> {
+) -> ConductorResult<Vec<OpHashSized>> {
     Ok(db
         .async_reader(move |txn| {
             let sql = holochain_sqlite::sql::sql_cell::FETCH_REGION_OP_HASHES;
@@ -26,7 +26,10 @@ pub(super) async fn query_region_op_hashes(
                     },
                     |row| {
                         let hash: DhtOpHash = row.get("hash")?;
-                        Ok(hash.to_kitsune())
+                        let action_size: usize = row.get("action_size")?;
+                        let entry_size: usize = row.get("entry_size")?;
+                        let op_size = (action_size + entry_size).into();
+                        Ok(OpHashSized::new(hash.to_kitsune(), Some(op_size)))
                     },
                 )?
                 .collect::<Result<Vec<_>, _>>()

@@ -19,7 +19,8 @@ use holochain_types::{
     share::RwShare,
 };
 use kitsune_p2p::{
-    agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
+    agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
+    event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
 use kitsune_p2p_types::{config::KitsuneP2pTuningParams, KOpData, KOpHash};
 
@@ -144,7 +145,7 @@ impl KitsuneHost for KitsuneHostImpl {
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         region: holochain_p2p::dht::region::RegionCoords,
-    ) -> KitsuneHostResult<Vec<KOpHash>> {
+    ) -> KitsuneHostResult<Vec<OpHashSized>> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
             let db = self.spaces.dht_db(&dna_hash)?;

@@ -101,7 +101,7 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
         &self,
         _space: Arc<KitsuneSpace>,
         _region: RegionCoords,
-    ) -> KitsuneHostResult<Vec<KOpHash>> {
+    ) -> KitsuneHostResult<Vec<OpHashSized>> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
             "query_op_hashes_by_region",
@@ -168,7 +168,7 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         &self,
         space: Arc<KitsuneSpace>,
         region: RegionCoords,
-    ) -> KitsuneHostResult<Vec<KOpHash>> {
+    ) -> KitsuneHostResult<Vec<OpHashSized>> {
         KitsuneHostDefaultError::query_op_hashes_by_region(self, space, region)
     }
 }

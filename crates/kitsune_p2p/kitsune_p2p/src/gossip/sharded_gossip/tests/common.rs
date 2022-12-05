@@ -110,7 +110,7 @@ impl KitsuneHost for StandardResponsesHostApi {
         &self,
         _space: Arc<KitsuneSpace>,
         _region: dht::region::RegionCoords,
-    ) -> crate::KitsuneHostResult<Vec<KOpHash>> {
+    ) -> crate::KitsuneHostResult<Vec<OpHashSized>> {
         todo!()
     }
 }
