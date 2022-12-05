@@ -40,6 +40,7 @@ use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::CellId;
+use holochain_zome_types::ChainQueryFilter;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
@@ -557,8 +558,10 @@ where
     }
 
     pub async fn has_initialized(&self) -> SourceChainResult<bool> {
-        let mut query_filter = QueryFilter::default();
-        query_filter.action_type = Some(ActionType::InitZomesComplete);
+        let query_filter = ChainQueryFilter {
+            action_type: Some(ActionType::InitZomesComplete),
+            ..QueryFilter::default()
+        };
         let init_zomes_complete_actions = self.query(query_filter).await?;
         let has_initialized = init_zomes_complete_actions.len() == 1;
         Ok(has_initialized)
