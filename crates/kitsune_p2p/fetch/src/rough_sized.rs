@@ -68,7 +68,8 @@ pub struct RoughSized<T> {
     /// The data to be sized
     #[deref]
     data: T,
-    /// The approximate size of the hash
+    /// The approximate size of the hash.
+    // TODO: remove the option, which will require adding sizes for Recent gossip as well
     size: Option<RoughInt>,
 }
 
