@@ -1201,7 +1201,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<KitsuneDiagnostics> {
         let diagnostics = KitsuneDiagnostics {
             metrics: self.ro_inner.metrics.clone(),
-            fetch_queue: todo!("does Space need its own FetchQueue?"),
+            fetch_queue: self.ro_inner.fetch_queue.clone().into(),
         };
         Ok(async move { Ok(diagnostics) }.boxed().into())
     }

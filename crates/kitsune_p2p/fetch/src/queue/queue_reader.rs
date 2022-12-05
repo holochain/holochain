@@ -5,7 +5,7 @@ use kitsune_p2p_types::KSpace;
 use crate::FetchQueue;
 
 /// Read-only access to the queue
-#[derive(Clone)]
+#[derive(Clone, derive_more::From)]
 pub struct FetchQueueReader(FetchQueue);
 
 impl FetchQueueReader {
@@ -16,9 +16,9 @@ impl FetchQueueReader {
             .state
             .share_ref(|s| {
                 Ok(s.queue
-                    .iter()
-                    .filter(|(_, v)| spaces.contains(&v.space))
-                    .map(|(k, v)| v.size.unwrap_or_default().get())
+                    .values()
+                    .filter(|v| spaces.contains(&v.space))
+                    .map(|v| v.size.unwrap_or_default().get())
                     .fold((0, 0), |(c, s), t| (c + 1, s + t)))
             })
             .unwrap();
