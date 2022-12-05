@@ -228,9 +228,11 @@ jobs:
                 --force-branch-creation \
                 --steps=CreateReleaseBranch
 
-            release-automation \
-              --workspace-path=$PWD \
-              crate apply-dev-versions --commit --no-verify
+            # FIXME: something in the BumpReleaseVersions step may rely on the changed versions not being published
+            # ideally we would not have to do this at all
+            # release-automation \
+            #   --workspace-path=$PWD \
+            #   crate apply-dev-versions --commit --no-verify
 
             release-automation \
               --workspace-path=$PWD \
