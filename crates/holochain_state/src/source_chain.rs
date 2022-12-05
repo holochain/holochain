@@ -34,6 +34,7 @@ use holochain_zome_types::ActionBuilder;
 use holochain_zome_types::ActionBuilderCommon;
 use holochain_zome_types::ActionExt;
 use holochain_zome_types::ActionHashed;
+use holochain_zome_types::ActionType;
 use holochain_zome_types::ActionUnweighed;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
@@ -556,20 +557,10 @@ where
     }
 
     pub async fn has_initialized(&self) -> SourceChainResult<bool> {
-        let has_initialized = self
-            .author_db()
-            .async_reader::<DatabaseError, _, _>(move |txn| {
-                let mut statement = txn.prepare(
-                    "SELECT count(*) AS init_count FROM Action WHERE type = :action_type;",
-                )?;
-                let mut rows = statement.query_and_then::<u32, DatabaseError, _, _>(
-                    &[(":action_type", "InitZomesComplete")],
-                    |row| Ok(row.get("init_count")?),
-                )?;
-                let init_count = rows.next().unwrap()?;
-                Ok(init_count == 1)
-            })
-            .await?;
+        let mut query_filter = QueryFilter::default();
+        query_filter.action_type = Some(ActionType::InitZomesComplete);
+        let init_zomes_complete_actions = self.query(query_filter).await?;
+        let has_initialized = init_zomes_complete_actions.len() == 1;
         Ok(has_initialized)
     }
 
