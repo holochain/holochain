@@ -122,10 +122,10 @@ impl FetchQueue {
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    pub fn remove(&self, key: &FetchKey) {
+    pub fn remove(&self, key: &FetchKey) -> Option<FetchContext> {
         self.state
             .share_mut(|s, _| Ok(s.remove(key)))
-            .expect("no error");
+            .expect("no error")
     }
 }
 
@@ -187,8 +187,12 @@ impl State {
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    pub fn remove(&mut self, key: &FetchKey) {
-        self.queue.remove(key);
+    pub fn remove(&mut self, key: &FetchKey) -> Option<FetchContext> {
+        if let Some(FetchQueueItem { context, .. }) = self.queue.remove(key) {
+            context
+        } else {
+            None
+        }
     }
 }
 

@@ -150,7 +150,7 @@ impl KitsuneHost for KitsuneHostImpl {
             let db = self.spaces.dht_db(&dna_hash)?;
             let topology = self.get_topology(space).await?;
             let bounds = region.to_bounds(&topology);
-            Ok(query_region_op_hashes::query_region_op_hashes(db.clone(), bounds.clone()).await?)
+            Ok(query_region_op_hashes::query_region_op_hashes(db.clone(), bounds).await?)
         }
         .boxed()
         .into()
