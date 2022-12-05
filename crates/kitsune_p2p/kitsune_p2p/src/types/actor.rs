@@ -5,7 +5,7 @@ use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
 
-use crate::gossip::sharded_gossip::GossipDiagnostics;
+use crate::gossip::sharded_gossip::KitsuneDiagnostics;
 
 /// Make a request to multiple destination agents - awaiting/aggregating the responses.
 /// The remote sides will see these messages as "RequestEvt" events.
@@ -153,6 +153,6 @@ ghost_actor::ghost_chan! {
         ) -> serde_json::Value;
 
         /// Get data for diagnostics
-        fn get_diagnostics(space: KSpace) -> GossipDiagnostics;
+        fn get_diagnostics(space: KSpace) -> KitsuneDiagnostics;
     }
 }

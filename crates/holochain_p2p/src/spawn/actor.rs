@@ -7,7 +7,7 @@ use futures::future::FutureExt;
 use kitsune_p2p::actor::BroadcastData;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch;
 use kitsune_p2p::event::*;
-use kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics;
+use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
 use kitsune_p2p::KOp;
 use kitsune_p2p::KitsuneOpData;
 
@@ -1330,7 +1330,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
     fn handle_get_diagnostics(
         &mut self,
         dna_hash: DnaHash,
-    ) -> HolochainP2pHandlerResult<GossipDiagnostics> {
+    ) -> HolochainP2pHandlerResult<KitsuneDiagnostics> {
         let space = dna_hash.into_kitsune();
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {

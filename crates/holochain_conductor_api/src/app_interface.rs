@@ -110,7 +110,7 @@ pub enum AppResponse {
     CloneCellArchived,
 
     /// GossipInfo is returned
-    GossipInfo(Vec<DnaGossipInfo>),
+    GossipInfo(Vec<NetworkInfo>),
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ExternIO>),
@@ -215,10 +215,21 @@ impl From<InstalledAppInfoStatus> for AppStatus {
     }
 }
 
-// TODO: rewrite using fetch queue
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct DnaGossipInfo {
-    // pub total_historical_gossip_throughput: HistoricalGossipThroughput,
+pub struct NetworkInfo {
+    pub fetch_queue_info: FetchQueueInfo,
+}
+
+/// Throughput info specific to historical rounds
+#[derive(
+    Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes,
+)]
+pub struct FetchQueueInfo {
+    /// Total number of bytes expected to be received through fetches
+    pub op_bytes_to_fetch: usize,
+
+    /// Total number of ops expected to be received through fetches
+    pub num_ops_to_fetch: usize,
 }
 
 #[test]

@@ -47,7 +47,7 @@ mod types;
 pub use types::*;
 
 pub mod gossip;
-pub use gossip::sharded_gossip::GossipDiagnostics;
+pub use gossip::sharded_gossip::KitsuneDiagnostics;
 
 mod config;
 pub use config::*;

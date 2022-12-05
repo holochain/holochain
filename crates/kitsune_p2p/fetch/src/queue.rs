@@ -8,6 +8,9 @@ use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchKey, FetchOptions, FetchQueuePush, RoughInt};
 
+mod queue_reader;
+pub use queue_reader::*;
+
 /// Max number of queue items to check on each `next()` poll
 const NUM_ITEMS_PER_POLL: usize = 100;
 
@@ -27,6 +30,14 @@ const NUM_ITEMS_PER_POLL: usize = 100;
 pub struct FetchQueue {
     config: FetchConfig,
     state: Share<State>,
+}
+
+impl std::fmt::Debug for FetchQueue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.state
+            .share_ref(|state| Ok(f.debug_struct("FetchQueue").field("state", state).finish()))
+            .unwrap()
+    }
 }
 
 /// Alias
@@ -387,7 +398,8 @@ mod tests {
                 (key_op(2), item(sources(1..=3), ctx(1))),
                 (key_op(3), item(sources(2..=4), ctx(1))),
             ];
-            // Set the last_fetch time of one of the sources, so it won't show up in next() right away
+            // Set the last_fetch time of one of the sources to something a bit earlier,
+            // so it won't show up in next() right away
             queue[1].1.sources.0[1].last_fetch = Some(Instant::now() - Duration::from_secs(3));
 
             let queue = queue.into_iter().collect();
@@ -404,5 +416,8 @@ mod tests {
         // When traversing the entire queue again, the "special" item is still the last one.
         let items: Vec<_> = q.iter_mut(Duration::from_millis(0)).take(9).collect();
         assert_eq!(items[8], (key_op(2), space(0), source(2)));
+
+        // We traversed all items in the last second, so this returns None
+        assert_eq!(q.iter_mut(Duration::from_secs(1)).next(), None);
     }
 }

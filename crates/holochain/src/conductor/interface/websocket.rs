@@ -443,7 +443,12 @@ pub mod test {
             let response: AppResponse = bytes.try_into().unwrap();
             match response {
                 AppResponse::GossipInfo(info) => {
-                    assert_eq!(info, vec![DnaGossipInfo {}])
+                    assert_eq!(
+                        info,
+                        vec![NetworkInfo {
+                            fetch_queue_info: FetchQueueInfo::default()
+                        }]
+                    )
                 }
                 other => panic!("unexpected response {:?}", other),
             }

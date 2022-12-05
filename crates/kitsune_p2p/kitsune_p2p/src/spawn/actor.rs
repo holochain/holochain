@@ -4,7 +4,7 @@ use crate::actor;
 use crate::actor::*;
 use crate::event::*;
 use crate::gossip::sharded_gossip::BandwidthThrottles;
-use crate::gossip::sharded_gossip::GossipDiagnostics;
+use crate::gossip::sharded_gossip::KitsuneDiagnostics;
 use crate::types::gossip::GossipModuleType;
 use crate::types::metrics::KitsuneMetrics;
 use crate::wire::MetricExchangeMsg;
@@ -1177,7 +1177,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         &mut self,
         space: KSpace,
         // gossip_type: GossipModuleType,
-    ) -> KitsuneP2pHandlerResult<GossipDiagnostics> {
+    ) -> KitsuneP2pHandlerResult<KitsuneDiagnostics> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
             Some(space) => space.get(),

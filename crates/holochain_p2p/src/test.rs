@@ -153,7 +153,7 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_get_diagnostics(
         &mut self,
         dna_hash: DnaHash,
-    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics> {
+    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics> {
         Err("stub".into())
     }
 }
