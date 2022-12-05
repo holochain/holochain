@@ -12,6 +12,7 @@ use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use kitsune_p2p_fetch::FetchKey;
+use kitsune_p2p_fetch::FetchQueue;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
@@ -110,6 +111,7 @@ pub(crate) struct KitsuneP2pActor {
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
+    fetch_queue: FetchQueue,
 }
 
 impl KitsuneP2pActor {
@@ -279,13 +281,18 @@ impl KitsuneP2pActor {
             config.tuning_params.clone(),
         ));
 
+        // TODO - use a real config
+        let fetch_queue = FetchQueue::new_bitwise_or();
+
         let i_s = internal_sender.clone();
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
             let host = host.clone();
             let tuning_params = config.tuning_params.clone();
+            let fetch_queue = fetch_queue.clone();
             async move {
                 let fetch_response_queue = &fetch_response_queue;
+                let fetch_queue = &fetch_queue;
                 ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                     let evt_sender = evt_sender.clone();
                     let host = host.clone();
@@ -578,6 +585,15 @@ impl KitsuneP2pActor {
                                                     )
                                                     .await;
 
+                                                // TODO - check regions
+                                                //        if there, use that
+                                                //        instead of the hashes
+
+                                                let _fetch_context =
+                                                    fetch_queue.remove(&FetchKey::Op {
+                                                        op_hash: op_hash.clone(),
+                                                    });
+
                                                 // TODO - check op_hash against
                                                 //        active fetch queue
 
@@ -633,6 +649,7 @@ impl KitsuneP2pActor {
             config: Arc::new(config),
             bandwidth_throttles,
             parallel_notify_permit,
+            fetch_queue,
         })
     }
 }
@@ -921,6 +938,8 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let config = Arc::clone(&self.config);
         let bandwidth_throttles = self.bandwidth_throttles.clone();
         let parallel_notify_permit = self.parallel_notify_permit.clone();
+        let fetch_queue = self.fetch_queue.clone();
+
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
@@ -931,6 +950,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                     config,
                     bandwidth_throttles,
                     parallel_notify_permit,
+                    fetch_queue,
                 )
                 .await
                 .expect("cannot fail to create space");

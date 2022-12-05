@@ -2,6 +2,7 @@ use super::*;
 use crate::metrics::*;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_fetch::FetchQueue;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
@@ -101,6 +102,7 @@ pub(crate) async fn spawn_space(
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
+    fetch_queue: FetchQueue,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     ghost_actor::GhostSender<SpaceInternal>,
@@ -129,6 +131,7 @@ pub(crate) async fn spawn_space(
         config,
         bandwidth_throttles,
         parallel_notify_permit,
+        fetch_queue,
     )));
 
     Ok((sender, i_s, evt_recv))
@@ -1177,6 +1180,8 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) metrics: MetricsSync,
     pub(crate) metric_exchange: MetricExchangeSync,
     pub(crate) publish_pending_delegates: parking_lot::Mutex<HashMap<KOpHash, PendingDelegate>>,
+    #[allow(dead_code)]
+    pub(crate) fetch_queue: FetchQueue,
 }
 
 impl SpaceReadOnlyInner {
@@ -1254,6 +1259,7 @@ impl Space {
         config: Arc<KitsuneP2pConfig>,
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
+        fetch_queue: FetchQueue,
     ) -> Self {
         let metrics = MetricsSync::default();
 
@@ -1322,6 +1328,7 @@ impl Space {
                         evt_sender.clone(),
                         host_api.clone(),
                         metrics.clone(),
+                        fetch_queue.clone(),
                     ),
                 )
             })
@@ -1421,6 +1428,7 @@ impl Space {
             metrics,
             metric_exchange,
             publish_pending_delegates: parking_lot::Mutex::new(HashMap::new()),
+            fetch_queue,
         });
 
         Self {

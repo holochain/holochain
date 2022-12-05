@@ -174,6 +174,7 @@ impl ShardedGossip {
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
+        fetch_queue: FetchQueue,
         #[cfg(feature = "test")] enable_history: bool,
     ) -> Arc<Self> {
         #[cfg(feature = "test")]
@@ -185,8 +186,6 @@ impl ShardedGossip {
 
         #[cfg(not(feature = "test"))]
         let state = Default::default();
-
-        let fetch_queue = FetchQueue::new_bitwise_or();
 
         let this = Arc::new(Self {
             ep_hnd,
@@ -1332,6 +1331,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
+        fetch_queue: FetchQueue,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1342,6 +1342,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
+            fetch_queue,
         ))
     }
 }
@@ -1365,6 +1366,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
+        fetch_queue: FetchQueue,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1375,6 +1377,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             GossipType::Historical,
             self.bandwidth.clone(),
             metrics,
+            fetch_queue,
         ))
     }
 }
