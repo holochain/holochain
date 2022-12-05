@@ -12,8 +12,9 @@ use arbitrary::Arbitrary;
 #[cfg(feature = "test_utils")]
 async fn signed_zome_call() {
     use holochain_conductor_api::ZomeCall;
+    use holochain_state::nonce::fresh_nonce;
     use holochain_zome_types::{
-        CapAccess, ExternIO, Nonce256Bits, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned,
+        CapAccess, ExternIO, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned,
     };
     use matches::assert_matches;
 
@@ -126,6 +127,7 @@ async fn signed_zome_call() {
     // );
 
     // a zome call with the cap secret of the authorized signing key should succeed
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     let response = conductor
         .call_zome(
             ZomeCall::try_from_unsigned_zome_call(
@@ -137,8 +139,8 @@ async fn signed_zome_call() {
                     fn_name: "create_entry".into(),
                     cap_secret: Some(cap_access_secret),
                     payload: ExternIO::encode(()).unwrap(),
-                    nonce: Nonce256Bits::from([0; 32]),
-                    expires_at: Timestamp(Timestamp::now().as_micros() + 100000),
+                    nonce,
+                    expires_at,
                 },
             )
             .await
