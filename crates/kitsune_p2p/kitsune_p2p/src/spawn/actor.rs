@@ -11,8 +11,7 @@ use crate::wire::MetricExchangeMsg;
 use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
-use kitsune_p2p_fetch::FetchKey;
-use kitsune_p2p_fetch::FetchQueue;
+use kitsune_p2p_fetch::*;
 use kitsune_p2p_proxy::tx2::*;
 use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
@@ -91,6 +90,9 @@ ghost_actor::ghost_chan! {
 
         /// Del Con
         fn del_con(url: TxUrl) -> ();
+
+        /// Fetch an op from a remote
+        fn fetch(key: FetchKey, space: KSpace, source: FetchSource) -> ();
     }
 }
 
@@ -283,6 +285,21 @@ impl KitsuneP2pActor {
 
         // TODO - use a real config
         let fetch_queue = FetchQueue::new_bitwise_or();
+
+        // Start a loop to handle our fetch queue fetch items.
+        {
+            let fetch_queue = fetch_queue.clone();
+            let i_s = internal_sender.clone();
+            tokio::task::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+                for (key, space, source) in fetch_queue.get_items_to_fetch() {
+                    if let Err(err) = i_s.fetch(key, space, source).await {
+                        tracing::debug!(?err);
+                    }
+                }
+            });
+        }
 
         let i_s = internal_sender.clone();
         tokio::task::spawn({
@@ -836,6 +853,34 @@ impl InternalHandler for KitsuneP2pActor {
             }
             let _ = futures::future::join_all(all).await;
             Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_fetch(
+        &mut self,
+        key: FetchKey,
+        space: KSpace,
+        source: FetchSource,
+    ) -> InternalHandlerResult<()> {
+        // TODO - fix node handling
+        let agent = match source {
+            FetchSource::Agent(agent) => agent,
+            FetchSource::Node(_) => todo!(),
+        };
+
+        let space_sender = match self.spaces.get_mut(&space) {
+            None => {
+                tracing::warn!("received fetch for unhandled space: {:?}", space);
+                return unit_ok_fut();
+            }
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (_, space_inner) = space_sender.await;
+            let payload = wire::Wire::fetch_op(vec![(space, vec![key])]);
+            space_inner.notify(agent, payload).await
         }
         .boxed()
         .into())

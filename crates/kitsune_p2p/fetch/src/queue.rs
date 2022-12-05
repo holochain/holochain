@@ -34,6 +34,11 @@ pub type FetchConfig = Arc<dyn FetchQueueConfig>;
 
 /// Host-defined details about how the fetch queue should function
 pub trait FetchQueueConfig: 'static + Send + Sync {
+    /// How often we should attempt to fetch items by source.
+    fn fetch_retry_interval(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(5 * 60)
+    }
+
     /// When a fetch key is added twice, this determines how the two different contexts
     /// get reconciled.
     fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32;
@@ -127,6 +132,22 @@ impl FetchQueue {
     pub fn remove(&self, key: &FetchKey) -> Option<FetchContext> {
         self.state
             .share_mut(|s, _| Ok(s.remove(key)))
+            .expect("no error")
+    }
+
+    /// Get a list of the next items that should be fetched.
+    pub fn get_items_to_fetch(&self) -> Vec<(FetchKey, KSpace, FetchSource)> {
+        let interval = self.config.fetch_retry_interval();
+        self.state
+            .share_mut(|s, _| {
+                let mut out = Vec::new();
+
+                for (key, space, source) in s.iter_mut(interval) {
+                    out.push((key, space, source));
+                }
+
+                Ok(out)
+            })
             .expect("no error")
     }
 }

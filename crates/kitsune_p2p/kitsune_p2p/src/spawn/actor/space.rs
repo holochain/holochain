@@ -77,6 +77,12 @@ ghost_actor::ghost_chan! {
             maybe_delegate: MaybeDelegate,
         ) -> ();
 
+        /// Send a raw notify.
+        fn notify(
+            to_agent: KAgent,
+            data: wire::Wire,
+        ) -> ();
+
         /// We just received data for an op_hash. Check if we had a pending
         /// delegation action we need to continue now that we have the data.
         fn resolve_publish_pending_delegates(space: KSpace, op_hash: KOpHash) -> ();
@@ -469,6 +475,48 @@ impl SpaceInternalHandler for Space {
                             },
                         );
                     }
+                }
+            }
+
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_notify(&mut self, to_agent: KAgent, data: wire::Wire) -> InternalHandlerResult<()> {
+        let ro_inner = self.ro_inner.clone();
+        let timeout = ro_inner.config.tuning_params.implicit_timeout();
+
+        Ok(async move {
+            match discover::search_and_discover_peer_connect(
+                ro_inner.clone(),
+                to_agent.clone(),
+                timeout,
+            )
+            .await
+            {
+                discover::PeerDiscoverResult::OkShortcut => {
+                    use kitsune_p2p_types::codec::Codec;
+                    if let Err(err) = ro_inner
+                        .evt_sender
+                        .notify(
+                            ro_inner.space.clone(),
+                            to_agent,
+                            data.encode_vec().expect("encode data"),
+                        )
+                        .await
+                    {
+                        tracing::debug!(?err);
+                    }
+                }
+                discover::PeerDiscoverResult::OkRemote { url: _, con_hnd } => {
+                    if let Err(err) = con_hnd.notify(&data, timeout).await {
+                        tracing::debug!(?err);
+                    }
+                }
+                discover::PeerDiscoverResult::Err(err) => {
+                    tracing::debug!(?err);
                 }
             }
 
