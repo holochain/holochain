@@ -649,13 +649,15 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    async fn enzymatic_session() {
+    async fn enzymatic_session_success() {
         observability::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
+            alice_cell,
             alice_pubkey,
             bob,
+            bob_cell,
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
@@ -746,6 +748,8 @@ pub mod wasm_test {
             )
             .await;
 
+        consistency_10s([&alice_cell, &bob_cell]).await;
+
         // Now the action appears in alice's activty.
         let alice_activity: AgentActivity = conductor
             .call(
@@ -779,6 +783,7 @@ pub mod wasm_test {
             bob_activity.valid_activity.len(),
             bob_activity_pre.valid_activity.len() + 1
         );
+
     }
 
     #[tokio::test(flavor = "multi_thread")]
