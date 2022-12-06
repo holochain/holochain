@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace, Tx2Cert};
+use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace /*, Tx2Cert*/};
 use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchKey, FetchOptions, FetchQueuePush, RoughInt};
@@ -98,8 +98,8 @@ struct SourceRecord {
 pub enum FetchSource {
     /// An agent on a node
     Agent(KAgent),
-    /// A node, without agent specified
-    Node(Tx2Cert),
+    // /// A node, without agent specified
+    // Node(Tx2Cert),
 }
 
 // TODO: move this to host, but for now, for convenience, we just use this one config

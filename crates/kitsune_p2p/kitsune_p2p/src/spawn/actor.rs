@@ -865,11 +865,7 @@ impl InternalHandler for KitsuneP2pActor {
         space: KSpace,
         source: FetchSource,
     ) -> InternalHandlerResult<()> {
-        // TODO - fix node handling
-        let agent = match source {
-            FetchSource::Agent(agent) => agent,
-            FetchSource::Node(_) => todo!(),
-        };
+        let FetchSource::Agent(agent) = source;
 
         let space_sender = match self.spaces.get_mut(&space) {
             None => {
