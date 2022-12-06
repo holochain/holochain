@@ -166,8 +166,8 @@ async fn standard_responses(
             .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));
     }
     evt_handler
-        .expect_handle_gossip()
-        .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
+        .expect_handle_receive_ops()
+        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
 
     (evt_handler, Arc::new(host_api))
 }

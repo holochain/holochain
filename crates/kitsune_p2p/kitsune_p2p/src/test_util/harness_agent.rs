@@ -277,10 +277,11 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_gossip(
+    fn handle_receive_ops(
         &mut self,
         _space: Arc<super::KitsuneSpace>,
         ops: Vec<KOp>,
+        _context: Option<kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         for op_data in ops {
             // TODO: check that we're handling string data uniformly in both directions

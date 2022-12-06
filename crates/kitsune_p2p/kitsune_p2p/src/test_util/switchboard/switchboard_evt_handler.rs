@@ -259,10 +259,11 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         todo!()
     }
 
-    fn handle_gossip(
+    fn handle_receive_ops(
         &mut self,
         _space: Arc<KitsuneSpace>,
         ops: Vec<KOp>,
+        _context: Option<kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();

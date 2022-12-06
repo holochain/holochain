@@ -4,6 +4,7 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::sync::Arc;
 
 mod types;
@@ -71,7 +72,7 @@ pub trait HolochainP2pDnaT {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        op_hash_list: Vec<DhtOpHash>,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()>;
 
@@ -228,7 +229,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        op_hash_list: Vec<DhtOpHash>,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender

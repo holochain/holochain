@@ -33,14 +33,6 @@ pub enum WireMessage {
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
-    Publish {
-        request_validation_receipt: bool,
-        countersigning_session: bool,
-        // For backward compat with holochain < 0.0.164
-        #[serde(alias = "dht_hash")]
-        basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
-    },
     ValidationReceipt {
         #[serde(with = "serde_bytes")]
         receipt: Vec<u8>,
@@ -94,20 +86,6 @@ impl WireMessage {
             from_agent,
             cap_secret,
             data: payload.into_vec(),
-        }
-    }
-
-    pub fn publish(
-        request_validation_receipt: bool,
-        countersigning_session: bool,
-        basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
-    ) -> WireMessage {
-        Self::Publish {
-            request_validation_receipt,
-            countersigning_session,
-            basis_hash,
-            ops,
         }
     }
 

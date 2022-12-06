@@ -712,7 +712,7 @@ async fn handle_events(
                     .boxed()
                     .into()));
                 }
-                event::KitsuneP2pEvent::Gossip {
+                event::KitsuneP2pEvent::ReceiveOps {
                     respond,
                     space,
                     ops,

@@ -40,7 +40,7 @@ type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
-type OpHashList = Vec<KOpHash>;
+type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
 
 ghost_actor::ghost_chan! {
@@ -586,6 +586,7 @@ impl KitsuneP2pActor {
                                     wire::Wire::PushOpData(wire::PushOpData { op_data_list }) => {
                                         for (space, op_list) in op_data_list {
                                             for op in op_list {
+                                                // hash the op
                                                 let op_hash =
                                                     match host.op_hash(op.op_data.clone()).await {
                                                         Ok(op_hash) => op_hash,
@@ -602,31 +603,31 @@ impl KitsuneP2pActor {
                                                     )
                                                     .await;
 
-                                                // TODO - check regions
-                                                //        if there, use that
-                                                //        instead of the hashes
+                                                // MAYBE: do something with the
+                                                //        is_last bool?
+                                                //        Right now we don't
+                                                //        really care, because
+                                                //        if it's a region
+                                                //        we know it's gossip
+                                                //        so it's okay if
+                                                //        the context is
+                                                //        `None`.
+                                                let fetch_context =
+                                                    if let Some((region, _is_last)) = op.region {
+                                                        fetch_queue
+                                                            .remove(&FetchKey::Region(region))
+                                                    } else {
+                                                        fetch_queue
+                                                            .remove(&FetchKey::Op(op_hash.clone()))
+                                                    };
 
-                                                let _fetch_context = fetch_queue
-                                                    .remove(&FetchKey::Op(op_hash.clone()));
-
-                                                // TODO - check op_hash against
-                                                //        active fetch queue
-
-                                                // TODO - if we have context,
-                                                //        make sure to pass
-                                                //        publish
-                                                //        countersigning
-                                                //        info on publish
-
-                                                // TODO - remove this in favor
-                                                //        of a publish/gossip
-                                                //        combo event
-                                                //        yet to be added
-                                                //        (or maybe just switch
-                                                //        between this and
-                                                //        publish via context?)
+                                                // forward the received op
                                                 let _ = evt_sender
-                                                    .gossip(space.clone(), vec![op.op_data])
+                                                    .receive_ops(
+                                                        space.clone(),
+                                                        vec![op.op_data],
+                                                        fetch_context,
+                                                    )
                                                     .await;
                                             }
                                         }
@@ -930,12 +931,13 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         Ok(self.evt_sender.notify(space, to_agent, payload))
     }
 
-    fn handle_gossip(
+    fn handle_receive_ops(
         &mut self,
         space: Arc<KitsuneSpace>,
         ops: Vec<KOp>,
+        context: Option<FetchContext>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.gossip(space, ops))
+        Ok(self.evt_sender.receive_ops(space, ops, context))
     }
 
     fn handle_fetch_op_data(
@@ -1228,10 +1230,11 @@ mockall::mock! {
             payload: Vec<u8>,
         ) -> KitsuneP2pEventHandlerResult<()> ;
 
-        fn handle_gossip(
+        fn handle_receive_ops(
             &mut self,
             space: Arc<KitsuneSpace>,
             ops: Vec<KOp>,
+            context: Option<FetchContext>,
         ) -> KitsuneP2pEventHandlerResult<()>;
 
         fn handle_query_op_hashes(

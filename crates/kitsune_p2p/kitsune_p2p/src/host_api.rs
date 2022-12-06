@@ -1,4 +1,4 @@
-use kitsune_p2p_fetch::{FetchQueueConfig, OpHashSized};
+use kitsune_p2p_fetch::OpHashSized;
 use must_future::MustBoxFuture;
 use std::sync::Arc;
 

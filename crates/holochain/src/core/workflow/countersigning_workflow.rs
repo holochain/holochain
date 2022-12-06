@@ -13,6 +13,7 @@ use holochain_types::dht_op::DhtOp;
 use holochain_types::signal::{Signal, SystemSignal};
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedAction, ZomeCallResponse};
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::{named_params, Transaction};
 
@@ -286,7 +287,14 @@ pub(crate) async fn countersigning_success(
             }
             let op = DhtOp::RegisterAgentActivity(signature, action);
             let basis = op.dht_basis();
-            let ops = vec![DhtOpHash::with_data_sync(&op)];
+            use holochain_p2p::DhtOpHashExt;
+            let hash_sized = OpHashSized::new(
+                DhtOpHash::with_data_sync(&op).to_kitsune(),
+                // MAYBE: figure out the size some day?
+                //        it's not dire for countersigning publishes
+                None,
+            );
+            let ops = vec![hash_sized];
             if let Err(e) = network.publish(false, false, basis, ops, None).await {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
@@ -326,7 +334,14 @@ pub async fn countersigning_publish(
         }
     } else {
         let basis = op.dht_basis();
-        let ops = vec![DhtOpHash::with_data_sync(&op)];
+        use holochain_p2p::DhtOpHashExt;
+        let hash_sized = OpHashSized::new(
+            DhtOpHash::with_data_sync(&op).to_kitsune(),
+            // MAYBE: figure out the size some day?
+            //        it's not dire for countersigning publishes
+            None,
+        );
+        let ops = vec![hash_sized];
         if let Err(e) = network.publish(false, true, basis, ops, None).await {
             tracing::error!(
                 "Failed to publish to entry authorities for countersigning session because of: {:?}",

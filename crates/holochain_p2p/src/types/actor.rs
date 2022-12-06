@@ -4,6 +4,7 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
 
 /// Request a validation package.
@@ -245,7 +246,7 @@ ghost_actor::ghost_chan! {
             request_validation_receipt: bool,
             countersigning_session: bool,
             basis_hash: holo_hash::OpBasis,
-            op_hash_list: Vec<DhtOpHash>,
+            op_hash_list: Vec<OpHashSized>,
             timeout_ms: Option<u64>,
         ) -> ();
 

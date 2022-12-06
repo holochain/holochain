@@ -78,17 +78,27 @@ impl<T> RoughSized<T> {
     pub fn into_inner(self) -> (T, Option<RoughInt>) {
         (self.data, self.size)
     }
+
+    /// Accessor
+    pub fn data_ref(&self) -> &T {
+        &self.data
+    }
+
+    /// Accessor
+    pub fn maybe_size(&self) -> Option<RoughInt> {
+        self.size
+    }
+
+    /// Accessor
+    pub fn size(&self) -> RoughInt {
+        self.size.unwrap_or_default()
+    }
 }
 
 impl<T: Clone> RoughSized<T> {
     /// Accessor
     pub fn data(&self) -> T {
         self.data.clone()
-    }
-
-    /// Accessor
-    pub fn size(&self) -> RoughInt {
-        self.size.unwrap_or_default()
     }
 }
 

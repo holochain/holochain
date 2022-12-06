@@ -346,8 +346,7 @@ impl HolochainP2pMockMsg {
                 | crate::wire::WireMessage::GetAgentActivity { .. }
                 | crate::wire::WireMessage::MustGetAgentActivity { .. } => next_msg_id().as_req(),
 
-                crate::wire::WireMessage::Publish { .. }
-                | crate::wire::WireMessage::CountersigningSessionNegotiation { .. } => {
+                crate::wire::WireMessage::CountersigningSessionNegotiation { .. } => {
                     MsgId::new_notify()
                 }
             },
@@ -374,8 +373,7 @@ impl HolochainP2pMockMsg {
                     | crate::wire::WireMessage::GetAgentActivity { .. }
                     | crate::wire::WireMessage::MustGetAgentActivity { .. } => true,
 
-                    crate::wire::WireMessage::Publish { .. }
-                    | crate::wire::WireMessage::CountersigningSessionNegotiation { .. } => false,
+                    crate::wire::WireMessage::CountersigningSessionNegotiation { .. } => false,
                 };
                 let to_agent = to_agent.to_kitsune();
                 let space = dna.to_kitsune();
