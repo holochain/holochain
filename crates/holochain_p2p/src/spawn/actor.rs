@@ -1012,7 +1012,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        op_hash_list: Vec<DhtOpHash>,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
         use kitsune_p2p_types::KitsuneTimeout;
@@ -1027,11 +1027,6 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let fetch_context = FetchContext::default()
             .with_request_validation_receipt(request_validation_receipt)
             .with_countersigning_session(countersigning_session);
-
-        let op_hash_list = op_hash_list
-            .into_iter()
-            .map(|op| op.into_kitsune())
-            .collect::<Vec<_>>();
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {

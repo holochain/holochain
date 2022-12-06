@@ -73,7 +73,10 @@ pub enum BroadcastData {
     AgentInfo(kitsune_p2p_types::agent_info::AgentInfoSigned),
 
     /// Publish broadcast.
-    Publish(Vec<KOpHash>, kitsune_p2p_fetch::FetchContext),
+    Publish(
+        Vec<kitsune_p2p_fetch::OpHashSized>,
+        kitsune_p2p_fetch::FetchContext,
+    ),
 }
 
 type KSpace = Arc<super::KitsuneSpace>;
@@ -84,7 +87,6 @@ type KBasis = Arc<super::KitsuneBasis>;
 type Payload = Vec<u8>;
 type OptU64 = Option<u64>;
 type OptArc = Option<crate::dht_arc::DhtArc>;
-use kitsune_p2p_types::KOpHash;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.

@@ -3,6 +3,7 @@ use std::time::UNIX_EPOCH;
 
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
+use holochain_p2p::DhtOpHashExt;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_state::query::prelude::*;
 use holochain_types::db::DbRead;
@@ -12,6 +13,7 @@ use holochain_types::prelude::OpBasis;
 use holochain_zome_types::Entry;
 use holochain_zome_types::EntryVisibility;
 use holochain_zome_types::SignedAction;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use rusqlite::named_params;
 use rusqlite::Transaction;
 
@@ -26,7 +28,7 @@ use super::MIN_PUBLISH_INTERVAL;
 pub async fn get_ops_to_publish(
     agent: AgentPubKey,
     db: &DbRead<DbKindAuthored>,
-) -> WorkflowResult<Vec<(OpBasis, DhtOpHash)>> {
+) -> WorkflowResult<Vec<(OpBasis, OpHashSized)>> {
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
@@ -40,6 +42,11 @@ pub async fn get_ops_to_publish(
                 "
             SELECT
             Action.blob as action_blob,
+            LENGTH(Action.blob) AS action_size,
+            CASE
+              WHEN DhtOp.type IN ('StoreEntry', 'StoreRecord') THEN LENGTH(Entry.blob)
+              ELSE 0
+            END AS entry_size,
             Entry.blob as entry_blob,
             DhtOp.type as dht_type,
             DhtOp.hash as dht_hash
@@ -67,9 +74,13 @@ pub async fn get_ops_to_publish(
                     ":store_entry": DhtOpType::StoreEntry,
                 },
                 |row| {
+                    let action_size: usize = row.get("action_size")?;
+                    let entry_size: usize = row.get("entry_size")?;
+                    let op_size = (action_size + entry_size).into();
                     let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                     let op_type: DhtOpType = row.get("dht_type")?;
                     let hash: DhtOpHash = row.get("dht_hash")?;
+                    let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
                     let entry = match action.0.entry_type().map(|et| et.visibility()) {
                         Some(EntryVisibility::Public) => {
                             let entry: Option<Vec<u8>> = row.get("entry_blob")?;
@@ -82,7 +93,7 @@ pub async fn get_ops_to_publish(
                     };
                     let op = DhtOp::from_type(op_type, action, entry)?;
                     let basis = op.dht_basis();
-                    WorkflowResult::Ok((basis, hash))
+                    WorkflowResult::Ok((basis, op_hash_sized))
                 },
             )?;
             WorkflowResult::Ok(r.collect())
@@ -162,11 +173,13 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            r.into_iter().map(|t| t.1).collect::<Vec<_>>(),
+            r.into_iter()
+                .map(|t| t.1.into_inner().0)
+                .collect::<Vec<_>>(),
             expected
                 .results
                 .into_iter()
-                .map(|op| op.into_inner().1)
+                .map(|op| op.into_inner().1.to_kitsune())
                 .collect::<Vec<_>>(),
         );
     }

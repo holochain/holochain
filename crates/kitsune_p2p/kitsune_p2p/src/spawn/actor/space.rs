@@ -27,7 +27,7 @@ type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
-type OpHashList = Vec<KOpHash>;
+type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
 
 ghost_actor::ghost_chan! {
@@ -434,10 +434,12 @@ impl SpaceInternalHandler for Space {
     ) -> InternalHandlerResult<()> {
         let ro_inner = self.ro_inner.clone();
 
+        let just_hashes = op_hash_list.iter().map(|s| s.data()).collect();
+
         Ok(async move {
             let have_data_list = ro_inner
                 .host_api
-                .check_op_data(space.clone(), op_hash_list.clone())
+                .check_op_data(space.clone(), just_hashes)
                 .await
                 .map_err(KitsuneP2pError::other)?;
 
@@ -460,11 +462,10 @@ impl SpaceInternalHandler for Space {
                 } else {
                     // Add this hash to our fetch queue.
                     ro_inner.fetch_queue.push(FetchQueuePush {
-                        key: FetchKey::Op(op_hash.clone()),
+                        key: FetchKey::Op(op_hash.data()),
                         space: space.clone(),
                         source: FetchSource::Agent(to_agent.clone()),
-                        // TODO - get the size from somewhere
-                        size: None,
+                        size: op_hash.maybe_size(),
                         // TODO - get the author from somewhere
                         author: None,
                         options: None,
@@ -475,7 +476,7 @@ impl SpaceInternalHandler for Space {
                     // to invoke the delegation on receipt of data.
                     if let Some((basis, mod_idx, mod_cnt)) = &maybe_delegate {
                         ro_inner.clone().publish_pending_delegate(
-                            op_hash.clone(),
+                            op_hash.data(),
                             PendingDelegate {
                                 space: space.clone(),
                                 basis: basis.clone(),
