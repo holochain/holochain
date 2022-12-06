@@ -427,7 +427,9 @@ async fn mock_network_sharded_gossip() {
     let num_hashes_alice_should_hold = Arc::new(AtomicUsize::new(0));
 
     // Create some oneshot to notify of any publishes to the wrong node.
-    let (bad_publish_tx, mut bad_publish_rx) = tokio::sync::oneshot::channel();
+    // TODO (david.b) - publish has been replaced by a combined receive_ops
+    //let (bad_publish_tx, mut bad_publish_rx) = tokio::sync::oneshot::channel();
+
     // Create some oneshot to notify of any gets to the wrong node.
     let (bad_get_tx, mut bad_get_rx) = tokio::sync::oneshot::channel();
     // Track the agents that have been gossiped with.
@@ -445,7 +447,9 @@ async fn mock_network_sharded_gossip() {
             let mut agents_gossiped_with = HashSet::new();
             let mut num_missed_gossips = 0;
             let mut last_intervals = None;
-            let mut bad_publish = Some(bad_publish_tx);
+            // TODO (david.b) - publish has been replaced by a
+            //                  combined receive_ops
+            //let mut bad_publish = Some(bad_publish_tx);
             let mut bad_get = Some(bad_get_tx);
 
             // Get the next network message.
@@ -461,6 +465,8 @@ async fn mock_network_sharded_gossip() {
                 match msg {
                     HolochainP2pMockMsg::Wire { msg, .. } => match msg {
                         holochain_p2p::WireMessage::CallRemote { .. } => debug!("CallRemote"),
+                        /* (david.b) TODO - this has been replaced by
+                         *                  combined `receive_ops`
                         holochain_p2p::WireMessage::Publish { ops, .. } => {
                             if bad_publish.is_some() {
                                 let arc = data.agent_to_arc[&agent];
@@ -472,6 +478,7 @@ async fn mock_network_sharded_gossip() {
                                 }
                             }
                         }
+                        */
                         holochain_p2p::WireMessage::ValidationReceipt { receipt: _ } => {
                             debug!("Validation Receipt")
                         }
@@ -850,6 +857,8 @@ async fn mock_network_sharded_gossip() {
         }
     }
 
+    // TODO (david.b) - publish has been replaced by a combined receive_ops
+    /*
     // Check if we got any publishes to the wrong agent.
     match bad_publish_rx.try_recv() {
         Ok(_) | Err(tokio::sync::oneshot::error::TryRecvError::Closed) => {
@@ -857,6 +866,7 @@ async fn mock_network_sharded_gossip() {
         }
         Err(_) => (),
     }
+    */
 
     // Check if we got any gets to the wrong agent.
     match bad_get_rx.try_recv() {
@@ -969,7 +979,6 @@ async fn mock_network_sharding() {
                 match msg {
                     HolochainP2pMockMsg::Wire { msg, .. } => match msg {
                         holochain_p2p::WireMessage::CallRemote { .. } => debug!("CallRemote"),
-                        holochain_p2p::WireMessage::Publish { .. } => {}
                         holochain_p2p::WireMessage::ValidationReceipt { receipt: _ } => {
                             debug!("Validation Receipt")
                         }

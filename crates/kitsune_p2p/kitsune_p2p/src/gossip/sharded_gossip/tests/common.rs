@@ -1,6 +1,7 @@
 use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
 use crate::{HostStub, KitsuneHost};
+use kitsune_p2p_fetch::FetchQueueConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
@@ -165,8 +166,8 @@ async fn standard_responses(
             .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));
     }
     evt_handler
-        .expect_handle_gossip()
-        .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
+        .expect_handle_receive_ops()
+        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
 
     (evt_handler, Arc::new(host_api))
 }

@@ -1,3 +1,4 @@
+use kitsune_p2p_fetch::FetchQueueConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 

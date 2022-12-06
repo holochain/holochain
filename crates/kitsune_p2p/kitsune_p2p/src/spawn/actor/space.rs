@@ -458,7 +458,18 @@ impl SpaceInternalHandler for Space {
                     }
                     continue;
                 } else {
-                    // TODO - Add this hash to the fetch queue.
+                    // Add this hash to our fetch queue.
+                    ro_inner.fetch_queue.push(FetchQueuePush {
+                        key: FetchKey::Op(op_hash.clone()),
+                        space: space.clone(),
+                        source: FetchSource::Agent(to_agent.clone()),
+                        // TODO - get the size from somewhere
+                        size: None,
+                        // TODO - get the author from somewhere
+                        author: None,
+                        options: None,
+                        context: Some(context),
+                    });
 
                     // Register a callback if maybe_delegate.is_some()
                     // to invoke the delegation on receipt of data.

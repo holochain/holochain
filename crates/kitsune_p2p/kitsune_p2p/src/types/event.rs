@@ -227,6 +227,7 @@ type KAgent = Arc<super::KitsuneAgent>;
 type KOpHash = Arc<super::KitsuneOpHash>;
 type Payload = Vec<u8>;
 type Ops = Vec<KOp>;
+type MaybeContext = Option<kitsune_p2p_fetch::FetchContext>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
@@ -248,8 +249,13 @@ ghost_actor::ghost_chan! {
         /// We are receiving a notification from a remote node.
         fn notify(space: KSpace, to_agent: KAgent, payload: Payload) -> ();
 
-        /// We are receiving a dht op we may need to hold distributed via gossip.
-        fn gossip(space: KSpace, ops: Ops) -> ();
+        /// We have received ops to be integrated,
+        /// either through gossip or publish.
+        fn receive_ops(
+            space: KSpace,
+            ops: Ops,
+            context: MaybeContext,
+        ) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.
