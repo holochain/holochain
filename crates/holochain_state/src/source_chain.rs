@@ -1,3 +1,5 @@
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::integrate::authored_ops_to_dht_db;
@@ -34,13 +36,11 @@ use holochain_zome_types::ActionBuilder;
 use holochain_zome_types::ActionBuilderCommon;
 use holochain_zome_types::ActionExt;
 use holochain_zome_types::ActionHashed;
-use holochain_zome_types::ActionType;
 use holochain_zome_types::ActionUnweighed;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::CellId;
-use holochain_zome_types::ChainQueryFilter;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
@@ -82,6 +82,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     persisted_head: ActionHash,
     persisted_timestamp: Timestamp,
     public_only: bool,
+    zomes_initialized: Arc<AtomicBool>,
 }
 
 /// A source chain with read only access to the underlying databases.
@@ -468,6 +469,7 @@ where
             persisted_head,
             persisted_timestamp,
             public_only: false,
+            zomes_initialized: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -508,6 +510,7 @@ where
             persisted_head,
             persisted_timestamp,
             public_only: false,
+            zomes_initialized: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -557,14 +560,12 @@ where
         Ok(self.scratch.apply(|scratch| scratch.records().collect())?)
     }
 
-    pub async fn has_initialized(&self) -> SourceChainResult<bool> {
-        let query_filter = ChainQueryFilter {
-            action_type: Some(ActionType::InitZomesComplete),
-            ..QueryFilter::default()
-        };
-        let init_zomes_complete_actions = self.query(query_filter).await?;
-        let has_initialized = init_zomes_complete_actions.len() == 1;
-        Ok(has_initialized)
+    pub fn zomes_initialized(&self) -> bool {
+        self.zomes_initialized.load(Ordering::Relaxed)
+    }
+
+    pub fn set_zomes_initialized(&self, value: bool) {
+        self.zomes_initialized.store(value, Ordering::Relaxed);
     }
 
     pub fn is_empty(&self) -> SourceChainResult<bool> {
@@ -1313,6 +1314,7 @@ impl From<SourceChain> for SourceChainRead {
             persisted_head: chain.persisted_head,
             persisted_timestamp: chain.persisted_timestamp,
             public_only: chain.public_only,
+            zomes_initialized: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -2169,8 +2171,7 @@ pub mod tests {
             .unwrap();
 
         // has initialized should be false after genesis
-        let has_initialized = chain.has_initialized().await.unwrap();
-        assert_eq!(has_initialized, false);
+        assert_eq!(chain.zomes_initialized(), false);
 
         // insert init marker into source chain
         let result = chain
@@ -2188,7 +2189,6 @@ pub mod tests {
         chain.flush(&mock).await.unwrap();
 
         // has initialized should be true after init zomes has run
-        let has_initialized = chain.has_initialized().await.unwrap();
-        assert_eq!(has_initialized, true);
+        assert_eq!(chain.zomes_initialized(), true);
     }
 }
