@@ -147,7 +147,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// This is a fire-and-forget "response" to the
         /// fire-and-forget "FetchOp" request, also sent via Notify.
         PushOpData(0x61) {
-            op_data_list.1: Vec<(Arc<KitsuneSpace>, Vec<PushOpItem>)>,
+            op_data_list.0: Vec<(Arc<KitsuneSpace>, Vec<PushOpItem>)>,
         },
 
         /// MetricsExchangeMessage
