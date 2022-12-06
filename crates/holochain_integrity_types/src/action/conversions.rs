@@ -1,18 +1,18 @@
 use super::*;
 
-impl From<u8> for ZomeId {
+impl From<u8> for ZomeIndex {
     fn from(a: u8) -> Self {
         Self(a)
     }
 }
 
-impl From<ZomeId> for u8 {
-    fn from(a: ZomeId) -> Self {
+impl From<ZomeIndex> for u8 {
+    fn from(a: ZomeIndex) -> Self {
         a.0
     }
 }
 
-impl std::fmt::Display for ZomeId {
+impl std::fmt::Display for ZomeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }

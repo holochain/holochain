@@ -80,7 +80,7 @@ how_many: 42
         fake_agent_pubkey_1(),
         fake_dna_path,
         Some(properties.clone()),
-        "role_id".into(),
+        "role_name".into(),
         10000,
     )
     .await;

@@ -398,14 +398,14 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///
     /// The resulting [`InstalledAppInfo`] contains the app ID,
-    /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
+    /// the [`RoleName`]s and, most usefully, the new [`CellId`]s
     /// of the newly installed DNAs.
     AppInstalled(InstalledAppInfo),
 
     /// The successful response to an [`AdminRequest::InstallAppBundle`].
     ///
     /// The resulting [`InstalledAppInfo`] contains the app ID,
-    /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
+    /// the [`RoleName`]s and, most usefully, the new [`CellId`]s
     /// of the newly installed DNAs.
     AppBundleInstalled(InstalledAppInfo),
 

@@ -217,14 +217,14 @@ async fn bob_links_in_a_legit_way(
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let link_tag = fixt!(LinkTag);
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data
+    let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_id;
+        .zome_index;
     // 3
     call_data
         .commit_entry(
             base.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;
@@ -233,7 +233,7 @@ async fn bob_links_in_a_legit_way(
     call_data
         .commit_entry(
             target.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;
@@ -244,7 +244,7 @@ async fn bob_links_in_a_legit_way(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
-            zome_id,
+            zome_index,
             LinkType(0),
             link_tag.clone(),
         )
@@ -277,15 +277,15 @@ async fn bob_makes_a_large_link(
     let link_tag = LinkTag(bytes);
 
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data
+    let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_id;
+        .zome_index;
 
     // 6
     let original_action_address = call_data
         .commit_entry(
             base.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;
@@ -294,7 +294,7 @@ async fn bob_makes_a_large_link(
     call_data
         .commit_entry(
             target.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;
@@ -305,7 +305,7 @@ async fn bob_makes_a_large_link(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
-            zome_id,
+            zome_index,
             LinkType(0),
             link_tag.clone(),
         )
@@ -329,15 +329,15 @@ async fn bob_makes_a_large_link(
 async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {
     let legit_entry = Post("Bob is the best and I'll link to proof so you can check".into());
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data
+    let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_id;
+        .zome_index;
 
     // 11
     call_data
         .commit_entry(
             legit_entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;

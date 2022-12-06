@@ -14,7 +14,9 @@ pub enum KeystoreError {
 
     /// Used in TryFrom implementations for some zome types.
     #[error("Secure primitive error: {0}")]
-    SecurePrimitiveError(#[from] holochain_zome_types::SecurePrimitiveError),
+    SecurePrimitiveError(
+        #[from] holochain_zome_types::dependencies::holochain_integrity_types::SecurePrimitiveError,
+    ),
 
     /// Unexpected Internal Error.
     #[error("Other: {0}")]

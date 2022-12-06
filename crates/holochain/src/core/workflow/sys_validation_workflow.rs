@@ -297,7 +297,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
         ValidationOutcome::VerifySignature(_, _) => Rejected,
-        ValidationOutcome::ZomeId(_) => Rejected,
+        ValidationOutcome::ZomeIndex(_) => Rejected,
         ValidationOutcome::CounterSigningError(_) => Rejected,
     }
 }
@@ -616,9 +616,9 @@ async fn store_entry(
 
     // Checks
     check_entry_type(entry_type, entry)?;
-    if let EntryType::App(app_entry_type) = entry_type {
+    if let EntryType::App(app_entry_def) = entry_type {
         let entry_def =
-            check_app_entry_type(workspace.dna_hash(), app_entry_type, conductor_handle).await?;
+            check_app_entry_def(workspace.dna_hash(), app_entry_def, conductor_handle).await?;
         check_not_private(&entry_def)?;
     }
 

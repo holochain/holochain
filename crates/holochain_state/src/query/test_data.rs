@@ -49,7 +49,7 @@ pub struct RecordTestData {
 impl LinkTestData {
     pub fn new() -> Self {
         let mut create_link = fixt!(CreateLink);
-        create_link.zome_id = 0.into();
+        create_link.zome_index = 0.into();
         let mut later_create_link = create_link.clone();
         let mut delete_link = fixt!(DeleteLink);
 
@@ -114,7 +114,7 @@ impl LinkTestData {
             target: target_hash.clone().into(),
             timestamp: create_link.timestamp,
             tag: create_link.tag.clone(),
-            zome_id: create_link.zome_id,
+            zome_index: create_link.zome_index,
             link_type: create_link.link_type,
             create_link_hash: create_link_hash.clone(),
         };
@@ -123,12 +123,12 @@ impl LinkTestData {
             target: target_hash.clone().into(),
             timestamp: later_create_link.timestamp,
             tag: later_create_link.tag.clone(),
-            zome_id: later_create_link.zome_id,
+            zome_index: later_create_link.zome_index,
             link_type: later_create_link.link_type,
             create_link_hash: later_create_link_hash.clone(),
         };
 
-        let base_query = GetLinksQuery::base(base_hash.clone().into(), vec![ZomeId(0)]);
+        let base_query = GetLinksQuery::base(base_hash.clone().into(), vec![ZomeIndex(0)]);
         let tag_query = GetLinksQuery::new(
             base_hash.clone().into(),
             LinkTypeFilter::single_dep(0.into()),
@@ -166,12 +166,12 @@ impl EntryTestData {
         let entry_hash = EntryHash::with_data_sync(&entry);
         create.entry_hash = entry_hash.clone();
         update.entry_hash = entry_hash.clone();
-        create.entry_type = EntryType::App(AppEntryType::new(
+        create.entry_type = EntryType::App(AppEntryDef::new(
             0.into(),
             0.into(),
             EntryVisibility::Public,
         ));
-        update.entry_type = EntryType::App(AppEntryType::new(
+        update.entry_type = EntryType::App(AppEntryDef::new(
             0.into(),
             0.into(),
             EntryVisibility::Public,

@@ -69,7 +69,7 @@ a deeply nested structure.
 
 ```rust
 match op.to_type()? {
-    OpType::StoreEntry(OpEntry::CreateEntry { entry_type, .. }) => match entry_type {
+    OpType::StoreEntry(OpEntry::CreateEntry { entry_def, .. }) => match entry_def {
         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
             "No Bs allowed in this app".to_string(),

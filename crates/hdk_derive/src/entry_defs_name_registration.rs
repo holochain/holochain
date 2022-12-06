@@ -83,7 +83,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 match zome_info()?.zome_types.entries.get(value) {
                     Some(t) => Ok(t),
                     _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "{:?} does not map to any ZomeId and EntryDefIndex that is in scope for this zome.",
+                        "{:?} does not map to any ZomeIndex and EntryDefIndex that is in scope for this zome.",
                         value
                     )))),
                 }
@@ -186,22 +186,22 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
             type Error = WasmError;
 
             fn try_from(value: #unit_ident) -> Result<Self, Self::Error> {
-                Ok(EntryType::App(AppEntryType::try_from(value)?))
+                Ok(EntryType::App(AppEntryDef::try_from(value)?))
             }
         }
 
-        impl TryFrom<#unit_ident> for AppEntryType {
+        impl TryFrom<#unit_ident> for AppEntryDef {
             type Error = WasmError;
 
             fn try_from(value: #unit_ident) -> Result<Self, Self::Error> {
                 let ScopedEntryDefIndex {
-                    zome_id,
-                    zome_type: id,
+                    zome_index,
+                    zome_type: entry_index,
                 } = value.try_into()?;
                 let def: EntryDef = value.into();
                 Ok(Self {
-                    id,
-                    zome_id,
+                    entry_index,
+                    zome_index,
                     visibility: def.visibility,
                 })
             }
@@ -227,24 +227,24 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         impl EntryTypesHelper for #ident {
             type Error = WasmError;
             fn deserialize_from_type<Z, I>(
-                zome_id: Z,
+                zome_index: Z,
                 entry_def_index: I,
                 entry: &Entry,
             ) -> std::result::Result<Option<Self>, Self::Error>
             where
-                Z: Into<ZomeId>,
+                Z: Into<ZomeIndex>,
                 I: Into<EntryDefIndex>
             {
-                let s = ScopedEntryDefIndex{ zome_id: zome_id.into(), zome_type: entry_def_index.into() };
+                let s = ScopedEntryDefIndex{ zome_index: zome_index.into(), zome_type: entry_def_index.into() };
                 let entries = zome_info()?.zome_types.entries;
                 match entries.find(#unit_ident::iter(), s) {
                     Some(unit) => {
                         Ok(Some((unit, entry).try_into()?))
                     }
-                    None => if entries.dependencies().any(|z| z == s.zome_id) {
+                    None => if entries.dependencies().any(|z| z == s.zome_index) {
                         Err(wasm_error!(WasmErrorInner::Guest(format!(
                             "Entry type: {:?} is out of range for this zome. \
-                            This happens when an Action is created with a ZomeId for a dependency \
+                            This happens when an Action is created with a ZomeIndex for a dependency \
                             of this zome and an EntryDefIndex that is out of range of all the \
                             app defined entry types.",
                             s

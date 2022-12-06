@@ -127,7 +127,7 @@ pub struct RegisterDna {
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
-/// AppRoleIds are set to `my-app-0`, `my-app-1` etc.
+/// RoleName are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallApp {
     #[structopt(short, long, default_value = "test-app")]
     /// Sets the InstalledAppId.
@@ -148,7 +148,7 @@ pub struct InstallApp {
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
-/// AppRoleIds are set to `my-app-0`, `my-app-1` etc.
+/// RoleNames are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallAppBundle {
     #[structopt(long)]
     /// Sets the InstalledAppId.

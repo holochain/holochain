@@ -17,7 +17,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
                 let _ = api.create_link(CreateLinkInput::new(
                     base,
                     hash.clone().into(),
-                    ZomeId(0),
+                    ZomeIndex(0),
                     LinkType::new(0),
                     ().into(),
                     ChainTopOrdering::Relaxed,
@@ -42,7 +42,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
                     let _ = api.create_link(CreateLinkInput::new(
                         base.clone(),
                         hash.clone().into(),
-                        ZomeId(0),
+                        ZomeIndex(0),
                         LinkType::new(0),
                         ().into(),
                         ChainTopOrdering::Relaxed,

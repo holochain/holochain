@@ -28,8 +28,8 @@ pub enum AppValidationError {
     RibosomeError(#[from] RibosomeError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
-    #[error("The app entry type {0:?} zome id was out of range")]
-    ZomeId(ZomeId),
+    #[error("The app entry type {0:?} zome index was out of range")]
+    ZomeIndex(ZomeIndex),
 }
 
 pub type AppValidationResult<T> = Result<T, AppValidationError>;

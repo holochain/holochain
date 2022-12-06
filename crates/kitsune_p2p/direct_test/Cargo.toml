@@ -12,8 +12,8 @@ edition = "2021"
 
 [dependencies]
 kitsune_p2p_direct = { version = "0.0.1", path = "../direct" }
-kitsune_p2p_transport_quic = { version = "^0.0.37", path = "../transport_quic" }
-kitsune_p2p_proxy = { version = "^0.0.37", path = "../proxy" }
+kitsune_p2p_transport_quic = { version = "^0.0.39", path = "../transport_quic" }
+kitsune_p2p_proxy = { version = "^0.0.39", path = "../proxy" }
 rand = "0.8.5"
 structopt = "0.3.21"
 tokio = { version = "1.11", features = ["full"] }

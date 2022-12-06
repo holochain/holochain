@@ -43,41 +43,41 @@ pub enum LinkTypes {
 #[test_case(0, 1 => matches Ok(Some(UnitEntryTypes::B)) ; "unit b")]
 #[test_case(0, 2 => matches Ok(Some(UnitEntryTypes::C)) ; "unit c")]
 fn test_get_unit_entry_type(
-    zome_id: u8,
+    zome_index: u8,
     entry_type: u8,
 ) -> Result<Option<UnitEntryTypes>, WasmErrorInner> {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
-    get_unit_entry_type::<EntryTypes>(zome_id.into(), entry_type.into()).map_err(|e| e.error)
+    get_unit_entry_type::<EntryTypes>(zome_index.into(), entry_type.into()).map_err(|e| e.error)
 }
 
 #[test_case(
-    EntryType::App(public_aet(0, 0))
+    EntryType::App(public_app_entry_def(0, 0))
     => matches Ok(ActivityEntry::App{entry_type: Some(UnitEntryTypes::A), ..}) ; "unit a")]
 #[test_case(
-    EntryType::App(public_aet(0, 1))
+    EntryType::App(public_app_entry_def(0, 1))
     => matches Ok(ActivityEntry::App{entry_type: Some(UnitEntryTypes::B), ..}) ; "unit b")]
 #[test_case(
-    EntryType::App(public_aet(0, 2))
+    EntryType::App(public_app_entry_def(0, 2))
     => matches Ok(ActivityEntry::App{entry_type: Some(UnitEntryTypes::C), ..}) ; "unit c")]
 #[test_case(
-    EntryType::App(private_aet(0, 0))
+    EntryType::App(private_app_entry_def(0, 0))
     => matches Ok(ActivityEntry::PrivateApp{entry_type: Some(UnitEntryTypes::A), ..}) ; "private unit a")]
 #[test_case(
-    EntryType::App(private_aet(0, 1))
+    EntryType::App(private_app_entry_def(0, 1))
     => matches Ok(ActivityEntry::PrivateApp{entry_type: Some(UnitEntryTypes::B), ..}) ; "private unit b")]
 #[test_case(
-    EntryType::App(private_aet(0, 2))
+    EntryType::App(private_app_entry_def(0, 2))
     => matches Ok(ActivityEntry::PrivateApp{entry_type: Some(UnitEntryTypes::C), ..}) ; "private unit c")]
 #[test_case(EntryType::AgentPubKey => matches Ok(ActivityEntry::Agent(_)); "agent")]
 #[test_case(EntryType::CapClaim => matches Ok(ActivityEntry::CapClaim(_)); "cap claim")]
 #[test_case(EntryType::CapGrant => matches Ok(ActivityEntry::CapGrant(_)); "cap grant")]
-#[test_case(EntryType::App(public_aet(0, 3)) => matches Err(WasmErrorInner::Guest(_)) ; "entry type out of range")]
-#[test_case(EntryType::App(private_aet(0, 3)) => matches Err(WasmErrorInner::Guest(_)) ; "private entry type out of range")]
+#[test_case(EntryType::App(public_app_entry_def(0, 3)) => matches Err(WasmErrorInner::Guest(_)) ; "entry type out of range")]
+#[test_case(EntryType::App(private_app_entry_def(0, 3)) => matches Err(WasmErrorInner::Guest(_)) ; "private entry type out of range")]
 #[test_case(
-    EntryType::App(public_aet(1, 0))
+    EntryType::App(public_app_entry_def(1, 0))
     => matches Ok(ActivityEntry::App{entry_type: None, ..}) ; "zome out of range")]
 #[test_case(
-    EntryType::App(private_aet(1, 0))
+    EntryType::App(private_app_entry_def(1, 0))
     => matches Ok(ActivityEntry::PrivateApp{entry_type: None, ..}) ; "private entry, zome out of range")]
 fn test_activity_entry(
     entry_type: EntryType,
@@ -87,22 +87,22 @@ fn test_activity_entry(
 }
 
 #[test_case(
-    EntryType::App(public_aet(0, 0)), RecordEntry::Present(e(A{}))
+    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::Present(e(A{}))
     => matches Ok(InScopeEntry::App(EntryTypes::A(A{}))) ; "a")]
 #[test_case(
-    EntryType::App(public_aet(0, 1)), RecordEntry::Present(e(B{}))
+    EntryType::App(public_app_entry_def(0, 1)), RecordEntry::Present(e(B{}))
     => matches Ok(InScopeEntry::App(EntryTypes::B(B{}))) ; "b")]
 #[test_case(
-    EntryType::App(public_aet(0, 2)), RecordEntry::Present(e(C{}))
+    EntryType::App(public_app_entry_def(0, 2)), RecordEntry::Present(e(C{}))
     => matches Ok(InScopeEntry::App(EntryTypes::C(C{}))) ; "c")]
 #[test_case(
-    EntryType::App(private_aet(0, 0)), RecordEntry::Hidden
+    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::Hidden
     => matches Ok(InScopeEntry::PrivateApp(UnitEntryTypes::A)) ; "private a")]
 #[test_case(
-    EntryType::App(private_aet(0, 1)), RecordEntry::Hidden
+    EntryType::App(private_app_entry_def(0, 1)), RecordEntry::Hidden
     => matches Ok(InScopeEntry::PrivateApp(UnitEntryTypes::B)) ; "private b")]
 #[test_case(
-    EntryType::App(private_aet(0, 2)), RecordEntry::Hidden
+    EntryType::App(private_app_entry_def(0, 2)), RecordEntry::Hidden
     => matches Ok(InScopeEntry::PrivateApp(UnitEntryTypes::C)) ; "private c")]
 #[test_case(
     EntryType::AgentPubKey, RecordEntry::Present(Entry::Agent(eh(0).into()))
@@ -114,37 +114,37 @@ fn test_activity_entry(
     EntryType::CapGrant, RecordEntry::Hidden
     => matches Ok(InScopeEntry::CapGrant) ; "cap grant")]
 #[test_case(
-    EntryType::App(public_aet(0, 0)), RecordEntry::Present(e(D::default()))
+    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::Present(e(D::default()))
     => matches Err(WasmErrorInner::Serialize(_)) ; "deserialization failure")]
 #[test_case(
-    EntryType::App(public_aet(0, 3)), RecordEntry::Present(e(A{}))
+    EntryType::App(public_app_entry_def(0, 3)), RecordEntry::Present(e(A{}))
     => matches Err(WasmErrorInner::Guest(_)) ; "entry type out of range")]
 #[test_case(
-    EntryType::App(private_aet(0, 3)), RecordEntry::Hidden
+    EntryType::App(private_app_entry_def(0, 3)), RecordEntry::Hidden
     => matches Err(WasmErrorInner::Guest(_)) ; "private entry type out of range")]
 #[test_case(
-    EntryType::App(public_aet(1, 0)), RecordEntry::Present(e(A{}))
+    EntryType::App(public_app_entry_def(1, 0)), RecordEntry::Present(e(A{}))
     => matches Err(WasmErrorInner::Host(_)) ; "zome id out of range")]
 #[test_case(
-    EntryType::App(private_aet(1, 0)), RecordEntry::Hidden
+    EntryType::App(private_app_entry_def(1, 0)), RecordEntry::Hidden
     => matches Err(WasmErrorInner::Host(_)) ; "private entry zome id out of range")]
 #[test_case(
-    EntryType::App(public_aet(0, 0)), RecordEntry::Hidden
+    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::Hidden
     => matches Err(WasmErrorInner::Guest(_)) ; "public entry hidden")]
 #[test_case(
-    EntryType::App(public_aet(0, 0)), RecordEntry::NotApplicable
+    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::NotApplicable
     => matches Err(WasmErrorInner::Guest(_)) ; "public entry not applicable")]
 #[test_case(
-    EntryType::App(public_aet(0, 0)), RecordEntry::NotStored
+    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::NotStored
     => matches Err(WasmErrorInner::Host(_)) ; "public entry not stored")]
 #[test_case(
-    EntryType::App(private_aet(0, 0)), RecordEntry::Present(e(A{}))
+    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::Present(e(A{}))
     => matches Err(WasmErrorInner::Guest(_)) ; "private entry present")]
 #[test_case(
-    EntryType::App(private_aet(0, 0)), RecordEntry::NotApplicable
+    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::NotApplicable
     => matches Err(WasmErrorInner::Guest(_)) ; "private entry not applicable")]
 #[test_case(
-    EntryType::App(private_aet(0, 0)), RecordEntry::NotStored
+    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::NotStored
     => matches Err(WasmErrorInner::Host(_)) ; "private entry not stored")]
 #[test_case(
     EntryType::AgentPubKey, RecordEntry::Hidden
@@ -186,9 +186,9 @@ fn test_map_entry(
 #[test_case(0, 2 => matches Ok(LinkTypes::C) ; "c")]
 #[test_case(0, 3 => matches Err(WasmErrorInner::Guest(_)) ; "link type out of scope")]
 #[test_case(1, 0 => matches Err(WasmErrorInner::Host(_)) ; "zome out of scope")]
-fn test_in_scope_link_type(zome_id: u8, link_type: u8) -> Result<LinkTypes, WasmErrorInner> {
+fn test_in_scope_link_type(zome_index: u8, link_type: u8) -> Result<LinkTypes, WasmErrorInner> {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
-    in_scope_link_type::<LinkTypes>(zome_id.into(), link_type.into()).map_err(|e| e.error)
+    in_scope_link_type::<LinkTypes>(zome_index.into(), link_type.into()).map_err(|e| e.error)
 }
 
 #[test_case(0, 0 => matches Ok(Some(LinkTypes::A)) ; "a")]
@@ -197,9 +197,9 @@ fn test_in_scope_link_type(zome_id: u8, link_type: u8) -> Result<LinkTypes, Wasm
 #[test_case(0, 3 => matches Err(WasmErrorInner::Guest(_)); "link type out of scope")]
 #[test_case(1, 0 => matches Ok(None) ; "zome out of scope is none")]
 fn test_activity_link_type(
-    zome_id: u8,
+    zome_index: u8,
     link_type: u8,
 ) -> Result<Option<LinkTypes>, WasmErrorInner> {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
-    activity_link_type::<LinkTypes>(zome_id.into(), link_type.into()).map_err(|e| e.error)
+    activity_link_type::<LinkTypes>(zome_index.into(), link_type.into()).map_err(|e| e.error)
 }

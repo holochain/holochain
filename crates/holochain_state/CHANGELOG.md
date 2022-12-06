@@ -4,6 +4,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.72
+
+## 0.0.71
+
+## 0.0.70
+
+## 0.0.69
+
 ## 0.0.68
 
 ## 0.0.67

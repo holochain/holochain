@@ -807,7 +807,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.1.7"
+version = "0.1.10"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.0.159"
+version = "0.0.163"
 dependencies = [
  "getrandom",
  "hdi",
@@ -841,7 +841,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.0.53"
+version = "0.0.56"
 dependencies = [
  "darling 0.14.1",
  "heck 0.4.0",
@@ -898,7 +898,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.0.23"
+version = "0.0.25"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -946,7 +946,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.0.60"
+version = "0.0.64"
 dependencies = [
  "hdk",
  "serde",
@@ -981,7 +981,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.0.54"
+version = "0.0.58"
 dependencies = [
  "derive_builder",
  "fixt",
@@ -1091,7 +1091,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.0.9"
+version = "0.0.11"
 dependencies = [
  "colored",
  "derivative",
@@ -1124,7 +1124,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "arbitrary",
  "chrono",
@@ -1165,12 +1165,6 @@ name = "libm"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "292a948cd991e376cf75541fe5b97a1081d713c618b4f1b9500f8844e49eb565"
-
-[[package]]
-name = "linked-hash-map"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
 name = "lock_api"
@@ -2007,14 +2001,15 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.8.26"
+version = "0.9.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "578a7433b776b56a35785ed5ce9a7e777ac0598aac5a6dd1b4b18a307c7fc71b"
+checksum = "6d232d893b10de3eb7258ff01974d6ee20663d8e833263c99409d4b13a0209da"
 dependencies = [
  "indexmap",
+ "itoa",
  "ryu",
  "serde",
- "yaml-rust",
+ "unsafe-libyaml",
 ]
 
 [[package]]
@@ -2672,6 +2667,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ed742d4ea2bd1176e236172c8429aaf54486e7ac098db29ffe6529e0ce50973"
 
 [[package]]
+name = "unsafe-libyaml"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1e5fa573d8ac5f1a856f8d7be41d390ee973daf97c806b2c1a465e4e1406e68"
+
+[[package]]
 name = "valuable"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3134,12 +3135,3 @@ name = "windows_x86_64_msvc"
 version = "0.36.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c811ca4a8c853ef420abd8592ba53ddbbac90410fab6903b3e79972a631f7680"
-
-[[package]]
-name = "yaml-rust"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56c1936c4cc7a1c9ab21a1ebb602eb942ba868cbd44a99cb7cdc5892335e1c85"
-dependencies = [
- "linked-hash-map",
-]
