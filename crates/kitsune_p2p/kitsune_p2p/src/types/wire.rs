@@ -94,7 +94,7 @@ kitsune_p2p_types::write_codec_enum! {
             /// see mod_idx description
             mod_cnt.4: u32,
 
-            data.6: BroadcastData,
+            data.5: BroadcastData,
         },
 
         /// Fire-and-forget broadcast message.
@@ -102,7 +102,7 @@ kitsune_p2p_types::write_codec_enum! {
         Broadcast(0x23) {
             space.0: Arc<KitsuneSpace>,
             to_agent.1: Arc<KitsuneAgent>,
-            data.3: BroadcastData,
+            data.2: BroadcastData,
         },
 
         /// Gossip op with opaque data section,
