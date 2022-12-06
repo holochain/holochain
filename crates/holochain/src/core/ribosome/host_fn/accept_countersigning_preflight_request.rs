@@ -191,6 +191,26 @@ pub mod wasm_test {
                     activity_request: ActivityRequest::Full,
                 }
             ).await;
+        let bob_agent_activity_alice_observed_before: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let bob_agent_activity_bob_observed_before: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
 
         // Everyone accepts a short lived session.
         let preflight_request: PreflightRequest = conductor
@@ -230,10 +250,10 @@ pub mod wasm_test {
             };
 
         // Alice commits the session entry.
-        let countersigned_action_hash_alice: ActionHash = conductor
+        let (countersigned_action_hash_alice, countersigned_entry_hash_alice): (ActionHash, EntryHash) = conductor
             .call(
                 &alice,
-                "create_a_countersigned_thing",
+                "create_a_countersigned_thing_with_entry_hash",
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await;
@@ -290,17 +310,39 @@ pub mod wasm_test {
                     activity_request: ActivityRequest::Full,
                 }
             ).await;
-        dbg!(&alice_pubkey);
-        dbg!(countersigned_action_hash_alice);
-        dbg!(&alice_agent_activity_alice_observed_before);
-        dbg!(&alice_agent_activity_bob_observed_before);
-        dbg!(&alice_agent_activity_alice_observed_after);
-        dbg!(&alice_agent_activity_bob_observed_after);
-        dbg!(&bob_agent_activity_alice_observed_after);
-        dbg!(&bob_agent_activity_bob_observed_after);
 
         assert_eq!(alice_agent_activity_alice_observed_before, alice_agent_activity_alice_observed_after);
         assert_eq!(alice_agent_activity_bob_observed_before, alice_agent_activity_bob_observed_after);
+        assert_eq!(bob_agent_activity_alice_observed_before, bob_agent_activity_alice_observed_after);
+        assert_eq!(bob_agent_activity_bob_observed_before, bob_agent_activity_bob_observed_after);
+
+        let alice_action: SignedActionHashed = conductor
+        .call(
+            &alice,
+            "must_get_action",
+            countersigned_action_hash_alice.clone(),
+        )
+        .await;
+
+        dbg!(alice_action);
+
+        let alice_record: Record = conductor
+        .call(
+            &alice,
+            "must_get_valid_record",
+            countersigned_action_hash_alice.clone(),
+        )
+        .await;
+
+        dbg!(alice_record);
+
+        let alice_entry: EntryHashed = conductor.call(
+            &alice,
+            "must_get_entry",
+            countersigned_entry_hash_alice.clone()
+        ).await;
+
+        dbg!(&alice_entry);
     }
 
     #[tokio::test(flavor = "multi_thread")]

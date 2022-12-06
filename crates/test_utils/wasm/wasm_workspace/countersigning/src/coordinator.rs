@@ -17,7 +17,7 @@ fn create_an_invalid_thing(_: ()) -> ExternResult<ActionHash> {
 fn create_countersigned(
     responses: Vec<PreflightResponse>,
     thing: Thing,
-) -> ExternResult<ActionHash> {
+) -> ExternResult<(ActionHash, EntryHash)> {
     let thing = EntryTypes::Thing(thing);
     let entry_def_index = ScopedEntryDefIndex::try_from(&thing)?;
     let visibility = EntryVisibility::from(&thing);
@@ -34,7 +34,7 @@ fn create_countersigned(
         ),
         thing.try_into()?,
     );
-    HDK.with(|h| {
+    let action_hash: ActionHash = HDK.with(|h| {
         h.borrow().create(CreateInput::new(
             entry_def_index,
             visibility,
@@ -42,18 +42,28 @@ fn create_countersigned(
             // Countersigned entries MUST have strict ordering.
             ChainTopOrdering::Strict,
         ))
-    })
+    })?;
+
+    let signed_action: SignedActionHashed = must_get_action(action_hash.clone())?;
+    let entry_hash: EntryHash = signed_action.action().entry_hash().unwrap().clone();
+
+    Ok((action_hash, entry_hash))
 }
 
 #[hdk_extern]
 fn create_an_invalid_countersigned_thing(
     responses: Vec<PreflightResponse>,
 ) -> ExternResult<ActionHash> {
-    create_countersigned(responses, Thing::Invalid)
+    Ok(create_countersigned(responses, Thing::Invalid)?.0)
 }
 
 #[hdk_extern]
 fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResult<ActionHash> {
+    Ok(create_countersigned(responses, Thing::Valid)?.0)
+}
+
+#[hdk_extern]
+fn create_a_countersigned_thing_with_entry_hash(responses: Vec<PreflightResponse>) -> ExternResult<(ActionHash, EntryHash)> {
     create_countersigned(responses, Thing::Valid)
 }
 
