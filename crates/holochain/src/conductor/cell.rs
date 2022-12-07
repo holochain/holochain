@@ -920,7 +920,7 @@ impl Cell {
         .await?;
 
         // Check if initialization has run
-        if workspace.source_chain().zomes_initialized() {
+        if workspace.source_chain().zomes_initialized().await? {
             return Ok(());
         }
         trace!("running init");

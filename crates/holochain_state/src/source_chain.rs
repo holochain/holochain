@@ -36,11 +36,13 @@ use holochain_zome_types::ActionBuilder;
 use holochain_zome_types::ActionBuilderCommon;
 use holochain_zome_types::ActionExt;
 use holochain_zome_types::ActionHashed;
+use holochain_zome_types::ActionType;
 use holochain_zome_types::ActionUnweighed;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::CellId;
+use holochain_zome_types::ChainQueryFilter;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
@@ -560,8 +562,18 @@ where
         Ok(self.scratch.apply(|scratch| scratch.records().collect())?)
     }
 
-    pub fn zomes_initialized(&self) -> bool {
-        self.zomes_initialized.load(Ordering::Relaxed)
+    pub async fn zomes_initialized(&self) -> SourceChainResult<bool> {
+        if self.zomes_initialized.load(Ordering::Relaxed) == true {
+            return Ok(true);
+        }
+        let query_filter = ChainQueryFilter {
+            action_type: Some(ActionType::InitZomesComplete),
+            ..QueryFilter::default()
+        };
+        let init_zomes_complete_actions = self.query(query_filter).await?;
+        let zomes_initialized = init_zomes_complete_actions.len() == 1;
+        self.set_zomes_initialized(zomes_initialized);
+        Ok(zomes_initialized)
     }
 
     pub fn set_zomes_initialized(&self, value: bool) {
@@ -2170,25 +2182,27 @@ pub mod tests {
             .await
             .unwrap();
 
-        // has initialized should be false after genesis
-        assert_eq!(chain.zomes_initialized(), false);
-
+        // zomes initialized should be false after genesis
+        let zomes_initialized = chain.zomes_initialized().await.unwrap();
+        assert_eq!(zomes_initialized, false);
+        
         // insert init marker into source chain
         let result = chain
-            .put(
-                builder::InitZomesComplete {},
-                None,
-                ChainTopOrdering::Strict,
-            )
-            .await;
+        .put(
+            builder::InitZomesComplete {},
+            None,
+            ChainTopOrdering::Strict,
+        )
+        .await;
         assert!(result.is_ok());
-
+        
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
         mock.expect_chc().return_const(None);
         chain.flush(&mock).await.unwrap();
-
-        // has initialized should be true after init zomes has run
-        assert_eq!(chain.zomes_initialized(), true);
+        
+        // zomes initialized should be true after init zomes has run
+        let zomes_initialized = chain.zomes_initialized().await.unwrap();
+        assert_eq!(zomes_initialized, true);
     }
 }

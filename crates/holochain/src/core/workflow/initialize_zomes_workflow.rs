@@ -59,7 +59,6 @@ where
         let flushed_actions = HostFnWorkspace::from(workspace.clone())
             .flush(&network)
             .await?;
-        workspace.source_chain().set_zomes_initialized(true);
 
         send_post_commit(
             conductor_handle,
