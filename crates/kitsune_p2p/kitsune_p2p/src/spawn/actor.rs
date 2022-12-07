@@ -264,13 +264,12 @@ impl KitsuneP2pActor {
                     // MAYBE: open a new connection if the con was closed??
                     let (con, _url, region) = user;
 
-                    let payload = wire::Wire::push_op_data(vec![(
-                        space,
-                        vec![wire::PushOpItem {
-                            op_data: op,
-                            region,
-                        }],
-                    )]);
+                    let item = wire::PushOpItem {
+                        op_data: op,
+                        region,
+                    };
+                    tracing::debug!("push_op_data: {:?}", item);
+                    let payload = wire::Wire::push_op_data(vec![(space, vec![item])]);
 
                     if let Err(err) = con.notify(&payload, timeout).await {
                         tracing::warn!(?err, "error responding to op fetch");
