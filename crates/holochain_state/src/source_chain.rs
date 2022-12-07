@@ -2185,22 +2185,22 @@ pub mod tests {
         // zomes initialized should be false after genesis
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
         assert_eq!(zomes_initialized, false);
-        
+
         // insert init marker into source chain
         let result = chain
-        .put(
-            builder::InitZomesComplete {},
-            None,
-            ChainTopOrdering::Strict,
-        )
-        .await;
+            .put(
+                builder::InitZomesComplete {},
+                None,
+                ChainTopOrdering::Strict,
+            )
+            .await;
         assert!(result.is_ok());
-        
+
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
         mock.expect_chc().return_const(None);
         chain.flush(&mock).await.unwrap();
-        
+
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();
         assert_eq!(zomes_initialized, true);
