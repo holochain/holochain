@@ -563,7 +563,7 @@ where
     }
 
     pub async fn zomes_initialized(&self) -> SourceChainResult<bool> {
-        if self.zomes_initialized.load(Ordering::Relaxed) == true {
+        if self.zomes_initialized.load(Ordering::Relaxed) {
             return Ok(true);
         }
         let query_filter = ChainQueryFilter {
