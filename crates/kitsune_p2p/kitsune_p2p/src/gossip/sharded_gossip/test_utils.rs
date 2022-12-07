@@ -52,7 +52,7 @@ pub fn create_op_bloom(ops: Vec<Arc<KitsuneOpHash>>) -> PoolBuf {
 }
 
 /// Check an ops bloom for testing.
-pub fn check_ops_boom<'a>(
+pub fn check_ops_bloom<'a>(
     ops: impl Iterator<Item = (kitsune_p2p_timestamp::Timestamp, &'a Arc<KitsuneOpHash>)>,
     bloom: EncodedTimedBloomFilter,
 ) -> Vec<&'a Arc<KitsuneOpHash>> {

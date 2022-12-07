@@ -10,7 +10,6 @@ use tokio::time::Instant;
 use crate::gossip::sharded_gossip::NodeId;
 use crate::gossip::sharded_gossip::RegionDiffs;
 use crate::gossip::sharded_gossip::RoundState;
-use crate::gossip::sharded_gossip::RoundThroughput;
 use crate::types::event::*;
 use crate::types::*;
 use kitsune_p2p_timestamp::Timestamp;
@@ -163,8 +162,6 @@ pub struct CompletedRound {
     pub start_time: Instant,
     /// The end time of the round
     pub end_time: Instant,
-    /// Throughput stats
-    pub throughput: RoundThroughput,
     /// This round ended in an error
     pub error: bool,
     /// If historical, the region diffs
@@ -189,8 +186,6 @@ pub struct CurrentRound {
     pub last_touch: Instant,
     /// The start time of the round
     pub start_time: Instant,
-    /// Total information sent/received so far
-    pub throughput: RoundThroughput,
     /// If historical, the region diffs
     pub region_diffs: RegionDiffs,
 }
@@ -203,7 +198,6 @@ impl CurrentRound {
             gossip_type,
             start_time,
             last_touch: Instant::now(),
-            throughput: Default::default(),
             region_diffs: Default::default(),
         }
     }
@@ -211,7 +205,6 @@ impl CurrentRound {
     /// Update status based on an existing round
     pub fn update(&mut self, round_state: &RoundState) {
         self.last_touch = Instant::now();
-        self.throughput = round_state.throughput.clone();
         self.region_diffs = round_state.region_diffs.clone();
     }
 
@@ -222,7 +215,6 @@ impl CurrentRound {
             gossip_type: self.gossip_type,
             start_time: self.start_time,
             end_time: Instant::now(),
-            throughput: self.throughput,
             error,
             region_diffs: self.region_diffs,
         }
@@ -393,24 +385,6 @@ impl Metrics {
             "aggExtrapCov": *self.agg_extrap_cov,
             "agents": agents,
         })
-    }
-
-    /// Get the sum of throughputs for all current rounds
-    pub fn current_throughputs(
-        &self,
-        gossip_type: GossipModuleType,
-    ) -> impl Iterator<Item = RoundThroughput> + '_ {
-        self.node_history
-            .values()
-            .flat_map(|r| &r.current_round)
-            .filter(move |r| r.gossip_type == gossip_type)
-            .map(|r| r.throughput.clone())
-    }
-
-    /// Get the sum of throughputs for all current rounds
-    pub fn total_current_historical_throughput(&self) -> RoundThroughput {
-        self.current_throughputs(GossipModuleType::ShardedHistorical)
-            .sum()
     }
 
     /// Record an individual extrapolated coverage event
@@ -591,27 +565,6 @@ impl Metrics {
                 gossip_type,
                 Instant::now(),
             ));
-        }
-
-        // print progress
-        {
-            let tps = self
-                .current_throughputs(GossipModuleType::ShardedHistorical)
-                .count();
-            let tot = self.total_current_historical_throughput();
-            let n = tot.op_bytes.incoming;
-            let d = tot.expected_op_bytes.incoming;
-            if d > 0 {
-                let r = n as f64 / d as f64 * 100.0;
-                tracing::debug!(
-                    "PROGRESS [{:?}] {} / {} ({:>3.1}%) : {}",
-                    peer,
-                    n,
-                    d,
-                    r,
-                    tps,
-                );
-            }
         }
     }
 

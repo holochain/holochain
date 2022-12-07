@@ -240,7 +240,7 @@ async fn publish_loop() {
         .expect_publish()
         .returning(move |_, _, _, _, _| {
             tx.try_send(()).unwrap();
-            Ok(0)
+            Ok(())
         });
 
     let (ts, mut trigger_recv) =

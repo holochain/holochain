@@ -51,6 +51,7 @@ use holochain_zome_types::ActionRefMut;
 use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::ValidationStatus;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;
@@ -225,9 +226,9 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _request_validation_receipt: bool,
         _countersigning_session: bool,
         _basis_hash: holo_hash::OpBasis,
-        _ops: Vec<holochain_types::dht_op::DhtOp>,
+        _op_hash_list: Vec<OpHashSized>,
         _timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<usize> {
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 
@@ -411,9 +412,9 @@ impl HolochainP2pDnaT for MockNetwork {
         _request_validation_receipt: bool,
         _countersigning_session: bool,
         _basis_hash: holo_hash::OpBasis,
-        _ops: Vec<holochain_types::dht_op::DhtOp>,
+        _op_hash_list: Vec<OpHashSized>,
         _timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<usize> {
+    ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
 

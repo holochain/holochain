@@ -34,6 +34,7 @@ members = [
   "crates/kitsune_p2p/direct",
   "crates/kitsune_p2p/direct_api",
   "crates/kitsune_p2p/direct_test",
+  "crates/kitsune_p2p/fetch",
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/mdns",
   "crates/kitsune_p2p/proxy",

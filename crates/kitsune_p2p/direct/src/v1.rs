@@ -5,10 +5,11 @@ use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueConfig;
 use kitsune_p2p::test_util::hash_op_data;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
-use kitsune_p2p::actor::{BroadcastTo, KitsuneP2pSender};
+use kitsune_p2p::actor::{BroadcastData, KitsuneP2pSender};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::event::*;
 use kitsune_p2p::*;
@@ -304,6 +305,12 @@ impl KitsuneHostDefaultError for Kd1 {
     }
 }
 
+impl FetchQueueConfig for Kd1 {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
+    }
+}
+
 async fn handle_srv_events(
     tuning_params: KitsuneP2pTuningParams,
     kdirect: Arc<Kd1>,
@@ -561,8 +568,7 @@ async fn handle_srv_events(
                                             root.to_kitsune_space(),
                                             basis,
                                             timeout,
-                                            BroadcastTo::Notify,
-                                            payload,
+                                            BroadcastData::User(payload),
                                         ))
                                     }).map_err(KdError::other)?;
                                     tokio::task::spawn(async move {
@@ -706,7 +712,7 @@ async fn handle_events(
                     .boxed()
                     .into()));
                 }
-                event::KitsuneP2pEvent::Gossip {
+                event::KitsuneP2pEvent::ReceiveOps {
                     respond,
                     space,
                     ops,

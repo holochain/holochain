@@ -1,6 +1,7 @@
 use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
 use crate::{HostStub, KitsuneHost};
+use kitsune_p2p_fetch::FetchQueueConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
@@ -14,6 +15,12 @@ pub struct StandardResponsesHostApi {
     topology: Topology,
     strat: ArqStrat,
     with_data: bool,
+}
+
+impl FetchQueueConfig for StandardResponsesHostApi {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
+    }
 }
 
 impl KitsuneHost for StandardResponsesHostApi {
@@ -95,6 +102,18 @@ impl KitsuneHost for StandardResponsesHostApi {
     ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
         box_fut(Ok(self.topology.clone()))
     }
+
+    fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
+        todo!()
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: dht::region::RegionCoords,
+    ) -> crate::KitsuneHostResult<Vec<OpHashSized>> {
+        todo!()
+    }
 }
 
 // TODO: integrate with `HandlerBuilder`
@@ -147,8 +166,8 @@ async fn standard_responses(
             .returning(|_| Ok(async { Ok(vec![]) }.boxed().into()));
     }
     evt_handler
-        .expect_handle_gossip()
-        .returning(|_, _| Ok(async { Ok(()) }.boxed().into()));
+        .expect_handle_receive_ops()
+        .returning(|_, _, _| Ok(async { Ok(()) }.boxed().into()));
 
     (evt_handler, Arc::new(host_api))
 }

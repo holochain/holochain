@@ -1,3 +1,4 @@
+use kitsune_p2p_fetch::FetchQueueConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
@@ -7,7 +8,7 @@ use super::*;
 /// Allows only specifying the methods you care about, and letting all the rest
 /// throw errors if called
 #[allow(missing_docs)]
-pub trait KitsuneHostDefaultError: KitsuneHost {
+pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
     /// Name to be printed out on unimplemented error
     const NAME: &'static str;
 
@@ -87,6 +88,32 @@ pub trait KitsuneHostDefaultError: KitsuneHost {
         )
         .into()))
     }
+
+    fn op_hash(&self, _op_data: KOpData) -> KitsuneHostResult<KOpHash> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "op_hash",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: RegionCoords,
+    ) -> KitsuneHostResult<Vec<OpHashSized>> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "query_op_hashes_by_region",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        0
+    }
 }
 
 impl<T: KitsuneHostDefaultError> KitsuneHost for T {
@@ -132,5 +159,17 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
 
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
         KitsuneHostDefaultError::get_topology(self, space)
+    }
+
+    fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {
+        KitsuneHostDefaultError::op_hash(self, op_data)
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        space: Arc<KitsuneSpace>,
+        region: RegionCoords,
+    ) -> KitsuneHostResult<Vec<OpHashSized>> {
+        KitsuneHostDefaultError::query_op_hashes_by_region(self, space, region)
     }
 }

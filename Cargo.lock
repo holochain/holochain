@@ -2516,7 +2516,7 @@ dependencies = [
  "nanoid 0.3.0",
  "observability",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -2983,6 +2983,7 @@ dependencies = [
  "itertools 0.10.3",
  "kitsune_p2p",
  "kitsune_p2p_bootstrap",
+ "kitsune_p2p_fetch",
  "kitsune_p2p_mdns",
  "kitsune_p2p_proxy",
  "kitsune_p2p_timestamp",
@@ -3130,6 +3131,29 @@ dependencies = [
  "structopt",
  "tokio",
  "tracing-subscriber 0.2.25",
+]
+
+[[package]]
+name = "kitsune_p2p_fetch"
+version = "0.0.1"
+dependencies = [
+ "derive_more",
+ "futures",
+ "holochain_serialized_bytes",
+ "kitsune_p2p_fetch",
+ "kitsune_p2p_timestamp",
+ "kitsune_p2p_types",
+ "linked-hash-map",
+ "must_future",
+ "num-traits",
+ "observability",
+ "pretty_assertions 0.7.2",
+ "serde",
+ "serde_bytes",
+ "test-case 1.2.3",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3401,6 +3425,12 @@ dependencies = [
  "mortal",
  "winapi",
 ]
+
+[[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
 name = "lock_api"

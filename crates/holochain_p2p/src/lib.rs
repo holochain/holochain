@@ -4,6 +4,7 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::sync::Arc;
 
 mod types;
@@ -71,9 +72,9 @@ pub trait HolochainP2pDnaT {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<usize>;
+    ) -> actor::HolochainP2pResult<()>;
 
     /// Get an entry from the DHT.
     async fn get(
@@ -228,16 +229,16 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<usize> {
+    ) -> actor::HolochainP2pResult<()> {
         self.sender
             .publish(
                 (*self.dna_hash).clone(),
                 request_validation_receipt,
                 countersigning_session,
                 basis_hash,
-                ops,
+                op_hash_list,
                 timeout_ms,
             )
             .await

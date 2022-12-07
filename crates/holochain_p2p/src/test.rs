@@ -62,9 +62,9 @@ impl HolochainP2pHandler for StubNetwork {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
-    ) -> HolochainP2pHandlerResult<usize> {
+    ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
 
@@ -153,7 +153,7 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_get_diagnostics(
         &mut self,
         dna_hash: DnaHash,
-    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics> {
+    ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics> {
         Err("stub".into())
     }
 }
