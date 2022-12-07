@@ -571,7 +571,10 @@ where
             ..QueryFilter::default()
         };
         let init_zomes_complete_actions = self.query(query_filter).await?;
-        let zomes_initialized = init_zomes_complete_actions.len() == 1;
+        if init_zomes_complete_actions.len() > 1 {
+            tracing::warn("Multiple InitZomesComplete actions are present");
+        }
+        let zomes_initialized = init_zomes_complete_actions.len() > 0;
         self.set_zomes_initialized(zomes_initialized);
         Ok(zomes_initialized)
     }
