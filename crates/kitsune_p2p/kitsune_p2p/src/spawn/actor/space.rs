@@ -1213,7 +1213,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<KitsuneDiagnostics> {
         let diagnostics = KitsuneDiagnostics {
             metrics: self.ro_inner.metrics.clone(),
-            fetch_queue: self.ro_inner.fetch_queue.clone().into(),
+            fetch_queue: FetchQueueReader::new(self.ro_inner.fetch_queue.clone()),
         };
         Ok(async move { Ok(diagnostics) }.boxed().into())
     }

@@ -3,7 +3,7 @@
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_types::prelude::*;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfo;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfoStateful;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -218,7 +218,8 @@ impl From<InstalledAppInfoStatus> for AppStatus {
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct NetworkInfo {
-    pub fetch_queue_info: FetchQueueInfo,
+    /// Info about the FetchQueue
+    pub fetch_queue_info: FetchQueueInfoStateful,
 }
 
 #[test]

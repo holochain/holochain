@@ -1,8 +1,7 @@
 //! Displays a table of info about each gossip round a node has participated in.
 
+use crate::dht::prelude::RegionData;
 use std::fmt::Display;
-
-use holochain::prelude::gossip::sharded_gossip::RoundThroughput;
 
 use super::*;
 
@@ -17,10 +16,8 @@ pub struct GossipRoundTableState<'a, Id: Display + Clone> {
 pub fn gossip_round_table<Id: Display + Clone>(
     state: &GossipRoundTableState<Id>,
 ) -> Table<'static> {
-    let header = Row::new([
-        "g", "e", "n", "id", "T", "dur", "#in", "#out", "in", "out", "thru",
-    ])
-    .style(Style::default().add_modifier(Modifier::UNDERLINED));
+    let header = Row::new(["g", "e", "n", "id", "T", "dur", "#in", "#out", "in", "out"])
+        .style(Style::default().add_modifier(Modifier::UNDERLINED));
 
     let mut rows = vec![];
 
@@ -39,7 +36,7 @@ pub fn gossip_round_table<Id: Display + Clone>(
                     round.gossip_type,
                     Instant::from(round.start_time).duration_since(state.start_time),
                     state.current_time.duration_since(round.start_time.into()),
-                    Some(&round.throughput),
+                    &round.region_diffs,
                     true,
                     Some(i) == state.table_state.selected(),
                     false,
@@ -56,11 +53,11 @@ pub fn gossip_round_table<Id: Display + Clone>(
             .iter()
             .enumerate()
             .filter_map(|(i, (n, round))| {
-                let zero = round.throughput.op_count.incoming
-                    + round.throughput.op_count.outgoing
-                    + round.throughput.op_bytes.incoming
-                    + round.throughput.op_bytes.outgoing
-                    == 0;
+                let zero = round
+                    .region_diffs
+                    .as_ref()
+                    .map(|(ours, theirs)| ours.is_empty() && theirs.is_empty())
+                    .unwrap_or_else(|| todo!("check num ops"));
                 if state.filter_zeroes && zero {
                     None
                 } else {
@@ -70,7 +67,7 @@ pub fn gossip_round_table<Id: Display + Clone>(
                         round.gossip_type,
                         Instant::from(round.start_time).duration_since(state.start_time),
                         round.duration(),
-                        Some(&round.throughput),
+                        &round.region_diffs,
                         false,
                         Some(i) == state.table_state.selected(),
                         round.error,
@@ -90,7 +87,6 @@ pub fn gossip_round_table<Id: Display + Clone>(
         Constraint::Percentage(100 / 8),
         Constraint::Percentage(100 / 8),
         Constraint::Percentage(100 / 8),
-        Constraint::Percentage(100 / 8),
     ])
 }
 
@@ -100,29 +96,13 @@ fn render_gossip_metric_row<Id: Display>(
     gossip_type: GossipModuleType,
     time_since_start: Duration,
     duration: Duration,
-    throughput: Option<&RoundThroughput>,
+    region_diffs: &RegionDiffs,
     is_current: bool,
     is_selected: bool,
     error: bool,
 ) -> Row<'static> {
-    let throughput_cell = |b, d: Duration| {
-        let cell = Cell::from(format!(
-            "{}",
-            (b as f64 * 1000. / d.as_millis() as f64).human_throughput_bytes()
-        ));
-        if b == 0 {
-            cell.style(Style::default().fg(Color::DarkGray))
-        } else {
-            cell
-        }
-    };
-
-    let number_cell = |v: u32, expected: u32| {
-        let cell = if expected == 0 {
-            Cell::from(format!("{:>6}", v))
-        } else {
-            Cell::from(format!("{:}/{:}", v, expected))
-        };
+    let number_cell = |v: u32| {
+        let cell = Cell::from(format!("{:>6}", v));
         if v == 0 {
             // if is_current {
             //     cell.style(Style::default().bg(Color::Gray))
@@ -134,16 +114,8 @@ fn render_gossip_metric_row<Id: Display>(
         }
     };
 
-    let bytes_cell = |v: u32, expected: u32| {
-        let cell = if expected == 0 {
-            Cell::from(format!("{:>5.1}", v.human_count_bytes()))
-        } else {
-            Cell::from(format!(
-                "{:>5.1}/{:>5.1}",
-                v.human_count_bytes(),
-                expected.human_count_bytes()
-            ))
-        };
+    let bytes_cell = |v: u32| {
+        let cell = Cell::from(format!("{:>5.1}", v.human_count_bytes()));
         if v == 0 {
             cell.style(Style::default().fg(Color::Gray))
         } else if v >= 1_000_000 {
@@ -183,13 +155,14 @@ fn render_gossip_metric_row<Id: Display>(
         Cell::from(format!("{:3.1?}", duration)).style(style)
     });
 
-    if let Some(tp) = throughput {
+    if let Some((ours, theirs)) = region_diffs {
+        let outgoing: RegionData = ours.into_iter().map(|r| r.data.clone()).sum();
+        let incoming: RegionData = theirs.into_iter().map(|r| r.data.clone()).sum();
         cells.extend([
-            number_cell(tp.op_count.incoming, tp.expected_op_count.incoming),
-            number_cell(tp.op_count.outgoing, tp.expected_op_count.outgoing),
-            bytes_cell(tp.op_bytes.incoming, tp.expected_op_bytes.incoming),
-            bytes_cell(tp.op_bytes.outgoing, tp.expected_op_bytes.outgoing),
-            throughput_cell(tp.op_bytes.incoming + tp.op_bytes.outgoing, duration),
+            number_cell(incoming.count),
+            number_cell(outgoing.count),
+            bytes_cell(incoming.size),
+            bytes_cell(outgoing.size),
         ])
     }
     let style = if is_current {

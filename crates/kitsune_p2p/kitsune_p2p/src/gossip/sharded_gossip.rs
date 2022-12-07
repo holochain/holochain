@@ -1426,7 +1426,7 @@ impl TryFrom<u8> for MissingOpsStatus {
 }
 
 /// Data and handlers for diagnostic info, to be used by the host.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct KitsuneDiagnostics {
     /// Access to metrics info
     pub metrics: MetricsSync,

@@ -1,10 +1,12 @@
 use super::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfoStateful;
 
 impl GossipDashboard {
     pub fn render<K: Backend>(&self, f: &mut Frame<K>, state: &impl ClientState) {
         let layout = layout::layout(state.nodes().len(), state.num_bases(), f);
 
         self.local_state.share_mut(|local| {
+            let network_info = state.network_info();
             let metrics: Vec<_> = state
                 .nodes()
                 .iter()
@@ -31,29 +33,13 @@ impl GossipDashboard {
                 layout.basis_table,
             );
 
-            {
-                let sums = metrics
-                    .iter()
-                    .map(|(metrics, _)| {
-                        let rounds = state.node_rounds_sorted(metrics);
-                        let completed_bytes: u32 = rounds
-                            .completed
-                            .iter()
-                            .map(|(_, r)| r.throughput.op_bytes.incoming)
-                            .sum();
-                        let current_bytes: u32 = rounds
-                            .currents
-                            .iter()
-                            .map(|(_, r)| r.throughput.op_bytes.incoming)
-                            .sum();
-                        completed_bytes + current_bytes
-                    })
-                    .collect();
-                f.render_widget(
-                    widgets::ui_throughput_summary(sums),
-                    layout.throughput_summary,
-                );
-            }
+            // {
+            //     let sums = todo!("get total throughput");
+            //     f.render_widget(
+            //         widgets::ui_throughput_summary(sums),
+            //         layout.throughput_summary,
+            //     );
+            // }
 
             let selected = local.selected_node();
             if selected.is_none() {
@@ -65,7 +51,7 @@ impl GossipDashboard {
             }
             let gauges: Vec<_> = metrics
                 .iter()
-                .map(|(m, _)| ui_gossip_progress_gauge(m.total_current_historical_throughput()))
+                .map(|(m, _)| ui_gossip_progress_gauge(network_info.fetch_queue_info.clone()))
                 .collect();
 
             if let Some(selected) = selected {

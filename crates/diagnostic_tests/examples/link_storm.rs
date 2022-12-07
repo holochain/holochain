@@ -250,6 +250,10 @@ impl ClientState for State {
         histories.sort_unstable_by_key(|(i, _)| *i);
         NodeRounds::new(histories)
     }
+
+    fn network_info(&self) -> holochain::conductor::api::NetworkInfo {
+        todo!("network info")
+    }
 }
 
 impl State {

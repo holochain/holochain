@@ -1,18 +1,28 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
-use kitsune_p2p_types::KSpace;
+use kitsune_p2p_types::{tx2::tx2_utils::Share, KSpace};
 
 use crate::FetchQueue;
 
 /// Read-only access to the queue
-#[derive(Clone, derive_more::From)]
-pub struct FetchQueueReader(FetchQueue);
+#[derive(Clone, Debug)]
+pub struct FetchQueueReader {
+    queue: FetchQueue,
+    max_info: Arc<Share<FetchQueueInfo>>,
+}
 
 impl FetchQueueReader {
+    /// Constructor
+    pub fn new(queue: FetchQueue) -> Self {
+        Self {
+            queue,
+            max_info: Arc::new(Share::new(Default::default())),
+        }
+    }
     /// Get info about the queue, filtered by space
-    pub fn info(&self, spaces: HashSet<KSpace>) -> FetchQueueInfo {
+    pub fn info(&self, spaces: HashSet<KSpace>) -> FetchQueueInfoStateful {
         let (count, bytes) = self
-            .0
+            .queue
             .state
             .share_ref(|s| {
                 Ok(s.queue
@@ -22,10 +32,29 @@ impl FetchQueueReader {
                     .fold((0, 0), |(c, s), t| (c + 1, s + t)))
             })
             .unwrap();
-        FetchQueueInfo {
+
+        let max = self
+            .max_info
+            .share_mut(|i, _| {
+                if count > i.num_ops_to_fetch {
+                    i.num_ops_to_fetch = count;
+                }
+                if bytes > i.op_bytes_to_fetch {
+                    i.op_bytes_to_fetch = bytes;
+                }
+                if count == 0 && bytes == 0 {
+                    i.num_ops_to_fetch = 0;
+                    i.op_bytes_to_fetch = 0;
+                }
+                Ok(i.clone())
+            })
+            .unwrap();
+
+        let current = FetchQueueInfo {
             op_bytes_to_fetch: bytes,
             num_ops_to_fetch: count,
-        }
+        };
+        FetchQueueInfoStateful { current, max }
     }
 }
 
@@ -37,6 +66,15 @@ pub struct FetchQueueInfo {
 
     /// Total number of ops expected to be received through fetches
     pub num_ops_to_fetch: usize,
+}
+
+/// The instantaneous and accumulated max FetchQueueInfo
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct FetchQueueInfoStateful {
+    /// The instantaneous info
+    pub current: FetchQueueInfo,
+    /// The max info since the last time it went to zero
+    pub max: FetchQueueInfo,
 }
 
 #[cfg(test)]
@@ -62,14 +100,17 @@ mod tests {
             queue[1].1.size = Some(1000.into());
 
             let queue = queue.into_iter().collect();
-            FetchQueueReader(FetchQueue {
-                config: Arc::new(Config),
-                state: Share::new(State { queue }),
-            })
+            FetchQueueReader {
+                queue: FetchQueue {
+                    config: Arc::new(Config),
+                    state: Share::new(State { queue }),
+                },
+                max_info: Arc::new(Share::new(Default::default())),
+            }
         };
         let info = q.info([space(0)].into_iter().collect());
         // The item without a size is not returned.
-        assert_eq!(info.num_ops_to_fetch, 2);
-        assert_eq!(info.op_bytes_to_fetch, 1100);
+        assert_eq!(info.current.num_ops_to_fetch, 2);
+        assert_eq!(info.current.op_bytes_to_fetch, 1100);
     }
 }

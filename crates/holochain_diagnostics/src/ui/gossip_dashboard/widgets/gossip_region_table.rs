@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use holochain::prelude::{dht::region::Region, gossip::sharded_gossip::RoundThroughput};
+use holochain::prelude::dht::region::Region;
 
 use super::*;
 

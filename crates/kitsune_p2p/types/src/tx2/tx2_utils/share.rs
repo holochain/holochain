@@ -9,6 +9,13 @@ impl<T: 'static + Send> Clone for Share<T> {
     }
 }
 
+impl<T: 'static + Send + std::fmt::Debug> std::fmt::Debug for Share<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.share_ref(|s| Ok(f.debug_tuple("Share").field(s).finish()))
+            .unwrap()
+    }
+}
+
 impl<T: 'static + Send> PartialEq for Share<T> {
     fn eq(&self, oth: &Self) -> bool {
         Arc::ptr_eq(&self.0, &oth.0)

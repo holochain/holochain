@@ -252,6 +252,7 @@ pub mod test {
     use holochain_zome_types::ExternIO;
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfo;
+    use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfoStateful;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
@@ -447,7 +448,7 @@ pub mod test {
                     assert_eq!(
                         info,
                         vec![NetworkInfo {
-                            fetch_queue_info: FetchQueueInfo::default()
+                            fetch_queue_info: FetchQueueInfoStateful::default()
                         }]
                     )
                 }

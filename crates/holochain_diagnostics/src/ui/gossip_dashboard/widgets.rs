@@ -1,4 +1,5 @@
-use holochain::prelude::{gossip::sharded_gossip::RoundThroughput, metrics::PeerAgentHistory};
+use holochain::prelude::metrics::PeerAgentHistory;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfoStateful;
 
 use super::*;
 
@@ -32,9 +33,9 @@ pub fn ui_throughput_summary(sums: Vec<u32>) -> List<'static> {
     )
 }
 
-pub fn ui_gossip_progress_gauge(throughput: RoundThroughput) -> Gauge<'static> {
-    let n = throughput.op_bytes.incoming;
-    let d = throughput.expected_op_bytes.incoming;
+pub fn ui_gossip_progress_gauge(info: FetchQueueInfoStateful) -> Gauge<'static> {
+    let n = info.current.op_bytes_to_fetch;
+    let d = info.max.op_bytes_to_fetch;
 
     if d > 0 {
         let r = n as f64 / d as f64;

@@ -1,13 +1,16 @@
 #![allow(unused_imports)]
 
-use holochain::prelude::{
-    dht::region::Region,
-    gossip::sharded_gossip::RegionDiffs,
-    kitsune_p2p::dependencies::{
-        kitsune_p2p_proxy,
-        kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},
+use holochain::{
+    conductor::api::NetworkInfo,
+    prelude::{
+        dht::region::Region,
+        gossip::sharded_gossip::{KitsuneDiagnostics, RegionDiffs},
+        kitsune_p2p::dependencies::{
+            kitsune_p2p_proxy,
+            kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},
+        },
+        metrics::{CompletedRound, CurrentRound, PeerNodeHistory},
     },
-    metrics::{CompletedRound, CurrentRound, PeerNodeHistory},
 };
 use human_repr::{HumanCount, HumanThroughput};
 use std::{
@@ -53,7 +56,7 @@ const RED_THRESHOLD: usize = MAX_COUNT / 2;
 pub struct Node {
     pub conductor: Arc<SweetConductor>,
     pub zome: SweetZome,
-    pub diagnostics: GossipDiagnostics,
+    pub diagnostics: KitsuneDiagnostics,
     pub cert: Tx2Cert,
 }
 
@@ -106,6 +109,7 @@ pub trait ClientState {
 
     fn total_commits(&self) -> usize;
     fn link_counts(&self) -> LinkCountsRef;
+    fn network_info(&self) -> NetworkInfo;
     fn node_rounds_sorted<'a>(&self, metrics: &'a Metrics) -> NodeRounds<'a, usize>;
 }
 
