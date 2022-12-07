@@ -4,8 +4,55 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
+
+/// Holochain-specific FetchContext extension trait.
+pub trait FetchContextExt {
+    /// Applies the "request_validation_receipt" flag *if* the param is true
+    /// otherwise, leaves the flag unchanged.
+    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self;
+
+    /// Returns true if the "request_validation_receipt" flag is set.
+    fn has_request_validation_receipt(&self) -> bool;
+
+    /// Applies the "countersigning_session" flag *if* the param is true
+    /// otherwise, leaves the flag unchanged.
+    fn with_countersigning_session(&self, countersigning_session: bool) -> Self;
+
+    /// Returns true if the "countersigning_session" flag is set.
+    fn has_countersigning_session(&self) -> bool;
+}
+
+const FLAG_REQ_VAL_RCPT: u32 = 1 << 0;
+const FLAG_CNTR_SSN: u32 = 1 << 1;
+
+impl FetchContextExt for FetchContext {
+    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self {
+        if request_validation_receipt {
+            FetchContext(self.0 | FLAG_REQ_VAL_RCPT)
+        } else {
+            *self
+        }
+    }
+
+    fn has_request_validation_receipt(&self) -> bool {
+        self.0 & FLAG_REQ_VAL_RCPT > 0
+    }
+
+    fn with_countersigning_session(&self, countersigning_session: bool) -> Self {
+        if countersigning_session {
+            FetchContext(self.0 | FLAG_CNTR_SSN)
+        } else {
+            *self
+        }
+    }
+
+    fn has_countersigning_session(&self) -> bool {
+        self.0 & FLAG_CNTR_SSN > 0
+    }
+}
 
 /// Request a validation package.
 #[derive(Clone, Debug)]

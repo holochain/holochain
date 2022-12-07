@@ -8,6 +8,7 @@ use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::sync::Arc;
 
 mod types;
+pub use types::actor::FetchContextExt;
 pub use types::actor::HolochainP2pRef;
 pub use types::actor::HolochainP2pSender;
 pub use types::AgentPubKeyExt; // why is this not included by * above???

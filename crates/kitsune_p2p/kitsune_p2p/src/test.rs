@@ -8,6 +8,7 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_transport_coms() {
         observability::test_run().ok();
         observability::metrics::init();
@@ -41,6 +42,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -70,6 +72,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -98,6 +101,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_request_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -117,6 +121,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_multi_request_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -154,6 +159,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_single_agent_multi_request_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -184,6 +190,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_gossip_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -223,6 +230,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_peer_data_workflow() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
 
@@ -255,6 +263,7 @@ mod tests {
 
     /// Test that we can gossip across a in memory transport layer.
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_gossip_transport() -> Result<(), KitsuneP2pError> {
         observability::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;

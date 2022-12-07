@@ -185,21 +185,32 @@ impl KitsuneHost for KitsuneHostImpl {
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         op_hash_list: Vec<KOpHash>,
+        context: kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext,
     ) -> KitsuneHostResult<Vec<bool>> {
-        use holochain_p2p::DhtOpHashExt;
+        use holochain_p2p::{DhtOpHashExt, FetchContextExt};
+        use holochain_sqlite::rusqlite::ToSql;
 
         async move {
             let db = self.spaces.dht_db(&DnaHash::from_kitsune(&space))?;
             let results = db
-                .async_reader(move |txn| {
+                .async_commit(move |txn| {
                     let mut out = Vec::new();
                     for op_hash in op_hash_list {
+                        let op_hash = DhtOpHash::from_kitsune(&op_hash);
                         match txn.query_row(
                             "SELECT 1 FROM DhtOp WHERE hash = ?",
-                            [DhtOpHash::from_kitsune(&op_hash)],
+                            [&op_hash],
                             |_row| Ok(()),
                         ) {
-                            Ok(_) => out.push(true),
+                            Ok(_) => {
+                                if context.has_request_validation_receipt() {
+                                    txn.execute(
+                                        "UPDATE DhtOp SET require_receipt = ? WHERE DhtOp.hash = ?",
+                                        [&true as &dyn ToSql, &op_hash as &dyn ToSql],
+                                    )?;
+                                }
+                                out.push(true)
+                            }
                             Err(_) => out.push(false),
                         }
                     }
