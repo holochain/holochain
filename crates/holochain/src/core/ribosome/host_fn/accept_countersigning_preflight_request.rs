@@ -316,7 +316,31 @@ pub mod wasm_test {
         assert_eq!(bob_agent_activity_alice_observed_before, bob_agent_activity_alice_observed_after);
         assert_eq!(bob_agent_activity_bob_observed_before, bob_agent_activity_bob_observed_after);
 
-        let alice_action: SignedActionHashed = conductor
+        // @TODO - the following all pass but perhaps we do NOT want them to?
+        // It's not immediately clear what direct requests by hash should do in all cases here.
+        //
+        // If an author does a must_get during a zome call like we do in this test, should it
+        // be returned (it's in the scratch ready to be flushed so it does atm) even though it
+        // hasn't been countersigned and so may never be included in a source chain?
+        //
+        // Should it be returned in subsequent zome calls by an author who has signed it but it
+        // hasn't been coauthored yet, but the session is still active? (c.f. private entries being visible to author)
+        // What about after the session?
+        //
+        // What about returned by/for coauthors who do NOT sign during and after the session?
+        //
+        // What about everyone else during and after the session?
+        //
+        // The answer to the above may be different per call, idk at this point.
+        // Seems intuitive that an action that is in nobody's agent activity should never be visible
+        // but then how can you get the entry hash and entry data during the session, like we do in this test?
+        //
+        // Maybe it also seems intuitive that must_get_entry should return the entry as we know its
+        // hash and normally must_get ignores validity or even which headers created it, but what if NO
+        // headers created it?
+        //
+        // etc. etc. I'm just leaving this commentary here to germinate future headaches and self doubt.
+        let _alice_action: SignedActionHashed = conductor
         .call(
             &alice,
             "must_get_action",
@@ -324,25 +348,18 @@ pub mod wasm_test {
         )
         .await;
 
-        dbg!(alice_action);
-
-        let alice_record: Record = conductor
+        let _alice_record: Record = conductor
         .call(
             &alice,
             "must_get_valid_record",
             countersigned_action_hash_alice.clone(),
         )
         .await;
-
-        dbg!(alice_record);
-
-        let alice_entry: EntryHashed = conductor.call(
+        let _alice_entry: EntryHashed = conductor.call(
             &alice,
             "must_get_entry",
             countersigned_entry_hash_alice.clone()
         ).await;
-
-        dbg!(&alice_entry);
     }
 
     #[tokio::test(flavor = "multi_thread")]
