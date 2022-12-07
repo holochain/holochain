@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221207.011003
+
+## [holochain\_cli-0.0.71](crates/holochain_cli/CHANGELOG.md#0.0.71)
+
+- Added handling of `hc` extensions. This allows for existing executables in the system whose names match `hc-<COMMAND>` to be executed with `hc <COMMAND>`.
+
 # 20221130.011217
 
 ## [holochain\_cli-0.0.70](crates/holochain_cli/CHANGELOG.md#0.0.70)
