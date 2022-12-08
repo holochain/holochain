@@ -689,7 +689,12 @@ jobs:
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
+          # TODO: only use holochain in the title if the holochain crate is part of the release
+          # TODO: only mark the release as "latest in the repository" if holochain was part of it
+          # TODO: use a release specific tag instead of the latest holochain tag
+
           gh release create "${TAG}" \
+            --target ${HOLOCHAIN_TARGET_BRANCH} \
             --title "holochain ${VERSION} (${RELEASE_BRANCH#*-})" \
             --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***"
 
