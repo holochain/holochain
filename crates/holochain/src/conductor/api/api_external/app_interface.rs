@@ -116,6 +116,14 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     .await?;
                 Ok(AppResponse::CloneCellDisabled)
             }
+            AppRequest::EnableCloneCell(payload) => {
+                let enabled_cell = self
+                    .conductor_handle
+                    .clone()
+                    .enable_clone_cell(&*payload)
+                    .await?;
+                Ok(AppResponse::CloneCellEnabled(enabled_cell))
+            }
             AppRequest::GossipInfo(payload) => {
                 let info = self.conductor_handle.gossip_info(&payload.dnas).await?;
                 Ok(AppResponse::GossipInfo(info))

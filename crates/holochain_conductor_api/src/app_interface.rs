@@ -60,6 +60,13 @@ pub enum AppRequest {
     /// and has been disabled.
     DisableCloneCell(Box<DisableCloneCellPayload>),
 
+    /// Enable a clone cell that was previously disabled.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CloneCellEnabled`]
+    EnableCloneCell(Box<EnableCloneCellPayload>),
+
     /// Info about gossip
     GossipInfo(Box<GossipInfoRequestPayload>),
 
@@ -111,6 +118,11 @@ pub enum AppResponse {
     ///
     /// An existing clone cell has been disabled.
     CloneCellDisabled,
+
+    /// The successful response to an [`AppRequest::EnableCloneCell`].
+    ///
+    /// A previously disabled clone cell has been enabled.
+    CloneCellEnabled(InstalledCell),
 
     /// GossipInfo is returned
     GossipInfo(Vec<DnaGossipInfo>),
