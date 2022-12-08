@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- Breaking: Adds the action that was used to create the entry to the OpEntry::CreateEntry enum variant so that it is easily available in validation.
+
 # 20221207.011003
 
 ## [holochain\_cli-0.0.71](crates/holochain_cli/CHANGELOG.md#0.0.71)
