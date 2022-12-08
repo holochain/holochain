@@ -169,17 +169,18 @@ impl OpHelper for Op {
                         entry_type,
                         entry_hash,
                         ..
-                    }) => store_entry_create(entry_type, entry_hash, entry)?,
+                    }) => store_entry_create(entry_type, entry_hash, entry, action)?,
                     EntryCreationAction::Update(Update {
                         original_action_address: original_action_hash,
                         original_entry_address: original_entry_hash,
                         entry_type,
                         entry_hash,
                         ..
-                    }) => match store_entry_create::<ET>(entry_type, entry_hash, entry)? {
+                    }) => match store_entry_create::<ET>(entry_type, entry_hash, entry, action)? {
                         OpEntry::CreateEntry {
                             entry_hash,
                             entry_type,
+                            action,
                         } => OpEntry::UpdateEntry {
                             entry_hash,
                             original_action_hash: original_action_hash.clone(),
@@ -451,6 +452,7 @@ fn store_entry_create<ET>(
     entry_type: &EntryType,
     entry_hash: &EntryHash,
     entry: &Entry,
+    action: &SignedHashed<EntryCreationAction>,
 ) -> Result<OpEntry<ET>, WasmError>
 where
     ET: EntryTypesHelper + UnitEnum,
@@ -461,6 +463,7 @@ where
         InScopeEntry::App(entry_type) => Ok(OpEntry::CreateEntry {
             entry_hash: entry_hash.clone(),
             entry_type,
+            action: action.clone(),
         }),
         InScopeEntry::Agent(agent_key) => Ok(OpEntry::CreateAgent(agent_key)),
         _ => Err(wasm_error!(WasmErrorInner::Guest(

@@ -412,6 +412,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         OpType::StoreEntry(OpEntry::CreateEntry {
             entry_hash,
             entry_type: et,
+            action,
         }) => {
             let entry = Entry::try_from(&et).unwrap();
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();

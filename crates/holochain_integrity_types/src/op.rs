@@ -227,7 +227,7 @@ pub struct RegisterDeleteLink {
     pub create_link: CreateLink,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Eq)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 /// Either a [`Action::Create`] or a [`Action::Update`].
 /// These actions both create a new instance of an [`Entry`].
@@ -777,6 +777,8 @@ where
         /// The app defined entry type with the deserialized
         /// [`Entry`] data.
         entry_type: ET,
+        /// The signed action that created this entry
+        action: SignedHashed<EntryCreationAction>,
     },
     /// This operation stores the [`Entry`] for an
     /// [`AgentPubKey`].
