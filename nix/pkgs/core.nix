@@ -8,6 +8,7 @@
 , hcToplevelDir
 , releaseAutomation
 , util-linux
+, iproute2
 }:
 
 rec {
@@ -36,7 +37,7 @@ rec {
     # run all the cargo tests with no net
     cargo build --features 'build' -p holochain_wasm_test_utils
     cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test skip-all-tests
-    ${util-linux}/bin/unshare -n -r cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test ''${1-}
+    ${util-linux}/bin/unshare -n -r bash -c "${iproute2}/bin/ip link set lo up && cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test ''${1-}"
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
