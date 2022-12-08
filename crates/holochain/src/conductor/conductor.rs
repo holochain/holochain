@@ -1319,12 +1319,12 @@ mod clone_cell_impls {
         }
 
         /// Archive a clone cell for future deletion from the app.
-        pub(crate) async fn archive_clone_cell(
+        pub(crate) async fn disable_clone_cell(
             &self,
-            ArchiveCloneCellPayload {
+            DisableCloneCellPayload {
                 app_id,
                 clone_cell_id,
-            }: &ArchiveCloneCellPayload,
+            }: &DisableCloneCellPayload,
         ) -> ConductorResult<()> {
             let (_, removed_cell_id) = self
                 .update_state_prime({
@@ -1334,7 +1334,7 @@ mod clone_cell_impls {
                         let app = state.get_app_mut(&app_id)?;
                         let clone_id = app.get_clone_id(&clone_cell_id)?;
                         let cell_id = app.get_clone_cell_id(&clone_cell_id)?;
-                        app.archive_clone_cell(&clone_id)?;
+                        app.disable_clone_cell(&clone_id)?;
                         Ok((state, cell_id))
                     }
                 })
@@ -1346,10 +1346,10 @@ mod clone_cell_impls {
         /// Restore an archived clone cell for an app.
         pub(crate) async fn restore_clone_cell(
             &self,
-            ArchiveCloneCellPayload {
+            DisableCloneCellPayload {
                 app_id,
                 clone_cell_id,
-            }: &ArchiveCloneCellPayload,
+            }: &DisableCloneCellPayload,
         ) -> ConductorResult<InstalledCell> {
             let (_, restored_cell) = self
                 .update_state_prime({
@@ -1388,7 +1388,7 @@ mod clone_cell_impls {
         /// Restore an archived clone cell
         pub async fn restore_archived_clone_cell(
             self: Arc<Self>,
-            payload: &ArchiveCloneCellPayload,
+            payload: &DisableCloneCellPayload,
         ) -> ConductorResult<InstalledCell> {
             let restored_cell = self.restore_clone_cell(payload).await?;
             self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
