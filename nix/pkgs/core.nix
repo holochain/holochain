@@ -32,9 +32,10 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # run all the cargo tests
+    # run all the cargo tests with no net
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test ''${1-}
+    cargo build --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests
+    unshare -n -r cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test ''${1-}
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''

@@ -129,7 +129,7 @@ jobs:
               name: Run the standard tests (nextest)
               no_output_timeout: 30m
               # uses unshare to run all the tests without network access
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" -p util-linux --run "unshare -r -n hc-test-standard-nextest"
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" -p util-linux --run hc-test-standard-nextest-nonet
          - run:
               name: push to cachix
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciCachixPush)/bin/hc-ci-cachix-push.sh || true
