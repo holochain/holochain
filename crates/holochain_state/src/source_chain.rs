@@ -574,7 +574,7 @@ where
         if init_zomes_complete_actions.len() > 1 {
             tracing::warn!("Multiple InitZomesComplete actions are present");
         }
-        let zomes_initialized = init_zomes_complete_actions.len() > 0;
+        let zomes_initialized = !init_zomes_complete_actions.is_empty();
         self.set_zomes_initialized(zomes_initialized);
         Ok(zomes_initialized)
     }
