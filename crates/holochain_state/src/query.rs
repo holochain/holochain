@@ -12,7 +12,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::sql::sql_cell::FETCH_OP;
+use holochain_sqlite::sql::sql_cell::FETCH_PUBLISHABLE_OP;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
@@ -942,7 +942,7 @@ pub fn get_public_op_from_db(
     op_hash: &DhtOpHash,
 ) -> StateQueryResult<Option<DhtOpHashed>> {
     let result = txn.query_row_and_then(
-        FETCH_OP,
+        FETCH_PUBLISHABLE_OP,
         named_params! {
             ":hash": op_hash,
         },
