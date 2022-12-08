@@ -180,17 +180,22 @@ impl OpHelper for Op {
                         OpEntry::CreateEntry {
                             entry_hash,
                             entry_type,
-                            action,
+                            ..
                         } => OpEntry::UpdateEntry {
                             entry_hash,
                             original_action_hash: original_action_hash.clone(),
                             original_entry_hash: original_entry_hash.clone(),
                             entry_type,
+                            action: action.clone(),
                         },
-                        OpEntry::CreateAgent(new_key) => OpEntry::UpdateAgent {
+                        OpEntry::CreateAgent {
+                            agent: new_key, 
+                            action,
+                        } => OpEntry::UpdateAgent {
                             original_key: original_entry_hash.clone().into(),
                             original_action_hash: original_action_hash.clone(),
                             new_key,
+                            action: action.clone(),
                         },
                         _ => unreachable!("This record is never created in this arm"),
                     },
@@ -465,7 +470,7 @@ where
             entry_type,
             action: action.clone(),
         }),
-        InScopeEntry::Agent(agent_key) => Ok(OpEntry::CreateAgent(agent_key)),
+        InScopeEntry::Agent(agent_key) => Ok(OpEntry::CreateAgent{agent:agent_key, action: action.clone()}),
         _ => Err(wasm_error!(WasmErrorInner::Guest(
             "StoreEntry should not exist for private entries Id".to_string()
         ))),

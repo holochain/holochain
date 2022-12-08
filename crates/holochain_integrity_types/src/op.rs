@@ -782,7 +782,12 @@ where
     },
     /// This operation stores the [`Entry`] for an
     /// [`AgentPubKey`].
-    CreateAgent(AgentPubKey),
+    CreateAgent {
+        /// The agent that was created
+        agent: AgentPubKey,
+        /// The signed action that created this entry
+        action: SignedHashed<EntryCreationAction>,
+    },
     /// This operation stores the [`Entry`] for the
     /// newly created entry in an update.
     UpdateEntry {
@@ -795,6 +800,8 @@ where
         /// The app defined entry type with the deserialized
         /// [`Entry`] data of the new entry.
         entry_type: ET,
+        /// The signed action that created this entry
+        action: SignedHashed<EntryCreationAction>,
     },
     /// This operation stores the [`Entry`] for an
     /// updated [`AgentPubKey`].
@@ -805,6 +812,8 @@ where
         original_key: AgentPubKey,
         /// The hash of the original keys [`Action`].
         original_action_hash: ActionHash,
+        /// The signed action that created this entry
+        action: SignedHashed<EntryCreationAction>,
     },
 }
 

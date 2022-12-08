@@ -185,7 +185,7 @@ fn op_errors(op: Op) -> WasmErrorInner {
 #[test_case(OpType::StoreRecord(OpRecord::InitZomesComplete))]
 #[test_case(OpType::StoreRecord(OpRecord::AgentValidationPkg(None)))]
 // Store Entry
-#[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: EntryTypes::A(A{}) }))]
+#[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: EntryTypes::A(A{}), action: a(0) }))]
 #[test_case(OpType::StoreEntry(OpEntry::UpdateEntry {entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: EntryTypes::A(A{}) }))]
 #[test_case(OpType::StoreEntry(OpEntry::CreateAgent(ak(4))))]
 #[test_case(OpType::StoreEntry(OpEntry::UpdateAgent { original_key: ak(4), new_key: ak(8), original_action_hash: ah(2) }))]
@@ -425,6 +425,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             original_action_hash,
             original_entry_hash,
             entry_type: et,
+            action,
         }) => {
             let entry = Entry::try_from(&et).unwrap();
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
