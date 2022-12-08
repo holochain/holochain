@@ -4,7 +4,7 @@
 , hcToplevelDir
 , nixEnvPrefixEval
 
-, jq
+, jq, util-linux
 }:
 
 let
