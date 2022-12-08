@@ -189,7 +189,7 @@ impl OpHelper for Op {
                             action: action.clone(),
                         },
                         OpEntry::CreateAgent {
-                            agent: new_key, 
+                            agent: new_key,
                             action,
                         } => OpEntry::UpdateAgent {
                             original_key: original_entry_hash.clone().into(),
@@ -470,7 +470,10 @@ where
             entry_type,
             action: action.clone(),
         }),
-        InScopeEntry::Agent(agent_key) => Ok(OpEntry::CreateAgent{agent:agent_key, action: action.clone()}),
+        InScopeEntry::Agent(agent_key) => Ok(OpEntry::CreateAgent {
+            agent: agent_key,
+            action: action.clone(),
+        }),
         _ => Err(wasm_error!(WasmErrorInner::Guest(
             "StoreEntry should not exist for private entries Id".to_string()
         ))),
