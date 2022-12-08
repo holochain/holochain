@@ -355,12 +355,12 @@ pub enum AdminRequest {
     /// [`AdminResponse::ZomeCallCapabilityGranted`]
     GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
 
-    /// Restore a clone cell that was previously archived.
+    /// Enable a clone cell that was previously disabled.
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::CloneCellRestored`]
-    RestoreCloneCell(Box<RestoreCloneCellPayload>),
+    /// [`AdminResponse::CloneCellEnabled`]
+    EnableCloneCell(Box<EnableCloneCellPayload>),
 
     /// Delete all clone cells that were previously archived.
     ///
@@ -526,8 +526,8 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
     ZomeCallCapabilityGranted,
 
-    // The successful response to an [`AdminRequest::RestoreCloneCell`].
-    CloneCellRestored(InstalledCell),
+    // The successful response to an [`AdminRequest::EnableCloneCell`].
+    CloneCellEnabled(InstalledCell),
 
     /// The successful response to an [`AdminRequest::DeleteArchivedCloneCells`].
     ArchivedCloneCellsDeleted,

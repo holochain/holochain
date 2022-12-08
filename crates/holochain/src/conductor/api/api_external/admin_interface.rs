@@ -343,13 +343,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ZomeCallCapabilityGranted)
             }
-            RestoreCloneCell(payload) => {
-                let restored_cell = self
+            EnableCloneCell(payload) => {
+                let enabled_cell = self
                     .conductor_handle
                     .clone()
-                    .restore_archived_clone_cell(&*payload)
+                    .enable_clone_cell(&*payload)
                     .await?;
-                Ok(AdminResponse::CloneCellRestored(restored_cell))
+                Ok(AdminResponse::CloneCellEnabled(enabled_cell))
             }
             DeleteArchivedCloneCells(payload) => {
                 self.conductor_handle

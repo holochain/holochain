@@ -1343,27 +1343,27 @@ mod clone_cell_impls {
             Ok(())
         }
 
-        /// Restore an archived clone cell for an app.
-        pub(crate) async fn restore_clone_cell(
-            &self,
-            DisableCloneCellPayload {
-                app_id,
-                clone_cell_id,
-            }: &DisableCloneCellPayload,
+        /// Enable a disabled clone cell
+        pub async fn enable_clone_cell(
+            self: Arc<Self>,
+            payload: &EnableCloneCellPayload,
         ) -> ConductorResult<InstalledCell> {
-            let (_, restored_cell) = self
+            let (_, enabled_cell) = self
                 .update_state_prime({
-                    let app_id = app_id.to_owned();
-                    let clone_cell_id = clone_cell_id.to_owned();
+                    let app_id = payload.app_id.to_owned();
+                    let clone_cell_id = payload.clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
-                        let clone_id = app.get_archived_clone_id(&clone_cell_id)?;
-                        let restored_cell = app.restore_clone_cell(&clone_id)?;
-                        Ok((state, restored_cell))
+                        let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                        let enabled_cell = app.enable_clone_cell(&clone_id)?;
+                        Ok((state, enabled_cell))
                     }
                 })
                 .await?;
-            Ok(restored_cell)
+
+            self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
+                .await?;
+            Ok(enabled_cell)
         }
 
         /// Remove a clone cell from an app.
@@ -1383,17 +1383,6 @@ mod clone_cell_impls {
             .await?;
             self.remove_dangling_cells().await?;
             Ok(())
-        }
-
-        /// Restore an archived clone cell
-        pub async fn restore_archived_clone_cell(
-            self: Arc<Self>,
-            payload: &DisableCloneCellPayload,
-        ) -> ConductorResult<InstalledCell> {
-            let restored_cell = self.restore_clone_cell(payload).await?;
-            self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
-                .await?;
-            Ok(restored_cell)
         }
     }
 }
