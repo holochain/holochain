@@ -103,7 +103,7 @@ jobs:
          - run:
               name: Run the standard tests (nextest)
               no_output_timeout: 30m
-              command: nix-shell -p util-linux --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
          - run:
               name: push to cachix
               command: $(nix-build . --fallback --no-link -A pkgs.ci.ciCachixPush)/bin/hc-ci-cachix-push.sh || true
