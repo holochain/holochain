@@ -38,6 +38,7 @@ pub async fn integrate_dht_ops_workflow(
                 for (author, seq_range) in &activity_to_integrate {
                     let start = seq_range.start();
                     let end = seq_range.end();
+
                     total += stmt.execute(named_params! {
                         ":when_integrated": time,
                         ":register_activity": DhtOpType::RegisterAgentActivity,
