@@ -290,12 +290,16 @@ impl KitsuneP2pActor {
             let fetch_queue = fetch_queue.clone();
             let i_s = internal_sender.clone();
             tokio::task::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                loop {
+                    let list = fetch_queue.get_items_to_fetch();
 
-                for (key, space, source) in fetch_queue.get_items_to_fetch() {
-                    if let Err(err) = i_s.fetch(key, space, source).await {
-                        tracing::debug!(?err);
+                    for (key, space, source) in list {
+                        if let Err(err) = i_s.fetch(key, space, source).await {
+                            tracing::debug!(?err);
+                        }
                     }
+
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 }
             });
         }
