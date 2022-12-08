@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221208.022202
+
+## [holochain\_cli-0.1.0-a-minor-release-test.2](crates/holochain_cli/CHANGELOG.md#0.1.0-a-minor-release-test.2)
+
+This release is just a test for the release workflow. The resulting release on crates.io will be yanked.
+
 # 20221206.003458
 
 ## [holochain\_cli-0.1.0-a-minor-release-test.1](crates/holochain_cli/CHANGELOG.md#0.1.0-a-minor-release-test.1)
