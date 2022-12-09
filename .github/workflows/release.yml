@@ -689,14 +689,27 @@ jobs:
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
-          # TODO: only use holochain in the title if the holochain crate is part of the release
-          # TODO: only mark the release as "latest in the repository" if holochain was part of it
-          # TODO: use a release specific tag instead of the latest holochain tag
+          # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
+          if gh release view ${TAG}; then
+            export RELEASE_TAG=${RELEASE_BRANCH}
+            export IS_HOLOCHAIN_RELEASE="false"
+          else
+            export RELEASE_TAG=${TAG}
+            export IS_HOLOCHAIN_RELEASE="true"
+          fi
 
-          gh release create "${TAG}" \
-            --target ${HOLOCHAIN_TARGET_BRANCH} \
-            --title "holochain ${VERSION} (${RELEASE_BRANCH#*-})" \
-            --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***"
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/holochain/holochain/releases \
+            -f tag_name="${RELEASE_TAG}" \
+            -f target_commitish="${HOLOCHAIN_TARGET_BRANCH}" \
+            -f name="holochain ${VERSION} (${RELEASE_BRANCH#*-})" \
+            -f body="***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***" \
+            -F draft=false \
+            -F prerelease=false \
+            -F generate_release_notes=false \
+            -F make_latest="${IS_HOLOCHAIN_RELEASE}"
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
