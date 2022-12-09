@@ -57,7 +57,8 @@ pub fn gossip_round_table<Id: Display + Clone>(
                     .region_diffs
                     .as_ref()
                     .map(|(ours, theirs)| ours.is_empty() && theirs.is_empty())
-                    .unwrap_or_else(|| todo!("check num ops"));
+                    .unwrap_or(false);
+                // .unwrap_or_else(|| todo!("check num ops"));
                 if state.filter_zeroes && zero {
                     None
                 } else {

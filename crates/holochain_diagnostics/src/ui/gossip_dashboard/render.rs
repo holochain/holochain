@@ -6,11 +6,25 @@ impl GossipDashboard {
         let layout = layout::layout(state.nodes().len(), state.num_bases(), f);
 
         self.local_state.share_mut(|local| {
-            let network_info = state.network_info();
             let metrics: Vec<_> = state
                 .nodes()
                 .iter()
                 .map(|n| (n.diagnostics.metrics.read(), n.cert.clone()))
+                .collect();
+
+            let queue_info: Vec<_> = state
+                .nodes()
+                .iter()
+                .map(|n| {
+                    (
+                        n.diagnostics.fetch_queue.info(
+                            [n.zome.cell_id().dna_hash().to_kitsune()]
+                                .into_iter()
+                                .collect(),
+                        ),
+                        n.cert.clone(),
+                    )
+                })
                 .collect();
 
             {
@@ -49,9 +63,9 @@ impl GossipDashboard {
                     layout.table_extras,
                 );
             }
-            let gauges: Vec<_> = metrics
+            let gauges: Vec<_> = queue_info
                 .iter()
-                .map(|(m, _)| ui_gossip_progress_gauge(network_info.fetch_queue_info.clone()))
+                .map(|(i, _)| ui_gossip_progress_gauge(i.clone()))
                 .collect();
 
             if let Some(selected) = selected {
