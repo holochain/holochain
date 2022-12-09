@@ -608,49 +608,16 @@ jobs:
           git push origin ${HOLOCHAIN_TARGET_BRANCH}
 
       - name: Push the release branch
+        id: push-release-branch
         run: |
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
           git checkout ${RELEASE_BRANCH}
           git push origin ${RELEASE_BRANCH}
 
-      - name: Create a pull-request towards the source branch
-        id: cpr
-        env:
-          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        run: |
-          set -euE -o pipefail
-
-          source ${HOLOCHAIN_RELEASE_SH}
-          cd "${HOLOCHAIN_REPO}"
-
-          gh pr create \
-            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
-            --label release \
-            --label "autoupdate:opt-in" \
-            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
-            --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
-            # --reviewer "holochain/core-dev" \
-
-          pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
-          echo "::set-output name=pull-request-number::${pull_request_number}"
-
-      - name: Enable Pull Request Automerge
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: peter-evans/enable-pull-request-automerge@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN}}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: squash
-      - name: Auto approve Pull Request
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: juliangruber/approve-pull-request-action@v1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          number: ${{ steps.cpr.outputs.pull-request-number }}
-
       - name: Publish crates
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        id: publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
@@ -670,6 +637,7 @@ jobs:
 
       - name: Push the tags
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        id: push-tags
         run: |
           set -eu
           source ${HOLOCHAIN_RELEASE_SH}
@@ -678,6 +646,49 @@ jobs:
           git status
 
           git push origin ${HOLOCHAIN_TARGET_BRANCH} --tags
+
+      - name: Merge release branch into source branch
+        continue-on-error: true
+        id: merge-into-source
+        run: |
+          set -xeu
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          git fetch origin ${HOLOCHAIN_SOURCE_BRANCH}
+          git checkout -B ${HOLOCHAIN_SOURCE_BRANCH} origin/${HOLOCHAIN_SOURCE_BRANCH}
+          git merge ${RELEASE_BRANCH}
+
+      - name: Push the updated source branch
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        continue-on-error: true
+        run: |
+          set -xeu
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+          git push origin ${HOLOCHAIN_SOURCE_BRANCH}
+
+      - name: Create a pull-request towards the source branch
+        id: cpr
+        if: ${{ always() && steps.push-release-branch.outcome == 'success' && (needs.vars.outputs.dry_run == 'true' || (steps.publish.outcome == 'failed' || steps.push-tags.outcome == 'failed' || steps.merge-into-source.outcome == 'failed')) }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+        run: |
+          set -euE -o pipefail
+
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          gh pr create \
+            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
+            --label release \
+            --label "autoupdate:opt-in" \
+            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
+            --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
+            # --reviewer "holochain/core-dev" \
+
+          pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
+          echo "::set-output name=pull-request-number::${pull_request_number}"
 
       - name: Create a github release
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
