@@ -284,6 +284,32 @@ fn bump_release_versions<'a>(
         cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
     )?;
 
+    /* TODO: the workspace probably needs to be re-read here because otherwise the publish dry-run will assume the previous crate versions
+     * either this or something else is leading to this issue where the verify_post checks aren't effective
+     *
+     * > [INFO  release_automation::lib::common] crates selected for the release process: [
+     * >         "holochain_cli-0.1.0-a-minor-release-test.2",
+     * >     ]
+     * > [DEBUG release_automation::lib::crate_selection] setting version to 0.1.0-a-minor-release-test.3 in manifest at "/home/steveej/src/holo/holochain/crates/hc/Cargo.toml"
+     * > [DEBUG release_automation::lib::release] [holochain_cli] creating crate release heading '0.1.0-a-minor-release-test.3' in '"/home/steveej/src/holo/holochain/crates/hc/CHANGELOG.md"'
+     * > [DEBUG release_automation::lib::crate_selection] running command: "cargo" "fetch" "--verbose" "--manifest-path" "Cargo.toml"
+     * > [DEBUG release_automation::lib::crate_selection] running command: "cargo" "update" "--workspace" "--offline" "--verbose"
+     * > [DEBUG release_automation::lib::crate_selection] running command: "cargo" "fetch" "--verbose" "--manifest-path" "crates/test_utils/wasm/wasm_workspace/Cargo.toml"
+     * >     Blocking waiting for file lock on package cache
+     * >     Blocking waiting for file lock on package cache
+     * > [DEBUG release_automation::lib::crate_selection] running command: "cargo" "update" "--workspace" "--offline" "--verbose" "--manifest-path" "crates/test_utils/wasm/wasm_workspace/Cargo.toml"
+     * >     Blocking waiting for file lock on package cache
+     * > [INFO  release_automation::lib::release] running consistency checks after changing the versions...
+     * > [DEBUG release_automation::lib::release] attempting to publish {"holochain_cli"}
+     * > [DEBUG release_automation::lib::release] holochain_cli-0.1.0-a-minor-release-test.2 is unchanged and already published, skipping..
+     * > [DEBUG release_automation::lib::release] Running command: "cargo" "check" "--locked" "--verbose" "--release" "--manifest-path=/home/steveej/src/holo/holochain/crates/hc/Cargo.toml"
+     * > [DEBUG release_automation::lib::release] Running command: "cargo" "publish" "--locked" "--verbose" "--no-verify" "--manifest-path=/home/steveej/src/holo/holochain/crates/hc/Cargo.toml" "--dry-run" "--allow-dirty"
+     * > [INFO  release_automation::lib::release] successfully published holochain_cli-0.1.0-a-minor-release-test.2
+     * > [INFO  release_automation::lib::release] crates processed: 1, consistent: 1, published: 1, skipped: 1, tolerated: 0
+     *
+     * the above shouldn't have looked up .2 but rather .3, which it wouldn't have found
+     */
+
     if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
         do_publish_to_crates_io(
