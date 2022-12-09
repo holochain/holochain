@@ -355,12 +355,12 @@ pub enum AdminRequest {
     /// [`AdminResponse::ZomeCallCapabilityGranted`]
     GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
 
-    /// Delete all clone cells that were previously archived.
+    /// Delete a clone cell that was previously disabled.
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::ArchivedCloneCellsDeleted`]
-    DeleteArchivedCloneCells(Box<DeleteArchivedCloneCellsPayload>),
+    /// [`AdminResponse::CloneCellDeleted`]
+    DeleteCloneCell(Box<DeleteCloneCellPayload>),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -519,8 +519,8 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
     ZomeCallCapabilityGranted,
 
-    /// The successful response to an [`AdminRequest::DeleteArchivedCloneCells`].
-    ArchivedCloneCellsDeleted,
+    /// The successful response to an [`AdminRequest::DeleteCloneCell`].
+    CloneCellDeleted,
 }
 
 /// Error type that goes over the websocket wire.

@@ -343,12 +343,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ZomeCallCapabilityGranted)
             }
-            DeleteArchivedCloneCells(payload) => {
+            DeleteCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .delete_archived_clone_cells(&*payload)
+                    .delete_clone_cell(&*payload)
                     .await?;
-                Ok(AdminResponse::ArchivedCloneCellsDeleted)
+                Ok(AdminResponse::CloneCellDeleted)
             }
 
             // deprecated aliases

@@ -1343,7 +1343,7 @@ mod clone_cell_impls {
             Ok(())
         }
 
-        /// Enable a disabled clone cell
+        /// Enable a disabled clone cell.
         pub async fn enable_clone_cell(
             self: Arc<Self>,
             payload: &EnableCloneCellPayload,
@@ -1366,17 +1366,21 @@ mod clone_cell_impls {
             Ok(enabled_cell)
         }
 
-        /// Remove a clone cell from an app.
-        pub(crate) async fn delete_archived_clone_cells(
+        /// Delete a clone cell.
+        pub(crate) async fn delete_clone_cell(
             &self,
-            DeleteArchivedCloneCellsPayload { app_id, role_name }: &DeleteArchivedCloneCellsPayload,
+            DeleteCloneCellPayload {
+                app_id,
+                clone_cell_id,
+            }: &DeleteCloneCellPayload,
         ) -> ConductorResult<()> {
             self.update_state_prime({
                 let app_id = app_id.clone();
-                let role_name = role_name.clone();
+                let clone_cell_id = clone_cell_id.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    app.delete_archived_clone_cells_for_role(&role_name)?;
+                    let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                    app.delete_clone_cell(&clone_id)?;
                     Ok((state, ()))
                 }
             })

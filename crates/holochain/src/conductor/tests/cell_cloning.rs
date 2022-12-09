@@ -2,7 +2,7 @@ use crate::sweettest::*;
 use holo_hash::ActionHash;
 use holochain_types::{
     app::CreateCloneCellPayload,
-    prelude::{DisableCloneCellPayload, CloneCellId, DeleteArchivedCloneCellsPayload},
+    prelude::{CloneCellId, DeleteCloneCellPayload, DisableCloneCellPayload},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CloneId, DnaModifiersOpt, RoleName};
@@ -191,7 +191,7 @@ async fn clone_cell_deletion() {
         .await
         .unwrap();
 
-    // archive clone cell
+    // disable clone cell
     conductor
         .raw_handle()
         .disable_clone_cell(&DisableCloneCellPayload {
@@ -211,7 +211,7 @@ async fn clone_cell_deletion() {
         .unwrap();
     assert_eq!(app_info.cell_data.contains(&installed_clone_cell), false);
 
-    // calling the cell after archiving fails
+    // calling the cell after disabling fails
     let zome = SweetZome::new(
         installed_clone_cell.as_id().clone(),
         TestWasm::Create.coordinator_zome_name(),
@@ -221,8 +221,8 @@ async fn clone_cell_deletion() {
         .await;
     assert!(zome_call_response.is_err());
 
-    // restore the archived clone cell by clone id
-    let restored_cell = conductor
+    // enable the disabled clone cell by clone id
+    let enabled_cell = conductor
         .raw_handle()
         .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
@@ -233,8 +233,8 @@ async fn clone_cell_deletion() {
         .await
         .unwrap();
 
-    // assert the restored clone cell is the previously created clone cell
-    assert_eq!(restored_cell, installed_clone_cell);
+    // assert the enabled clone cell is the previously created clone cell
+    assert_eq!(enabled_cell, installed_clone_cell);
 
     // assert that the cell appears in app info's cell data again
     let app_info = conductor
@@ -250,7 +250,7 @@ async fn clone_cell_deletion() {
         .await;
     assert!(zome_call_response.is_ok());
 
-    // archive clone cell again
+    // disable clone cell again
     conductor
         .raw_handle()
         .disable_clone_cell(&DisableCloneCellPayload {
@@ -262,8 +262,8 @@ async fn clone_cell_deletion() {
         .await
         .unwrap();
 
-    // restore clone cell by cell id
-    let restored_cell = conductor
+    // enable clone cell by cell id
+    let enabled_cell = conductor
         .raw_handle()
         .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
@@ -272,10 +272,10 @@ async fn clone_cell_deletion() {
         .await
         .unwrap();
 
-    // assert the restored clone cell is the previously created clone cell
-    assert_eq!(restored_cell, installed_clone_cell);
+    // assert the enabled clone cell is the previously created clone cell
+    assert_eq!(enabled_cell, installed_clone_cell);
 
-    // archive and delete clone cell
+    // disable and delete clone cell
     conductor
         .raw_handle()
         .disable_clone_cell(&DisableCloneCellPayload {
@@ -288,14 +288,14 @@ async fn clone_cell_deletion() {
         .unwrap();
     conductor
         .raw_handle()
-        .delete_archived_clone_cells(&DeleteArchivedCloneCellsPayload {
+        .delete_clone_cell(&DeleteCloneCellPayload {
             app_id: app_id.into(),
-            role_name: role_name.clone(),
+            clone_cell_id: CloneCellId::CellId(installed_clone_cell.as_id().clone()),
         })
         .await
         .unwrap();
-    // assert the deleted cell cannot be restored
-    let restore_result = conductor
+    // assert the deleted cell cannot be enabled
+    let disable_result = conductor
         .raw_handle()
         .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
@@ -304,7 +304,7 @@ async fn clone_cell_deletion() {
             ),
         })
         .await;
-    assert!(restore_result.is_err());
+    assert!(disable_result.is_err());
 }
 
 #[tokio::test(flavor = "multi_thread")]
