@@ -627,11 +627,12 @@ mod test {
             .await;
 
         let res = admin_api
-            .handle_admin_request(AdminRequest::ListEnabledApps)
+            .handle_admin_request(AdminRequest::ListApps {
+                status_filter: Some(AppStatusFilter::Enabled),
+            })
             .await;
 
-        assert_matches!(res, AdminResponse::EnabledAppsListed(v) if v.contains(&"test-by-path".to_string()) && v.contains(&"test-by-hash".to_string())
-        );
+        assert_matches!(res, AdminResponse::AppsListed(v) if v.iter().find(|app_info| app_info.installed_app_id.as_str() == "test-by-path").is_some() && v.iter().find(|app_info| app_info.installed_app_id.as_str() == "test-by-hash").is_some());
 
         handle.shutdown();
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
