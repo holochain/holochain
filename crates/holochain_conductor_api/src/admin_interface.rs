@@ -174,9 +174,6 @@ pub enum AdminRequest {
         installed_app_id: InstalledAppId,
     },
 
-    #[deprecated = "alias for DisableApp"]
-    DeactivateApp { installed_app_id: InstalledAppId },
-
     StartApp {
         /// The app ID to (re)start
         installed_app_id: InstalledAppId,

@@ -358,12 +358,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ArchivedCloneCellsDeleted)
             }
-            #[allow(deprecated)]
-            DeactivateApp { installed_app_id } => {
-                tracing::warn!("Admin method DeactivateApp is deprecated: use DisableApp instead (functionality is identical).");
-                self.handle_admin_request_inner(DisableApp { installed_app_id })
-                    .await
-            }
         }
     }
 }
