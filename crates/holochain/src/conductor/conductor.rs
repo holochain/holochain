@@ -419,7 +419,7 @@ mod interface_impls {
             Ok(())
         }
 
-        pub(crate) async fn add_app_interface(
+        pub async fn add_app_interface(
             self: Arc<Self>,
             port: either::Either<u16, AppInterfaceId>,
         ) -> ConductorResult<u16> {
@@ -476,7 +476,7 @@ mod interface_impls {
             self.admin_websocket_ports.share_ref(|p| p.get(0).copied())
         }
 
-        pub(crate) async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
+        pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
             Ok(self
                 .get_state()
                 .await?
