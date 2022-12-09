@@ -730,7 +730,7 @@ jobs:
             -F draft=false \
             -F prerelease=false \
             -F generate_release_notes=false \
-            -F make_latest="${IS_HOLOCHAIN_RELEASE}"
+            -f make_latest="${IS_HOLOCHAIN_RELEASE}"
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
