@@ -77,6 +77,7 @@ pub trait KitsuneHost: 'static + Send + Sync {
         &self,
         space: Arc<KitsuneSpace>,
         op_hash_list: Vec<KOpHash>,
+        _context: kitsune_p2p_fetch::FetchContext,
     ) -> KitsuneHostResult<Vec<bool>> {
         let _space = space;
         futures::FutureExt::boxed(

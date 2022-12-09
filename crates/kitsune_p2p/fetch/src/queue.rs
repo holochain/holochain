@@ -1,9 +1,21 @@
+//! The Fetch Queue: a structure to store ops-to-be-fetched.
+//!
+//! When we encounter an op hash that we have no record of, we store it as an item
+//! at the end of the FetchQueue. The items of the queue contain not only the op hash,
+//! but also the source(s) to fetch it from, and other data including the last time
+//! a fetch was attempted.
+//!
+//! The consumer of the queue can read items whose last_fetch time is older than some interval
+//! from the current moment. The items thus returned are not guaranteed to be returned in
+//! order of last_fetch time, but they are guaranteed to be at least as old as the specified
+//! interval.
+
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace, Tx2Cert};
+use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace /*, Tx2Cert*/};
 use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchKey, FetchOptions, FetchQueuePush, RoughInt};
@@ -98,8 +110,8 @@ struct SourceRecord {
 pub enum FetchSource {
     /// An agent on a node
     Agent(KAgent),
-    /// A node, without agent specified
-    Node(Tx2Cert),
+    // /// A node, without agent specified
+    // Node(Tx2Cert),
 }
 
 // TODO: move this to host, but for now, for convenience, we just use this one config
@@ -135,14 +147,30 @@ impl FetchQueue {
     /// changing the position in the queue.
     pub fn push(&self, args: FetchQueuePush) {
         self.state
-            .share_mut(|s, _| Ok(s.push(&*self.config, args)))
+            .share_mut(|s, _| {
+                tracing::debug!(
+                    "FetchQueue (size = {}) item added: {:?}",
+                    s.queue.len() + 1,
+                    args
+                );
+                s.push(&*self.config, args);
+                Ok(())
+            })
             .expect("no error");
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
     pub fn remove(&self, key: &FetchKey) -> Option<FetchContext> {
         self.state
-            .share_mut(|s, _| Ok(s.remove(key)))
+            .share_mut(|s, _| {
+                let removed = s.remove(key);
+                tracing::debug!(
+                    "FetchQueue (size = {}) item removed: {:?}",
+                    s.queue.len(),
+                    removed
+                );
+                Ok(removed)
+            })
             .expect("no error")
     }
 

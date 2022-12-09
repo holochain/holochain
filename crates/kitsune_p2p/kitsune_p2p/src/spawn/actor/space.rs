@@ -437,11 +437,18 @@ impl SpaceInternalHandler for Space {
         let just_hashes = op_hash_list.iter().map(|s| s.data()).collect();
 
         Ok(async move {
-            let have_data_list = ro_inner
+            let have_data_list = match ro_inner
                 .host_api
-                .check_op_data(space.clone(), just_hashes)
+                .check_op_data(space.clone(), just_hashes, context)
                 .await
-                .map_err(KitsuneP2pError::other)?;
+                .map_err(KitsuneP2pError::other)
+            {
+                Err(err) => {
+                    tracing::warn!(?err);
+                    return Err(err);
+                }
+                Ok(res) => res,
+            };
 
             for (op_hash, have_data) in op_hash_list.into_iter().zip(have_data_list) {
                 if have_data {

@@ -24,7 +24,7 @@ pub use rough_sized::*;
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize,
 )]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub enum FetchKey {
     /// Fetch via region.
     Region(RegionCoords),

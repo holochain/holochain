@@ -524,7 +524,7 @@ impl Spaces {
                     let mut stmt = txn.prepare_cached(
                         "
                     SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                    Action.blob AS action_blob, Entry.blob AS entry_blob,
+                    Action.blob AS action_blob, Entry.blob AS entry_blob
                     FROM DHtOp
                     JOIN Action ON DhtOp.action_hash = Action.hash
                     LEFT JOIN Entry ON Action.entry_hash = Entry.hash

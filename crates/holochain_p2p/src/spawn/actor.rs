@@ -40,52 +40,6 @@ macro_rules! timing_trace {
     }};
 }
 
-/// Holochain-specific FetchContext extension trait.
-pub trait FetchContextExt {
-    /// Applies the "request_validation_receipt" flag *if* the param is true
-    /// otherwise, leaves the flag unchanged.
-    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self;
-
-    /// Returns true if the "request_validation_receipt" flag is set.
-    fn has_request_validation_receipt(&self) -> bool;
-
-    /// Applies the "countersigning_session" flag *if* the param is true
-    /// otherwise, leaves the flag unchanged.
-    fn with_countersigning_session(&self, countersigning_session: bool) -> Self;
-
-    /// Returns true if the "countersigning_session" flag is set.
-    fn has_countersigning_session(&self) -> bool;
-}
-
-const FLAG_REQ_VAL_RCPT: u32 = 1 << 0;
-const FLAG_CNTR_SSN: u32 = 1 << 1;
-
-impl FetchContextExt for FetchContext {
-    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self {
-        if request_validation_receipt {
-            FetchContext(self.0 | FLAG_REQ_VAL_RCPT)
-        } else {
-            *self
-        }
-    }
-
-    fn has_request_validation_receipt(&self) -> bool {
-        self.0 & FLAG_REQ_VAL_RCPT > 0
-    }
-
-    fn with_countersigning_session(&self, countersigning_session: bool) -> Self {
-        if countersigning_session {
-            FetchContext(self.0 | FLAG_CNTR_SSN)
-        } else {
-            *self
-        }
-    }
-
-    fn has_countersigning_session(&self) -> bool {
-        self.0 & FLAG_CNTR_SSN > 0
-    }
-}
-
 #[derive(Clone)]
 struct WrapEvtSender(futures::channel::mpsc::Sender<HolochainP2pEvent>);
 
@@ -361,6 +315,7 @@ pub(crate) struct HolochainP2pActor {
     tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
     evt_sender: WrapEvtSender,
     kitsune_p2p: ghost_actor::GhostSender<kitsune_p2p::actor::KitsuneP2p>,
+    host: kitsune_p2p::HostApi,
 }
 
 impl ghost_actor::GhostControlHandler for HolochainP2pActor {
@@ -387,7 +342,7 @@ impl HolochainP2pActor {
     ) -> HolochainP2pResult<Self> {
         let tuning_params = config.tuning_params.clone();
         let (kitsune_p2p, kitsune_p2p_events) =
-            kitsune_p2p::spawn_kitsune_p2p(config, tls_config, host).await?;
+            kitsune_p2p::spawn_kitsune_p2p(config, tls_config, host.clone()).await?;
 
         channel_factory.attach_receiver(kitsune_p2p_events).await?;
 
@@ -395,6 +350,7 @@ impl HolochainP2pActor {
             tuning_params,
             evt_sender: WrapEvtSender(evt_sender),
             kitsune_p2p,
+            host,
         })
     }
 
@@ -1029,7 +985,21 @@ impl HolochainP2pHandler for HolochainP2pActor {
             .with_countersigning_session(countersigning_session);
 
         let kitsune_p2p = self.kitsune_p2p.clone();
+        let host = self.host.clone();
         Ok(async move {
+            // little awkward, but we need the side-effects of reporting
+            // the context back to the host api here:
+            if let Err(err) = host
+                .check_op_data(
+                    space.clone(),
+                    op_hash_list.iter().map(|x| x.data()).collect(),
+                    fetch_context,
+                )
+                .await
+            {
+                tracing::warn!(?err);
+            }
+
             kitsune_p2p
                 .broadcast(
                     space.clone(),

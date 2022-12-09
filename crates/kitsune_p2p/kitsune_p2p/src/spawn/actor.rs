@@ -264,13 +264,12 @@ impl KitsuneP2pActor {
                     // MAYBE: open a new connection if the con was closed??
                     let (con, _url, region) = user;
 
-                    let payload = wire::Wire::push_op_data(vec![(
-                        space,
-                        vec![wire::PushOpItem {
-                            op_data: op,
-                            region,
-                        }],
-                    )]);
+                    let item = wire::PushOpItem {
+                        op_data: op,
+                        region,
+                    };
+                    tracing::debug!("push_op_data: {:?}", item);
+                    let payload = wire::Wire::push_op_data(vec![(space, vec![item])]);
 
                     if let Err(err) = con.notify(&payload, timeout).await {
                         tracing::warn!(?err, "error responding to op fetch");
@@ -291,12 +290,16 @@ impl KitsuneP2pActor {
             let fetch_queue = fetch_queue.clone();
             let i_s = internal_sender.clone();
             tokio::task::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                loop {
+                    let list = fetch_queue.get_items_to_fetch();
 
-                for (key, space, source) in fetch_queue.get_items_to_fetch() {
-                    if let Err(err) = i_s.fetch(key, space, source).await {
-                        tracing::debug!(?err);
+                    for (key, space, source) in list {
+                        if let Err(err) = i_s.fetch(key, space, source).await {
+                            tracing::debug!(?err);
+                        }
                     }
+
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 }
             });
         }
@@ -865,11 +868,7 @@ impl InternalHandler for KitsuneP2pActor {
         space: KSpace,
         source: FetchSource,
     ) -> InternalHandlerResult<()> {
-        // TODO - fix node handling
-        let agent = match source {
-            FetchSource::Agent(agent) => agent,
-            FetchSource::Node(_) => todo!(),
-        };
+        let FetchSource::Agent(agent) = source;
 
         let space_sender = match self.spaces.get_mut(&space) {
             None => {

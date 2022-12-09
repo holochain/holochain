@@ -203,10 +203,108 @@ mod tests {
     use kitsune_p2p::dht::prelude::Topology;
     use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
 
+    use crate::dht::prelude::*;
+    use crate::dht_arc::DhtArcSet;
     use crate::HolochainP2pSender;
     use holochain_zome_types::ValidationStatus;
+    use kitsune_p2p::agent_store::AgentInfoSigned;
+    use kitsune_p2p::dependencies::kitsune_p2p_fetch;
     use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
+    use kitsune_p2p::event::*;
     use kitsune_p2p::KitsuneP2pConfig;
+    use kitsune_p2p::*;
+    use kitsune_p2p_types::*;
+    use std::sync::Mutex;
+
+    #[derive(Clone)]
+    struct TestHost(Arc<Mutex<Vec<String>>>);
+
+    impl TestHost {
+        pub fn drain(&self) -> Vec<String> {
+            self.0.lock().unwrap().drain(..).collect()
+        }
+    }
+
+    impl Default for TestHost {
+        fn default() -> Self {
+            Self(Arc::new(Mutex::new(Vec::new())))
+        }
+    }
+
+    impl kitsune_p2p::KitsuneHost for TestHost {
+        fn get_agent_info_signed(
+            &self,
+            _input: GetAgentInfoSignedEvt,
+        ) -> KitsuneHostResult<Option<AgentInfoSigned>> {
+            todo!()
+        }
+
+        fn peer_extrapolated_coverage(
+            &self,
+            _space: Arc<KitsuneSpace>,
+            _dht_arc_set: DhtArcSet,
+        ) -> KitsuneHostResult<Vec<f64>> {
+            todo!()
+        }
+
+        fn query_region_set(
+            &self,
+            _space: Arc<KitsuneSpace>,
+            _dht_arc_set: Arc<DhtArcSet>,
+        ) -> KitsuneHostResult<RegionSetLtcs> {
+            todo!()
+        }
+
+        fn query_size_limited_regions(
+            &self,
+            _space: Arc<KitsuneSpace>,
+            _size_limit: u32,
+            _regions: Vec<Region>,
+        ) -> KitsuneHostResult<Vec<Region>> {
+            todo!()
+        }
+
+        fn query_op_hashes_by_region(
+            &self,
+            _space: Arc<KitsuneSpace>,
+            _region: RegionCoords,
+        ) -> KitsuneHostResult<Vec<OpHashSized>> {
+            todo!()
+        }
+
+        fn record_metrics(
+            &self,
+            _space: Arc<KitsuneSpace>,
+            _records: Vec<MetricRecord>,
+        ) -> KitsuneHostResult<()> {
+            todo!()
+        }
+
+        fn get_topology(&self, _space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
+            todo!()
+        }
+
+        fn op_hash(&self, _op_data: KOpData) -> KitsuneHostResult<KOpHash> {
+            todo!()
+        }
+
+        /// Check which hashes we have data for.
+        fn check_op_data(
+            &self,
+            space: Arc<KitsuneSpace>,
+            op_hash_list: Vec<KOpHash>,
+            context: kitsune_p2p_fetch::FetchContext,
+        ) -> KitsuneHostResult<Vec<bool>> {
+            self.0
+                .lock()
+                .unwrap()
+                .push(format!("{:?}:{:?}:{:?}", space, op_hash_list, context,));
+            tracing::warn!("@!@!@!@!@!!# {:#?}", &*self.0.lock().unwrap());
+            async move { Ok(op_hash_list.into_iter().map(|_| false).collect()) }
+                .boxed()
+                .into()
+        }
+    }
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
@@ -345,17 +443,23 @@ mod tests {
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
+        let mut tuning_params =
+            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning_params.gossip_strategy = "none".to_string();
+        let tuning_params = Arc::new(tuning_params);
+        let mut config = KitsuneP2pConfig::default();
+        config.tuning_params = tuning_params;
+
+        let test_host = TestHost::default();
+
         let (p2p, mut evt) = spawn_holochain_p2p(
-            KitsuneP2pConfig::default(),
+            config,
             TlsConfig::new_ephemeral().await.unwrap(),
-            kitsune_p2p::HostStub::new(),
+            Arc::new(test_host.clone()),
         )
         .await
         .unwrap();
 
-        let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
-
-        let recv_count_clone = recv_count.clone();
         let r_task = tokio::task::spawn(async move {
             use tokio_stream::StreamExt;
             while let Some(evt) = evt.next().await {
@@ -363,7 +467,6 @@ mod tests {
                 match evt {
                     Publish { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
-                        recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     SignNetworkData { respond, .. } => {
                         respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
@@ -374,11 +477,16 @@ mod tests {
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
+                    QueryAgentInfoSignedNearBasis { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
                     QueryPeerDensity { respond, .. } => {
                         let view = test_peer_view();
                         respond.r(Ok(async move { Ok(view) }.boxed().into()));
                     }
-                    _ => {}
+                    oth => {
+                        tracing::warn!(?oth, "@@@");
+                    }
                 }
             }
         });
@@ -398,7 +506,10 @@ mod tests {
             .publish(dna, true, false, action_hash, vec![], Some(200))
             .await;
 
-        assert_eq!(3, recv_count.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(
+            "KitsuneSpace(0x737373737373737373737373737373737373737373737373737373737373737373737373):[]:FetchContext(1)",
+            test_host.drain()[0],
+        );
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
@@ -483,7 +594,7 @@ mod tests {
 
         tracing::info!("test - get");
         let res = p2p
-            .get(dna, hash, actor::GetOptions::default())
+            .get(dna, hash, crate::actor::GetOptions::default())
             .await
             .unwrap();
 
@@ -572,7 +683,7 @@ mod tests {
         };
 
         let res = p2p
-            .get_links(dna, link_key, actor::GetLinksOptions::default())
+            .get_links(dna, link_key, crate::actor::GetLinksOptions::default())
             .await
             .unwrap();
 
