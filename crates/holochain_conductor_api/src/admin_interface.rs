@@ -161,9 +161,6 @@ pub enum AdminRequest {
         installed_app_id: InstalledAppId,
     },
 
-    #[deprecated = "alias for EnableApp"]
-    ActivateApp { installed_app_id: InstalledAppId },
-
     /// Changes the specified app from an enabled to a disabled state in the conductor.
     ///
     /// When an app is disabled, zome calls can no longer be made, and the app will not be
