@@ -230,14 +230,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .list_cell_ids(Some(CellStatus::Joined));
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
-            ListEnabledApps => {
-                tracing::warn!(
-                    "AdminRequest::ListEnabledApps is deprecated, use AdminRequest::ListApps (TODO: update conductor-api)"
-                );
-
-                let app_ids = self.conductor_handle.list_running_apps().await?;
-                Ok(AdminResponse::EnabledAppsListed(app_ids))
-            }
             ListApps { status_filter } => {
                 let apps = self.conductor_handle.list_apps(status_filter).await?;
                 Ok(AdminResponse::AppsListed(apps))

@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
@@ -127,13 +125,6 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::CellIdsListed`]
     ListCellIds,
-
-    /// List the IDs of all enabled apps in the conductor.
-    ///
-    /// # Returns
-    ///
-    /// [`AdminResponse::ActiveAppsListed`]
-    ListEnabledApps,
 
     /// List the apps and their information that are installed in the conductor.
     ///
@@ -425,14 +416,6 @@ pub enum AdminResponse {
     /// Contains a list of all the cell IDs in the conductor.
     CellIdsListed(Vec<CellId>),
 
-    /// The successful response to an [`AdminRequest::ListEnabledApps`].
-    ///
-    /// Contains a list of all the active app IDs in the conductor.
-    EnabledAppsListed(Vec<InstalledAppId>),
-
-    #[deprecated = "alias for EnabledAppsListed"]
-    ActiveAppsListed(Vec<InstalledAppId>),
-
     /// The successful response to an [`AdminRequest::ListApps`].
     ///
     /// Contains a list of the `InstalledAppInfo` of the installed apps in the conductor.
@@ -461,12 +444,6 @@ pub enum AdminResponse {
         errors: Vec<(CellId, String)>,
     },
 
-    #[deprecated = "alias for AppEnabled"]
-    AppActivated {
-        app: InstalledAppInfo,
-        errors: Vec<(CellId, String)>,
-    },
-
     /// The successful response to an [`AdminRequest::DisableApp`].
     ///
     /// It means the app was disabled successfully.
@@ -479,8 +456,6 @@ pub enum AdminResponse {
     /// failed to start.
     /// TODO: add reason why app couldn't start
     AppStarted(bool),
-    #[deprecated = "alias for AppDisabled"]
-    AppDeactivated,
 
     /// The successful response to an [`AdminRequest::DumpState`].
     ///
