@@ -135,9 +135,6 @@ pub enum AdminRequest {
     /// [`AdminResponse::ActiveAppsListed`]
     ListEnabledApps,
 
-    #[deprecated = "alias for ListEnabledApps"]
-    ListActiveApps,
-
     /// List the apps and their information that are installed in the conductor.
     ///
     /// If `status_filter` is `Some(_)`, it will return only the apps with the specified status.

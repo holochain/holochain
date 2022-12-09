@@ -358,13 +358,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ArchivedCloneCellsDeleted)
             }
-
-            // deprecated aliases
-            #[allow(deprecated)]
-            ListActiveApps => {
-                tracing::warn!("Admin method ListActiveApps is deprecated: use ListApps instead.");
-                self.handle_admin_request_inner(ListEnabledApps).await
-            }
             #[allow(deprecated)]
             ActivateApp { installed_app_id } => {
                 tracing::warn!("Admin method ActivateApp is deprecated: use EnableApp instead (functionality is identical).");
