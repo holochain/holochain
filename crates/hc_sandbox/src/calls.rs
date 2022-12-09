@@ -70,8 +70,6 @@ pub enum AdminRequestCli {
     NewAgent,
     /// Calls AdminRequest::ListCellIds.
     ListCells,
-    /// Calls AdminRequest::ListActiveApps.
-    ListActiveApps,
     /// Calls AdminRequest::ListApps.
     ListApps(ListApps),
     EnableApp(EnableApp),
@@ -323,10 +321,6 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let cells = list_cell_ids(cmd).await?;
             msg!("Cell Ids: {:?}", cells);
         }
-        AdminRequestCli::ListActiveApps => {
-            let apps = list_running_apps(cmd).await?;
-            msg!("Active Apps: {:?}", apps);
-        }
         AdminRequestCli::ListApps(args) => {
             let apps = list_apps(cmd, args).await?;
             msg!("List Apps: {:?}", apps);
@@ -576,12 +570,6 @@ pub async fn generate_agent_pub_key(cmd: &mut CmdRunner) -> anyhow::Result<Agent
 pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
     let resp = cmd.command(AdminRequest::ListCellIds).await?;
     Ok(expect_match!(resp => AdminResponse::CellIdsListed, "Failed to list cell ids"))
-}
-
-/// Calls [`AdminRequest::ListActiveApps`].
-pub async fn list_running_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
-    let resp = cmd.command(AdminRequest::ListEnabledApps).await?;
-    Ok(expect_match!(resp => AdminResponse::EnabledAppsListed, "Failed to list active apps"))
 }
 
 /// Calls [`AdminRequest::ListApps`].
