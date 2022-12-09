@@ -63,22 +63,6 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
-            #[allow(deprecated)]
-            AppRequest::ZomeCallInvocation(call) => {
-                tracing::warn!(
-                    "AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)"
-                );
-                self.handle_app_request_inner(AppRequest::ZomeCall(call))
-                    .await
-                    .map(|r| {
-                        match r {
-                            // if successful, re-wrap in the deprecated response type
-                            AppResponse::ZomeCall(zc) => AppResponse::ZomeCallInvocation(zc),
-                            // else (probably an error), return as-is
-                            other => other,
-                        }
-                    })
-            }
             AppRequest::ZomeCall(call) => {
                 match self.conductor_handle.call_zome(*call.clone()).await? {
                     Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCall(Box::new(output))),

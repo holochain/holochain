@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_types::prelude::*;
@@ -63,9 +61,6 @@ pub enum AppRequest {
     /// Info about gossip
     GossipInfo(Box<GossipInfoRequestPayload>),
 
-    #[deprecated = "use ZomeCall"]
-    ZomeCallInvocation(Box<ZomeCall>),
-
     /// Is currently unimplemented and will return
     /// an [`AppResponse::Unimplemented`].
     Crypto(Box<CryptoRequest>),
@@ -112,9 +107,6 @@ pub enum AppResponse {
 
     /// GossipInfo is returned
     GossipInfo(Vec<DnaGossipInfo>),
-
-    #[deprecated = "use ZomeCall"]
-    ZomeCallInvocation(Box<ExternIO>),
 }
 
 /// The data provided over an app interface in order to make a zome call
