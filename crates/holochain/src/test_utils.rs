@@ -237,6 +237,12 @@ where
                 QueryAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                 }
+                QueryAgentInfoSignedNearBasis { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                }
+                QueryGossipAgents { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                }
                 QueryPeerDensity { respond, .. } => {
                     respond.r(Ok(async move {
                         Ok(PeerViewQ::new(
@@ -249,7 +255,7 @@ where
                     .boxed()
                     .into()));
                 }
-                _ => {}
+                oth => tracing::warn!(?oth, "UnhandledEvent"),
             }
         }
     });
