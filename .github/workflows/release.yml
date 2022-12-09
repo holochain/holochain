@@ -635,19 +635,20 @@ jobs:
           pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
           echo "::set-output name=pull-request-number::${pull_request_number}"
 
-      - name: Enable Pull Request Automerge
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: peter-evans/enable-pull-request-automerge@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN}}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: squash
-      - name: Auto approve Pull Request
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: juliangruber/approve-pull-request-action@v1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          number: ${{ steps.cpr.outputs.pull-request-number }}
+      # FIXME: this commented code serves only as a reminder. remove it entirely once push to source branch is working
+      # - name: Enable Pull Request Automerge
+      #   if: ${{ needs.vars.outputs.dry_run == 'false' }}
+      #   uses: peter-evans/enable-pull-request-automerge@v1
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN}}
+      #     pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+      #     merge-method: squash
+      # - name: Auto approve Pull Request
+      #   if: ${{ needs.vars.outputs.dry_run == 'false' }}
+      #   uses: juliangruber/approve-pull-request-action@v1
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     number: ${{ steps.cpr.outputs.pull-request-number }}
 
       - name: Publish crates
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
@@ -678,6 +679,26 @@ jobs:
           git status
 
           git push origin ${HOLOCHAIN_TARGET_BRANCH} --tags
+
+      - name: Merge release branch into source branch
+        continue-on-error: true
+        run: |
+          set -xeu
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          git fetch origin ${HOLOCHAIN_SOURCE_BRANCH}
+          git checkout -B ${HOLOCHAIN_SOURCE_BRANCH} origin/${HOLOCHAIN_SOURCE_BRANCH}
+          git merge ${RELEASE_BRANCH}
+
+      - name: Push the updated source branch
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        continue-on-error: true
+        run: |
+          set -xeu
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+          git push origin ${HOLOCHAIN_SOURCE_BRANCH}
 
       - name: Create a github release
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
