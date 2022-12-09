@@ -1318,7 +1318,7 @@ mod clone_cell_impls {
             Ok(installed_clone_cell)
         }
 
-        /// Archive a clone cell for future deletion from the app.
+        /// Disable a clone cell.
         pub(crate) async fn disable_clone_cell(
             &self,
             DisableCloneCellPayload {
