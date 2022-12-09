@@ -126,19 +126,42 @@ pub struct TestNetwork {
     network: Option<HolochainP2pRef>,
     respond_task: Option<tokio::task::JoinHandle<()>>,
     dna_network: HolochainP2pDna,
+
+    /// check op data calls
+    #[allow(clippy::type_complexity)]
+    pub check_op_data_calls: Arc<
+        std::sync::Mutex<
+            Vec<(
+                kitsune_p2p_types::KSpace,
+                Vec<kitsune_p2p_types::KOpHash>,
+                kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext,
+            )>,
+        >,
+    >,
 }
 
 impl TestNetwork {
     /// Create a new test network
-    pub fn new(
+    #[allow(clippy::type_complexity)]
+    fn new(
         network: HolochainP2pRef,
         respond_task: tokio::task::JoinHandle<()>,
         dna_network: HolochainP2pDna,
+        check_op_data_calls: Arc<
+            std::sync::Mutex<
+                Vec<(
+                    kitsune_p2p_types::KSpace,
+                    Vec<kitsune_p2p_types::KOpHash>,
+                    kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext,
+                )>,
+            >,
+        >,
     ) -> Self {
         Self {
             network: Some(network),
             respond_task: Some(respond_task),
             dna_network,
+            check_op_data_calls,
         }
     }
 
@@ -206,13 +229,24 @@ where
     let cutoff = tuning.danger_gossip_recent_threshold();
     config.tuning_params = tuning;
 
+    let check_op_data_calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+
+    let test_host = {
+        let check_op_data_calls = check_op_data_calls.clone();
+        kitsune_p2p::HostStub::with_check_op_data(Box::new(move |space, list, ctx| {
+            let out = list.iter().map(|_| false).collect();
+            check_op_data_calls.lock().unwrap().push((space, list, ctx));
+            futures::FutureExt::boxed(async move { Ok(out) }).into()
+        }))
+    };
+
     let (network, mut recv) = spawn_holochain_p2p(
         config,
         holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral(
         )
         .await
         .unwrap(),
-        kitsune_p2p::HostStub::new(),
+        test_host,
     )
     .await
     .unwrap();
@@ -264,7 +298,7 @@ where
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let dna_network = network.to_dna(dna.clone(), None);
     network.join(dna.clone(), agent_key, None).await.unwrap();
-    TestNetwork::new(network, respond_task, dna_network)
+    TestNetwork::new(network, respond_task, dna_network, check_op_data_calls)
 }
 
 /// Do what's necessary to install an app
