@@ -685,7 +685,7 @@ jobs:
 
       - name: Create a pull-request towards the source branch
         id: cpr
-        if: ${{ always() && steps.push-release-branch.outcome == 'success' && (needs.vars.outputs.dry_run == 'false' || (steps.publish.outcome == 'failed' || steps.push-tags.outcome == 'failed' || steps.merge-into-source.outcome == 'failed')) }}
+        if: ${{ always() && steps.push-release-branch.outcome == 'success' && (needs.vars.outputs.dry_run == 'true' || (steps.publish.outcome == 'failed' || steps.push-tags.outcome == 'failed' || steps.merge-into-source.outcome == 'failed')) }}
         env:
           GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
