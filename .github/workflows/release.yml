@@ -602,6 +602,10 @@ jobs:
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
+          # regenerate the nix sources
+          git config --global user.email "devcore@holochain.org"
+          git config --global user.name "Holochain Core Dev Team"
+
           # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
           git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
 
