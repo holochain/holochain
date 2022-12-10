@@ -2113,7 +2113,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.1.0-a-minor-release-test.4"
+version = "0.1.0-a-minor-release-test.5"
 dependencies = [
  "anyhow",
  "futures",
@@ -2126,7 +2126,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.0.66"
+version = "0.1.0-a-minor-release-test.0"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
