@@ -834,9 +834,10 @@ jobs:
         env:
           RESULTS: "${{ toJSON(needs.*.result) }}"
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
+          SKIP_TEST: "${{ needs.vars.outputs.skip_test }}"
         run: |
           [[ $(jq -n 'env.RESULTS | fromjson | unique == ["success"]') == 'true' ]] || \
-          [[ ${DRY_RUN} == 'true' && $(jq -n 'env.RESULTS | fromjson | unique | sort == ["skipped", "success"]') == 'true' ]]
+          [[ (${DRY_RUN} == 'true' || ${SKIP_TEST} == 'true') && $(jq -n 'env.RESULTS | fromjson | unique | sort == ["skipped", "success"]') == 'true' ]]
 
       - name: Post mattermost message
         if: always()
