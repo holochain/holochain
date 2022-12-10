@@ -63,10 +63,6 @@ pub enum AppRequest {
 
     /// Is currently unimplemented and will return
     /// an [`AppResponse::Unimplemented`].
-    Crypto(Box<CryptoRequest>),
-
-    /// Is currently unimplemented and will return
-    /// an [`AppResponse::Unimplemented`].
     SignalSubscription(SignalSubscription),
 }
 
@@ -132,15 +128,6 @@ pub struct ZomeCall {
     /// is making this zome call over this interface. Until we do, the caller simply
     /// provides this data and Holochain trusts them.
     pub provenance: AgentPubKey,
-}
-
-#[allow(missing_docs)]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
-pub enum CryptoRequest {
-    Sign(String),
-    Decrypt(String),
-    Encrypt(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]

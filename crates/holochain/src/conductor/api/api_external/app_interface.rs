@@ -105,7 +105,6 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 Ok(AppResponse::GossipInfo(info))
             }
             AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
-            AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),
         }
     }
 }
