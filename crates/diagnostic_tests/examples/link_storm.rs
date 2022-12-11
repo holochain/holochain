@@ -26,7 +26,7 @@ const MAX_COMMITS: usize = 1_000;
 const ENTRIES_PER_COMMIT: u32 = 1;
 
 const COMMIT_RATE: Duration = Duration::from_millis(0);
-const GET_RATE: Duration = Duration::from_millis(2000);
+const GET_RATE: Duration = Duration::from_millis(200);
 
 const REFRESH_RATE: Duration = Duration::from_millis(50);
 
@@ -40,10 +40,10 @@ fn config() -> ConductorConfig {
     let mut config = config_standard();
     config.network.as_mut().map(|c| {
         *c = c.clone().tune(|mut tp| {
-            tp.disable_publish = true;
+            tp.disable_publish = false;
 
-            tp.disable_recent_gossip = true;
-            tp.danger_gossip_recent_threshold_secs = 3;
+            tp.disable_recent_gossip = false;
+            tp.danger_gossip_recent_threshold_secs = 5;
 
             tp.gossip_inbound_target_mbps = 1000000.0;
             tp.gossip_outbound_target_mbps = 1000000.0;
