@@ -58,7 +58,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::AppInfo { installed_app_id } => Ok(AppResponse::AppInfo(
+            AppRequest::GetAppInfo { installed_app_id } => Ok(AppResponse::AppInfoReturned(
                 self.conductor_handle
                     .get_app_info(&installed_app_id)
                     .await?,
