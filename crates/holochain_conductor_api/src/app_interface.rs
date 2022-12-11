@@ -32,7 +32,7 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::ZomeCall`]
+    /// [`AppResponse::ZomeCalled`]
     CallZome(Box<ZomeCall>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
@@ -131,7 +131,7 @@ pub struct ZomeCall {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
+/// Info about an installed app, returned as part of [`AppResponse::AppInfoReturned`]
 pub struct InstalledAppInfo {
     /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,
