@@ -397,11 +397,62 @@ pub mod test {
             .unwrap()
             .into();
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeCallInvocation(Box::new(request));
+        let msg = AppRequest::ZomeCall(Box::new(request));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeCallInvocation { .. });
+            assert_matches!(response, AppResponse::ZomeCall { .. });
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, app_api).await.unwrap();
+        // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
+        // the overhead of a websocket request locally is small
+        let shutdown = handle.take_shutdown_handle().unwrap();
+        handle.shutdown();
+        shutdown.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn gossip_info_request() {
+        observability::test_run().ok();
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+
+        // warm the zome
+        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+
+        let dna_hash = dna.dna_hash().clone();
+        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
+
+        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
+        let request = GossipInfoRequestPayload {
+            dnas: vec![dna_hash],
+        };
+
+        let msg = AppRequest::GossipInfo(Box::new(request));
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AppResponse = bytes.try_into().unwrap();
+            match response {
+                AppResponse::GossipInfo(info) => {
+                    assert_eq!(
+                        info,
+                        vec![DnaGossipInfo {
+                            total_historical_gossip_throughput: HistoricalGossipThroughput::default(
+                            )
+                        }]
+                    )
+                }
+                other => panic!("unexpected response {:?}", other),
+            }
             async { Ok(()) }.boxed().into()
         };
         let respond = Respond::Request(Box::new(respond));
@@ -422,11 +473,7 @@ pub mod test {
         for _i in 0..2 as u32 {
             let zomes = vec![TestWasm::Foo.into()];
             let def = DnaDef::unique_from_zomes(zomes.clone(), Vec::new());
-            dnas.push(
-                DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo))
-                    .await
-                    .unwrap(),
-            );
+            dnas.push(DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo)).await);
         }
         let dna_map = dnas
             .iter()
@@ -494,7 +541,7 @@ pub mod test {
         }
 
         // Now deactivate app
-        let msg = AdminRequest::DeactivateApp {
+        let msg = AdminRequest::DisableApp {
             installed_app_id: app_id.clone(),
         };
         let msg = msg.try_into().unwrap();
@@ -601,9 +648,12 @@ pub mod test {
         DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                network_seed: network_seed.to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
-                origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                modifiers: DnaModifiers {
+                    network_seed: network_seed.to_string(),
+                    properties: SerializedBytes::try_from(()).unwrap(),
+                    origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                    quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
+                },
                 integrity_zomes: zomes
                     .clone()
                     .into_iter()
@@ -620,7 +670,6 @@ pub mod test {
             zomes.into_iter().flat_map(|t| Vec::<DnaWasm>::from(t)),
         )
         .await
-        .unwrap()
     }
 
     /// Check that we can add and get agent info for a conductor

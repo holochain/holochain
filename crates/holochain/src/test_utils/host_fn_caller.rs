@@ -120,7 +120,9 @@ impl HostFnCaller {
         let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_db(cell_id).unwrap();
         let keystore = handle.keystore().clone();
-        let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
+        let network = handle
+            .holochain_p2p()
+            .to_dna(cell_id.dna_hash().clone(), None);
 
         let zome_path = (
             cell_id.clone(),
@@ -134,7 +136,7 @@ impl HostFnCaller {
         )
             .into();
         let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
-        let signal_tx = handle.signal_broadcaster().await;
+        let signal_tx = handle.signal_broadcaster();
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         HostFnCaller {
@@ -213,7 +215,7 @@ impl HostFnCaller {
         index: impl Into<EntryDefIndex>,
     ) -> ScopedEntryDefIndex {
         let TestWasmPair { integrity, .. } = zome.into();
-        let zome_id = self
+        let zome_index = self
             .ribosome
             .dna_def()
             .integrity_zomes
@@ -223,7 +225,7 @@ impl HostFnCaller {
         let zome_types = self
             .ribosome
             .zome_types()
-            .in_scope_subset(&[ZomeId(zome_id as u8)]);
+            .in_scope_subset(&[ZomeIndex(zome_index as u8)]);
         zome_types
             .entries
             .get(ZomeTypesKey {
@@ -238,7 +240,7 @@ impl HostFnCaller {
         index: impl Into<LinkType>,
     ) -> ScopedLinkType {
         let TestWasmPair { integrity, .. } = zome.into();
-        let zome_id = self
+        let zome_index = self
             .ribosome
             .dna_def()
             .integrity_zomes
@@ -248,7 +250,7 @@ impl HostFnCaller {
         let zome_types = self
             .ribosome
             .zome_types()
-            .in_scope_subset(&[ZomeId(zome_id as u8)]);
+            .in_scope_subset(&[ZomeIndex(zome_index as u8)]);
         zome_types
             .links
             .get(ZomeTypesKey {
@@ -335,7 +337,7 @@ impl HostFnCaller {
         &self,
         base: AnyLinkableHash,
         target: AnyLinkableHash,
-        zome_id: impl Into<ZomeId>,
+        zome_index: impl Into<ZomeIndex>,
         link_type: impl Into<LinkType>,
         link_tag: LinkTag,
     ) -> ActionHash {
@@ -343,7 +345,7 @@ impl HostFnCaller {
         let input = CreateLinkInput::new(
             base,
             target,
-            zome_id.into(),
+            zome_index.into(),
             link_type.into(),
             link_tag,
             ChainTopOrdering::default(),

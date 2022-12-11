@@ -23,7 +23,7 @@ use thiserror::Error;
 /// It is a lot cleaner to express this using
 /// ? try's unfortunately try for custom types is
 /// unstable but when it lands we should use:
-/// https://docs.rs/try-guard/0.2.0/try_guard/
+/// <https://docs.rs/try-guard/0.2.0/try_guard/>
 #[derive(Error, Debug)]
 pub enum SysValidationError {
     #[error(transparent)]
@@ -59,7 +59,7 @@ impl From<CounterSigningError> for SysValidationError {
     }
 }
 
-#[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
+// #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
 
 /// Return either:
@@ -105,16 +105,16 @@ pub enum ValidationOutcome {
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
-    #[error("The app entry type {0:?} entry def id was out of range")]
-    EntryDefId(AppEntryType),
+    #[error("The app entry def {0:?} entry def id was out of range")]
+    EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
     EntryHash,
     #[error("The entry size {0} was bigger then the MAX_ENTRY_SIZE {1}")]
     EntryTooLarge(usize, usize),
     #[error("The entry has a different type to the action's entry type")]
     EntryType,
-    #[error("The app entry type {0:?} visibility didn't match the zome")]
-    EntryVisibility(AppEntryType),
+    #[error("The app entry def {0:?} visibility didn't match the zome")]
+    EntryVisibility(AppEntryDef),
     #[error("The link tag size {0} was bigger then the MAX_TAG_SIZE {1}")]
     TagTooLarge(usize, usize),
     #[error("The action {0:?} was expected to be a link add action")]
@@ -133,8 +133,8 @@ pub enum ValidationOutcome {
     UpdateTypeMismatch(EntryType, EntryType),
     #[error("Signature {0:?} failed to verify for Action {1:?}")]
     VerifySignature(Signature, Action),
-    #[error("The app entry type {0:?} zome id was out of range")]
-    ZomeId(AppEntryType),
+    #[error("The app entry def {0:?} zome index was out of range")]
+    ZomeIndex(AppEntryDef),
 }
 
 impl ValidationOutcome {
@@ -154,8 +154,8 @@ impl ValidationOutcome {
 
 #[derive(Error, Debug)]
 pub enum PrevActionError {
-    #[error("The previous action in the source chain doesn't match the next action")]
-    HashMismatch,
+    #[error("The previous action hash specified in an action doesn't match the actual previous action. Seq: {0}")]
+    HashMismatch(u32),
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
     #[error("Root of source chain must have a timestamp greater than the Dna's origin_time")]
@@ -164,8 +164,8 @@ pub enum PrevActionError {
     InvalidSeq(u32, u32),
     #[error("Previous action was missing from the metadata store")]
     MissingMeta(ActionHash),
-    #[error("Action is not Dna so needs previous action")]
+    #[error("Action is not the first, so needs previous action")]
     MissingPrev,
-    #[error("The previous action's timestamp is not before the current action's timestamp")]
-    Timestamp,
+    #[error("The previous action's timestamp is not before the current action's timestamp: {0:?} >= {1:?}")]
+    Timestamp(Timestamp, Timestamp),
 }

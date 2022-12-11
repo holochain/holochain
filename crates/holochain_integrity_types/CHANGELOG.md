@@ -4,6 +4,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.0.25
+
+## 0.0.24
+
+## 0.0.23
+
+## 0.0.22
+
+## 0.0.21
+
+## 0.0.20
+
+## 0.0.19
+
+## 0.0.18
+
+## 0.0.17
+
 ## 0.0.16
 
 - Adds `ChainFilter` type for use in `must_get_agent_activity`. This allows specifying a chain top hash to start from and then creates a range either to genesis or `unit` a given hash or after `take`ing a number of actions. The range iterates backwards from the given chain top till it reaches on of the above possible chain bottoms. For this reason it will never contain forks. [\#1502](https://github.com/holochain/holochain/pull/1502)

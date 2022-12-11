@@ -15,6 +15,7 @@ use holochain_types::activity::*;
 use holochain_types::chain::MustGetAgentActivityResponse;
 use holochain_types::test_utils::chain::*;
 use holochain_zome_types::ChainFilter;
+use holochain_zome_types::ChainQueryFilter;
 use holochain_zome_types::ChainStatus;
 use test_case::test_case;
 
@@ -53,7 +54,7 @@ async fn get_activity() {
     let mut cascade = Cascade::empty().with_network(network, cache.to_db());
 
     let r = cascade
-        .get_agent_activity(td.agent.clone(), td.query_filter.clone(), options)
+        .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options)
         .await
         .unwrap();
 
@@ -69,10 +70,10 @@ async fn get_activity() {
 
 #[derive(Default)]
 struct Data {
-    scratch: Option<Vec<(AgentPubKey, Vec<ChainItem>)>>,
-    authored: Vec<(AgentPubKey, Vec<ChainItem>)>,
-    cache: Vec<(AgentPubKey, Vec<ChainItem>)>,
-    authority: Vec<(AgentPubKey, Vec<ChainItem>)>,
+    scratch: Option<Vec<(AgentPubKey, Vec<TestChainItem>)>>,
+    authored: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+    cache: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+    authority: Vec<(AgentPubKey, Vec<TestChainItem>)>,
 }
 
 #[test_case(

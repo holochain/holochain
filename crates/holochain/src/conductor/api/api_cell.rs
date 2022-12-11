@@ -28,9 +28,12 @@ pub struct CellConductorApi {
     cell_id: CellId,
 }
 
+/// Alias
+pub type CellConductorHandle = Arc<dyn CellConductorApiT + Send + 'static>;
+
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
-pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT>;
+pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT + Send + 'static>;
 
 impl CellConductorApi {
     /// Instantiate from a Conductor reference and a CellId to identify which Cell
@@ -76,8 +79,8 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.keystore()
     }
 
-    async fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_handle.signal_broadcaster().await
+    fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.conductor_handle.signal_broadcaster()
     }
 
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
@@ -120,7 +123,7 @@ impl CellConductorApiT for CellConductorApi {
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
 #[mockall::automock]
-pub trait CellConductorApiT: Send + Sync + Sized {
+pub trait CellConductorApiT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
 
@@ -141,7 +144,7 @@ pub trait CellConductorApiT: Send + Sync + Sized {
 
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
-    async fn signal_broadcaster(&self) -> SignalBroadcaster;
+    fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
@@ -166,6 +169,7 @@ pub trait CellConductorApiT: Send + Sync + Sized {
 }
 
 #[async_trait]
+#[mockall::automock]
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
 pub trait CellConductorReadHandleT: Send + Sync {
@@ -190,7 +194,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn find_cell_with_role_alongside_cell(
         &self,
         cell_id: &CellId,
-        role_id: &AppRoleId,
+        role_name: &RoleName,
     ) -> ConductorResult<Option<CellId>>;
 }
 
@@ -225,10 +229,10 @@ impl CellConductorReadHandleT for CellConductorApi {
     async fn find_cell_with_role_alongside_cell(
         &self,
         cell_id: &CellId,
-        role_id: &AppRoleId,
+        role_name: &RoleName,
     ) -> ConductorResult<Option<CellId>> {
         self.conductor_handle
-            .find_cell_with_role_alongside_cell(cell_id, role_id)
+            .find_cell_with_role_alongside_cell(cell_id, role_name)
             .await
     }
 }

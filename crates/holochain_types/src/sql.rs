@@ -80,8 +80,8 @@ impl<'a> From<&'a LinkTag> for SqlOutput<'a> {
     }
 }
 
-impl<'a, 'b> From<&'b ZomeId> for SqlOutput<'a> {
-    fn from(d: &'b ZomeId) -> Self {
+impl<'a, 'b> From<&'b ZomeIndex> for SqlOutput<'a> {
+    fn from(d: &'b ZomeIndex) -> Self {
         Self(d.0.into())
     }
 }
@@ -95,16 +95,16 @@ impl ToSqlStatement for LinkTypeFilter {
                     .filter(|(_, t)| types.len() == 1 && t.len() == 1)
                     .and_then(|(z, t)| t.first().map(|t| (z, t)))
                 {
-                    Some((zome_id, link_type)) => {
+                    Some((zome_index, link_type)) => {
                         format!(
-                            " AND zome_id = {} AND link_type = {} ",
-                            zome_id.0, link_type.0
+                            " AND zome_index = {} AND link_type = {} ",
+                            zome_index.0, link_type.0
                         )
                     }
                     _ => {
                         let mut out = types
                             .iter()
-                            .flat_map(|(zome_id, types)| {
+                            .flat_map(|(zome_index, types)| {
                                 let mut types: Vec<String> = types
                                     .iter()
                                     .flat_map(|t| {
@@ -117,8 +117,8 @@ impl ToSqlStatement for LinkTypeFilter {
 
                                 [
                                     format!(
-                                        " ( zome_id = {} AND ({}) ) ",
-                                        zome_id.0,
+                                        " ( zome_index = {} AND ({}) ) ",
+                                        zome_index.0,
                                         types.into_iter().collect::<String>()
                                     ),
                                     "OR".to_string(),
@@ -138,7 +138,7 @@ impl ToSqlStatement for LinkTypeFilter {
             LinkTypeFilter::Dependencies(dependencies) => {
                 let mut out = dependencies
                     .iter()
-                    .flat_map(|z| [format!(" zome_id = {} ", z.0), "OR".to_string()])
+                    .flat_map(|z| [format!(" zome_index = {} ", z.0), "OR".to_string()])
                     .collect::<Vec<_>>();
                 // Pop last " OR "
                 out.pop();

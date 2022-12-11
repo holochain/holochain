@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use holo_hash::{ActionHash, AgentPubKey, DhtOpHash};
-use holo_hash::{AnyDhtHash, EntryHash};
+use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash, OpBasis};
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
-use holochain_state::integrate::authored_ops_to_dht_db;
+use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
 use holochain_state::prelude::{
     current_countersigning_session, SourceChainResult, StateMutationResult, Store,
@@ -205,7 +204,7 @@ pub(crate) async fn countersigning_success(
                             },
                             |row| {
                                 let hash: DhtOpHash = row.get("hash")?;
-                                let basis: AnyDhtHash = row.get("basis_hash")?;
+                                let basis: OpBasis = row.get("basis_hash")?;
                                 Ok((hash, basis))
                             },
                         )?
@@ -216,7 +215,7 @@ pub(crate) async fn countersigning_success(
             StateMutationResult::Ok(Vec::with_capacity(0))
         }
     };
-    let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, AnyDhtHash)> =
+    let this_cell_actions_op_basis_hashes: Vec<(DhtOpHash, OpBasis)> =
         authored_db.async_reader(reader_closure).await?;
 
     // If there is no active session then we can short circuit.
@@ -225,10 +224,18 @@ pub(crate) async fn countersigning_success(
     }
 
     // Verify signatures of actions.
+    let mut i_am_an_author = false;
     for SignedAction(action, signature) in &signed_actions {
         if !action.author().verify_signature(signature, action).await {
             return Ok(());
         }
+        if action.author() == &author {
+            i_am_an_author = true;
+        }
+    }
+    // Countersigning success is ultimately between authors to agree and publish.
+    if !i_am_an_author {
+        return Ok(());
     }
 
     // Hash actions.
@@ -271,9 +278,13 @@ pub(crate) async fn countersigning_success(
         .await?;
 
     if result {
-        authored_ops_to_dht_db(
-            network,
-            this_cell_actions_op_basis_hashes,
+        // If all signatures are valid (above) and i signed then i must have
+        // validated it previously so i now agree that i authored it.
+        authored_ops_to_dht_db_without_check(
+            this_cell_actions_op_basis_hashes
+                .into_iter()
+                .map(|(op_hash, _)| op_hash)
+                .collect(),
             &(authored_db.into()),
             &dht_db,
             &dht_db_cache,

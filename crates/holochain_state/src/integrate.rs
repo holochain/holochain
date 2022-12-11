@@ -1,4 +1,4 @@
-use holo_hash::{AnyDhtHash, DhtOpHash, HasHash};
+use holo_hash::{AnyLinkableHash, DhtOpHash, HasHash};
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::{
@@ -16,7 +16,7 @@ use crate::{prelude::*, query::get_public_op_from_db};
 /// of any local agents.
 pub async fn authored_ops_to_dht_db(
     network: &(dyn HolochainP2pDnaT + Send + Sync),
-    hashes: Vec<(DhtOpHash, AnyDhtHash)>,
+    hashes: Vec<(DhtOpHash, AnyLinkableHash)>,
     authored_db: &DbRead<DbKindAuthored>,
     dht_db: &DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
@@ -36,6 +36,10 @@ pub async fn authored_ops_to_dht_db(
 
 /// Insert any authored ops that have been locally validated
 /// into the dht database awaiting integration.
+/// The "check" that isn't being done is whether the dht db is for an authority
+/// for these ops, which sort of makes sense to skip for the author, even though
+/// the author IS an authority, the network doesn't necessarily think so based
+/// on basis hash alone.
 pub async fn authored_ops_to_dht_db_without_check(
     hashes: Vec<DhtOpHash>,
     authored_db: &DbRead<DbKindAuthored>,

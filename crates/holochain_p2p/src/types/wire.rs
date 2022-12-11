@@ -36,7 +36,9 @@ pub enum WireMessage {
     Publish {
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        // For backward compat with holochain < 0.0.164
+        #[serde(alias = "dht_hash")]
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     },
     ValidationReceipt {
@@ -63,9 +65,6 @@ pub enum WireMessage {
     MustGetAgentActivity {
         agent: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
-    },
-    GetValidationPackage {
-        action_hash: ActionHash,
     },
     CountersigningSessionNegotiation {
         message: event::CountersigningSessionNegotiationMessage,
@@ -101,13 +100,13 @@ impl WireMessage {
     pub fn publish(
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis_hash: holo_hash::OpBasis,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> WireMessage {
         Self::Publish {
             request_validation_receipt,
             countersigning_session,
-            dht_hash,
+            basis_hash,
             ops,
         }
     }
@@ -150,10 +149,6 @@ impl WireMessage {
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> WireMessage {
         Self::MustGetAgentActivity { agent, filter }
-    }
-
-    pub fn get_validation_package(action_hash: ActionHash) -> WireMessage {
-        Self::GetValidationPackage { action_hash }
     }
 
     pub fn countersigning_session_negotiation(

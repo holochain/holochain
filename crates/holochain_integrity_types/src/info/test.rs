@@ -14,7 +14,7 @@ enum LinkZomes {
 fn make_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<LinkType> {
     ScopedZomeTypes(
         ids.into_iter()
-            .map(|(zome_id, len)| ((*zome_id).into(), (0..*len).map(|t| t.into()).collect()))
+            .map(|(zome_index, len)| ((*zome_index).into(), (0..*len).map(|t| t.into()).collect()))
             .collect(),
     )
 }
@@ -22,7 +22,7 @@ fn make_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<LinkType> {
 fn make_entry_map(ids: &[(u8, u8)]) -> ScopedZomeTypes<EntryDefIndex> {
     ScopedZomeTypes(
         ids.into_iter()
-            .map(|(zome_id, len)| ((*zome_id).into(), (0..*len).map(|t| t.into()).collect()))
+            .map(|(zome_index, len)| ((*zome_index).into(), (0..*len).map(|t| t.into()).collect()))
             .collect(),
     )
 }
@@ -77,14 +77,14 @@ fn can_map_to_key() {
     assert_eq!(
         map.get(LinkTypes::A).unwrap(),
         ScopedLinkType {
-            zome_id: 12.into(),
+            zome_index: 12.into(),
             zome_type: 0.into()
         }
     );
     assert_eq!(
         map.get(LinkTypes::B).unwrap(),
         ScopedLinkType {
-            zome_id: 12.into(),
+            zome_index: 12.into(),
             zome_type: 1.into()
         }
     );
@@ -93,28 +93,28 @@ fn can_map_to_key() {
     assert_eq!(
         map.get(LinkZomes::A(LinkTypes::A)).unwrap(),
         ScopedLinkType {
-            zome_id: 12.into(),
+            zome_index: 12.into(),
             zome_type: 0.into()
         }
     );
     assert_eq!(
         map.get(LinkZomes::A(LinkTypes::B)).unwrap(),
         ScopedLinkType {
-            zome_id: 12.into(),
+            zome_index: 12.into(),
             zome_type: 1.into()
         }
     );
     assert_eq!(
         map.get(LinkZomes::B(LinkTypes::A)).unwrap(),
         ScopedLinkType {
-            zome_id: 3.into(),
+            zome_index: 3.into(),
             zome_type: 0.into()
         }
     );
     assert_eq!(
         map.get(LinkZomes::B(LinkTypes::B)).unwrap(),
         ScopedLinkType {
-            zome_id: 3.into(),
+            zome_index: 3.into(),
             zome_type: 1.into()
         }
     );
@@ -127,7 +127,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkTypes::iter(),
             ScopedLinkType {
-                zome_id: 12.into(),
+                zome_index: 12.into(),
                 zome_type: 0.into()
             }
         )
@@ -138,7 +138,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkTypes::iter(),
             ScopedLinkType {
-                zome_id: 12.into(),
+                zome_index: 12.into(),
                 zome_type: 1.into()
             }
         )
@@ -149,7 +149,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkTypes::iter(),
             ScopedLinkType {
-                zome_id: 12.into(),
+                zome_index: 12.into(),
                 zome_type: 3.into()
             }
         ),
@@ -159,7 +159,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkTypes::iter(),
             ScopedLinkType {
-                zome_id: 13.into(),
+                zome_index: 13.into(),
                 zome_type: 1.into()
             }
         ),
@@ -171,7 +171,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkZomes::iter(),
             ScopedLinkType {
-                zome_id: 12.into(),
+                zome_index: 12.into(),
                 zome_type: 0.into()
             }
         )
@@ -182,7 +182,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkZomes::iter(),
             ScopedLinkType {
-                zome_id: 12.into(),
+                zome_index: 12.into(),
                 zome_type: 1.into()
             }
         )
@@ -193,7 +193,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkZomes::iter(),
             ScopedLinkType {
-                zome_id: 3.into(),
+                zome_index: 3.into(),
                 zome_type: 0.into()
             }
         )
@@ -204,7 +204,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkZomes::iter(),
             ScopedLinkType {
-                zome_id: 3.into(),
+                zome_index: 3.into(),
                 zome_type: 1.into()
             }
         )
@@ -215,7 +215,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkZomes::iter(),
             ScopedLinkType {
-                zome_id: 3.into(),
+                zome_index: 3.into(),
                 zome_type: 2.into()
             }
         ),
@@ -225,7 +225,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkZomes::iter(),
             ScopedLinkType {
-                zome_id: 12.into(),
+                zome_index: 12.into(),
                 zome_type: 2.into()
             }
         ),
@@ -235,7 +235,7 @@ fn can_map_from_scoped_type() {
         map.find(
             LinkZomes::iter(),
             ScopedLinkType {
-                zome_id: 14.into(),
+                zome_index: 14.into(),
                 zome_type: 0.into()
             }
         ),
@@ -363,9 +363,9 @@ impl From<(ZomeEntryTypesKey, Entry)> for EntryZomes {
 #[test]
 fn can_map_entry_from_scoped_type() {
     let map = make_entry_map(&[(12, 2), (34, 2)]);
-    let find_key = |zome_id: u8, zome_type: u8| {
+    let find_key = |zome_index: u8, zome_type: u8| {
         let input = ScopedEntryDefIndex {
-            zome_id: zome_id.into(),
+            zome_index: zome_index.into(),
             zome_type: zome_type.into(),
         };
 

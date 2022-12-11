@@ -1,3 +1,4 @@
+use holo_hash::AgentPubKey;
 use holochain_zome_types::Signature;
 use kitsune_p2p_types::dependencies::{lair_keystore_api, url2};
 use lair_keystore_api::prelude::*;
@@ -215,6 +216,27 @@ impl MetaLairClient {
                     .export_seed_by_tag(tag, sender_pub_key, recipient_pub_key, None)
                     .await
             ))
+        }
+    }
+
+    /// Retrieve a list of the AgentPubKey values which are stored
+    /// in the keystore available for use.
+    pub fn list_public_keys(
+        &self,
+    ) -> impl Future<Output = LairResult<Vec<AgentPubKey>>> + 'static + Send {
+        let (client, esnd) = self.cli();
+        async move {
+            let seed_infos = echk!(esnd, client.list_entries().await);
+            Ok(seed_infos
+                .into_iter()
+                .filter_map(|lair_entry_info| {
+                    if let LairEntryInfo::Seed { tag: _, seed_info } = lair_entry_info {
+                        Some(AgentPubKey::from_raw_32(seed_info.ed25519_pub_key.to_vec()))
+                    } else {
+                        None
+                    }
+                })
+                .collect())
         }
     }
 

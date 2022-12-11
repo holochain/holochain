@@ -1,6 +1,9 @@
+#![allow(deprecated)]
+
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_types::prelude::*;
+use kitsune_p2p::gossip::sharded_gossip::{InOut, RoundThroughput};
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -25,9 +28,7 @@ pub enum AppRequest {
         /// The app ID for which to get information
         installed_app_id: InstalledAppId,
     },
-    /// Is currently unimplemented and will return
-    /// an [`AppResponse::Unimplemented`].
-    Crypto(Box<CryptoRequest>),
+
     /// Call a zome function. See [`ZomeCall`]
     /// to understand the data that must be provided.
     ///
@@ -36,8 +37,38 @@ pub enum AppRequest {
     /// [`AppResponse::ZomeCall`]
     ZomeCall(Box<ZomeCall>),
 
+    /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
+    ///
+    /// Using the provided, already-registered DNA, create a new DNA with a unique
+    /// ID and the specified properties, create a new cell from this cloned DNA,
+    /// and add the cell to the specified app.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CloneCellCreated`]
+    CreateCloneCell(Box<CreateCloneCellPayload>),
+
+    /// Archive a clone cell.
+    ///
+    /// Providing a [`CloneId`] or [`CellId`], archive an existing clone cell.
+    /// When the clone cell exists, it is archived and can not be called any
+    /// longer. If it doesn't exist, the call is a no-op.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CloneCellArchived`] if the clone cell existed
+    /// and was archived.
+    ArchiveCloneCell(Box<ArchiveCloneCellPayload>),
+
+    /// Info about gossip
+    GossipInfo(Box<GossipInfoRequestPayload>),
+
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ZomeCall>),
+
+    /// Is currently unimplemented and will return
+    /// an [`AppResponse::Unimplemented`].
+    Crypto(Box<CryptoRequest>),
 
     /// Is currently unimplemented and will return
     /// an [`AppResponse::Unimplemented`].
@@ -69,6 +100,18 @@ pub enum AppResponse {
     ///
     /// [msgpack]: https://msgpack.org/
     ZomeCall(Box<ExternIO>),
+
+    /// The successful response to an [`AppRequest::CreateCloneCell`].
+    ///
+    /// The response contains an [`InstalledCell`] with the created clone
+    /// cell's [`CloneId`] and [`CellId`].
+    CloneCellCreated(InstalledCell),
+
+    /// An existing clone cell has been archived.
+    CloneCellArchived,
+
+    /// GossipInfo is returned
+    GossipInfo(Vec<DnaGossipInfo>),
 
     #[deprecated = "use ZomeCall"]
     ZomeCallInvocation(Box<ExternIO>),
@@ -125,9 +168,12 @@ impl InstalledAppInfo {
     pub fn from_installed_app(app: &InstalledApp) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
-        let cell_data = app
-            .provisioned_cells()
-            .map(|(role_id, id)| InstalledCell::new(id.clone(), role_id.clone()))
+        let clone_cells = app
+            .clone_cells()
+            .map(|cell| (cell.0.as_app_role_name(), cell.1));
+        let cells = app.provisioned_cells().chain(clone_cells);
+        let cell_data = cells
+            .map(|(role_name, id)| InstalledCell::new(id.clone(), role_name.clone()))
             .collect();
         Self {
             installed_app_id,
@@ -168,6 +214,40 @@ impl From<InstalledAppInfoStatus> for AppStatus {
             InstalledAppInfoStatus::Running => AppStatus::Running,
             InstalledAppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
             InstalledAppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct DnaGossipInfo {
+    pub total_historical_gossip_throughput: HistoricalGossipThroughput,
+}
+
+/// Throughput info specific to historical rounds
+#[derive(
+    Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes,
+)]
+pub struct HistoricalGossipThroughput {
+    /// Total number of bytes expected to be sent for region data (historical only)
+    pub expected_op_bytes: InOut,
+
+    /// Total number of ops expected to be sent for region data (historical only)
+    pub expected_op_count: InOut,
+
+    /// Total number of bytes sent for op data
+    pub op_bytes: InOut,
+
+    /// Total number of ops sent
+    pub op_count: InOut,
+}
+
+impl From<RoundThroughput> for HistoricalGossipThroughput {
+    fn from(r: RoundThroughput) -> Self {
+        Self {
+            expected_op_bytes: r.expected_op_bytes,
+            expected_op_count: r.expected_op_count,
+            op_count: r.op_count,
+            op_bytes: r.op_bytes,
         }
     }
 }

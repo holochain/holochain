@@ -181,15 +181,6 @@ ghost_actor::ghost_chan! {
             ops: Vec<holochain_types::dht_op::DhtOp>,
         ) -> ();
 
-        /// A remote node is requesting a validation package.
-        fn get_validation_package(
-            // The dna_hash / space_hash context.
-            dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
-            to_agent: AgentPubKey,
-            action_hash: ActionHash,
-        ) -> ValidationPackageResponse;
-
         /// A remote node is requesting entry data from us.
         fn get(
             dna_hash: DnaHash,
@@ -280,7 +271,6 @@ macro_rules! match_p2p_evt {
     ($h:ident => |$i:ident| { $($t:tt)* }, { $($t2:tt)* }) => {
         match $h {
             HolochainP2pEvent::CallRemote { $i, .. } => { $($t)* }
-            HolochainP2pEvent::GetValidationPackage { $i, .. } => { $($t)* }
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }

@@ -57,7 +57,10 @@ impl Default for ChainQueryFilterRange {
     }
 }
 
-/// Query arguments
+/// Specifies arguments to a query of the source chain, including ordering and filtering.
+///
+/// This struct is used to construct an actual SQL query on the database, and also has methods
+/// to allow filtering in-memory.
 #[derive(
     serde::Serialize, serde::Deserialize, SerializedBytes, Default, PartialEq, Clone, Debug,
 )]
@@ -78,6 +81,9 @@ pub struct ChainQueryFilter {
     pub action_type: Option<ActionType>,
     /// Include the entries in the records
     pub include_entries: bool,
+    /// The query should be ordered in descending order (default is ascending),
+    /// when run as a database query. There is no provisioning for in-memory ordering.
+    pub order_descending: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -207,6 +213,18 @@ impl ChainQueryFilter {
         self
     }
 
+    /// Set the order to ascending.
+    pub fn ascending(mut self) -> Self {
+        self.order_descending = false;
+        self
+    }
+
+    /// Set the order to ascending.
+    pub fn descending(mut self) -> Self {
+        self.order_descending = true;
+        self
+    }
+
     /// If the sequence range supports fork disambiguation, apply it to remove
     /// actions that are not in the correct branch.
     /// Numerical range bounds do NOT support fork disambiguation, and neither
@@ -314,7 +332,7 @@ impl ChainQueryFilter {
 mod tests {
     use super::ChainQueryFilter;
     use crate::action::EntryType;
-    use crate::fixt::AppEntryTypeFixturator;
+    use crate::fixt::AppEntryDefFixturator;
     use crate::fixt::*;
     use crate::ActionHashed;
     use crate::ChainQueryFilterRange;
@@ -324,7 +342,7 @@ mod tests {
     /// Create three Actions with various properties.
     /// Also return the EntryTypes used to construct the first two actions.
     fn fixtures() -> [ActionHashed; 7] {
-        let entry_type_1 = EntryType::App(fixt!(AppEntryType));
+        let entry_type_1 = EntryType::App(fixt!(AppEntryDef));
         let entry_type_2 = EntryType::AgentPubKey;
 
         let entry_hash_0 = fixt!(EntryHash);

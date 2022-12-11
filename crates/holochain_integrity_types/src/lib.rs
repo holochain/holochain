@@ -154,15 +154,25 @@ macro_rules! secure_primitive {
         /// Also, encodings like base64 are not constant time so debugging could open some weird
         /// side channel issue trying to be 'human friendly'.
         /// It seems better to never try to encode secrets.
+        ///
+        /// Note that when using this crate with feature "subtle-encoding", a hex
+        /// representation will be used.
+        //
+        // @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
+        //       behind a feature flag?
+        #[cfg(not(feature = "subtle-encoding"))]
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str(stringify!($t))?;
-                f.write_str("(0x")?;
-                for byte in &self.0 {
-                    f.write_fmt(format_args!("{:02x}", byte))?;
-                }
-                f.write_str(")")?;
-                Ok(())
+                std::fmt::Debug::fmt(&self.0.to_vec(), f)
+            }
+        }
+
+        #[cfg(feature = "subtle-encoding")]
+        impl std::fmt::Debug for $t {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let str = String::from_utf8(subtle_encoding::hex::encode(self.0.to_vec()))
+                    .unwrap_or_else(|_| "<unparseable signature>".into());
+                f.write_str(&str)
             }
         }
 

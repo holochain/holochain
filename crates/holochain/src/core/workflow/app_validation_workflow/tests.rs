@@ -32,8 +32,7 @@ async fn app_validation_workflow_test() {
         TestWasm::ValidateLink,
         TestWasm::Create,
     ])
-    .await
-    .unwrap();
+    .await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors
@@ -222,7 +221,7 @@ async fn run_test(
     });
 
     let (invalid_action_hash, invalid_entry_hash) =
-        commit_invalid(&bob_cell_id, &conductors[1].handle(), dna_file).await;
+        commit_invalid(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
@@ -276,11 +275,15 @@ async fn run_test(
         TestWasm::ValidateLink.coordinator_zome(),
     )
     .unwrap();
-    let invalid_link_hash: ActionHash =
-        call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation)
-            .await
-            .decode()
-            .unwrap();
+    let invalid_link_hash: ActionHash = call_zome_directly(
+        &bob_cell_id,
+        &conductors[1].raw_handle(),
+        dna_file,
+        invocation,
+    )
+    .await
+    .decode()
+    .unwrap();
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
@@ -309,7 +312,13 @@ async fn run_test(
         TestWasm::ValidateLink.coordinator_zome(),
     )
     .unwrap();
-    call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation).await;
+    call_zome_directly(
+        &bob_cell_id,
+        &conductors[1].raw_handle(),
+        dna_file,
+        invocation,
+    )
+    .await;
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
@@ -338,11 +347,15 @@ async fn run_test(
         TestWasm::ValidateLink.coordinator_zome(),
     )
     .unwrap();
-    let invalid_remove_hash: ActionHash =
-        call_zome_directly(&bob_cell_id, &conductors[1].handle(), dna_file, invocation)
-            .await
-            .decode()
-            .unwrap();
+    let invalid_remove_hash: ActionHash = call_zome_directly(
+        &bob_cell_id,
+        &conductors[1].raw_handle(),
+        dna_file,
+        invocation,
+    )
+    .await
+    .decode()
+    .unwrap();
 
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
@@ -385,7 +398,7 @@ async fn run_test_entry_def_id(
     let delay_per_attempt = Duration::from_millis(100);
 
     let (invalid_action_hash, invalid_entry_hash) =
-        commit_invalid_post(&bob_cell_id, &conductors[1].handle(), dna_file).await;
+        commit_invalid_post(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
@@ -419,12 +432,12 @@ async fn commit_invalid(
     let entry = ThisWasmEntry::NeverValidates;
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data.get_entry_type(TestWasm::Validate, 0).zome_id;
+    let zome_index = call_data.get_entry_type(TestWasm::Validate, 0).zome_index;
     // 4
     let invalid_action_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, 0),
+            EntryDefLocation::app(zome_index, 0),
             EntryVisibility::Public,
         )
         .await;
@@ -447,14 +460,14 @@ async fn commit_invalid_post(
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
     let call_data = HostFnCaller::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
-    let zome_id = call_data
+    let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_id;
+        .zome_index;
     // 9
     let invalid_action_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;

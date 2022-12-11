@@ -35,15 +35,10 @@ impl DnaBundle {
     }
 
     /// Convert to a DnaFile, and return what the hash of the Dna *would* have
-    /// been without the provided phenotype overrides
-    pub async fn into_dna_file(
-        self,
-        network_seed: Option<NetworkSeed>,
-        properties: Option<YamlProperties>,
-    ) -> DnaResult<(DnaFile, DnaHash)> {
+    /// been without the provided modifier overrides
+    pub async fn into_dna_file(self, modifiers: DnaModifiersOpt) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
-        let (dna_def, original_hash) =
-            self.to_dna_def(integrity, coordinator, network_seed, properties)?;
+        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, modifiers)?;
 
         Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
     }
@@ -117,45 +112,27 @@ impl DnaBundle {
         &self,
         integrity_zomes: IntegrityZomes,
         coordinator_zomes: CoordinatorZomes,
-        network_seed: Option<NetworkSeed>,
-        properties: Option<YamlProperties>,
+        modifiers: DnaModifiersOpt,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
-                let mut dna_def = DnaDef {
+                let dna_def = DnaDef {
                     name: manifest.name.clone(),
-                    network_seed: manifest.integrity.network_seed.clone().unwrap_or_default(),
-                    properties: SerializedBytes::try_from(
-                        manifest.integrity.properties.clone().unwrap_or_default(),
-                    )?,
-                    origin_time: manifest.integrity.origin_time.into(),
+                    modifiers: DnaModifiers {
+                        network_seed: manifest.integrity.network_seed.clone().unwrap_or_default(),
+                        properties: SerializedBytes::try_from(
+                            manifest.integrity.properties.clone().unwrap_or_default(),
+                        )?,
+                        origin_time: manifest.integrity.origin_time.into(),
+                        quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
+                    },
                     integrity_zomes,
                     coordinator_zomes,
                 };
 
-                if network_seed.is_none() && properties.is_none() {
-                    // If no phenotype overrides, then the original hash is the same as the current hash
-                    let ddh = DnaDefHashed::from_content_sync(dna_def);
-                    let original_hash = ddh.as_hash().clone();
-                    Ok((ddh, original_hash))
-                } else {
-                    // Otherwise, record the original hash first, for version comparisons.
-                    let original_hash = DnaHash::with_data_sync(&dna_def);
-
-                    let props = manifest.integrity.properties.as_ref();
-                    let properties: SerializedBytes = properties
-                        .as_ref()
-                        .or(props)
-                        .map(SerializedBytes::try_from)
-                        .unwrap_or_else(|| SerializedBytes::try_from(()))?;
-                    let network_seed = network_seed
-                        .or_else(|| manifest.integrity.network_seed.clone())
-                        .unwrap_or_default();
-
-                    dna_def.network_seed = network_seed;
-                    dna_def.properties = properties;
-                    Ok((DnaDefHashed::from_content_sync(dna_def), original_hash))
-                }
+                let original_hash = DnaHash::with_data_sync(&dna_def);
+                let ddh = DnaDefHashed::from_content_sync(dna_def.update_modifiers(modifiers));
+                Ok((ddh, original_hash))
             }
         }
     }
@@ -223,14 +200,14 @@ impl DnaBundle {
         Ok(DnaManifestCurrent {
             name: dna_def.name,
             integrity: IntegrityManifest {
-                network_seed: Some(dna_def.network_seed),
-                properties: Some(dna_def.properties.try_into().map_err(|e| {
+                network_seed: Some(dna_def.modifiers.network_seed),
+                properties: Some(dna_def.modifiers.properties.try_into().map_err(|e| {
                     DnaError::DnaFileToBundleConversionError(format!(
                         "DnaDef properties were not YAML-deserializable: {}",
                         e
                     ))
                 })?),
-                origin_time: dna_def.origin_time.into(),
+                origin_time: dna_def.modifiers.origin_time.into(),
                 zomes: integrity,
             },
             coordinator: CoordinatorManifest { zomes: coordinator },
@@ -319,7 +296,7 @@ mod tests {
         .unwrap()
         .into();
         matches::assert_matches!(
-            bad_bundle.into_dna_file(None, None).await,
+            bad_bundle.into_dna_file(DnaModifiersOpt::none()).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
             if h1 == hash1 && h2 == hash2
         );
@@ -332,7 +309,11 @@ mod tests {
         )
         .unwrap()
         .into();
-        let dna_file: DnaFile = bundle.into_dna_file(None, None).await.unwrap().0;
+        let dna_file: DnaFile = bundle
+            .into_dna_file(DnaModifiersOpt::none())
+            .await
+            .unwrap()
+            .0;
         assert_eq!(dna_file.dna_def().integrity_zomes.len(), 2);
         assert_eq!(dna_file.code().len(), 2);
 
@@ -343,13 +324,22 @@ mod tests {
                 .unwrap()
                 .into();
         let dna_file: DnaFile = bundle
-            .into_dna_file(Some("network_seed".into()), Some(properties.clone()))
+            .into_dna_file(
+                DnaModifiersOpt::none()
+                    .with_network_seed("network_seed".into())
+                    .with_properties(properties.clone())
+                    .serialized()
+                    .unwrap(),
+            )
             .await
             .unwrap()
             .0;
-        assert_eq!(dna_file.dna.network_seed, "network_seed".to_string());
         assert_eq!(
-            dna_file.dna.properties,
+            dna_file.dna.modifiers.network_seed,
+            "network_seed".to_string()
+        );
+        assert_eq!(
+            dna_file.dna.modifiers.properties,
             SerializedBytes::try_from(properties).unwrap()
         );
     }

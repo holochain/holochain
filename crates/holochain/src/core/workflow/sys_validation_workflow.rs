@@ -1,9 +1,8 @@
 //! The workflow and queue consumer for sys validation
-#![allow(deprecated)]
 
 use super::*;
-use crate::conductor::handle::ConductorHandleT;
 use crate::conductor::space::Space;
+use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
@@ -233,7 +232,7 @@ async fn validate_op(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(
@@ -298,7 +297,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
         ValidationOutcome::VerifySignature(_, _) => Rejected,
-        ValidationOutcome::ZomeId(_) => Rejected,
+        ValidationOutcome::ZomeIndex(_) => Rejected,
         ValidationOutcome::CounterSigningError(_) => Rejected,
     }
 }
@@ -307,7 +306,7 @@ async fn validate_op_inner(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     match op {
@@ -439,7 +438,7 @@ async fn validate_op_inner(
     }
 }
 
-#[instrument(skip(record, call_zome_workspace, network, conductor_handle))]
+// #[instrument(skip(record, call_zome_workspace, network, conductor_handle))]
 /// Direct system validation call that takes
 /// a Record instead of an op.
 /// Does not require holding dependencies.
@@ -449,7 +448,7 @@ pub async fn sys_validate_record(
     record: &Record,
     call_zome_workspace: &HostFnWorkspace,
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
 ) -> SysValidationOutcome<()> {
     trace!(?record);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
@@ -474,7 +473,7 @@ async fn sys_validate_record_inner(
     record: &Record,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
 ) -> SysValidationResult<()> {
     let signature = record.signature();
     let action = record.action();
@@ -486,7 +485,7 @@ async fn sys_validate_record_inner(
         maybe_entry: Option<&Entry>,
         workspace: &SysValidationWorkspace,
         network: HolochainP2pDna,
-        conductor_handle: &dyn ConductorHandleT,
+        conductor_handle: &Conductor,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
         store_record(action, workspace, network.clone()).await?;
@@ -607,7 +606,7 @@ async fn store_record(
 async fn store_entry(
     action: NewEntryActionRef<'_>,
     entry: &Entry,
-    conductor_handle: &dyn ConductorHandleT,
+    conductor_handle: &Conductor,
     workspace: &SysValidationWorkspace,
     network: HolochainP2pDna,
 ) -> SysValidationResult<()> {
@@ -617,9 +616,9 @@ async fn store_entry(
 
     // Checks
     check_entry_type(entry_type, entry)?;
-    if let EntryType::App(app_entry_type) = entry_type {
+    if let EntryType::App(app_entry_def) = entry_type {
         let entry_def =
-            check_app_entry_type(workspace.dna_hash(), app_entry_type, conductor_handle).await?;
+            check_app_entry_def(workspace.dna_hash(), app_entry_def, conductor_handle).await?;
         check_not_private(&entry_def)?;
     }
 

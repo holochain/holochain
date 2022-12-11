@@ -131,32 +131,29 @@ impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
     }
 }
 
-/// Show that this type is used as the basis
-type DhtBasis = AnyDhtHash;
-
 /// A type for storing in databases that don't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, derive_more::Display)]
 pub enum DhtOpLight {
     #[display(fmt = "StoreRecord")]
-    StoreRecord(ActionHash, Option<EntryHash>, DhtBasis),
+    StoreRecord(ActionHash, Option<EntryHash>, OpBasis),
     #[display(fmt = "StoreEntry")]
-    StoreEntry(ActionHash, EntryHash, DhtBasis),
+    StoreEntry(ActionHash, EntryHash, OpBasis),
     #[display(fmt = "RegisterAgentActivity")]
-    RegisterAgentActivity(ActionHash, DhtBasis),
+    RegisterAgentActivity(ActionHash, OpBasis),
     #[display(fmt = "RegisterUpdatedContent")]
-    RegisterUpdatedContent(ActionHash, EntryHash, DhtBasis),
+    RegisterUpdatedContent(ActionHash, EntryHash, OpBasis),
     #[display(fmt = "RegisterUpdatedRecord")]
-    RegisterUpdatedRecord(ActionHash, EntryHash, DhtBasis),
+    RegisterUpdatedRecord(ActionHash, EntryHash, OpBasis),
     #[display(fmt = "RegisterDeletedBy")]
-    RegisterDeletedBy(ActionHash, DhtBasis),
+    RegisterDeletedBy(ActionHash, OpBasis),
     #[display(fmt = "RegisterDeletedEntryAction")]
-    RegisterDeletedEntryAction(ActionHash, DhtBasis),
+    RegisterDeletedEntryAction(ActionHash, OpBasis),
     #[display(fmt = "RegisterAddLink")]
-    RegisterAddLink(ActionHash, DhtBasis),
+    RegisterAddLink(ActionHash, OpBasis),
     #[display(fmt = "RegisterRemoveLink")]
-    RegisterRemoveLink(ActionHash, DhtBasis),
+    RegisterRemoveLink(ActionHash, OpBasis),
 }
 
 impl PartialEq for DhtOpLight {
@@ -253,7 +250,7 @@ impl DhtOp {
     }
 
     /// Returns the basis hash which determines which agents will receive this DhtOp
-    pub fn dht_basis(&self) -> AnyDhtHash {
+    pub fn dht_basis(&self) -> OpBasis {
         self.as_unique_form().basis()
     }
 
@@ -265,44 +262,44 @@ impl DhtOp {
     ) -> DhtOpLight {
         let basis = self.dht_basis();
         match self {
-            DhtOp::StoreRecord(_, h, _) => {
-                let e = h.entry_data().map(|(e, _)| e.clone());
-                let h = ActionHash::with_data_sync(h);
+            DhtOp::StoreRecord(_, a, _) => {
+                let e = a.entry_data().map(|(e, _)| e.clone());
+                let h = ActionHash::with_data_sync(a);
                 DhtOpLight::StoreRecord(h, e, basis)
             }
-            DhtOp::StoreEntry(_, h, _) => {
-                let e = h.entry().clone();
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::StoreEntry(_, a, _) => {
+                let e = a.entry().clone();
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::StoreEntry(h, e, basis)
             }
-            DhtOp::RegisterAgentActivity(_, h) => {
-                let h = ActionHash::with_data_sync(h);
+            DhtOp::RegisterAgentActivity(_, a) => {
+                let h = ActionHash::with_data_sync(a);
                 DhtOpLight::RegisterAgentActivity(h, basis)
             }
-            DhtOp::RegisterUpdatedContent(_, h, _) => {
-                let e = h.entry_hash.clone();
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterUpdatedContent(_, a, _) => {
+                let e = a.entry_hash.clone();
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterUpdatedContent(h, e, basis)
             }
-            DhtOp::RegisterUpdatedRecord(_, h, _) => {
-                let e = h.entry_hash.clone();
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterUpdatedRecord(_, a, _) => {
+                let e = a.entry_hash.clone();
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterUpdatedRecord(h, e, basis)
             }
-            DhtOp::RegisterDeletedBy(_, h) => {
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterDeletedBy(_, a) => {
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterDeletedBy(h, basis)
             }
-            DhtOp::RegisterDeletedEntryAction(_, h) => {
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterDeletedEntryAction(_, a) => {
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterDeletedEntryAction(h, basis)
             }
-            DhtOp::RegisterAddLink(_, h) => {
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterAddLink(_, a) => {
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterAddLink(h, basis)
             }
-            DhtOp::RegisterRemoveLink(_, h) => {
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterRemoveLink(_, a) => {
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterRemoveLink(h, basis)
             }
         }
@@ -461,7 +458,7 @@ impl Ord for DhtOp {
 
 impl DhtOpLight {
     /// Get the dht basis for where to send this op
-    pub fn dht_basis(&self) -> &AnyDhtHash {
+    pub fn dht_basis(&self) -> &OpBasis {
         match self {
             DhtOpLight::StoreRecord(_, _, b)
             | DhtOpLight::StoreEntry(_, _, b)
@@ -566,14 +563,14 @@ impl DhtOpLight {
                     Action::CreateLink(create_link) => create_link.base_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),
                 };
-                Self::RegisterAddLink(action_hash, basis.into())
+                Self::RegisterAddLink(action_hash, basis)
             }
             DhtOpType::RegisterRemoveLink => {
                 let basis = match action {
                     Action::DeleteLink(delete_link) => delete_link.base_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),
                 };
-                Self::RegisterRemoveLink(action_hash, basis.into())
+                Self::RegisterRemoveLink(action_hash, basis)
             }
         };
         Ok(op)
@@ -597,7 +594,7 @@ pub enum UniqueForm<'a> {
 }
 
 impl<'a> UniqueForm<'a> {
-    fn basis(&'a self) -> AnyDhtHash {
+    fn basis(&'a self) -> OpBasis {
         match self {
             UniqueForm::StoreRecord(action) => ActionHash::with_data_sync(*action).into(),
             UniqueForm::StoreEntry(action) => action.entry().clone().into(),
@@ -612,8 +609,8 @@ impl<'a> UniqueForm<'a> {
             UniqueForm::RegisterDeletedEntryAction(action) => {
                 action.deletes_entry_address.clone().into()
             }
-            UniqueForm::RegisterAddLink(action) => action.base_address.clone().into(),
-            UniqueForm::RegisterRemoveLink(action) => action.base_address.clone().into(),
+            UniqueForm::RegisterAddLink(action) => action.base_address.clone(),
+            UniqueForm::RegisterRemoveLink(action) => action.base_address.clone(),
         }
     }
 

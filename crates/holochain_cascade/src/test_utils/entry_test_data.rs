@@ -28,7 +28,10 @@ use holochain_zome_types::ValidationStatus;
 use std::convert::TryInto;
 
 use ::fixt::prelude::*;
+
+/// A collection of test fixtures used to test entry-related cascade functionality
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub struct EntryTestData {
     pub store_entry_op: DhtOpHashed,
     pub wire_create: Judged<WireNewEntryAction>,
@@ -55,13 +58,14 @@ pub struct EntryTestData {
 }
 
 impl EntryTestData {
+    /// Create the test fixtures
     pub fn create() -> Self {
         let mut create = fixt!(Create);
         let mut update = fixt!(Update);
         let mut delete = fixt!(Delete);
 
         let mut create_link = fixt!(CreateLink);
-        create_link.zome_id = 0.into();
+        create_link.zome_index = 0.into();
         let mut delete_link = fixt!(DeleteLink);
 
         let entry: AppEntryBytes = SerializedBytes::from(UnsafeBytes::from(vec![3u8]))
@@ -76,7 +80,7 @@ impl EntryTestData {
         let update_entry_hash = EntryHash::with_data_sync(&update_entry);
 
         let mut entry_type_fixt =
-            AppEntryTypeFixturator::new(EntryVisibility::Public).map(EntryType::App);
+            AppEntryDefFixturator::new(EntryVisibility::Public).map(EntryType::App);
 
         create.entry_hash = entry_hash.clone();
         create.entry_type = entry_type_fixt.next().unwrap();
@@ -178,7 +182,7 @@ impl EntryTestData {
         let link = Link {
             target: create_link.target_address.clone(),
             timestamp: create_link.timestamp,
-            zome_id: create_link.zome_id,
+            zome_index: create_link.zome_index,
             link_type: create_link.link_type,
             tag: create_link.tag,
             create_link_hash,

@@ -2,6 +2,8 @@ use num_traits::Zero;
 
 use crate::hash::{OpHash, RegionHash};
 
+use super::RegionDataConstraints;
+
 /// Take bitwise XOR of each element of both arrays
 pub fn array_xor<const N: usize>(a: &mut [u8; N], b: &[u8; N]) {
     for i in 0..N {
@@ -68,10 +70,20 @@ impl From<OpHash> for RegionHash {
 pub struct RegionData {
     /// The XOR of hashes of all Ops in this Region
     pub hash: RegionHash,
-    /// The total size of Op data contains in this Region
+    /// The total size of Op data contained in this Region
     pub size: u32,
     /// The number of Ops in this Region.
     pub count: u32,
+}
+
+impl RegionDataConstraints for RegionData {
+    fn count(&self) -> u32 {
+        self.count
+    }
+
+    fn size(&self) -> u32 {
+        self.size
+    }
 }
 
 impl num_traits::Zero for RegionData {
@@ -96,7 +108,6 @@ impl num_traits::Zero for RegionData {
 
 impl std::ops::AddAssign for RegionData {
     fn add_assign(&mut self, other: Self) {
-        // dbg!("add regions", &self, &other);
         self.hash.xor(&other.hash);
         self.size += other.size;
         self.count += other.count;
@@ -121,7 +132,6 @@ impl std::iter::Sum for RegionData {
 impl std::ops::SubAssign for RegionData {
     fn sub_assign(&mut self, other: Self) {
         // XOR works as both addition and subtraction
-        // dbg!("subtract regions", &self, &other);
         self.hash.xor(&other.hash);
         self.size -= other.size;
         self.count -= other.count;

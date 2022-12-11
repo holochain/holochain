@@ -162,7 +162,7 @@ pub async fn register_and_install_dna(
     agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
-    role_id: AppRoleId,
+    role_name: RoleName,
     timeout: u64,
 ) -> DnaHash {
     register_and_install_dna_named(
@@ -171,7 +171,7 @@ pub async fn register_and_install_dna(
         agent_key,
         dna_path,
         properties,
-        role_id,
+        role_name,
         "test".to_string(),
         timeout,
     )
@@ -184,13 +184,15 @@ pub async fn register_and_install_dna_named(
     agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
-    role_id: AppRoleId,
+    role_name: RoleName,
     name: String,
     timeout: u64,
 ) -> DnaHash {
     let register_payload = RegisterDnaPayload {
-        network_seed: None,
-        properties,
+        modifiers: DnaModifiersOpt {
+            properties,
+            ..Default::default()
+        },
         source: DnaSource::Path(dna_path),
     };
     let request = AdminRequest::RegisterDna(Box::new(register_payload));
@@ -205,7 +207,7 @@ pub async fn register_and_install_dna_named(
 
     let dna_payload = InstallAppDnaPayload {
         hash: dna_hash.clone(),
-        role_id,
+        role_name,
         membrane_proof: None,
     };
     let payload = InstallAppPayload {
@@ -276,8 +278,9 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         environment_path: environment_path.into(),
         network: None,
         dpki: None,
-        keystore: KeystoreConfig::DangerTestKeystoreLegacyDeprecated,
+        keystore: KeystoreConfig::DangerTestKeystore,
         db_sync_strategy: DbSyncStrategy::default(),
+        chc_namespace: None,
     }
 }
 
@@ -301,6 +304,8 @@ async fn check_timeout_named<T>(
     response: impl Future<Output = Result<T, WebsocketError>>,
     timeout_millis: u64,
 ) -> T {
+    // FIXME(stefan): remove this multiplier once it's faster on self-hosted CI
+    let timeout_millis = timeout_millis * 4;
     match tokio::time::timeout(std::time::Duration::from_millis(timeout_millis), response).await {
         Ok(response) => response.unwrap(),
         Err(e) => {

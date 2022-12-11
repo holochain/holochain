@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cascade"
-version = "0.0.57"
+version = "0.0.74"
 description = "Logic for cascading updates to Holochain state and network interaction"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,17 +15,17 @@ fallible-iterator = "0.2"
 fixt = { version = "0.0.14", path = "../fixt" }
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
-hdk = { version = "0.0.148", path = "../hdk" }
-hdk_derive = { version = "0.0.46", path = "../hdk_derive" }
-holo_hash = { version = "0.0.31", path = "../holo_hash", features = ["full"] }
-holochain_sqlite = { version = "0.0.51", path = "../holochain_sqlite" }
-holochain_p2p = { version = "0.0.53", path = "../holochain_p2p" }
+hdk = { version = "^0.0.163", path = "../hdk" }
+hdk_derive = { version = "^0.0.56", path = "../hdk_derive" }
+holo_hash = { version = "^0.0.35", path = "../holo_hash", features = ["full"] }
+holochain_sqlite = { version = "^0.0.66", path = "../holochain_sqlite" }
+holochain_p2p = { version = "^0.0.69", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_state = { version = "0.0.56", path = "../holochain_state" }
-holochain_types = { version = "0.0.53", path = "../holochain_types" }
-holochain_zome_types = { version = "0.0.45", path = "../holochain_zome_types" }
+holochain_state = { version = "^0.0.72", path = "../holochain_state" }
+holochain_types = { version = "^0.0.69", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.0.58", path = "../holochain_zome_types" }
 observability = "0.1.3"
-kitsune_p2p = { version = "0.0.42", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p = { version = "^0.0.52", path = "../kitsune_p2p/kitsune_p2p" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_derive = "1.0"
 tokio = { version = "1.11", features = ["full"] }
@@ -37,6 +37,7 @@ async-trait = { version = "0.1", optional = true }
 mockall = { version = "0.10.2", optional = true }
 
 [dev-dependencies]
+isotest = "0"
 matches = "0.1"
 pretty_assertions = "0.7.2"
 test-case = "2.1"

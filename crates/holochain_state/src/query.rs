@@ -12,7 +12,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::sql::sql_cell::FETCH_OP;
+use holochain_sqlite::sql::sql_cell::FETCH_PUBLISHABLE_OP;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
@@ -260,7 +260,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     }
 
     fn contains_entry(&self, hash: &EntryHash) -> StateQueryResult<bool> {
-        let exists = self.txn.query_row_named(
+        let exists = self.txn.query_row(
             "
             SELECT
             EXISTS(
@@ -288,7 +288,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     }
 
     fn contains_action(&self, hash: &ActionHash) -> StateQueryResult<bool> {
-        let exists = self.txn.query_row_named(
+        let exists = self.txn.query_row(
             "
             SELECT
             EXISTS(
@@ -316,7 +316,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     }
 
     fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>> {
-        let shh = self.txn.query_row_named(
+        let shh = self.txn.query_row(
             "
             SELECT
             Action.blob, Action.hash
@@ -388,7 +388,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
 
 impl<'stmt> Txn<'stmt, '_> {
     fn get_exact_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
-        let record = self.txn.query_row_named(
+        let record = self.txn.query_row(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -425,7 +425,7 @@ impl<'stmt> Txn<'stmt, '_> {
         }
     }
     fn get_any_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
-        let record = self.txn.query_row_named(
+        let record = self.txn.query_row(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -463,7 +463,7 @@ impl<'stmt> Txn<'stmt, '_> {
     }
 
     fn get_any_public_record(&self, hash: &EntryHash) -> StateQueryResult<Option<Record>> {
-        let record = self.txn.query_row_named(
+        let record = self.txn.query_row(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -507,7 +507,7 @@ impl<'stmt> Txn<'stmt, '_> {
         hash: &EntryHash,
         author: &AgentPubKey,
     ) -> StateQueryResult<Option<Record>> {
-        let record = self.txn.query_row_named(
+        let record = self.txn.query_row(
             "
             SELECT
             Action.blob AS action_blob, Action.hash, Entry.blob as entry_blob
@@ -832,7 +832,7 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
                 if params.is_empty() {
                     Ok(Box::new(fallible_iterator::convert(std::iter::empty())) as StmtIter<T>)
                 } else {
-                    let iter = stmt.query_and_then_named(params, move |r| map_fn(r))?;
+                    let iter = stmt.query_and_then(params, move |r| map_fn(r))?;
                     Ok(Box::new(fallible_iterator::convert(iter)) as StmtIter<T>)
                 }
             }
@@ -882,7 +882,7 @@ pub fn get_entry_from_db(
     txn: &Transaction,
     entry_hash: &EntryHash,
 ) -> StateQueryResult<Option<Entry>> {
-    let entry = txn.query_row_named(
+    let entry = txn.query_row(
         "
         SELECT Entry.blob AS entry_blob FROM Entry
         WHERE hash = :entry_hash
@@ -908,7 +908,7 @@ pub fn get_public_entry_from_db(
     txn: &Transaction,
     entry_hash: &EntryHash,
 ) -> StateQueryResult<Option<Entry>> {
-    let entry = txn.query_row_named(
+    let entry = txn.query_row(
         "
         SELECT Entry.blob AS entry_blob FROM Entry
         JOIN Action ON Action.entry_hash = Entry.hash
@@ -942,7 +942,7 @@ pub fn get_public_op_from_db(
     op_hash: &DhtOpHash,
 ) -> StateQueryResult<Option<DhtOpHashed>> {
     let result = txn.query_row_and_then(
-        FETCH_OP,
+        FETCH_PUBLISHABLE_OP,
         named_params! {
             ":hash": op_hash,
         },

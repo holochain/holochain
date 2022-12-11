@@ -70,8 +70,12 @@ impl ShardedGossipLocal {
             // TODO: What happen if we are in the middle of a new outgoing and
             // a stale accept comes in for the same peer cert?
             // Maybe we need to check timestamps on messages or have unique round ids?
+
+            let mut metrics = inner.metrics.write();
+            metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
+            metrics.record_initiate(&remote_agent_list, self.gossip_type.into());
+
             inner.round_map.insert(peer_cert.clone(), state);
-            inner.metrics.write().record_initiate(&remote_agent_list);
             Ok(())
         })?;
         Ok(gossip)

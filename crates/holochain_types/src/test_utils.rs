@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
 
-#[allow(missing_docs)]
+#[warn(missing_docs)]
 pub mod chain;
 
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
@@ -40,11 +40,14 @@ pub fn fake_dna_zomes_named(
 ) -> DnaFile {
     let mut dna = DnaDef {
         name: name.to_string(),
-        properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
-            .try_into()
-            .unwrap(),
-        network_seed: network_seed.to_string(),
-        origin_time: Timestamp::HOLOCHAIN_EPOCH,
+        modifiers: DnaModifiers {
+            properties: YamlProperties::new(serde_yaml::from_str("p: hi").unwrap())
+                .try_into()
+                .unwrap(),
+            network_seed: network_seed.to_string(),
+            origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
+        },
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),
     };
@@ -65,7 +68,6 @@ pub fn fake_dna_zomes_named(
         }
         DnaFile::new(dna, wasm_code).await
     })
-    .unwrap()
 }
 
 /// Save a Dna to a file and return the path and tempdir that contains it
@@ -111,14 +113,14 @@ pub async fn fake_unique_record(
     let content: SerializedBytes =
         UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
     let entry = Entry::App(content.try_into().unwrap()).into_hashed();
-    let app_entry_type = AppEntryTypeFixturator::new(visibility).next().unwrap();
+    let app_entry_def = AppEntryDefFixturator::new(visibility).next().unwrap();
     let action_1 = Action::Create(Create {
         author: agent_key,
         timestamp: Timestamp::now(),
         action_seq: 0,
         prev_action: fake_action_hash(1),
 
-        entry_type: EntryType::App(app_entry_type),
+        entry_type: EntryType::App(app_entry_def),
         entry_hash: entry.as_hash().to_owned(),
 
         weight: Default::default(),

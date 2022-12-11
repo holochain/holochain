@@ -3,6 +3,7 @@ manifest_version: "1"
 name: another dna
 integrity:
   network_seed: 00000000-0000-0000-0000-000000000000
+  origin_time: 2022-02-11T23:05:19.470323Z
   properties: ~
   zomes:
     - name: zome1

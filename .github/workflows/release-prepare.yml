@@ -7,8 +7,14 @@ on:
       debug:
         type: string
         required: true
+      skip_prepare_logic:
+        type: string
+        required: true
 
       HOLOCHAIN_SOURCE_BRANCH:
+        type: string
+        required: true
+      HOLOCHAIN_TARGET_BRANCH:
         type: string
         required: true
       HOLOCHAIN_URL:
@@ -70,15 +76,15 @@ jobs:
         uses: actions/checkout@v3
       - name: Extend space
         uses: ./.github/actions/extend-space
+        if: ${{ inputs.skip_prepare_logic != 'true' }}
 
       - name: Install nix
         uses: cachix/install-nix-action@v17
       - name: Setup cachix
-        uses: cachix/cachix-action@v10
+        uses: cachix/cachix-action@v11
         continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           name: holochain-ci
-          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
           installCommand: |
             nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV:?} \
@@ -88,29 +94,30 @@ jobs:
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
       - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@main
+        uses: steveeJ-forks/actions-cache/restore@retry
         with:
           path: |
-            /tmp/holochain_release.sh
+            /var/tmp/holochain_release.sh
             # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /tmp/holochain_repo/*
-            !/tmp/holochain_repo/.cargo/
-            !/tmp/holochain_repo/target/
+            /var/tmp/holochain_repo/*
+            !/var/tmp/holochain_repo/.cargo/
+            !/var/tmp/holochain_repo/target/
           key: holochain-repo-finalize-release-
           restore-keys: |
             holochain-repo-
           required: false
 
       - name: Restore holochain cargo related state and build files
-        uses: steveeJ-forks/actions-cache/restore@main
+        if: ${{ inputs.skip_prepare_logic != 'true' }}
+        uses: steveeJ-forks/actions-cache/restore@retry
         id: restore-build-files
         with:
           path: |
-            /tmp/holochain_repo/.cargo/bin/
-            /tmp/holochain_repo/.cargo/registry/index/
-            /tmp/holochain_repo/.cargo/registry/cache/
-            /tmp/holochain_repo/.cargo/git/db/
-            /tmp/holochain_repo/target/
+            /var/tmp/holochain_repo/.cargo/bin/
+            /var/tmp/holochain_repo/.cargo/registry/index/
+            /var/tmp/holochain_repo/.cargo/registry/cache/
+            /var/tmp/holochain_repo/.cargo/git/db/
+            /var/tmp/holochain_repo/target/
           key: ${{ runner.os }}-prepare-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-prepare
@@ -121,18 +128,20 @@ jobs:
       - name: Prepare the environment file
         env:
           HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
+          HOLOCHAIN_TARGET_BRANCH: ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
           HOLOCHAIN_URL: ${{ inputs.HOLOCHAIN_URL }}
           HOLOCHAIN_NIXPKGS_URL: ${{ inputs.HOLOCHAIN_NIXPKGS_URL }}
           HOLONIX_URL: "https://github.com/holochain/holonix.git"
         run: |
           cat <<EOF > "${HOLOCHAIN_RELEASE_SH}"
-          PATH="~/.cargo/bin:$PATH"
+          export PATH="~/.cargo/bin:\$PATH"
 
           export HOLOCHAIN_URL=${HOLOCHAIN_URL:?}
           export HOLOCHAIN_NIXPKGS_URL=${HOLOCHAIN_NIXPKGS_URL:?}
           export HOLONIX_URL=${HOLONIX_URL:?}
 
           export HOLOCHAIN_SOURCE_BRANCH="${HOLOCHAIN_SOURCE_BRANCH:?}"
+          export HOLOCHAIN_TARGET_BRANCH="${HOLOCHAIN_TARGET_BRANCH:?}"
 
           export HOLOCHAIN_NIXPKGS_REPO=$(mktemp -d)
           export HOLONIX_REPO=$(mktemp -d)
@@ -144,7 +153,7 @@ jobs:
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
-          set -eE -o pipefail
+          set -exE -o pipefail
           source "${HOLOCHAIN_RELEASE_SH}"
 
           if [[ ! -d "${HOLOCHAIN_REPO}" ]]; then
@@ -165,6 +174,7 @@ jobs:
           git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
 
           git fetch --all --tags --prune --prune-tags --force
+          git branch --list --all
           git checkout --force -B ${HOLOCHAIN_SOURCE_BRANCH} remotes/origin/${HOLOCHAIN_SOURCE_BRANCH}
 
           # .gitignore might've changed
@@ -177,6 +187,7 @@ jobs:
           fi
 
       - name: Detect missing release headings
+        if: ${{ inputs.skip_prepare_logic != 'true' }}
         run: |
           set -ex
           source "${HOLOCHAIN_RELEASE_SH}"
@@ -192,6 +203,7 @@ jobs:
             '
 
       - name: Generate crate READMEs from doc comments
+        if: ${{ inputs.skip_prepare_logic != 'true' }}
         run: |
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
@@ -199,8 +211,9 @@ jobs:
 
       - name: Bump the crate versions for the release
         id: bump-versions
+        if: ${{ inputs.skip_prepare_logic != 'true' }}
         run: |
-          set -ex
+          set -exu
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
@@ -222,17 +235,18 @@ jobs:
             release-automation \
               --workspace-path=$PWD \
               --log-level=debug \
+              --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
               release \
                 --no-verify-pre \
                 --force-tag-creation \
-                --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-                --disallowed-version-reqs=">=0.1" \
+                --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
+                --disallowed-version-reqs=">=0.2" \
                 --steps=BumpReleaseVersions
 
             cargo sweep -f
             '
 
-          if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH:?}; then
+          if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH}; then
             echo "::set-output name=releasable_crates::true"
           else
             echo "::set-output name=releasable_crates::false"
@@ -258,39 +272,44 @@ jobs:
           echo "::set-output name=version_compat::${VERSION_COMPAT}"
           echo "::set-output name=release_branch::${RELEASE_BRANCH}"
 
-      - name: Merge release branch to main
+      - name: Merge release branch to the target branch
         run: |
+          set -exu
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
-          git checkout --force -B main origin/main
-          git merge --ff-only "${RELEASE_BRANCH}"
+          if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
+            git checkout -B ${HOLOCHAIN_TARGET_BRANCH} "${RELEASE_BRANCH}"
+          else
+            git checkout --force -B ${HOLOCHAIN_TARGET_BRANCH} origin/${HOLOCHAIN_TARGET_BRANCH}
+            git merge --ff-only "${RELEASE_BRANCH}"
+          fi
 
       - name: Cache the holochain release repository
         uses: steveeJ-forks/actions-cache/save@main
         with:
           path: |
-            /tmp/holochain_release.sh
+            /var/tmp/holochain_release.sh
             # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /tmp/holochain_repo/*
-            !/tmp/holochain_repo/.cargo/
-            !/tmp/holochain_repo/target/
+            /var/tmp/holochain_repo/*
+            !/var/tmp/holochain_repo/.cargo/
+            !/var/tmp/holochain_repo/target/
           key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
 
       - name: Cache cargo related build files
         uses: steveeJ-forks/actions-cache/save@main
-        if: success() || ${{ steps.restore-build-files.outputs.cache-hit != 'false' }}
+        if: ${{ inputs.skip_prepare_logic != 'true' }}
         with:
           path: |
-            /tmp/holochain_repo/.cargo/bin/
-            /tmp/holochain_repo/.cargo/registry/index/
-            /tmp/holochain_repo/.cargo/registry/cache/
-            /tmp/holochain_repo/.cargo/git/db/
-            /tmp/holochain_repo/target/
+            /var/tmp/holochain_repo/.cargo/bin/
+            /var/tmp/holochain_repo/.cargo/registry/index/
+            /var/tmp/holochain_repo/.cargo/registry/cache/
+            /var/tmp/holochain_repo/.cargo/git/db/
+            /var/tmp/holochain_repo/target/
           key: ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
 
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
+      - name: Setup SSH session
+        uses: steveeJ-forks/action-upterm@main
         if: ${{ failure() && inputs.debug == 'true' }}
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}

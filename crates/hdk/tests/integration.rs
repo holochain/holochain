@@ -10,7 +10,7 @@ where
     ScopedLinkType: TryFrom<T, Error = WasmError>,
 {
     let t: ScopedLinkType = t.try_into().unwrap();
-    (t.zome_id.0, t.zome_type.0)
+    (t.zome_index.0, t.zome_type.0)
 }
 
 fn zome_and_entry_type<T>(t: T) -> (u8, u8)
@@ -18,12 +18,12 @@ where
     ScopedEntryDefIndex: TryFrom<T, Error = WasmError>,
 {
     let t: ScopedEntryDefIndex = t.try_into().unwrap();
-    (t.zome_id.0, t.zome_type.0)
+    (t.zome_index.0, t.zome_type.0)
 }
 
-fn scoped_link(zome_id: u8, link_type: u8) -> ScopedLinkType {
+fn scoped_link(zome_index: u8, link_type: u8) -> ScopedLinkType {
     ScopedZomeType {
-        zome_id: zome_id.into(),
+        zome_index: zome_index.into(),
         zome_type: link_type.into(),
     }
 }
@@ -144,7 +144,7 @@ fn combine_integrity_zomes() {
 
 #[test]
 fn link_types_create_link() {
-    set_zome_types_and_compare(&[], &[(3, 3)], CreateLink(ZomeId(3), LinkType(0)));
+    set_zome_types_and_compare(&[], &[(3, 3)], CreateLink(ZomeIndex(3), LinkType(0)));
     create_link(
         base(),
         base(),
@@ -173,14 +173,14 @@ fn link_zomes_create_link() {
     set_zome_types_and_compare(
         &[],
         &[(32, 3), (15, 3)],
-        CreateLink(ZomeId(32), LinkType(2)),
+        CreateLink(ZomeIndex(32), LinkType(2)),
     );
     create_link(base(), base(), LinkZomes::A(integrity_a::LinkTypes::C), ()).unwrap();
 
     set_zome_types_and_compare(
         &[],
         &[(32, 3), (15, 6)],
-        CreateLink(ZomeId(15), LinkType(2)),
+        CreateLink(ZomeIndex(15), LinkType(2)),
     );
     create_link(base(), base(), LinkZomes::B(integrity_b::LinkTypes::C), ()).unwrap();
 
@@ -401,14 +401,14 @@ fn link_zomes_from_action() {
 
     assert!(matches!(
         LinkZomes::try_from(ScopedLinkType {
-            zome_id: 4.into(),
+            zome_index: 4.into(),
             zome_type: 50.into()
         }),
         Err(_)
     ));
     assert!(matches!(
         LinkZomes::try_from(ScopedLinkType {
-            zome_id: 5.into(),
+            zome_index: 5.into(),
             zome_type: 2.into()
         }),
         Err(_)
@@ -417,7 +417,7 @@ fn link_zomes_from_action() {
 
 enum Compare {
     GetLinks(LinkTypeFilter),
-    CreateLink(ZomeId, LinkType),
+    CreateLink(ZomeIndex, LinkType),
     Nothing,
 }
 
@@ -426,7 +426,7 @@ fn make_filter(r: &[(u8, std::ops::RangeInclusive<u8>)]) -> LinkTypeFilter {
         r.iter()
             .map(|(z, r)| {
                 (
-                    ZomeId(*z),
+                    ZomeIndex(*z),
                     r.clone().map(|t| LinkType(t)).collect::<Vec<_>>(),
                 )
             })
@@ -451,13 +451,18 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
             entries: ScopedZomeTypes(
                 entries
                     .iter()
-                    .map(|(z, types)| (ZomeId(*z), (0..*types).map(|t| EntryDefIndex(t)).collect()))
+                    .map(|(z, types)| {
+                        (
+                            ZomeIndex(*z),
+                            (0..*types).map(|t| EntryDefIndex(t)).collect(),
+                        )
+                    })
                     .collect(),
             ),
             links: ScopedZomeTypes(
                 links
                     .iter()
-                    .map(|(z, types)| (ZomeId(*z), (0..*types).map(|t| LinkType(t)).collect()))
+                    .map(|(z, types)| (ZomeIndex(*z), (0..*types).map(|t| LinkType(t)).collect()))
                     .collect(),
             ),
         };
@@ -485,7 +490,7 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
             Ok(vec![vec![Link {
                 target: base(),
                 timestamp: Timestamp(0),
-                zome_id: 0.into(),
+                zome_index: 0.into(),
                 link_type: 0.into(),
                 tag: ().into(),
                 create_link_hash: ActionHash::from_raw_36(vec![0u8; 36]),
@@ -505,7 +510,7 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
                     Ok(vec![vec![Link {
                         target: base(),
                         timestamp: Timestamp(0),
-                        zome_id: 0.into(),
+                        zome_index: 0.into(),
                         link_type: 0.into(),
                         tag: ().into(),
                         create_link_hash: ActionHash::from_raw_36(vec![0u8; 36]),
@@ -517,8 +522,10 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
                 .expect_create_link()
                 .withf(
                     move |CreateLinkInput {
-                              link_type, zome_id, ..
-                          }| *link_type == l && *zome_id == z,
+                              link_type,
+                              zome_index,
+                              ..
+                          }| *link_type == l && *zome_index == z,
                 )
                 .returning(|_| Ok(ActionHash::from_raw_36(vec![0u8; 36])));
         }

@@ -25,7 +25,7 @@ rec {
 
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,test_utils,build_wasms,db-encryption --lib --tests --profile fast-test -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --profile fast-test ''${1-} -- --nocapture
   '';
 
   hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
@@ -34,7 +34,7 @@ rec {
 
     # run all the cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test ''${1-}
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
@@ -75,12 +75,12 @@ rec {
         ${releaseAutomation} \
             --workspace-path=''${TEST_WORKSPACE:?} \
             --log-level=${logLevel} \
+            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
           release \
             --no-verify-pre \
             --force-branch-creation \
             --disallowed-version-reqs=">=0.1" \
             --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
             --steps=CreateReleaseBranch,BumpReleaseVersions
       '';
     in
@@ -147,7 +147,7 @@ rec {
 
     for i in {0..100}
     do
-      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,glacial_tests,build_wasms -- --nocapture
     done
     for i in {0..100}
     do
@@ -254,6 +254,15 @@ rec {
 
   hcRegenReadmes = writeShellScriptBin "hc-regen-readmes" ''
     cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
+  '';
+
+  hcRegenNixExpressions = writeShellScriptBin "hc-regen-nix-expressions" ''
+    set -xe
+    pushd ${hcToplevelDir}
+    crate2nix generate \
+        -f crates/release-automation/Cargo.toml \
+        -o crates/release-automation/Cargo.nix
+    git commit crates/release-automation/Cargo.nix -m "chore: hc-regen-nix-expressions"
   '';
 } // (if stdenv.isLinux then {
   hcCoverageTest = writeShellScriptBin "hc-coverage-test" ''

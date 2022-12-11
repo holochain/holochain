@@ -8,6 +8,7 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_p2p::dht::hash::RegionHash;
 use holochain_p2p::dht::prelude::Dimension;
 use holochain_p2p::dht::region::RegionData;
+use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_p2p::dht_arc::DhtArcSet;
 use holochain_types::dht_op::facts::valid_dht_op;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
@@ -51,7 +52,8 @@ async fn test_region_queries() {
     let tq_ms = tq.as_millis() as u64;
 
     // - The origin time is five time quanta ago
-    dna_def.origin_time = five_quanta_ago.clone();
+    dna_def.modifiers.origin_time = five_quanta_ago.clone();
+    dna_def.modifiers.quantum_time = STANDARD_QUANTUM_TIME;
 
     // Cutoff duration is 2 quanta, meaning historic gossip goes up to 1 quantum ago
     let cutoff = Duration::from_micros(q_us * 2);

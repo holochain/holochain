@@ -24,8 +24,10 @@ pub fn must_get_entry<'a>(
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
                 let mut cascade = match call_context.host_context {
-                    HostContext::Validate(_) => Cascade::from_workspace(workspace.stores(), None),
-                    _ => Cascade::from_workspace_network(
+                    HostContext::Validate(_) => {
+                        Cascade::from_workspace_stores(workspace.stores(), None)
+                    }
+                    _ => Cascade::from_workspace_and_network(
                         &workspace,
                         call_context.host_context.network().clone(),
                     ),
@@ -51,9 +53,9 @@ pub fn must_get_entry<'a>(
                                 &ExternIO::encode(InitCallbackResult::UnresolvedDependencies(
                                     UnresolvedDependencies::Hashes(vec![entry_hash.into()],)
                                 ))
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             )
-                            .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?
+                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                         ))
                         .into()),
                         HostContext::Validate(_) => {
@@ -67,10 +69,10 @@ pub fn must_get_entry<'a>(
                                         ),
                                     )
                                     .map_err(
-                                        |e| -> RuntimeError { wasm_error!(e.into()).into() }
+                                        |e| -> RuntimeError { wasm_error!(e).into() }
                                     )?
                                 )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             ))
                             .into())
                         }
@@ -82,9 +84,9 @@ pub fn must_get_entry<'a>(
                                             vec![entry_hash.into(),]
                                         ),
                                     )
-                                    .map_err(|e| wasm_error!(e.into()))?
+                                    .map_err(|e| wasm_error!(e))?
                                 )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e.into()).into() })?,
+                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             ))
                             .into())
                         }
@@ -142,7 +144,7 @@ pub mod test {
             .await;
 
         let dht_db = conductor
-            .inner_handle()
+            .raw_handle()
             .get_dht_db(alice.cell_id().dna_hash())
             .unwrap();
 

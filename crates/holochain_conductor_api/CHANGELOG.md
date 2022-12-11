@@ -4,6 +4,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.0.72
+
+## 0.0.71
+
+## 0.0.70
+
+## 0.0.69
+
+## 0.0.68
+
+## 0.0.67
+
+## 0.0.66
+
+## 0.0.65
+
+## 0.0.64
+
+## 0.0.63
+
+## 0.0.62
+
+## 0.0.61
+
+## 0.0.60
+
+## 0.0.59
+
+- Include cloned cells in App API call `AppInfo`. [\#1547](https://github.com/holochain/holochain/pull/1547)
+- **BREAKING CHANGE:** The `AddRecords` admin api method has been changed to `GraftRecords`, and the functionality has changed accordingly. See the docs for that method to understand the changes.
+  - In short, the `truncate` parameter has been removed. If you desire that functionality, simply pass a fully valid chain in for “grafting”, which will have the effect of removing all existing records. If you just want to append records to the existing chain, just pass in a collection of new records, with the first one pointing to the last existing record.
+
+## 0.0.58
+
+## 0.0.57
+
 ## 0.0.56
 
 ## 0.0.55
@@ -127,7 +163,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 #### Example
 
 ``` yaml
----
 passphrase_service:
   type: danger_insecure_from_config
   passphrase: "foobar"

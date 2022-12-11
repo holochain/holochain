@@ -1,7 +1,7 @@
-//! # Dht Operational Transforms
+//! # Dht Operations
 
 use crate::{
-    Action, ActionRef, ActionType, AppEntryType, Create, CreateLink, Delete, DeleteLink, Entry,
+    Action, ActionRef, ActionType, AppEntryDef, Create, CreateLink, Delete, DeleteLink, Entry,
     EntryType, LinkTag, MembraneProof, Record, SignedActionHashed, SignedHashed, UnitEnum, Update,
 };
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent};
@@ -10,7 +10,7 @@ use kitsune_p2p_timestamp::Timestamp;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
-/// These are the operational transformations that can be applied to Holochain data.
+/// These are the operations that can be applied to Holochain data.
 /// Every [`Action`] produces a set of operations.
 /// These operations are each sent to an authority for validation.
 ///
@@ -71,7 +71,7 @@ use kitsune_p2p_timestamp::Timestamp;
 /// actually running the validation.
 ///
 /// For example the entry authority will be passed the [`Op::StoreEntry`] operation.
-/// The operational transforms that can are applied to Holochain data.
+/// The operations that can be applied to Holochain data.
 /// Operations beginning with `Store` are concerned with creating and
 /// storing data.
 /// Operations beginning with `Register` are concerned with registering
@@ -195,6 +195,12 @@ pub struct RegisterAgentActivity {
     /// definitions.
     /// If it is cached for this action then this will be some.
     pub cached_entry: Option<Entry>,
+}
+
+impl AsRef<SignedActionHashed> for RegisterAgentActivity {
+    fn as_ref(&self) -> &SignedActionHashed {
+        &self.action
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
@@ -364,11 +370,11 @@ impl EntryCreationAction {
             | EntryCreationAction::Update(Update { entry_hash, .. }) => entry_hash,
         }
     }
-    /// The [`AppEntryType`] of the [`Entry`] being created if it
+    /// The [`AppEntryDef`] of the [`Entry`] being created if it
     /// is an application defined [`Entry`].
-    pub fn app_entry_type(&self) -> Option<&AppEntryType> {
+    pub fn app_entry_def(&self) -> Option<&AppEntryDef> {
         match self.entry_type() {
-            EntryType::App(app_entry_type) => Some(app_entry_type),
+            EntryType::App(app_entry_def) => Some(app_entry_def),
             _ => None,
         }
     }

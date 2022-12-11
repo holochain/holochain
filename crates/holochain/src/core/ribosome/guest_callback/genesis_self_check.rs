@@ -156,14 +156,13 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_integrity_zome_can_run_self_check() {
-        let mut conductor = SweetConductor::from_config(Default::default()).await;
+        let mut conductor = SweetConductor::from_standard_config().await;
         let (dna, _, _) = SweetDnaFile::unique_from_zomes(
             vec![TestIntegrityWasm::IntegrityZome],
             Vec::<TestCoordinatorWasm>::new(),
             vec![TestIntegrityWasm::IntegrityZome],
         )
-        .await
-        .unwrap();
+        .await;
 
         let app = conductor.setup_app("app", &[dna]).await.unwrap();
         let cells = app.into_cells();

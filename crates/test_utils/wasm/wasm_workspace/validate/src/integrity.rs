@@ -14,11 +14,10 @@ impl TryFrom<&Entry> for ThisWasmEntry {
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))
-                .map_err(|e| wasm_error!(e.into()))?),
-            _ => Err(wasm_error!(SerializedBytesError::Deserialize(
-                "failed to deserialize ThisWasmEntry".into(),
-            )
-            .into())),
+                .map_err(|e| wasm_error!(e))?),
+            _ => Err(wasm_error!(
+                "failed to deserialize ThisWasmEntry"
+            )),
         }
     }
 }
@@ -28,7 +27,7 @@ impl TryFrom<&ThisWasmEntry> for Entry {
     fn try_from(this_wasm_entry: &ThisWasmEntry) -> Result<Self, Self::Error> {
         Ok(Entry::App(
             match AppEntryBytes::try_from(
-                SerializedBytes::try_from(this_wasm_entry).map_err(|e| wasm_error!(e.into()))?,
+                SerializedBytes::try_from(this_wasm_entry).map_err(|e| wasm_error!(e))?,
             ) {
                 Ok(app_entry_bytes) => app_entry_bytes,
                 Err(entry_error) => match entry_error {
@@ -95,14 +94,14 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     ..
                 },
             entry,
-        }) => match action.app_entry_type() {
-            Some(AppEntryType { id, zome_id, .. }) => {
+        }) => match action.app_entry_def() {
+            Some(AppEntryDef { entry_index, zome_index, .. }) => {
                 if zome_info()?
                     .zome_types
                     .entries
                     .find_key(ScopedZomeType {
-                        zome_id: *zome_id,
-                        zome_type: *id,
+                        zome_index: *zome_index,
+                        zome_type: *entry_index,
                     })
                     .is_some()
                 {

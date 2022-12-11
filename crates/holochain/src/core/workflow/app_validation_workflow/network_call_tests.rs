@@ -35,169 +35,12 @@ const NUM_ATTEMPTS: usize = 100;
 const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
 #[tokio::test(flavor = "multi_thread")]
-async fn get_validation_package_test() {
-    observability::test_run().ok();
-
-    let zomes = vec![TestWasm::Create];
-    let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-    let handle = conductor_test.handle();
-    let alice_call_data = conductor_test.alice_call_data_mut();
-    let alice_cell_id = &alice_call_data.cell_id;
-    let alice_agent_id = alice_cell_id.agent_pubkey();
-
-    // Helper to get action hashed
-    let get_action = {
-        let db = alice_call_data.db.clone();
-        move |action_hash| {
-            let alice_authored = RecordBuf::authored(db.clone().into(), false).unwrap();
-            alice_authored
-                .get_action(action_hash)
-                .unwrap()
-                .unwrap()
-                .into_action_and_signature()
-                .0
-        }
-    };
-
-    let action_hash = commit_some_data("create_entry", &alice_call_data, &handle).await;
-
-    // Expecting every action from the latest to the beginning
-    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
-    let alice_authored = alice_source_chain.records();
-    let expected_package = alice_source_chain
-        .iter_back()
-        // Skip the actual entry
-        .skip(1)
-        .filter_map(|shh| alice_authored.get_record(shh.action_address()))
-        .collect::<Vec<_>>()
-        .unwrap();
-
-    let expected_package = Some(ValidationPackage::new(expected_package)).into();
-
-    // Network call
-    let validation_package = alice_call_data
-        .network
-        .get_validation_package(alice_agent_id.clone(), action_hash.clone())
-        .await
-        .unwrap();
-
-    assert_eq!(validation_package, expected_package);
-
-    // Cascade
-    let action_hashed = get_action(&action_hash);
-    let validation_package = check_cascade(&action_hashed, &alice_call_data).await;
-
-    assert_eq!(validation_package, expected_package.0);
-
-    // What happens if we commit a private entry?
-    let action_hash_priv = commit_some_data("create_priv_msg", &alice_call_data, &handle).await;
-
-    // Network
-    // Check we still get the last package with new commits
-    let validation_package = alice_call_data
-        .network
-        .get_validation_package(alice_agent_id.clone(), action_hash.clone())
-        .await
-        .unwrap();
-
-    assert_eq!(validation_package, expected_package);
-
-    // Cascade
-    let action_hashed = get_action(&action_hash);
-    let validation_package = check_cascade(&action_hashed, &alice_call_data).await;
-
-    assert_eq!(validation_package, expected_package.0);
-
-    // Get the package for the private entry, this is still full chain
-    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
-    let alice_authored = alice_source_chain.records();
-    let expected_package = alice_source_chain
-        .iter_back()
-        // Skip the actual entry
-        .skip(1)
-        .filter_map(|shh| alice_authored.get_record(shh.action_address()))
-        .collect::<Vec<_>>()
-        .unwrap();
-
-    let expected_package = Some(ValidationPackage::new(expected_package)).into();
-
-    // Network
-    let validation_package = alice_call_data
-        .network
-        .get_validation_package(alice_agent_id.clone(), action_hash_priv.clone())
-        .await
-        .unwrap();
-
-    assert_eq!(validation_package, expected_package);
-
-    // Cascade
-    let action_hashed = get_action(&action_hash_priv);
-    let validation_package = check_cascade(&action_hashed, &alice_call_data).await;
-
-    assert_eq!(validation_package, expected_package.0);
-
-    // Test sub chain package
-
-    // Commit some entries with sub chain requirements
-    let action_hash = commit_some_data("create_msg", &alice_call_data, &handle).await;
-
-    // Get the entry type
-    let entry_type = alice_source_chain
-        .get_record(&action_hash)
-        .unwrap()
-        .expect("Alice should have the entry in their authored because they just committed")
-        .action()
-        .entry_data()
-        .unwrap()
-        .1
-        .clone();
-
-    // Expecting all the records that match this entry type from the latest to the start
-    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
-    let alice_authored = alice_source_chain.records();
-    let expected_package = alice_source_chain
-        .iter_back()
-        .filter_map(|shh| alice_authored.get_record(shh.action_address()))
-        .filter_map(|el| {
-            Ok(el.action().entry_type().cloned().and_then(|et| {
-                if et == entry_type {
-                    Some(el)
-                } else {
-                    None
-                }
-            }))
-        })
-        // Skip the actual entry
-        .skip(1)
-        .collect::<Vec<_>>()
-        .unwrap();
-
-    let expected_package = Some(ValidationPackage::new(expected_package)).into();
-
-    // Network
-    let validation_package = alice_call_data
-        .network
-        .get_validation_package(alice_agent_id.clone(), action_hash.clone())
-        .await
-        .unwrap();
-
-    assert_eq!(validation_package, expected_package);
-
-    // Cascade
-    let action_hashed = get_action(&action_hash);
-    let validation_package = check_cascade(&action_hashed, &alice_call_data).await;
-
-    assert_eq!(validation_package, expected_package.0);
-    conductor_test.shutdown_conductor().await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_test() {
     observability::test_run().ok();
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-    let handle = conductor_test.handle();
+    let handle = conductor_test.raw_handle();
     let alice_call_data = conductor_test.alice_call_data_mut();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
@@ -478,7 +321,7 @@ async fn get_custom_package_test() {
 
     let zomes = vec![TestWasm::ValidationPackageSuccess];
     let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
-    let handle = conductor_test.handle();
+    let handle = conductor_test.raw_handle();
     let alice_call_data = conductor_test.alice_call_data();
     let bob_call_data = conductor_test.bob_call_data().unwrap();
     let alice_cell_id = &alice_call_data.cell_id;
@@ -537,9 +380,9 @@ async fn get_custom_package_test() {
             Ok(shh
                 .action()
                 .entry_type()
-                .map(|et| {
-                    if let EntryType::App(aet) = et {
-                        aet.id().index() == 1
+                .map(|entry_type| {
+                    if let EntryType::App(app_entry_def) = entry_type {
+                        app_entry_def.entry_index().index() == 1
                     } else {
                         false
                     }
@@ -574,7 +417,7 @@ async fn get_agent_activity_host_fn_test() {
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-    let handle = conductor_test.handle();
+    let handle = conductor_test.raw_handle();
     let alice_call_data = conductor_test.alice_call_data();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();

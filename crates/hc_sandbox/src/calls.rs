@@ -17,9 +17,11 @@ use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
+use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::InstallAppDnaPayload;
 use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::RegisterDnaPayload;
+use holochain_types::prelude::Timestamp;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppBundlePayload};
@@ -108,6 +110,9 @@ pub struct RegisterDna {
     #[structopt(long)]
     /// Properties to override when installing this Dna
     pub properties: Option<PathBuf>,
+    #[structopt(long)]
+    /// Origin time to override when installing this Dna
+    pub origin_time: Option<Timestamp>,
     #[structopt(long, conflicts_with = "hash", required_unless = "hash")]
     /// Path to a DnaBundle file.
     pub path: Option<PathBuf>,
@@ -122,7 +127,7 @@ pub struct RegisterDna {
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
-/// AppRoleIds are set to `my-app-0`, `my-app-1` etc.
+/// RoleName are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallApp {
     #[structopt(short, long, default_value = "test-app")]
     /// Sets the InstalledAppId.
@@ -143,7 +148,7 @@ pub struct InstallApp {
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
-/// AppRoleIds are set to `my-app-0`, `my-app-1` etc.
+/// RoleNames are set to `my-app-0`, `my-app-1` etc.
 pub struct InstallAppBundle {
     #[structopt(long)]
     /// Sets the InstalledAppId.
@@ -418,6 +423,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
     let RegisterDna {
         network_seed,
         properties,
+        origin_time,
         path,
         hash,
     } = args;
@@ -433,8 +439,12 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         _ => unreachable!("Can't have hash and path for dna source"),
     };
     let dna = RegisterDnaPayload {
-        network_seed,
-        properties,
+        modifiers: DnaModifiersOpt {
+            properties,
+            network_seed,
+            origin_time,
+            quantum_time: None,
+        },
         source,
     };
 
@@ -570,8 +580,8 @@ pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
 
 /// Calls [`AdminRequest::ListActiveApps`].
 pub async fn list_running_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
-    let resp = cmd.command(AdminRequest::ListActiveApps).await?;
-    Ok(expect_match!(resp => AdminResponse::ActiveAppsListed, "Failed to list active apps"))
+    let resp = cmd.command(AdminRequest::ListEnabledApps).await?;
+    Ok(expect_match!(resp => AdminResponse::EnabledAppsListed, "Failed to list active apps"))
 }
 
 /// Calls [`AdminRequest::ListApps`].

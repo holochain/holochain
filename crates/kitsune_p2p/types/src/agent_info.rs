@@ -259,6 +259,11 @@ impl AgentInfoSigned {
     pub fn to_agent_arc(&self) -> AgentArc {
         (self.agent.clone(), self.storage_arc)
     }
+
+    /// Accessor
+    pub fn agent(&self) -> Arc<KitsuneAgent> {
+        self.agent.clone()
+    }
 }
 
 #[cfg(test)]

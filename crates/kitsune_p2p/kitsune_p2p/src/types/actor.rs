@@ -5,6 +5,8 @@ use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
 use url2::Url2;
 
+use crate::gossip::sharded_gossip::GossipDiagnostics;
+
 /// Make a request to multiple destination agents - awaiting/aggregating the responses.
 /// The remote sides will see these messages as "RequestEvt" events.
 #[derive(Clone, Debug)]
@@ -96,6 +98,9 @@ ghost_actor::ghost_chan! {
 
         /// Make a request to multiple destination agents - awaiting/aggregating the responses.
         /// The remote sides will see these messages as "Call" events.
+        /// NOTE: We've currently disabled the "multi" part of this.
+        /// It will still pick appropriate peers by basis, but will only
+        /// make requests one at a time, returning the first success.
         fn rpc_multi(input: RpcMulti) -> Vec<RpcMultiResponse>;
 
         /// Publish data to a "neighborhood" of remote nodes surrounding the
@@ -141,5 +146,8 @@ ghost_actor::ghost_chan! {
         fn dump_network_metrics(
             space: KSpaceOpt,
         ) -> serde_json::Value;
+
+        /// Get data for diagnostics
+        fn get_diagnostics(space: KSpace) -> GossipDiagnostics;
     }
 }

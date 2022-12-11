@@ -5,9 +5,11 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
+use holochain_zome_types::DnaModifiersOpt;
+
 use super::error::{AppManifestError, AppManifestResult};
 use crate::app::app_manifest::current::{DnaLocation, DnaVersionSpec};
-use crate::prelude::{AppRoleId, YamlProperties};
+use crate::prelude::RoleName;
 use std::collections::HashMap;
 
 /// Normalized, validated representation of the App Manifest.
@@ -17,7 +19,7 @@ pub struct AppManifestValidated {
     pub(in crate::app) name: String,
 
     /// The role descriptions that make up this app.
-    pub(in crate::app) roles: HashMap<AppRoleId, AppRoleManifestValidated>,
+    pub(in crate::app) roles: HashMap<RoleName, AppRoleManifestValidated>,
 }
 
 impl AppManifestValidated {
@@ -27,13 +29,13 @@ impl AppManifestValidated {
     /// the only way to instantiate this type.
     pub(in crate::app) fn new(
         name: String,
-        roles: HashMap<AppRoleId, AppRoleManifestValidated>,
+        roles: HashMap<RoleName, AppRoleManifestValidated>,
     ) -> AppManifestResult<Self> {
-        for (role_id, role) in roles.iter() {
+        for (role_name, role) in roles.iter() {
             if let AppRoleManifestValidated::Disabled { clone_limit, .. } = role {
                 if *clone_limit == 0 {
                     return Err(AppManifestError::InvalidStrategyDisabled(
-                        role_id.to_owned(),
+                        role_name.to_owned(),
                     ));
                 }
             }
@@ -51,8 +53,7 @@ pub enum AppRoleManifestValidated {
         clone_limit: u32,
         deferred: bool,
         location: DnaLocation,
-        properties: Option<YamlProperties>,
-        network_seed: Option<String>,
+        modifiers: DnaModifiersOpt,
         version: Option<DnaVersionSpec>,
     },
     /// Always create a new Cell when installing the App,
@@ -61,7 +62,7 @@ pub enum AppRoleManifestValidated {
         clone_limit: u32,
         deferred: bool,
         location: DnaLocation,
-        properties: Option<YamlProperties>,
+        modifiers: DnaModifiersOpt,
         version: Option<DnaVersionSpec>,
     },
     /// Require that a Cell is already installed which matches the DNA version
@@ -77,8 +78,7 @@ pub enum AppRoleManifestValidated {
         clone_limit: u32,
         deferred: bool,
         location: DnaLocation,
-        properties: Option<YamlProperties>,
-        network_seed: Option<String>,
+        modifiers: DnaModifiersOpt,
         version: DnaVersionSpec,
     },
     /// Disallow provisioning altogether. In this case, we expect

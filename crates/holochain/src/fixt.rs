@@ -1,8 +1,7 @@
 pub mod curve;
 
-use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::handle::MockConductorHandleT;
+use crate::conductor::api::MockCellConductorReadHandleT;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -60,8 +59,7 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
         let uuid = StringFixturator::new(Unpredictable).next().unwrap();
         let (dna_file, _, _) = tokio_helper::block_forever_on(async move {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
-        })
-        .unwrap();
+        });
 
         let ribosome = RealRibosome::new(dna_file).unwrap();
 
@@ -345,15 +343,14 @@ fixturator!(
         })
     };
 );
-fn make_call_zome_handle(cell_id: CellId) -> CellConductorReadHandle {
-    let handle = Arc::new(MockConductorHandleT::new());
-    let cell_conductor_api = CellConductorApi::new(handle, cell_id);
-    Arc::new(cell_conductor_api)
+
+fn make_call_zome_handle() -> CellConductorReadHandle {
+    Arc::new(MockCellConductorReadHandleT::new())
 }
 
 fixturator!(
     CellConductorReadHandle;
-    vanilla fn make_call_zome_handle(CellId);
+    vanilla fn make_call_zome_handle();
 );
 
 fixturator!(
@@ -413,7 +410,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageInvocation;
-    constructor fn new(IntegrityZome, AppEntryType);
+    constructor fn new(IntegrityZome, AppEntryDef);
 );
 
 fixturator!(

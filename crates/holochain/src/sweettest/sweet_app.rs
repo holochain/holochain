@@ -5,7 +5,7 @@ use itertools::traits::HomogeneousTuple;
 use itertools::Itertools;
 
 /// An installed app, with prebuilt SweetCells
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SweetApp {
     installed_app_id: InstalledAppId,
     cells: Vec<SweetCell>,
@@ -102,8 +102,12 @@ impl SweetAppBatch {
     }
 
     /// Access all Cells across all Apps, with Cells from the same App being contiguous
-    pub fn cells_flattened(&self) -> Vec<&SweetCell> {
-        self.0.iter().flat_map(|app| app.cells().iter()).collect()
+    pub fn cells_flattened(&self) -> Vec<SweetCell> {
+        self.0
+            .iter()
+            .flat_map(|app| app.cells().iter())
+            .cloned()
+            .collect()
     }
 
     /// Get the underlying data

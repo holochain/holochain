@@ -2,8 +2,8 @@ use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::scratch::Scratch;
 use ::fixt::prelude::*;
 use holo_hash::*;
+use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::rusqlite::TransactionBehavior;
-use holochain_sqlite::rusqlite::{Transaction, NO_PARAMS};
 use holochain_sqlite::{rusqlite::Connection, schema::SCHEMA_CELL};
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::OpOrder;
@@ -232,24 +232,24 @@ async fn insert_op_equivalence() {
 
     // Query the DB on conn1
     let entries1: Vec<u8> = conn1
-        .query_row("SELECT * FROM Entry", NO_PARAMS, |row| row.get("hash"))
+        .query_row("SELECT * FROM Entry", [], |row| row.get("hash"))
         .unwrap();
     let actions1: Vec<u8> = conn1
-        .query_row("SELECT * FROM Action", NO_PARAMS, |row| row.get("hash"))
+        .query_row("SELECT * FROM Action", [], |row| row.get("hash"))
         .unwrap();
     let ops1: Vec<u8> = conn1
-        .query_row("SELECT * FROM DhtOp", NO_PARAMS, |row| row.get("hash"))
+        .query_row("SELECT * FROM DhtOp", [], |row| row.get("hash"))
         .unwrap();
 
     // Query the DB on conn2
     let entries2: Vec<u8> = conn2
-        .query_row("SELECT * FROM Entry", NO_PARAMS, |row| row.get("hash"))
+        .query_row("SELECT * FROM Entry", [], |row| row.get("hash"))
         .unwrap();
     let actions2: Vec<u8> = conn2
-        .query_row("SELECT * FROM Action", NO_PARAMS, |row| row.get("hash"))
+        .query_row("SELECT * FROM Action", [], |row| row.get("hash"))
         .unwrap();
     let ops2: Vec<u8> = conn2
-        .query_row("SELECT * FROM DhtOp", NO_PARAMS, |row| row.get("hash"))
+        .query_row("SELECT * FROM DhtOp", [], |row| row.get("hash"))
         .unwrap();
 
     assert_eq!(entries1, entries2);

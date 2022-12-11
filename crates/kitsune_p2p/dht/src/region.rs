@@ -29,7 +29,7 @@ use std::ops::{AddAssign, Sub};
 pub const REGION_MASS: u32 = std::mem::size_of::<Region<RegionData>>() as u32;
 
 /// The coordinates defining the Region, along with the calculated [`RegionData`]
-#[derive(Debug, Clone, derive_more::Constructor)]
+#[derive(Debug, Clone, PartialEq, Eq, derive_more::Constructor)]
 pub struct Region<D: RegionDataConstraints = RegionData> {
     /// The coords
     pub coords: RegionCoords,
@@ -52,17 +52,11 @@ pub trait RegionDataConstraints:
     + serde::Serialize
     + serde::de::DeserializeOwned
 {
-}
-impl<T> RegionDataConstraints for T where
-    T: Eq
-        + Zero
-        + AddAssign
-        + Sub<Output = T>
-        + Clone
-        + Send
-        + Sync
-        + std::fmt::Debug
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-{
+    /// The number of ops in this region
+    fn count(&self) -> u32;
+
+    /// The size of all ops in this region
+    fn size(&self) -> u32;
+
+    // TODO: hash (not currently needed to be generic)
 }

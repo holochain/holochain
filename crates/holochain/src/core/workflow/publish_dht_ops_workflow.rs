@@ -94,7 +94,7 @@ pub async fn publish_dht_ops_workflow(
 pub async fn publish_dht_ops_workflow_inner(
     db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
-) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
+) -> WorkflowResult<HashMap<OpBasis, Vec<(DhtOpHash, DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
@@ -396,7 +396,7 @@ mod tests {
                 // Make them private
                 let visibility = EntryVisibility::Private;
                 let mut entry_type_fixt =
-                    AppEntryTypeFixturator::new(visibility.clone()).map(EntryType::App);
+                    AppEntryDefFixturator::new(visibility.clone()).map(EntryType::App);
                 let ec_entry_type = entry_type_fixt.next().unwrap();
                 let eu_entry_type = entry_type_fixt.next().unwrap();
 

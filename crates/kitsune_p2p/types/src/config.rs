@@ -87,22 +87,31 @@ pub mod tuning_params_struct {
         gossip_loop_iteration_delay_ms: u32 = 1000,
 
         /// The gossip loop will attempt to rate-limit output
-        /// to this count mega bits per second. [Default: 0.5]
-        gossip_outbound_target_mbps: f64 = 0.5,
+        /// to this count megabits per second. [Default: 100.0]
+        gossip_outbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop will attempt to rate-limit input
-        /// to this count mega bits per second. [Default: 0.5]
-        gossip_inbound_target_mbps: f64 = 0.5,
+        /// to this count megabits per second. [Default: 100.0]
+        gossip_inbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop will attempt to rate-limit outbound
         /// traffic for the historic loop (if there is one)
-        /// to this count mega bits per second. [Default: 0.1]
-        gossip_historic_outbound_target_mbps: f64 = 0.1,
+        /// to this count megabits per second. [Default: 100.0]
+        gossip_historic_outbound_target_mbps: f64 = 100.0,
 
         /// The gossip loop will attempt to rate-limit inbound
         /// traffic for the historic loop (if there is one)
-        /// to this count mega bits per second. [Default: 0.1]
-        gossip_historic_inbound_target_mbps: f64 = 0.1,
+        /// to this count megabits per second. [Default: 100.0]
+        gossip_historic_inbound_target_mbps: f64 = 100.0,
+
+        /// The gossip loop accomodates this amount of excess capacity
+        /// before enacting the target rate limit, expressed as a ratio
+        /// of the target rate limit. For instance, if the historic
+        /// outbound target is 10mbps, a burst ratio of 50 will allow
+        /// an extra 500mb of outbound traffic before the target rate
+        /// limiting kicks in (and this extra capacity will take 50
+        /// seconds to "refill"). [Default: 100.0]
+        gossip_burst_ratio: f64 = 100.0,
 
         /// How long should we hold off talking to a peer
         /// we've previously spoken successfully to.
@@ -128,8 +137,12 @@ pub mod tuning_params_struct {
         gossip_redundancy_target: f64 = 100.0,
 
         /// The max number of bytes of op data to send in a single message.
-        /// Payloads larger than this are split into multiple batches.
-        gossip_max_batch_size: u32 = 16_000_000,
+        /// Payloads larger than this are split into multiple batches
+        /// when possible  -- currently, a single Op exceeding this size
+        /// will not be further split up, and there are other cases where
+        /// densely populated DHT regions may contain more than this
+        /// limit when transferred.
+        gossip_max_batch_size: u32 = 1_000_000,
 
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = true,
@@ -143,8 +156,8 @@ pub mod tuning_params_struct {
         /// what you are doing.
         gossip_single_storage_arc_per_space: bool = false,
 
-        /// Default timeout for rpc single. [Default: 30s]
-        default_rpc_single_timeout_ms: u32 = 1000 * 30,
+        /// Default timeout for rpc single. [Default: 60s]
+        default_rpc_single_timeout_ms: u32 = 1000 * 60,
 
         /// Default agent count for rpc multi. [Default: 3]
         default_rpc_multi_remote_agent_count: u8 = 3,
@@ -177,8 +190,8 @@ pub mod tuning_params_struct {
         concurrent_limit_per_thread: usize = 4096,
 
         /// tx2 quic max_idle_timeout
-        /// [Default: 30 seconds]
-        tx2_quic_max_idle_timeout_ms: u32 = 1000 * 30,
+        /// [Default: 60 seconds]
+        tx2_quic_max_idle_timeout_ms: u32 = 1000 * 60,
 
         /// tx2 pool max connection count
         /// [Default: 4096]
@@ -190,8 +203,8 @@ pub mod tuning_params_struct {
 
         /// tx2 timeout used for passive background operations
         /// like reads / responds.
-        /// [Default: 30 seconds]
-        tx2_implicit_timeout_ms: u32 = 1000 * 30,
+        /// [Default: 60 seconds]
+        tx2_implicit_timeout_ms: u32 = 1000 * 60,
 
         /// tx2 initial connect retry delay
         /// (note, this delay is currenty exponentially backed off--
@@ -209,7 +222,9 @@ pub mod tuning_params_struct {
         danger_tls_keylog: String = "no_keylog".to_string(),
 
         /// Set the cutoff time when gossip switches over from recent
-        /// to historical gossip. This is dangerous, because gossip may not be
+        /// to historical gossip.
+        ///
+        /// This is dangerous to change, because gossip may not be
         /// possible with nodes using a different setting for this threshold.
         /// Do not change this except in testing environments.
         /// [Default: 15 minutes]
@@ -217,6 +232,14 @@ pub mod tuning_params_struct {
 
         /// Don't publish ops, only rely on gossip. Useful for testing the efficacy of gossip.
         disable_publish: bool = false,
+
+        /// Disable recent gossip. Useful for testing Historical gossip in isolation.
+        /// Note that this also disables agent gossip!
+        disable_recent_gossip: bool = false,
+
+        /// Disable historical gossip. Useful for testing Recent gossip in isolation.
+        disable_historical_gossip: bool = false,
+
     }
 
     impl KitsuneP2pTuningParams {

@@ -10,8 +10,6 @@ use std::sync::Arc;
 #[derive(Clone, Debug, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 /// The type of gossip module running this gossip.
 pub enum GossipModuleType {
-    /// Simple bloom.
-    Simple,
     /// Recent sharded gossip.
     ShardedRecent,
     /// Historical sharded gossip.

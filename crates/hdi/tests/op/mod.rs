@@ -60,69 +60,67 @@ pub enum LinkTypes {
 #[test_case(s_record(Action::Create(c(EntryType::AgentPubKey)), RecordEntry::NotStored) => matches WasmErrorInner::Host(_))]
 #[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-// NOTE: this is ignored because it currently fails
 #[test_case(s_record(Action::Create(c(EntryType::CapClaim)), RecordEntry::NotStored) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-// NOTE: this is ignored because it currently fails
 #[test_case(s_record(Action::Create(c(EntryType::CapGrant)), RecordEntry::NotStored) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(create_link(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_record(create_link(100, 0), RecordEntry::NotApplicable) => matches WasmErrorInner::Host(_))]
 // Store Entry
-#[test_case(s_entry(c(EntryType::App(public_aet(0, 100))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
-#[test_case(s_entry(c(EntryType::App(public_aet(100, 0))).into(), e(A{})) => matches WasmErrorInner::Host(_))]
-#[test_case(s_entry(c(EntryType::App(public_aet(0, 0))).into(), e(D::default())) => matches WasmErrorInner::Serialize(_))]
-#[test_case(s_entry(c(EntryType::App(private_aet(0, 0))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_entry(c(EntryType::App(public_app_entry_def(0, 100))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_entry(c(EntryType::App(public_app_entry_def(100, 0))).into(), e(A{})) => matches WasmErrorInner::Host(_))]
+#[test_case(s_entry(c(EntryType::App(public_app_entry_def(0, 0))).into(), e(D::default())) => matches WasmErrorInner::Serialize(_))]
+#[test_case(s_entry(c(EntryType::App(private_app_entry_def(0, 0))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_entry(c(EntryType::CapClaim).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_entry(c(EntryType::CapGrant).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
 // RegisterUpdate
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), Some(e(D::default())),
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), Some(e(D::default())),
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Serialize(_) ; "Register Update: original entry fails to deserialize")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(0, 0))), Some(e(D::default())))
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(D::default())))
     => matches WasmErrorInner::Serialize(_) ; "Register Update: new entry fails to deserialize")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), None,
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), None,
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: original entry is missing")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(0, 0))), None)
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(public_app_entry_def(0, 0))), None)
     => matches WasmErrorInner::Guest(_) ; "Register Update: new entry is missing")]
 #[test_case(r_update(
-    c(EntryType::App(private_aet(0, 0))).into(), Some(e(A{})),
-    u(EntryType::App(private_aet(0, 0))), None)
+    c(EntryType::App(private_app_entry_def(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(private_app_entry_def(0, 0))), None)
     => matches WasmErrorInner::Guest(_) ; "Register Update: original entry is private but also present")]
 #[test_case(r_update(
-    c(EntryType::App(private_aet(0, 0))).into(), None,
-    u(EntryType::App(private_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(private_app_entry_def(0, 0))).into(), None,
+    u(EntryType::App(private_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: new entry is private but also present")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 100))).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(0, 100))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(0, 100))).into(), Some(e(A{})),
+    u(EntryType::App(public_app_entry_def(0, 100))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: entry type is out of range")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(100, 0))).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(100, 0))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(100, 0))).into(), Some(e(A{})),
+    u(EntryType::App(public_app_entry_def(100, 0))), Some(e(A{})))
     => matches WasmErrorInner::Host(_) ; "Register Update: zome id is out of range")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 0))).into(), Some(e(A{})),
-    u(EntryType::App(private_aet(0, 0))), None)
+    c(EntryType::App(public_app_entry_def(0, 0))).into(), Some(e(A{})),
+    u(EntryType::App(private_app_entry_def(0, 0))), None)
     => matches WasmErrorInner::Guest(_) ; "Register Update: public to private type mismatch")]
 #[test_case(r_update(
-    c(EntryType::App(private_aet(0, 0))).into(), None,
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(private_app_entry_def(0, 0))).into(), None,
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: private to public type mismatch")]
 #[test_case(r_update(
     c(EntryType::AgentPubKey).into(), Some(e(A{})),
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: agent to app mismatch")]
 #[test_case(r_update(
-    c(EntryType::App(public_aet(0, 1))).into(), None,
-    u(EntryType::App(public_aet(0, 0))), Some(e(A{})))
+    c(EntryType::App(public_app_entry_def(0, 1))).into(), None,
+    u(EntryType::App(public_app_entry_def(0, 0))), Some(e(A{})))
     => matches WasmErrorInner::Guest(_) ; "Register Update: entry type mismatch")]
 #[test_case(r_create_link(0, 100) => matches WasmErrorInner::Guest(_) ; "Register Create Link: link type out of range")]
 #[test_case(r_create_link(100, 0) => matches WasmErrorInner::Host(_) ; "Register Create Link: zome id out of range")]
@@ -320,7 +318,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         }) => {
             let t = ScopedLinkType::try_from(&lt).unwrap();
             let mut c = CreateLink::arbitrary(&mut ud).unwrap();
-            c.zome_id = t.zome_id;
+            c.zome_index = t.zome_index;
             c.link_type = t.zome_type;
             c.base_address = base_address;
             c.target_address = target_address;
@@ -470,7 +468,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         } => {
             let t = ScopedLinkType::try_from(&lt).unwrap();
             let mut c = CreateLink::arbitrary(&mut ud).unwrap();
-            c.zome_id = t.zome_id;
+            c.zome_index = t.zome_index;
             c.link_type = t.zome_type;
             c.base_address = base_address;
             c.target_address = target_address;
@@ -493,7 +491,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             let mut c = CreateLink::arbitrary(&mut ud).unwrap();
             let mut d = DeleteLink::arbitrary(&mut ud).unwrap();
             d.link_add_address = original_link_hash;
-            c.zome_id = t.zome_id;
+            c.zome_index = t.zome_index;
             c.link_type = t.zome_type;
             c.base_address = base_address;
             c.target_address = target_address;
@@ -849,11 +847,11 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                     match lt {
                         Some(lt) => {
                             let t = ScopedLinkType::try_from(&lt).unwrap();
-                            c.zome_id = t.zome_id;
+                            c.zome_index = t.zome_index;
                             c.link_type = t.zome_type;
                         }
                         None => {
-                            c.zome_id = 200.into();
+                            c.zome_index = 200.into();
                             c.link_type = 0.into();
                         }
                     }
@@ -966,9 +964,9 @@ fn create(
     entry_hash: EntryHash,
 ) -> Create {
     let mut c = Create::arbitrary(ud).unwrap();
-    c.entry_type = EntryType::App(AppEntryType {
-        id: t.zome_type,
-        zome_id: t.zome_id,
+    c.entry_type = EntryType::App(AppEntryDef {
+        entry_index: t.zome_type,
+        zome_index: t.zome_index,
         visibility,
     });
     c.entry_hash = entry_hash;
@@ -983,9 +981,9 @@ fn update(
     original_entry_hash: EntryHash,
 ) -> Update {
     let mut u = Update::arbitrary(ud).unwrap();
-    u.entry_type = EntryType::App(AppEntryType {
-        id: t.zome_type,
-        zome_id: t.zome_id,
+    u.entry_type = EntryType::App(AppEntryDef {
+        entry_index: t.zome_type,
+        zome_index: t.zome_index,
         visibility,
     });
     u.entry_hash = entry_hash;
@@ -1008,17 +1006,17 @@ where
     c.entry_hash = entry_hash;
     match t {
         Some(t) => {
-            c.entry_type = EntryType::App(AppEntryType {
-                id: t.zome_type,
-                zome_id: t.zome_id,
+            c.entry_type = EntryType::App(AppEntryDef {
+                entry_index: t.zome_type,
+                zome_index: t.zome_index,
                 visibility,
             })
         }
         None => {
             // Make sure this is out of range for this test.
-            c.entry_type = EntryType::App(AppEntryType {
-                id: 0.into(),
-                zome_id: 200.into(),
+            c.entry_type = EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 200.into(),
                 visibility,
             })
         }
@@ -1034,9 +1032,9 @@ fn op_match_sanity() {
             timestamp: Timestamp(0),
             action_seq: 1,
             prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
-            entry_type: EntryType::App(AppEntryType {
-                id: 0.into(),
-                zome_id: 0.into(),
+            entry_type: EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 0.into(),
                 visibility: EntryVisibility::Public,
             }),
             entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
@@ -1048,9 +1046,9 @@ fn op_match_sanity() {
             signed_action: SignedHashed {
                 hashed: ActionHashed {
                     content: Action::Create(Create {
-                        entry_type: EntryType::App(AppEntryType {
-                            id: 0.into(),
-                            zome_id: 0.into(),
+                        entry_type: EntryType::App(AppEntryDef {
+                            entry_index: 0.into(),
+                            zome_index: 0.into(),
                             visibility: EntryVisibility::Public,
                         }),
                         ..empty_create()

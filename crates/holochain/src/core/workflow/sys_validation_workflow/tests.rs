@@ -27,9 +27,7 @@ use std::time::Duration;
 async fn sys_validation_workflow_test() {
     observability::test_run().ok();
 
-    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
-        .await
-        .unwrap();
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors
@@ -57,7 +55,7 @@ async fn run_test(
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 
-    bob_links_in_a_legit_way(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
+    bob_links_in_a_legit_way(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
     // Integration should have 9 ops in it.
     // Plus another 14 for genesis.
@@ -101,7 +99,7 @@ async fn run_test(
     });
 
     let (bad_update_action, bad_update_entry_hash, link_add_hash) =
-        bob_makes_a_large_link(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
+        bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
     // Integration should have 14 ops in it + the running tally
     let expected_count = 14 + expected_count;
@@ -166,7 +164,7 @@ async fn run_test(
         assert_eq!(valid_ops, expected_count);
     });
 
-    dodgy_bob(&bob_cell_id, &conductors[1].handle(), &dna_file).await;
+    dodgy_bob(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
     // Integration should have new 5 ops in it
     let expected_count = 5 + expected_count;
@@ -219,14 +217,14 @@ async fn bob_links_in_a_legit_way(
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let link_tag = fixt!(LinkTag);
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data
+    let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_id;
+        .zome_index;
     // 3
     call_data
         .commit_entry(
             base.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;
@@ -235,7 +233,7 @@ async fn bob_links_in_a_legit_way(
     call_data
         .commit_entry(
             target.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;
@@ -246,7 +244,7 @@ async fn bob_links_in_a_legit_way(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
-            zome_id,
+            zome_index,
             LinkType(0),
             link_tag.clone(),
         )
@@ -279,15 +277,15 @@ async fn bob_makes_a_large_link(
     let link_tag = LinkTag(bytes);
 
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data
+    let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_id;
+        .zome_index;
 
     // 6
     let original_action_address = call_data
         .commit_entry(
             base.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;
@@ -296,7 +294,7 @@ async fn bob_makes_a_large_link(
     call_data
         .commit_entry(
             target.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;
@@ -307,7 +305,7 @@ async fn bob_makes_a_large_link(
         .create_link(
             base_entry_hash.clone().into(),
             target_entry_hash.clone().into(),
-            zome_id,
+            zome_index,
             LinkType(0),
             link_tag.clone(),
         )
@@ -331,15 +329,15 @@ async fn bob_makes_a_large_link(
 async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {
     let legit_entry = Post("Bob is the best and I'll link to proof so you can check".into());
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data
+    let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_id;
+        .zome_index;
 
     // 11
     call_data
         .commit_entry(
             legit_entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;

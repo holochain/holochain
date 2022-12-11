@@ -161,6 +161,7 @@ const METRIC_KIND_LATENCY_MICROS: &str = "LatencyMicros";
 const METRIC_KIND_AGG_EXTRAP_COV: &str = "AggExtrapCov";
 
 /// The type of metric recorded
+#[derive(Debug)]
 pub enum MetricRecordKind {
     /// Failure to parse metric kind
     Unknown,
@@ -203,12 +204,13 @@ impl MetricRecordKind {
 }
 
 /// An individual metric record
+#[derive(Debug)]
 pub struct MetricRecord {
     /// kind of this record
     pub kind: MetricRecordKind,
 
     /// agent associated with this metric (if applicable)
-    pub agent: Option<Arc<super::KitsuneAgent>>,
+    pub agent: Option<KAgent>,
 
     /// timestamp this metric was recorded at
     pub recorded_at_utc: Timestamp,

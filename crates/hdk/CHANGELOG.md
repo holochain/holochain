@@ -1,12 +1,40 @@
----
-unreleasable: false
-default_unreleasable: true
----
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.0.163
+
+## 0.0.162
+
+## 0.0.161
+
+## 0.0.160
+
+## 0.0.159
+
+## 0.0.158
+
+## 0.0.157
+
+- Pin the *hdi* dependency version. [\#1605](https://github.com/holochain/holochain/pull/1605)
+
+## 0.0.156
+
+## 0.0.155
+
+## 0.0.154
+
+## 0.0.153
+
+## 0.0.152
+
+## 0.0.151
+
+## 0.0.150
+
+## 0.0.149
 
 ## 0.0.148
 

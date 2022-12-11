@@ -33,8 +33,6 @@ pub enum RequiredValidationType {
     SubChain,
     /// The entire chain
     Full,
-    /// A custom package set by the zome
-    Custom,
 }
 
 impl Default for RequiredValidationType {
