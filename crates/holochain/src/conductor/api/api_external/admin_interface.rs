@@ -467,122 +467,122 @@ mod test {
     // @todo fix test by using new InstallApp call
     // #[tokio::test(flavor = "multi_thread")]
     // async fn install_list_dna_app() {
-        // observability::test_run().ok();
-        // let db_dir = test_db_dir();
-        // let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
-        // let shutdown = handle.take_shutdown_handle().unwrap();
-        // let admin_api = RealAdminInterfaceApi::new(handle.clone());
-        // let network_seed = Uuid::new_v4();
-        // let dna = fake_dna_zomes(
-        //     &network_seed.to_string(),
-        //     vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-        // );
-        // let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        // let agent_key1 = fake_agent_pubkey_1();
+    // observability::test_run().ok();
+    // let db_dir = test_db_dir();
+    // let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
+    // let shutdown = handle.take_shutdown_handle().unwrap();
+    // let admin_api = RealAdminInterfaceApi::new(handle.clone());
+    // let network_seed = Uuid::new_v4();
+    // let dna = fake_dna_zomes(
+    //     &network_seed.to_string(),
+    //     vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+    // );
+    // let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+    // let agent_key1 = fake_agent_pubkey_1();
 
-        // attempt install with a hash before the DNA has been registered
-        // let dna_hash = dna.dna_hash().clone();
-        // let hash_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
-        // let hash_install_payload = InstallAppPayload {
-        //     dnas: vec![hash_payload],
-        //     installed_app_id: "test-by-hash".to_string(),
-        //     agent_key: agent_key1,
-        // };
-        // let install_response = admin_api
-        //     .handle_admin_request(AdminRequest::InstallApp(Box::new(
-        //         hash_install_payload.clone(),
-        //     )))
-        //     .await;
-        // assert_matches!(
-        //     install_response,
-        //     AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == format!("Given dna has not been registered: {}", dna_hash)
-        // );
+    // attempt install with a hash before the DNA has been registered
+    // let dna_hash = dna.dna_hash().clone();
+    // let hash_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
+    // let hash_install_payload = InstallAppPayload {
+    //     dnas: vec![hash_payload],
+    //     installed_app_id: "test-by-hash".to_string(),
+    //     agent_key: agent_key1,
+    // };
+    // let install_response = admin_api
+    //     .handle_admin_request(AdminRequest::InstallApp(Box::new(
+    //         hash_install_payload.clone(),
+    //     )))
+    //     .await;
+    // assert_matches!(
+    //     install_response,
+    //     AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == format!("Given dna has not been registered: {}", dna_hash)
+    // );
 
-        // now register a DNA
-        // let path_payload = RegisterDnaPayload {
-        //     modifiers: DnaModifiersOpt::none(),
-        //     source: DnaSource::Path(dna_path),
-        // };
-        // let path_install_response = admin_api
-        //     .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
-        //     .await;
-        // assert_matches!(
-        //     path_install_response,
-        //     AdminResponse::DnaRegistered(h) if h == dna_hash
-        // );
+    // now register a DNA
+    // let path_payload = RegisterDnaPayload {
+    //     modifiers: DnaModifiersOpt::none(),
+    //     source: DnaSource::Path(dna_path),
+    // };
+    // let path_install_response = admin_api
+    //     .handle_admin_request(AdminRequest::RegisterDna(Box::new(path_payload)))
+    //     .await;
+    // assert_matches!(
+    //     path_install_response,
+    //     AdminResponse::DnaRegistered(h) if h == dna_hash
+    // );
 
-        // let agent_key2 = fake_agent_pubkey_2();
-        // let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
-        // let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
-        // let expected_installed_app = InstalledApp::new_fresh(
-        //     InstalledAppCommon::new_legacy(
-        //         "test-by-path".to_string(),
-        //         vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
-        //     )
-        //     .unwrap(),
-        // );
-        // let expected_installed_app_info: InstalledAppInfo = (&expected_installed_app).into();
-        // let path_install_payload = InstallAppPayload {
-        //     dnas: vec![path_payload],
-        //     installed_app_id: "test-by-path".to_string(),
-        //     agent_key: agent_key2,
-        // };
+    // let agent_key2 = fake_agent_pubkey_2();
+    // let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
+    // let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
+    // let expected_installed_app = InstalledApp::new_fresh(
+    //     InstalledAppCommon::new_legacy(
+    //         "test-by-path".to_string(),
+    //         vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+    //     )
+    //     .unwrap(),
+    // );
+    // let expected_installed_app_info: InstalledAppInfo = (&expected_installed_app).into();
+    // let path_install_payload = InstallAppPayload {
+    //     dnas: vec![path_payload],
+    //     installed_app_id: "test-by-path".to_string(),
+    //     agent_key: agent_key2,
+    // };
 
-        // let install_response = admin_api
-        //     .handle_admin_request(AdminRequest::InstallApp(Box::new(path_install_payload)))
-        //     .await;
-        // assert_matches!(
-        //     install_response,
-        //     AdminResponse::AppInstalled(info) if info == expected_installed_app_info
-        // );
-        // let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
-        // let expects = vec![dna_hash.clone()];
-        // assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
+    // let install_response = admin_api
+    //     .handle_admin_request(AdminRequest::InstallApp(Box::new(path_install_payload)))
+    //     .await;
+    // assert_matches!(
+    //     install_response,
+    //     AdminResponse::AppInstalled(info) if info == expected_installed_app_info
+    // );
+    // let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
+    // let expects = vec![dna_hash.clone()];
+    // assert_matches!(dna_list, AdminResponse::DnasListed(a) if a == expects);
 
-        // let expected_enabled_app = InstalledApp::new_running(
-        //     InstalledAppCommon::new_legacy(
-        //         "test-by-path".to_string(),
-        //         vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
-        //     )
-        //     .unwrap(),
-        // );
-        // let expected_enabled_app_info: InstalledAppInfo = (&expected_enabled_app).into();
-        // let res = admin_api
-        //     .handle_admin_request(AdminRequest::EnableApp {
-        //         installed_app_id: "test-by-path".to_string(),
-        //     })
-        //     .await;
-        // assert_matches!(res,
-        //     AdminResponse::AppEnabled {app, ..} if app == expected_enabled_app_info
-        // );
+    // let expected_enabled_app = InstalledApp::new_running(
+    //     InstalledAppCommon::new_legacy(
+    //         "test-by-path".to_string(),
+    //         vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+    //     )
+    //     .unwrap(),
+    // );
+    // let expected_enabled_app_info: InstalledAppInfo = (&expected_enabled_app).into();
+    // let res = admin_api
+    //     .handle_admin_request(AdminRequest::EnableApp {
+    //         installed_app_id: "test-by-path".to_string(),
+    //     })
+    //     .await;
+    // assert_matches!(res,
+    //     AdminResponse::AppEnabled {app, ..} if app == expected_enabled_app_info
+    // );
 
-        // let res = admin_api
-        //     .handle_admin_request(AdminRequest::ListCellIds)
-        //     .await;
+    // let res = admin_api
+    //     .handle_admin_request(AdminRequest::ListCellIds)
+    //     .await;
 
-        // assert_matches!(res, AdminResponse::CellIdsListed(v) if v == vec![cell_id2]);
+    // assert_matches!(res, AdminResponse::CellIdsListed(v) if v == vec![cell_id2]);
 
-        // now try to install the happ using the hash
-        // let _install_response = admin_api
-        //     .handle_admin_request(AdminRequest::InstallApp(Box::new(hash_install_payload)))
-        //     .await;
-        // let _res = admin_api
-        //     .handle_admin_request(AdminRequest::EnableApp {
-        //         installed_app_id: "test-by-hash".to_string(),
-        //     })
-        //     .await;
+    // now try to install the happ using the hash
+    // let _install_response = admin_api
+    //     .handle_admin_request(AdminRequest::InstallApp(Box::new(hash_install_payload)))
+    //     .await;
+    // let _res = admin_api
+    //     .handle_admin_request(AdminRequest::EnableApp {
+    //         installed_app_id: "test-by-hash".to_string(),
+    //     })
+    //     .await;
 
-        // let res = admin_api
-        //     .handle_admin_request(AdminRequest::ListApps {
-        //         status_filter: Some(AppStatusFilter::Enabled),
-        //     })
-        //     .await;
+    // let res = admin_api
+    //     .handle_admin_request(AdminRequest::ListApps {
+    //         status_filter: Some(AppStatusFilter::Enabled),
+    //     })
+    //     .await;
 
-        // assert_matches!(res, AdminResponse::AppsListed(v) if v.iter().find(|app_info| app_info.installed_app_id.as_str() == "test-by-path").is_some() && v.iter().find(|app_info| app_info.installed_app_id.as_str() == "test-by-hash").is_some());
+    // assert_matches!(res, AdminResponse::AppsListed(v) if v.iter().find(|app_info| app_info.installed_app_id.as_str() == "test-by-path").is_some() && v.iter().find(|app_info| app_info.installed_app_id.as_str() == "test-by-hash").is_some());
 
-        // handle.shutdown();
-        // tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
-        //     .await
-        //     .ok();
+    // handle.shutdown();
+    // tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
+    //     .await
+    //     .ok();
     // }
 }

@@ -33,7 +33,7 @@ pub enum AppRequest {
     /// # Returns
     ///
     /// [`AppResponse::ZomeCall`]
-    ZomeCall(Box<ZomeCall>),
+    CallZome(Box<ZomeCall>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
@@ -84,13 +84,13 @@ pub enum AppResponse {
     /// Check out [`InstalledApp`] for details on when the option is `Some<InstalledAppInfo>`
     AppInfoReturned(Option<InstalledAppInfo>),
 
-    /// The successful response to an [`AppRequest::ZomeCall`].
+    /// The successful response to an [`AppRequest::CallZome`].
     ///
     /// Note that [`ExternIO`] is simply a structure of [`struct@SerializedBytes`], so the client will have
     /// to decode this response back into the data provided by the zome using a [msgpack] library to utilize it.
     ///
     /// [msgpack]: https://msgpack.org/
-    ZomeCall(Box<ExternIO>),
+    ZomeCalled(Box<ExternIO>),
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///

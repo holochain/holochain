@@ -108,11 +108,11 @@ pub async fn call_zome_fn<S>(
     .next()
     .unwrap()
     .into();
-    let request = AppRequest::ZomeCall(Box::new(call));
+    let request = AppRequest::CallZome(Box::new(call));
     let response = app_tx.request(request);
     let call_response = check_timeout(response, 6000).await;
     trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeCall(_));
+    assert_matches!(call_response, AppResponse::ZomeCalled(_));
 }
 
 pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16>) -> u16 {
@@ -156,71 +156,71 @@ pub async fn generate_agent_pubkey(client: &mut WebsocketSender, timeout: u64) -
     unwrap_to::unwrap_to!(response => AdminResponse::AgentPubKeyGenerated).clone()
 }
 
-pub async fn register_and_install_dna(
-    client: &mut WebsocketSender,
-    orig_dna_hash: DnaHash,
-    agent_key: AgentPubKey,
-    dna_path: PathBuf,
-    properties: Option<YamlProperties>,
-    role_name: RoleName,
-    timeout: u64,
-) -> DnaHash {
-    register_and_install_dna_named(
-        client,
-        orig_dna_hash,
-        agent_key,
-        dna_path,
-        properties,
-        role_name,
-        "test".to_string(),
-        timeout,
-    )
-    .await
-}
+// pub async fn register_and_install_dna(
+//     client: &mut WebsocketSender,
+//     orig_dna_hash: DnaHash,
+//     agent_key: AgentPubKey,
+//     dna_path: PathBuf,
+//     properties: Option<YamlProperties>,
+//     role_name: RoleName,
+//     timeout: u64,
+// ) -> DnaHash {
+//     register_and_install_dna_named(
+//         client,
+//         orig_dna_hash,
+//         agent_key,
+//         dna_path,
+//         properties,
+//         role_name,
+//         "test".to_string(),
+//         timeout,
+//     )
+//     .await
+// }
 
-pub async fn register_and_install_dna_named(
-    client: &mut WebsocketSender,
-    orig_dna_hash: DnaHash,
-    agent_key: AgentPubKey,
-    dna_path: PathBuf,
-    properties: Option<YamlProperties>,
-    role_name: RoleName,
-    name: String,
-    timeout: u64,
-) -> DnaHash {
-    let register_payload = RegisterDnaPayload {
-        modifiers: DnaModifiersOpt {
-            properties,
-            ..Default::default()
-        },
-        source: DnaSource::Path(dna_path),
-    };
-    let request = AdminRequest::RegisterDna(Box::new(register_payload));
-    let response = client.request(request);
-    let response = check_timeout_named("RegisterDna", response, timeout).await;
-    assert_matches!(response, AdminResponse::DnaRegistered(_));
-    let dna_hash = if let AdminResponse::DnaRegistered(h) = response {
-        h.clone()
-    } else {
-        orig_dna_hash
-    };
+// pub async fn register_and_install_dna_named(
+//     client: &mut WebsocketSender,
+//     orig_dna_hash: DnaHash,
+//     agent_key: AgentPubKey,
+//     dna_path: PathBuf,
+//     properties: Option<YamlProperties>,
+//     role_name: RoleName,
+//     name: String,
+//     timeout: u64,
+// ) -> DnaHash {
+//     let register_payload = RegisterDnaPayload {
+//         modifiers: DnaModifiersOpt {
+//             properties,
+//             ..Default::default()
+//         },
+//         source: DnaSource::Path(dna_path),
+//     };
+//     let request = AdminRequest::RegisterDna(Box::new(register_payload));
+//     let response = client.request(request);
+//     let response = check_timeout_named("RegisterDna", response, timeout).await;
+//     assert_matches!(response, AdminResponse::DnaRegistered(_));
+//     let dna_hash = if let AdminResponse::DnaRegistered(h) = response {
+//         h.clone()
+//     } else {
+//         orig_dna_hash
+//     };
 
-    let dna_payload = InstallAppDnaPayload {
-        hash: dna_hash.clone(),
-        role_name,
-        membrane_proof: None,
-    };
-    let payload = InstallAppPayload {
-        dnas: vec![dna_payload],
-        installed_app_id: name,
-        agent_key,
-    };
-    let request = AdminRequest::InstallApp(Box::new(payload));
-    let response = client.request(request);
-    let response = check_timeout_named("InstallApp", response, timeout).await;
-    assert_matches!(response, AdminResponse::AppInstalled(_));
-    dna_hash
-}
+//     let dna_payload = InstallAppDnaPayload {
+//         hash: dna_hash.clone(),
+//         role_name,
+//         membrane_proof: None,
+//     };
+//     let payload = InstallAppPayload {
+//         dnas: vec![dna_payload],
+//         installed_app_id: name,
+//         agent_key,
+//     };
+//     let request = AdminRequest::InstallApp(Box::new(payload));
+//     let response = client.request(request);
+//     let response = check_timeout_named("InstallApp", response, timeout).await;
+//     assert_matches!(response, AdminResponse::AppInstalled(_));
+//     dna_hash
+// }
 
 pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16> {
     let stdout = holochain.stdout.take();

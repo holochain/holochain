@@ -63,7 +63,8 @@ async fn main() -> anyhow::Result<()> {
         let installed_app = cmd.command(r).await?;
 
         // Check you got the correct response and get the inner value.
-        let installed_app = expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
+        let installed_app =
+            expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
 
         // Activate the app using the simple calls api.
         hc_sandbox::calls::enable_app(

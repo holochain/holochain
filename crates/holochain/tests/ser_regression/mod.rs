@@ -116,11 +116,11 @@ async fn ser_regression_test() {
     };
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCall(request).try_into().unwrap();
+    let request = AppRequest::CallZome(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _channel_hash: EntryHash = match response {
-        AppResponse::ZomeCall(r) => r.decode().unwrap(),
+        AppResponse::ZomeCalled(r) => r.decode().unwrap(),
         _ => unreachable!(),
     };
 
@@ -145,11 +145,11 @@ async fn ser_regression_test() {
     };
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCall(request).try_into().unwrap();
+    let request = AppRequest::CallZome(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _msg_hash: EntryHash = match response {
-        AppResponse::ZomeCall(r) => r.decode().unwrap(),
+        AppResponse::ZomeCalled(r) => r.decode().unwrap(),
         _ => unreachable!(),
     };
 

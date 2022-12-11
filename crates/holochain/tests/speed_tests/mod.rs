@@ -218,7 +218,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         app_interface: &mut WebsocketSender,
         invocation: ZomeCall,
     ) -> WebsocketResult<AppResponse> {
-        let request = AppRequest::ZomeCall(Box::new(invocation));
+        let request = AppRequest::CallZome(Box::new(invocation));
         app_interface.request(request).await
     }
 
@@ -227,10 +227,10 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     for i in 0..num {
         let invocation = anchor_invocation("alice", alice_cell_id.clone(), i).unwrap();
         let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCall(_));
+        assert_matches!(response, AppResponse::ZomeCalled(_));
         let invocation = anchor_invocation("bobbo", bob_cell_id.clone(), i).unwrap();
         let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCall(_));
+        assert_matches!(response, AppResponse::ZomeCalled(_));
     }
 
     let mut alice_done = false;
@@ -248,7 +248,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             .unwrap();
             let response = call(&mut app_interface, invocation).await.unwrap();
             let hashes: EntryHashes = match response {
-                AppResponse::ZomeCall(r) => r.decode().unwrap(),
+                AppResponse::ZomeCalled(r) => r.decode().unwrap(),
                 _ => unreachable!(),
             };
             bobbo_done = hashes.0.len() == num;
@@ -264,7 +264,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             .unwrap();
             let response = call(&mut app_interface, invocation).await.unwrap();
             let hashes: EntryHashes = match response {
-                AppResponse::ZomeCall(r) => r.decode().unwrap(),
+                AppResponse::ZomeCalled(r) => r.decode().unwrap(),
                 _ => unreachable!(),
             };
             alice_done = hashes.0.len() == num;
