@@ -128,19 +128,6 @@ pub struct DeleteArchivedCloneCellsPayload {
     pub role_name: RoleName,
 }
 
-/// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct InstallAppPayload {
-    /// The unique identifier for an installed app in this conductor
-    pub installed_app_id: InstalledAppId,
-
-    /// The agent to use when creating Cells for this App
-    pub agent_key: AgentPubKey,
-
-    /// The DNA paths in this app
-    pub dnas: Vec<InstallAppDnaPayload>,
-}
-
 /// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppBundlePayload {

@@ -54,24 +54,6 @@ pub enum AdminRequest {
     /// [`AdminResponse::CoordinatorsUpdated`]
     UpdateCoordinators(Box<UpdateCoordinatorsPayload>),
 
-    /// Install an app from a list of DNA paths.
-    ///
-    /// Triggers genesis to be run on all cells and to be stored.
-    /// An app is intended for use by one and only one agent and for that reason
-    /// it takes an `AgentPubKey` and installs all the DNAs with that `AgentPubKey`
-    /// forming new Cells. See [`InstallAppPayload`] for full details on the
-    /// configuration.  
-    ///
-    /// Note that the new app will not be enabled automatically after installation
-    /// and can be enabled by calling [`EnableApp`].
-    ///
-    /// # Returns
-    ///
-    /// [`AdminResponse::AppInstalled`]
-    ///
-    /// [`EnableApp`]: AdminRequest::EnableApp
-    InstallApp(Box<InstallAppPayload>),
-
     /// Install an app using an [`AppBundle`].
     ///
     /// Triggers genesis to be run on all Cells and to be stored.
@@ -376,13 +358,6 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::UpdateCoordinators`]
     CoordinatorsUpdated,
-
-    /// The successful response to an [`AdminRequest::InstallApp`].
-    ///
-    /// The resulting [`InstalledAppInfo`] contains the app ID,
-    /// the [`RoleName`]s and, most usefully, the new [`CellId`]s
-    /// of the newly installed DNAs.
-    AppInstalled(InstalledAppInfo),
 
     /// The successful response to an [`AdminRequest::InstallAppBundle`].
     ///
