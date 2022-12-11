@@ -22,7 +22,7 @@ use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
-use holochain_types::prelude::{CellId, InstallAppBundlePayload};
+use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
 use std::convert::TryFrom;
 
@@ -56,7 +56,7 @@ pub enum AdminRequestCli {
     AddAdminWs(AddAdminWs),
     AddAppWs(AddAppWs),
     RegisterDna(RegisterDna),
-    InstallAppBundle(InstallAppBundle),
+    InstallApp(InstallApp),
     /// Calls AdminRequest::UninstallApp.
     UninstallApp(UninstallApp),
     /// Calls AdminRequest::ListAppInterfaces.
@@ -117,13 +117,13 @@ pub struct RegisterDna {
 }
 
 #[derive(Debug, StructOpt, Clone)]
-/// Calls AdminRequest::InstallAppBundle
+/// Calls AdminRequest::InstallApp
 /// and installs a new app.
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
 /// RoleNames are set to `my-app-0`, `my-app-1` etc.
-pub struct InstallAppBundle {
+pub struct InstallApp {
     #[structopt(long)]
     /// Sets the InstalledAppId.
     pub app_id: Option<String>,
@@ -271,7 +271,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let dnas = register_dna(cmd, args).await?;
             msg!("Registered Dna: {:?}", dnas);
         }
-        AdminRequestCli::InstallAppBundle(args) => {
+        AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(cmd, args).await?;
             msg!("Installed App: {}", app.installed_app_id,);
         }
@@ -423,9 +423,9 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
 /// Calls [`AdminRequest::InstallApp`] and installs a new app.
 pub async fn install_app_bundle(
     cmd: &mut CmdRunner,
-    args: InstallAppBundle,
+    args: InstallApp,
 ) -> anyhow::Result<InstalledAppInfo> {
-    let InstallAppBundle {
+    let InstallApp {
         app_id,
         agent_key,
         path,
@@ -437,7 +437,7 @@ pub async fn install_app_bundle(
         None => generate_agent_pub_key(cmd).await?,
     };
 
-    let payload = InstallAppBundlePayload {
+    let payload = InstallAppPayload {
         installed_app_id: app_id,
         agent_key,
         source: AppBundleSource::Path(path),
@@ -445,10 +445,10 @@ pub async fn install_app_bundle(
         network_seed,
     };
 
-    let r = AdminRequest::InstallAppBundle(Box::new(payload));
+    let r = AdminRequest::InstallApp(Box::new(payload));
     let installed_app = cmd.command(r).await?;
     let installed_app =
-        expect_match!(installed_app => AdminResponse::AppBundleInstalled, "Failed to install app");
+        expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
     enable_app(
         cmd,
         EnableApp {

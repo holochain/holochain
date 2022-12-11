@@ -1059,9 +1059,9 @@ mod app_impls {
         /// Install DNAs and set up Cells as specified by an AppBundle
         pub async fn install_app_bundle(
             self: Arc<Self>,
-            payload: InstallAppBundlePayload,
+            payload: InstallAppPayload,
         ) -> ConductorResult<StoppedApp> {
-            let InstallAppBundlePayload {
+            let InstallAppPayload {
                 source,
                 agent_key,
                 installed_app_id,

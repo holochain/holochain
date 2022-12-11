@@ -140,14 +140,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
 
                 Ok(AdminResponse::CoordinatorsUpdated)
             }
-            InstallAppBundle(payload) => {
+            InstallApp(payload) => {
                 let app: InstalledApp = self
                     .conductor_handle
                     .clone()
                     .install_app_bundle(*payload)
                     .await?
                     .into();
-                Ok(AdminResponse::AppBundleInstalled(
+                Ok(AdminResponse::AppInstalled(
                     InstalledAppInfo::from_installed_app(&app),
                 ))
             }

@@ -60,7 +60,7 @@ pub enum AdminRequest {
     /// An app is intended for use by
     /// one and only one Agent and for that reason it takes an `AgentPubKey` and
     /// installs all the DNAs with that `AgentPubKey`, forming new cells.
-    /// See [`InstallAppBundlePayload`] for full details on the configuration.
+    /// See [`InstallAppPayload`] for full details on the configuration.
     ///
     /// Note that the new app will not be enabled automatically after installation
     /// and can be enabled by calling [`EnableApp`].
@@ -70,7 +70,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::AppInstalled`]
     ///
     /// [`EnableApp`]: AdminRequest::EnableApp
-    InstallAppBundle(Box<InstallAppBundlePayload>),
+    InstallApp(Box<InstallAppPayload>),
 
     /// Uninstalls the app specified by argument `installed_app_id` from the conductor.
     ///
@@ -359,12 +359,12 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::UpdateCoordinators`]
     CoordinatorsUpdated,
 
-    /// The successful response to an [`AdminRequest::InstallAppBundle`].
+    /// The successful response to an [`AdminRequest::InstallApp`].
     ///
     /// The resulting [`InstalledAppInfo`] contains the app ID,
     /// the [`RoleName`]s and, most usefully, the new [`CellId`]s
     /// of the newly installed DNAs.
-    AppBundleInstalled(InstalledAppInfo),
+    AppInstalled(InstalledAppInfo),
 
     /// The successful response to an [`AdminRequest::UninstallApp`].
     ///

@@ -130,7 +130,7 @@ pub struct DeleteArchivedCloneCellsPayload {
 
 /// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct InstallAppBundlePayload {
+pub struct InstallAppPayload {
     /// The unique identifier for an installed app in this conductor.
     #[serde(flatten)]
     pub source: AppBundleSource,
