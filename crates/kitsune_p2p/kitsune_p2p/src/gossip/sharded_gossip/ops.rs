@@ -302,7 +302,7 @@ impl ShardedGossipLocal {
     }
 
     /// Incoming ops that were missing from this nodes bloom filter.
-    pub(super) async fn incoming_missing_ops(
+    pub(super) async fn incoming_missing_op_hashes(
         &self,
         source: FetchSource,
         ops: Vec<OpHashSized>,

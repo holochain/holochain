@@ -84,8 +84,9 @@ pub struct StateIter<'a> {
 #[derive(Debug, PartialEq, Eq)]
 struct Sources(Vec<SourceRecord>);
 
+/// An item in the queue, corresponding to a single op or region to fetch
 #[derive(Debug, PartialEq, Eq)]
-struct FetchQueueItem {
+pub struct FetchQueueItem {
     /// Known sources from whom we can fetch this item.
     /// Sources will always be tried in order.
     sources: Sources,
@@ -96,7 +97,7 @@ struct FetchQueueItem {
     /// Options specified for this fetch job
     options: Option<FetchOptions>,
     /// Opaque user data specified by the host
-    context: Option<FetchContext>,
+    pub context: Option<FetchContext>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -160,13 +161,14 @@ impl FetchQueue {
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    pub fn remove(&self, key: &FetchKey) -> Option<FetchContext> {
+    pub fn remove(&self, key: &FetchKey) -> Option<FetchQueueItem> {
         self.state
             .share_mut(|s, _| {
                 let removed = s.remove(key);
                 tracing::debug!(
-                    "FetchQueue (size = {}) item removed: {:?}",
+                    "FetchQueue (size = {}) item removed: key={:?} val={:?}",
                     s.queue.len(),
+                    key,
                     removed
                 );
                 Ok(removed)
@@ -247,12 +249,8 @@ impl State {
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    pub fn remove(&mut self, key: &FetchKey) -> Option<FetchContext> {
-        if let Some(FetchQueueItem { context, .. }) = self.queue.remove(key) {
-            context
-        } else {
-            None
-        }
+    pub fn remove(&mut self, key: &FetchKey) -> Option<FetchQueueItem> {
+        self.queue.remove(key)
     }
 }
 

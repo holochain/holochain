@@ -967,14 +967,23 @@ impl ShardedGossipLocal {
                 {
                     //let source = FetchSource::Node(peer_cert);
 
-                    // unwrap ok: we checked is_some() above
-                    let state = state.as_ref().unwrap();
-
-                    if let Some(agent) = state.remote_agent_list.get(0) {
-                        // there is at least 1 agent
-                        let agent = agent.agent.clone();
-                        let source = FetchSource::Agent(agent);
-                        self.incoming_missing_ops(source, ops).await?;
+                    if let Some(state) = state.as_ref() {
+                        if let Some(agent) = state.remote_agent_list.get(0) {
+                            // there is at least 1 agent
+                            let agent = agent.agent.clone();
+                            let source = FetchSource::Agent(agent);
+                            self.incoming_missing_op_hashes(source, ops).await?;
+                        } else {
+                            tracing::warn!(
+                                "Op hashes were received for a round with no remote agent(s). {} ops dropped!",
+                                ops.len()
+                            );
+                        }
+                    } else {
+                        tracing::warn!(
+                            "Op hashes were received after a round was dropped. {} ops dropped!",
+                            ops.len()
+                        );
                     }
                 }
                 gossip
