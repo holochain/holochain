@@ -124,6 +124,11 @@ pub async fn incoming_dht_ops_workflow(
     mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
+    tracing::debug!(
+        "incoming_dht_ops here: {:?}",
+        ops.iter().map(|(h, _)| h).collect::<Vec<_>>()
+    );
+
     let Space {
         incoming_op_hashes,
         incoming_ops_batch,

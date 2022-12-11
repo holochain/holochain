@@ -203,108 +203,12 @@ mod tests {
     use kitsune_p2p::dht::prelude::Topology;
     use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
 
-    use crate::dht::prelude::*;
-    use crate::dht_arc::DhtArcSet;
     use crate::HolochainP2pSender;
     use holochain_zome_types::ValidationStatus;
-    use kitsune_p2p::agent_store::AgentInfoSigned;
-    use kitsune_p2p::dependencies::kitsune_p2p_fetch;
     use kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig;
-    use kitsune_p2p::event::*;
     use kitsune_p2p::KitsuneP2pConfig;
     use kitsune_p2p::*;
-    use kitsune_p2p_types::*;
     use std::sync::Mutex;
-
-    #[derive(Clone)]
-    struct TestHost(Arc<Mutex<Vec<String>>>);
-
-    impl TestHost {
-        pub fn drain(&self) -> Vec<String> {
-            self.0.lock().unwrap().drain(..).collect()
-        }
-    }
-
-    impl Default for TestHost {
-        fn default() -> Self {
-            Self(Arc::new(Mutex::new(Vec::new())))
-        }
-    }
-
-    impl kitsune_p2p::KitsuneHost for TestHost {
-        fn get_agent_info_signed(
-            &self,
-            _input: GetAgentInfoSignedEvt,
-        ) -> KitsuneHostResult<Option<AgentInfoSigned>> {
-            todo!()
-        }
-
-        fn peer_extrapolated_coverage(
-            &self,
-            _space: Arc<KitsuneSpace>,
-            _dht_arc_set: DhtArcSet,
-        ) -> KitsuneHostResult<Vec<f64>> {
-            todo!()
-        }
-
-        fn query_region_set(
-            &self,
-            _space: Arc<KitsuneSpace>,
-            _dht_arc_set: Arc<DhtArcSet>,
-        ) -> KitsuneHostResult<RegionSetLtcs> {
-            todo!()
-        }
-
-        fn query_size_limited_regions(
-            &self,
-            _space: Arc<KitsuneSpace>,
-            _size_limit: u32,
-            _regions: Vec<Region>,
-        ) -> KitsuneHostResult<Vec<Region>> {
-            todo!()
-        }
-
-        fn query_op_hashes_by_region(
-            &self,
-            _space: Arc<KitsuneSpace>,
-            _region: RegionCoords,
-        ) -> KitsuneHostResult<Vec<OpHashSized>> {
-            todo!()
-        }
-
-        fn record_metrics(
-            &self,
-            _space: Arc<KitsuneSpace>,
-            _records: Vec<MetricRecord>,
-        ) -> KitsuneHostResult<()> {
-            todo!()
-        }
-
-        fn get_topology(&self, _space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
-            todo!()
-        }
-
-        fn op_hash(&self, _op_data: KOpData) -> KitsuneHostResult<KOpHash> {
-            todo!()
-        }
-
-        /// Check which hashes we have data for.
-        fn check_op_data(
-            &self,
-            space: Arc<KitsuneSpace>,
-            op_hash_list: Vec<KOpHash>,
-            context: kitsune_p2p_fetch::FetchContext,
-        ) -> KitsuneHostResult<Vec<bool>> {
-            self.0
-                .lock()
-                .unwrap()
-                .push(format!("{:?}:{:?}:{:?}", space, op_hash_list, context,));
-            tracing::warn!("@!@!@!@!@!!# {:#?}", &*self.0.lock().unwrap());
-            async move { Ok(op_hash_list.into_iter().map(|_| false).collect()) }
-                .boxed()
-                .into()
-        }
-    }
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
@@ -450,15 +354,25 @@ mod tests {
         let mut config = KitsuneP2pConfig::default();
         config.tuning_params = tuning_params;
 
-        let test_host = TestHost::default();
+        let host_list = Arc::new(Mutex::new(Vec::new()));
+        let test_host = {
+            let host_list = host_list.clone();
+            HostStub::with_check_op_data(Box::new(move |space, list, ctx| {
+                host_list
+                    .lock()
+                    .unwrap()
+                    .push(format!("{:?}:{:?}:{:?}", space, list, ctx,));
+                async move { Ok(list.into_iter().map(|_| false).collect()) }
+                    .boxed()
+                    .into()
+            }))
+        };
+        //let test_host = TestHost::default();
 
-        let (p2p, mut evt) = spawn_holochain_p2p(
-            config,
-            TlsConfig::new_ephemeral().await.unwrap(),
-            Arc::new(test_host.clone()),
-        )
-        .await
-        .unwrap();
+        let (p2p, mut evt) =
+            spawn_holochain_p2p(config, TlsConfig::new_ephemeral().await.unwrap(), test_host)
+                .await
+                .unwrap();
 
         let r_task = tokio::task::spawn(async move {
             use tokio_stream::StreamExt;
@@ -508,7 +422,7 @@ mod tests {
 
         assert_eq!(
             "KitsuneSpace(0x737373737373737373737373737373737373737373737373737373737373737373737373):[]:FetchContext(1)",
-            test_host.drain()[0],
+            host_list.lock().unwrap()[0],
         );
 
         p2p.ghost_actor_shutdown().await.unwrap();

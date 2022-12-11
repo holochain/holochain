@@ -615,14 +615,15 @@ impl KitsuneP2pActor {
                                                 //        so it's okay if
                                                 //        the context is
                                                 //        `None`.
-                                                let fetch_context =
+                                                let key =
                                                     if let Some((region, _is_last)) = op.region {
-                                                        fetch_queue
-                                                            .remove(&FetchKey::Region(region))
+                                                        FetchKey::Region(region)
                                                     } else {
-                                                        fetch_queue
-                                                            .remove(&FetchKey::Op(op_hash.clone()))
+                                                        FetchKey::Op(op_hash.clone())
                                                     };
+                                                let fetch_context = fetch_queue
+                                                    .remove(&key)
+                                                    .and_then(|i| i.context);
 
                                                 // forward the received op
                                                 let _ = evt_sender
