@@ -12,7 +12,7 @@ use std::time::Duration;
 
 /// Rather arbitrary but we expire nonces after 5 mins.
 pub const FRESH_NONCE_EXPIRES_AFTER: Duration = Duration::from_secs(60 * 5);
-pub const WITNESSABLE_EXPIRY_DURATION: Duration = Duration::from_secs(600 * 5);
+pub const WITNESSABLE_EXPIRY_DURATION: Duration = Duration::from_secs(60 * 50);
 
 #[derive(PartialEq, Debug)]
 pub enum WitnessNonceResult {
