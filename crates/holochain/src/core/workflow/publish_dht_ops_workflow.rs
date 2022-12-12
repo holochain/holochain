@@ -253,6 +253,7 @@ mod tests {
     #[test_case(100, 1)]
     #[test_case(100, 10)]
     #[test_case(100, 100)]
+    #[ignore = "(david.b) tests should be re-written using mock network"]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
             observability::test_run().ok();
@@ -358,6 +359,7 @@ mod tests {
     #[test_case(1)]
     #[test_case(10)]
     #[test_case(100)]
+    #[ignore = "(david.b) tests should be re-written using mock network"]
     fn test_private_entries(num_agents: u32) {
         tokio_helper::block_forever_on(
             async {
