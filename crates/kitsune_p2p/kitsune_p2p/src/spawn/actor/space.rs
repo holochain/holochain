@@ -439,7 +439,7 @@ impl SpaceInternalHandler for Space {
         Ok(async move {
             let have_data_list = match ro_inner
                 .host_api
-                .check_op_data(space.clone(), just_hashes, context)
+                .check_op_data(space.clone(), just_hashes, Some(context))
                 .await
                 .map_err(KitsuneP2pError::other)
             {

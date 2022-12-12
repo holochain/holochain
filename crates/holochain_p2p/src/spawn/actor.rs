@@ -993,7 +993,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
                 .check_op_data(
                     space.clone(),
                     op_hash_list.iter().map(|x| x.data()).collect(),
-                    fetch_context,
+                    Some(fetch_context),
                 )
                 .await
             {

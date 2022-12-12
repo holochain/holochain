@@ -289,11 +289,24 @@ impl KitsuneP2pActor {
         {
             let fetch_queue = fetch_queue.clone();
             let i_s = internal_sender.clone();
+            let host = host.clone();
             tokio::task::spawn(async move {
                 loop {
                     let list = fetch_queue.get_items_to_fetch();
 
-                    for (key, space, source) in list {
+                    for (key, space, source, context) in list {
+                        if let FetchKey::Op(op_hash) = &key {
+                            if let Ok(mut res) = host
+                                .check_op_data(space.clone(), vec![op_hash.clone()], context)
+                                .await
+                            {
+                                if res.len() == 1 && res.remove(0) {
+                                    fetch_queue.remove(&key);
+                                    continue;
+                                }
+                            }
+                        }
+
                         if let Err(err) = i_s.fetch(key, space, source).await {
                             tracing::debug!(?err);
                         }

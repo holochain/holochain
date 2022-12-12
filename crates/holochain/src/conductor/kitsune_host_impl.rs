@@ -185,7 +185,7 @@ impl KitsuneHost for KitsuneHostImpl {
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         op_hash_list: Vec<KOpHash>,
-        context: kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext,
+        context: Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneHostResult<Vec<bool>> {
         use holochain_p2p::{DhtOpHashExt, FetchContextExt};
         use holochain_sqlite::rusqlite::ToSql;
@@ -203,11 +203,13 @@ impl KitsuneHost for KitsuneHostImpl {
                             |_row| Ok(()),
                         ) {
                             Ok(_) => {
-                                if context.has_request_validation_receipt() {
-                                    txn.execute(
-                                        "UPDATE DhtOp SET require_receipt = ? WHERE DhtOp.hash = ?",
-                                        [&true as &dyn ToSql, &op_hash as &dyn ToSql],
-                                    )?;
+                                if let Some(context) = context {
+                                    if context.has_request_validation_receipt() {
+                                        txn.execute(
+                                            "UPDATE DhtOp SET require_receipt = ? WHERE DhtOp.hash = ?",
+                                            [&true as &dyn ToSql, &op_hash as &dyn ToSql],
+                                        )?;
+                                    }
                                 }
                                 out.push(true)
                             }

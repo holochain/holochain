@@ -177,14 +177,14 @@ impl FetchQueue {
     }
 
     /// Get a list of the next items that should be fetched.
-    pub fn get_items_to_fetch(&self) -> Vec<(FetchKey, KSpace, FetchSource)> {
+    pub fn get_items_to_fetch(&self) -> Vec<(FetchKey, KSpace, FetchSource, Option<FetchContext>)> {
         let interval = self.config.fetch_retry_interval();
         self.state
             .share_mut(|s, _| {
                 let mut out = Vec::new();
 
-                for (key, space, source) in s.iter_mut(interval) {
-                    out.push((key, space, source));
+                for (key, space, source, context) in s.iter_mut(interval) {
+                    out.push((key, space, source, context));
                 }
 
                 Ok(out)
@@ -255,7 +255,7 @@ impl State {
 }
 
 impl<'a> Iterator for StateIter<'a> {
-    type Item = (FetchKey, KSpace, FetchSource);
+    type Item = (FetchKey, KSpace, FetchSource, Option<FetchContext>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let keys: Vec<_> = self
@@ -269,7 +269,7 @@ impl<'a> Iterator for StateIter<'a> {
             let item = self.state.queue.get_refresh(&key)?;
             if let Some(source) = item.sources.next(self.interval) {
                 let space = item.space.clone();
-                return Some((key, space, source));
+                return Some((key, space, source, item.context));
             }
         }
         None
@@ -436,12 +436,12 @@ mod tests {
         // The next (and only) item will be the one with the timestamp explicitly set
         assert_eq!(
             q.iter_mut(Duration::from_secs(1)).collect::<Vec<_>>(),
-            vec![(key_op(2), space(0), source(2))]
+            vec![(key_op(2), space(0), source(2), ctx(1))]
         );
 
         // When traversing the entire queue again, the "special" item is still the last one.
         let items: Vec<_> = q.iter_mut(Duration::from_millis(0)).take(9).collect();
-        assert_eq!(items[8], (key_op(2), space(0), source(2)));
+        assert_eq!(items[8], (key_op(2), space(0), source(2), ctx(1)));
 
         // We traversed all items in the last second, so this returns None
         assert_eq!(q.iter_mut(Duration::from_secs(1)).next(), None);
