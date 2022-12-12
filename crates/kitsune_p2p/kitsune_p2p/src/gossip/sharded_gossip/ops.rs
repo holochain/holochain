@@ -27,7 +27,8 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
     let mut to_fetch = vec![];
     let mut first = true;
     while let Some(region) = queue.front() {
-        size += region.data.size;
+        // Only op hashes are gossiped now, so we just count the 36 bytes for each has.
+        size += region.data.count * 36;
         if first || size <= batch_size {
             to_fetch.push(queue.pop_front().unwrap());
             if size > batch_size {
@@ -135,22 +136,8 @@ impl ShardedGossipLocal {
             // Note, this is a LOT of output!
             // tracing::info!("region diffs ({}): {:?}", diff_regions.len(), diff_regions);
 
-            // subdivide any regions which are too large to fit in a batch.
-            // TODO: PERF: this does a DB query per region, and potentially many more for large
-            // regions which need to be split many times. Check to make sure this
-            // doesn't become a hotspot.
-            let limited_regions = self
-                .host_api
-                .query_size_limited_regions(
-                    self.space.clone(),
-                    self.tuning_params.gossip_max_batch_size,
-                    our_region_diff,
-                )
-                .await
-                .map_err(KitsuneError::other)?;
-
             state.ops_batch_queue.0.share_mut(|queue, _| {
-                for region in limited_regions {
+                for region in our_region_diff {
                     queue.region_queue.push_back(region)
                 }
                 Ok(())
