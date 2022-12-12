@@ -134,7 +134,7 @@ pub struct TestNetwork {
             Vec<(
                 kitsune_p2p_types::KSpace,
                 Vec<kitsune_p2p_types::KOpHash>,
-                kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext,
+                Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
             )>,
         >,
     >,
@@ -152,7 +152,7 @@ impl TestNetwork {
                 Vec<(
                     kitsune_p2p_types::KSpace,
                     Vec<kitsune_p2p_types::KOpHash>,
-                    kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext,
+                    Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
                 )>,
             >,
         >,

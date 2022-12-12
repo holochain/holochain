@@ -4,7 +4,11 @@ use kitsune_p2p_fetch::*;
 
 /// Signature for check_op_data_impl
 pub type CheckOpDataImpl = Box<
-    dyn Fn(Arc<KitsuneSpace>, Vec<KOpHash>, FetchContext) -> KitsuneHostResult<'static, Vec<bool>>
+    dyn Fn(
+            Arc<KitsuneSpace>,
+            Vec<KOpHash>,
+            Option<FetchContext>,
+        ) -> KitsuneHostResult<'static, Vec<bool>>
         + 'static
         + Send
         + Sync,
@@ -107,7 +111,7 @@ impl KitsuneHost for HostStub {
         &self,
         space: Arc<KitsuneSpace>,
         op_hash_list: Vec<KOpHash>,
-        context: kitsune_p2p_fetch::FetchContext,
+        context: Option<kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneHostResult<Vec<bool>> {
         if let Some(i) = &self.check_op_data_impl {
             i(space, op_hash_list, context)
