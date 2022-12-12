@@ -24,6 +24,7 @@ pub use test::HolochainP2pDnaFixturator;
 pub use kitsune_p2p;
 
 #[mockall::automock]
+#[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
@@ -42,14 +43,18 @@ pub trait HolochainP2pDnaT {
     async fn leave(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
+    #[allow(clippy::too_many_arguments)]
     async fn call_remote(
         &self,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -59,11 +64,13 @@ pub trait HolochainP2pDnaT {
     async fn remote_signal(
         &self,
         from_agent: AgentPubKey,
-        to_agent_list: Vec<AgentPubKey>,
+        to_agent_list: Vec<(Signature, AgentPubKey)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()>;
 
     /// Publish data to the correct neighborhood.
@@ -179,21 +186,27 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn call_remote(
         &self,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
             .call_remote(
                 (*self.dna_hash).clone(),
                 from_agent,
+                from_signature,
                 to_agent,
                 zome_name,
                 fn_name,
                 cap_secret,
                 payload,
+                nonce,
+                expires_at,
             )
             .await
     }
@@ -205,11 +218,13 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn remote_signal(
         &self,
         from_agent: AgentPubKey,
-        to_agent_list: Vec<AgentPubKey>,
+        to_agent_list: Vec<(Signature, AgentPubKey)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
             .remote_signal(
@@ -220,6 +235,8 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 fn_name,
                 cap,
                 payload,
+                nonce,
+                expires_at,
             )
             .await
     }

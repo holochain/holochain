@@ -94,6 +94,9 @@ pub struct Space {
     /// There is one per unique Dna.
     pub cache_db: DbWrite<DbKindCache>,
 
+    /// The conductor database. There is only one of these.
+    pub conductor_db: DbWrite<DbKindConductor>,
+
     /// The authored databases. These are shared across cells.
     /// There is one per unique Dna.
     pub authored_db: DbWrite<DbKindAuthored>,
@@ -662,6 +665,8 @@ impl Space {
             DbKindP2pMetrics(space),
             db_sync_level,
         )?;
+        let conductor_db: DbWrite<DbKindConductor> =
+            DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         tokio::spawn(p2p_agent_store::p2p_put_all_batch(
@@ -686,6 +691,7 @@ impl Space {
             incoming_op_hashes,
             incoming_ops_batch,
             dht_query_cache,
+            conductor_db,
         };
         Ok(r)
     }
