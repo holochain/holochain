@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
@@ -25,8 +23,8 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::AppInfo`]
-    AppInfo {
+    /// [`AppResponse::AppInfoReturned`]
+    GetAppInfo {
         /// The app ID for which to get information
         installed_app_id: InstalledAppId,
     },
@@ -36,8 +34,8 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::ZomeCall`]
-    ZomeCall(Box<ZomeCall>),
+    /// [`AppResponse::ZomeCalled`]
+    CallZome(Box<ZomeCall>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
@@ -72,13 +70,6 @@ pub enum AppRequest {
     /// Info about gossip
     GossipInfo(Box<GossipInfoRequestPayload>),
 
-    #[deprecated = "use ZomeCall"]
-    ZomeCallInvocation(Box<ZomeCall>),
-
-    /// Is currently unimplemented and will return
-    /// an [`AppResponse::Unimplemented`].
-    Crypto(Box<CryptoRequest>),
-
     /// Is currently unimplemented and will return
     /// an [`AppResponse::Unimplemented`].
     SignalSubscription(SignalSubscription),
@@ -96,19 +87,19 @@ pub enum AppResponse {
     /// There has been an error during the handling of the request.
     Error(ExternalApiWireError),
 
-    /// The succesful response to an [`AppRequest::AppInfo`].
+    /// The succesful response to an [`AppRequest::GetAppInfo`].
     ///
     /// Option will be `None` if there is no installed app with the given `installed_app_id`.
     /// Check out [`InstalledApp`] for details on when the option is `Some<InstalledAppInfo>`
-    AppInfo(Option<InstalledAppInfo>),
+    AppInfoReturned(Option<InstalledAppInfo>),
 
-    /// The successful response to an [`AppRequest::ZomeCall`].
+    /// The successful response to an [`AppRequest::CallZome`].
     ///
     /// Note that [`ExternIO`] is simply a structure of [`struct@SerializedBytes`], so the client will have
     /// to decode this response back into the data provided by the zome using a [msgpack] library to utilize it.
     ///
     /// [msgpack]: https://msgpack.org/
-    ZomeCall(Box<ExternIO>),
+    ZomeCalled(Box<ExternIO>),
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
@@ -128,9 +119,6 @@ pub enum AppResponse {
 
     /// GossipInfo is returned
     GossipInfo(Vec<DnaGossipInfo>),
-
-    #[deprecated = "use ZomeCall"]
-    ZomeCallInvocation(Box<ExternIO>),
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -219,17 +207,8 @@ impl ZomeCall {
     }
 }
 
-#[allow(missing_docs)]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
-pub enum CryptoRequest {
-    Sign(String),
-    Decrypt(String),
-    Encrypt(String),
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
+/// Info about an installed app, returned as part of [`AppResponse::AppInfoReturned`]
 pub struct InstalledAppInfo {
     /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,

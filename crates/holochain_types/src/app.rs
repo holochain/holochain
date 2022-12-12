@@ -122,22 +122,9 @@ pub type EnableCloneCellPayload = DisableCloneCellPayload;
 /// Arguments to delete a disabled clone cell of an app.
 pub type DeleteCloneCellPayload = DisableCloneCellPayload;
 
-/// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct InstallAppPayload {
-    /// The unique identifier for an installed app in this conductor
-    pub installed_app_id: InstalledAppId,
-
-    /// The agent to use when creating Cells for this App
-    pub agent_key: AgentPubKey,
-
-    /// The DNA paths in this app
-    pub dnas: Vec<InstallAppDnaPayload>,
-}
-
 /// An [AppBundle] along with an [AgentPubKey] and optional [InstalledAppId]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct InstallAppBundlePayload {
+pub struct InstallAppPayload {
     /// The unique identifier for an installed app in this conductor.
     #[serde(flatten)]
     pub source: AppBundleSource,

@@ -58,30 +58,14 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::AppInfo { installed_app_id } => Ok(AppResponse::AppInfo(
+            AppRequest::GetAppInfo { installed_app_id } => Ok(AppResponse::AppInfoReturned(
                 self.conductor_handle
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
-            #[allow(deprecated)]
-            AppRequest::ZomeCallInvocation(call) => {
-                tracing::warn!(
-                    "AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)"
-                );
-                self.handle_app_request_inner(AppRequest::ZomeCall(call))
-                    .await
-                    .map(|r| {
-                        match r {
-                            // if successful, re-wrap in the deprecated response type
-                            AppResponse::ZomeCall(zc) => AppResponse::ZomeCallInvocation(zc),
-                            // else (probably an error), return as-is
-                            other => other,
-                        }
-                    })
-            }
-            AppRequest::ZomeCall(call) => {
+            AppRequest::CallZome(call) => {
                 match self.conductor_handle.call_zome(*call.clone()).await? {
-                    Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCall(Box::new(output))),
+                    Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
                     Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, _, zome_name, fn_name, _)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "Call was not authorized with reason {:?}, cap secret {:?} to call the function {} in zome {}",
@@ -129,7 +113,6 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 Ok(AppResponse::GossipInfo(info))
             }
             AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
-            AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),
         }
     }
 }

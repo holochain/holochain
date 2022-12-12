@@ -32,12 +32,12 @@ async fn call_app_interface(port: u16) {
     let (mut app_tx, _) = websocket_client_by_port(port)
         .await
         .expect(&format!("Failed to get port {}", port));
-    let request = AppRequest::AppInfo {
+    let request = AppRequest::GetAppInfo {
         installed_app_id: "Stub".to_string(),
     };
     let response = app_tx.request(request);
     let r: AppResponse = check_timeout(response).await;
-    assert_matches!(r, AppResponse::AppInfo(None));
+    assert_matches!(r, AppResponse::AppInfoReturned(None));
 }
 
 async fn check_timeout<T>(response: impl Future<Output = Result<T, ws::WebsocketError>>) -> T {
