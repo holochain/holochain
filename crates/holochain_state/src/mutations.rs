@@ -7,6 +7,7 @@ use crate::scratch::Scratch;
 use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
+use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
@@ -18,6 +19,7 @@ use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
 use holochain_types::sql::AsSql;
 use holochain_zome_types::entry::EntryHashed;
+use holochain_zome_types::zome_io::Nonce256Bits;
 use holochain_zome_types::*;
 use std::str::FromStr;
 
@@ -254,6 +256,20 @@ pub fn insert_conductor_state(
     sql_insert!(txn, ConductorState, {
         "id": 1,
         "blob": bytes,
+    })?;
+    Ok(())
+}
+
+pub fn insert_nonce(
+    txn: &Transaction<'_>,
+    agent: &AgentPubKey,
+    nonce: Nonce256Bits,
+    expires: Timestamp,
+) -> DatabaseResult<()> {
+    sql_insert!(txn, Nonce, {
+        "agent": agent,
+        "nonce": nonce.into_inner(),
+        "expires": expires,
     })?;
     Ok(())
 }
