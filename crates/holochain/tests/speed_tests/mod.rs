@@ -240,7 +240,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         )
         .await
         .unwrap();
-        assert_matches!(response, AppResponse::ZomeCall(_));
+        assert_matches!(response, AppResponse::ZomeCalled(_));
         let invocation = anchor_invocation("bobbo".to_string(), bob_cell_id.clone(), i)
             .await
             .unwrap();
@@ -252,7 +252,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
         )
         .await
         .unwrap();
-        assert_matches!(response, AppResponse::ZomeCall(_));
+        assert_matches!(response, AppResponse::ZomeCalled(_));
     }
 
     let mut alice_done = false;

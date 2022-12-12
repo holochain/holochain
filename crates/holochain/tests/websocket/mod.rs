@@ -1,6 +1,5 @@
 use ::fixt::prelude::*;
 use anyhow::Result;
-use ed25519_dalek::Keypair;
 use futures::future;
 use hdk::prelude::RemoteSignal;
 use holochain::sweettest::SweetAgents;

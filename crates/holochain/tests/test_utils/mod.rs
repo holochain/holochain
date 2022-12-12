@@ -149,7 +149,7 @@ pub async fn call_zome_fn<S>(
         expires_at: zome_call_unsigned.expires_at,
         signature: Signature::from(signature.to_bytes()),
     };
-    let request = AppRequest::ZomeCall(Box::new(call));
+    let request = AppRequest::CallZome(Box::new(call));
     let response = app_tx.request(request);
     let call_response = check_timeout(response, 6000).await;
     trace!(?call_response);

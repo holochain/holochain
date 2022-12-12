@@ -13,7 +13,6 @@ use crate::{
 use ::fixt::prelude::*;
 use holochain_conductor_api::InstalledAppInfoStatus;
 use holochain_keystore::crude_mock_keystore::*;
-use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
@@ -331,39 +330,39 @@ async fn test_signing_error_during_genesis() {
     }
 }
 
-async fn make_signing_call(
-    conductor: &SweetConductor,
-    client: &mut WebsocketSender,
-    keystore_control: &MockLairControl,
-    cell: &SweetCell,
-) -> AppResponse {
-    let reinstate_mock = keystore_control.using_mock();
-    if reinstate_mock {
-        keystore_control.use_real();
-    }
-    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    let request = AppRequest::ZomeCall(Box::new(
-        ZomeCall::try_from_unsigned_zome_call(
-            conductor.raw_handle().keystore(),
-            ZomeCallUnsigned {
-                cell_id: cell.cell_id().clone(),
-                zome_name: "sign".into(),
-                fn_name: "sign_ephemeral".into(),
-                payload: ExternIO::encode(()).unwrap(),
-                cap_secret: None,
-                provenance: cell.agent_pubkey().clone(),
-                nonce,
-                expires_at,
-            },
-        )
-        .await
-        .unwrap(),
-    ));
-    if reinstate_mock {
-        keystore_control.use_mock();
-    }
-    client.request(request).await.unwrap()
-}
+// async fn make_signing_call(
+//     conductor: &SweetConductor,
+//     client: &mut WebsocketSender,
+//     keystore_control: &MockLairControl,
+//     cell: &SweetCell,
+// ) -> AppResponse {
+//     let reinstate_mock = keystore_control.using_mock();
+//     if reinstate_mock {
+//         keystore_control.use_real();
+//     }
+//     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+//     let request = AppRequest::CallZome(Box::new(
+//         ZomeCall::try_from_unsigned_zome_call(
+//             conductor.raw_handle().keystore(),
+//             ZomeCallUnsigned {
+//                 cell_id: cell.cell_id().clone(),
+//                 zome_name: "sign".into(),
+//                 fn_name: "sign_ephemeral".into(),
+//                 payload: ExternIO::encode(()).unwrap(),
+//                 cap_secret: None,
+//                 provenance: cell.agent_pubkey().clone(),
+//                 nonce,
+//                 expires_at,
+//             },
+//         )
+//         .await
+//         .unwrap(),
+//     ));
+//     if reinstate_mock {
+//         keystore_control.use_mock();
+//     }
+//     client.request(request).await.unwrap()
+// }
 
 // A test which simulates Keystore errors with a test keystore which is designed
 // to fail.
