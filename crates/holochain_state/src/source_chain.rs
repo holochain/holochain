@@ -1,3 +1,5 @@
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::integrate::authored_ops_to_dht_db;
@@ -34,11 +36,13 @@ use holochain_zome_types::ActionBuilder;
 use holochain_zome_types::ActionBuilderCommon;
 use holochain_zome_types::ActionExt;
 use holochain_zome_types::ActionHashed;
+use holochain_zome_types::ActionType;
 use holochain_zome_types::ActionUnweighed;
 use holochain_zome_types::CapAccess;
 use holochain_zome_types::CapGrant;
 use holochain_zome_types::CapSecret;
 use holochain_zome_types::CellId;
+use holochain_zome_types::ChainQueryFilter;
 use holochain_zome_types::ChainTopOrdering;
 use holochain_zome_types::CounterSigningAgentState;
 use holochain_zome_types::CounterSigningSessionData;
@@ -80,6 +84,7 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     persisted_head: ActionHash,
     persisted_timestamp: Timestamp,
     public_only: bool,
+    zomes_initialized: Arc<AtomicBool>,
 }
 
 /// A source chain with read only access to the underlying databases.
@@ -466,6 +471,7 @@ where
             persisted_head,
             persisted_timestamp,
             public_only: false,
+            zomes_initialized: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -506,6 +512,7 @@ where
             persisted_head,
             persisted_timestamp,
             public_only: false,
+            zomes_initialized: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -555,8 +562,25 @@ where
         Ok(self.scratch.apply(|scratch| scratch.records().collect())?)
     }
 
-    pub fn has_initialized(&self) -> SourceChainResult<bool> {
-        Ok(self.len()? > 3)
+    pub async fn zomes_initialized(&self) -> SourceChainResult<bool> {
+        if self.zomes_initialized.load(Ordering::Relaxed) {
+            return Ok(true);
+        }
+        let query_filter = ChainQueryFilter {
+            action_type: Some(ActionType::InitZomesComplete),
+            ..QueryFilter::default()
+        };
+        let init_zomes_complete_actions = self.query(query_filter).await?;
+        if init_zomes_complete_actions.len() > 1 {
+            tracing::warn!("Multiple InitZomesComplete actions are present");
+        }
+        let zomes_initialized = !init_zomes_complete_actions.is_empty();
+        self.set_zomes_initialized(zomes_initialized);
+        Ok(zomes_initialized)
+    }
+
+    pub fn set_zomes_initialized(&self, value: bool) {
+        self.zomes_initialized.store(value, Ordering::Relaxed);
     }
 
     pub fn is_empty(&self) -> SourceChainResult<bool> {
@@ -1305,6 +1329,7 @@ impl From<SourceChain> for SourceChainRead {
             persisted_head: chain.persisted_head,
             persisted_timestamp: chain.persisted_timestamp,
             public_only: chain.public_only,
+            zomes_initialized: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -2131,5 +2156,56 @@ pub mod tests {
         let mut desc_sorted = desc;
         desc_sorted.sort_by_key(|r| r.signed_action.action().action_seq());
         assert_eq!(asc, desc_sorted);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn init_zomes_complete() {
+        let test_db = test_authored_db();
+        let dht_db = test_dht_db();
+        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
+        let keystore = test_keystore();
+        let vault = test_db.to_db();
+        let alice = keystore.new_sign_keypair_random().await.unwrap();
+        let dna_hash = fixt!(DnaHash);
+
+        genesis(
+            vault.clone().into(),
+            dht_db.to_db(),
+            &dht_db_cache,
+            keystore.clone(),
+            dna_hash.clone(),
+            alice.clone(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+            .await
+            .unwrap();
+
+        // zomes initialized should be false after genesis
+        let zomes_initialized = chain.zomes_initialized().await.unwrap();
+        assert_eq!(zomes_initialized, false);
+
+        // insert init marker into source chain
+        let result = chain
+            .put(
+                builder::InitZomesComplete {},
+                None,
+                ChainTopOrdering::Strict,
+            )
+            .await;
+        assert!(result.is_ok());
+
+        let mut mock = MockHolochainP2pDnaT::new();
+        mock.expect_authority_for_hash().returning(|_| Ok(false));
+        mock.expect_chc().return_const(None);
+        chain.flush(&mock).await.unwrap();
+
+        // zomes initialized should be true after init zomes has run
+        let zomes_initialized = chain.zomes_initialized().await.unwrap();
+        assert_eq!(zomes_initialized, true);
     }
 }
