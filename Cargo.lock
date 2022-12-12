@@ -3182,7 +3182,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_types",
  "lair_keystore_api",
- "lru 0.6.6",
+ "lru",
  "mockall 0.10.2",
  "nanoid 0.3.0",
  "observability",
@@ -3239,7 +3239,7 @@ dependencies = [
  "base64",
  "dunce",
  "hc_seed_bundle",
- "lru 0.7.8",
+ "lru",
  "nanoid 0.4.0",
  "once_cell",
  "parking_lot 0.12.1",
@@ -3415,15 +3415,6 @@ checksum = "c0fbfc88337168279f2e9ae06e157cfed4efd3316e14dc96ed074d4f2e6c5952"
 dependencies = [
  "quote",
  "syn",
-]
-
-[[package]]
-name = "lru"
-version = "0.6.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ea2d928b485416e8908cff2d97d621db22b27f7b3b6729e438bcf42c671ba91"
-dependencies = [
- "hashbrown 0.11.2",
 ]
 
 [[package]]
