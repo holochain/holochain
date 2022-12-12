@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
+use arbitrary::Arbitrary;
+use ed25519_dalek::{Keypair, Signer};
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::FullStateDump;
 use holochain_websocket::WebsocketReceiver;
@@ -38,8 +40,6 @@ use tokio::process::Command;
 use tracing::instrument;
 
 use hdk::prelude::*;
-use holochain::fixt::NamedInvocation;
-use holochain::fixt::ZomeCallInvocationFixturator;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::api::{AdminRequest, AdminResponse, AppRequest},
@@ -47,7 +47,6 @@ use holochain::{
 use holochain_conductor_api::AppResponse;
 use holochain_types::prelude::*;
 use holochain_util::tokio_helper;
-use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 
 /// Wrapper that synchronously waits for the Child to terminate on drop.
@@ -83,32 +82,74 @@ pub async fn start_holochain(
     (SupervisedChild("Holochain".to_string(), child), admin_port)
 }
 
-pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash) {
-    // Connect to App Interface
-    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
-    let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
-    call_zome_fn(&mut app_tx, cell_id, TestWasm::Foo, "foo".into(), ()).await;
+pub async fn grant_zome_call_capability(
+    admin_tx: &mut WebsocketSender,
+    cell_id: &CellId,
+    zome_name: ZomeName,
+    fn_name: FunctionName,
+    signing_key: AgentPubKey,
+) -> CapSecret {
+    let mut functions = BTreeSet::new();
+    functions.insert((zome_name, fn_name));
+
+    let mut assignees = BTreeSet::new();
+    assignees.insert(signing_key.clone());
+
+    let mut buf = arbitrary::Unstructured::new(&[]);
+    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
+
+    let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
+        cell_id: cell_id.clone(),
+        cap_grant: ZomeCallCapGrant {
+            tag: "".into(),
+            access: CapAccess::Assigned {
+                secret: cap_secret,
+                assignees,
+            },
+            functions,
+        },
+    }));
+    let response = admin_tx.request(request);
+    let response = check_timeout(response, 3000).await;
+    assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted);
+    cap_secret
 }
 
 pub async fn call_zome_fn<S>(
     app_tx: &mut WebsocketSender,
     cell_id: CellId,
-    wasm: TestWasm,
-    fn_name: String,
-    input: S,
+    signing_keypair: &Keypair,
+    cap_secret: CapSecret,
+    zome_name: ZomeName,
+    fn_name: FunctionName,
+    input: &S,
 ) where
     S: Serialize + std::fmt::Debug,
 {
-    let call: ZomeCall = ZomeCallInvocationFixturator::new(NamedInvocation(
-        cell_id,
-        wasm,
-        fn_name,
-        ExternIO::encode(input).unwrap(),
-    ))
-    .next()
-    .unwrap()
-    .into();
-    let request = AppRequest::CallZome(Box::new(call));
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let zome_call_unsigned = ZomeCallUnsigned {
+        cap_secret: Some(cap_secret),
+        cell_id: cell_id.clone(),
+        zome_name: zome_name.clone(),
+        fn_name: fn_name.clone(),
+        provenance: signing_key,
+        payload: ExternIO::encode(input).unwrap(),
+        nonce: Nonce256Bits::from([0; 32]),
+        expires_at: Timestamp(Timestamp::now().as_micros() + 100000),
+    };
+    let signature = signing_keypair.sign(&zome_call_unsigned.data_to_sign().unwrap());
+    let call = ZomeCall {
+        cell_id: zome_call_unsigned.cell_id,
+        zome_name: zome_call_unsigned.zome_name,
+        fn_name: zome_call_unsigned.fn_name,
+        payload: zome_call_unsigned.payload,
+        cap_secret: zome_call_unsigned.cap_secret,
+        provenance: zome_call_unsigned.provenance,
+        nonce: zome_call_unsigned.nonce,
+        expires_at: zome_call_unsigned.expires_at,
+        signature: Signature::from(signature.to_bytes()),
+    };
+    let request = AppRequest::ZomeCall(Box::new(call));
     let response = app_tx.request(request);
     let call_response = check_timeout(response, 6000).await;
     trace!(?call_response);

@@ -396,6 +396,11 @@ pub mod test {
             .unwrap()
             .into();
         request.cell_id = cell_id;
+        request = request
+            .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
+            .await
+            .unwrap();
+
         let msg = AppRequest::CallZome(Box::new(request));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {

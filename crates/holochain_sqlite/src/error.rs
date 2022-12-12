@@ -4,6 +4,7 @@
 #![allow(missing_docs)]
 
 use holochain_serialized_bytes::SerializedBytesError;
+use holochain_zome_types::TimestampError;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -52,6 +53,24 @@ pub enum DatabaseError {
 
     #[error("transparent")]
     FailedToJoinBlocking(#[from] tokio::task::JoinError),
+
+    #[error(transparent)]
+    Timestamp(TimestampError),
+
+    #[error(transparent)]
+    GetRandom(getrandom::Error),
+}
+
+impl From<TimestampError> for DatabaseError {
+    fn from(timestamp_error: TimestampError) -> Self {
+        Self::Timestamp(timestamp_error)
+    }
+}
+
+impl From<getrandom::Error> for DatabaseError {
+    fn from(getrandom_error: getrandom::Error) -> Self {
+        Self::GetRandom(getrandom_error)
+    }
 }
 
 impl PartialEq for DatabaseError {

@@ -3,6 +3,7 @@
 pub use holochain_keystore::AgentPubKeyExt;
 pub use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::prelude::*;
+pub use holochain_zome_types::zome_io::Nonce256Bits;
 pub use std::convert::TryFrom;
 pub use std::convert::TryInto;
 

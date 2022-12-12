@@ -99,6 +99,8 @@ use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::witness_nonce;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
@@ -236,7 +238,26 @@ impl Conductor {
 mod startup_shutdown_impls {
     use super::*;
 
+    //-----------------------------------------------------------------------------
+    /// Methods used by the [ConductorHandle]
+    //-----------------------------------------------------------------------------
     impl Conductor {
+        pub(crate) async fn witness_nonce_from_calling_agent(
+            &self,
+            agent: AgentPubKey,
+            nonce: Nonce256Bits,
+            expires: Timestamp,
+        ) -> ConductorResult<WitnessNonceResult> {
+            Ok(witness_nonce(
+                &self.spaces.conductor_db,
+                agent,
+                nonce,
+                Timestamp::now(),
+                expires,
+            )
+            .await?)
+        }
+
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
             config: ConductorConfig,
