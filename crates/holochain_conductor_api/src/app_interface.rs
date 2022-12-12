@@ -50,17 +50,24 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellCreated`]
     CreateCloneCell(Box<CreateCloneCellPayload>),
 
-    /// Archive a clone cell.
+    /// Disable a clone cell.
     ///
-    /// Providing a [`CloneId`] or [`CellId`], archive an existing clone cell.
-    /// When the clone cell exists, it is archived and can not be called any
+    /// Providing a [`CloneId`] or [`CellId`], disable an existing clone cell.
+    /// When the clone cell exists, it is disabled and can not be called any
     /// longer. If it doesn't exist, the call is a no-op.
     ///
     /// # Returns
     ///
-    /// [`AppResponse::CloneCellArchived`] if the clone cell existed
-    /// and was archived.
-    ArchiveCloneCell(Box<ArchiveCloneCellPayload>),
+    /// [`AppResponse::CloneCellDisabled`] if the clone cell existed
+    /// and has been disabled.
+    DisableCloneCell(Box<DisableCloneCellPayload>),
+
+    /// Enable a clone cell that was previously disabled.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CloneCellEnabled`]
+    EnableCloneCell(Box<EnableCloneCellPayload>),
 
     /// Info about gossip
     GossipInfo(Box<GossipInfoRequestPayload>),
@@ -109,8 +116,15 @@ pub enum AppResponse {
     /// cell's [`CloneId`] and [`CellId`].
     CloneCellCreated(InstalledCell),
 
-    /// An existing clone cell has been archived.
-    CloneCellArchived,
+    /// The successful response to an [`AppRequest::DisableCloneCell`].
+    ///
+    /// An existing clone cell has been disabled.
+    CloneCellDisabled,
+
+    /// The successful response to an [`AppRequest::EnableCloneCell`].
+    ///
+    /// A previously disabled clone cell has been enabled.
+    CloneCellEnabled(InstalledCell),
 
     /// GossipInfo is returned
     GossipInfo(Vec<DnaGossipInfo>),

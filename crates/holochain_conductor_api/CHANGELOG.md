@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- **BREAKING CHANGE**: Rename ArchiveCloneCell to DisableCloneCell.
+- **BREAKING CHANGE**: Rename RestoreArchivedCloneCell to EnableCloneCell.
+- **BREAKING CHANGE**: Move EnableCloneCell to App API.
+- **BREAKING CHANGE**: Refactor DeleteCloneCell to delete a single disabled clone cell. [\#1704](https://github.com/holochain/holochain/pull/1704)
+
 ## 0.0.72
 
 ## 0.0.71
