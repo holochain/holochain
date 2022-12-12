@@ -40,8 +40,7 @@ fn config() -> ConductorConfig {
     let mut config = config_standard();
     config.network.as_mut().map(|c| {
         *c = c.clone().tune(|mut tp| {
-            tp.disable_publish = false;
-
+            tp.disable_publish = true;
             tp.disable_recent_gossip = false;
             tp.danger_gossip_recent_threshold_secs = 5;
 
@@ -250,10 +249,6 @@ impl ClientState for State {
         histories.sort_unstable_by_key(|(i, _)| *i);
         NodeRounds::new(histories)
     }
-
-    fn network_info(&self) -> holochain::conductor::api::NetworkInfo {
-        self.network_info()
-    }
 }
 
 impl State {
@@ -359,6 +354,14 @@ async fn create_new_node(app: App, selected_node: usize) {
     })
 }
 
+async fn remove_node(app: App, index: usize) {
+    let handle = app.state.share_mut(|state| {
+        let node = state.nodes.remove(index);
+        node.conductor.sweet_handle()
+    });
+    handle.shutdown_and_wait().await;
+}
+
 fn random_node(state: &mut State) -> &Node {
     let num = state.nodes.len();
     assert!(num > 0);
@@ -427,6 +430,9 @@ fn run_app<B: Backend + io::Write>(terminal: &mut Terminal<B>, app: App) -> io::
             }
             Some(InputCmd::AddNode(index)) => {
                 tokio::spawn(create_new_node(app.clone(), index));
+            }
+            Some(InputCmd::RemoveNode(index)) => {
+                tokio::spawn(remove_node(app.clone(), index));
             }
             Some(InputCmd::AddEntry(index)) => {
                 app.state.share_ref(|state| state.nodes[index].clone());

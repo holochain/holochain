@@ -5,6 +5,7 @@ pub enum InputCmd {
     ClearBuffer,
     ExchangePeers,
     AddNode(usize),
+    RemoveNode(usize),
     AddEntry(usize),
     AwakenGossip,
 }
@@ -17,17 +18,23 @@ impl GossipDashboard {
                     KeyCode::Char('q') => {
                         return Some(InputCmd::Quit);
                     }
-                    KeyCode::Char('x') => {
-                        return Some(InputCmd::ExchangePeers);
-                    }
                     KeyCode::Char('c') => {
                         return Some(InputCmd::ClearBuffer);
                     }
+                    KeyCode::Char('x') => {
+                        if let Some(node) = self.local_state.share_ref(|s| s.selected_node()) {
+                            return Some(InputCmd::RemoveNode(node));
+                        }
+                    }
                     KeyCode::Char('n') => {
-                        return Some(InputCmd::AddNode(0));
+                        if let Some(node) = self.local_state.share_ref(|s| s.selected_node()) {
+                            return Some(InputCmd::AddNode(node));
+                        }
                     }
                     KeyCode::Char('e') => {
-                        return Some(InputCmd::AddEntry(0));
+                        if let Some(node) = self.local_state.share_ref(|s| s.selected_node()) {
+                            return Some(InputCmd::AddEntry(node));
+                        }
                     }
                     KeyCode::Char('g') => {
                         return Some(InputCmd::AwakenGossip);

@@ -34,12 +34,12 @@ pub fn ui_throughput_summary(sums: Vec<u32>) -> List<'static> {
 }
 
 pub fn ui_gossip_progress_gauge(info: FetchQueueInfoStateful) -> Gauge<'static> {
-    let n = info.current.op_bytes_to_fetch;
     let d = info.max.op_bytes_to_fetch;
+    let n = d.saturating_sub(info.current.op_bytes_to_fetch);
 
     if d > 0 {
         let r = n as f64 / d as f64;
-        let mut style = Style::default().fg(Color::Gray).bg(Color::Blue);
+        let mut style = Style::default().fg(Color::Blue).bg(Color::Gray);
         if r > 1.0 {
             style = style
                 .add_modifier(Modifier::ITALIC)

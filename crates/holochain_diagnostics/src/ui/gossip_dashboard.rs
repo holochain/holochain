@@ -109,7 +109,6 @@ pub trait ClientState {
 
     fn total_commits(&self) -> usize;
     fn link_counts(&self) -> LinkCountsRef;
-    fn network_info(&self) -> NetworkInfo;
     fn node_rounds_sorted<'a>(&self, metrics: &'a Metrics) -> NodeRounds<'a, usize>;
 }
 
@@ -126,6 +125,16 @@ pub enum Focus {
         round: RoundInfo,
         ours: bool,
     },
+}
+
+impl Focus {
+    pub fn node_index(&self) -> Option<usize> {
+        tracing::debug!("node_index focus {:?}", self);
+        match self {
+            Self::Node(node) | Self::Round { node, .. } => Some(*node),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
