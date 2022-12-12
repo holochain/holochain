@@ -46,7 +46,7 @@ pub async fn publish_dht_ops_workflow(
     let mut success = Vec::new();
     for (basis, op_hash_list) in to_publish {
         match network
-            .publish(true, false, basis, op_hash_list.clone(), None)
+            .publish(true, false, basis, op_hash_list.clone(), None, None)
             .await
         {
             Err(e) => {

@@ -82,6 +82,7 @@ pub trait HolochainP2pDnaT {
         basis_hash: holo_hash::OpBasis,
         op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
+        reflect_ops: Option<Vec<DhtOp>>,
     ) -> actor::HolochainP2pResult<()>;
 
     /// Get an entry from the DHT.
@@ -249,6 +250,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         basis_hash: holo_hash::OpBasis,
         op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
+        reflect_ops: Option<Vec<DhtOp>>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
             .publish(
@@ -258,6 +260,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 basis_hash,
                 op_hash_list,
                 timeout_ms,
+                reflect_ops,
             )
             .await
     }

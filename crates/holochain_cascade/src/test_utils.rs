@@ -232,6 +232,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _basis_hash: holo_hash::OpBasis,
         _op_hash_list: Vec<OpHashSized>,
         _timeout_ms: Option<u64>,
+        _reflect_ops: Option<Vec<crate::DhtOp>>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -423,6 +424,7 @@ impl HolochainP2pDnaT for MockNetwork {
         _basis_hash: holo_hash::OpBasis,
         _op_hash_list: Vec<OpHashSized>,
         _timeout_ms: Option<u64>,
+        _reflect_ops: Option<Vec<crate::DhtOp>>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }

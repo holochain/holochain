@@ -545,7 +545,7 @@ pub mod wasm_test {
             };
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
-        
+
         // Can't accept a second preflight request while the first is active.
         let preflight_acceptance_fail = conductor
             .raw_handle()
@@ -588,7 +588,7 @@ pub mod wasm_test {
             };
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
-        
+
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
             .raw_handle()

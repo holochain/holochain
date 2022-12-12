@@ -307,7 +307,7 @@ pub(crate) async fn countersigning_success(
                 None,
             );
             let ops = vec![hash_sized];
-            if let Err(e) = network.publish(false, false, basis, ops, None).await {
+            if let Err(e) = network.publish(false, false, basis, ops, None, None).await {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
                     e
@@ -354,7 +354,10 @@ pub async fn countersigning_publish(
             None,
         );
         let ops = vec![hash_sized];
-        if let Err(e) = network.publish(false, true, basis, ops, None).await {
+        if let Err(e) = network
+            .publish(false, true, basis, ops, None, Some(vec![op]))
+            .await
+        {
             tracing::error!(
                 "Failed to publish to entry authorities for countersigning session because of: {:?}",
                 e

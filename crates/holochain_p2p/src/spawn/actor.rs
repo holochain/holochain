@@ -1060,10 +1060,11 @@ impl HolochainP2pHandler for HolochainP2pActor {
         basis_hash: holo_hash::OpBasis,
         op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
+        reflect_ops: Option<Vec<DhtOp>>,
     ) -> HolochainP2pHandlerResult<()> {
         use kitsune_p2p_types::KitsuneTimeout;
 
-        let space = dna_hash.into_kitsune();
+        let space = dna_hash.clone().into_kitsune();
         let basis = basis_hash.to_kitsune();
         let timeout = match timeout_ms {
             Some(ms) => KitsuneTimeout::from_millis(ms),
@@ -1076,7 +1077,19 @@ impl HolochainP2pHandler for HolochainP2pActor {
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         let host = self.host.clone();
+        let evt_sender = self.evt_sender.clone();
         Ok(async move {
+            if let Some(reflect_ops) = reflect_ops {
+                let _ = evt_sender
+                    .publish(
+                        dna_hash,
+                        request_validation_receipt,
+                        countersigning_session,
+                        reflect_ops,
+                    )
+                    .await;
+            }
+
             // little awkward, but we need the side-effects of reporting
             // the context back to the host api here:
             if let Err(err) = host

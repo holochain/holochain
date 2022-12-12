@@ -300,6 +300,7 @@ ghost_actor::ghost_chan! {
             basis_hash: holo_hash::OpBasis,
             op_hash_list: Vec<OpHashSized>,
             timeout_ms: Option<u64>,
+            reflect_ops: Option<Vec<DhtOp>>,
         ) -> ();
 
         /// Get an entry from the DHT.

@@ -238,7 +238,7 @@ async fn publish_loop() {
     let (tx, mut op_published) = tokio::sync::mpsc::channel(100);
     dna_network
         .expect_publish()
-        .returning(move |_, _, _, _, _| {
+        .returning(move |_, _, _, _, _, _| {
             tx.try_send(()).unwrap();
             Ok(())
         });

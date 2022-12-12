@@ -75,8 +75,9 @@ pub async fn get_ops_to_publish(
                 },
                 |row| {
                     let action_size: usize = row.get("action_size")?;
-                    let entry_size: usize = row.get("entry_size")?;
-                    let op_size = (action_size + entry_size).into();
+                    // will be NULL if the op has no associated entry
+                    let entry_size: Option<usize> = row.get("entry_size")?;
+                    let op_size = (action_size + entry_size.unwrap_or(0)).into();
                     let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                     let op_type: DhtOpType = row.get("dht_type")?;
                     let hash: DhtOpHash = row.get("dht_hash")?;
