@@ -25,7 +25,7 @@ pub mod sql_cell {
     pub const FETCH_OP_REGION: &str = include_str!("sql/cell/fetch_op_region.sql");
     pub const FETCH_OPS_BY_REGION: &str = include_str!("sql/cell/fetch_ops_by_region.sql");
 
-    pub const FETCH_OP: &str = include_str!("sql/cell/fetch_op.sql");
+    pub const FETCH_PUBLISHABLE_OP: &str = include_str!("sql/cell/fetch_publishable_op.sql");
 
     pub mod must_get_agent_activity {
         pub const MUST_GET_AGENT_ACTIVITY: &str =

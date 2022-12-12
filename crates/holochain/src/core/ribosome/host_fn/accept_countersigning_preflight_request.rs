@@ -140,6 +140,229 @@ pub mod wasm_test {
         };
     }
 
+    /// Allow LockExpired error, panic on anything else
+    fn expect_chain_lock_expired<T>(
+        result: Result<T, ConductorApiError>,
+    ) where T: std::fmt::Debug {
+        match result {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
+                match *workflow_error {
+                    WorkflowError::SourceChainError(SourceChainError::LockExpired) => {}
+                    _ => panic!("{:?}", workflow_error),
+                }
+            }
+            something_else => panic!("{:?}", something_else),
+        };
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "slow_tests")]
+    async fn unlock_timeout_session() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            bob,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
+        // Before preflight everyone commits some stuff.
+        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+
+        let alice_agent_activity_alice_observed_before: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let alice_agent_activity_bob_observed_before: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let bob_agent_activity_alice_observed_before: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let bob_agent_activity_bob_observed_before: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+
+        // Everyone accepts a short lived session.
+        let preflight_request: PreflightRequest = conductor
+            .call(
+                &alice,
+                "generate_countersigning_preflight_request_fast",
+                vec![
+                    (alice_pubkey.clone(), vec![Role(0)]),
+                    (bob_pubkey.clone(), vec![]),
+                ],
+            ).await;
+        let alice_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &alice,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+            let alice_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+        let bob_acceptance: PreflightRequestAcceptance = conductor
+            .call(
+                &bob,
+                "accept_countersigning_preflight_request",
+                preflight_request.clone(),
+            )
+            .await;
+            let bob_response =
+            if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+                response
+            } else {
+                unreachable!();
+            };
+
+        // Alice commits the session entry.
+        let (countersigned_action_hash_alice, countersigned_entry_hash_alice): (ActionHash, EntryHash) = conductor
+            .call(
+                &alice,
+                "create_a_countersigned_thing_with_entry_hash",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await;
+
+        // Bob tries to do the same thing but after timeout.
+        tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+        let bob_result: Result<ActionHash, _> = conductor
+        .call_fallible(
+            &bob,
+            "create_a_countersigned_thing",
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await;
+        expect_chain_lock_expired(bob_result);
+
+        // At this point Alice's session entry is a liability so can't exist.
+        let alice_agent_activity_alice_observed_after: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let alice_agent_activity_bob_observed_after: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: alice_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let bob_agent_activity_alice_observed_after: AgentActivity = conductor
+            .call(
+                &alice,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+        let bob_agent_activity_bob_observed_after: AgentActivity = conductor
+            .call(
+                &bob,
+                "get_agent_activity",
+                GetAgentActivityInput {
+                    agent_pubkey: bob_pubkey.clone(),
+                    chain_query_filter: ChainQueryFilter::new(),
+                    activity_request: ActivityRequest::Full,
+                }
+            ).await;
+
+        assert_eq!(alice_agent_activity_alice_observed_before, alice_agent_activity_alice_observed_after);
+        assert_eq!(alice_agent_activity_bob_observed_before, alice_agent_activity_bob_observed_after);
+        assert_eq!(bob_agent_activity_alice_observed_before, bob_agent_activity_alice_observed_after);
+        assert_eq!(bob_agent_activity_bob_observed_before, bob_agent_activity_bob_observed_after);
+
+        // @TODO - the following all pass but perhaps we do NOT want them to?
+        // It's not immediately clear what direct requests by hash should do in all cases here.
+        //
+        // If an author does a must_get during a zome call like we do in this test, should it
+        // be returned (it's in the scratch ready to be flushed so it does atm) even though it
+        // hasn't been countersigned and so may never be included in a source chain?
+        //
+        // Should it be returned in subsequent zome calls by an author who has signed it but it
+        // hasn't been coauthored yet, but the session is still active? (c.f. private entries being visible to author)
+        // What about after the session?
+        //
+        // What about returned by/for coauthors who do NOT sign during and after the session?
+        //
+        // What about everyone else during and after the session?
+        //
+        // The answer to the above may be different per call, idk at this point.
+        // Seems intuitive that an action that is in nobody's agent activity should never be visible
+        // but then how can you get the entry hash and entry data during the session, like we do in this test?
+        //
+        // Maybe it also seems intuitive that must_get_entry should return the entry as we know its
+        // hash and normally must_get ignores validity or even which headers created it, but what if NO
+        // headers created it?
+        //
+        // etc. etc. I'm just leaving this commentary here to germinate future headaches and self doubt.
+        let _alice_action: SignedActionHashed = conductor
+        .call(
+            &alice,
+            "must_get_action",
+            countersigned_action_hash_alice.clone(),
+        )
+        .await;
+
+        let _alice_record: Record = conductor
+        .call(
+            &alice,
+            "must_get_valid_record",
+            countersigned_action_hash_alice.clone(),
+        )
+        .await;
+        let _alice_entry: EntryHashed = conductor.call(
+            &alice,
+            "must_get_entry",
+            countersigned_entry_hash_alice.clone()
+        ).await;
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn unlock_invalid_session() {
@@ -571,13 +794,15 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    async fn enzymatic_session() {
+    async fn enzymatic_session_success() {
         observability::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
+            alice_cell,
             alice_pubkey,
             bob,
+            bob_cell,
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
@@ -668,6 +893,8 @@ pub mod wasm_test {
             )
             .await;
 
+        consistency_10s([&alice_cell, &bob_cell]).await;
+
         // Now the action appears in alice's activty.
         let alice_activity: AgentActivity = conductor
             .call(
@@ -701,6 +928,7 @@ pub mod wasm_test {
             bob_activity.valid_activity.len(),
             bob_activity_pre.valid_activity.len() + 1
         );
+
     }
 
     #[tokio::test(flavor = "multi_thread")]
