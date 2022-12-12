@@ -11,17 +11,13 @@ pub struct FetchQueueReader(FetchQueue);
 impl FetchQueueReader {
     /// Get info about the queue, filtered by space
     pub fn info(&self, spaces: HashSet<KSpace>) -> FetchQueueInfo {
-        let (count, bytes) = self
-            .0
-            .state
-            .share_ref(|s| {
-                Ok(s.queue
-                    .values()
-                    .filter(|v| spaces.contains(&v.space))
-                    .filter_map(|v| v.size.map(|s| s.get()))
-                    .fold((0, 0), |(c, s), t| (c + 1, s + t)))
-            })
-            .unwrap();
+        let (count, bytes) = self.0.state.share_ref(|s| {
+            s.queue
+                .values()
+                .filter(|v| spaces.contains(&v.space))
+                .filter_map(|v| v.size.map(|s| s.get()))
+                .fold((0, 0), |(c, s), t| (c + 1, s + t))
+        });
         FetchQueueInfo {
             op_bytes_to_fetch: bytes,
             num_ops_to_fetch: count,
@@ -43,7 +39,7 @@ pub struct FetchQueueInfo {
 mod tests {
     use std::sync::Arc;
 
-    use kitsune_p2p_types::tx2::tx2_utils::Share;
+    use kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
 
     use crate::{queue::tests::*, State};
 
@@ -64,7 +60,7 @@ mod tests {
             let queue = queue.into_iter().collect();
             FetchQueueReader(FetchQueue {
                 config: Arc::new(Config),
-                state: Share::new(State { queue }),
+                state: ShareOpen::new(State { queue }),
             })
         };
         let info = q.info([space(0)].into_iter().collect());

@@ -11,11 +11,12 @@
 //! interval.
 
 use std::{
-    sync::Arc,
+    collections::HashMap,
+    sync::{atomic::AtomicU32, Arc},
     time::{Duration, Instant},
 };
 
-use kitsune_p2p_types::{tx2::tx2_utils::Share, KAgent, KSpace /*, Tx2Cert*/};
+use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace /*, Tx2Cert*/};
 use linked_hash_map::{Entry, LinkedHashMap};
 
 use crate::{FetchContext, FetchKey, FetchOptions, FetchQueuePush, RoughInt};
@@ -41,14 +42,13 @@ const NUM_ITEMS_PER_POLL: usize = 100;
 #[derive(Clone)]
 pub struct FetchQueue {
     config: FetchConfig,
-    state: Share<State>,
+    state: ShareOpen<State>,
 }
 
 impl std::fmt::Debug for FetchQueue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.state
-            .share_ref(|state| Ok(f.debug_struct("FetchQueue").field("state", state).finish()))
-            .unwrap()
+            .share_ref(|state| f.debug_struct("FetchQueue").field("state", state).finish())
     }
 }
 
@@ -68,10 +68,18 @@ pub trait FetchQueueConfig: 'static + Send + Sync {
 }
 
 /// The actual inner state of the FetchQueue, from which items can be obtained
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct State {
     /// Items ready to be fetched
     queue: LinkedHashMap<FetchKey, FetchQueueItem>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            queue: Default::default(),
+        }
+    }
 }
 
 /// A mutable iterator over the FetchQueue State
@@ -107,7 +115,7 @@ struct SourceRecord {
 }
 
 /// A source to fetch from: either a node, or an agent on a node
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FetchSource {
     /// An agent on a node
     Agent(KAgent),
@@ -130,7 +138,7 @@ impl FetchQueue {
     pub fn new(config: FetchConfig) -> Self {
         Self {
             config,
-            state: Share::new(State::default()),
+            state: ShareOpen::new(State::default()),
         }
     }
 
@@ -138,7 +146,7 @@ impl FetchQueue {
     pub fn new_bitwise_or() -> Self {
         Self {
             config: Arc::new(FetchQueueConfigBitwiseOr),
-            state: Share::new(State::default()),
+            state: ShareOpen::new(State::default()),
         }
     }
 
@@ -147,49 +155,42 @@ impl FetchQueue {
     /// If the FetchKey exists, add the new source and merge the context in, without
     /// changing the position in the queue.
     pub fn push(&self, args: FetchQueuePush) {
-        self.state
-            .share_mut(|s, _| {
-                tracing::debug!(
-                    "FetchQueue (size = {}) item added: {:?}",
-                    s.queue.len() + 1,
-                    args
-                );
-                s.push(&*self.config, args);
-                Ok(())
-            })
-            .expect("no error");
+        self.state.share_mut(|s| {
+            tracing::debug!(
+                "FetchQueue (size = {}) item added: {:?}",
+                s.queue.len() + 1,
+                args
+            );
+            s.push(&*self.config, args);
+        });
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
     pub fn remove(&self, key: &FetchKey) -> Option<FetchQueueItem> {
-        self.state
-            .share_mut(|s, _| {
-                let removed = s.remove(key);
-                tracing::debug!(
-                    "FetchQueue (size = {}) item removed: key={:?} val={:?}",
-                    s.queue.len(),
-                    key,
-                    removed
-                );
-                Ok(removed)
-            })
-            .expect("no error")
+        self.state.share_mut(|s| {
+            let removed = s.remove(key);
+            tracing::debug!(
+                "FetchQueue (size = {}) item removed: key={:?} val={:?}",
+                s.queue.len(),
+                key,
+                removed
+            );
+            removed
+        })
     }
 
     /// Get a list of the next items that should be fetched.
     pub fn get_items_to_fetch(&self) -> Vec<(FetchKey, KSpace, FetchSource, Option<FetchContext>)> {
         let interval = self.config.fetch_retry_interval();
-        self.state
-            .share_mut(|s, _| {
-                let mut out = Vec::new();
+        self.state.share_mut(|s| {
+            let mut out = Vec::new();
 
-                for (key, space, source, context) in s.iter_mut(interval) {
-                    out.push((key, space, source, context));
-                }
+            for (key, space, source, context) in s.iter_mut(interval) {
+                out.push((key, space, source, context));
+            }
 
-                Ok(out)
-            })
-            .expect("no error")
+            out
+        })
     }
 }
 
