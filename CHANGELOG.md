@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
-- Breaking: Adds the action that was used to create the entry to the OpEntry::CreateEntry enum variant so that it is easily available in validation.
+- Breaking: Improves Op::to_type helper to make action info more ergonomic in validation
 
 # 20221207.011003
 
