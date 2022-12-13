@@ -390,6 +390,7 @@ impl OpHelper for Op {
                     target_address: target_address.clone(),
                     tag: tag.clone(),
                     link_type,
+                    action: create_link.clone()
                 })
             }
             Op::RegisterDeleteLink(RegisterDeleteLink {
@@ -411,6 +412,7 @@ impl OpHelper for Op {
                     target_address: target_address.clone(),
                     tag: tag.clone(),
                     link_type,
+                    action: delete_link.clone()
                 })
             }
             Op::RegisterDelete(RegisterDelete {

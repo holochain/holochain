@@ -449,6 +449,8 @@ where
         tag: LinkTag,
         /// The app defined link type of this link.
         link_type: LT,
+        /// The [`CreateLink`] action that created the link
+        action: SignedHashed<CreateLink>,
     },
     /// The [`Op::RegisterDeleteLink`] which is validated by
     /// the authority for the [`AnyLinkableHash`] in the base address
@@ -469,6 +471,8 @@ where
         tag: LinkTag,
         /// The app defined link type of the deleted link.
         link_type: LT,
+        /// The [`DeleteLink`] action that created the link
+        action: SignedHashed<DeleteLink>,
     },
     /// The [`Op::RegisterUpdate`] which is validated by
     /// the authority for the [`ActionHash`] of the original entry
