@@ -99,6 +99,8 @@ use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::witness_nonce;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
@@ -236,7 +238,26 @@ impl Conductor {
 mod startup_shutdown_impls {
     use super::*;
 
+    //-----------------------------------------------------------------------------
+    /// Methods used by the [ConductorHandle]
+    //-----------------------------------------------------------------------------
     impl Conductor {
+        pub(crate) async fn witness_nonce_from_calling_agent(
+            &self,
+            agent: AgentPubKey,
+            nonce: Nonce256Bits,
+            expires: Timestamp,
+        ) -> ConductorResult<WitnessNonceResult> {
+            Ok(witness_nonce(
+                &self.spaces.conductor_db,
+                agent,
+                nonce,
+                Timestamp::now(),
+                expires,
+            )
+            .await?)
+        }
+
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
             config: ConductorConfig,
@@ -1059,9 +1080,9 @@ mod app_impls {
         /// Install DNAs and set up Cells as specified by an AppBundle
         pub async fn install_app_bundle(
             self: Arc<Self>,
-            payload: InstallAppBundlePayload,
+            payload: InstallAppPayload,
         ) -> ConductorResult<StoppedApp> {
-            let InstallAppBundlePayload {
+            let InstallAppPayload {
                 source,
                 agent_key,
                 installed_app_id,
@@ -1318,13 +1339,13 @@ mod clone_cell_impls {
             Ok(installed_clone_cell)
         }
 
-        /// Archive a clone cell for future deletion from the app.
-        pub(crate) async fn archive_clone_cell(
+        /// Disable a clone cell.
+        pub(crate) async fn disable_clone_cell(
             &self,
-            ArchiveCloneCellPayload {
+            DisableCloneCellPayload {
                 app_id,
                 clone_cell_id,
-            }: &ArchiveCloneCellPayload,
+            }: &DisableCloneCellPayload,
         ) -> ConductorResult<()> {
             let (_, removed_cell_id) = self
                 .update_state_prime({
@@ -1334,7 +1355,7 @@ mod clone_cell_impls {
                         let app = state.get_app_mut(&app_id)?;
                         let clone_id = app.get_clone_id(&clone_cell_id)?;
                         let cell_id = app.get_clone_cell_id(&clone_cell_id)?;
-                        app.archive_clone_cell(&clone_id)?;
+                        app.disable_clone_cell(&clone_id)?;
                         Ok((state, cell_id))
                     }
                 })
@@ -1343,57 +1364,50 @@ mod clone_cell_impls {
             Ok(())
         }
 
-        /// Restore an archived clone cell for an app.
-        pub(crate) async fn restore_clone_cell(
-            &self,
-            ArchiveCloneCellPayload {
-                app_id,
-                clone_cell_id,
-            }: &ArchiveCloneCellPayload,
+        /// Enable a disabled clone cell.
+        pub async fn enable_clone_cell(
+            self: Arc<Self>,
+            payload: &EnableCloneCellPayload,
         ) -> ConductorResult<InstalledCell> {
-            let (_, restored_cell) = self
+            let (_, enabled_cell) = self
                 .update_state_prime({
-                    let app_id = app_id.to_owned();
-                    let clone_cell_id = clone_cell_id.to_owned();
+                    let app_id = payload.app_id.to_owned();
+                    let clone_cell_id = payload.clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
-                        let clone_id = app.get_archived_clone_id(&clone_cell_id)?;
-                        let restored_cell = app.restore_clone_cell(&clone_id)?;
-                        Ok((state, restored_cell))
+                        let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                        let enabled_cell = app.enable_clone_cell(&clone_id)?;
+                        Ok((state, enabled_cell))
                     }
                 })
                 .await?;
-            Ok(restored_cell)
+
+            self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
+                .await?;
+            Ok(enabled_cell)
         }
 
-        /// Remove a clone cell from an app.
-        pub(crate) async fn delete_archived_clone_cells(
+        /// Delete a clone cell.
+        pub(crate) async fn delete_clone_cell(
             &self,
-            DeleteArchivedCloneCellsPayload { app_id, role_name }: &DeleteArchivedCloneCellsPayload,
+            DeleteCloneCellPayload {
+                app_id,
+                clone_cell_id,
+            }: &DeleteCloneCellPayload,
         ) -> ConductorResult<()> {
             self.update_state_prime({
                 let app_id = app_id.clone();
-                let role_name = role_name.clone();
+                let clone_cell_id = clone_cell_id.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    app.delete_archived_clone_cells_for_role(&role_name)?;
+                    let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                    app.delete_clone_cell(&clone_id)?;
                     Ok((state, ()))
                 }
             })
             .await?;
             self.remove_dangling_cells().await?;
             Ok(())
-        }
-
-        /// Restore an archived clone cell
-        pub async fn restore_archived_clone_cell(
-            self: Arc<Self>,
-            payload: &ArchiveCloneCellPayload,
-        ) -> ConductorResult<InstalledCell> {
-            let restored_cell = self.restore_clone_cell(payload).await?;
-            self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
-                .await?;
-            Ok(restored_cell)
         }
     }
 }

@@ -165,12 +165,15 @@ ghost_actor::ghost_chan! {
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
             dna_hash: DnaHash,
-            to_agent: AgentPubKey,
             from_agent: AgentPubKey,
+            signature: Signature,
+            to_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap_secret: Option<CapSecret>,
             payload: ExternIO,
+            nonce: Nonce256Bits,
+            expires_at: Timestamp,
         ) -> SerializedBytes;
 
         /// A remote node is publishing data in a range we claim to be holding.

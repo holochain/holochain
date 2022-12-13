@@ -1,7 +1,7 @@
-#![allow(deprecated)]
-
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
+use holochain_keystore::LairResult;
+use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use kitsune_p2p::gossip::sharded_gossip::{InOut, RoundThroughput};
 
@@ -23,8 +23,8 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::AppInfo`]
-    AppInfo {
+    /// [`AppResponse::AppInfoReturned`]
+    GetAppInfo {
         /// The app ID for which to get information
         installed_app_id: InstalledAppId,
     },
@@ -34,8 +34,8 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::ZomeCall`]
-    ZomeCall(Box<ZomeCall>),
+    /// [`AppResponse::ZomeCalled`]
+    CallZome(Box<ZomeCall>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
@@ -48,27 +48,27 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellCreated`]
     CreateCloneCell(Box<CreateCloneCellPayload>),
 
-    /// Archive a clone cell.
+    /// Disable a clone cell.
     ///
-    /// Providing a [`CloneId`] or [`CellId`], archive an existing clone cell.
-    /// When the clone cell exists, it is archived and can not be called any
+    /// Providing a [`CloneId`] or [`CellId`], disable an existing clone cell.
+    /// When the clone cell exists, it is disabled and can not be called any
     /// longer. If it doesn't exist, the call is a no-op.
     ///
     /// # Returns
     ///
-    /// [`AppResponse::CloneCellArchived`] if the clone cell existed
-    /// and was archived.
-    ArchiveCloneCell(Box<ArchiveCloneCellPayload>),
+    /// [`AppResponse::CloneCellDisabled`] if the clone cell existed
+    /// and has been disabled.
+    DisableCloneCell(Box<DisableCloneCellPayload>),
+
+    /// Enable a clone cell that was previously disabled.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CloneCellEnabled`]
+    EnableCloneCell(Box<EnableCloneCellPayload>),
 
     /// Info about gossip
     GossipInfo(Box<GossipInfoRequestPayload>),
-
-    #[deprecated = "use ZomeCall"]
-    ZomeCallInvocation(Box<ZomeCall>),
-
-    /// Is currently unimplemented and will return
-    /// an [`AppResponse::Unimplemented`].
-    Crypto(Box<CryptoRequest>),
 
     /// Is currently unimplemented and will return
     /// an [`AppResponse::Unimplemented`].
@@ -87,19 +87,19 @@ pub enum AppResponse {
     /// There has been an error during the handling of the request.
     Error(ExternalApiWireError),
 
-    /// The succesful response to an [`AppRequest::AppInfo`].
+    /// The succesful response to an [`AppRequest::GetAppInfo`].
     ///
     /// Option will be `None` if there is no installed app with the given `installed_app_id`.
     /// Check out [`InstalledApp`] for details on when the option is `Some<InstalledAppInfo>`
-    AppInfo(Option<InstalledAppInfo>),
+    AppInfoReturned(Option<InstalledAppInfo>),
 
-    /// The successful response to an [`AppRequest::ZomeCall`].
+    /// The successful response to an [`AppRequest::CallZome`].
     ///
     /// Note that [`ExternIO`] is simply a structure of [`struct@SerializedBytes`], so the client will have
     /// to decode this response back into the data provided by the zome using a [msgpack] library to utilize it.
     ///
     /// [msgpack]: https://msgpack.org/
-    ZomeCall(Box<ExternIO>),
+    ZomeCalled(Box<ExternIO>),
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
@@ -107,14 +107,18 @@ pub enum AppResponse {
     /// cell's [`CloneId`] and [`CellId`].
     CloneCellCreated(InstalledCell),
 
-    /// An existing clone cell has been archived.
-    CloneCellArchived,
+    /// The successful response to an [`AppRequest::DisableCloneCell`].
+    ///
+    /// An existing clone cell has been disabled.
+    CloneCellDisabled,
+
+    /// The successful response to an [`AppRequest::EnableCloneCell`].
+    ///
+    /// A previously disabled clone cell has been enabled.
+    CloneCellEnabled(InstalledCell),
 
     /// GossipInfo is returned
     GossipInfo(Vec<DnaGossipInfo>),
-
-    #[deprecated = "use ZomeCall"]
-    ZomeCallInvocation(Box<ExternIO>),
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -135,24 +139,76 @@ pub struct ZomeCall {
     /// via a `CapGrant`. Otherwise it will be necessary to provide a `CapSecret` for every call.
     pub cap_secret: Option<CapSecret>,
     /// The provenance (source) of the call
-    ///
-    /// NB: **This will be removed** as soon as Holochain has a way of determining who
-    /// is making this zome call over this interface. Until we do, the caller simply
-    /// provides this data and Holochain trusts them.
+    /// MUST match the signature.
     pub provenance: AgentPubKey,
+    pub signature: Signature,
+    pub nonce: Nonce256Bits,
+    pub expires_at: Timestamp,
 }
 
-#[allow(missing_docs)]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
-pub enum CryptoRequest {
-    Sign(String),
-    Decrypt(String),
-    Encrypt(String),
+impl From<ZomeCall> for ZomeCallUnsigned {
+    fn from(zome_call: ZomeCall) -> Self {
+        Self {
+            cell_id: zome_call.cell_id,
+            zome_name: zome_call.zome_name,
+            fn_name: zome_call.fn_name,
+            payload: zome_call.payload,
+            cap_secret: zome_call.cap_secret,
+            provenance: zome_call.provenance,
+            nonce: zome_call.nonce,
+            expires_at: zome_call.expires_at,
+        }
+    }
+}
+
+impl ZomeCall {
+    pub async fn try_from_unsigned_zome_call(
+        keystore: &MetaLairClient,
+        unsigned_zome_call: ZomeCallUnsigned,
+    ) -> LairResult<Self> {
+        let signature = unsigned_zome_call
+            .provenance
+            .sign_raw(
+                keystore,
+                unsigned_zome_call
+                    .data_to_sign()
+                    .map_err(|e| e.to_string())?,
+            )
+            .await?;
+        Ok(Self {
+            cell_id: unsigned_zome_call.cell_id,
+            zome_name: unsigned_zome_call.zome_name,
+            fn_name: unsigned_zome_call.fn_name,
+            payload: unsigned_zome_call.payload,
+            cap_secret: unsigned_zome_call.cap_secret,
+            provenance: unsigned_zome_call.provenance,
+            nonce: unsigned_zome_call.nonce,
+            expires_at: unsigned_zome_call.expires_at,
+            signature,
+        })
+    }
+
+    pub async fn resign_zome_call(
+        self,
+        keystore: &MetaLairClient,
+        agent_key: AgentPubKey,
+    ) -> LairResult<Self> {
+        let zome_call_unsigned = ZomeCallUnsigned {
+            provenance: agent_key,
+            cell_id: self.cell_id,
+            zome_name: self.zome_name,
+            fn_name: self.fn_name,
+            cap_secret: self.cap_secret,
+            payload: self.payload,
+            nonce: self.nonce,
+            expires_at: self.expires_at,
+        };
+        ZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned).await
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
+/// Info about an installed app, returned as part of [`AppResponse::AppInfoReturned`]
 pub struct InstalledAppInfo {
     /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,

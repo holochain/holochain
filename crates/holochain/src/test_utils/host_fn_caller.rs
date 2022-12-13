@@ -13,6 +13,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::call_zome_function_authorized;
 use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -435,15 +436,17 @@ impl HostFnCaller {
     pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> ExternIO {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
 
-        let output = {
+        let (_, output) = {
             let host_access = call_context.host_context();
             let zcha = unwrap_to!(host_access => HostContext::ZomeCall).clone();
-            ribosome.call_zome_function(zcha, invocation).unwrap()
+            call_zome_function_authorized((*ribosome).clone(), zcha, invocation)
+                .await
+                .unwrap()
         };
 
         // Write
         workspace_lock.flush(&self.network).await.unwrap();
-        unwrap_to!(output => ZomeCallResponse::Ok).to_owned()
+        unwrap_to!(output.unwrap() => ZomeCallResponse::Ok).to_owned()
     }
 }
 
