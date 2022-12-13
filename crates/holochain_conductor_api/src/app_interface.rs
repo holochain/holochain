@@ -1,5 +1,7 @@
 #![allow(deprecated)]
 
+use std::collections::HashMap;
+
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
@@ -92,7 +94,6 @@ pub enum AppResponse {
     /// The succesful response to an [`AppRequest::AppInfo`].
     ///
     /// Option will be `None` if there is no installed app with the given `installed_app_id`.
-    /// Check out [`InstalledApp`] for details on when the option is `Some<InstalledAppInfo>`
     AppInfo(Option<InstalledAppInfo>),
 
     /// The successful response to an [`AppRequest::ZomeCall`].
@@ -214,13 +215,44 @@ pub enum CryptoRequest {
     Encrypt(String),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum CellInfo {
+    // cells provisioned at app installation as defined in the bundle
+    Provisioned(Cell),
+
+    // cells created by cloning
+    Cloned(Cell),
+
+    // potential cells with deferred installation as defined in the bundle
+    // unimplemented
+    Stem(StemCell),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct StemCell {
+    pub dna: DnaHash,
+    pub name: Option<String>,
+    pub dna_modifiers: DnaModifiers,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Cell {
+    pub cell_id: CellId,
+    pub clone_id: Option<CloneId>,
+    pub dna_modifiers: DnaModifiers,
+    pub name: String,
+    pub enabled: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 pub struct InstalledAppInfo {
     /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,
-    /// Info about the cells installed in this app
-    pub cell_data: Vec<InstalledCell>,
+    /// Info about the cells installed in this app. Lists of cells are ordered
+    /// and contain first the provisioned cell, then enabled clone cells and
+    /// finally disabled clone cells.
+    pub cell_info: HashMap<RoleName, Vec<CellInfo>>,
     /// The app's current status, in an API-friendly format
     pub status: InstalledAppInfoStatus,
 }
@@ -233,12 +265,13 @@ impl InstalledAppInfo {
             .clone_cells()
             .map(|cell| (cell.0.as_app_role_name(), cell.1));
         let cells = app.provisioned_cells().chain(clone_cells);
-        let cell_data = cells
-            .map(|(role_name, id)| InstalledCell::new(id.clone(), role_name.clone()))
-            .collect();
+        let cell_data = HashMap::new();
+        // cells
+        //     .map(|(role_name, id)| InstalledCell::new(id.clone(), role_name.clone()))
+        //     .collect();
         Self {
             installed_app_id,
-            cell_data,
+            cell_info: cell_data,
             status,
         }
     }

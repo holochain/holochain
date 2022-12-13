@@ -1052,6 +1052,8 @@ mod network_impls {
 /// Methods related to app installation and management
 mod app_impls {
 
+    use holochain_conductor_api::{Cell, CellInfo, InstalledAppInfoStatus};
+
     use super::*;
     impl Conductor {
         pub(crate) async fn install_app(
@@ -1228,7 +1230,105 @@ mod app_impls {
             &self,
             installed_app_id: &InstalledAppId,
         ) -> ConductorResult<Option<InstalledAppInfo>> {
-            Ok(self.get_state().await?.get_app_info(installed_app_id))
+            let state = self.get_state().await?;
+            let app = state.installed_apps().get(installed_app_id);
+            if app.is_none() {
+                return Ok(None);
+            }
+            let app = app.unwrap();
+            let installed_app_id = app.id().clone();
+            let status = app.status().clone().into();
+
+            // create a hash map of all existing ribosomes
+            let mut dna_defs: HashMap<CellId, DnaDefHashed> = HashMap::new();
+            self.cells.share_ref(|cells| {
+                cells.iter().for_each(|(cell_id, cell_item)| {
+                    let ribosome = cell_item.cell.get_ribosome();
+                    if ribosome.is_ok() {
+                        dna_defs.insert(cell_id.to_owned(), ribosome.unwrap().dna_def().to_owned());
+                    } else {
+                        tracing::error!("app info: no ribosome found for cell id {}", cell_id);
+                    }
+                })
+            });
+
+            let mut cell_data: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
+            app.roles().iter().for_each(|(role_name, role_assignment)| {
+                // create a vector with info of all cells for this role
+                let mut cell_infos: Vec<CellInfo> = Vec::new();
+                println!("role {}", role_name);
+                println!(
+                    "provisioned cell {:?}\n",
+                    role_assignment.provisioned_cell()
+                );
+
+                // add the base cell to the vector of cell infos
+                if let Some(provisioned_cell) = role_assignment.provisioned_cell() {
+                    if let Some(dna_def) = dna_defs.get(provisioned_cell) {
+                        let cell_info = CellInfo::Provisioned(Cell {
+                            clone_id: None,
+                            cell_id: provisioned_cell.clone(),
+                            dna_modifiers: dna_def.modifiers.to_owned(),
+                            name: dna_def.name.to_owned(),
+                            // TODO: populate with cell state once it is implemented for a base cell
+                            enabled: status == InstalledAppInfoStatus::Running,
+                        });
+                        cell_infos.push(cell_info);
+                    }
+                } else {
+                    // no provisioned cell, thus there must be a deferred cell
+                    // this is not implemented as of now
+                    unimplemented!()
+                };
+
+                // add enabled clone cells to the vector of cell infos
+                if let Some(clone_cells) = app.clone_cells_for_role_name(role_name) {
+                    clone_cells.iter().for_each(|(clone_id, cell_id)| {
+                        if let Some(dna_def) = dna_defs.get(cell_id) {
+                            let cell_info = CellInfo::Cloned(Cell {
+                                clone_id: Some(clone_id.to_owned()),
+                                cell_id: cell_id.to_owned(),
+                                dna_modifiers: dna_def.modifiers.to_owned(),
+                                name: dna_def.name.to_owned(),
+                                enabled: true,
+                            });
+                            cell_infos.push(cell_info);
+                        } else {
+                            tracing::error!("app info: no ribosome found for cell id {}", cell_id);
+                        }
+                    });
+                }
+
+                // add disabled clone cells to the vector of cell infos
+                if let Some(clone_cells) = app.disabled_clone_cells_for_role_name(role_name) {
+                    clone_cells.iter().for_each(|(clone_id, cell_id)| {
+                        if let Some(dna_def) = dna_defs.get(cell_id) {
+                            let cell_info = CellInfo::Cloned(Cell {
+                                clone_id: Some(clone_id.to_owned()),
+                                cell_id: cell_id.to_owned(),
+                                dna_modifiers: dna_def.modifiers.to_owned(),
+                                name: dna_def.name.to_owned(),
+                                enabled: false,
+                            });
+                            cell_infos.push(cell_info);
+                        } else {
+                            tracing::error!("app info: no ribosome found for cell id {}", cell_id);
+                        }
+                    });
+                }
+
+                for cell_info in cell_infos.clone() {
+                    println!("cell info {:#?}", cell_info);
+                }
+
+                cell_data.insert(role_name.clone(), cell_infos);
+            });
+
+            Ok(Some(InstalledAppInfo {
+                cell_info: cell_data,
+                installed_app_id,
+                status,
+            }))
         }
     }
 }
