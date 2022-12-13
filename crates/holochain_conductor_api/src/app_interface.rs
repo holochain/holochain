@@ -1,13 +1,10 @@
-#![allow(deprecated)]
-
-use std::collections::HashMap;
-
 use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use kitsune_p2p::gossip::sharded_gossip::{InOut, RoundThroughput};
+use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -27,8 +24,8 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::AppInfo`]
-    AppInfo {
+    /// [`AppResponse::AppInfoReturned`]
+    GetAppInfo {
         /// The app ID for which to get information
         installed_app_id: InstalledAppId,
     },
@@ -38,8 +35,8 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::ZomeCall`]
-    ZomeCall(Box<ZomeCall>),
+    /// [`AppResponse::ZomeCalled`]
+    CallZome(Box<ZomeCall>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
@@ -52,27 +49,27 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellCreated`]
     CreateCloneCell(Box<CreateCloneCellPayload>),
 
-    /// Archive a clone cell.
+    /// Disable a clone cell.
     ///
-    /// Providing a [`CloneId`] or [`CellId`], archive an existing clone cell.
-    /// When the clone cell exists, it is archived and can not be called any
+    /// Providing a [`CloneId`] or [`CellId`], disable an existing clone cell.
+    /// When the clone cell exists, it is disabled and can not be called any
     /// longer. If it doesn't exist, the call is a no-op.
     ///
     /// # Returns
     ///
-    /// [`AppResponse::CloneCellArchived`] if the clone cell existed
-    /// and was archived.
-    ArchiveCloneCell(Box<ArchiveCloneCellPayload>),
+    /// [`AppResponse::CloneCellDisabled`] if the clone cell existed
+    /// and has been disabled.
+    DisableCloneCell(Box<DisableCloneCellPayload>),
+
+    /// Enable a clone cell that was previously disabled.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CloneCellEnabled`]
+    EnableCloneCell(Box<EnableCloneCellPayload>),
 
     /// Info about gossip
     GossipInfo(Box<GossipInfoRequestPayload>),
-
-    #[deprecated = "use ZomeCall"]
-    ZomeCallInvocation(Box<ZomeCall>),
-
-    /// Is currently unimplemented and will return
-    /// an [`AppResponse::Unimplemented`].
-    Crypto(Box<CryptoRequest>),
 
     /// Is currently unimplemented and will return
     /// an [`AppResponse::Unimplemented`].
@@ -91,18 +88,18 @@ pub enum AppResponse {
     /// There has been an error during the handling of the request.
     Error(ExternalApiWireError),
 
-    /// The succesful response to an [`AppRequest::AppInfo`].
+    /// The succesful response to an [`AppRequest::GetAppInfo`].
     ///
     /// Option will be `None` if there is no installed app with the given `installed_app_id`.
-    AppInfo(Option<InstalledAppInfo>),
+    AppInfoReturned(Option<InstalledAppInfo>),
 
-    /// The successful response to an [`AppRequest::ZomeCall`].
+    /// The successful response to an [`AppRequest::CallZome`].
     ///
     /// Note that [`ExternIO`] is simply a structure of [`struct@SerializedBytes`], so the client will have
     /// to decode this response back into the data provided by the zome using a [msgpack] library to utilize it.
     ///
     /// [msgpack]: https://msgpack.org/
-    ZomeCall(Box<ExternIO>),
+    ZomeCalled(Box<ExternIO>),
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
@@ -110,14 +107,18 @@ pub enum AppResponse {
     /// cell's [`CloneId`] and [`CellId`].
     CloneCellCreated(InstalledCell),
 
-    /// An existing clone cell has been archived.
-    CloneCellArchived,
+    /// The successful response to an [`AppRequest::DisableCloneCell`].
+    ///
+    /// An existing clone cell has been disabled.
+    CloneCellDisabled,
+
+    /// The successful response to an [`AppRequest::EnableCloneCell`].
+    ///
+    /// A previously disabled clone cell has been enabled.
+    CloneCellEnabled(InstalledCell),
 
     /// GossipInfo is returned
     GossipInfo(Vec<DnaGossipInfo>),
-
-    #[deprecated = "use ZomeCall"]
-    ZomeCallInvocation(Box<ExternIO>),
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -245,7 +246,7 @@ pub struct Cell {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
+/// Info about an installed app, returned as part of [`AppResponse::AppInfoReturned`]
 pub struct InstalledAppInfo {
     /// The unique identifier for an installed app in this conductor
     pub installed_app_id: InstalledAppId,

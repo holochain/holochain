@@ -6,7 +6,7 @@
 //!
 //! Eg: when the launcher installs a web-happ bundle, it will extract the WebUI and
 //! install it in the file system. Also, it will extract the happ bundle and call
-//! `InstallAppBundle` with it.
+//! `InstallApp` with it.
 
 mod web_app_bundle;
 mod web_app_manifest;
