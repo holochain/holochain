@@ -207,15 +207,6 @@ impl ZomeCall {
     }
 }
 
-#[allow(missing_docs)]
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
-pub enum CryptoRequest {
-    Sign(String),
-    Decrypt(String),
-    Encrypt(String),
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CellInfo {
     // cells provisioned at app installation as defined in the bundle
