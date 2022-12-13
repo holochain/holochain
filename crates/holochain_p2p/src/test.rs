@@ -447,7 +447,16 @@ mod tests {
         // this will fail because we can't reach any remote nodes
         // but, it still published locally, so our test will work
         let _ = p2p
-            .publish(dna, true, false, action_hash, a1.clone(), vec![], Some(200), None)
+            .publish(
+                dna,
+                true,
+                false,
+                action_hash,
+                a1.clone(),
+                vec![],
+                Some(200),
+                None,
+            )
             .await;
 
         assert_eq!(

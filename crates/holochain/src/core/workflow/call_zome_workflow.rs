@@ -89,7 +89,10 @@ where
                                 super::countersigning_workflow::countersigning_publish(
                                     &network,
                                     op,
-                                    (*workspace.author().expect("have author")).clone(),
+                                    (*workspace.author().ok_or_else(|| {
+                                        WorkflowError::Other("author required".into())
+                                    })?)
+                                    .clone(),
                                 )
                                 .await
                             {
