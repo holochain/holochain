@@ -552,9 +552,8 @@ mod dna_impls {
             let mut dna_defs = HashMap::new();
             self.cells.share_ref(|cells| {
                 cells.iter().for_each(|(cell_id, cell_item)| {
-                    let ribosome = cell_item.cell.get_ribosome();
-                    if ribosome.is_ok() {
-                        dna_defs.insert(cell_id.to_owned(), ribosome.unwrap().dna_def().to_owned());
+                    if let Ok(ribosome) = cell_item.cell.get_ribosome() {
+                        dna_defs.insert(cell_id.to_owned(), ribosome.dna_def().to_owned());
                     } else {
                         tracing::error!("no ribosome found for cell id {}", cell_id);
                     }
@@ -1259,7 +1258,7 @@ mod app_impls {
                 None => None,
                 Some(app) => {
                     let dna_definitions = self.get_dna_definitions();
-                    Some(InstalledAppInfo::from_installed_app(&app, &dna_definitions))
+                    Some(InstalledAppInfo::from_installed_app(app, &dna_definitions))
                 }
             }
         }

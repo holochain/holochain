@@ -37,7 +37,6 @@ async fn app_info_returns_dna_modifiers() {
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
     // app info has cell info for one role name
     assert_eq!(app_info.cell_info.len(), 1);
-    println!("app info {:?}", app_info);
 
     let cell_info_for_role = app_info.cell_info.get(&role_name).unwrap();
     // first cell in cell info is provisioned cell
