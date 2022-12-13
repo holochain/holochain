@@ -259,28 +259,78 @@ pub struct InstalledAppInfo {
 }
 
 impl InstalledAppInfo {
-    pub fn from_installed_app(app: &InstalledApp) -> Self {
+    pub fn from_installed_app(app: &InstalledApp, dna_definitions: &HashMap<CellId, DnaDefHashed>) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
-        let clone_cells = app
-            .clone_cells()
-            .map(|cell| (cell.0.as_app_role_name(), cell.1));
-        let cells = app.provisioned_cells().chain(clone_cells);
-        let cell_data = HashMap::new();
-        // cells
-        //     .map(|(role_name, id)| InstalledCell::new(id.clone(), role_name.clone()))
-        //     .collect();
+
+        let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
+        app.roles().iter().for_each(|(role_name, role_assignment)| {
+            // create a vector with info of all cells for this role
+            let mut cell_info_for_role: Vec<CellInfo> = Vec::new();
+
+            // push the base cell to the vector of cell infos
+            if let Some(provisioned_cell) = role_assignment.provisioned_cell() {
+                if let Some(dna_def) = dna_definitions.get(provisioned_cell) {
+                    let cell_info = CellInfo::Provisioned(Cell {
+                        clone_id: None,
+                        cell_id: provisioned_cell.clone(),
+                        dna_modifiers: dna_def.modifiers.to_owned(),
+                        name: dna_def.name.to_owned(),
+                        // TODO: populate with cell state once it is implemented for a base cell
+                        enabled: status == InstalledAppInfoStatus::Running,
+                    });
+                    cell_info_for_role.push(cell_info);
+                }
+            } else {
+                // no provisioned cell, thus there must be a deferred cell
+                // this is not implemented as of now
+                unimplemented!()
+            };
+
+            // push enabled clone cells to the vector of cell infos
+            if let Some(clone_cells) = app.clone_cells_for_role_name(role_name) {
+                clone_cells.iter().for_each(|(clone_id, cell_id)| {
+                    if let Some(dna_def) = dna_definitions.get(cell_id) {
+                        let cell_info = CellInfo::Cloned(Cell {
+                            clone_id: Some(clone_id.to_owned()),
+                            cell_id: cell_id.to_owned(),
+                            dna_modifiers: dna_def.modifiers.to_owned(),
+                            name: dna_def.name.to_owned(),
+                            enabled: true,
+                        });
+                        cell_info_for_role.push(cell_info);
+                    } else {
+                        tracing::error!("app info: no ribosome found for cell id {}", cell_id);
+                    }
+                });
+            }
+
+            // push disabled clone cells to the vector of cell infos
+            if let Some(clone_cells) = app.disabled_clone_cells_for_role_name(role_name) {
+                clone_cells.iter().for_each(|(clone_id, cell_id)| {
+                    if let Some(dna_def) = dna_definitions.get(cell_id) {
+                        let cell_info = CellInfo::Cloned(Cell {
+                            clone_id: Some(clone_id.to_owned()),
+                            cell_id: cell_id.to_owned(),
+                            dna_modifiers: dna_def.modifiers.to_owned(),
+                            name: dna_def.name.to_owned(),
+                            enabled: false,
+                        });
+                        cell_info_for_role.push(cell_info);
+                    } else {
+                        tracing::error!("app info: no ribosome found for cell id {}", cell_id);
+                    }
+                });
+            }
+
+            cell_info.insert(role_name.clone(), cell_info_for_role);
+        });
+
         Self {
             installed_app_id,
-            cell_info: cell_data,
+            cell_info,
             status,
         }
-    }
-}
-
-impl From<&InstalledApp> for InstalledAppInfo {
-    fn from(app: &InstalledApp) -> Self {
-        Self::from_installed_app(app)
     }
 }
 
