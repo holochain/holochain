@@ -580,11 +580,11 @@ pub async fn request_agent_info(
     args: ListAgents,
 ) -> anyhow::Result<Vec<AgentInfoSigned>> {
     let resp = cmd
-        .command(AdminRequest::RequestAgentInfo {
+        .command(AdminRequest::GetAgentInfo {
             cell_id: args.into(),
         })
         .await?;
-    Ok(expect_match!(resp => AdminResponse::AgentInfoRequested, "Failed to request agent info"))
+    Ok(expect_match!(resp => AdminResponse::AgentInfoReturned, "Failed to request agent info"))
 }
 
 fn parse_agent_key(arg: &str) -> anyhow::Result<AgentPubKey> {

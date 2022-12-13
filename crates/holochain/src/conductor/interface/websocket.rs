@@ -740,44 +740,44 @@ pub mod test {
         assert_matches!(r, AdminResponse::AgentInfoAdded);
 
         // - Request all the infos
-        let req = AdminRequest::RequestAgentInfo { cell_id: None };
+        let req = AdminRequest::GetAgentInfo { cell_id: None };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoReturned).clone());
         assert_eq!(expect, results);
 
         // - Request the dna 0 agent 0
-        let req = AdminRequest::RequestAgentInfo {
+        let req = AdminRequest::GetAgentInfo {
             cell_id: Some(CellId::new(dnas[0].clone(), agents[0].clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoReturned).clone());
 
         assert_eq!(vec![k00], results);
 
         // - Request the dna 0 agent 1
-        let req = AdminRequest::RequestAgentInfo {
+        let req = AdminRequest::GetAgentInfo {
             cell_id: Some(CellId::new(dnas[0].clone(), agents[1].clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoReturned).clone());
 
         assert_eq!(vec![k01], results);
 
         // - Request the dna 1 agent 0
-        let req = AdminRequest::RequestAgentInfo {
+        let req = AdminRequest::GetAgentInfo {
             cell_id: Some(CellId::new(dnas[1].clone(), agents[0].clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoReturned).clone());
 
         assert_eq!(vec![k10], results);
 
         // - Request the dna 1 agent 1
-        let req = AdminRequest::RequestAgentInfo {
+        let req = AdminRequest::GetAgentInfo {
             cell_id: Some(CellId::new(dnas[1].clone(), agents[1].clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoReturned).clone());
 
         assert_eq!(vec![k11], results);
 

@@ -255,8 +255,8 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::AgentInfoRequested`]
-    RequestAgentInfo {
+    /// [`AdminResponse::AgentInfoReturned`]
+    GetAgentInfo {
         /// Optionally choose the agent info of a specific cell.
         cell_id: Option<CellId>,
     },
@@ -449,10 +449,10 @@ pub enum AdminResponse {
     /// This means the agent info was successfully added to the peer store.
     AgentInfoAdded,
 
-    /// The successful response to an [`AdminRequest::RequestAgentInfo`].
+    /// The successful response to an [`AdminRequest::GetAgentInfo`].
     ///
     /// This is all the agent info that was found for the request.
-    AgentInfoRequested(Vec<AgentInfoSigned>),
+    AgentInfoReturned(Vec<AgentInfoSigned>),
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,

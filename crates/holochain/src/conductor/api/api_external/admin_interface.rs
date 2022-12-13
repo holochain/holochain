@@ -262,9 +262,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
                 Ok(AdminResponse::AgentInfoAdded)
             }
-            RequestAgentInfo { cell_id } => {
+            GetAgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
-                Ok(AdminResponse::AgentInfoRequested(r))
+                Ok(AdminResponse::AgentInfoReturned(r))
             }
             GraftRecords {
                 cell_id,
