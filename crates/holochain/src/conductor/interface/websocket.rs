@@ -537,7 +537,7 @@ pub mod test {
         assert_eq!(expected, cell_ids);
 
         // Check that it is returned in get_app_info as running
-        let maybe_info = state.get_app_info(&app_id);
+        let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
             assert_matches!(info.status, InstalledAppInfoStatus::Running);
@@ -580,7 +580,7 @@ pub mod test {
         assert_eq!(expected, cell_ids);
 
         // Check that it is returned in get_app_info as deactivated
-        let maybe_info = state.get_app_info(&app_id);
+        let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
             assert_matches!(info.status, InstalledAppInfoStatus::Disabled { .. });

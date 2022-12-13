@@ -1256,11 +1256,6 @@ mod app_impls {
             app.roles().iter().for_each(|(role_name, role_assignment)| {
                 // create a vector with info of all cells for this role
                 let mut cell_infos: Vec<CellInfo> = Vec::new();
-                println!("role {}", role_name);
-                println!(
-                    "provisioned cell {:?}\n",
-                    role_assignment.provisioned_cell()
-                );
 
                 // add the base cell to the vector of cell infos
                 if let Some(provisioned_cell) = role_assignment.provisioned_cell() {
