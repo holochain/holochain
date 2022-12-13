@@ -18,13 +18,11 @@ use holochain_conductor_api::{AdminInterfaceConfig, InstalledAppInfo};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_types::prelude::DnaHash;
 use holochain_types::prelude::DnaModifiersOpt;
-use holochain_types::prelude::InstallAppDnaPayload;
-use holochain_types::prelude::InstallAppPayload;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
-use holochain_types::prelude::{CellId, InstallAppBundlePayload};
+use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
 use std::convert::TryFrom;
 
@@ -59,7 +57,6 @@ pub enum AdminRequestCli {
     AddAppWs(AddAppWs),
     RegisterDna(RegisterDna),
     InstallApp(InstallApp),
-    InstallAppBundle(InstallAppBundle),
     /// Calls AdminRequest::UninstallApp.
     UninstallApp(UninstallApp),
     /// Calls AdminRequest::ListAppInterfaces.
@@ -70,8 +67,6 @@ pub enum AdminRequestCli {
     NewAgent,
     /// Calls AdminRequest::ListCellIds.
     ListCells,
-    /// Calls AdminRequest::ListActiveApps.
-    ListActiveApps,
     /// Calls AdminRequest::ListApps.
     ListApps(ListApps),
     EnableApp(EnableApp),
@@ -127,29 +122,8 @@ pub struct RegisterDna {
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
-/// RoleName are set to `my-app-0`, `my-app-1` etc.
-pub struct InstallApp {
-    #[structopt(short, long, default_value = "test-app")]
-    /// Sets the InstalledAppId.
-    pub app_id: String,
-    #[structopt(short = "i", long, parse(try_from_str = parse_agent_key))]
-    /// If not set then a key will be generated.
-    /// Agent key is Base64 (same format that is used in logs).
-    /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
-    pub agent_key: Option<AgentPubKey>,
-    #[structopt(required = true, min_values = 1, parse(try_from_str = parse_dna_hash))]
-    /// The dna hashes to use in this app.
-    pub dnas: Vec<DnaHash>,
-}
-
-#[derive(Debug, StructOpt, Clone)]
-/// Calls AdminRequest::InstallAppBundle
-/// and installs a new app.
-///
-/// Setting properties and membrane proofs is not
-/// yet supported.
 /// RoleNames are set to `my-app-0`, `my-app-1` etc.
-pub struct InstallAppBundle {
+pub struct InstallApp {
     #[structopt(long)]
     /// Sets the InstalledAppId.
     pub app_id: Option<String>,
@@ -298,11 +272,6 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             msg!("Registered Dna: {:?}", dnas);
         }
         AdminRequestCli::InstallApp(args) => {
-            let app_id = args.app_id.clone();
-            let _ = install_app(cmd, args).await?;
-            msg!("Installed App: {}", app_id);
-        }
-        AdminRequestCli::InstallAppBundle(args) => {
             let app = install_app_bundle(cmd, args).await?;
             msg!("Installed App: {}", app.installed_app_id,);
         }
@@ -322,10 +291,6 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::ListCells => {
             let cells = list_cell_ids(cmd).await?;
             msg!("Cell Ids: {:?}", cells);
-        }
-        AdminRequestCli::ListActiveApps => {
-            let apps = list_running_apps(cmd).await?;
-            msg!("Active Apps: {:?}", apps);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = list_apps(cmd, args).await?;
@@ -456,54 +421,11 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
 }
 
 /// Calls [`AdminRequest::InstallApp`] and installs a new app.
-/// Creates an app per dna with the app id of `{app-id}-{dna-index}`
-/// e.g. `my-cool-app-3`.
-pub async fn install_app(
+pub async fn install_app_bundle(
     cmd: &mut CmdRunner,
     args: InstallApp,
 ) -> anyhow::Result<InstalledAppInfo> {
     let InstallApp {
-        app_id,
-        agent_key,
-        dnas,
-    } = args;
-    let agent_key = match agent_key {
-        Some(agent) => agent,
-        None => generate_agent_pub_key(cmd).await?,
-    };
-
-    let dnas = dnas
-        .into_iter()
-        .enumerate()
-        .map(|(i, hash)| InstallAppDnaPayload::hash_only(hash, format!("{}-{}", app_id, i)))
-        .collect();
-
-    let app = InstallAppPayload {
-        installed_app_id: app_id,
-        agent_key,
-        dnas,
-    };
-
-    let r = AdminRequest::InstallApp(app.into());
-    let installed_app = cmd.command(r).await?;
-    let installed_app =
-        expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
-    enable_app(
-        cmd,
-        EnableApp {
-            app_id: installed_app.installed_app_id.clone(),
-        },
-    )
-    .await?;
-    Ok(installed_app)
-}
-
-/// Calls [`AdminRequest::InstallApp`] and installs a new app.
-pub async fn install_app_bundle(
-    cmd: &mut CmdRunner,
-    args: InstallAppBundle,
-) -> anyhow::Result<InstalledAppInfo> {
-    let InstallAppBundle {
         app_id,
         agent_key,
         path,
@@ -515,7 +437,7 @@ pub async fn install_app_bundle(
         None => generate_agent_pub_key(cmd).await?,
     };
 
-    let payload = InstallAppBundlePayload {
+    let payload = InstallAppPayload {
         installed_app_id: app_id,
         agent_key,
         source: AppBundleSource::Path(path),
@@ -523,10 +445,10 @@ pub async fn install_app_bundle(
         network_seed,
     };
 
-    let r = AdminRequest::InstallAppBundle(Box::new(payload));
+    let r = AdminRequest::InstallApp(Box::new(payload));
     let installed_app = cmd.command(r).await?;
     let installed_app =
-        expect_match!(installed_app => AdminResponse::AppBundleInstalled, "Failed to install app");
+        expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
     enable_app(
         cmd,
         EnableApp {
@@ -576,12 +498,6 @@ pub async fn generate_agent_pub_key(cmd: &mut CmdRunner) -> anyhow::Result<Agent
 pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
     let resp = cmd.command(AdminRequest::ListCellIds).await?;
     Ok(expect_match!(resp => AdminResponse::CellIdsListed, "Failed to list cell ids"))
-}
-
-/// Calls [`AdminRequest::ListActiveApps`].
-pub async fn list_running_apps(cmd: &mut CmdRunner) -> anyhow::Result<Vec<String>> {
-    let resp = cmd.command(AdminRequest::ListEnabledApps).await?;
-    Ok(expect_match!(resp => AdminResponse::EnabledAppsListed, "Failed to list active apps"))
 }
 
 /// Calls [`AdminRequest::ListApps`].
