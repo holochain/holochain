@@ -355,7 +355,7 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///
     /// The resulting [`AppInfo`] contains the app ID,
-    /// the [`RoleName`]s and, most usefully, [`CellInfo`]s
+    /// the [`RoleName`]s and, most usefully, [`CellInfo`](crate::CellInfo)s
     /// of the newly installed DNAs.
     AppInstalled(AppInfo),
 
