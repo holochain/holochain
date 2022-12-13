@@ -83,10 +83,10 @@ use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
-use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -1167,7 +1167,7 @@ mod app_impls {
         pub async fn list_apps(
             &self,
             status_filter: Option<AppStatusFilter>,
-        ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        ) -> ConductorResult<Vec<AppInfo>> {
             use AppStatusFilter::*;
             let conductor_state = self.get_state().await?;
 
@@ -1180,7 +1180,7 @@ mod app_impls {
                 None => conductor_state.installed_apps().keys().collect(),
             };
 
-            let apps_info: Vec<InstalledAppInfo> = apps_ids
+            let apps_info: Vec<AppInfo> = apps_ids
                 .into_iter()
                 .filter_map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
                 .collect();
@@ -1243,7 +1243,7 @@ mod app_impls {
         pub async fn get_app_info(
             &self,
             installed_app_id: &InstalledAppId,
-        ) -> ConductorResult<Option<InstalledAppInfo>> {
+        ) -> ConductorResult<Option<AppInfo>> {
             let state = self.get_state().await?;
             let maybe_app_info = self.get_app_info_inner(installed_app_id, &state);
             Ok(maybe_app_info)
@@ -1253,12 +1253,12 @@ mod app_impls {
             &self,
             app_id: &InstalledAppId,
             state: &ConductorState,
-        ) -> Option<InstalledAppInfo> {
+        ) -> Option<AppInfo> {
             match state.installed_apps().get(app_id) {
                 None => None,
                 Some(app) => {
                     let dna_definitions = self.get_dna_definitions();
-                    Some(InstalledAppInfo::from_installed_app(app, &dna_definitions))
+                    Some(AppInfo::from_installed_app(app, &dna_definitions))
                 }
             }
         }

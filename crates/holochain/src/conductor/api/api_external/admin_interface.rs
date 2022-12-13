@@ -148,9 +148,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?
                     .into();
                 let dna_definitions = self.conductor_handle.get_dna_definitions();
-                Ok(AdminResponse::AppInstalled(
-                    InstalledAppInfo::from_installed_app(&app, &dna_definitions),
-                ))
+                Ok(AdminResponse::AppInstalled(AppInfo::from_installed_app(
+                    &app,
+                    &dna_definitions,
+                )))
             }
             UninstallApp { installed_app_id } => {
                 self.conductor_handle

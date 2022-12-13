@@ -539,7 +539,7 @@ pub mod test {
         let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
-            assert_matches!(info.status, InstalledAppInfoStatus::Running);
+            assert_matches!(info.status, AppInfoStatus::Running);
         } else {
             assert!(false);
         }
@@ -582,7 +582,7 @@ pub mod test {
         let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
-            assert_matches!(info.status, InstalledAppInfoStatus::Disabled { .. });
+            assert_matches!(info.status, AppInfoStatus::Disabled { .. });
         } else {
             assert!(false);
         }

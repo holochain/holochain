@@ -3,7 +3,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
-use crate::{FullStateDump, InstalledAppInfo};
+use crate::{AppInfo, FullStateDump};
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -354,10 +354,10 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///
-    /// The resulting [`InstalledAppInfo`] contains the app ID,
-    /// the [`RoleName`]s and, most usefully, the new [`CellId`]s
+    /// The resulting [`AppInfo`] contains the app ID,
+    /// the [`RoleName`]s and, most usefully, [`CellInfo`]s
     /// of the newly installed DNAs.
-    AppInstalled(InstalledAppInfo),
+    AppInstalled(AppInfo),
 
     /// The successful response to an [`AdminRequest::UninstallApp`].
     ///
@@ -387,7 +387,7 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::ListApps`].
     ///
     /// Contains a list of the `InstalledAppInfo` of the installed apps in the conductor.
-    AppsListed(Vec<InstalledAppInfo>),
+    AppsListed(Vec<AppInfo>),
 
     /// The successful response to an [`AdminRequest::AttachAppInterface`].
     ///
@@ -408,7 +408,7 @@ pub enum AdminResponse {
     /// put the app in a running state, it will be running, otherwise it will
     /// be paused.
     AppEnabled {
-        app: InstalledAppInfo,
+        app: AppInfo,
         errors: Vec<(CellId, String)>,
     },
 
