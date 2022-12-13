@@ -179,13 +179,13 @@ impl OpHelper for Op {
                     }) => match store_entry_create::<ET>(entry_type, entry_hash, entry, action)? {
                         OpEntry::CreateEntry {
                             entry_hash,
-                            entry_type,
+                            app_entry: entry_type,
                             ..
                         } => OpEntry::UpdateEntry {
                             entry_hash,
                             original_action_hash: original_action_hash.clone(),
                             original_entry_hash: original_entry_hash.clone(),
-                            entry_type,
+                            app_entry: entry_type,
                             action: action.clone(),
                         },
                         OpEntry::CreateAgent {
@@ -237,6 +237,7 @@ impl OpHelper for Op {
                         original_key: original_entry_hash.clone().into(),
                         original_action_hash: original_action_hash.clone(),
                         new_key,
+                        action: update.clone(),
                     }),
                     InScopeEntry::App(new_entry_type) => {
                         match map_entry::<ET>(entry_type, entry_hash, original_entry)? {
@@ -244,8 +245,9 @@ impl OpHelper for Op {
                                 entry_hash: entry_hash.clone(),
                                 original_action_hash: original_action_hash.clone(),
                                 original_entry_hash: original_entry_hash.clone(),
-                                new_entry_type,
-                                original_entry_type,
+                                new_app_entry: new_entry_type,
+                                original_app_entry: original_entry_type,
+                                action: update.clone(),
                             }),
                             _ => None,
                         }
@@ -259,6 +261,7 @@ impl OpHelper for Op {
                                     original_entry_hash: original_entry_hash.clone(),
                                     new_entry_type,
                                     original_entry_type,
+                                    action: update.clone(),
                                 })
                             }
                             _ => None,
@@ -268,11 +271,14 @@ impl OpHelper for Op {
                         entry_hash: entry_hash.clone(),
                         original_action_hash: original_action_hash.clone(),
                         original_entry_hash: original_entry_hash.clone(),
+                        action: update.clone(),
+
                     }),
                     InScopeEntry::CapGrant => Some(OpUpdate::CapGrant {
                         entry_hash: entry_hash.clone(),
                         original_action_hash: original_action_hash.clone(),
                         original_entry_hash: original_entry_hash.clone(),
+                        action: update.clone(),
                     }),
                 };
                 match r {
@@ -427,24 +433,29 @@ impl OpHelper for Op {
                     InScopeEntry::Agent(_) => OpDelete::Agent {
                         original_key: original_entry_hash.clone().into(),
                         original_action_hash: original_action_hash.clone(),
+                        action: delete.clone(),
                     },
                     InScopeEntry::App(original_entry_type) => OpDelete::Entry {
                         original_action_hash: original_action_hash.clone(),
                         original_entry_hash: original_entry_hash.clone(),
                         original_entry_type,
+                        action: delete.clone(),
                     },
                     InScopeEntry::PrivateApp(original_entry_type) => OpDelete::PrivateEntry {
                         original_action_hash: original_action_hash.clone(),
                         original_entry_hash: original_entry_hash.clone(),
                         original_entry_type,
+                        action: delete.clone(),
                     },
                     InScopeEntry::CapClaim => OpDelete::CapClaim {
                         original_action_hash: original_action_hash.clone(),
                         original_entry_hash: original_entry_hash.clone(),
+                        action: delete.clone(),
                     },
                     InScopeEntry::CapGrant => OpDelete::CapGrant {
                         original_action_hash: original_action_hash.clone(),
                         original_entry_hash: original_entry_hash.clone(),
+                        action: delete.clone(),
                     },
                 };
                 Ok(OpType::RegisterDelete(r))
@@ -467,7 +478,7 @@ where
     match map_entry::<ET>(entry_type, entry_hash, RecordEntryRef::Present(entry))? {
         InScopeEntry::App(entry_type) => Ok(OpEntry::CreateEntry {
             entry_hash: entry_hash.clone(),
-            entry_type,
+            app_entry: entry_type,
             action: action.clone(),
         }),
         InScopeEntry::Agent(agent_key) => Ok(OpEntry::CreateAgent {

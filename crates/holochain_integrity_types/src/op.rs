@@ -774,9 +774,9 @@ where
     CreateEntry {
         /// The hash of the [`Entry`] being created.
         entry_hash: EntryHash,
-        /// The app defined entry type with the deserialized
+        /// The app defined entry with the deserialized
         /// [`Entry`] data.
-        entry_type: ET,
+        app_entry: ET,
         /// The signed action that created this entry
         action: SignedHashed<EntryCreationAction>,
     },
@@ -791,15 +791,15 @@ where
     /// This operation stores the [`Entry`] for the
     /// newly created entry in an update.
     UpdateEntry {
-        /// The hash of the newly created [`Entry`].
+        /// The hash of the [`Entry`] being created.
         entry_hash: EntryHash,
         /// The hash of the original [`Action`].
         original_action_hash: ActionHash,
         /// The hash of the original [`Entry`].
         original_entry_hash: EntryHash,
-        /// The app defined entry type with the deserialized
+        /// The app defined entry with the deserialized
         /// [`Entry`] data of the new entry.
-        entry_type: ET,
+        app_entry: ET,
         /// The signed action that created this entry
         action: SignedHashed<EntryCreationAction>,
     },
@@ -826,7 +826,7 @@ where
     /// This operation registers an update from
     /// the original [`Entry`].
     Entry {
-        /// The hash of the newly created [`Entry`].
+        /// The hash of the [`Entry`] being created.
         entry_hash: EntryHash,
         /// The hash of the original [`Action`].
         original_action_hash: ActionHash,
@@ -834,10 +834,12 @@ where
         original_entry_hash: EntryHash,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data of the original entry.
-        original_entry_type: ET,
+        original_app_entry: ET,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data of the new entry.
-        new_entry_type: ET,
+        new_app_entry: ET,
+        /// The signed action that updated this entry
+        action: SignedHashed<Update>,
     },
     /// This operation registers an update from
     /// the original private [`Entry`].
@@ -854,6 +856,8 @@ where
         /// The unit version of the app defined entry type
         /// for the new entry.
         new_entry_type: <ET as UnitEnum>::Unit,
+        /// The signed action that updated this entry
+        action: SignedHashed<Update>,
     },
     /// This operation registers an update from
     /// the original [`AgentPubKey`].
@@ -864,6 +868,8 @@ where
         original_key: AgentPubKey,
         /// The hash of the original keys [`Action`].
         original_action_hash: ActionHash,
+        /// The signed action that updated this agent
+        action: SignedHashed<Update>,
     },
     /// This operation registers an update from
     /// a Capability Claim.
@@ -874,6 +880,8 @@ where
         original_action_hash: ActionHash,
         /// The hash of the original Capability Claim.
         original_entry_hash: EntryHash,
+        /// The signed action that updated this entry
+        action: SignedHashed<Update>,
     },
     /// This operation registers an update from
     /// a Capability Grant.
@@ -884,6 +892,8 @@ where
         original_action_hash: ActionHash,
         /// The hash of the original Capability Grant.
         original_entry_hash: EntryHash,
+        /// The signed action that updated this entry
+        action: SignedHashed<Update>,
     },
 }
 
@@ -903,6 +913,8 @@ where
         /// The app defined entry type with the deserialized
         /// [`Entry`] data from the deleted entry.
         original_entry_type: ET,
+        /// The signed action that deleted this entry
+        action: SignedHashed<Delete>,
     },
     /// This operation registers a deletion to the
     /// original private [`Entry`].
@@ -914,6 +926,8 @@ where
         /// The unit version of the app defined entry type
         /// of the deleted entry.
         original_entry_type: <ET as UnitEnum>::Unit,
+        /// The signed action that deleted this entry
+        action: SignedHashed<Delete>,
     },
     /// This operation registers a deletion to an
     /// [`AgentPubKey`].
@@ -922,6 +936,8 @@ where
         original_key: AgentPubKey,
         /// The hash of the deleted keys [`Action`].
         original_action_hash: ActionHash,
+        /// The signed action that deleted this entry
+        action: SignedHashed<Delete>,
     },
     /// This operation registers a deletion to a
     /// Capability Claim.
@@ -930,6 +946,8 @@ where
         original_action_hash: ActionHash,
         /// The hash of the deleted Capability Claim.
         original_entry_hash: EntryHash,
+        /// The signed action that deleted this entry
+        action: SignedHashed<Delete>,
     },
     /// This operation registers a deletion to a
     /// Capability Grant.
@@ -938,6 +956,8 @@ where
         original_action_hash: ActionHash,
         /// The hash of the deleted Capability Grant.
         original_entry_hash: EntryHash,
+        /// The signed action that deleted this entry
+        action: SignedHashed<Delete>,
     },
 }
 
