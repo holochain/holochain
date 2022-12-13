@@ -298,6 +298,7 @@ ghost_actor::ghost_chan! {
             request_validation_receipt: bool,
             countersigning_session: bool,
             basis_hash: holo_hash::OpBasis,
+            source: AgentPubKey,
             op_hash_list: Vec<OpHashSized>,
             timeout_ms: Option<u64>,
             reflect_ops: Option<Vec<DhtOp>>,

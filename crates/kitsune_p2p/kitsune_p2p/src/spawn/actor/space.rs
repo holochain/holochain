@@ -72,6 +72,7 @@ ghost_actor::ghost_chan! {
         fn incoming_publish(
             space: KSpace,
             to_agent: KAgent,
+            source: KAgent,
             op_hash_list: OpHashList,
             context: kitsune_p2p_fetch::FetchContext,
             maybe_delegate: MaybeDelegate,
@@ -362,7 +363,7 @@ impl SpaceInternalHandler for Space {
                     });
                 }
             }
-            BroadcastData::Publish(_op_hash, _context) => {
+            BroadcastData::Publish { .. } => {
                 // Don't do anything here. This case is handled by the actor
                 // invoking incoming_publish instead of
                 // incoming_delegate_broadcast.
@@ -428,6 +429,7 @@ impl SpaceInternalHandler for Space {
         &mut self,
         space: KSpace,
         to_agent: KAgent,
+        source: KAgent,
         op_hash_list: OpHashList,
         context: kitsune_p2p_fetch::FetchContext,
         maybe_delegate: MaybeDelegate,
@@ -461,7 +463,11 @@ impl SpaceInternalHandler for Space {
                                 to_agent.clone(),
                                 *mod_idx,
                                 *mod_cnt,
-                                BroadcastData::Publish(vec![op_hash], context),
+                                BroadcastData::Publish {
+                                    source: source.clone(),
+                                    op_hash_list: vec![op_hash],
+                                    context,
+                                },
                             )
                             .await?;
                     }
@@ -471,7 +477,7 @@ impl SpaceInternalHandler for Space {
                     ro_inner.fetch_queue.push(FetchQueuePush {
                         key: FetchKey::Op(op_hash.data()),
                         space: space.clone(),
-                        source: FetchSource::Agent(to_agent.clone()),
+                        source: FetchSource::Agent(source.clone()),
                         size: op_hash.maybe_size(),
                         // TODO - get the author from somewhere
                         author: None,
@@ -490,7 +496,11 @@ impl SpaceInternalHandler for Space {
                                 to_agent: to_agent.clone(),
                                 mod_idx: *mod_idx,
                                 mod_cnt: *mod_cnt,
-                                data: BroadcastData::Publish(vec![op_hash], context),
+                                data: BroadcastData::Publish {
+                                    source: source.clone(),
+                                    op_hash_list: vec![op_hash],
+                                    context,
+                                },
                             },
                         );
                     }
@@ -516,18 +526,7 @@ impl SpaceInternalHandler for Space {
             .await
             {
                 discover::PeerDiscoverResult::OkShortcut => {
-                    use kitsune_p2p_types::codec::Codec;
-                    if let Err(err) = ro_inner
-                        .evt_sender
-                        .notify(
-                            ro_inner.space.clone(),
-                            to_agent,
-                            data.encode_vec().expect("encode data"),
-                        )
-                        .await
-                    {
-                        tracing::debug!(?err);
-                    }
+                    tracing::warn!("no reason to notify ourselves");
                 }
                 discover::PeerDiscoverResult::OkRemote { url: _, con_hnd } => {
                     if let Err(err) = con_hnd.notify(&data, timeout).await {
@@ -972,7 +971,7 @@ impl KitsuneP2pHandler for Space {
                     });
                 }
             }
-            BroadcastData::Publish(_op_hash, _context) => {
+            BroadcastData::Publish { .. } => {
                 // There is nothing to do here!
                 // *We* are the node publishing
                 // so we already have these hashes : )

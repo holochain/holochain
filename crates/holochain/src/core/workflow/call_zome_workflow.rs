@@ -86,8 +86,12 @@ where
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =
-                                super::countersigning_workflow::countersigning_publish(&network, op)
-                                    .await
+                                super::countersigning_workflow::countersigning_publish(
+                                    &network,
+                                    op,
+                                    (*workspace.author().expect("have author")).clone(),
+                                )
+                                .await
                             {
                                 return Ok(Ok(error_response));
                             }

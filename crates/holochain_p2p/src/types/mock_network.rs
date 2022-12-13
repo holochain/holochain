@@ -469,7 +469,7 @@ impl HolochainP2pMockMsg {
                         dna,
                         info,
                     },
-                    BroadcastData::Publish(_op_hash_list, _context) => {
+                    BroadcastData::Publish { .. } => {
                         todo!()
                     }
                 }

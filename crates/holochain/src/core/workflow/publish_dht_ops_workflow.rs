@@ -39,14 +39,22 @@ pub async fn publish_dht_ops_workflow(
     agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
-    let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent).await?;
+    let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
 
     // Commit to the network
     tracing::info!("publishing to {} nodes", to_publish.len());
     let mut success = Vec::new();
     for (basis, op_hash_list) in to_publish {
         match network
-            .publish(true, false, basis, op_hash_list.clone(), None, None)
+            .publish(
+                true,
+                false,
+                basis,
+                agent.clone(),
+                op_hash_list.clone(),
+                None,
+                None,
+            )
             .await
         {
             Err(e) => {

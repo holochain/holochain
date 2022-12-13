@@ -67,6 +67,7 @@ impl HolochainP2pHandler for StubNetwork {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
+        source: AgentPubKey,
         op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
         reflect_ops: Option<Vec<DhtOp>>,
@@ -446,7 +447,7 @@ mod tests {
         // this will fail because we can't reach any remote nodes
         // but, it still published locally, so our test will work
         let _ = p2p
-            .publish(dna, true, false, action_hash, vec![], Some(200), None)
+            .publish(dna, true, false, action_hash, a1.clone(), vec![], Some(200), None)
             .await;
 
         assert_eq!(

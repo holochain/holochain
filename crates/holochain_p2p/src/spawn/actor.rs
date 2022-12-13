@@ -1058,12 +1058,14 @@ impl HolochainP2pHandler for HolochainP2pActor {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
+        source: AgentPubKey,
         op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
         reflect_ops: Option<Vec<DhtOp>>,
     ) -> HolochainP2pHandlerResult<()> {
         use kitsune_p2p_types::KitsuneTimeout;
 
+        let source = source.into_kitsune();
         let space = dna_hash.clone().into_kitsune();
         let basis = basis_hash.to_kitsune();
         let timeout = match timeout_ms {
@@ -1108,7 +1110,11 @@ impl HolochainP2pHandler for HolochainP2pActor {
                     space.clone(),
                     basis.clone(),
                     timeout,
-                    BroadcastData::Publish(op_hash_list, fetch_context),
+                    BroadcastData::Publish {
+                        source,
+                        op_hash_list,
+                        context: fetch_context,
+                    },
                 )
                 .await?;
             Ok(())
