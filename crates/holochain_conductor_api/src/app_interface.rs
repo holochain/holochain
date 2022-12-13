@@ -220,6 +220,39 @@ pub enum CellInfo {
     Stem(StemCell),
 }
 
+impl CellInfo {
+    fn new_provisioned(
+        cell_id: CellId,
+        dna_modifiers: DnaModifiers,
+        name: String,
+        enabled: bool,
+    ) -> Self {
+        Self::Provisioned(Cell {
+            cell_id,
+            clone_id: None,
+            dna_modifiers,
+            name,
+            enabled,
+        })
+    }
+
+    fn new_cloned(
+        cell_id: CellId,
+        clone_id: CloneId,
+        dna_modifiers: DnaModifiers,
+        name: String,
+        enabled: bool,
+    ) -> Self {
+        Self::Cloned(Cell {
+            cell_id,
+            clone_id: Some(clone_id),
+            dna_modifiers,
+            name,
+            enabled,
+        })
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StemCell {
     pub dna: DnaHash,
@@ -265,14 +298,13 @@ impl InstalledAppInfo {
             // push the base cell to the vector of cell infos
             if let Some(provisioned_cell) = role_assignment.provisioned_cell() {
                 if let Some(dna_def) = dna_definitions.get(provisioned_cell) {
-                    let cell_info = CellInfo::Provisioned(Cell {
-                        clone_id: None,
-                        cell_id: provisioned_cell.clone(),
-                        dna_modifiers: dna_def.modifiers.to_owned(),
-                        name: dna_def.name.to_owned(),
-                        // TODO: populate with cell state once it is implemented for a base cell
-                        enabled: status == InstalledAppInfoStatus::Running,
-                    });
+                    // TODO: populate `enabled` with cell state once it is implemented for a base cell
+                    let cell_info = CellInfo::new_provisioned(
+                        provisioned_cell.clone(),
+                        dna_def.modifiers.to_owned(),
+                        dna_def.name.to_owned(),
+                        status == InstalledAppInfoStatus::Running,
+                    );
                     cell_info_for_role.push(cell_info);
                 }
             } else {
@@ -285,13 +317,13 @@ impl InstalledAppInfo {
             if let Some(clone_cells) = app.clone_cells_for_role_name(role_name) {
                 clone_cells.iter().for_each(|(clone_id, cell_id)| {
                     if let Some(dna_def) = dna_definitions.get(cell_id) {
-                        let cell_info = CellInfo::Cloned(Cell {
-                            clone_id: Some(clone_id.to_owned()),
-                            cell_id: cell_id.to_owned(),
-                            dna_modifiers: dna_def.modifiers.to_owned(),
-                            name: dna_def.name.to_owned(),
-                            enabled: true,
-                        });
+                        let cell_info = CellInfo::new_cloned(
+                            cell_id.to_owned(),
+                            clone_id.to_owned(),
+                            dna_def.modifiers.to_owned(),
+                            dna_def.name.to_owned(),
+                            true,
+                        );
                         cell_info_for_role.push(cell_info);
                     } else {
                         tracing::error!("app info: no ribosome found for cell id {}", cell_id);
@@ -303,13 +335,13 @@ impl InstalledAppInfo {
             if let Some(clone_cells) = app.disabled_clone_cells_for_role_name(role_name) {
                 clone_cells.iter().for_each(|(clone_id, cell_id)| {
                     if let Some(dna_def) = dna_definitions.get(cell_id) {
-                        let cell_info = CellInfo::Cloned(Cell {
-                            clone_id: Some(clone_id.to_owned()),
-                            cell_id: cell_id.to_owned(),
-                            dna_modifiers: dna_def.modifiers.to_owned(),
-                            name: dna_def.name.to_owned(),
-                            enabled: false,
-                        });
+                        let cell_info = CellInfo::new_cloned(
+                            cell_id.to_owned(),
+                            clone_id.to_owned(),
+                            dna_def.modifiers.to_owned(),
+                            dna_def.name.to_owned(),
+                            false,
+                        );
                         cell_info_for_role.push(cell_info);
                     } else {
                         tracing::error!("app info: no ribosome found for cell id {}", cell_id);
