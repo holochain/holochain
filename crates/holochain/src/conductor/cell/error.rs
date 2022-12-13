@@ -75,6 +75,8 @@ pub enum CellError {
     StateQueryError(#[from] holochain_state::query::StateQueryError),
     #[error(transparent)]
     StateMutationError(#[from] holochain_state::mutations::StateMutationError),
+    #[error(transparent)]
+    OneErr(#[from] one_err::OneErr),
 }
 
 pub type CellResult<T> = Result<T, CellError>;

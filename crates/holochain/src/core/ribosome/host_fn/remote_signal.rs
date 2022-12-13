@@ -3,12 +3,19 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_state::nonce::fresh_nonce;
 use holochain_types::access::Permission;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
 use std::sync::Arc;
 use tracing::Instrument;
+use holochain_types::prelude::Signature;
+use holochain_zome_types::zome_io::ZomeCallUnsigned;
+use holochain_types::prelude::CellId;
+use holochain_types::prelude::AgentPubKey;
+use holochain_zome_types::Timestamp;
+use holochain_keystore::AgentPubKeyExt;
 
 #[tracing::instrument(skip(_ribosome, call_context, input))]
 pub fn remote_signal(
@@ -31,10 +38,49 @@ pub fn remote_signal(
             let RemoteSignal { agents, signal } = input;
             let zome_name = call_context.zome().zome_name().clone();
             let fn_name: FunctionName = FN_NAME.into();
+
             tokio::task::spawn(
                 async move {
+                    let mut to_agent_list: Vec<(Signature, AgentPubKey)> = Vec::new();
+
+                    let (nonce, expires_at) = match fresh_nonce(Timestamp::now()) {
+                        Ok(nonce) => nonce,
+                        Err(e) => {
+                            tracing::info!("Failed to get a fresh nonce because of {:?}", e);
+                            return;
+                        }
+                    };
+
+                    for agent in agents {
+                        let zome_call_unsigned = ZomeCallUnsigned {
+                            provenance: from_agent.clone(),
+                            cell_id: CellId::new(network.dna_hash(), agent.clone()),
+                            zome_name: zome_name.clone(),
+                            fn_name: fn_name.clone(),
+                            cap_secret: None,
+                            payload: signal.clone(),
+                            nonce,
+                            expires_at,
+                        };
+                        let potentially_signature = zome_call_unsigned.provenance.sign_raw(call_context.host_context.keystore(), match zome_call_unsigned.data_to_sign() {
+                            Ok(to_sign) => to_sign,
+                            Err(e) => {
+                                tracing::info!("Failed to serialize zome call for signal because of {:?}", e);
+                                return;
+                            }
+                        }).await;
+
+                        match potentially_signature {
+                            Ok(signature) => to_agent_list.push((signature, agent)),
+                            Err(e) => {
+                                tracing::info!("Failed to sign and send remote signals because of {:?}", e);
+                                return;
+                            }
+                        }
+                    }
+
                     if let Err(e) = network
-                        .remote_signal(from_agent, agents, zome_name, fn_name, None, signal)
+                        .remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal, nonce, expires_at)
                         .await
                     {
                         tracing::info!("Failed to send remote signals because of {:?}", e);

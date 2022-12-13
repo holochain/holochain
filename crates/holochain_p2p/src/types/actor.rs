@@ -218,11 +218,14 @@ ghost_actor::ghost_chan! {
         fn call_remote(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
+            signature: Signature,
             to_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap_secret: Option<CapSecret>,
             payload: ExternIO,
+            nonce: Nonce256Bits,
+            expires_at: Timestamp,
         ) -> SerializedBytes;
 
         /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -232,11 +235,13 @@ ghost_actor::ghost_chan! {
         fn remote_signal(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            to_agent_list: Vec<AgentPubKey>,
+            to_agent_list: Vec<(Signature, AgentPubKey)>,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap: Option<CapSecret>,
             payload: ExternIO,
+            nonce: Nonce256Bits,
+            expires_at: Timestamp,
         ) -> ();
 
         /// Publish data to the correct neighborhood.

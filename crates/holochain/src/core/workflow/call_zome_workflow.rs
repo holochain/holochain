@@ -196,22 +196,24 @@ pub async fn call_zome_function_authorized<R>(
 where
     R: RibosomeT + 'static,
 {
-    if invocation.is_authorized(&host_access).await? {
-        tokio::task::spawn_blocking(|| {
-            let r = ribosome.call_zome_function(host_access, invocation);
-            Ok((ribosome, r))
-        })
-        .await?
-    } else {
-        Ok((
+    match invocation.is_authorized(&host_access).await? {
+        ZomeCallAuthorization::Authorized => {
+            tokio::task::spawn_blocking(|| {
+                let r = ribosome.call_zome_function(host_access, invocation);
+                Ok((ribosome, r))
+            })
+            .await?
+        }
+        not_authorized_reason => Ok((
             ribosome,
             Ok(ZomeCallResponse::Unauthorized(
+                not_authorized_reason,
                 invocation.cell_id.clone(),
                 invocation.zome.zome_name().clone(),
                 invocation.fn_name.clone(),
                 invocation.provenance.clone(),
             )),
-        ))
+        )),
     }
 }
 /// Run validation inline and wait for the result.

@@ -136,7 +136,7 @@ pub async fn connect(
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(tag = "type")]
+#[serde(rename_all = "snake_case", tag = "type")]
 /// The messages actually sent over the wire by this library.
 /// If you want to impliment your own server or client you
 /// will need this type or be able to serialize / deserialize it.
