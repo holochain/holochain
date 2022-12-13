@@ -450,7 +450,7 @@ mod tests {
             .await;
 
         assert_eq!(
-            "KitsuneSpace(0x737373737373737373737373737373737373737373737373737373737373737373737373):[]:FetchContext(1)",
+            "KitsuneSpace(0x737373737373737373737373737373737373737373737373737373737373737373737373):[]:Some(FetchContext(1))",
             host_list.lock().unwrap()[0],
         );
 
