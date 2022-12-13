@@ -1,5 +1,6 @@
 use crate::sweettest::*;
 use holo_hash::ActionHash;
+use holochain_conductor_api::CellInfo;
 use holochain_types::{
     app::CreateCloneCellPayload,
     prelude::{ArchiveCloneCellPayload, CloneCellId, DeleteArchivedCloneCellsPayload},
@@ -143,15 +144,16 @@ async fn app_info_includes_cloned_cells() {
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app_id = "app";
     conductor
-        .setup_app_for_agent(app_id, alice.clone(), [&(role_name.clone(), dna)])
+        .setup_app_for_agent(app_id, alice.clone(), [&(role_name.clone(), dna.clone())])
         .await
         .unwrap();
+    let dna_modifiers = DnaModifiersOpt::none().with_network_seed("seed_1".to_string());
     let installed_clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.to_string(),
             role_name: role_name.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
+            modifiers: dna_modifiers.clone(),
             membrane_proof: None,
             name: None,
         })
@@ -163,9 +165,17 @@ async fn app_info_includes_cloned_cells() {
         .await
         .unwrap()
         .unwrap();
+    let cell_info_for_role = app_info.cell_info.get(&role_name).unwrap();
 
-    assert_eq!(app_info.cell_data.len(), 2);
-    assert!(app_info.cell_data.contains(&installed_clone_cell));
+    assert_eq!(cell_info_for_role.len(), 2);
+    assert!(cell_info_for_role
+        .iter()
+        .find(|cell_info| if let CellInfo::Cloned(cell) = cell_info {
+            cell.cell_id == installed_clone_cell.as_id().clone()
+        } else {
+            false
+        })
+        .is_some());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -209,7 +219,15 @@ async fn clone_cell_deletion() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(app_info.cell_data.contains(&installed_clone_cell), false);
+    let cell_info_for_role = app_info.cell_info.get(&role_name).unwrap();
+    assert!(cell_info_for_role
+        .iter()
+        .find(|cell_info| if let CellInfo::Cloned(cell) = cell_info {
+            cell.cell_id == installed_clone_cell.as_id().clone()
+        } else {
+            false
+        })
+        .is_none());
 
     // calling the cell after archiving fails
     let zome = SweetZome::new(
@@ -242,7 +260,15 @@ async fn clone_cell_deletion() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(app_info.cell_data.contains(&installed_clone_cell), true);
+    let cell_info_for_role = app_info.cell_info.get(&role_name).unwrap();
+    assert!(cell_info_for_role
+        .iter()
+        .find(|cell_info| if let CellInfo::Cloned(cell) = cell_info {
+            cell.cell_id == installed_clone_cell.as_id().clone()
+        } else {
+            false
+        })
+        .is_some());
 
     // calling the cell after restoring succeeds
     let zome_call_response: Result<ActionHash, _> = conductor

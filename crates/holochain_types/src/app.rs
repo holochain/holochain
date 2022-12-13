@@ -487,6 +487,17 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
+    pub fn disabled_clone_cells_for_role_name(
+        &self,
+        role_name: &RoleName,
+    ) -> Option<&HashMap<CloneId, CellId>> {
+        match self.role_assignments.get(role_name) {
+            None => None,
+            Some(role_assignments) => Some(&role_assignments.archived_clones),
+        }
+    }
+
+    /// Accessor
     pub fn clone_cell_ids(&self) -> impl Iterator<Item = &CellId> {
         self.clone_cells().map(|(_, cell_id)| cell_id)
     }

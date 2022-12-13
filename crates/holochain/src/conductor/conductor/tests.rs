@@ -489,7 +489,7 @@ async fn test_reenable_app() {
         .unwrap();
     assert_eq!(inactive_apps.len(), 0);
     assert_eq!(active_apps.len(), 1);
-    assert_eq!(active_apps[0].cell_data.len(), 2);
+    assert_eq!(active_apps[0].cell_info.len(), 2);
     assert_matches!(active_apps[0].status, InstalledAppInfoStatus::Running);
 
     conductor
@@ -507,7 +507,7 @@ async fn test_reenable_app() {
         .unwrap();
     assert_eq!(active_apps.len(), 0);
     assert_eq!(inactive_apps.len(), 1);
-    assert_eq!(inactive_apps[0].cell_data.len(), 2);
+    assert_eq!(inactive_apps[0].cell_info.len(), 2);
     assert_matches!(
         inactive_apps[0].status,
         InstalledAppInfoStatus::Disabled {
