@@ -259,7 +259,10 @@ pub struct InstalledAppInfo {
 }
 
 impl InstalledAppInfo {
-    pub fn from_installed_app(app: &InstalledApp, dna_definitions: &HashMap<CellId, DnaDefHashed>) -> Self {
+    pub fn from_installed_app(
+        app: &InstalledApp,
+        dna_definitions: &HashMap<CellId, DnaDefHashed>,
+    ) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
 
