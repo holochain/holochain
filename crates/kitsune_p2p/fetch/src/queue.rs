@@ -11,8 +11,7 @@
 //! interval.
 
 use std::{
-    collections::HashMap,
-    sync::{atomic::AtomicU32, Arc},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -74,6 +73,7 @@ pub struct State {
     queue: LinkedHashMap<FetchKey, FetchQueueItem>,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for State {
     fn default() -> Self {
         Self {
