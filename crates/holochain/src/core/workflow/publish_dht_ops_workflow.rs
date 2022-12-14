@@ -39,14 +39,23 @@ pub async fn publish_dht_ops_workflow(
     agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
-    let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent).await?;
+    let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
 
     // Commit to the network
     tracing::info!("publishing to {} nodes", to_publish.len());
     let mut success = Vec::new();
-    for (basis, op_hash_list) in to_publish {
+    for (basis, list) in to_publish {
+        let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
         match network
-            .publish(true, false, basis, op_hash_list.clone(), None)
+            .publish(
+                true,
+                false,
+                basis,
+                agent.clone(),
+                op_hash_list.clone(),
+                None,
+                Some(op_data_list),
+            )
             .await
         {
             Err(e) => {
@@ -92,17 +101,17 @@ pub async fn publish_dht_ops_workflow(
 pub async fn publish_dht_ops_workflow_inner(
     db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
-) -> WorkflowResult<HashMap<OpBasis, Vec<OpHashSized>>> {
+) -> WorkflowResult<HashMap<OpBasis, Vec<(OpHashSized, crate::prelude::DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash) in publish_query::get_ops_to_publish(agent, &db).await? {
+    for (basis, op_hash, op) in publish_query::get_ops_to_publish(agent, &db).await? {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
             .entry(basis)
             .or_insert_with(Vec::new)
-            .push(op_hash);
+            .push((op_hash, op));
     }
 
     Ok(to_publish)

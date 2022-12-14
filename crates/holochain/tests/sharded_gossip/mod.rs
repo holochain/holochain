@@ -466,6 +466,9 @@ async fn mock_network_sharded_gossip() {
                 // Match on the message and create a response (if a response is needed).
                 match msg {
                     HolochainP2pMockMsg::Wire { msg, .. } => match msg {
+                        holochain_p2p::WireMessage::CallRemoteMulti { .. } => {
+                            debug!("CallRemoteMulti")
+                        }
                         holochain_p2p::WireMessage::CallRemote { .. } => debug!("CallRemote"),
                         /* (david.b) TODO - this has been replaced by
                          *                  combined `receive_ops`
@@ -980,6 +983,9 @@ async fn mock_network_sharding() {
                 // Match on the message and create a response (if a response is needed).
                 match msg {
                     HolochainP2pMockMsg::Wire { msg, .. } => match msg {
+                        holochain_p2p::WireMessage::CallRemoteMulti { .. } => {
+                            debug!("CallRemoteMulti")
+                        }
                         holochain_p2p::WireMessage::CallRemote { .. } => debug!("CallRemote"),
                         holochain_p2p::WireMessage::ValidationReceipt { receipt: _ } => {
                             debug!("Validation Receipt")

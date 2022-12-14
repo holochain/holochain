@@ -198,6 +198,7 @@ where
             init_is_root: false,
         })
     }
+
     pub fn source_chain(&self) -> &Option<SourceChain<SourceChainDb, SourceChainDht>> {
         &self.source_chain
     }

@@ -5,7 +5,6 @@
 //! SourceChain which has already undergone Genesis.
 
 use super::api::CellConductorHandle;
-use super::api::ZomeCall;
 use super::interface::SignalBroadcaster;
 use super::manager::ManagedTaskAdd;
 use super::space::Space;
@@ -34,12 +33,14 @@ use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
+use holochain_conductor_api::ZomeCall;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
@@ -285,15 +286,42 @@ impl Cell {
                             continue;
                         }
                     };
-                    let invocation = ZomeCall {
+                    let provenance = self.id.agent_pubkey().clone();
+                    let (nonce, expires_at) = match fresh_nonce(now) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            error!("{}", e.to_string());
+                            continue;
+                        }
+                    };
+                    let unsigned_zome_call = ZomeCallUnsigned {
+                        provenance,
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
+                        fn_name: scheduled_fn.fn_name().clone(),
                         cap_secret: None,
                         payload,
-                        provenance: self.id.agent_pubkey().clone(),
-                        fn_name: scheduled_fn.fn_name().clone(),
+                        nonce,
+                        expires_at,
                     };
-                    tasks.push(self.call_zome(invocation, None));
+
+                    tasks.push(
+                        self.call_zome(
+                            match ZomeCall::try_from_unsigned_zome_call(
+                                self.conductor_handle.keystore(),
+                                unsigned_zome_call,
+                            )
+                            .await
+                            {
+                                Ok(zome_call) => zome_call,
+                                Err(e) => {
+                                    error!("{}", e.to_string());
+                                    continue;
+                                }
+                            },
+                            None,
+                        ),
+                    );
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
@@ -364,16 +392,22 @@ impl Cell {
             CallRemote {
                 span_context: _,
                 from_agent,
+                signature,
                 zome_name,
                 fn_name,
                 cap_secret,
                 respond,
                 payload,
+                nonce,
+                expires_at,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, zome_name, fn_name, cap_secret, payload)
+                        .handle_call_remote(
+                            from_agent, signature, zome_name, fn_name, cap_secret, payload, nonce,
+                            expires_at,
+                        )
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -757,14 +791,18 @@ impl Cell {
     }
 
     #[instrument(skip(self, from_agent, fn_name, cap_secret, payload))]
+    #[allow(clippy::too_many_arguments)]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCall {
             cell_id: self.id.clone(),
@@ -772,7 +810,10 @@ impl Cell {
             cap_secret,
             payload,
             provenance: from_agent,
+            signature: from_signature,
             fn_name,
+            nonce,
+            expires_at,
         };
         // double ? because
         // - ConductorApiResult
@@ -879,7 +920,7 @@ impl Cell {
         .await?;
 
         // Check if initialization has run
-        if workspace.source_chain().has_initialized()? {
+        if workspace.source_chain().zomes_initialized().await? {
             return Ok(());
         }
         trace!("running init");

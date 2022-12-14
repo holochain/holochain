@@ -94,6 +94,9 @@ pub struct Space {
     /// There is one per unique Dna.
     pub cache_db: DbWrite<DbKindCache>,
 
+    /// The conductor database. There is only one of these.
+    pub conductor_db: DbWrite<DbKindConductor>,
+
     /// The authored databases. These are shared across cells.
     /// There is one per unique Dna.
     pub authored_db: DbWrite<DbKindAuthored>,
@@ -455,8 +458,11 @@ impl Spaces {
         query: FetchOpDataQuery,
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         match query {
-            FetchOpDataQuery::Hashes(op_hashes) => {
-                self.handle_fetch_op_data_by_hashes(dna_hash, op_hashes)
+            FetchOpDataQuery::Hashes {
+                op_hash_list,
+                include_limbo,
+            } => {
+                self.handle_fetch_op_data_by_hashes(dna_hash, op_hash_list, include_limbo)
                     .await
             }
             FetchOpDataQuery::Regions(regions) => {
@@ -515,25 +521,34 @@ impl Spaces {
         &self,
         dna_hash: &DnaHash,
         op_hashes: Vec<holo_hash::DhtOpHash>,
+        include_limbo: bool,
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
+        let mut sql = "
+            SELECT DhtOp.hash, DhtOp.type AS dht_type,
+            Action.blob AS action_blob, Entry.blob AS entry_blob
+            FROM DHtOp
+            JOIN Action ON DhtOp.action_hash = Action.hash
+            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+            WHERE
+            DhtOp.hash = ?
+        "
+        .to_string();
+
+        if !include_limbo {
+            sql.push_str(
+                "
+                AND
+                DhtOp.when_integrated IS NOT NULL
+            ",
+            );
+        }
+
         let db = self.dht_db(dna_hash)?;
         let results = db
             .async_reader(move |txn| {
                 let mut out = Vec::with_capacity(op_hashes.len());
                 for hash in op_hashes {
-                    let mut stmt = txn.prepare_cached(
-                        "
-                    SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                    Action.blob AS action_blob, Entry.blob AS entry_blob
-                    FROM DHtOp
-                    JOIN Action ON DhtOp.action_hash = Action.hash
-                    LEFT JOIN Entry ON Action.entry_hash = Entry.hash
-                    WHERE
-                    DhtOp.hash = ?
-                    AND
-                    DhtOp.when_integrated IS NOT NULL
-                ",
-                    )?;
+                    let mut stmt = txn.prepare_cached(&sql)?;
                     let mut rows = stmt.query([hash])?;
                     if let Some(row) = rows.next()? {
                         let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
@@ -662,6 +677,8 @@ impl Space {
             DbKindP2pMetrics(space),
             db_sync_level,
         )?;
+        let conductor_db: DbWrite<DbKindConductor> =
+            DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         tokio::spawn(p2p_agent_store::p2p_put_all_batch(
@@ -686,6 +703,7 @@ impl Space {
             incoming_op_hashes,
             incoming_ops_batch,
             dht_query_cache,
+            conductor_db,
         };
         Ok(r)
     }

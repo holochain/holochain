@@ -121,6 +121,7 @@ pub mod wasm_test {
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
+    use holochain_zome_types::zome_io::ZomeCallUnsigned;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasmer_host::prelude::*;
 
@@ -365,6 +366,8 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn unlock_invalid_session() {
+        use holochain_state::nonce::fresh_nonce;
+
         observability::test_run().ok();
         let RibosomeTestFixture {
             conductor,
@@ -374,6 +377,7 @@ pub mod wasm_test {
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+        let now = Timestamp::now();
 
         // Before preflight Alice can commit
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
@@ -422,34 +426,59 @@ pub mod wasm_test {
                 unreachable!();
             };
 
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
             .raw_handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
 
         expect_chain_locked(thing_fail_create_alice);
 
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+    
         // Creating the INCORRECT countersigned entry WILL immediately unlock
         // the chain.
         let countersign_fail_create_alice = conductor
             .raw_handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "create_an_invalid_countersigned_thing".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(vec![alice_response.clone(), bob_response.clone()])
-                    .unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_an_invalid_countersigned_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(vec![
+                            alice_response.clone(),
+                            bob_response.clone(),
+                        ])
+                        .unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         assert!(matches!(countersign_fail_create_alice, Err(_)));
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
@@ -458,6 +487,8 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn lock_chain() {
+        use holochain_state::nonce::fresh_nonce;
+
         observability::test_run().ok();
         let RibosomeTestFixture {
             conductor,
@@ -469,7 +500,7 @@ pub mod wasm_test {
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
-
+        let now = Timestamp::now();
         // Before the preflight creation of things should work.
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
 
@@ -513,17 +544,28 @@ pub mod wasm_test {
                 unreachable!();
             };
 
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
         // Can't accept a second preflight request while the first is active.
         let preflight_acceptance_fail = conductor
             .raw_handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "accept_countersigning_preflight_request".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(&preflight_request_2).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "accept_countersigning_preflight_request".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(&preflight_request_2).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         assert!(matches!(
             preflight_acceptance_fail,
@@ -545,30 +587,52 @@ pub mod wasm_test {
                 unreachable!();
             };
 
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
         // With an accepted preflight creations must fail for alice.
         let thing_fail_create_alice = conductor
             .raw_handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         expect_chain_locked(thing_fail_create_alice);
 
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
         let thing_fail_create_bob = conductor
             .raw_handle()
-            .call_zome(ZomeCall {
-                cell_id: bob.cell_id().clone(),
-                zome_name: bob.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: bob_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: bob.cell_id().clone(),
+                        zome_name: bob.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: bob_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         expect_chain_locked(thing_fail_create_bob);
 
@@ -581,16 +645,27 @@ pub mod wasm_test {
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await;
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
         let thing_fail_create_alice = conductor
             .raw_handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
 
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -611,17 +686,28 @@ pub mod wasm_test {
             .await;
         assert_eq!(alice_activity_pre.valid_activity.len(), 6);
 
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
         // Creation will still fail for bob.
         let thing_fail_create_bob = conductor
             .raw_handle()
-            .call_zome(ZomeCall {
-                cell_id: bob.cell_id().clone(),
-                zome_name: bob.name().clone(),
-                fn_name: "create_a_thing".into(),
-                cap_secret: None,
-                provenance: bob_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: bob.cell_id().clone(),
+                        zome_name: bob.name().clone(),
+                        fn_name: "create_a_thing".into(),
+                        cap_secret: None,
+                        provenance: bob_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await;
         expect_chain_locked(thing_fail_create_bob);
 
@@ -947,6 +1033,8 @@ pub mod wasm_test {
                     unreachable!();
                 };
 
+            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+
             // Alice commits the action.
             let _countersigned_action_hash_alice: ActionHash = alice_conductor
                 .call(
@@ -1001,6 +1089,7 @@ pub mod wasm_test {
                 bob_activity_pre.valid_activity.len() + 2
             );
         }
+
 
         // ENZYMATIC
 

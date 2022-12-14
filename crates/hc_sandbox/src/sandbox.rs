@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use holochain_types::prelude::InstalledAppId;
 
-use crate::calls::InstallAppBundle;
+use crate::calls::InstallApp;
 use crate::cmds::*;
 use crate::run::run_async;
 use crate::CmdRunner;
@@ -23,7 +23,7 @@ pub async fn default_with_network(
     let path = crate::generate::generate(network.map(|n| n.into_inner().into()), root, directory)?;
     let conductor = run_async(holochain_path, path.clone(), None).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
-    let install_bundle = InstallAppBundle {
+    let install_bundle = InstallApp {
         app_id: Some(app_id),
         agent_key: None,
         path: happ,

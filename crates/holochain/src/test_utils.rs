@@ -1,7 +1,5 @@
 //! Utils for Holochain tests
-
 use crate::conductor::api::RealAppInterfaceApi;
-use crate::conductor::api::ZomeCall;
 use crate::conductor::conductor::CellStatus;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
@@ -17,6 +15,7 @@ use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
+use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::dht::prelude::Topology;
@@ -29,6 +28,7 @@ use holochain_p2p::HolochainP2pRef;
 use holochain_p2p::HolochainP2pSender;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
+use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::prelude::SourceChainResult;
@@ -834,8 +834,9 @@ pub async fn display_agent_infos(conductor: &ConductorHandle) {
     }
 }
 
-/// Helper to create a zome invocation for tests
-pub fn new_zome_call<P, Z: Into<ZomeName>>(
+/// Helper to create a signed zome invocation for tests
+pub async fn new_zome_call<P, Z: Into<ZomeName>>(
+    keystore: &MetaLairClient,
     cell_id: &CellId,
     func: &str,
     payload: P,
@@ -844,18 +845,40 @@ pub fn new_zome_call<P, Z: Into<ZomeName>>(
 where
     P: serde::Serialize + std::fmt::Debug,
 {
-    Ok(ZomeCall {
+    let zome_call_unsigned = new_zome_call_unsigned(cell_id, func, payload, zome)?;
+    Ok(
+        ZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned)
+            .await
+            .unwrap(),
+    )
+}
+
+/// Helper to create an unsigned zome invocation for tests
+pub fn new_zome_call_unsigned<P, Z: Into<ZomeName>>(
+    cell_id: &CellId,
+    func: &str,
+    payload: P,
+    zome: Z,
+) -> Result<ZomeCallUnsigned, SerializedBytesError>
+where
+    P: serde::Serialize + std::fmt::Debug,
+{
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+    Ok(ZomeCallUnsigned {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
         provenance: cell_id.agent_pubkey().clone(),
+        nonce,
+        expires_at,
     })
 }
 
 /// Helper to create a zome invocation for tests
-pub fn new_invocation<P, Z: Into<Zome>>(
+pub async fn new_invocation<P, Z: Into<Zome> + Clone>(
+    keystore: &MetaLairClient,
     cell_id: &CellId,
     func: &str,
     payload: P,
@@ -864,13 +887,27 @@ pub fn new_invocation<P, Z: Into<Zome>>(
 where
     P: serde::Serialize + std::fmt::Debug,
 {
+    let ZomeCall {
+        cell_id,
+        cap_secret,
+        fn_name,
+        payload,
+        provenance,
+        signature,
+        nonce,
+        expires_at,
+        ..
+    } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
     Ok(ZomeCallInvocation {
-        cell_id: cell_id.clone(),
+        cell_id,
         zome: zome.into(),
-        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: func.into(),
-        payload: ExternIO::encode(payload)?,
-        provenance: cell_id.agent_pubkey().clone(),
+        cap_secret,
+        fn_name,
+        payload,
+        provenance,
+        signature,
+        nonce,
+        expires_at,
     })
 }
 

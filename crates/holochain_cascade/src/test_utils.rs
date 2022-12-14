@@ -47,8 +47,10 @@ use holochain_types::metadata::MetadataSet;
 use holochain_types::prelude::WireEntryOps;
 use holochain_types::record::WireRecordOps;
 use holochain_types::test_utils::chain::*;
+use holochain_zome_types::zome_io::Nonce256Bits;
 use holochain_zome_types::ActionRefMut;
 use holochain_zome_types::QueryFilter;
+use holochain_zome_types::Signature;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::ValidationStatus;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
@@ -212,11 +214,13 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn remote_signal(
         &self,
         _from_agent: AgentPubKey,
-        _to_agent_list: Vec<AgentPubKey>,
+        _to_agent_list: Vec<(Signature, AgentPubKey)>,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
+        _nonce: Nonce256Bits,
+        _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -226,8 +230,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _request_validation_receipt: bool,
         _countersigning_session: bool,
         _basis_hash: holo_hash::OpBasis,
+        _source: AgentPubKey,
         _op_hash_list: Vec<OpHashSized>,
         _timeout_ms: Option<u64>,
+        _reflect_ops: Option<Vec<crate::DhtOp>>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -267,11 +273,14 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn call_remote(
         &self,
         _from_agent: AgentPubKey,
+        _from_signature: Signature,
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
+        _nonce: Nonce256Bits,
+        _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }
@@ -398,11 +407,13 @@ impl HolochainP2pDnaT for MockNetwork {
     async fn remote_signal(
         &self,
         _from_agent: AgentPubKey,
-        _to_agent_list: Vec<AgentPubKey>,
+        _to_agent_list: Vec<(Signature, AgentPubKey)>,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
+        _nonce: Nonce256Bits,
+        _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -412,8 +423,10 @@ impl HolochainP2pDnaT for MockNetwork {
         _request_validation_receipt: bool,
         _countersigning_session: bool,
         _basis_hash: holo_hash::OpBasis,
+        _source: AgentPubKey,
         _op_hash_list: Vec<OpHashSized>,
         _timeout_ms: Option<u64>,
+        _reflect_ops: Option<Vec<crate::DhtOp>>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -453,11 +466,14 @@ impl HolochainP2pDnaT for MockNetwork {
     async fn call_remote(
         &self,
         _from_agent: AgentPubKey,
+        _from_signature: Signature,
         _to_agent: AgentPubKey,
         _zome_name: holochain_zome_types::ZomeName,
         _fn_name: holochain_zome_types::FunctionName,
         _cap: Option<holochain_zome_types::CapSecret>,
         _payload: holochain_zome_types::ExternIO,
+        _nonce: Nonce256Bits,
+        _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }

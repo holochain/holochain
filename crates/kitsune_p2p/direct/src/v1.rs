@@ -925,7 +925,10 @@ async fn handle_fetch_op_data(
         .map_err(KdError::other)?;
 
     match query {
-        FetchOpDataEvtQuery::Hashes(hashes) => {
+        FetchOpDataEvtQuery::Hashes {
+            op_hash_list: hashes,
+            ..
+        } => {
             for op_hash in hashes {
                 for info in &agent_info_list {
                     let agent = info.agent().clone();

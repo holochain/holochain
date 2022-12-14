@@ -21,17 +21,13 @@ impl FetchQueueReader {
     }
     /// Get info about the queue, filtered by space
     pub fn info(&self, spaces: HashSet<KSpace>) -> FetchQueueInfoStateful {
-        let (count, bytes) = self
-            .queue
-            .state
-            .share_ref(|s| {
-                Ok(s.queue
-                    .values()
-                    .filter(|v| spaces.contains(&v.space))
-                    .filter_map(|v| v.size.map(|s| s.get()))
-                    .fold((0, 0), |(c, s), t| (c + 1, s + t)))
-            })
-            .unwrap();
+        let (count, bytes) = self.queue.state.share_ref(|s| {
+            s.queue
+                .values()
+                .filter(|v| spaces.contains(&v.space))
+                .filter_map(|v| v.size.map(|s| s.get()))
+                .fold((0, 0), |(c, s), t| (c + 1, s + t))
+        });
 
         let max = self
             .max_info
@@ -81,7 +77,7 @@ pub struct FetchQueueInfoStateful {
 mod tests {
     use std::sync::Arc;
 
-    use kitsune_p2p_types::tx2::tx2_utils::Share;
+    use kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
 
     use crate::{queue::tests::*, State};
 
@@ -89,11 +85,12 @@ mod tests {
 
     #[test]
     fn queue_info() {
+        let cfg = Config(1, 1);
         let q = {
             let mut queue = [
-                (key_op(1), item(sources(0..=2), ctx(1))),
-                (key_op(2), item(sources(1..=3), ctx(1))),
-                (key_op(3), item(sources(2..=4), ctx(1))),
+                (key_op(1), item(&cfg, sources(0..=2), ctx(1))),
+                (key_op(2), item(&cfg, sources(1..=3), ctx(1))),
+                (key_op(3), item(&cfg, sources(2..=4), ctx(1))),
             ];
 
             queue[0].1.size = Some(100.into());
@@ -102,8 +99,8 @@ mod tests {
             let queue = queue.into_iter().collect();
             FetchQueueReader {
                 queue: FetchQueue {
-                    config: Arc::new(Config),
-                    state: Share::new(State { queue }),
+                    config: Arc::new(cfg),
+                    state: ShareOpen::new(State { queue }),
                 },
                 max_info: Arc::new(Share::new(Default::default())),
             }

@@ -70,6 +70,7 @@ ghost_actor::ghost_chan! {
         fn incoming_publish(
             space: KSpace,
             to_agent: KAgent,
+            source: KAgent,
             op_hash_list: OpHashList,
             context: kitsune_p2p_fetch::FetchContext,
             maybe_delegate: MaybeDelegate,
@@ -425,11 +426,16 @@ impl KitsuneP2pActor {
                                         mod_cnt,
                                         data,
                                     }) => match data {
-                                        BroadcastData::Publish(op_hash_list, context) => {
+                                        BroadcastData::Publish {
+                                            source,
+                                            op_hash_list,
+                                            context,
+                                        } => {
                                             if let Err(err) = i_s
                                                 .incoming_publish(
                                                     space,
                                                     to_agent,
+                                                    source,
                                                     op_hash_list,
                                                     context,
                                                     Some((basis, mod_idx, mod_cnt)),
@@ -495,11 +501,16 @@ impl KitsuneP2pActor {
                                                 );
                                             }
                                         }
-                                        BroadcastData::Publish(op_hash_list, context) => {
+                                        BroadcastData::Publish {
+                                            source,
+                                            op_hash_list,
+                                            context,
+                                        } => {
                                             if let Err(err) = i_s
                                                 .incoming_publish(
                                                     space,
                                                     to_agent,
+                                                    source,
                                                     op_hash_list,
                                                     context,
                                                     None,
@@ -554,14 +565,22 @@ impl KitsuneP2pActor {
                                             }
 
                                             if !hashes.is_empty() {
+                                                //let mut found = std::collections::HashMap::new();
+                                                //for hash in hashes.iter() {
+                                                //    found.insert(hash.clone(), false);
+                                                //}
                                                 if let Ok(list) = evt_sender
                                                     .fetch_op_data(FetchOpDataEvt {
                                                         space: space.clone(),
-                                                        query: FetchOpDataEvtQuery::Hashes(hashes),
+                                                        query: FetchOpDataEvtQuery::Hashes {
+                                                            op_hash_list: hashes,
+                                                            include_limbo: true,
+                                                        },
                                                     })
                                                     .await
                                                 {
                                                     for (_hash, op) in list {
+                                                        //found.insert(hash, true);
                                                         fetch_response_queue.enqueue_op(
                                                             space.clone(),
                                                             (con.clone(), url.clone(), None),
@@ -569,6 +588,7 @@ impl KitsuneP2pActor {
                                                         );
                                                     }
                                                 }
+                                                //tracing::warn!(?found, "fetch op data responder");
                                             }
 
                                             for (coord, bound) in regions {
@@ -758,6 +778,7 @@ impl InternalHandler for KitsuneP2pActor {
         &mut self,
         space: KSpace,
         to_agent: KAgent,
+        source: KAgent,
         op_hash_list: OpHashList,
         context: kitsune_p2p_fetch::FetchContext,
         maybe_delegate: MaybeDelegate,
@@ -772,7 +793,14 @@ impl InternalHandler for KitsuneP2pActor {
         Ok(async move {
             let (_, space_inner) = space_sender.await;
             space_inner
-                .incoming_publish(space, to_agent, op_hash_list, context, maybe_delegate)
+                .incoming_publish(
+                    space,
+                    to_agent,
+                    source,
+                    op_hash_list,
+                    context,
+                    maybe_delegate,
+                )
                 .await
         }
         .boxed()

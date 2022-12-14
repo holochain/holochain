@@ -39,7 +39,14 @@ pub struct FetchOpDataEvt {
 #[derive(Debug, derive_more::From)]
 pub enum FetchOpDataEvtQuery {
     /// Fetch all ops with the hashes specified
-    Hashes(Vec<KOpHash>),
+    Hashes {
+        /// list of ops to fetch
+        op_hash_list: Vec<KOpHash>,
+
+        /// should we include limbo ops
+        include_limbo: bool,
+    },
+
     /// Fetch all ops within the time and space bounds specified
     Regions(Vec<RegionBounds>),
 }

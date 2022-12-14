@@ -64,7 +64,7 @@ pub struct RpcMultiResponse {
 
 /// Data to broadcast to the remote.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum BroadcastData {
     /// User broadcast.
     User(#[serde(with = "serde_bytes")] Vec<u8>),
@@ -73,10 +73,16 @@ pub enum BroadcastData {
     AgentInfo(kitsune_p2p_types::agent_info::AgentInfoSigned),
 
     /// Publish broadcast.
-    Publish(
-        Vec<kitsune_p2p_fetch::OpHashSized>,
-        kitsune_p2p_fetch::FetchContext,
-    ),
+    Publish {
+        /// Source (origin) agent that sent this publish.
+        source: Arc<super::KitsuneAgent>,
+
+        /// List of hashes being published.
+        op_hash_list: Vec<kitsune_p2p_fetch::OpHashSized>,
+
+        /// Context associated with this publish.
+        context: kitsune_p2p_fetch::FetchContext,
+    },
 }
 
 type KSpace = Arc<super::KitsuneSpace>;

@@ -307,7 +307,18 @@ pub(crate) async fn countersigning_success(
                 None,
             );
             let ops = vec![hash_sized];
-            if let Err(e) = network.publish(false, false, basis, ops, None).await {
+            if let Err(e) = network
+                .publish(
+                    false,
+                    false,
+                    basis,
+                    author.clone(),
+                    ops,
+                    None,
+                    Some(vec![op]),
+                )
+                .await
+            {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
                     e
@@ -329,6 +340,7 @@ pub(crate) async fn countersigning_success(
 pub async fn countersigning_publish(
     network: &HolochainP2pDna,
     op: DhtOp,
+    author: AgentPubKey,
 ) -> Result<(), ZomeCallResponse> {
     if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {
         if let Err(e) = network
@@ -354,7 +366,10 @@ pub async fn countersigning_publish(
             None,
         );
         let ops = vec![hash_sized];
-        if let Err(e) = network.publish(false, true, basis, ops, None).await {
+        if let Err(e) = network
+            .publish(false, true, basis, author, ops, None, Some(vec![op]))
+            .await
+        {
             tracing::error!(
                 "Failed to publish to entry authorities for countersigning session because of: {:?}",
                 e

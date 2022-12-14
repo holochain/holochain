@@ -280,7 +280,7 @@ impl RealRibosome {
 
         let zome_types = Arc::new(map?);
 
-        // Create a map of integrity zome names to ZomeIndexs.
+        // Create a map of integrity zome names to ZomeIndexes.
         let integrity_zomes: HashMap<_, _> = ribosome
             .dna_def()
             .integrity_zomes
@@ -961,8 +961,10 @@ pub mod wasm_test {
     use crate::sweettest::SweetDnaFile;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
+    use holochain_state::nonce::fresh_nonce;
     use holochain_types::prelude::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::zome_io::ZomeCallUnsigned;
 
     #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
@@ -993,16 +995,28 @@ pub mod wasm_test {
 
         assert_eq!("foobar", &bar_result);
 
+        let now = Timestamp::now();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+
         let infallible_result = conductor
             .raw_handle()
-            .call_zome(ZomeCall {
-                cell_id: alice.cell_id().clone(),
-                zome_name: alice.name().clone(),
-                fn_name: "infallible".into(),
-                cap_secret: None,
-                provenance: alice_pubkey.clone(),
-                payload: ExternIO::encode(()).unwrap(),
-            })
+            .call_zome(
+                ZomeCall::try_from_unsigned_zome_call(
+                    conductor.raw_handle().keystore(),
+                    ZomeCallUnsigned {
+                        cell_id: alice.cell_id().clone(),
+                        zome_name: alice.name().clone(),
+                        fn_name: "infallible".into(),
+                        cap_secret: None,
+                        provenance: alice_pubkey.clone(),
+                        payload: ExternIO::encode(()).unwrap(),
+                        nonce,
+                        expires_at,
+                    },
+                )
+                .await
+                .unwrap(),
+            )
             .await
             .unwrap()
             .unwrap();

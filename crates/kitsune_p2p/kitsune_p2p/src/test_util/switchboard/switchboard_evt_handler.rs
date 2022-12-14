@@ -347,7 +347,10 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         FetchOpDataEvt { space, query }: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
         ok_fut(Ok(self.sb.share(|sb| match query {
-            FetchOpDataEvtQuery::Hashes(hashes) => hashes
+            FetchOpDataEvtQuery::Hashes {
+                op_hash_list: hashes,
+                ..
+            } => hashes
                 .into_iter()
                 .map(|hash| {
                     let loc = hash.get_loc().as_loc8();
