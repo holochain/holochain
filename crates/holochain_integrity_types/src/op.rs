@@ -876,7 +876,7 @@ where
         /// The app defined entry with the deserialized
         /// [`Entry`] data.
         app_entry: ET,
-        /// The [`Updated`] or [`Create`] action that created this entry
+        /// The [`Update`] or [`Create`] action that created this entry
         action: EntryCreationAction,
     },
     /// This operation stores the [`Entry`] for an
@@ -884,7 +884,7 @@ where
     CreateAgent {
         /// The agent that was created
         agent: AgentPubKey,
-        /// The [`Updated`] or [`Create`] action that created this entry
+        /// The [`Update`] or [`Create`] action that created this entry
         action: EntryCreationAction,
     },
     /// This operation stores the [`Entry`] for the
@@ -897,7 +897,7 @@ where
         /// The app defined entry with the deserialized
         /// [`Entry`] data of the new entry.
         app_entry: ET,
-        /// The [`Updated`] action that updated this entry
+        /// The [`Update`] action that updated this entry
         action: Update,
     },
     /// This operation stores the [`Entry`] for an
@@ -909,7 +909,7 @@ where
         original_key: AgentPubKey,
         /// The hash of the original keys [`Action`].
         original_action_hash: ActionHash,
-        /// The [`Updated`] action that updated this entry
+        /// The [`Update`] action that updated this entry
         action: Update,
     },
 }
