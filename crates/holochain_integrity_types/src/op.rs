@@ -568,12 +568,12 @@ where
     /// This operation stores the [`Record`] for an
     /// updated [`AgentPubKey`].
     UpdateAgent {
-        /// The new [`AgentPubKey`].
-        new_key: AgentPubKey,
         /// The original [`AgentPubKey`].
-        original_key: AgentPubKey,
+        original_agent: AgentPubKey,
         /// The original [`Create`] or [`Update`] [`Action`].
         original_action: SignedHashed<EntryCreationAction>,
+        /// The new [`AgentPubKey`].
+        agent: AgentPubKey,
         /// The [`Update`] action that created the entry
         action: SignedHashed<Update>,
     },
