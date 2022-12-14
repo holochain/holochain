@@ -451,7 +451,7 @@ where
         /// The app defined link type of this link.
         link_type: LT,
         /// The [`CreateLink`] action that created the link
-        action: SignedHashed<CreateLink>,
+        action: CreateLink,
     },
     /// The [`Op::RegisterDeleteLink`] which is validated by
     /// the authority for the [`AnyLinkableHash`] in the base address
@@ -461,8 +461,8 @@ where
     /// on the DHT and is returned when the authority receives a request
     /// on the base [`AnyLinkableHash`] for the link that is being deleted.
     RegisterDeleteLink {
-        /// The deleted links [`CreateLink`] [`Action`].
-        original_link_action: SignedHashed<CreateLink>,
+        /// The hash of the [`CreateLink`] [`Action`] that created the link.
+        original_link_action_hash: ActionHash,
         /// The base address where this link is stored.
         /// This is the base address of the link that is being deleted.
         base_address: AnyLinkableHash,
@@ -473,7 +473,7 @@ where
         /// The app defined link type of the deleted link.
         link_type: LT,
         /// The [`DeleteLink`] action that created the link
-        action: SignedHashed<DeleteLink>,
+        action: DeleteLink,
     },
     /// The [`Op::RegisterUpdate`] which is validated by
     /// the authority for the [`ActionHash`] of the original entry
@@ -508,7 +508,7 @@ where
         /// [`Entry`] data.
         app_entry: ET,
         /// The [`Create`] action that created the entry
-        action: SignedHashed<Create>,
+        action: Create,
     },
     /// This operation stores the [`Record`] for an
     /// app defined private entry type.
@@ -518,7 +518,7 @@ where
         /// entry type here because we don't have the [`Entry`] data.
         app_entry_type: <ET as UnitEnum>::Unit,
         /// The [`Create`] action that created the entry
-        action: SignedHashed<Create>,
+        action: Create,
     },
     /// This operation stores the [`Record`] for an
     /// [`AgentPubKey`] that has been created.
@@ -526,83 +526,90 @@ where
         /// The agent that was created
         agent: AgentPubKey,
         /// The [`Create`] action that created the entry
-        action: SignedHashed<Create>,
+        action: Create,
     },
     /// This operation stores the [`Record`] for a
     /// Capability Claim that has been created.
     CreateCapClaim {
         /// The [`Create`] action that created the entry
-        action: SignedHashed<Create>,
+        action: Create,
     },
     /// This operation stores the [`Record`] for a
     /// Capability Grant that has been created.
     CreateCapGrant {
         /// The [`Create`] action that created the entry
-        action: SignedHashed<Create>,
+        action: Create,
     },
     /// This operation stores the [`Record`] for an
     /// updated app defined entry type.
     UpdateEntry {
-        /// The original [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data from the new entry.
         /// Note the new entry type is always the same as the
         /// original entry type however the data may have changed.
         app_entry: ET,
         /// The [`Update`] action that updated the entry
-        action: SignedHashed<Update>,
+        action: Update,
     },
     /// This operation stores the [`Record`] for an
     /// updated app defined private entry type.
     UpdatePrivateEntry {
-        /// The original [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The unit version of the app defined entry type.
         /// Note the new entry type is always the same as the
         /// original entry type however the data may have changed.
         app_entry_type: <ET as UnitEnum>::Unit,
         /// The [`Update`] action that updated the entry
-        action: SignedHashed<Update>,
+        action: Update,
     },
     /// This operation stores the [`Record`] for an
     /// updated [`AgentPubKey`].
     UpdateAgent {
         /// The original [`AgentPubKey`].
         original_agent: AgentPubKey,
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
         /// The new [`AgentPubKey`].
         agent: AgentPubKey,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
         /// The [`Update`] action that updated the entry
-        action: SignedHashed<Update>,
+        action: Update,
     },
     /// This operation stores the [`Record`] for an
     /// updated Capability Claim.
     UpdateCapClaim {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The [`Update`] action that updated the entry
-        action: SignedHashed<Update>,
+        action: Update,
     },
     /// This operation stores the [`Record`] for an
     /// updated Capability Grant.
     UpdateCapGrant {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The [`Update`] action that udated the entry
-        action: SignedHashed<Update>,
+        action: Update,
     },
     /// This operation stores the [`Record`] for a
     /// deleted app defined entry type.
     DeleteEntry {
-        /// The original [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
-        /// The app defined entry type with the deserialized
-        /// [`Entry`] data from the deleted entry.
-        original_entry_type: ET,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The [`Delete`] action that created the entry
-        action: SignedHashed<Delete>,
+        action: Delete,
     },
     /// This operation stores the [`Record`] for a
     /// new link.
@@ -615,26 +622,20 @@ where
         tag: LinkTag,
         /// The app defined link type of this link.
         link_type: LT,
-        /// The signed action that created this link
-        action: SignedHashed<CreateLink>,
+        /// The [`CreateLink`] action that created this link
+        action: CreateLink,
     },
     /// This operation stores the [`Record`] for a
     /// deleted link and contains the original link's
     /// [`Action`] hash.
     DeleteLink {
         /// The deleted links [`CreateLink`] [`Action`].
-        original_action: SignedHashed<CreateLink>,
+        original_action_hash: ActionHash,
         /// The base address where this link is stored.
         /// This is the base address of the link that is being deleted.
         base_address: AnyLinkableHash,
-        /// The target address of the link being deleted.
-        target_address: AnyLinkableHash,
-        /// The deleted links tag data.
-        tag: LinkTag,
-        /// The app defined link type of the deleted link.
-        link_type: LT,
         /// The [`DeleteLink`] action that created the link
-        action: SignedHashed<DeleteLink>,
+        action: DeleteLink,
     },
     /// This operation stores the [`Record`] for an
     /// [`Action::Dna`].
@@ -642,7 +643,7 @@ where
         /// The hash of the DNA
         dna_hash: DnaHash,
         /// The [`Dna`] action
-        action: SignedHashed<Dna>,
+        action: Dna,
     },
     /// This operation stores the [`Record`] for an
     /// [`Action::OpenChain`] and contains the previous
@@ -650,8 +651,8 @@ where
     OpenChain {
         /// Hash of the prevous DNA that we are migrating from
         previous_dna_hash: DnaHash,
-        /// The signed [`OpenChain`] action
-        action: SignedHashed<OpenChain>,
+        /// The [`OpenChain`] action
+        action: OpenChain,
     },
     /// This operation stores the [`Record`] for an
     /// [`Action::CloseChain`] and contains the new
@@ -659,8 +660,8 @@ where
     CloseChain {
         /// Hash of the new DNA that we are migrating to
         new_dna_hash: DnaHash,
-        /// The signed [`CloseChain`] action
-        action: SignedHashed<CloseChain>,
+        /// The [`CloseChain`] action
+        action: CloseChain,
     },
     /// This operation stores the [`Record`] for an
     /// [`Action::AgentValidationPkg`] and contains
@@ -668,14 +669,14 @@ where
     AgentValidationPkg {
         /// The membrane proof proving that the agent is allowed to participate in this DNA
         membrane_proof: Option<MembraneProof>,
-        /// The signed [`AgentValidationPkg`] action
-        action: SignedHashed<AgentValidationPkg>,
+        /// The [`AgentValidationPkg`] action
+        action: AgentValidationPkg,
     },
     /// This operation stores the [`Record`] for an
     /// [`Action::InitZomesComplete`].
     InitZomesComplete {
-        /// The signed [`InitZomesComplete`] action
-        action: SignedHashed<InitZomesComplete>,
+        /// The [`InitZomesComplete`] action
+        action: InitZomesComplete,
     },
 }
 
@@ -690,7 +691,7 @@ pub enum OpActivity<UnitType, LT> {
         /// in a different zome.
         app_entry_type: Option<UnitType>,
         /// The [`Create`] action that created the entry
-        action: SignedHashed<Create>,
+        action: Create,
     },
     /// This operation registers the [`Action`] for an
     /// app defined private entry type to the author's chain.
@@ -700,7 +701,7 @@ pub enum OpActivity<UnitType, LT> {
         /// in a different zome.
         app_entry_type: Option<UnitType>,
         /// The [`Create`] action that created the entry
-        action: SignedHashed<Create>,
+        action: Create,
     },
     /// This operation registers the [`Action`] for an
     /// [`AgentPubKey`] to the author's chain.
@@ -708,43 +709,47 @@ pub enum OpActivity<UnitType, LT> {
         /// The agent that was created
         agent: AgentPubKey,
         /// The [`Create`] action that created the entry
-        action: SignedHashed<Create>,
+        action: Create,
     },
     /// This operation registers the [`Action`] for a
     /// Capability Claim to the author's chain.
     CreateCapClaim {
-        /// The signed action that created the entry
-        action: SignedHashed<Create>,
+        /// The [`Create`] action that created the entry
+        action: Create,
     },
     /// This operation registers the [`Action`] for a
     /// Capability Grant to the author's chain.
     CreateCapGrant {
-        /// The signed action that created the entry
-        action: SignedHashed<Create>,
+        /// The [`Create`] action that created the entry
+        action: Create,
     },
     /// This operation registers the [`Action`] for an
     /// updated app defined entry type to the author's chain.
     UpdateEntry {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The unit version of the app defined entry type.
         /// If this is [`None`] then the entry type is defined
         /// in a different zome.
         app_entry_type: Option<UnitType>,
-        /// The signed [`Update`] action
-        action: SignedHashed<Update>,
+        /// The [`Update`] action
+        action: Update,
     },
     /// This operation registers the [`Action`] for an
     /// updated app defined private entry type to the author's chain.
     UpdatePrivateEntry {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The unit version of the app defined entry type.
         /// If this is [`None`] then the entry type is defined
         /// in a different zome.
         app_entry_type: Option<UnitType>,
-        /// The signed [`Update`] action
-        action: SignedHashed<Update>,
+        /// The [`Update`] action
+        action: Update,
     },
     /// This operation registers the [`Action`] for an
     /// updated [`AgentPubKey`] to the author's chain.
@@ -753,38 +758,40 @@ pub enum OpActivity<UnitType, LT> {
         new_key: AgentPubKey,
         /// The original [`AgentPubKey`].
         original_key: AgentPubKey,
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
         /// The [`Update`] action that updated the entry
-        action: SignedHashed<Update>,
+        action: Update,
     },
     /// This operation registers the [`Action`] for an
     /// updated Capability Claim to the author's chain.
     UpdateCapClaim {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The [`Update`] action that updated the entry
-        action: SignedHashed<Update>,
+        action: Update,
     },
     /// This operation registers the [`Action`] for an
     /// updated Capability Grant to the author's chain.
     UpdateCapGrant {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The [`Update`] action that updated the entry
-        action: SignedHashed<Update>,
+        action: Update,
     },
     /// This operation registers the [`Action`] for a
     /// deleted app defined entry type to the author's chain.
     DeleteEntry {
-        /// The original [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
-        /// The unit version of the app defined entry type.
-        /// If this is [`None`] then the entry type is defined
-        /// in a different zome.
-        original_app_entry_type: Option<UnitType>,
-        /// The signed action that deleted the orginal entry
-        action: SignedHashed<Delete>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
+        /// The action that deleted the orginal entry
+        action: Delete,
     },
     /// This operation registers the [`Action`] for a
     /// new link to the author's chain.
@@ -799,36 +806,28 @@ pub enum OpActivity<UnitType, LT> {
         /// If this is [`None`] then the link type is defined
         /// in a different zome.
         link_type: Option<LT>,
-        /// The signed action that created this link
-        action: SignedHashed<CreateLink>,
+        /// The action that created this link
+        action: CreateLink,
     },
     /// This operation registers the [`Action`] for a
     /// deleted link to the author's chain and contains
     /// the original link's [`Action`] hash.
     DeleteLink {
         /// The deleted links [`CreateLink`] [`Action`].
-        original_action: SignedHashed<CreateLink>,
+        original_action_hash: ActionHash,
         /// The base address where this link is stored.
         /// This is the base address of the link that is being deleted.
         base_address: AnyLinkableHash,
-        /// The target address of the link being deleted.
-        target_address: AnyLinkableHash,
-        /// The deleted links tag data.
-        tag: LinkTag,
-        /// The app defined link type of this link.
-        /// If this is [`None`] then the link type is defined
-        /// in a different zome.
-        link_type: Option<LT>,
         /// The [`DeleteLink`] action that deleted the link
-        action: SignedHashed<DeleteLink>,
+        action: DeleteLink,
     },
     /// This operation registers the [`Action`] for an
     /// [`Action::Dna`] to the author's chain.
     Dna {
         /// The hash of the DNA
         dna_hash: DnaHash,
-        /// The signed [`Dna`] action
-        action: SignedHashed<Dna>,
+        /// The [`Dna`] action
+        action: Dna,
     },
     /// This operation registers the [`Action`] for an
     /// [`Action::OpenChain`] to the author's chain
@@ -836,8 +835,8 @@ pub enum OpActivity<UnitType, LT> {
     OpenChain {
         /// Hash of the prevous DNA that we are migrating from
         previous_dna_hash: DnaHash,
-        /// The signed [`OpenChain`] action
-        action: SignedHashed<OpenChain>,
+        /// The [`OpenChain`] action
+        action: OpenChain,
     },
     /// This operation registers the [`Action`] for an
     /// [`Action::CloseChain`] to the author's chain
@@ -845,8 +844,8 @@ pub enum OpActivity<UnitType, LT> {
     CloseChain {
         /// Hash of the new DNA that we are migrating to
         new_dna_hash: DnaHash,
-        /// The signed [`CloseChain`] action
-        action: SignedHashed<CloseChain>,
+        /// The [`CloseChain`] action
+        action: CloseChain,
     },
     /// This operation registers the [`Action`] for an
     /// [`Action::AgentValidationPkg`] to the author's chain
@@ -854,14 +853,14 @@ pub enum OpActivity<UnitType, LT> {
     AgentValidationPkg {
         /// The membrane proof proving that the agent is allowed to participate in this DNA
         membrane_proof: Option<MembraneProof>,
-        /// The signed [`AgentValidationPkg`] action
-        action: SignedHashed<AgentValidationPkg>,
+        /// The [`AgentValidationPkg`] action
+        action: AgentValidationPkg,
     },
     /// This operation registers the [`Action`] for an
     /// [`Action::InitZomesComplete`] to the author's chain.
     InitZomesComplete {
-        /// The signed [`InitZomesComplete`] action
-        action: SignedHashed<InitZomesComplete>,
+        /// The [`InitZomesComplete`] action
+        action: InitZomesComplete,
     },
 }
 
@@ -877,27 +876,29 @@ where
         /// The app defined entry with the deserialized
         /// [`Entry`] data.
         app_entry: ET,
-        /// The signed [`Updated`] or [`Create`] action that created this entry
-        action: SignedHashed<EntryCreationAction>,
+        /// The [`Updated`] or [`Create`] action that created this entry
+        action: EntryCreationAction,
     },
     /// This operation stores the [`Entry`] for an
     /// [`AgentPubKey`].
     CreateAgent {
         /// The agent that was created
         agent: AgentPubKey,
-        /// The signed [`Updated`] or [`Create`] action that created this entry
-        action: SignedHashed<EntryCreationAction>,
+        /// The [`Updated`] or [`Create`] action that created this entry
+        action: EntryCreationAction,
     },
     /// This operation stores the [`Entry`] for the
     /// newly created entry in an update.
     UpdateEntry {
-        /// The original [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the [`Action`] that created the original entry
+        original_action_hash: ActionHash,
+        /// The hash of the original entry
+        original_entry_hash: EntryHash,
         /// The app defined entry with the deserialized
         /// [`Entry`] data of the new entry.
         app_entry: ET,
-        /// The signed [`Updated`] action that updated this entry
-        action: SignedHashed<Update>,
+        /// The [`Updated`] action that updated this entry
+        action: Update,
     },
     /// This operation stores the [`Entry`] for an
     /// updated [`AgentPubKey`].
@@ -907,9 +908,9 @@ where
         /// The original [`AgentPubKey`].
         original_key: AgentPubKey,
         /// The hash of the original keys [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
-        /// The signed [`Updated`] action that updated this entry
-        action: SignedHashed<Update>,
+        original_action_hash: ActionHash,
+        /// The [`Updated`] action that updated this entry
+        action: Update,
     },
 }
 
@@ -922,30 +923,30 @@ where
     /// This operation registers an update from
     /// the original [`Entry`].
     Entry {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the original original [`Action`].
+        original_action_hash: ActionHash,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data of the original entry.
         original_app_entry: ET,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data of the new entry.
         app_entry: ET,
-        /// The signed action that updated this entry
-        action: SignedHashed<Update>,
+        /// The action that updated this entry
+        action: Update,
     },
     /// This operation registers an update from
     /// the original private [`Entry`].
     PrivateEntry {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the original original [`Action`].
+        original_action_hash: ActionHash,
         /// The unit version of the app defined entry type
         /// for the original entry.
         original_app_entry_type: <ET as UnitEnum>::Unit,
         /// The unit version of the app defined entry type
         /// for the new entry.
         app_entry_type: <ET as UnitEnum>::Unit,
-        /// The signed action that updated this entry
-        action: SignedHashed<Update>,
+        /// The action that updated this entry
+        action: Update,
     },
     /// This operation registers an update from
     /// the original [`AgentPubKey`].
@@ -954,26 +955,26 @@ where
         new_key: AgentPubKey,
         /// The original [`AgentPubKey`].
         original_key: AgentPubKey,
-        /// The original [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
-        /// The signed [`Update`] action that updates the entry
-        action: SignedHashed<Update>,
+        /// The hash of the original original [`Action`].
+        original_action_hash: ActionHash,
+        /// The [`Update`] action that updates the entry
+        action: Update,
     },
     /// This operation registers an update from
     /// a Capability Claim.
     CapClaim {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        /// The hash of the original original [`Action`].
+        original_action_hash: ActionHash,
         /// The [`Update`] action that updates the entry
-        action: SignedHashed<Update>,
+        action: Update,
     },
     /// This operation registers an update from
     /// a Capability Grant.
     CapGrant {
-        /// The original [`Create`] or [`Update`] [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
-        /// The signed [`Update`] action that updates the entry
-        action: SignedHashed<Update>,
+        /// The hash of the original original [`Action`].
+        original_action_hash: ActionHash,
+        /// The [`Update`] action that updates the entry
+        action: Update,
     },
 }
 
@@ -987,23 +988,23 @@ where
     /// original [`Entry`].
     Entry {
         /// The hash of the delete entry's [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        original_action: EntryCreationAction,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data from the deleted entry.
         original_app_entry: ET,
-        /// The signed [`Delete`] action that deleted this entry
-        action: SignedHashed<Delete>,
+        /// The [`Delete`] action that deleted this entry
+        action: Delete,
     },
     /// This operation registers a deletion to the
     /// original private [`Entry`].
     PrivateEntry {
         /// The hash of the delete entry's [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
+        original_action: EntryCreationAction,
         /// The unit version of the app defined entry type
         /// of the deleted entry.
         original_app_entry_type: <ET as UnitEnum>::Unit,
-        /// The signed [`Delete`] action that deleted this entry
-        action: SignedHashed<Delete>,
+        /// The [`Delete`] action that deleted this entry
+        action: Delete,
     },
     /// This operation registers a deletion to an
     /// [`AgentPubKey`].
@@ -1011,25 +1012,25 @@ where
         /// The deleted [`AgentPubKey`].
         original_key: AgentPubKey,
         /// The hash of the deleted keys [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
-        /// The signed [`Delete`] action that deleted this entry
-        action: SignedHashed<Delete>,
+        original_action: EntryCreationAction,
+        /// The [`Delete`] action that deleted this entry
+        action: Delete,
     },
     /// This operation registers a deletion to a
     /// Capability Claim.
     CapClaim {
         /// The deleted Capability Claim's [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
-        /// The signed [`Delete`] action that deleted this entry
-        action: SignedHashed<Delete>,
+        original_action: EntryCreationAction,
+        /// The [`Delete`] action that deleted this entry
+        action: Delete,
     },
     /// This operation registers a deletion to a
     /// Capability Grant.
     CapGrant {
         /// The deleted Capability Claim's [`Action`].
-        original_action: SignedHashed<EntryCreationAction>,
-        /// The signed [`Delete`] action that deleted this entry
-        action: SignedHashed<Delete>,
+        original_action: EntryCreationAction,
+        /// The [`Delete`] action that deleted this entry
+        action: Delete,
     },
 }
 
