@@ -24,7 +24,7 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::AppInfoReturned`]
+    /// [`AppResponse::AppInfo`]
     AppInfo {
         /// The app ID for which to get information
         installed_app_id: InstalledAppId,
@@ -269,7 +269,7 @@ pub struct Cell {
     pub enabled: bool,
 }
 
-/// Info about an installed app, returned as part of [`AppResponse::AppInfoReturned`]
+/// Info about an installed app, returned as part of [`AppResponse::AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppInfo {
     /// The unique identifier for an installed app in this conductor
