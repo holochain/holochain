@@ -308,7 +308,15 @@ pub(crate) async fn countersigning_success(
             );
             let ops = vec![hash_sized];
             if let Err(e) = network
-                .publish(false, false, basis, author.clone(), ops, None, None)
+                .publish(
+                    false,
+                    false,
+                    basis,
+                    author.clone(),
+                    ops,
+                    None,
+                    Some(vec![op]),
+                )
                 .await
             {
                 tracing::error!(

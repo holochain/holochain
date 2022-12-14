@@ -28,7 +28,7 @@ use super::MIN_PUBLISH_INTERVAL;
 pub async fn get_ops_to_publish(
     agent: AgentPubKey,
     db: &DbRead<DbKindAuthored>,
-) -> WorkflowResult<Vec<(OpBasis, OpHashSized)>> {
+) -> WorkflowResult<Vec<(OpBasis, OpHashSized, DhtOp)>> {
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
@@ -94,7 +94,7 @@ pub async fn get_ops_to_publish(
                     };
                     let op = DhtOp::from_type(op_type, action, entry)?;
                     let basis = op.dht_basis();
-                    WorkflowResult::Ok((basis, op_hash_sized))
+                    WorkflowResult::Ok((basis, op_hash_sized, op))
                 },
             )?;
             WorkflowResult::Ok(r.collect())

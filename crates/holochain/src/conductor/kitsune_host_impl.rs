@@ -185,10 +185,9 @@ impl KitsuneHost for KitsuneHostImpl {
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
         op_hash_list: Vec<KOpHash>,
-        context: Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
+        _context: Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneHostResult<Vec<bool>> {
-        use holochain_p2p::{DhtOpHashExt, FetchContextExt};
-        use holochain_sqlite::rusqlite::ToSql;
+        use holochain_p2p::DhtOpHashExt;
 
         async move {
             let db = self.spaces.dht_db(&DnaHash::from_kitsune(&space))?;
@@ -203,6 +202,9 @@ impl KitsuneHost for KitsuneHostImpl {
                             |_row| Ok(()),
                         ) {
                             Ok(_) => {
+                                /* MAYBE: (david.b) disabling this for now
+                                 *        as we're just doing the outgoing
+                                 *        publish reflection back as an event
                                 if let Some(context) = context {
                                     if context.has_request_validation_receipt() {
                                         txn.execute(
@@ -211,6 +213,7 @@ impl KitsuneHost for KitsuneHostImpl {
                                         )?;
                                     }
                                 }
+                                */
                                 out.push(true)
                             }
                             Err(_) => out.push(false),
