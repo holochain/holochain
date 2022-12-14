@@ -574,17 +574,17 @@ pub async fn add_agent_info(cmd: &mut CmdRunner, args: Vec<AgentInfoSigned>) -> 
     Ok(())
 }
 
-/// Calls [`AdminRequest::RequestAgentInfo`] and pretty prints the agent info on this conductor.
+/// Calls [`AdminRequest::AgentInfo`] and pretty prints the agent info on this conductor.
 pub async fn request_agent_info(
     cmd: &mut CmdRunner,
     args: ListAgents,
 ) -> anyhow::Result<Vec<AgentInfoSigned>> {
     let resp = cmd
-        .command(AdminRequest::GetAgentInfo {
+        .command(AdminRequest::AgentInfo {
             cell_id: args.into(),
         })
         .await?;
-    Ok(expect_match!(resp => AdminResponse::AgentInfoReturned, "Failed to request agent info"))
+    Ok(expect_match!(resp => AdminResponse::AgentInfo, "Failed to request agent info"))
 }
 
 fn parse_agent_key(arg: &str) -> anyhow::Result<AgentPubKey> {
