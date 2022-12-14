@@ -470,6 +470,9 @@ async fn mock_network_sharded_gossip() {
                             debug!("CallRemoteMulti")
                         }
                         holochain_p2p::WireMessage::CallRemote { .. } => debug!("CallRemote"),
+                        holochain_p2p::WireMessage::PublishCountersign { .. } => {
+                            debug!("PublishCountersign")
+                        }
                         /* (david.b) TODO - this has been replaced by
                          *                  combined `receive_ops`
                         holochain_p2p::WireMessage::Publish { ops, .. } => {
@@ -1034,6 +1037,9 @@ async fn mock_network_sharding() {
                         }
                         holochain_p2p::WireMessage::CountersigningSessionNegotiation { .. } => {
                             debug!("countersigning_session_negotiation")
+                        }
+                        holochain_p2p::WireMessage::PublishCountersign { .. } => {
+                            debug!("publish_countersign")
                         }
                     },
                     HolochainP2pMockMsg::CallResp(_) => debug!("CallResp"),

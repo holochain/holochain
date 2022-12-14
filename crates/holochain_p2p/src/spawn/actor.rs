@@ -736,10 +736,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 self.handle_incoming_validation_receipt(space, to_agent, receipt)
             }
             // holochain_p2p only broadcasts this message.
-            crate::wire::WireMessage::CountersigningSessionNegotiation { .. } => {
+            crate::wire::WireMessage::CountersigningSessionNegotiation { .. }
+            | crate::wire::WireMessage::PublishCountersign { .. } => {
                 Err(HolochainP2pError::invalid_p2p_message(
-                    "invalid: countersigning session negotation is a broadcast type, not a request"
-                        .to_string(),
+                    "invalid: countersigning messages are broadcast, not requests".to_string(),
                 )
                 .into())
             }
@@ -826,6 +826,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             }
             crate::wire::WireMessage::CountersigningSessionNegotiation { message } => {
                 self.handle_incoming_countersigning_session_negotiation(space, to_agent, message)
+            }
+            crate::wire::WireMessage::PublishCountersign { flag, op } => {
+                self.handle_incoming_publish(space, false, flag, vec![op])
             }
         }
     }
@@ -1116,6 +1119,31 @@ impl HolochainP2pHandler for HolochainP2pActor {
                         context: fetch_context,
                     },
                 )
+                .await?;
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_publish_countersign(
+        &mut self,
+        dna_hash: DnaHash,
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> HolochainP2pHandlerResult<()> {
+        let space = dna_hash.into_kitsune();
+        let basis = basis_hash.to_kitsune();
+        let timeout = self.tuning_params.implicit_timeout();
+
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            let payload = crate::wire::WireMessage::publish_countersign(flag, op).encode()?;
+
+            kitsune_p2p
+                .broadcast(space, basis, timeout, BroadcastData::User(payload))
                 .await?;
             Ok(())
         }

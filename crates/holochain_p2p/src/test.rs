@@ -75,6 +75,16 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
+    fn handle_publish_countersign(
+        &mut self,
+        dna_hash: DnaHash,
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+
     fn handle_get(
         &mut self,
         dna_hash: DnaHash,

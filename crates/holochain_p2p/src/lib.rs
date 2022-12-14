@@ -86,6 +86,14 @@ pub trait HolochainP2pDnaT {
         reflect_ops: Option<Vec<DhtOp>>,
     ) -> actor::HolochainP2pResult<()>;
 
+    /// Publish a countersigning op.
+    async fn publish_countersign(
+        &self,
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> actor::HolochainP2pResult<()>;
+
     /// Get an entry from the DHT.
     async fn get(
         &self,
@@ -265,6 +273,18 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 timeout_ms,
                 reflect_ops,
             )
+            .await
+    }
+
+    /// Publish a countersigning op.
+    async fn publish_countersign(
+        &self,
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .publish_countersign((*self.dna_hash).clone(), flag, basis_hash, op)
             .await
     }
 

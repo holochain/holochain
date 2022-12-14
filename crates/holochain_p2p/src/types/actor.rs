@@ -304,6 +304,14 @@ ghost_actor::ghost_chan! {
             reflect_ops: Option<Vec<DhtOp>>,
         ) -> ();
 
+        /// Publish a countersigning op.
+        fn publish_countersign(
+            dna_hash: DnaHash,
+            flag: bool,
+            basis_hash: holo_hash::OpBasis,
+            op: DhtOp,
+        ) -> ();
+
         /// Get an entry from the DHT.
         fn get(
             dna_hash: DnaHash,
