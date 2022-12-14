@@ -565,14 +565,22 @@ impl KitsuneP2pActor {
                                             }
 
                                             if !hashes.is_empty() {
+                                                //let mut found = std::collections::HashMap::new();
+                                                //for hash in hashes.iter() {
+                                                //    found.insert(hash.clone(), false);
+                                                //}
                                                 if let Ok(list) = evt_sender
                                                     .fetch_op_data(FetchOpDataEvt {
                                                         space: space.clone(),
-                                                        query: FetchOpDataEvtQuery::Hashes(hashes),
+                                                        query: FetchOpDataEvtQuery::Hashes {
+                                                            op_hash_list: hashes,
+                                                            include_limbo: true,
+                                                        },
                                                     })
                                                     .await
                                                 {
                                                     for (_hash, op) in list {
+                                                        //found.insert(hash, true);
                                                         fetch_response_queue.enqueue_op(
                                                             space.clone(),
                                                             (con.clone(), url.clone(), None),
@@ -580,6 +588,7 @@ impl KitsuneP2pActor {
                                                         );
                                                     }
                                                 }
+                                                //tracing::warn!(?found, "fetch op data responder");
                                             }
 
                                             for (coord, bound) in regions {

@@ -238,7 +238,10 @@ impl ShardedGossipLocal {
             self.evt_sender
                 .fetch_op_data(FetchOpDataEvt {
                     space: self.space.clone(),
-                    query: FetchOpDataEvtQuery::Hashes(missing_hashes.clone()),
+                    query: FetchOpDataEvtQuery::Hashes {
+                        op_hash_list: missing_hashes.clone(),
+                        include_limbo: false,
+                    },
                 })
                 .await
                 .map_err(KitsuneError::other)?

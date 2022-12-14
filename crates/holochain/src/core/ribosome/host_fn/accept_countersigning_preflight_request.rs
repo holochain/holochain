@@ -1033,6 +1033,8 @@ pub mod wasm_test {
                     unreachable!();
                 };
 
+            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+
             // Alice commits the action.
             let _countersigned_action_hash_alice: ActionHash = alice_conductor
                 .call(
@@ -1087,6 +1089,7 @@ pub mod wasm_test {
                 bob_activity_pre.valid_activity.len() + 2
             );
         }
+
 
         // ENZYMATIC
 
