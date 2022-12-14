@@ -440,6 +440,10 @@ mod interface_impls {
             Ok(())
         }
 
+        /// Spawn a new app interface task, register it with the TaskManager,
+        /// and modify the conductor accordingly, based on the config passed in
+        /// which is just a networking port number (or 0 to auto-select one).
+        /// Returns the given or auto-chosen port number if giving an Ok Result
         pub async fn add_app_interface(
             self: Arc<Self>,
             port: either::Either<u16, AppInterfaceId>,
@@ -497,6 +501,7 @@ mod interface_impls {
             self.admin_websocket_ports.share_ref(|p| p.get(0).copied())
         }
 
+        /// Give a list of networking ports taken up as running app interface tasks
         pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
             Ok(self
                 .get_state()
