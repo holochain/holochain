@@ -227,9 +227,12 @@ impl OpHelper for Op {
                                 new_key: agent_key,
                                 action: action.clone(),
                             },
-                            _ => Err(wasm_error!(WasmErrorInner::Guest(
-                                "StoreEntry should not exist for private entries Id".to_string()
-                            )))?,
+                            _ => {
+                                return Err(wasm_error!(WasmErrorInner::Guest(
+                                    "StoreEntry should not exist for private entries Id"
+                                        .to_string()
+                                )))
+                            }
                         }
                     }
                 };
