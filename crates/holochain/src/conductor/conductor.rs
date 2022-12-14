@@ -1393,6 +1393,7 @@ mod clone_cell_impls {
                 })
                 .await?;
             // TODO refactor this once cells know which app they're part of
+            // disable cell in conductor
             self.cells.share_ref(|cells| {
                 if let Some(cell) = cells.get(&removed_cell_id) {
                     cell.cell.set_enabled(false);
@@ -1420,6 +1421,7 @@ mod clone_cell_impls {
                 .await?;
 
             // TODO refactor this once cells know which app they're part of
+            // enable cell in conductor
             self.cells.share_ref(|cells| {
                 if let Some(cell) = cells.get(enabled_cell.as_id()) {
                     cell.cell.set_enabled(true)
