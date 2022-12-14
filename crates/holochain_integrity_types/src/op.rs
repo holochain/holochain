@@ -987,7 +987,7 @@ where
     /// This operation registers a deletion to the
     /// original [`Entry`].
     Entry {
-        /// The hash of the delete entry's [`Action`].
+        /// The entries original [`EntryCreationAction`].
         original_action: EntryCreationAction,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data from the deleted entry.
@@ -998,7 +998,7 @@ where
     /// This operation registers a deletion to the
     /// original private [`Entry`].
     PrivateEntry {
-        /// The hash of the delete entry's [`Action`].
+        /// The entries original [`EntryCreationAction`].
         original_action: EntryCreationAction,
         /// The unit version of the app defined entry type
         /// of the deleted entry.

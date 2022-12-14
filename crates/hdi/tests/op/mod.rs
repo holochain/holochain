@@ -418,7 +418,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         }) => {
             let entry = Entry::try_from(&et).unwrap();
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
-            let c = create(EntryVisibility::Public, &mut ud, t, action.entry_hash);
+            let c = create(EntryVisibility::Public, &mut ud, t, action.entry_hash().clone());
             let c = EntryCreationAction::Create(c);
             store_entry_entry(c, entry)
         }
@@ -512,19 +512,20 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         }
         OpType::RegisterUpdate(OpUpdate::Entry {
             original_action_hash,
-            original_app_entry,
+            original_app_entry: oet,
             app_entry: et,
             action,
         }) => {
             let entry = Entry::try_from(&et).unwrap();
+            let original_entry = Entry::try_from(&oet).unwrap();
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
             let original_action = update(
-                original_app_entry.into(),
+                (&oet).into(),
                 &mut ud,
                 t,
                 action.entry_hash.clone(),
                 original_action_hash.clone(),
-                original_app_entry.entry_hash.clone(),
+                action.original_entry_address.clone(),
             );
             let original_action = EntryCreationAction::Update(original_action);
             let u = update(
@@ -533,7 +534,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 t,
                 action.entry_hash,
                 original_action_hash,
-                original_app_entry.entry_hash,
+                action.original_entry_address.clone(),
             );
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
@@ -542,7 +543,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 },
                 new_entry: Some(entry),
                 original_action,
-                original_entry: Some(original_app_entry),
+                original_entry: Some(original_entry),
             })
         }
         OpType::RegisterUpdate(OpUpdate::Agent {
@@ -585,7 +586,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 t,
                 action.entry_hash,
                 original_action_hash,
-                original_action.entry_hash,
+                original_action.entry_hash().clone(),
             );
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
@@ -599,17 +600,16 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         }
         OpType::RegisterUpdate(OpUpdate::CapClaim {
             original_action_hash,
-            original_entry_hash,
             action,
         }) => {
             let mut u = Update::arbitrary(&mut ud).unwrap();
             u.entry_type = EntryType::CapClaim;
             u.entry_hash = action.entry_hash;
             u.original_action_address = original_action_hash;
-            u.original_entry_address = original_entry_hash.clone();
+            u.original_entry_address = action.original_entry_address.clone();
             let mut c = Create::arbitrary(&mut ud).unwrap();
             c.entry_type = EntryType::CapClaim;
-            c.entry_hash = original_entry_hash;
+            c.entry_hash = action.original_entry_address;
             let original_action = EntryCreationAction::Create(c);
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
@@ -622,18 +622,17 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterUpdate(OpUpdate::CapGrant {
-            entry_hash,
             original_action_hash,
-            original_entry_hash,
+            action,
         }) => {
             let mut u = Update::arbitrary(&mut ud).unwrap();
             u.entry_type = EntryType::CapGrant;
-            u.entry_hash = entry_hash;
+            u.entry_hash = action.entry_hash;
             u.original_action_address = original_action_hash;
-            u.original_entry_address = original_entry_hash.clone();
+            u.original_entry_address = action.original_entry_address.clone();
             let mut c = Create::arbitrary(&mut ud).unwrap();
             c.entry_type = EntryType::CapGrant;
-            c.entry_hash = original_entry_hash;
+            c.entry_hash = action.original_entry_address;
             let original_action = EntryCreationAction::Create(c);
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
@@ -646,22 +645,15 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterDelete(OpDelete::Entry {
-            original_action_hash,
-            original_entry_hash,
-            original_entry_type: original_et,
+            original_action,
+            original_app_entry: original_et,
+            action,
         }) => {
             let original_entry = Entry::try_from(&original_et).unwrap();
             let t = ScopedEntryDefIndex::try_from(&original_et).unwrap();
             let mut d = Delete::arbitrary(&mut ud).unwrap();
-            d.deletes_address = original_action_hash;
-            d.deletes_entry_address = original_entry_hash.clone();
-            let original_action = create(
-                (&original_et).into(),
-                &mut ud,
-                t,
-                original_entry_hash.clone(),
-            );
-            let original_action = EntryCreationAction::Create(original_action);
+            d.deletes_address = action.deletes_address.clone();
+            d.deletes_entry_address = original_action.entry_hash().clone();
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed {
                     hashed: HoloHashed::from_content_sync(d),
@@ -672,17 +664,14 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterDelete(OpDelete::Agent {
-            original_action_hash,
+            original_action,
             original_key,
+            action,
         }) => {
             let original_entry = Entry::Agent(original_key.clone());
             let mut d = Delete::arbitrary(&mut ud).unwrap();
-            let mut c = Create::arbitrary(&mut ud).unwrap();
-            c.entry_type = EntryType::AgentPubKey;
-            c.entry_hash = original_key.clone().into();
-            d.deletes_address = original_action_hash;
+            d.deletes_address = action.deletes_address.clone();
             d.deletes_entry_address = original_key.clone().into();
-            let original_action = EntryCreationAction::Create(c);
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed {
                     hashed: HoloHashed::from_content_sync(d),
@@ -693,21 +682,13 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterDelete(OpDelete::PrivateEntry {
-            original_action_hash,
-            original_entry_hash,
-            original_entry_type: et,
+            original_action,
+            original_app_entry_type: et,
+            action,
         }) => {
-            let t = ScopedEntryDefIndex::try_from(&et).unwrap();
-            let original_action = create(
-                EntryVisibility::Private,
-                &mut ud,
-                t,
-                original_entry_hash.clone(),
-            );
-            let original_action = EntryCreationAction::Create(original_action);
             let mut d = Delete::arbitrary(&mut ud).unwrap();
-            d.deletes_address = original_action_hash;
-            d.deletes_entry_address = original_entry_hash;
+            d.deletes_address = action.deletes_address.clone();
+            d.deletes_entry_address = action.deletes_entry_address;
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed {
                     hashed: HoloHashed::from_content_sync(d),
@@ -718,16 +699,12 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterDelete(OpDelete::CapClaim {
-            original_action_hash,
-            original_entry_hash,
+            original_action,
+            action,
         }) => {
             let mut d = Delete::arbitrary(&mut ud).unwrap();
-            d.deletes_address = original_action_hash;
-            d.deletes_entry_address = original_entry_hash.clone();
-            let mut c = Create::arbitrary(&mut ud).unwrap();
-            c.entry_type = EntryType::CapClaim;
-            c.entry_hash = original_entry_hash;
-            let original_action = EntryCreationAction::Create(c);
+            d.deletes_address = action.deletes_address.clone();
+            d.deletes_entry_address = action.deletes_entry_address.clone();
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed {
                     hashed: HoloHashed::from_content_sync(d),
@@ -738,16 +715,12 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterDelete(OpDelete::CapGrant {
-            original_action_hash,
-            original_entry_hash,
+            original_action,
+            action,
         }) => {
             let mut d = Delete::arbitrary(&mut ud).unwrap();
-            d.deletes_address = original_action_hash;
-            d.deletes_entry_address = original_entry_hash.clone();
-            let mut c = Create::arbitrary(&mut ud).unwrap();
-            c.entry_type = EntryType::CapGrant;
-            c.entry_hash = original_entry_hash;
-            let original_action = EntryCreationAction::Create(c);
+            d.deletes_address = action.deletes_address.clone();
+            d.deletes_entry_address = action.deletes_entry_address.clone();
             Op::RegisterDelete(RegisterDelete {
                 delete: SignedHashed {
                     hashed: HoloHashed::from_content_sync(d),
