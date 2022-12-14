@@ -31,6 +31,7 @@ holochain_serialized_bytes = "0.0.51"
 observability = "0.1"
 pretty_assertions = "0.7.2"
 test-case = "1.2"
+tokio = { version = "1.11", features = [ "full", "test-util" ] }
 
 [features]
 test_utils = []

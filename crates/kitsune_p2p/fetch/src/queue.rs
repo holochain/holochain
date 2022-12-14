@@ -10,10 +10,8 @@
 //! order of last_fetch time, but they are guaranteed to be at least as old as the specified
 //! interval.
 
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::sync::Arc;
+use tokio::time::{Duration, Instant};
 
 use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace /*, Tx2Cert*/};
 use linked_hash_map::{Entry, LinkedHashMap};
@@ -299,7 +297,11 @@ impl Sources {
             .0
             .iter()
             .enumerate()
-            .find(|(_, s)| s.last_fetch.map(|t| t.elapsed() > interval).unwrap_or(true))
+            .find(|(_, s)| {
+                s.last_fetch
+                    .map(|t| t.elapsed() >= interval)
+                    .unwrap_or(true)
+            })
             .map(|(i, s)| (i, s.source.clone()))
         {
             self.0[i].last_fetch = Some(Instant::now());
@@ -321,11 +323,15 @@ mod tests {
 
     use super::*;
 
-    pub(super) struct Config;
+    pub(super) struct Config(pub u32);
 
     impl FetchQueueConfig for Config {
         fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
             (a + b).min(1)
+        }
+
+        fn fetch_retry_interval(&self) -> Duration {
+            Duration::from_secs(self.0 as u64)
         }
     }
 
@@ -345,9 +351,13 @@ mod tests {
         }
     }
 
-    pub(super) fn item(sources: Vec<FetchSource>, context: Option<FetchContext>) -> FetchQueueItem {
+    pub(super) fn item(
+        cfg: &dyn FetchQueueConfig,
+        sources: Vec<FetchSource>,
+        context: Option<FetchContext>,
+    ) -> FetchQueueItem {
         FetchQueueItem {
-            sources: Sources(sources.into_iter().map(SourceRecord::new).collect()),
+            sources: Sources(sources.into_iter().map(|s| SourceRecord::new(s)).collect()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             options: Default::default(),
             context,
@@ -371,35 +381,49 @@ mod tests {
         Some(c.into())
     }
 
-    #[test]
-    fn source_rotation() {
+    #[tokio::test(start_paused = true)]
+    async fn source_rotation() {
+        let sec1 = Duration::from_secs(10);
         let mut ss = Sources(vec![
             SourceRecord {
                 source: source(1),
                 last_fetch: Some(Instant::now()),
-            },
+            }
+            .into(),
             SourceRecord {
                 source: source(2),
                 last_fetch: None,
-            },
+            }
+            .into(),
         ]);
 
-        assert_eq!(ss.next(Duration::from_secs(10)), Some(source(2)));
-        assert_eq!(ss.next(Duration::from_secs(10)), None);
-        assert_eq!(ss.next(Duration::from_nanos(1)), Some(source(1)));
-        assert_eq!(ss.next(Duration::from_secs(10)), None);
-        assert_eq!(ss.next(Duration::from_secs(10)), None);
-        assert_eq!(ss.next(Duration::from_nanos(1)), Some(source(2)));
-        assert_eq!(ss.next(Duration::from_nanos(1)), Some(source(1)));
-        assert_eq!(ss.next(Duration::from_secs(10)), None);
-        assert_eq!(ss.next(Duration::from_secs(10)), None);
-        assert_eq!(ss.next(Duration::from_secs(10)), None);
+        tokio::time::advance(Duration::from_secs(1)).await;
+
+        assert_eq!(ss.next(sec1), Some(source(2)));
+        assert_eq!(ss.next(sec1), None);
+
+        tokio::time::advance(Duration::from_secs(9)).await;
+
+        assert_eq!(ss.next(sec1), Some(source(1)));
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+
+        assert_eq!(ss.next(sec1), Some(source(2)));
+        // source 1 has already had its delay backed off to 20s
+        // due to a retry, so it returns None
+        assert_eq!(ss.next(sec1), None);
+
+        tokio::time::advance(Duration::from_secs(20)).await;
+
+        assert_eq!(ss.next(sec1), Some(source(1)));
+        assert_eq!(ss.next(sec1), Some(source(2)));
+        assert_eq!(ss.next(sec1), None);
     }
 
     #[test]
     fn queue_push() {
         let mut q = State::default();
-        let c = Config;
+        let c = Config(1);
 
         // note: new sources get added to the front of the list
         q.push(&c, req(1, ctx(1), source(1)));
@@ -408,8 +432,8 @@ mod tests {
         q.push(&c, req(2, ctx(0), source(0)));
 
         let expected_ready = [
-            (key_op(1), item(sources(0..=1), ctx(1))),
-            (key_op(2), item(sources([0]), ctx(0))),
+            (key_op(1), item(&c, sources(0..=1), ctx(1))),
+            (key_op(2), item(&c, sources([0]), ctx(0))),
         ]
         .into_iter()
         .collect();
@@ -417,13 +441,15 @@ mod tests {
         assert_eq!(q.queue, expected_ready);
     }
 
-    #[test]
-    fn queue_next() {
+    #[tokio::test(start_paused = true)]
+    async fn queue_next() {
+        let c = Config(10);
+        let sec10 = Duration::from_secs(10);
         let mut q = {
             let mut queue = [
-                (key_op(1), item(sources(0..=2), ctx(1))),
-                (key_op(2), item(sources(1..=3), ctx(1))),
-                (key_op(3), item(sources(2..=4), ctx(1))),
+                (key_op(1), item(&c, sources(0..=2), ctx(1))),
+                (key_op(2), item(&c, sources(1..=3), ctx(1))),
+                (key_op(3), item(&c, sources(2..=4), ctx(1))),
             ];
             // Set the last_fetch time of one of the sources to something a bit earlier,
             // so it won't show up in next() right away
@@ -432,19 +458,22 @@ mod tests {
             let queue = queue.into_iter().collect();
             State { queue }
         };
-        assert_eq!(q.iter_mut(Duration::from_secs(10)).count(), 8);
+        assert_eq!(q.iter_mut(sec10).count(), 8);
+
+        tokio::time::advance(Duration::from_secs(7)).await;
 
         // The next (and only) item will be the one with the timestamp explicitly set
         assert_eq!(
-            q.iter_mut(Duration::from_secs(1)).collect::<Vec<_>>(),
+            q.iter_mut(sec10).collect::<Vec<_>>(),
             vec![(key_op(2), space(0), source(2), ctx(1))]
         );
 
+        // wait long enough for all items to retry
+        tokio::time::advance(Duration::from_secs(10)).await;
+
         // When traversing the entire queue again, the "special" item is still the last one.
-        let items: Vec<_> = q.iter_mut(Duration::from_millis(0)).take(9).collect();
+        let items: Vec<_> = q.iter_mut(sec10).take(9).collect();
         assert_eq!(items[8], (key_op(2), space(0), source(2), ctx(1)));
 
-        // We traversed all items in the last second, so this returns None
-        assert_eq!(q.iter_mut(Duration::from_secs(1)).next(), None);
     }
 }
