@@ -298,6 +298,29 @@ async fn conductor_can_startup_with_cloned_cell() {
         .await
         .unwrap();
 
+    // calling the cell works
+    let zome = SweetZome::new(
+        clone_cell.as_id().clone(),
+        TestWasm::Create.coordinator_zome_name(),
+    );
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    assert!(zome_call_response.is_ok());
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    // calling the cell works after restart
+    let zome = SweetZome::new(
+        clone_cell.as_id().clone(),
+        TestWasm::Create.coordinator_zome_name(),
+    );
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    assert!(zome_call_response.is_ok());
+
     conductor
         .clone()
         .disable_clone_cell(&DisableCloneCellPayload {
@@ -306,19 +329,6 @@ async fn conductor_can_startup_with_cloned_cell() {
         })
         .await
         .unwrap();
-
-    // // calling the cell after disabling fails
-    // let zome = SweetZome::new(
-    //     clone_cell.as_id().clone(),
-    //     TestWasm::Create.coordinator_zome_name(),
-    // );
-    // let zome_call_response: Result<ActionHash, _> = conductor
-    //     .call_fallible(&zome, "call_create_entry", ())
-    //     .await;
-    // assert!(zome_call_response.is_err());
-
-    conductor.shutdown().await;
-    conductor.startup().await;
 
     // calling the cell after disabling fails
     let zome = SweetZome::new(
@@ -330,5 +340,16 @@ async fn conductor_can_startup_with_cloned_cell() {
         .await;
     assert!(zome_call_response.is_err());
 
-    // Simply test that the conductor can startup with a cloned cell present.
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    // calling the cell still fails after restart, cell still disabled
+    let zome = SweetZome::new(
+        clone_cell.as_id().clone(),
+        TestWasm::Create.coordinator_zome_name(),
+    );
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    assert!(zome_call_response.is_err());
 }
