@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     fn queue_info() {
-        let cfg = Config(1);
+        let cfg = Config(1, 1);
         let q = {
             let mut queue = [
                 (key_op(1), item(&cfg, sources(0..=2), ctx(1))),
