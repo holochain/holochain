@@ -132,71 +132,71 @@ fn op_errors(op: Op) -> WasmErrorInner {
 }
 
 // Register Agent Activity
-#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateEntry { entry_hash: eh(0), entry_type: Some(UnitEntryTypes::A) }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateEntry { entry_hash: eh(0), entry_type: None }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateCapClaim(eh(0))))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateCapGrant(eh(0))))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::CreatePrivateEntry {entry_hash: eh(0), entry_type: Some(UnitEntryTypes::A) }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::CreatePrivateEntry {entry_hash: eh(0), entry_type: None }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateAgent(ak(4))))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateEntry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: Some(UnitEntryTypes::A) }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateEntry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: None }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdatePrivateEntry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: Some(UnitEntryTypes::A) }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdatePrivateEntry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: None }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateEntry { action: c(A), entry_type: Some(UnitEntryTypes::A) }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateEntry { action: c(A), entry_type: None }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateCapClaim{ entry_hash: eh(0)}))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateCapGrant{ entry_hash: eh(0)}))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreatePrivateEntry {entry_type: Some(UnitEntryTypes::A) }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreatePrivateEntry {entry_type: None }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateAgent { agent: ak(4)}))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: Some(UnitEntryTypes::A) }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: None }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdatePrivateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: Some(UnitEntryTypes::A) }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdatePrivateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: None }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateAgent { new_key: ak(2), original_action_hash: ah(1), original_key: ak(1) }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateCapClaim { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1) }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateCapGrant { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1) }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateCapClaim { original_action_hash: ah(1), original_entry_hash: eh(1) }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateCapGrant { original_action_hash: ah(1), original_entry_hash: eh(1) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::DeleteEntry { original_action_hash: ah(1), original_entry_hash: eh(1) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: Some(LinkTypes::A) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: None }))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::DeleteLink(ah(4))))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::DeleteLink{ original_action_hash: ah(4)}))]
 // Action's without entries
-#[test_case(OpType::RegisterAgentActivity(OpActivity::Dna(dh(0))))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::OpenChain(dh(0))))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::CloseChain(dh(0))))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::InitZomesComplete))]
-#[test_case(OpType::RegisterAgentActivity(OpActivity::AgentValidationPkg(None)))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::Dna { dna_hash: dh(0)}))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::OpenChain { previous_dna_hash: dh(0)}))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CloseChain { new_dna_hash: dh(0)}))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::InitZomesComplete {}))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::AgentValidationPkg{None}))]
 // Store Record
 // Entries
 // App Entries
-#[test_case(OpType::StoreRecord(OpRecord::CreateEntry { entry_hash: eh(0), entry_type: EntryTypes::A(A{}) }))]
-#[test_case(OpType::StoreRecord(OpRecord::UpdateEntry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: EntryTypes::A(A{}) }))]
+#[test_case(OpType::StoreRecord(OpRecord::CreateEntry { entry_type: EntryTypes::A(A{}) }))]
+#[test_case(OpType::StoreRecord(OpRecord::UpdateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: EntryTypes::A(A{}) }))]
 #[test_case(OpType::StoreRecord(OpRecord::DeleteEntry { original_action_hash: ah(1), original_entry_hash: eh(1) }))]
-#[test_case(OpType::StoreRecord(OpRecord::CreateEntry { entry_hash: eh(0), entry_type: EntryTypes::C(C{}) }))]
-#[test_case(OpType::StoreRecord(OpRecord::UpdateEntry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: EntryTypes::C(C{}) }))]
+#[test_case(OpType::StoreRecord(OpRecord::CreateEntry { entry_type: EntryTypes::C(C{}) }))]
+#[test_case(OpType::StoreRecord(OpRecord::UpdateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: EntryTypes::C(C{}) }))]
 // Agent Keys
-#[test_case(OpType::StoreRecord(OpRecord::CreateAgent(ak(4))))]
+#[test_case(OpType::StoreRecord(OpRecord::CreateAgent{ agent: ak(4)}))]
 #[test_case(OpType::StoreRecord(OpRecord::UpdateAgent { original_key: ak(4), new_key: ak(8), original_action_hash: ah(2) }))]
 // Private Entries
-#[test_case(OpType::StoreRecord(OpRecord::CreatePrivateEntry {entry_hash: eh(0), entry_type: UnitEntryTypes::A }))]
-#[test_case(OpType::StoreRecord(OpRecord::UpdatePrivateEntry {entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: UnitEntryTypes::A }))]
+#[test_case(OpType::StoreRecord(OpRecord::CreatePrivateEntry { entry_type: UnitEntryTypes::A }))]
+#[test_case(OpType::StoreRecord(OpRecord::UpdatePrivateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: UnitEntryTypes::A }))]
 // Caps
-#[test_case(OpType::StoreRecord(OpRecord::CreateCapClaim(eh(0))))]
-#[test_case(OpType::StoreRecord(OpRecord::CreateCapGrant(eh(0))))]
-#[test_case(OpType::StoreRecord(OpRecord::UpdateCapClaim{ entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1) }))]
-#[test_case(OpType::StoreRecord(OpRecord::UpdateCapGrant{ entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1) }))]
+#[test_case(OpType::StoreRecord(OpRecord::CreateCapClaim{ entry_hash: eh(0)}))]
+#[test_case(OpType::StoreRecord(OpRecord::CreateCapGrant{ entry_hash: eh(0)}))]
+#[test_case(OpType::StoreRecord(OpRecord::UpdateCapClaim{ original_action_hash: ah(1), original_entry_hash: eh(1) }))]
+#[test_case(OpType::StoreRecord(OpRecord::UpdateCapGrant{ original_action_hash: ah(1), original_entry_hash: eh(1) }))]
 // Links
 #[test_case(OpType::StoreRecord(OpRecord::CreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: LinkTypes::A }))]
-#[test_case(OpType::StoreRecord(OpRecord::DeleteLink(ah(4))))]
+#[test_case(OpType::StoreRecord(OpRecord::DeleteLink{ original_action_hash: ah(4)}))]
 // Action's without entries
-#[test_case(OpType::StoreRecord(OpRecord::Dna(dh(0))))]
-#[test_case(OpType::StoreRecord(OpRecord::OpenChain(dh(0))))]
-#[test_case(OpType::StoreRecord(OpRecord::CloseChain(dh(0))))]
-#[test_case(OpType::StoreRecord(OpRecord::InitZomesComplete))]
-#[test_case(OpType::StoreRecord(OpRecord::AgentValidationPkg(None)))]
+#[test_case(OpType::StoreRecord(OpRecord::Dna{ dna_hash: dh(0)}))]
+#[test_case(OpType::StoreRecord(OpRecord::OpenChain{ previous_dna_hash: dh(0)}))]
+#[test_case(OpType::StoreRecord(OpRecord::CloseChain{new_dna_hash: dh(0)}))]
+#[test_case(OpType::StoreRecord(OpRecord::InitZomesComplete {}))]
+#[test_case(OpType::StoreRecord(OpRecord::AgentValidationPkg {None}))]
 // Store Entry
-#[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: EntryTypes::A(A{}), action: a(0) }))]
-#[test_case(OpType::StoreEntry(OpEntry::UpdateEntry {entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: EntryTypes::A(A{}) }))]
-#[test_case(OpType::StoreEntry(OpEntry::CreateAgent(ak(4))))]
+#[test_case(OpType::StoreEntry(OpEntry::CreateEntry { entry_type: EntryTypes::A(A{}) }))]
+#[test_case(OpType::StoreEntry(OpEntry::UpdateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), entry_type: EntryTypes::A(A{}) }))]
+#[test_case(OpType::StoreEntry(OpEntry::CreateAgent { agent: ak(4)}))]
 #[test_case(OpType::StoreEntry(OpEntry::UpdateAgent { original_key: ak(4), new_key: ak(8), original_action_hash: ah(2) }))]
 // Error Cases
 // #[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: EntryTypes::B(B{}) }))]
 // Register Update
-#[test_case(OpType::RegisterUpdate(OpUpdate::Entry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), new_entry_type: EntryTypes::A(A{}), original_entry_type: EntryTypes::A(A{}) }))]
-#[test_case(OpType::RegisterUpdate(OpUpdate::PrivateEntry { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1), new_entry_type: UnitEntryTypes::A, original_entry_type: UnitEntryTypes::A }))]
+#[test_case(OpType::RegisterUpdate(OpUpdate::Entry { original_action_hash: ah(1), original_entry_hash: eh(1), new_entry_type: EntryTypes::A(A{}), original_entry_type: EntryTypes::A(A{}) }))]
+#[test_case(OpType::RegisterUpdate(OpUpdate::PrivateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), new_entry_type: UnitEntryTypes::A, original_entry_type: UnitEntryTypes::A }))]
 #[test_case(OpType::RegisterUpdate(OpUpdate::Agent { original_key: ak(4), new_key: ak(8), original_action_hash: ah(2) }))]
-#[test_case(OpType::RegisterUpdate(OpUpdate::CapClaim { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1) }))]
-#[test_case(OpType::RegisterUpdate(OpUpdate::CapGrant { entry_hash: eh(0), original_action_hash: ah(1), original_entry_hash: eh(1) }))]
+#[test_case(OpType::RegisterUpdate(OpUpdate::CapClaim { original_action_hash: ah(1), original_entry_hash: eh(1) }))]
+#[test_case(OpType::RegisterUpdate(OpUpdate::CapGrant { original_action_hash: ah(1), original_entry_hash: eh(1) }))]
 // Register Delete
 #[test_case(OpType::RegisterDelete(OpDelete::Entry { original_action_hash: ah(1), original_entry_hash: eh(1), original_entry_type: EntryTypes::A(A{}) }))]
 #[test_case(OpType::RegisterDelete(OpDelete::PrivateEntry { original_action_hash: ah(1), original_entry_hash: eh(1), original_entry_type: UnitEntryTypes::A }))]
@@ -207,63 +207,63 @@ fn op_errors(op: Op) -> WasmErrorInner {
 #[test_case(OpType::RegisterCreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: LinkTypes::A })]
 #[test_case(OpType::RegisterCreateLink {base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: LinkTypes::B })]
 // Register Delete Link
-#[test_case(OpType::RegisterDeleteLink {original_link_hash: ah(2), base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: LinkTypes::A })]
-#[test_case(OpType::RegisterDeleteLink {original_link_hash: ah(2), base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: LinkTypes::C })]
+#[test_case(OpType::RegisterDeleteLink { original_action_hash: ah(2), base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: LinkTypes::A })]
+#[test_case(OpType::RegisterDeleteLink { original_action_hash: ah(2), base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: LinkTypes::C })]
 fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
     let data = vec![0u8; 2000];
     let mut ud = Unstructured::new(&data);
     let o = match op.clone() {
-        OpType::StoreRecord(OpRecord::Dna(dna_hash)) => {
+        OpType::StoreRecord(OpRecord::Dna{dna_hash, ..}) => {
             let mut d = Dna::arbitrary(&mut ud).unwrap();
             d.hash = dna_hash;
             let d = Action::Dna(d);
             store_record_entry(d, RecordEntry::NotApplicable)
         }
-        OpType::StoreRecord(OpRecord::AgentValidationPkg(membrane)) => {
+        OpType::StoreRecord(OpRecord::AgentValidationPkg{membrane_proof, ..}) => {
             let mut d = AgentValidationPkg::arbitrary(&mut ud).unwrap();
-            d.membrane_proof = membrane;
+            d.membrane_proof = membrane_proof;
             let d = Action::AgentValidationPkg(d);
             store_record_entry(d, RecordEntry::NotApplicable)
         }
-        OpType::StoreRecord(OpRecord::InitZomesComplete) => {
+        OpType::StoreRecord(OpRecord::InitZomesComplete{..}) => {
             let d = InitZomesComplete::arbitrary(&mut ud).unwrap();
             let d = Action::InitZomesComplete(d);
             store_record_entry(d, RecordEntry::NotApplicable)
         }
-        OpType::StoreRecord(OpRecord::OpenChain(dna_hash)) => {
+        OpType::StoreRecord(OpRecord::OpenChain{previous_dna_hash, ..}) => {
             let mut d = OpenChain::arbitrary(&mut ud).unwrap();
-            d.prev_dna_hash = dna_hash;
+            d.prev_dna_hash = previous_dna_hash;
             let d = Action::OpenChain(d);
             store_record_entry(d, RecordEntry::NotApplicable)
         }
-        OpType::StoreRecord(OpRecord::CloseChain(dna_hash)) => {
+        OpType::StoreRecord(OpRecord::CloseChain {new_dna_hash, ..}) => {
             let mut d = CloseChain::arbitrary(&mut ud).unwrap();
-            d.new_dna_hash = dna_hash;
+            d.new_dna_hash = new_dna_hash;
             let d = Action::CloseChain(d);
             store_record_entry(d, RecordEntry::NotApplicable)
         }
-        OpType::StoreRecord(OpRecord::CreateCapClaim(entry_hash)) => {
+        OpType::StoreRecord(OpRecord::CreateCapClaim {action}) => {
             let mut d = Create::arbitrary(&mut ud).unwrap();
-            d.entry_hash = entry_hash;
+            d.entry_hash = action.entry_hash;
             d.entry_type = EntryType::CapClaim;
             let d = Action::Create(d);
             store_record_entry(d, RecordEntry::Hidden)
         }
-        OpType::StoreRecord(OpRecord::CreateCapGrant(entry_hash)) => {
+        OpType::StoreRecord(OpRecord::CreateCapGrant {action}) => {
             let mut d = Create::arbitrary(&mut ud).unwrap();
-            d.entry_hash = entry_hash;
+            d.entry_hash = action.entry_hash;
             d.entry_type = EntryType::CapGrant;
             let d = Action::Create(d);
             store_record_entry(d, RecordEntry::Hidden)
         }
         OpType::StoreRecord(OpRecord::UpdateCapClaim {
-            entry_hash,
             original_action_hash,
             original_entry_hash,
+            action,
         }) => {
             let mut u = Update::arbitrary(&mut ud).unwrap();
-            u.entry_hash = entry_hash;
+            u.entry_hash = action.entry_hash;
             u.entry_type = EntryType::CapClaim;
             u.original_action_address = original_action_hash;
             u.original_entry_address = original_entry_hash;
@@ -271,12 +271,12 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             store_record_entry(u, RecordEntry::Hidden)
         }
         OpType::StoreRecord(OpRecord::UpdateCapGrant {
-            entry_hash,
             original_action_hash,
             original_entry_hash,
+            action,
         }) => {
             let mut u = Update::arbitrary(&mut ud).unwrap();
-            u.entry_hash = entry_hash;
+            u.entry_hash = action.entry_hash;
             u.entry_type = EntryType::CapGrant;
             u.original_action_address = original_action_hash;
             u.original_entry_address = original_entry_hash;
@@ -284,25 +284,25 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             store_record_entry(u, RecordEntry::Hidden)
         }
         OpType::StoreRecord(OpRecord::CreateEntry {
-            entry_hash,
-            entry_type: et,
+            app_entry: et,
+            action,
         }) => {
             let entry = RecordEntry::Present(Entry::try_from(&et).unwrap());
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
-            let c = create((&et).into(), &mut ud, t, entry_hash);
+            let c = create((&et).into(), &mut ud, t, action.entry_hash);
             let c = Action::Create(c);
             store_record_entry(c, entry)
         }
         OpType::StoreRecord(OpRecord::CreatePrivateEntry {
-            entry_hash,
-            entry_type: et,
+            app_entry_type: et,
+            action,
         }) => {
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
-            let c = create(EntryVisibility::Private, &mut ud, t, entry_hash);
+            let c = create(EntryVisibility::Private, &mut ud, t, action.entry_hash);
             let c = Action::Create(c);
             store_record_entry(c, RecordEntry::Hidden)
         }
-        OpType::StoreRecord(OpRecord::CreateAgent(agent)) => {
+        OpType::StoreRecord(OpRecord::CreateAgent{agent, ..}) => {
             let entry = RecordEntry::Present(Entry::Agent(agent.clone()));
             let mut c = Create::arbitrary(&mut ud).unwrap();
             c.entry_type = EntryType::AgentPubKey;
@@ -315,6 +315,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             base_address,
             target_address,
             tag,
+            ..
         }) => {
             let t = ScopedLinkType::try_from(&lt).unwrap();
             let mut c = CreateLink::arbitrary(&mut ud).unwrap();
@@ -334,9 +335,9 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 },
             })
         }
-        OpType::StoreRecord(OpRecord::DeleteLink(link_action_hash)) => {
+        OpType::StoreRecord(OpRecord::DeleteLink{original_action_hash, ..}) => {
             let mut c = DeleteLink::arbitrary(&mut ud).unwrap();
-            c.link_add_address = link_action_hash;
+            c.link_add_address = original_action_hash;
             let c = Action::DeleteLink(c);
             Op::StoreRecord(StoreRecord {
                 record: Record {
@@ -349,10 +350,10 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::StoreRecord(OpRecord::UpdateEntry {
-            entry_hash,
             original_action_hash,
             original_entry_hash,
-            entry_type: et,
+            app_entry: et,
+            action,
         }) => {
             let entry = RecordEntry::Present(Entry::try_from(&et).unwrap());
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
@@ -360,7 +361,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 (&et).into(),
                 &mut ud,
                 t,
-                entry_hash,
+                action.entry_hash,
                 original_action_hash,
                 original_entry_hash,
             );
@@ -368,17 +369,17 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             store_record_entry(u, entry)
         }
         OpType::StoreRecord(OpRecord::UpdatePrivateEntry {
-            entry_hash,
             original_action_hash,
             original_entry_hash,
-            entry_type: et,
+            app_entry_type: et,
+            action
         }) => {
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
             let u = update(
                 EntryVisibility::Private,
                 &mut ud,
                 t,
-                entry_hash,
+                action.entry_hash,
                 original_action_hash,
                 original_entry_hash,
             );
@@ -389,6 +390,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             original_action_hash,
             original_key,
             new_key,
+            action,
         }) => {
             let entry = RecordEntry::Present(Entry::Agent(new_key.clone()));
             let mut u = Update::arbitrary(&mut ud).unwrap();
@@ -402,6 +404,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         OpType::StoreRecord(OpRecord::DeleteEntry {
             original_action_hash,
             original_entry_hash,
+            action,
         }) => {
             let mut d = Delete::arbitrary(&mut ud).unwrap();
             d.deletes_address = original_action_hash;
@@ -410,21 +413,19 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             store_record_entry(d, RecordEntry::NotApplicable)
         }
         OpType::StoreEntry(OpEntry::CreateEntry {
-            entry_hash,
-            entry_type: et,
+            app_entry: et,
             action,
         }) => {
             let entry = Entry::try_from(&et).unwrap();
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
-            let c = create(EntryVisibility::Public, &mut ud, t, entry_hash);
+            let c = create(EntryVisibility::Public, &mut ud, t, action.entry_hash);
             let c = EntryCreationAction::Create(c);
             store_entry_entry(c, entry)
         }
         OpType::StoreEntry(OpEntry::UpdateEntry {
-            entry_hash,
             original_action_hash,
             original_entry_hash,
-            entry_type: et,
+            app_entry: et,
             action,
         }) => {
             let entry = Entry::try_from(&et).unwrap();
@@ -433,14 +434,14 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 (&et).into(),
                 &mut ud,
                 t,
-                entry_hash,
+                action.entry_hash,
                 original_action_hash,
                 original_entry_hash,
             );
             let u = EntryCreationAction::Update(u);
             store_entry_entry(u, entry)
         }
-        OpType::StoreEntry(OpEntry::CreateAgent(agent)) => {
+        OpType::StoreEntry(OpEntry::CreateAgent{agent, ..}) => {
             let entry = Entry::Agent(agent.clone());
             let mut c = Create::arbitrary(&mut ud).unwrap();
             c.entry_type = EntryType::AgentPubKey;
@@ -452,6 +453,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             original_action_hash,
             original_key,
             new_key,
+            action,
         }) => {
             let entry = Entry::Agent(new_key.clone());
             let mut u = Update::arbitrary(&mut ud).unwrap();
@@ -467,6 +469,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             base_address,
             target_address,
             tag,
+            action,
         } => {
             let t = ScopedLinkType::try_from(&lt).unwrap();
             let mut c = CreateLink::arbitrary(&mut ud).unwrap();
@@ -483,16 +486,17 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterDeleteLink {
-            original_link_hash,
+            original_action_hash,
             link_type: lt,
             base_address,
             target_address,
             tag,
+            action,
         } => {
             let t = ScopedLinkType::try_from(&lt).unwrap();
             let mut c = CreateLink::arbitrary(&mut ud).unwrap();
             let mut d = DeleteLink::arbitrary(&mut ud).unwrap();
-            d.link_add_address = original_link_hash;
+            d.link_add_address = original_action_hash;
             c.zome_index = t.zome_index;
             c.link_type = t.zome_type;
             c.base_address = base_address;
@@ -507,31 +511,29 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterUpdate(OpUpdate::Entry {
-            entry_hash,
             original_action_hash,
-            original_entry_hash,
-            original_entry_type: original_et,
-            new_entry_type: et,
+            original_app_entry,
+            app_entry: et,
+            action,
         }) => {
-            let original_entry = Entry::try_from(&original_et).unwrap();
             let entry = Entry::try_from(&et).unwrap();
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
             let original_action = update(
-                (&original_et).into(),
+                original_app_entry.into(),
                 &mut ud,
                 t,
-                entry_hash.clone(),
+                action.entry_hash.clone(),
                 original_action_hash.clone(),
-                original_entry_hash.clone(),
+                original_app_entry.entry_hash.clone(),
             );
             let original_action = EntryCreationAction::Update(original_action);
             let u = update(
                 (&et).into(),
                 &mut ud,
                 t,
-                entry_hash,
+                action.entry_hash,
                 original_action_hash,
-                original_entry_hash,
+                original_app_entry.entry_hash,
             );
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
@@ -540,13 +542,14 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 },
                 new_entry: Some(entry),
                 original_action,
-                original_entry: Some(original_entry),
+                original_entry: Some(original_app_entry),
             })
         }
         OpType::RegisterUpdate(OpUpdate::Agent {
             original_action_hash,
             original_key,
             new_key,
+            action,
         }) => {
             let entry = Entry::Agent(new_key.clone());
             let original_entry = Entry::Agent(original_key.clone());
@@ -568,22 +571,21 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterUpdate(OpUpdate::PrivateEntry {
-            entry_hash,
             original_action_hash,
-            original_entry_hash,
-            new_entry_type: et,
-            ..
+            original_app_entry_type,
+            app_entry_type: et,
+            action,
         }) => {
             let t = ScopedEntryDefIndex::try_from(&et).unwrap();
-            let original_action = create(EntryVisibility::Private, &mut ud, t, entry_hash.clone());
+            let original_action = create(EntryVisibility::Private, &mut ud, t, action.entry_hash.clone());
             let original_action = EntryCreationAction::Create(original_action);
             let u = update(
                 EntryVisibility::Private,
                 &mut ud,
                 t,
-                entry_hash,
+                action.entry_hash,
                 original_action_hash,
-                original_entry_hash,
+                original_action.entry_hash,
             );
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
@@ -596,13 +598,13 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterUpdate(OpUpdate::CapClaim {
-            entry_hash,
             original_action_hash,
             original_entry_hash,
+            action,
         }) => {
             let mut u = Update::arbitrary(&mut ud).unwrap();
             u.entry_type = EntryType::CapClaim;
-            u.entry_hash = entry_hash;
+            u.entry_hash = action.entry_hash;
             u.original_action_address = original_action_hash;
             u.original_entry_address = original_entry_hash.clone();
             let mut c = Create::arbitrary(&mut ud).unwrap();
@@ -765,10 +767,10 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                     entry_hash,
                     entry_type,
                 } => activity_create(EntryVisibility::Private, &mut ud, entry_type, entry_hash),
-                OpActivity::CreateAgent(a) => {
+                OpActivity::CreateAgent{agent, ..} => {
                     let mut c = Create::arbitrary(&mut ud).unwrap();
                     c.entry_type = EntryType::AgentPubKey;
-                    c.entry_hash = a.into();
+                    c.entry_hash = agent.into();
                     Action::Create(c)
                 }
                 OpActivity::UpdateEntry {
@@ -859,68 +861,68 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                     }
                     Action::CreateLink(c)
                 }
-                OpActivity::DeleteLink(deletes) => {
+                OpActivity::DeleteLink{original_action_hash: deletes} => {
                     let mut d = DeleteLink::arbitrary(&mut ud).unwrap();
                     d.link_add_address = deletes;
                     Action::DeleteLink(d)
                 }
-                OpActivity::CreateCapClaim(entry_hash) => {
+                OpActivity::CreateCapClaim{entry_hash, ..} => {
                     let mut c = Create::arbitrary(&mut ud).unwrap();
                     c.entry_hash = entry_hash;
                     c.entry_type = EntryType::CapClaim;
                     Action::Create(c)
                 }
-                OpActivity::CreateCapGrant(entry_hash) => {
+                OpActivity::CreateCapGrant{entry_hash, ..} => {
                     let mut c = Create::arbitrary(&mut ud).unwrap();
                     c.entry_hash = entry_hash;
                     c.entry_type = EntryType::CapGrant;
                     Action::Create(c)
                 }
                 OpActivity::UpdateCapClaim {
-                    entry_hash,
                     original_action_hash,
                     original_entry_hash,
+                    action,
                 } => {
                     let mut u = Update::arbitrary(&mut ud).unwrap();
-                    u.entry_hash = entry_hash;
+                    u.entry_hash = action.entry_hash;
                     u.entry_type = EntryType::CapClaim;
                     u.original_action_address = original_action_hash;
                     u.original_entry_address = original_entry_hash;
                     Action::Update(u)
                 }
                 OpActivity::UpdateCapGrant {
-                    entry_hash,
                     original_action_hash,
                     original_entry_hash,
+                    action,
                 } => {
                     let mut u = Update::arbitrary(&mut ud).unwrap();
-                    u.entry_hash = entry_hash;
+                    u.entry_hash = action.entry_hash;
                     u.entry_type = EntryType::CapGrant;
                     u.original_action_address = original_action_hash;
                     u.original_entry_address = original_entry_hash;
                     Action::Update(u)
                 }
-                OpActivity::Dna(dna_hash) => {
+                OpActivity::Dna{dna_hash, ..} => {
                     let mut d = Dna::arbitrary(&mut ud).unwrap();
                     d.hash = dna_hash;
                     Action::Dna(d)
                 }
-                OpActivity::OpenChain(dna_hash) => {
+                OpActivity::OpenChain{previous_dna_hash, ..} => {
                     let mut d = OpenChain::arbitrary(&mut ud).unwrap();
-                    d.prev_dna_hash = dna_hash;
+                    d.prev_dna_hash = previous_dna_hash;
                     Action::OpenChain(d)
                 }
-                OpActivity::CloseChain(dna_hash) => {
+                OpActivity::CloseChain{new_dna_hash, ..} => {
                     let mut d = CloseChain::arbitrary(&mut ud).unwrap();
-                    d.new_dna_hash = dna_hash;
+                    d.new_dna_hash = new_dna_hash;
                     Action::CloseChain(d)
                 }
-                OpActivity::AgentValidationPkg(membrane) => {
+                OpActivity::AgentValidationPkg{membrane_proof, ..} => {
                     let mut d = AgentValidationPkg::arbitrary(&mut ud).unwrap();
-                    d.membrane_proof = membrane;
+                    d.membrane_proof = membrane_proof;
                     Action::AgentValidationPkg(d)
                 }
-                OpActivity::InitZomesComplete => {
+                OpActivity::InitZomesComplete{..} => {
                     let d = InitZomesComplete::arbitrary(&mut ud).unwrap();
                     Action::InitZomesComplete(d)
                 }
@@ -1066,66 +1068,68 @@ fn op_match_sanity() {
     match op.to_type().unwrap() {
         OpType::StoreRecord(r) => match r {
             OpRecord::CreateEntry {
-                entry_type: EntryTypes::A(_),
-                entry_hash: _,
+                app_entry: EntryTypes::A(_),
+                action: _,
             } => (),
             OpRecord::CreateEntry {
-                entry_type: EntryTypes::B(_),
-                entry_hash: _,
+                app_entry: EntryTypes::B(_),
+                action: _,
             } => unreachable!(),
             OpRecord::CreateEntry {
-                entry_type: EntryTypes::C(_),
-                entry_hash: _,
+                app_entry: EntryTypes::C(_),
+                action: _,
             } => (),
             OpRecord::CreatePrivateEntry {
-                entry_type: UnitEntryTypes::B,
-                entry_hash: _,
+                app_entry_type: UnitEntryTypes::B,
+                action: _,
             } => (),
-            OpRecord::CreatePrivateEntry { entry_type: _, .. } => unreachable!(),
-            OpRecord::CreateAgent(_) => (),
-            OpRecord::CreateCapClaim(_) => (),
-            OpRecord::CreateCapGrant(_) => (),
+            OpRecord::CreatePrivateEntry { app_entry_type: _, .. } => unreachable!(),
+            OpRecord::CreateAgent{..} => (),
+            OpRecord::CreateCapClaim{..} => (),
+            OpRecord::CreateCapGrant{..} => (),
             OpRecord::UpdateEntry {
-                entry_hash: _,
+                action: _,
                 original_action_hash: _,
                 original_entry_hash: _,
-                entry_type: EntryTypes::A(_),
+                app_entry: EntryTypes::A(_),
             } => (),
             OpRecord::UpdateEntry {
-                entry_hash: _,
+                action: _,
                 original_action_hash: _,
                 original_entry_hash: _,
-                entry_type: EntryTypes::B(_),
+                app_entry: EntryTypes::B(_),
             } => unreachable!(),
             OpRecord::UpdateEntry {
-                entry_hash: _,
+                action: _,
                 original_action_hash: _,
                 original_entry_hash: _,
-                entry_type: EntryTypes::C(_),
+                app_entry: EntryTypes::C(_),
             } => (),
             OpRecord::UpdatePrivateEntry {
-                entry_hash: _,
+                action: _,
                 original_action_hash: _,
                 original_entry_hash: _,
-                entry_type: UnitEntryTypes::B,
+                app_entry_type: UnitEntryTypes::B,
             } => (),
             OpRecord::UpdatePrivateEntry { .. } => unreachable!(),
             OpRecord::UpdateAgent {
+                action: _,
                 original_action_hash: _,
                 original_key: _,
                 new_key: _,
             } => (),
             OpRecord::UpdateCapClaim {
-                entry_hash: _,
+                action: _,
                 original_action_hash: _,
                 original_entry_hash: _,
             } => (),
             OpRecord::UpdateCapGrant {
-                entry_hash: _,
+                action: _,
                 original_action_hash: _,
                 original_entry_hash: _,
             } => (),
             OpRecord::DeleteEntry {
+                action: _,
                 original_action_hash: _,
                 original_entry_hash: _,
             } => (),
@@ -1134,29 +1138,33 @@ fn op_match_sanity() {
                 target_address: _,
                 tag: _,
                 link_type: LinkTypes::A,
+                action: _,
             } => (),
             OpRecord::CreateLink {
                 base_address: _,
                 target_address: _,
                 tag: _,
                 link_type: LinkTypes::B,
+                action: _,
             } => (),
             OpRecord::CreateLink {
                 base_address: _,
                 target_address: _,
                 tag: _,
                 link_type: LinkTypes::C,
+                action: _,
             } => (),
-            OpRecord::DeleteLink(_) => (),
-            OpRecord::Dna(_) => (),
-            OpRecord::OpenChain(_) => (),
-            OpRecord::CloseChain(_) => (),
-            OpRecord::AgentValidationPkg(_) => (),
-            OpRecord::InitZomesComplete => (),
+            OpRecord::DeleteLink{..} => (),
+            OpRecord::Dna{..} => (),
+            OpRecord::OpenChain{..} => (),
+            OpRecord::CloseChain{..} => (),
+            OpRecord::AgentValidationPkg{..} => (),
+            OpRecord::InitZomesComplete{..} => (),
         },
         OpType::StoreEntry(_) => (),
         OpType::RegisterAgentActivity(_) => (),
         OpType::RegisterCreateLink {
+            action: _,
             base_address: _,
             target_address: _,
             tag: _,
@@ -1167,11 +1175,12 @@ fn op_match_sanity() {
             LinkTypes::C => (),
         },
         OpType::RegisterDeleteLink {
-            original_link_hash: _,
+            original_action_hash: _,
             base_address: _,
             target_address: _,
             tag: _,
             link_type,
+            action: _,
         } => match link_type {
             LinkTypes::A => (),
             LinkTypes::B => (),
@@ -1182,8 +1191,8 @@ fn op_match_sanity() {
     }
     match op.to_type::<_, ()>().unwrap() {
         OpType::StoreRecord(OpRecord::CreateEntry {
-            entry_hash: _,
-            entry_type: EntryTypes::A(_),
+            action: _,
+            app_entry: EntryTypes::A(_),
         }) => (),
         _ => (),
     }

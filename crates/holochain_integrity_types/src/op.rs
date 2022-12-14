@@ -462,7 +462,7 @@ where
     /// on the base [`AnyLinkableHash`] for the link that is being deleted.
     RegisterDeleteLink {
         /// The hash of the [`CreateLink`] [`Action`] that created the link.
-        original_link_action_hash: ActionHash,
+        original_action_hash: ActionHash,
         /// The base address where this link is stored.
         /// This is the base address of the link that is being deleted.
         base_address: AnyLinkableHash,
@@ -573,9 +573,9 @@ where
     /// updated [`AgentPubKey`].
     UpdateAgent {
         /// The original [`AgentPubKey`].
-        original_agent: AgentPubKey,
+        original_key: AgentPubKey,
         /// The new [`AgentPubKey`].
-        agent: AgentPubKey,
+        new_key: AgentPubKey,
         /// The hash of the [`Action`] that created the original entry
         original_action_hash: ActionHash,
         /// The [`Update`] action that updated the entry

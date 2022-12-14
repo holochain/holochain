@@ -163,9 +163,9 @@ impl OpHelper for Op {
                                 action: action.clone(),
                             },
                             InScopeEntry::Agent(new_key) => OpRecord::UpdateAgent {
-                                original_agent: original_entry_hash.clone().into(),
+                                original_key: original_entry_hash.clone().into(),
                                 original_action_hash: original_action_hash.clone(),
-                                agent: new_key,
+                                new_key,
                                 action: action.clone(),
                             },
                             InScopeEntry::CapClaim => OpRecord::UpdateCapClaim {
@@ -493,7 +493,7 @@ impl OpHelper for Op {
                 } = create_link;
                 let link_type = in_scope_link_type(*zome_index, *link_type)?;
                 Ok(OpType::RegisterDeleteLink {
-                    original_link_action_hash: delete_link.hashed.link_add_address.clone(),
+                    original_action_hash: delete_link.hashed.link_add_address.clone(),
                     base_address: base_address.clone(),
                     target_address: target_address.clone(),
                     tag: tag.clone(),
@@ -800,27 +800,3 @@ impl<'a> From<&'a RecordEntry> for RecordEntryRef<'a> {
         }
     }
 }
-
-// impl<Unit, LT> From<ActivityEntry<Unit>> for OpActivity<Unit, LT> {
-//     fn from(e: ActivityEntry<Unit>) -> Self {
-//         match e {
-//             ActivityEntry::App {
-//                 entry_hash,
-//                 entry_type,
-//             } => OpActivity::CreateEntry {
-//                 entry_hash,
-//                 entry_type,
-//             },
-//             ActivityEntry::PrivateApp {
-//                 entry_hash,
-//                 entry_type,
-//             } => OpActivity::CreatePrivateEntry {
-//                 entry_hash,
-//                 entry_type,
-//             },
-//             ActivityEntry::Agent(key) => OpActivity::CreateAgent(key),
-//             ActivityEntry::CapClaim(hash) => OpActivity::CreateCapClaim(hash),
-//             ActivityEntry::CapGrant(hash) => OpActivity::CreateCapGrant(hash),
-//         }
-//     }
-// }
