@@ -49,6 +49,8 @@ use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync;
 use tracing::*;
@@ -102,6 +104,7 @@ pub struct Cell {
     holochain_p2p_cell: HolochainP2pDna,
     queue_triggers: QueueTriggers,
     init_mutex: tokio::sync::Mutex<()>,
+    enabled: AtomicBool,
 }
 
 impl Cell {
@@ -151,6 +154,7 @@ impl Cell {
                     holochain_p2p_cell,
                     queue_triggers,
                     init_mutex: Default::default(),
+                    enabled: AtomicBool::new(true),
                 },
                 initial_queue_triggers,
             ))
@@ -159,7 +163,20 @@ impl Cell {
         }
     }
 
-    /// Performs the Genesis workflow the Cell, ensuring that its initial
+    ///
+    // Temporary workaround to check if a cloned cell is enabled or not when
+    // being called
+    // TODO refactor how to determine whether a cell is enabled when called.
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.store(enabled, Ordering::Relaxed)
+    }
+
+    ///
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::Relaxed)
+    }
+
+    /// Performs the Genesis workflow for the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
@@ -828,6 +845,10 @@ impl Cell {
         call: ZomeCall,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
+        // make sure that cell is enabled
+        if !self.is_enabled() {
+            return Err(CellError::CellDisabled(self.id.clone()));
+        }
         // Only check if init has run if this call is not coming from
         // an already running init call.
         if workspace_lock

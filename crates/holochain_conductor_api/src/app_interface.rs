@@ -306,6 +306,8 @@ impl AppInfo {
                         status == AppInfoStatus::Running,
                     );
                     cell_info_for_role.push(cell_info);
+                } else {
+                    tracing::error!("no ribosome found for cell id {}", provisioned_cell);
                 }
             } else {
                 // no provisioned cell, thus there must be a deferred cell
@@ -326,7 +328,7 @@ impl AppInfo {
                         );
                         cell_info_for_role.push(cell_info);
                     } else {
-                        tracing::error!("app info: no ribosome found for cell id {}", cell_id);
+                        tracing::error!("no ribosome found for cell id {}", cell_id);
                     }
                 });
             }
@@ -344,7 +346,7 @@ impl AppInfo {
                         );
                         cell_info_for_role.push(cell_info);
                     } else {
-                        tracing::error!("app info: no ribosome found for cell id {}", cell_id);
+                        tracing::error!("no ribosome found for cell id {}", cell_id);
                     }
                 });
             }

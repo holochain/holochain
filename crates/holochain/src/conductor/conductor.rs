@@ -1392,7 +1392,12 @@ mod clone_cell_impls {
                     }
                 })
                 .await?;
-            self.remove_cells(&[removed_cell_id]).await;
+            // TODO refactor this once cells know which app they're part of
+            self.cells.share_ref(|cells| {
+                if let Some(cell) = cells.get(&removed_cell_id) {
+                    cell.cell.set_enabled(false);
+                }
+            });
             Ok(())
         }
 
@@ -1414,6 +1419,12 @@ mod clone_cell_impls {
                 })
                 .await?;
 
+            // TODO refactor this once cells know which app they're part of
+            self.cells.share_ref(|cells| {
+                if let Some(cell) = cells.get(enabled_cell.as_id()) {
+                    cell.cell.set_enabled(true)
+                }
+            });
             self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
                 .await?;
             Ok(enabled_cell)

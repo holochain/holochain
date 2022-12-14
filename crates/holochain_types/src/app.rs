@@ -474,7 +474,7 @@ impl InstalledAppCommon {
     ) -> Option<&HashMap<CloneId, CellId>> {
         match self.role_assignments.get(role_name) {
             None => None,
-            Some(role_assignments) => Some(&role_assignments.disabled_clones),
+            Some(role_assignment) => Some(&role_assignment.disabled_clones),
         }
     }
 
