@@ -4,7 +4,6 @@ use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfo;
-use kitsune_p2p::gossip::sharded_gossip::{InOut, RoundThroughput};
 use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
