@@ -493,7 +493,7 @@ impl OpHelper for Op {
                 } = create_link;
                 let link_type = in_scope_link_type(*zome_index, *link_type)?;
                 Ok(OpType::RegisterDeleteLink {
-                    original_action_hash: delete_link.hashed.link_add_address.clone(),
+                    original_action: create_link.clone(),
                     base_address: base_address.clone(),
                     target_address: target_address.clone(),
                     tag: tag.clone(),

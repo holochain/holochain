@@ -461,8 +461,8 @@ where
     /// on the DHT and is returned when the authority receives a request
     /// on the base [`AnyLinkableHash`] for the link that is being deleted.
     RegisterDeleteLink {
-        /// The hash of the [`CreateLink`] [`Action`] that created the link.
-        original_action_hash: ActionHash,
+        /// The original [`CreateLink`] [`Action`] that created the link.
+        original_action: CreateLink,
         /// The base address where this link is stored.
         /// This is the base address of the link that is being deleted.
         base_address: AnyLinkableHash,
@@ -531,13 +531,13 @@ where
     /// This operation stores the [`Record`] for a
     /// Capability Claim that has been created.
     CreateCapClaim {
-        /// The [`Create`] action that creates the [`CapClaim`]
+        /// The [`Create`] action that creates the [`crate::CapClaim`]
         action: Create,
     },
     /// This operation stores the [`Record`] for a
     /// Capability Grant that has been created.
     CreateCapGrant {
-        /// The [`Create`] action that creates the [`CapGrant`]
+        /// The [`Create`] action that creates the [`crate::CapGrant`]
         action: Create,
     },
     /// This operation stores the [`Record`] for an
@@ -584,21 +584,21 @@ where
     /// This operation stores the [`Record`] for an
     /// updated Capability Claim.
     UpdateCapClaim {
-        /// The hash of the [`Action`] that created the original [`CapClaim`]
+        /// The hash of the [`Action`] that created the original [`crate::CapClaim`]
         original_action_hash: ActionHash,
-        /// The hash of the original [`CapClaim`]
+        /// The hash of the original [`crate::CapClaim`]
         original_entry_hash: EntryHash,
-        /// The [`Update`] action that updates the [`CapClaim`]
+        /// The [`Update`] action that updates the [`crate::CapClaim`]
         action: Update,
     },
     /// This operation stores the [`Record`] for an
     /// updated Capability Grant.
     UpdateCapGrant {
-        /// The hash of the [`Action`] that created the original [`CapGrant`]
+        /// The hash of the [`Action`] that created the original [`crate::CapGrant`]
         original_action_hash: ActionHash,
-        /// The hash of the original [`CapGrant`]
+        /// The hash of the original [`crate::CapGrant`]
         original_entry_hash: EntryHash,
-        /// The [`Update`] action that updates the [`CapGrant`]
+        /// The [`Update`] action that updates the [`crate::CapGrant`]
         action: Update,
     },
     /// This operation stores the [`Record`] for a
@@ -714,13 +714,13 @@ pub enum OpActivity<UnitType, LT> {
     /// This operation registers the [`Action`] for a
     /// Capability Claim to the author's chain.
     CreateCapClaim {
-        /// The [`Create`] action that creates the [`CapClaim`]
+        /// The [`Create`] action that creates the [`crate::CapClaim`]
         action: Create,
     },
     /// This operation registers the [`Action`] for a
     /// Capability Grant to the author's chain.
     CreateCapGrant {
-        /// The [`Create`] action that creates the [`CapGrant`]
+        /// The [`Create`] action that creates the [`crate::CapGrant`]
         action: Create,
     },
     /// This operation registers the [`Action`] for an
@@ -766,21 +766,21 @@ pub enum OpActivity<UnitType, LT> {
     /// This operation registers the [`Action`] for an
     /// updated Capability Claim to the author's chain.
     UpdateCapClaim {
-        /// The hash of the [`Action`] that created the original [`CapClaim`]
+        /// The hash of the [`Action`] that created the original [`crate::CapClaim`]
         original_action_hash: ActionHash,
-        /// The hash of the original [`CapClaim`]
+        /// The hash of the original [`crate::CapClaim`]
         original_entry_hash: EntryHash,
-        /// The [`Update`] action that updates the [`CapClaim`]
+        /// The [`Update`] action that updates the [`crate::CapClaim`]
         action: Update,
     },
     /// This operation registers the [`Action`] for an
     /// updated Capability Grant to the author's chain.
     UpdateCapGrant {
-        /// The hash of the [`Action`] that created the original [`CapGrant`]
+        /// The hash of the [`Action`] that created the original [`crate::CapGrant`]
         original_action_hash: ActionHash,
-        /// The hash of the original [`CapGrant`]
+        /// The hash of the original [`crate::CapGrant`]
         original_entry_hash: EntryHash,
-        /// The [`Update`] action that updates the [`CapGrant`]
+        /// The [`Update`] action that updates the [`crate::CapGrant`]
         action: Update,
     },
     /// This operation registers the [`Action`] for a
@@ -965,7 +965,7 @@ where
     CapClaim {
         /// The hash of the original original [`Action`].
         original_action_hash: ActionHash,
-        /// The [`Update`] action that updates the [`CapClaim`]
+        /// The [`Update`] action that updates the [`crate::CapClaim`]
         action: Update,
     },
     /// This operation registers an update from
@@ -973,7 +973,7 @@ where
     CapGrant {
         /// The hash of the original original [`Action`].
         original_action_hash: ActionHash,
-        /// The [`Update`] action that updates the [`CapGrant`]
+        /// The [`Update`] action that updates the [`crate::CapGrant`]
         action: Update,
     },
 }
