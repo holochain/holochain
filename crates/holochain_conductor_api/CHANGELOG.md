@@ -1,17 +1,28 @@
+---
+default_semver_increment_mode: !pre_minor beta-rc
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
 - **BREAKING CHANGE**: Remove deprecated Admin and App API calls.
+
 - **BREAKING CHANGE**: Remove call `InstallApp`.
+
 - **BREAKING CHANGE**: Rename `InstallAppBundle` to `InstallApp`.
+
 - **BREAKING CHANGE**: Rename `AppInfo` to `GetAppInfo`.
+
 - **BREAKING CHANGE**: Rename `ZomeCall` to `CallZome`. [\#1707](https://github.com/holochain/holochain/pull/1707)
 
 - **BREAKING CHANGE**: Rename ArchiveCloneCell to DisableCloneCell.
+
 - **BREAKING CHANGE**: Rename RestoreArchivedCloneCell to EnableCloneCell.
+
 - **BREAKING CHANGE**: Move EnableCloneCell to App API.
+
 - **BREAKING CHANGE**: Refactor DeleteCloneCell to delete a single disabled clone cell. [\#1704](https://github.com/holochain/holochain/pull/1704)
 
 ## 0.0.72
