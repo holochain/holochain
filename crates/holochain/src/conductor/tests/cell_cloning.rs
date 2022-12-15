@@ -1,4 +1,7 @@
-use crate::sweettest::*;
+use crate::{
+    conductor::{api::error::ConductorApiError, CellError},
+    sweettest::*,
+};
 use holo_hash::ActionHash;
 use holochain_conductor_api::CellInfo;
 use holochain_types::{
@@ -338,7 +341,7 @@ async fn conductor_can_startup_with_cloned_cell() {
     let zome_call_response: Result<ActionHash, _> = conductor
         .call_fallible(&zome, "call_create_entry", ())
         .await;
-    assert!(zome_call_response.is_err());
+    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(cell_id))) if cell_id == clone_cell.as_id().clone());
 
     conductor.shutdown().await;
     conductor.startup().await;
@@ -351,5 +354,5 @@ async fn conductor_can_startup_with_cloned_cell() {
     let zome_call_response: Result<ActionHash, _> = conductor
         .call_fallible(&zome, "call_create_entry", ())
         .await;
-    assert!(zome_call_response.is_err());
+    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(cell_id))) if cell_id == clone_cell.as_id().clone());
 }
