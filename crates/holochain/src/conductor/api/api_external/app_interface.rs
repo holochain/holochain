@@ -108,9 +108,9 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
-            AppRequest::GossipInfo(payload) => {
-                let info = self.conductor_handle.gossip_info(&payload.dnas).await?;
-                Ok(AppResponse::GossipInfo(info))
+            AppRequest::NetworkInfo(payload) => {
+                let info = self.conductor_handle.network_info(&payload.dnas).await?;
+                Ok(AppResponse::NetworkInfo(info))
             }
             AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
         }

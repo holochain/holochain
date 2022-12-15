@@ -6,7 +6,19 @@ use crate::spacetime::{SpaceSegment, SpacetimeQuantumCoords, TimeSegment, Topolo
 
 /// The cross product of a space segment and at time segment forms a Region.
 /// Hence, these two segments are the coordinates which define a Region of spacetime.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Constructor)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    derive_more::Constructor,
+    serde::Deserialize,
+    serde::Serialize,
+)]
 pub struct RegionCoords {
     /// The space segment
     pub space: SpaceSegment,
@@ -53,7 +65,7 @@ impl RegionCoords {
 /// This type should only be used in the host, which deals in absolute coords.
 /// Kitsune itself should only use [`RegionCoords`] to ensure proper quantum
 /// alignment.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct RegionBounds {
     /// The inclusive min and max locations
     pub x: (Loc, Loc),

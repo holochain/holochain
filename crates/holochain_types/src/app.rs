@@ -63,9 +63,9 @@ pub struct RegisterDnaPayload {
     pub source: DnaSource,
 }
 
-/// The instructions on how to request GossipInfo
+/// The instructions on how to request NetworkInfo
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct GossipInfoRequestPayload {
+pub struct NetworkInfoRequestPayload {
     /// Get gossip info for these DNAs
     pub dnas: Vec<DnaHash>,
 }

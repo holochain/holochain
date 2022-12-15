@@ -3,7 +3,7 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
-use kitsune_p2p::gossip::sharded_gossip::{InOut, RoundThroughput};
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfo;
 use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
@@ -68,8 +68,8 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellEnabled`]
     EnableCloneCell(Box<EnableCloneCellPayload>),
 
-    /// Info about gossip
-    GossipInfo(Box<GossipInfoRequestPayload>),
+    /// Info about networking processes
+    NetworkInfo(Box<NetworkInfoRequestPayload>),
 
     /// Is currently unimplemented and will return
     /// an [`AppResponse::Unimplemented`].
@@ -117,8 +117,8 @@ pub enum AppResponse {
     /// A previously disabled clone cell has been enabled.
     CloneCellEnabled(InstalledCell),
 
-    /// GossipInfo is returned
-    GossipInfo(Vec<DnaGossipInfo>),
+    /// NetworkInfo is returned
+    NetworkInfo(Vec<NetworkInfo>),
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -392,37 +392,8 @@ impl From<AppInfoStatus> for AppStatus {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct DnaGossipInfo {
-    pub total_historical_gossip_throughput: HistoricalGossipThroughput,
-}
-
-/// Throughput info specific to historical rounds
-#[derive(
-    Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes,
-)]
-pub struct HistoricalGossipThroughput {
-    /// Total number of bytes expected to be sent for region data (historical only)
-    pub expected_op_bytes: InOut,
-
-    /// Total number of ops expected to be sent for region data (historical only)
-    pub expected_op_count: InOut,
-
-    /// Total number of bytes sent for op data
-    pub op_bytes: InOut,
-
-    /// Total number of ops sent
-    pub op_count: InOut,
-}
-
-impl From<RoundThroughput> for HistoricalGossipThroughput {
-    fn from(r: RoundThroughput) -> Self {
-        Self {
-            expected_op_bytes: r.expected_op_bytes,
-            expected_op_count: r.expected_op_count,
-            op_count: r.op_count,
-            op_bytes: r.op_bytes,
-        }
-    }
+pub struct NetworkInfo {
+    pub fetch_queue_info: FetchQueueInfo,
 }
 
 #[test]

@@ -3,7 +3,7 @@
 
 use fixt::prelude::Distribution;
 use futures::stream::Stream;
-use kitsune_p2p::actor::BroadcastTo;
+use kitsune_p2p::actor::BroadcastData;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ops::Range;
@@ -345,10 +345,10 @@ impl HolochainP2pMockMsg {
                 | crate::wire::WireMessage::GetMeta { .. }
                 | crate::wire::WireMessage::GetLinks { .. }
                 | crate::wire::WireMessage::GetAgentActivity { .. }
+                | crate::wire::WireMessage::PublishCountersign { .. }
                 | crate::wire::WireMessage::MustGetAgentActivity { .. } => next_msg_id().as_req(),
 
-                crate::wire::WireMessage::Publish { .. }
-                | crate::wire::WireMessage::CountersigningSessionNegotiation { .. } => {
+                crate::wire::WireMessage::CountersigningSessionNegotiation { .. } => {
                     MsgId::new_notify()
                 }
             },
@@ -375,8 +375,7 @@ impl HolochainP2pMockMsg {
                     | crate::wire::WireMessage::GetLinks { .. }
                     | crate::wire::WireMessage::GetAgentActivity { .. }
                     | crate::wire::WireMessage::MustGetAgentActivity { .. } => true,
-
-                    crate::wire::WireMessage::Publish { .. }
+                    crate::wire::WireMessage::PublishCountersign { .. }
                     | crate::wire::WireMessage::CountersigningSessionNegotiation { .. } => false,
                 };
                 let to_agent = to_agent.to_kitsune();
@@ -392,8 +391,7 @@ impl HolochainP2pMockMsg {
                     kwire::Wire::Broadcast(kwire::Broadcast {
                         space,
                         to_agent,
-                        data,
-                        destination: BroadcastTo::Notify,
+                        data: BroadcastData::User(data.to_vec()),
                     })
                 }
             }
@@ -427,12 +425,10 @@ impl HolochainP2pMockMsg {
             } => {
                 let space = dna.to_kitsune();
                 let to_agent = to_agent.to_kitsune();
-                let data = info.encode().unwrap().to_vec().into();
                 kwire::Wire::Broadcast(kwire::Broadcast {
                     space,
                     to_agent,
-                    data,
-                    destination: BroadcastTo::PublishAgentInfo,
+                    data: BroadcastData::AgentInfo(info),
                 })
             }
         }
@@ -454,30 +450,28 @@ impl HolochainP2pMockMsg {
                 to_agent,
                 data,
                 space,
-                destination,
                 ..
             })
             | kwire::Wire::DelegateBroadcast(kwire::DelegateBroadcast {
                 to_agent,
                 data,
                 space,
-                destination,
                 ..
             }) => {
                 let to_agent = holo_hash::AgentPubKey::from_kitsune(&to_agent);
                 let dna = holo_hash::DnaHash::from_kitsune(&space);
-                match destination {
-                    BroadcastTo::Notify => {
+                match data {
+                    BroadcastData::User(data) => {
                         let msg = crate::wire::WireMessage::decode(data.as_ref()).unwrap();
                         HolochainP2pMockMsg::Wire { to_agent, msg, dna }
                     }
-                    BroadcastTo::PublishAgentInfo => {
-                        let info = AgentInfoSigned::decode(&data[..]).unwrap();
-                        HolochainP2pMockMsg::PublishedAgentInfo {
-                            to_agent,
-                            dna,
-                            info,
-                        }
+                    BroadcastData::AgentInfo(info) => HolochainP2pMockMsg::PublishedAgentInfo {
+                        to_agent,
+                        dna,
+                        info,
+                    },
+                    BroadcastData::Publish { .. } => {
+                        todo!()
                     }
                 }
             }
@@ -509,6 +503,8 @@ impl HolochainP2pMockMsg {
             kwire::Wire::PeerQueryResp(msg) => HolochainP2pMockMsg::PeerQueryResp(msg),
             kwire::Wire::CallResp(msg) => HolochainP2pMockMsg::CallResp(msg.data),
             kwire::Wire::Failure(msg) => HolochainP2pMockMsg::Failure(msg.reason),
+            kwire::Wire::FetchOp(_) => todo!(),
+            kwire::Wire::PushOpData(_) => todo!(),
         }
     }
 }

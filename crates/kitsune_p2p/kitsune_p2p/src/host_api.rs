@@ -1,10 +1,16 @@
+use kitsune_p2p_fetch::OpHashSized;
 use must_future::MustBoxFuture;
 use std::sync::Arc;
 
 use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
-    dht::{region::Region, region_set::RegionSetLtcs, spacetime::Topology},
+    dht::{
+        region::{Region, RegionCoords},
+        region_set::RegionSetLtcs,
+        spacetime::Topology,
+    },
     dht_arc::DhtArcSet,
+    KOpData, KOpHash,
 };
 
 use crate::event::{GetAgentInfoSignedEvt, MetricRecord};
@@ -22,14 +28,14 @@ pub trait KitsuneHost: 'static + Send + Sync {
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>>;
 
-    /// Extrapolated Peer Coverage
+    /// Extrapolated Peer Coverage.
     fn peer_extrapolated_coverage(
         &self,
         space: Arc<KitsuneSpace>,
         dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>>;
 
-    /// Query aggregate dht op data to form an LTCS set of region data
+    /// Query aggregate dht op data to form an LTCS set of region data.
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
@@ -46,19 +52,43 @@ pub trait KitsuneHost: 'static + Send + Sync {
         regions: Vec<Region>,
     ) -> KitsuneHostResult<Vec<Region>>;
 
-    /// Record a set of metric records
+    /// Get all op hashes within a region
+    fn query_op_hashes_by_region(
+        &self,
+        space: Arc<KitsuneSpace>,
+        region: RegionCoords,
+    ) -> KitsuneHostResult<Vec<OpHashSized>>;
+
+    /// Record a set of metric records.
     fn record_metrics(
         &self,
         space: Arc<KitsuneSpace>,
         records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()>;
 
-    /// Get the quantum Topology associated with this Space
+    /// Get the quantum Topology associated with this Space.
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology>;
+
+    /// Hashing function to get an op_hash from op_data.
+    fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash>;
+
+    /// Check which hashes we have data for.
+    fn check_op_data(
+        &self,
+        space: Arc<KitsuneSpace>,
+        op_hash_list: Vec<KOpHash>,
+        _context: Option<kitsune_p2p_fetch::FetchContext>,
+    ) -> KitsuneHostResult<Vec<bool>> {
+        let _space = space;
+        futures::FutureExt::boxed(
+            async move { Ok(op_hash_list.into_iter().map(|_| false).collect()) },
+        )
+        .into()
+    }
 }
 
 /// Trait object for the host interface
-pub type HostApi = std::sync::Arc<dyn KitsuneHost + Send + Sync>;
+pub type HostApi = std::sync::Arc<dyn KitsuneHost>;
 
 // Test-only stub which mostly panics
 #[cfg(any(test, feature = "test_utils"))]
