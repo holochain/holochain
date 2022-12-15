@@ -83,10 +83,10 @@ use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
-use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -549,6 +549,22 @@ mod dna_impls {
         /// Get an [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
         pub fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
             self.ribosome_store().share_ref(|ds| ds.get_entry_def(key))
+        }
+
+        /// Create a hash map of all existing DNA definitions, mapped to cell
+        /// ids.
+        pub fn get_dna_definitions(&self) -> HashMap<CellId, DnaDefHashed> {
+            let mut dna_defs = HashMap::new();
+            self.cells.share_ref(|cells| {
+                cells.iter().for_each(|(cell_id, cell_item)| {
+                    if let Ok(ribosome) = cell_item.cell.get_ribosome() {
+                        dna_defs.insert(cell_id.to_owned(), ribosome.dna_def().to_owned());
+                    } else {
+                        tracing::error!("no ribosome found for cell id {}", cell_id);
+                    }
+                })
+            });
+            dna_defs
         }
 
         pub(crate) async fn register_dna_wasm(
@@ -1156,7 +1172,7 @@ mod app_impls {
         pub async fn list_apps(
             &self,
             status_filter: Option<AppStatusFilter>,
-        ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        ) -> ConductorResult<Vec<AppInfo>> {
             use AppStatusFilter::*;
             let conductor_state = self.get_state().await?;
 
@@ -1169,9 +1185,9 @@ mod app_impls {
                 None => conductor_state.installed_apps().keys().collect(),
             };
 
-            let apps_info: Vec<InstalledAppInfo> = apps_ids
+            let apps_info: Vec<AppInfo> = apps_ids
                 .into_iter()
-                .filter_map(|app_id| conductor_state.get_app_info(app_id))
+                .filter_map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
                 .collect();
 
             Ok(apps_info)
@@ -1232,8 +1248,24 @@ mod app_impls {
         pub async fn get_app_info(
             &self,
             installed_app_id: &InstalledAppId,
-        ) -> ConductorResult<Option<InstalledAppInfo>> {
-            Ok(self.get_state().await?.get_app_info(installed_app_id))
+        ) -> ConductorResult<Option<AppInfo>> {
+            let state = self.get_state().await?;
+            let maybe_app_info = self.get_app_info_inner(installed_app_id, &state);
+            Ok(maybe_app_info)
+        }
+
+        fn get_app_info_inner(
+            &self,
+            app_id: &InstalledAppId,
+            state: &ConductorState,
+        ) -> Option<AppInfo> {
+            match state.installed_apps().get(app_id) {
+                None => None,
+                Some(app) => {
+                    let dna_definitions = self.get_dna_definitions();
+                    Some(AppInfo::from_installed_app(app, &dna_definitions))
+                }
+            }
         }
     }
 }
@@ -1352,7 +1384,7 @@ mod clone_cell_impls {
                 clone_cell_id,
             }: &DisableCloneCellPayload,
         ) -> ConductorResult<()> {
-            let (_, removed_cell_id) = self
+            let _ = self
                 .update_state_prime({
                     let app_id = app_id.to_owned();
                     let clone_cell_id = clone_cell_id.to_owned();
@@ -1365,7 +1397,6 @@ mod clone_cell_impls {
                     }
                 })
                 .await?;
-            self.remove_cells(&[removed_cell_id]).await;
             Ok(())
         }
 

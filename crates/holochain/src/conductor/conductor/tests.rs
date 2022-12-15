@@ -11,7 +11,7 @@ use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
-use holochain_conductor_api::InstalledAppInfoStatus;
+use holochain_conductor_api::AppInfoStatus;
 use holochain_keystore::crude_mock_keystore::*;
 use holochain_state::prelude::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
@@ -487,8 +487,8 @@ async fn test_reenable_app() {
         .unwrap();
     assert_eq!(inactive_apps.len(), 0);
     assert_eq!(active_apps.len(), 1);
-    assert_eq!(active_apps[0].cell_data.len(), 2);
-    assert_matches!(active_apps[0].status, InstalledAppInfoStatus::Running);
+    assert_eq!(active_apps[0].cell_info.len(), 2);
+    assert_matches!(active_apps[0].status, AppInfoStatus::Running);
 
     conductor
         .disable_app("app".to_string(), DisabledAppReason::User)
@@ -505,10 +505,10 @@ async fn test_reenable_app() {
         .unwrap();
     assert_eq!(active_apps.len(), 0);
     assert_eq!(inactive_apps.len(), 1);
-    assert_eq!(inactive_apps[0].cell_data.len(), 2);
+    assert_eq!(inactive_apps[0].cell_info.len(), 2);
     assert_matches!(
         inactive_apps[0].status,
-        InstalledAppInfoStatus::Disabled {
+        AppInfoStatus::Disabled {
             reason: DisabledAppReason::User
         }
     );
@@ -700,12 +700,12 @@ async fn test_app_status_states() {
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
 
     // PAUSED  --start->  RUNNING
 
     conductor.start_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Running);
 
     // RUNNING  --disable->  DISABLED
 
@@ -713,12 +713,12 @@ async fn test_app_status_states() {
         .disable_app("app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --start->  DISABLED
 
     conductor.start_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --pause->  DISABLED
 
@@ -726,12 +726,12 @@ async fn test_app_status_states() {
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --enable->  ENABLED
 
     conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Running);
 
     // RUNNING  --pause->  PAUSED
 
@@ -739,12 +739,12 @@ async fn test_app_status_states() {
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
 
     // PAUSED  --enable->  RUNNING
 
     conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Running);
 }
 
 #[tokio::test(flavor = "multi_thread")]

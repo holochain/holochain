@@ -457,6 +457,13 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
+    pub fn disabled_clone_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
+        self.role_assignments
+            .iter()
+            .flat_map(|app_role_assignment| app_role_assignment.1.disabled_clones.iter())
+    }
+
+    /// Accessor
     pub fn clone_cells_for_role_name(
         &self,
         role_name: &RoleName,
@@ -468,8 +475,24 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
+    pub fn disabled_clone_cells_for_role_name(
+        &self,
+        role_name: &RoleName,
+    ) -> Option<&HashMap<CloneId, CellId>> {
+        match self.role_assignments.get(role_name) {
+            None => None,
+            Some(role_assignment) => Some(&role_assignment.disabled_clones),
+        }
+    }
+
+    /// Accessor
     pub fn clone_cell_ids(&self) -> impl Iterator<Item = &CellId> {
         self.clone_cells().map(|(_, cell_id)| cell_id)
+    }
+
+    /// Accessor
+    pub fn disabled_clone_cell_ids(&self) -> impl Iterator<Item = &CellId> {
+        self.disabled_clone_cells().map(|(_, cell_id)| cell_id)
     }
 
     /// Iterator of all cells, both provisioned and cloned
@@ -477,6 +500,7 @@ impl InstalledAppCommon {
         self.provisioned_cells()
             .map(|(_, c)| c)
             .chain(self.clone_cell_ids())
+            .chain(self.disabled_clone_cell_ids())
     }
 
     /// Iterator of all "required" cells, meaning Cells which must be running
@@ -1062,16 +1086,14 @@ mod tests {
 
         // Disable a clone cell
         app.disable_clone_cell(&clone_id_0).unwrap();
-        // Assert it is not accessible from the app any longer
-        assert!(app
+        // Assert it is moved to disabled clone cells
+        assert!(!app
             .clone_cells()
-            .find(|(clone_id, _)| **clone_id == clone_id_0)
-            .is_none());
+            .any(|(clone_id, _)| *clone_id == clone_id_0));
         assert_eq!(app.clone_cells().count(), 2);
-        assert_eq!(
-            app.clone_cell_ids().collect::<HashSet<_>>(),
-            app.all_cells().collect::<HashSet<_>>()
-        );
+        assert!(app
+            .disabled_clone_cells()
+            .any(|(clone_id, _)| *clone_id == clone_id_0));
 
         // Enable a disabled clone cell
         let enabled_cell = app.enable_clone_cell(&clone_id_0).unwrap();
