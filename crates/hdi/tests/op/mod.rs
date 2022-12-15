@@ -133,23 +133,23 @@ fn op_errors(op: Op) -> WasmErrorInner {
 
 // Register Agent Activity
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateEntry { action: c(EntryType::App(public_app_entry_def(0, 0))), app_entry_type: Some(UnitEntryTypes::A) }))]
-// #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateEntry { action: c(EntryType::App(public_app_entry_def(0, 0))), app_entry_type: None }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateEntry { action: c(EntryType::App(public_app_entry_def(200, 0))), app_entry_type: None }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateCapClaim{ action: c(EntryType::CapClaim)}))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateCapGrant{ action: c(EntryType::CapGrant)}))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreatePrivateEntry { action: c(EntryType::App(private_app_entry_def(0, 0))), app_entry_type: Some(UnitEntryTypes::A) }))]
-// #[test_case(OpType::RegisterAgentActivity(OpActivity::CreatePrivateEntry { action: c(EntryType::App(private_app_entry_def(0, 0))), app_entry_type: None }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreatePrivateEntry { action: c(EntryType::App(private_app_entry_def(200, 0))), app_entry_type: None }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateAgent { action: c(EntryType::AgentPubKey), agent: ak(0)}))]
 
 #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateEntry { action: u(EntryType::App(public_app_entry_def(0, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry_type: Some(UnitEntryTypes::A) }))]
-// #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateEntry { action: u(EntryType::App(public_app_entry_def(0, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry_type: None }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateEntry { action: u(EntryType::App(public_app_entry_def(200, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry_type: None }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdatePrivateEntry { action: u(EntryType::App(private_app_entry_def(0, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry_type: Some(UnitEntryTypes::A)}))]
-// #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdatePrivateEntry { action: u(EntryType::App(private_app_entry_def(0, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry_type: None }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::UpdatePrivateEntry { action: u(EntryType::App(private_app_entry_def(200, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry_type: None }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateAgent { action: u(EntryType::AgentPubKey), new_key: ak(0), original_action_hash: ah(1), original_key: ak(1) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateCapClaim { action: u(EntryType::CapClaim), original_action_hash: ah(1), original_entry_hash: eh(1) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateCapGrant { action: u(EntryType::CapGrant), original_action_hash: ah(1), original_entry_hash: eh(1) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::DeleteEntry { action: d(ah(0)), original_action_hash: ah(0), original_entry_hash: eh(0) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateLink { action: cl(0, 0), base_address: lh(0), target_address: lh(1), tag: ().into(), link_type: Some(LinkTypes::A)}))]
-// #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateLink { action: cl(0, 0), base_address: lh(0), target_address: lh(1), tag: ().into(), link_type: None }))]
+#[test_case(OpType::RegisterAgentActivity(OpActivity::CreateLink { action: cl(200, 0), base_address: lh(0), target_address: lh(1), tag: ().into(), link_type: None }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::DeleteLink{ action: dl(ah(0)), original_action_hash: ah(0), base_address: eh(0).into()}))]
 // Action's without entries
 #[test_case(OpType::RegisterAgentActivity(OpActivity::Dna { action: dna(dh(0)), dna_hash: dh(0)}))]
