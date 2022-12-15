@@ -1,8 +1,12 @@
+---
+default_semver_increment_mode: !pre_minor beta-rc
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
 - **BREAKING CHANGE**: Remove deprecated Admin and App API calls.
 - **BREAKING CHANGE**: Remove call `InstallApp`.
 - **BREAKING CHANGE**: Rename `InstallAppBundle` to `InstallApp`.
@@ -13,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE**: Move EnableCloneCell to App API.
 - **BREAKING CHANGE**: Refactor DeleteCloneCell to delete a single disabled clone cell. [\#1704](https://github.com/holochain/holochain/pull/1704)
 
-- **BREAKING CHANGE**: Refactor `AppInfo` to return all cells and DNA modifiers. [\#1719](https://github.com/holochain/holochain/pull/1719)
+- **BREAKING CHANGE**: Refactor `AppInfo` to return all cells and DNA modifiers.
 - **BREAKING CHANGE**: Rename `RequestAgentInfo` to `AgentInfo`. [\#1719](https://github.com/holochain/holochain/pull/1719)
 
 ## 0.0.72
