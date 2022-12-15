@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- Breaking: Improves Op::to_type helper to make action info more ergonomic in validation
+
 # 20221207.011003
 
 ## [holochain\_cli-0.0.71](crates/holochain_cli/CHANGELOG.md#0.0.71)
