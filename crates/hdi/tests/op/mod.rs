@@ -139,7 +139,6 @@ fn op_errors(op: Op) -> WasmErrorInner {
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreatePrivateEntry { action: c(EntryType::App(private_app_entry_def(0, 0))), app_entry_type: Some(UnitEntryTypes::A) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreatePrivateEntry { action: c(EntryType::App(private_app_entry_def(200, 0))), app_entry_type: None }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::CreateAgent { action: c(EntryType::AgentPubKey), agent: ak(0)}))]
-
 #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateEntry { action: u(EntryType::App(public_app_entry_def(0, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry_type: Some(UnitEntryTypes::A) }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdateEntry { action: u(EntryType::App(public_app_entry_def(200, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry_type: None }))]
 #[test_case(OpType::RegisterAgentActivity(OpActivity::UpdatePrivateEntry { action: u(EntryType::App(private_app_entry_def(0, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry_type: Some(UnitEntryTypes::A)}))]
@@ -229,9 +228,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             let d = Action::InitZomesComplete(action);
             store_record_entry(d, RecordEntry::NotApplicable)
         }
-        OpType::StoreRecord(OpRecord::OpenChain {
-            action, ..
-        }) => {
+        OpType::StoreRecord(OpRecord::OpenChain { action, .. }) => {
             let d = Action::OpenChain(action);
             store_record_entry(d, RecordEntry::NotApplicable)
         }
@@ -247,17 +244,11 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             let d = Action::Create(action);
             store_record_entry(d, RecordEntry::Hidden)
         }
-        OpType::StoreRecord(OpRecord::UpdateCapClaim {
-            action,
-            ..
-        }) => {
+        OpType::StoreRecord(OpRecord::UpdateCapClaim { action, .. }) => {
             let u = Action::Update(action);
             store_record_entry(u, RecordEntry::Hidden)
         }
-        OpType::StoreRecord(OpRecord::UpdateCapGrant {
-            action,
-            ..
-        }) => {
+        OpType::StoreRecord(OpRecord::UpdateCapGrant { action, .. }) => {
             let u = Action::Update(action);
             store_record_entry(u, RecordEntry::Hidden)
         }
@@ -269,10 +260,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             let c = Action::Create(action);
             store_record_entry(c, entry)
         }
-        OpType::StoreRecord(OpRecord::CreatePrivateEntry {
-            action,
-            ..
-        }) => {
+        OpType::StoreRecord(OpRecord::CreatePrivateEntry { action, .. }) => {
             let c = Action::Create(action);
             store_record_entry(c, RecordEntry::Hidden)
         }
@@ -281,10 +269,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             let c = Action::Create(action);
             store_record_entry(c, entry)
         }
-        OpType::StoreRecord(OpRecord::CreateLink {
-            action,
-            ..
-        }) => {
+        OpType::StoreRecord(OpRecord::CreateLink { action, .. }) => {
             let c = Action::CreateLink(action);
             Op::StoreRecord(StoreRecord {
                 record: Record {
@@ -296,10 +281,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 },
             })
         }
-        OpType::StoreRecord(OpRecord::DeleteLink {
-            action,
-            ..
-        }) => {
+        OpType::StoreRecord(OpRecord::DeleteLink { action, .. }) => {
             let c = Action::DeleteLink(action);
             Op::StoreRecord(StoreRecord {
                 record: Record {
@@ -320,26 +302,18 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             let u = Action::Update(action);
             store_record_entry(u, entry)
         }
-        OpType::StoreRecord(OpRecord::UpdatePrivateEntry {
-            action,
-            ..
-        }) => {
+        OpType::StoreRecord(OpRecord::UpdatePrivateEntry { action, .. }) => {
             let u = Action::Update(action);
             store_record_entry(u, RecordEntry::Hidden)
         }
         OpType::StoreRecord(OpRecord::UpdateAgent {
-            new_key,
-            action,
-            ..
+            new_key, action, ..
         }) => {
             let entry = RecordEntry::Present(Entry::Agent(new_key.clone()));
             let u = Action::Update(action);
             store_record_entry(u, entry)
         }
-        OpType::StoreRecord(OpRecord::DeleteEntry {
-            action,
-            ..
-        }) => {
+        OpType::StoreRecord(OpRecord::DeleteEntry { action, .. }) => {
             let d = Action::Delete(action);
             store_record_entry(d, RecordEntry::NotApplicable)
         }
@@ -364,25 +338,18 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             store_entry_entry(action, entry)
         }
         OpType::StoreEntry(OpEntry::UpdateAgent {
-            new_key,
-            action,
-            ..
+            new_key, action, ..
         }) => {
             let entry = Entry::Agent(new_key.clone());
             let u = EntryCreationAction::Update(action);
             store_entry_entry(u, entry)
         }
-        OpType::RegisterCreateLink {
-            action,
-            ..
-        } => {
-            Op::RegisterCreateLink(RegisterCreateLink {
-                create_link: SignedHashed {
-                    hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
-                },
-            })
-        }
+        OpType::RegisterCreateLink { action, .. } => Op::RegisterCreateLink(RegisterCreateLink {
+            create_link: SignedHashed {
+                hashed: HoloHashed::from_content_sync(action),
+                signature: Signature::arbitrary(&mut ud).unwrap(),
+            },
+        }),
         OpType::RegisterDeleteLink {
             original_action_hash: _,
             link_type: lt,
@@ -496,10 +463,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                 original_entry: None,
             })
         }
-        OpType::RegisterUpdate(OpUpdate::CapGrant {
-            action,
-            ..
-        }) => {
+        OpType::RegisterUpdate(OpUpdate::CapGrant { action, .. }) => {
             let mut c = Create::arbitrary(&mut ud).unwrap();
             c.entry_type = EntryType::CapGrant;
             c.entry_hash = action.original_entry_address.clone();
@@ -548,42 +512,36 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             original_action,
             original_app_entry_type: _,
             action,
-        }) => {
-            Op::RegisterDelete(RegisterDelete {
-                delete: SignedHashed {
-                    hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
-                },
-                original_action,
-                original_entry: None,
-            })
-        }
+        }) => Op::RegisterDelete(RegisterDelete {
+            delete: SignedHashed {
+                hashed: HoloHashed::from_content_sync(action),
+                signature: Signature::arbitrary(&mut ud).unwrap(),
+            },
+            original_action,
+            original_entry: None,
+        }),
         OpType::RegisterDelete(OpDelete::CapClaim {
             original_action,
             action,
-        }) => {
-            Op::RegisterDelete(RegisterDelete {
-                delete: SignedHashed {
-                    hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
-                },
-                original_action,
-                original_entry: None,
-            })
-        }
+        }) => Op::RegisterDelete(RegisterDelete {
+            delete: SignedHashed {
+                hashed: HoloHashed::from_content_sync(action),
+                signature: Signature::arbitrary(&mut ud).unwrap(),
+            },
+            original_action,
+            original_entry: None,
+        }),
         OpType::RegisterDelete(OpDelete::CapGrant {
             original_action,
             action,
-        }) => {
-            Op::RegisterDelete(RegisterDelete {
-                delete: SignedHashed {
-                    hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
-                },
-                original_action,
-                original_entry: None,
-            })
-        }
+        }) => Op::RegisterDelete(RegisterDelete {
+            delete: SignedHashed {
+                hashed: HoloHashed::from_content_sync(action),
+                signature: Signature::arbitrary(&mut ud).unwrap(),
+            },
+            original_action,
+            original_entry: None,
+        }),
         OpType::RegisterAgentActivity(activity) => {
             let r = match activity {
                 OpActivity::CreateEntry {
@@ -594,81 +552,22 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
                     action,
                     app_entry_type: _,
                 } => Action::Create(action),
-                OpActivity::CreateAgent { action, .. } => {
-                    Action::Create(action)
-                }
-                OpActivity::UpdateEntry {
-                    action,
-                    ..
-                } => {
-                    Action::Update(action)
-                }
-                OpActivity::UpdatePrivateEntry {
-                    action,
-                    ..
-                } => {
-                    Action::Update(action)
-                }
-                OpActivity::UpdateAgent {
-                    action,
-                    ..
-                } => {
-                    Action::Update(action)
-                }
-                OpActivity::DeleteEntry {
-                    action,
-                    ..
-                } => {
-                    Action::Delete(action)
-                }
-                OpActivity::CreateLink {
-                    action,
-                    ..
-                } => {
-                    Action::CreateLink(action)
-                }
-                OpActivity::DeleteLink {
-                    action,
-                    ..
-                } => {
-                    Action::DeleteLink(action)
-                }
-                OpActivity::CreateCapClaim { action } => {
-                    Action::Create(action)
-                }
-                OpActivity::CreateCapGrant { action } => {
-                    Action::Create(action)
-                }
-                OpActivity::UpdateCapClaim {
-                    action,
-                    ..
-                } => {
-                    Action::Update(action)
-                }
-                OpActivity::UpdateCapGrant {
-                    action,
-                    ..
-                } => {
-                    Action::Update(action)
-                }
-                OpActivity::Dna { action, .. } => {
-                    Action::Dna(action)
-                }
-                OpActivity::OpenChain {
-                    action,
-                    ..
-                } => {
-                    Action::OpenChain(action)
-                }
-                OpActivity::CloseChain { action, .. } => {
-                    Action::CloseChain(action)
-                }
-                OpActivity::AgentValidationPkg { action, .. } => {
-                    Action::AgentValidationPkg(action)
-                }
-                OpActivity::InitZomesComplete { action } => {
-                    Action::InitZomesComplete(action)
-                }
+                OpActivity::CreateAgent { action, .. } => Action::Create(action),
+                OpActivity::UpdateEntry { action, .. } => Action::Update(action),
+                OpActivity::UpdatePrivateEntry { action, .. } => Action::Update(action),
+                OpActivity::UpdateAgent { action, .. } => Action::Update(action),
+                OpActivity::DeleteEntry { action, .. } => Action::Delete(action),
+                OpActivity::CreateLink { action, .. } => Action::CreateLink(action),
+                OpActivity::DeleteLink { action, .. } => Action::DeleteLink(action),
+                OpActivity::CreateCapClaim { action } => Action::Create(action),
+                OpActivity::CreateCapGrant { action } => Action::Create(action),
+                OpActivity::UpdateCapClaim { action, .. } => Action::Update(action),
+                OpActivity::UpdateCapGrant { action, .. } => Action::Update(action),
+                OpActivity::Dna { action, .. } => Action::Dna(action),
+                OpActivity::OpenChain { action, .. } => Action::OpenChain(action),
+                OpActivity::CloseChain { action, .. } => Action::CloseChain(action),
+                OpActivity::AgentValidationPkg { action, .. } => Action::AgentValidationPkg(action),
+                OpActivity::InitZomesComplete { action } => Action::InitZomesComplete(action),
             };
             let r = RegisterAgentActivity {
                 cached_entry: None,
