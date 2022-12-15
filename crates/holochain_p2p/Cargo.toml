@@ -1,6 +1,6 @@
 [package]
 name = "holochain_p2p"
-version = "0.0.69"
+version = "0.0.70-dev.0"
 description = "holochain specific wrapper around more generic p2p module"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,16 +13,16 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 derive_more = "0.99"
-fixt = { path = "../fixt", version = "0.0.14"}
+fixt = { path = "../fixt", version = "^0.0.15-dev.0"}
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
-holo_hash = { version = "^0.0.35", path = "../holo_hash" }
-holochain_keystore = { version = "^0.0.67", path = "../holochain_keystore" }
+holo_hash = { version = "^0.0.36-dev.0", path = "../holo_hash" }
+holochain_keystore = { version = "^0.0.68-dev.0", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_types = { version = "^0.0.69", path = "../holochain_types" }
-holochain_zome_types = { version = "^0.0.58", path = "../holochain_zome_types" }
-kitsune_p2p = { version = "^0.0.52", path = "../kitsune_p2p/kitsune_p2p" }
-kitsune_p2p_types = { version = "^0.0.39", path = "../kitsune_p2p/types" }
+holochain_types = { version = "^0.0.70-dev.0", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.0.59-dev.0", path = "../holochain_zome_types" }
+kitsune_p2p = { version = "^0.0.53-dev.0", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p_types = { version = "^0.0.40-dev.0", path = "../kitsune_p2p/types" }
 mockall = "0.10.2"
 observability = "0.1.3"
 rand = "0.8.5"
@@ -32,7 +32,7 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full" ] }
 tokio-stream = "0.1"
-holochain_util = { version = "^0.0.13", path = "../holochain_util" }
+holochain_util = { version = "^0.0.14-dev.0", path = "../holochain_util" }
 
 [features]
 mock_network = [
