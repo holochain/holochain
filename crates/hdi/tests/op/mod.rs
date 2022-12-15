@@ -209,8 +209,8 @@ fn op_errors(op: Op) -> WasmErrorInner {
 #[test_case(OpType::RegisterCreateLink { action: cl(0, 0), base_address: lh(0), target_address: lh(1), tag: ().into(), link_type: LinkTypes::A })]
 #[test_case(OpType::RegisterCreateLink { action: cl(0, 1), base_address: lh(0), target_address: lh(1), tag: ().into(), link_type: LinkTypes::B })]
 // Register Delete Link
-#[test_case(OpType::RegisterDeleteLink { action: dl(ah(0)), original_action: cl(0, 0), base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: LinkTypes::A })]
-#[test_case(OpType::RegisterDeleteLink { action: dl(ah(0)), original_action: cl(0, 0), base_address: lh(0), target_address: lh(2), tag: ().into(), link_type: LinkTypes::C })]
+#[test_case(OpType::RegisterDeleteLink { action: dl(ah(0)), original_action: cl(0, 0), base_address: eh(0).into(), target_address: eh(1).into(), tag: ().into(), link_type: LinkTypes::A })]
+#[test_case(OpType::RegisterDeleteLink { action: dl(ah(0)), original_action: cl(0, 0), base_address: eh(0).into(), target_address: eh(1).into(), tag: ().into(), link_type: LinkTypes::C })]
 fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
     let data = vec![0u8; 2000];
