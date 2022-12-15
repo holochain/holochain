@@ -457,6 +457,13 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
+    pub fn disabled_clone_cells(&self) -> impl Iterator<Item = (&CloneId, &CellId)> {
+        self.role_assignments
+            .iter()
+            .flat_map(|app_role_assignment| app_role_assignment.1.disabled_clones.iter())
+    }
+
+    /// Accessor
     pub fn clone_cells_for_role_name(
         &self,
         role_name: &RoleName,
@@ -483,11 +490,17 @@ impl InstalledAppCommon {
         self.clone_cells().map(|(_, cell_id)| cell_id)
     }
 
+    /// Accessor
+    pub fn disabled_clone_cell_ids(&self) -> impl Iterator<Item = &CellId> {
+        self.disabled_clone_cells().map(|(_, cell_id)| cell_id)
+    }
+
     /// Iterator of all cells, both provisioned and cloned
     pub fn all_cells(&self) -> impl Iterator<Item = &CellId> {
         self.provisioned_cells()
             .map(|(_, c)| c)
             .chain(self.clone_cell_ids())
+            .chain(self.disabled_clone_cell_ids())
     }
 
     /// Iterator of all "required" cells, meaning Cells which must be running

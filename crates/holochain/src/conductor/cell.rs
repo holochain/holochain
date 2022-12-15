@@ -49,8 +49,6 @@ use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync;
 use tracing::*;
@@ -104,7 +102,6 @@ pub struct Cell {
     holochain_p2p_cell: HolochainP2pDna,
     queue_triggers: QueueTriggers,
     init_mutex: tokio::sync::Mutex<()>,
-    enabled: AtomicBool,
 }
 
 impl Cell {
@@ -154,26 +151,12 @@ impl Cell {
                     holochain_p2p_cell,
                     queue_triggers,
                     init_mutex: Default::default(),
-                    enabled: AtomicBool::new(true),
                 },
                 initial_queue_triggers,
             ))
         } else {
             Err(CellError::CellWithoutGenesis(id))
         }
-    }
-
-    ///
-    // Temporary workaround to check if a cloned cell is enabled or not when
-    // being called
-    // TODO refactor how to determine whether a cell is enabled when called.
-    pub fn set_enabled(&self, enabled: bool) {
-        self.enabled.store(enabled, Ordering::Relaxed)
-    }
-
-    ///
-    pub fn is_enabled(&self) -> bool {
-        self.enabled.load(Ordering::Relaxed)
     }
 
     /// Performs the Genesis workflow for the Cell, ensuring that its initial
@@ -838,6 +821,26 @@ impl Cell {
         Ok(self.call_zome(invocation, None).await??.try_into()?)
     }
 
+    /// Check if this cell is enabled. Currently only applies to clone cells.
+    // TODO: refactor once cell state or cell-app association is implemented
+    pub async fn is_enabled(&self) -> CellResult<bool> {
+        let state = self
+            .conductor_handle
+            .get_state()
+            .await
+            .map_err(|e| CellError::ConductorError(Box::new(e)))?;
+        let mut is_enabled = true;
+        for (_, app) in state.enabled_apps() {
+            for (_, cell_id) in app.disabled_clone_cells() {
+                if cell_id.clone() == self.id {
+                    is_enabled = false;
+                    break;
+                }
+            }
+        }
+        Ok(is_enabled)
+    }
+
     /// Function called by the Conductor
     // #[instrument(skip(self, call, workspace_lock))]
     pub async fn call_zome(
@@ -845,8 +848,7 @@ impl Cell {
         call: ZomeCall,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
-        // make sure that cell is enabled
-        if !self.is_enabled() {
+        if !self.is_enabled().await? {
             return Err(CellError::CellDisabled(self.id.clone()));
         }
         // Only check if init has run if this call is not coming from

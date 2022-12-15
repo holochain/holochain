@@ -9,7 +9,7 @@ use matches::matches;
 use crate::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
 
 #[tokio::test(flavor = "multi_thread")]
-async fn app_info_returns_dna_modifiers() {
+async fn app_info_returns_all_cells_with_info() {
     // set up app with two provisioned cells and one clone cell of each of them
     let (dna_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let (dna_2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -96,4 +96,12 @@ async fn app_info_returns_dna_modifiers() {
     } else {
         false
     });
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    // make sure app info is identical after conductor restart
+    let app_info_after_restart = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    // println!("app info before {:#?}\nand after restart {:#?}", app_info, app_info_after_restart);
+    assert_eq!(app_info, app_info_after_restart);
 }
