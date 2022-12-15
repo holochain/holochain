@@ -194,7 +194,7 @@ fn op_errors(op: Op) -> WasmErrorInner {
 // // Error Cases
 // // #[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: EntryTypes::B(B{}) }))]
 // Register Update
-#[test_case(OpType::RegisterUpdate(OpUpdate::Entry { action: u(EntryType::App(public_app_entry_def(0, 0))), original_action_hash: ah(1), app_entry: EntryTypes::A(A{}), original_app_entry: EntryTypes::A(A{}) }))]
+#[test_case(OpType::RegisterUpdate(OpUpdate::Entry { action: u(EntryType::App(public_app_entry_def(0, 0))), original_action: EntryCreationAction::Create(c(EntryType::App(public_app_entry_def(0, 0)))), app_entry: EntryTypes::A(A{}), original_app_entry: EntryTypes::A(A{}) }))]
 #[test_case(OpType::RegisterUpdate(OpUpdate::PrivateEntry { action: u(EntryType::App(private_app_entry_def(0, 0))),  original_action_hash: ah(1), app_entry_type: UnitEntryTypes::A, original_app_entry_type: UnitEntryTypes::A }))]
 #[test_case(OpType::RegisterUpdate(OpUpdate::Agent { action: u(EntryType::AgentPubKey), original_key: ak(1), new_key: ak(0), original_action_hash: ah(1) }))]
 #[test_case(OpType::RegisterUpdate(OpUpdate::CapClaim { action: u(EntryType::CapClaim), original_action_hash: ah(1) }))]
@@ -374,23 +374,13 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             })
         }
         OpType::RegisterUpdate(OpUpdate::Entry {
-            original_action_hash,
+            original_action,
             original_app_entry: oet,
             app_entry: et,
             action,
         }) => {
             let entry = Entry::try_from(&et).unwrap();
             let original_entry = Entry::try_from(&oet).unwrap();
-            let t = ScopedEntryDefIndex::try_from(&et).unwrap();
-            let original_action = update(
-                (&oet).into(),
-                &mut ud,
-                t,
-                action.entry_hash.clone(),
-                original_action_hash.clone(),
-                action.original_entry_address.clone(),
-            );
-            let original_action = EntryCreationAction::Update(original_action);
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
                     hashed: HoloHashed::from_content_sync(action),
@@ -617,25 +607,6 @@ fn create(
     });
     c.entry_hash = entry_hash;
     c
-}
-fn update(
-    visibility: EntryVisibility,
-    ud: &mut Unstructured,
-    t: ScopedEntryDefIndex,
-    entry_hash: EntryHash,
-    original_action_hash: ActionHash,
-    original_entry_hash: EntryHash,
-) -> Update {
-    let mut u = Update::arbitrary(ud).unwrap();
-    u.entry_type = EntryType::App(AppEntryDef {
-        entry_index: t.zome_type,
-        zome_index: t.zome_index,
-        visibility,
-    });
-    u.entry_hash = entry_hash;
-    u.original_action_address = original_action_hash;
-    u.original_entry_address = original_entry_hash;
-    u
 }
 
 #[test]

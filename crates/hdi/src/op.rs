@@ -278,7 +278,7 @@ impl OpHelper for Op {
                     InScopeEntry::App(new_entry_type) => {
                         match map_entry::<ET>(entry_type, entry_hash, original_entry)? {
                             InScopeEntry::App(original_entry_type) => Some(OpUpdate::Entry {
-                                original_action_hash: original_action_hash.clone(),
+                                original_action: original_action.clone(),
                                 app_entry: new_entry_type,
                                 original_app_entry: original_entry_type,
                                 action: update.hashed.content.clone(),

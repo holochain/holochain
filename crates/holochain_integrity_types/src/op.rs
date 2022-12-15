@@ -923,8 +923,8 @@ where
     /// This operation registers an update from
     /// the original [`Entry`].
     Entry {
-        /// The hash of the original original [`Action`].
-        original_action_hash: ActionHash,
+        /// The original [`Create`] or [`Update`] [`Action`].
+        original_action: EntryCreationAction,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data of the original entry.
         original_app_entry: ET,
