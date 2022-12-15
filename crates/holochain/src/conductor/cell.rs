@@ -829,11 +829,10 @@ impl Cell {
             .get_state()
             .await
             .map_err(|e| CellError::ConductorError(Box::new(e)))?;
-        let is_enabled = state
+        let is_enabled = !state
             .enabled_apps()
             .flat_map(|(_, app)| app.disabled_clone_cell_ids())
-            .find(|cell_id| **cell_id == self.id)
-            .is_none();
+            .any(|cell_id| *cell_id == self.id);
         Ok(is_enabled)
     }
 
