@@ -1086,16 +1086,14 @@ mod tests {
 
         // Disable a clone cell
         app.disable_clone_cell(&clone_id_0).unwrap();
-        // Assert it is not accessible from the app any longer
-        assert!(app
+        // Assert it is moved to disabled clone cells
+        assert!(!app
             .clone_cells()
-            .find(|(clone_id, _)| **clone_id == clone_id_0)
-            .is_none());
+            .any(|(clone_id, _)| *clone_id == clone_id_0));
         assert_eq!(app.clone_cells().count(), 2);
-        assert_eq!(
-            app.clone_cell_ids().collect::<HashSet<_>>(),
-            app.all_cells().collect::<HashSet<_>>()
-        );
+        assert!(app
+            .disabled_clone_cells()
+            .any(|(clone_id, _)| *clone_id == clone_id_0));
 
         // Enable a disabled clone cell
         let enabled_cell = app.enable_clone_cell(&clone_id_0).unwrap();
