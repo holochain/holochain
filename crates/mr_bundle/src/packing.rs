@@ -42,7 +42,7 @@ impl<M: Manifest> Bundle<M> {
                 let resource_path = ffs::canonicalize(base_path.join(&relative_path)).await?;
                 ffs::read(&resource_path)
                     .await
-                    .map(|resource| (relative_path, resource))
+                    .map(|resource| (relative_path, resource.into()))
             },
         ))
         .await

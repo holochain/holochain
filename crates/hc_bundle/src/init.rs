@@ -54,7 +54,11 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
         vec![],
         vec![],
     );
-    Ok(DnaBundle::new(manifest.try_into()?, vec![], root_dir)?)
+    Ok(DnaBundle::new(
+        manifest.try_into()?,
+        vec![].into(),
+        root_dir,
+    )?)
 }
 
 fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
