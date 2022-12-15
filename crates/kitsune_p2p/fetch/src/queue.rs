@@ -132,8 +132,6 @@ struct SourceRecord {
 pub enum FetchSource {
     /// An agent on a node
     Agent(KAgent),
-    // /// A node, without agent specified
-    // Node(Tx2Cert),
 }
 
 // TODO: move this to host, but for now, for convenience, we just use this one config
