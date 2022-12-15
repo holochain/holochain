@@ -876,16 +876,16 @@ where
         /// The app defined entry with the deserialized
         /// [`Entry`] data.
         app_entry: ET,
-        /// The [`Update`] or [`Create`] action that creates this entry
-        action: EntryCreationAction,
+        /// The [`Create`] action that creates this entry
+        action: Create,
     },
     /// This operation stores the [`Entry`] for an
     /// [`AgentPubKey`].
     CreateAgent {
         /// The agent that was created
         agent: AgentPubKey,
-        /// The [`Update`] or [`Create`] action that creates this agent's key
-        action: EntryCreationAction,
+        /// The [`Create`] action that creates this agent's key
+        action: Create,
     },
     /// This operation stores the [`Entry`] for the
     /// newly created entry in an update.

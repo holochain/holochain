@@ -197,11 +197,9 @@ impl OpHelper for Op {
             }
             Op::StoreEntry(StoreEntry { action, entry }) => {
                 let r = match &action.hashed.content {
-                    EntryCreationAction::Create(Create {
-                        entry_type,
-                        entry_hash,
-                        ..
-                    }) => store_entry_create(entry_type, entry_hash, entry, action)?,
+                    EntryCreationAction::Create(action) => {
+                        store_entry_create(&action.entry_type, &action.entry_hash, entry, action)?
+                    }
                     EntryCreationAction::Update(action) => {
                         let Update {
                             original_action_address: original_action_hash,
@@ -551,7 +549,7 @@ fn store_entry_create<ET>(
     entry_type: &EntryType,
     entry_hash: &EntryHash,
     entry: &Entry,
-    action: &SignedHashed<EntryCreationAction>,
+    action: &Create,
 ) -> Result<OpEntry<ET>, WasmError>
 where
     ET: EntryTypesHelper + UnitEnum,
@@ -561,11 +559,11 @@ where
     match map_entry::<ET>(entry_type, entry_hash, RecordEntryRef::Present(entry))? {
         InScopeEntry::App(entry_type) => Ok(OpEntry::CreateEntry {
             app_entry: entry_type,
-            action: action.hashed.content.clone(),
+            action: action.clone(),
         }),
         InScopeEntry::Agent(agent_key) => Ok(OpEntry::CreateAgent {
             agent: agent_key,
-            action: action.hashed.content.clone(),
+            action: action.clone(),
         }),
         _ => Err(wasm_error!(WasmErrorInner::Guest(
             "StoreEntry should not exist for private entries Id".to_string()

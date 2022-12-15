@@ -187,9 +187,9 @@ fn op_errors(op: Op) -> WasmErrorInner {
 #[test_case(OpType::StoreRecord(OpRecord::AgentValidationPkg { action: avp(None), membrane_proof: None}))]
 #[test_case(OpType::StoreRecord(OpRecord::AgentValidationPkg { action: avp(Some(mp())), membrane_proof: Some(mp())}))]
 // Store Entry
-#[test_case(OpType::StoreEntry(OpEntry::CreateEntry { action: EntryCreationAction::Create(c(EntryType::App(public_app_entry_def(0, 0)))), app_entry: EntryTypes::A(A{}) }))]
+#[test_case(OpType::StoreEntry(OpEntry::CreateEntry { action: c(EntryType::App(public_app_entry_def(0, 0))), app_entry: EntryTypes::A(A{}) }))]
 #[test_case(OpType::StoreEntry(OpEntry::UpdateEntry { action: u(EntryType::App(public_app_entry_def(0, 0))), original_action_hash: ah(1), original_entry_hash: eh(1), app_entry: EntryTypes::A(A{}) }))]
-#[test_case(OpType::StoreEntry(OpEntry::CreateAgent { action: EntryCreationAction::Create(c(EntryType::AgentPubKey)), agent: ak(0)}))]
+#[test_case(OpType::StoreEntry(OpEntry::CreateAgent { action: c(EntryType::AgentPubKey), agent: ak(0)}))]
 #[test_case(OpType::StoreEntry(OpEntry::UpdateAgent { action: u(EntryType::AgentPubKey), original_key: ak(1), new_key: ak(0), original_action_hash: ah(1) }))]
 // // Error Cases
 // // #[test_case(OpType::StoreEntry(OpEntry::CreateEntry {entry_hash: eh(0), entry_type: EntryTypes::B(B{}) }))]
@@ -322,7 +322,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             action,
         }) => {
             let entry = Entry::try_from(&et).unwrap();
-            store_entry_entry(action, entry)
+            store_entry_entry(EntryCreationAction::Create(action), entry)
         }
         OpType::StoreEntry(OpEntry::UpdateEntry {
             app_entry: et,
@@ -335,7 +335,7 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
         }
         OpType::StoreEntry(OpEntry::CreateAgent { action, agent }) => {
             let entry = Entry::Agent(agent.clone());
-            store_entry_entry(action, entry)
+            store_entry_entry(EntryCreationAction::Create(action), entry)
         }
         OpType::StoreEntry(OpEntry::UpdateAgent {
             new_key, action, ..
