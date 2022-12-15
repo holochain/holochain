@@ -81,6 +81,9 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     fn_name: "echo_bytes".into(),
                     payload: ExternIO::encode(&bytes).unwrap(),
                     provenance: AGENT_KEY.lock().unwrap().clone(),
+                    expires_at: Timestamp::now(),
+                    nonce: [0; 32].into(),
+                    signature: [0; 64].into(),
                 };
                 REAL_RIBOSOME
                     .lock()

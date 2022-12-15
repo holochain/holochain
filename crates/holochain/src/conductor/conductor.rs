@@ -786,7 +786,7 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use holochain_conductor_api::DnaGossipInfo;
+    use holochain_conductor_api::NetworkInfo;
     use holochain_p2p::HolochainP2pSender;
 
     use super::*;
@@ -840,21 +840,14 @@ mod network_impls {
             Ok(())
         }
 
-        pub(crate) async fn gossip_info(
+        pub(crate) async fn network_info(
             &self,
             dnas: &[DnaHash],
-        ) -> ConductorResult<Vec<DnaGossipInfo>> {
+        ) -> ConductorResult<Vec<NetworkInfo>> {
             futures::future::join_all(dnas.iter().map(|dna| async move {
-                let m = self
-                    .holochain_p2p()
-                    .get_diagnostics(dna.clone())
-                    .await?
-                    .metrics;
-                let total_historical_gossip_throughput =
-                    m.read().total_current_historical_throughput().into();
-                ConductorResult::Ok(DnaGossipInfo {
-                    total_historical_gossip_throughput,
-                })
+                let d = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
+                let fetch_queue_info = d.fetch_queue.info([dna.to_kitsune()].into_iter().collect());
+                ConductorResult::Ok(NetworkInfo { fetch_queue_info })
             }))
             .await
             .into_iter()

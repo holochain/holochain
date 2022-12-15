@@ -458,8 +458,11 @@ impl Spaces {
         query: FetchOpDataQuery,
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         match query {
-            FetchOpDataQuery::Hashes(op_hashes) => {
-                self.handle_fetch_op_data_by_hashes(dna_hash, op_hashes)
+            FetchOpDataQuery::Hashes {
+                op_hash_list,
+                include_limbo,
+            } => {
+                self.handle_fetch_op_data_by_hashes(dna_hash, op_hash_list, include_limbo)
                     .await
             }
             FetchOpDataQuery::Regions(regions) => {
@@ -518,68 +521,59 @@ impl Spaces {
         &self,
         dna_hash: &DnaHash,
         op_hashes: Vec<holo_hash::DhtOpHash>,
+        include_limbo: bool,
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
-        const OPS_IN_MEMORY_BOUND_BYTES: usize = 3_000_000; // 3MB
-                                                            // FIXME: Test this query.
+        let mut sql = "
+            SELECT DhtOp.hash, DhtOp.type AS dht_type,
+            Action.blob AS action_blob, Entry.blob AS entry_blob
+            FROM DHtOp
+            JOIN Action ON DhtOp.action_hash = Action.hash
+            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+            WHERE
+            DhtOp.hash = ?
+        "
+        .to_string();
+
+        if !include_limbo {
+            sql.push_str(
+                "
+                AND
+                DhtOp.when_integrated IS NOT NULL
+            ",
+            );
+        }
+
         let db = self.dht_db(dna_hash)?;
         let results = db
             .async_reader(move |txn| {
                 let mut out = Vec::with_capacity(op_hashes.len());
-                let mut total_bytes = 0;
                 for hash in op_hashes {
-                    // FIXME: cache this query (make prepared statement)
-                    let r = txn.query_row_and_then(
-                        "
-                            SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                            Action.blob AS action_blob, Entry.blob AS entry_blob,
-                            LENGTH(Action.blob) as action_size, LENGTH(Entry.blob) as entry_size
-                            FROM DHtOp
-                            JOIN Action ON DhtOp.action_hash = Action.hash
-                            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
-                            WHERE
-                            DhtOp.hash = ?
-                            AND
-                            DhtOp.when_integrated IS NOT NULL
-                        ",
-                        [hash],
-                        |row| {
-                            let action_bytes: Option<usize> = row.get("action_size")?;
-                            let entry_bytes: Option<usize> = row.get("entry_size")?;
-                            let bytes = action_bytes.unwrap_or(0) + entry_bytes.unwrap_or(0);
-                            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                            let op_type: DhtOpType = row.get("dht_type")?;
-                            let hash: DhtOpHash = row.get("hash")?;
-                            // Check the entry isn't private before gossiping it.
-                            let mut entry: Option<Entry> = None;
-                            if action
-                                .0
-                                .entry_type()
-                                .filter(|et| *et.visibility() == EntryVisibility::Public)
-                                .is_some()
-                            {
-                                let e: Option<Vec<u8>> = row.get("entry_blob")?;
-                                entry = match e {
-                                    Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                    None => None,
-                                };
-                            }
-                            let op = DhtOp::from_type(op_type, action, entry)?;
-                            StateQueryResult::Ok(((hash, op), bytes))
-                        },
-                    );
-                    match r {
-                        Ok((r, bytes)) => {
-                            out.push(r);
-                            total_bytes += bytes;
-                            // pair(maackle, freesig): be sure to add this limit in the region fetch case too
-                            if total_bytes > OPS_IN_MEMORY_BOUND_BYTES {
-                                break;
-                            }
+                    let mut stmt = txn.prepare_cached(&sql)?;
+                    let mut rows = stmt.query([hash])?;
+                    if let Some(row) = rows.next()? {
+                        let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
+                        let op_type: DhtOpType = row.get("dht_type")?;
+                        let hash: DhtOpHash = row.get("hash")?;
+                        // Check the entry isn't private before gossiping it.
+                        let mut entry: Option<Entry> = None;
+                        if action
+                            .0
+                            .entry_type()
+                            .filter(|et| *et.visibility() == EntryVisibility::Public)
+                            .is_some()
+                        {
+                            let e: Option<Vec<u8>> = row.get("entry_blob")?;
+                            entry = match e {
+                                Some(entry) => Some(from_blob::<Entry>(entry)?),
+                                None => None,
+                            };
                         }
-                        Err(holochain_state::query::StateQueryError::Sql(
+                        let op = DhtOp::from_type(op_type, action, entry)?;
+                        out.push((hash, op))
+                    } else {
+                        return Err(holochain_state::query::StateQueryError::Sql(
                             rusqlite::Error::QueryReturnedNoRows,
-                        )) => (),
-                        Err(e) => return Err(e),
+                        ));
                     }
                 }
                 StateQueryResult::Ok(out)

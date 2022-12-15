@@ -4,9 +4,11 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::sync::Arc;
 
 mod types;
+pub use types::actor::FetchContextExt;
 pub use types::actor::HolochainP2pRef;
 pub use types::actor::HolochainP2pSender;
 pub use types::AgentPubKeyExt; // why is this not included by * above???
@@ -78,9 +80,19 @@ pub trait HolochainP2pDnaT {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        source: AgentPubKey,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<usize>;
+        reflect_ops: Option<Vec<DhtOp>>,
+    ) -> actor::HolochainP2pResult<()>;
+
+    /// Publish a countersigning op.
+    async fn publish_countersign(
+        &self,
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> actor::HolochainP2pResult<()>;
 
     /// Get an entry from the DHT.
     async fn get(
@@ -245,18 +257,34 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         request_validation_receipt: bool,
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+        source: AgentPubKey,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
-    ) -> actor::HolochainP2pResult<usize> {
+        reflect_ops: Option<Vec<DhtOp>>,
+    ) -> actor::HolochainP2pResult<()> {
         self.sender
             .publish(
                 (*self.dna_hash).clone(),
                 request_validation_receipt,
                 countersigning_session,
                 basis_hash,
-                ops,
+                source,
+                op_hash_list,
                 timeout_ms,
+                reflect_ops,
             )
+            .await
+    }
+
+    /// Publish a countersigning op.
+    async fn publish_countersign(
+        &self,
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .publish_countersign((*self.dna_hash).clone(), flag, basis_hash, op)
             .await
     }
 

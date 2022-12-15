@@ -14,6 +14,7 @@ use super::super::switchboard_state::Switchboard;
 use pretty_assertions::assert_eq;
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "(david.b) ignore until we write a switchboard fetch-queue impl"]
 async fn fullsync_3way_recent() {
     // observability::test_run().ok();
     let topo = Topology::standard_epoch_full();
@@ -61,6 +62,7 @@ async fn fullsync_3way_recent() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "(david.b) ignore until we write a switchboard fetch-queue impl"]
 async fn sharded_3way_recent() {
     observability::test_run().ok();
     let topo = Topology::standard_epoch_full();
@@ -175,6 +177,7 @@ async fn transitive_peer_gossip() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "(david.b) ignore until we write a switchboard fetch-queue impl"]
 async fn sharded_4way_recent() {
     observability::test_run().ok();
 
@@ -261,6 +264,7 @@ async fn sharded_4way_recent() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "(david.b) ignore until we write a switchboard fetch-queue impl"]
 async fn sharded_4way_historical() {
     observability::test_run().ok();
 

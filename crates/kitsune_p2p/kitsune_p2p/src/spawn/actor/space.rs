@@ -2,6 +2,7 @@ use super::*;
 use crate::metrics::*;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_fetch::FetchQueue;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
@@ -26,6 +27,8 @@ type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
 type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
+type OpHashList = Vec<OpHashSized>;
+type MaybeDelegate = Option<(KBasis, u32, u32)>;
 
 ghost_actor::ghost_chan! {
     #[allow(clippy::too_many_arguments)]
@@ -59,9 +62,31 @@ ghost_actor::ghost_chan! {
             to_agent: KAgent,
             mod_idx: u32,
             mod_cnt: u32,
-            destination: BroadcastTo,
-            data: crate::wire::WireData,
+            data: BroadcastData,
         ) -> ();
+
+        /// This should be invoked instead of incoming_delegate_broadcast
+        /// in the case of a publish data variant. It will, in turn, call
+        /// into incoming_delegate_broadcast once we have the data to act
+        /// as a fetch responder for the op data.
+        fn incoming_publish(
+            space: KSpace,
+            to_agent: KAgent,
+            source: KAgent,
+            op_hash_list: OpHashList,
+            context: kitsune_p2p_fetch::FetchContext,
+            maybe_delegate: MaybeDelegate,
+        ) -> ();
+
+        /// Send a raw notify.
+        fn notify(
+            to_agent: KAgent,
+            data: wire::Wire,
+        ) -> ();
+
+        /// We just received data for an op_hash. Check if we had a pending
+        /// delegation action we need to continue now that we have the data.
+        fn resolve_publish_pending_delegates(space: KSpace, op_hash: KOpHash) -> ();
 
         /// Incoming Gossip
         fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
@@ -84,6 +109,7 @@ pub(crate) async fn spawn_space(
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
+    fetch_queue: FetchQueue,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     ghost_actor::GhostSender<SpaceInternal>,
@@ -112,6 +138,7 @@ pub(crate) async fn spawn_space(
         config,
         bandwidth_throttles,
         parallel_notify_permit,
+        fetch_queue,
     )));
 
     Ok((sender, i_s, evt_recv))
@@ -251,13 +278,11 @@ impl SpaceInternalHandler for Space {
             .peer_data
             .into_iter()
             .map(|agent_info| {
-                let data = agent_info.encode().unwrap();
                 self.handle_broadcast(
                     self.space.clone(),
                     Arc::new(KitsuneBasis::new(agent_info.agent.0.clone())),
                     timeout,
-                    BroadcastTo::PublishAgentInfo,
-                    data.into(),
+                    BroadcastData::AgentInfo(agent_info),
                 )
             })
             .collect();
@@ -296,23 +321,20 @@ impl SpaceInternalHandler for Space {
         _to_agent: Arc<KitsuneAgent>,
         mod_idx: u32,
         mod_cnt: u32,
-        destination: BroadcastTo,
-        data: crate::wire::WireData,
+        data: BroadcastData,
     ) -> InternalHandlerResult<()> {
         // first, forward this incoming broadcast to all connected
         // local agents.
         let mut local_notify_events = Vec::new();
         let mut local_agent_info_events = Vec::new();
-        match destination {
-            BroadcastTo::Notify => {
+        match &data {
+            BroadcastData::User(data) => {
                 for agent in self.local_joined_agents.iter() {
                     if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
-                            let fut = self.evt_sender.notify(
-                                space.clone(),
-                                agent.clone(),
-                                data.clone().into(),
-                            );
+                            let fut =
+                                self.evt_sender
+                                    .notify(space.clone(), agent.clone(), data.clone());
                             local_notify_events.push(async move {
                                 if let Err(err) = fut.await {
                                     tracing::warn!(?err, "failed local broadcast");
@@ -322,18 +344,17 @@ impl SpaceInternalHandler for Space {
                     }
                 }
             }
-            BroadcastTo::PublishAgentInfo => {
+            BroadcastData::AgentInfo(agent_info) => {
                 if self
                     .agent_arcs
                     .values()
                     .any(|arc| arc.contains(basis.get_loc()))
                 {
-                    let info = AgentInfoSigned::decode(&data[..])?;
                     let fut = self
                         .evt_sender
                         .put_agent_info_signed(PutAgentInfoSignedEvt {
                             space: self.space.clone(),
-                            peer_data: vec![info],
+                            peer_data: vec![agent_info.clone()],
                         });
                     local_agent_info_events.push(async move {
                         if let Err(err) = fut.await {
@@ -341,6 +362,11 @@ impl SpaceInternalHandler for Space {
                         }
                     });
                 }
+            }
+            BroadcastData::Publish { .. } => {
+                // Don't do anything here. This case is handled by the actor
+                // invoking incoming_publish instead of
+                // incoming_delegate_broadcast.
             }
         }
 
@@ -382,8 +408,7 @@ impl SpaceInternalHandler for Space {
                     };
 
                     // generate our broadcast payload
-                    let payload =
-                        wire::Wire::broadcast(space, info.agent.clone(), destination, data);
+                    let payload = wire::Wire::broadcast(space, info.agent.clone(), data);
 
                     // forward the data
                     if let Err(err) = con_hnd.notify(&payload, timeout).await {
@@ -398,6 +423,134 @@ impl SpaceInternalHandler for Space {
         }
         .boxed()
         .into())
+    }
+
+    fn handle_incoming_publish(
+        &mut self,
+        space: KSpace,
+        to_agent: KAgent,
+        source: KAgent,
+        op_hash_list: OpHashList,
+        context: kitsune_p2p_fetch::FetchContext,
+        maybe_delegate: MaybeDelegate,
+    ) -> InternalHandlerResult<()> {
+        let ro_inner = self.ro_inner.clone();
+
+        let just_hashes = op_hash_list.iter().map(|s| s.data()).collect();
+
+        Ok(async move {
+            let have_data_list = match ro_inner
+                .host_api
+                .check_op_data(space.clone(), just_hashes, Some(context))
+                .await
+                .map_err(KitsuneP2pError::other)
+            {
+                Err(err) => {
+                    tracing::warn!(?err);
+                    return Err(err);
+                }
+                Ok(res) => res,
+            };
+
+            for (op_hash, have_data) in op_hash_list.into_iter().zip(have_data_list) {
+                if have_data {
+                    if let Some((basis, mod_idx, mod_cnt)) = &maybe_delegate {
+                        ro_inner
+                            .i_s
+                            .incoming_delegate_broadcast(
+                                space.clone(),
+                                basis.clone(),
+                                to_agent.clone(),
+                                *mod_idx,
+                                *mod_cnt,
+                                BroadcastData::Publish {
+                                    source: source.clone(),
+                                    op_hash_list: vec![op_hash],
+                                    context,
+                                },
+                            )
+                            .await?;
+                    }
+                    continue;
+                } else {
+                    // Add this hash to our fetch queue.
+                    ro_inner.fetch_queue.push(FetchQueuePush {
+                        key: FetchKey::Op(op_hash.data()),
+                        space: space.clone(),
+                        source: FetchSource::Agent(source.clone()),
+                        size: op_hash.maybe_size(),
+                        // TODO - get the author from somewhere
+                        author: None,
+                        context: Some(context),
+                    });
+
+                    // Register a callback if maybe_delegate.is_some()
+                    // to invoke the delegation on receipt of data.
+                    if let Some((basis, mod_idx, mod_cnt)) = &maybe_delegate {
+                        ro_inner.clone().publish_pending_delegate(
+                            op_hash.data(),
+                            PendingDelegate {
+                                space: space.clone(),
+                                basis: basis.clone(),
+                                to_agent: to_agent.clone(),
+                                mod_idx: *mod_idx,
+                                mod_cnt: *mod_cnt,
+                                data: BroadcastData::Publish {
+                                    source: source.clone(),
+                                    op_hash_list: vec![op_hash],
+                                    context,
+                                },
+                            },
+                        );
+                    }
+                }
+            }
+
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_notify(&mut self, to_agent: KAgent, data: wire::Wire) -> InternalHandlerResult<()> {
+        let ro_inner = self.ro_inner.clone();
+        let timeout = ro_inner.config.tuning_params.implicit_timeout();
+
+        Ok(async move {
+            match discover::search_and_discover_peer_connect(
+                ro_inner.clone(),
+                to_agent.clone(),
+                timeout,
+            )
+            .await
+            {
+                discover::PeerDiscoverResult::OkShortcut => {
+                    tracing::warn!("no reason to notify ourselves");
+                }
+                discover::PeerDiscoverResult::OkRemote { url: _, con_hnd } => {
+                    if let Err(err) = con_hnd.notify(&data, timeout).await {
+                        tracing::debug!(?err);
+                    }
+                }
+                discover::PeerDiscoverResult::Err(err) => {
+                    tracing::debug!(?err);
+                }
+            }
+
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_resolve_publish_pending_delegates(
+        &mut self,
+        _space: KSpace,
+        op_hash: KOpHash,
+    ) -> InternalHandlerResult<()> {
+        self.ro_inner.resolve_publish_pending_delegate(op_hash);
+
+        unit_ok_fut()
     }
 
     fn handle_incoming_gossip(
@@ -776,22 +929,19 @@ impl KitsuneP2pHandler for Space {
         space: Arc<KitsuneSpace>,
         basis: Arc<KitsuneBasis>,
         timeout: KitsuneTimeout,
-        destination: BroadcastTo,
-        payload: Vec<u8>,
+        data: BroadcastData,
     ) -> KitsuneP2pHandlerResult<()> {
         // first, forward this data to all connected local agents.
         let mut local_notify_events = Vec::new();
         let mut local_agent_info_events = Vec::new();
-        match destination {
-            BroadcastTo::Notify => {
+        match &data {
+            BroadcastData::User(data) => {
                 for agent in self.local_joined_agents.iter() {
                     if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
-                            let fut = self.evt_sender.notify(
-                                space.clone(),
-                                agent.clone(),
-                                payload.clone(),
-                            );
+                            let fut =
+                                self.evt_sender
+                                    .notify(space.clone(), agent.clone(), data.clone());
                             local_notify_events.push(async move {
                                 if let Err(err) = fut.await {
                                     tracing::warn!(?err, "failed local broadcast");
@@ -801,18 +951,17 @@ impl KitsuneP2pHandler for Space {
                     }
                 }
             }
-            BroadcastTo::PublishAgentInfo => {
+            BroadcastData::AgentInfo(agent_info) => {
                 if self
                     .agent_arcs
                     .values()
                     .any(|arc| arc.contains(basis.get_loc()))
                 {
-                    let info = AgentInfoSigned::decode(&payload[..])?;
                     let fut = self
                         .evt_sender
                         .put_agent_info_signed(PutAgentInfoSignedEvt {
                             space: self.space.clone(),
-                            peer_data: vec![info],
+                            peer_data: vec![agent_info.clone()],
                         });
                     local_agent_info_events.push(async move {
                         if let Err(err) = fut.await {
@@ -820,6 +969,11 @@ impl KitsuneP2pHandler for Space {
                         }
                     });
                 }
+            }
+            BroadcastData::Publish { .. } => {
+                // There is nothing to do here!
+                // *We* are the node publishing
+                // so we already have these hashes : )
             }
         }
 
@@ -899,19 +1053,18 @@ impl KitsuneP2pHandler for Space {
                 let mod_cnt = con_list.len();
                 for (mod_idx, (agent, con_hnd)) in con_list.into_iter().enumerate() {
                     // build our delegate message
-                    let payload = wire::Wire::delegate_broadcast(
+                    let data = wire::Wire::delegate_broadcast(
                         space.clone(),
                         basis.clone(),
                         agent,
                         mod_idx as u32,
                         mod_cnt as u32,
-                        destination,
-                        payload.clone().into(),
+                        data.clone(),
                     );
 
                     // notify the remote node
                     all.push(async move {
-                        if let Err(err) = con_hnd.notify(&payload, timeout).await {
+                        if let Err(err) = con_hnd.notify(&data, timeout).await {
                             tracing::warn!(?err, "delegate broadcast error");
                         }
                     });
@@ -988,12 +1141,8 @@ impl KitsuneP2pHandler for Space {
                                 .await;
                         }
                         discover::PeerDiscoverResult::OkRemote { con_hnd, .. } => {
-                            let payload = wire::Wire::broadcast(
-                                space,
-                                agent,
-                                BroadcastTo::Notify,
-                                payload.into(),
-                            );
+                            let payload =
+                                wire::Wire::broadcast(space, agent, BroadcastData::User(payload));
                             con_hnd
                                 .notify(&payload, timeout)
                                 .map(|r| {
@@ -1066,12 +1215,22 @@ impl KitsuneP2pHandler for Space {
     fn handle_get_diagnostics(
         &mut self,
         _space: KSpace,
-    ) -> KitsuneP2pHandlerResult<GossipDiagnostics> {
-        let diagnostics = GossipDiagnostics {
+    ) -> KitsuneP2pHandlerResult<KitsuneDiagnostics> {
+        let diagnostics = KitsuneDiagnostics {
             metrics: self.ro_inner.metrics.clone(),
+            fetch_queue: self.ro_inner.fetch_queue.clone().into(),
         };
         Ok(async move { Ok(diagnostics) }.boxed().into())
     }
+}
+
+pub(crate) struct PendingDelegate {
+    pub(crate) space: KSpace,
+    pub(crate) basis: KBasis,
+    pub(crate) to_agent: KAgent,
+    pub(crate) mod_idx: u32,
+    pub(crate) mod_cnt: u32,
+    pub(crate) data: BroadcastData,
 }
 
 pub(crate) struct SpaceReadOnlyInner {
@@ -1086,6 +1245,56 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     pub(crate) metrics: MetricsSync,
     pub(crate) metric_exchange: MetricExchangeSync,
+    pub(crate) publish_pending_delegates: parking_lot::Mutex<HashMap<KOpHash, PendingDelegate>>,
+    #[allow(dead_code)]
+    pub(crate) fetch_queue: FetchQueue,
+}
+
+impl SpaceReadOnlyInner {
+    pub(crate) fn publish_pending_delegate(
+        self: Arc<Self>,
+        op_hash: KOpHash,
+        pending_delegate: PendingDelegate,
+    ) {
+        {
+            let this = self.clone();
+            let op_hash = op_hash.clone();
+            tokio::task::spawn(async move {
+                tokio::time::sleep(
+                    this.config
+                        .tuning_params
+                        .implicit_timeout()
+                        .time_remaining(),
+                )
+                .await;
+
+                this.publish_pending_delegates.lock().remove(&op_hash);
+            });
+        }
+
+        self.publish_pending_delegates
+            .lock()
+            .insert(op_hash, pending_delegate);
+    }
+
+    pub(crate) fn resolve_publish_pending_delegate(&self, op_hash: KOpHash) {
+        if let Some(PendingDelegate {
+            space,
+            basis,
+            to_agent,
+            mod_idx,
+            mod_cnt,
+            data,
+        }) = self.publish_pending_delegates.lock().remove(&op_hash)
+        {
+            let i_s = self.i_s.clone();
+            tokio::task::spawn(async move {
+                let _ = i_s
+                    .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
+                    .await;
+            });
+        }
+    }
 }
 
 /// A Kitsune P2p Node can track multiple "spaces" -- Non-interacting namespaced
@@ -1116,6 +1325,7 @@ impl Space {
         config: Arc<KitsuneP2pConfig>,
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
+        fetch_queue: FetchQueue,
     ) -> Self {
         let metrics = MetricsSync::default();
 
@@ -1184,6 +1394,7 @@ impl Space {
                         evt_sender.clone(),
                         host_api.clone(),
                         metrics.clone(),
+                        fetch_queue.clone(),
                     ),
                 )
             })
@@ -1282,6 +1493,8 @@ impl Space {
             parallel_notify_permit,
             metrics,
             metric_exchange,
+            publish_pending_delegates: parking_lot::Mutex::new(HashMap::new()),
+            fetch_queue,
         });
 
         Self {

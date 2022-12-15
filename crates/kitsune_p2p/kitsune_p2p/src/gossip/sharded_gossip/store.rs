@@ -13,7 +13,7 @@ use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
-    bin_types::{KOp, KitsuneAgent, KitsuneOpHash, KitsuneSpace},
+    bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
     dht_arc::{DhtArc, DhtArcSet},
     KitsuneError, KitsuneResult,
 };
@@ -285,19 +285,5 @@ pub(super) async fn put_agent_info(
         })
         .await
         .map_err(KitsuneError::other)?;
-    Ok(())
-}
-
-/// Put new ops into agents that should hold them.
-pub(super) async fn put_ops(
-    evt_sender: &EventSender,
-    space: &Arc<KitsuneSpace>,
-    ops: Vec<KOp>,
-) -> KitsuneResult<()> {
-    evt_sender
-        .gossip(space.clone(), ops)
-        .await
-        .map_err(KitsuneError::other)?;
-
     Ok(())
 }
