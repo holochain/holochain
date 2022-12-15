@@ -536,10 +536,10 @@ pub mod test {
         assert_eq!(expected, cell_ids);
 
         // Check that it is returned in get_app_info as running
-        let maybe_info = state.get_app_info(&app_id);
+        let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
-            assert_matches!(info.status, InstalledAppInfoStatus::Running);
+            assert_matches!(info.status, AppInfoStatus::Running);
         } else {
             assert!(false);
         }
@@ -579,10 +579,10 @@ pub mod test {
         assert_eq!(expected, cell_ids);
 
         // Check that it is returned in get_app_info as deactivated
-        let maybe_info = state.get_app_info(&app_id);
+        let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
-            assert_matches!(info.status, InstalledAppInfoStatus::Disabled { .. });
+            assert_matches!(info.status, AppInfoStatus::Disabled { .. });
         } else {
             assert!(false);
         }
@@ -740,44 +740,44 @@ pub mod test {
         assert_matches!(r, AdminResponse::AgentInfoAdded);
 
         // - Request all the infos
-        let req = AdminRequest::RequestAgentInfo { cell_id: None };
+        let req = AdminRequest::AgentInfo { cell_id: None };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
         assert_eq!(expect, results);
 
         // - Request the dna 0 agent 0
-        let req = AdminRequest::RequestAgentInfo {
+        let req = AdminRequest::AgentInfo {
             cell_id: Some(CellId::new(dnas[0].clone(), agents[0].clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
 
         assert_eq!(vec![k00], results);
 
         // - Request the dna 0 agent 1
-        let req = AdminRequest::RequestAgentInfo {
+        let req = AdminRequest::AgentInfo {
             cell_id: Some(CellId::new(dnas[0].clone(), agents[1].clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
 
         assert_eq!(vec![k01], results);
 
         // - Request the dna 1 agent 0
-        let req = AdminRequest::RequestAgentInfo {
+        let req = AdminRequest::AgentInfo {
             cell_id: Some(CellId::new(dnas[1].clone(), agents[0].clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
 
         assert_eq!(vec![k10], results);
 
         // - Request the dna 1 agent 1
-        let req = AdminRequest::RequestAgentInfo {
+        let req = AdminRequest::AgentInfo {
             cell_id: Some(CellId::new(dnas[1].clone(), agents[1].clone())),
         };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
 
         assert_eq!(vec![k11], results);
 
