@@ -147,9 +147,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .install_app_bundle(*payload)
                     .await?
                     .into();
-                Ok(AdminResponse::AppInstalled(
-                    InstalledAppInfo::from_installed_app(&app),
-                ))
+                let dna_definitions = self.conductor_handle.get_dna_definitions();
+                Ok(AdminResponse::AppInstalled(AppInfo::from_installed_app(
+                    &app,
+                    &dna_definitions,
+                )))
             }
             UninstallApp { installed_app_id } => {
                 self.conductor_handle
@@ -260,9 +262,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
                 Ok(AdminResponse::AgentInfoAdded)
             }
-            RequestAgentInfo { cell_id } => {
+            AgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
-                Ok(AdminResponse::AgentInfoRequested(r))
+                Ok(AdminResponse::AgentInfo(r))
             }
             GraftRecords {
                 cell_id,
