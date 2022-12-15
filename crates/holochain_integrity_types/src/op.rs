@@ -450,7 +450,7 @@ where
         tag: LinkTag,
         /// The app defined link type of this link.
         link_type: LT,
-        /// The [`CreateLink`] action that created the link
+        /// The [`CreateLink`] action that creates the link
         action: CreateLink,
     },
     /// The [`Op::RegisterDeleteLink`] which is validated by
@@ -472,7 +472,7 @@ where
         tag: LinkTag,
         /// The app defined link type of the deleted link.
         link_type: LT,
-        /// The [`DeleteLink`] action that created the link
+        /// The [`DeleteLink`] action that deletes the link
         action: DeleteLink,
     },
     /// The [`Op::RegisterUpdate`] which is validated by
@@ -507,7 +507,7 @@ where
         /// The app defined entry type with the deserialized
         /// [`Entry`] data.
         app_entry: ET,
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the entry
         action: Create,
     },
     /// This operation stores the [`Record`] for an
@@ -517,7 +517,7 @@ where
         /// Note it is not possible to deserialize the full
         /// entry type here because we don't have the [`Entry`] data.
         app_entry_type: <ET as UnitEnum>::Unit,
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the entry
         action: Create,
     },
     /// This operation stores the [`Record`] for an
@@ -525,19 +525,19 @@ where
     CreateAgent {
         /// The agent that was created
         agent: AgentPubKey,
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the entry
         action: Create,
     },
     /// This operation stores the [`Record`] for a
     /// Capability Claim that has been created.
     CreateCapClaim {
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the [`CapClaim`]
         action: Create,
     },
     /// This operation stores the [`Record`] for a
     /// Capability Grant that has been created.
     CreateCapGrant {
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the [`CapGrant`]
         action: Create,
     },
     /// This operation stores the [`Record`] for an
@@ -552,7 +552,7 @@ where
         /// Note the new entry type is always the same as the
         /// original entry type however the data may have changed.
         app_entry: ET,
-        /// The [`Update`] action that updated the entry
+        /// The [`Update`] action that updates the entry
         action: Update,
     },
     /// This operation stores the [`Record`] for an
@@ -566,7 +566,7 @@ where
         /// Note the new entry type is always the same as the
         /// original entry type however the data may have changed.
         app_entry_type: <ET as UnitEnum>::Unit,
-        /// The [`Update`] action that updated the entry
+        /// The [`Update`] action that updates the entry
         action: Update,
     },
     /// This operation stores the [`Record`] for an
@@ -576,29 +576,29 @@ where
         original_key: AgentPubKey,
         /// The new [`AgentPubKey`].
         new_key: AgentPubKey,
-        /// The hash of the [`Action`] that created the original entry
+        /// The hash of the [`Action`] that created the original key
         original_action_hash: ActionHash,
-        /// The [`Update`] action that updated the entry
+        /// The [`Update`] action that updates the entry
         action: Update,
     },
     /// This operation stores the [`Record`] for an
     /// updated Capability Claim.
     UpdateCapClaim {
-        /// The hash of the [`Action`] that created the original entry
+        /// The hash of the [`Action`] that created the original [`CapClaim`]
         original_action_hash: ActionHash,
-        /// The hash of the original entry
+        /// The hash of the original [`CapClaim`]
         original_entry_hash: EntryHash,
-        /// The [`Update`] action that updated the entry
+        /// The [`Update`] action that updates the [`CapClaim`]
         action: Update,
     },
     /// This operation stores the [`Record`] for an
     /// updated Capability Grant.
     UpdateCapGrant {
-        /// The hash of the [`Action`] that created the original entry
+        /// The hash of the [`Action`] that created the original [`CapGrant`]
         original_action_hash: ActionHash,
-        /// The hash of the original entry
+        /// The hash of the original [`CapGrant`]
         original_entry_hash: EntryHash,
-        /// The [`Update`] action that udated the entry
+        /// The [`Update`] action that updates the [`CapGrant`]
         action: Update,
     },
     /// This operation stores the [`Record`] for a
@@ -608,7 +608,7 @@ where
         original_action_hash: ActionHash,
         /// The hash of the original entry
         original_entry_hash: EntryHash,
-        /// The [`Delete`] action that created the entry
+        /// The [`Delete`] action that creates the entry
         action: Delete,
     },
     /// This operation stores the [`Record`] for a
@@ -622,7 +622,7 @@ where
         tag: LinkTag,
         /// The app defined link type of this link.
         link_type: LT,
-        /// The [`CreateLink`] action that created this link
+        /// The [`CreateLink`] action that creates this link
         action: CreateLink,
     },
     /// This operation stores the [`Record`] for a
@@ -634,7 +634,7 @@ where
         /// The base address where this link is stored.
         /// This is the base address of the link that is being deleted.
         base_address: AnyLinkableHash,
-        /// The [`DeleteLink`] action that created the link
+        /// The [`DeleteLink`] action that deletes the link
         action: DeleteLink,
     },
     /// This operation stores the [`Record`] for an
@@ -690,7 +690,7 @@ pub enum OpActivity<UnitType, LT> {
         /// If this is [`None`] then the entry type is defined
         /// in a different zome.
         app_entry_type: Option<UnitType>,
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the entry
         action: Create,
     },
     /// This operation registers the [`Action`] for an
@@ -700,7 +700,7 @@ pub enum OpActivity<UnitType, LT> {
         /// If this is [`None`] then the entry type is defined
         /// in a different zome.
         app_entry_type: Option<UnitType>,
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the entry
         action: Create,
     },
     /// This operation registers the [`Action`] for an
@@ -708,19 +708,19 @@ pub enum OpActivity<UnitType, LT> {
     CreateAgent {
         /// The agent that was created
         agent: AgentPubKey,
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the entry
         action: Create,
     },
     /// This operation registers the [`Action`] for a
     /// Capability Claim to the author's chain.
     CreateCapClaim {
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the [`CapClaim`]
         action: Create,
     },
     /// This operation registers the [`Action`] for a
     /// Capability Grant to the author's chain.
     CreateCapGrant {
-        /// The [`Create`] action that created the entry
+        /// The [`Create`] action that creates the [`CapGrant`]
         action: Create,
     },
     /// This operation registers the [`Action`] for an
@@ -734,7 +734,7 @@ pub enum OpActivity<UnitType, LT> {
         /// If this is [`None`] then the entry type is defined
         /// in a different zome.
         app_entry_type: Option<UnitType>,
-        /// The [`Update`] action
+        /// The [`Update`] action that updates the entry
         action: Update,
     },
     /// This operation registers the [`Action`] for an
@@ -748,7 +748,7 @@ pub enum OpActivity<UnitType, LT> {
         /// If this is [`None`] then the entry type is defined
         /// in a different zome.
         app_entry_type: Option<UnitType>,
-        /// The [`Update`] action
+        /// The [`Update`] action that updates the entry
         action: Update,
     },
     /// This operation registers the [`Action`] for an
@@ -760,27 +760,27 @@ pub enum OpActivity<UnitType, LT> {
         original_key: AgentPubKey,
         /// The hash of the [`Action`] that created the original entry
         original_action_hash: ActionHash,
-        /// The [`Update`] action that updated the entry
+        /// The [`Update`] action that updates the agent's key
         action: Update,
     },
     /// This operation registers the [`Action`] for an
     /// updated Capability Claim to the author's chain.
     UpdateCapClaim {
-        /// The hash of the [`Action`] that created the original entry
+        /// The hash of the [`Action`] that created the original [`CapClaim`]
         original_action_hash: ActionHash,
-        /// The hash of the original entry
+        /// The hash of the original [`CapClaim`]
         original_entry_hash: EntryHash,
-        /// The [`Update`] action that updated the entry
+        /// The [`Update`] action that updates the [`CapClaim`]
         action: Update,
     },
     /// This operation registers the [`Action`] for an
     /// updated Capability Grant to the author's chain.
     UpdateCapGrant {
-        /// The hash of the [`Action`] that created the original entry
+        /// The hash of the [`Action`] that created the original [`CapGrant`]
         original_action_hash: ActionHash,
-        /// The hash of the original entry
+        /// The hash of the original [`CapGrant`]
         original_entry_hash: EntryHash,
-        /// The [`Update`] action that updated the entry
+        /// The [`Update`] action that updates the [`CapGrant`]
         action: Update,
     },
     /// This operation registers the [`Action`] for a
@@ -790,7 +790,7 @@ pub enum OpActivity<UnitType, LT> {
         original_action_hash: ActionHash,
         /// The hash of the original entry
         original_entry_hash: EntryHash,
-        /// The action that deleted the orginal entry
+        /// The action that deletes the original entry
         action: Delete,
     },
     /// This operation registers the [`Action`] for a
@@ -806,7 +806,7 @@ pub enum OpActivity<UnitType, LT> {
         /// If this is [`None`] then the link type is defined
         /// in a different zome.
         link_type: Option<LT>,
-        /// The action that created this link
+        /// The action that creates this link
         action: CreateLink,
     },
     /// This operation registers the [`Action`] for a
@@ -818,7 +818,7 @@ pub enum OpActivity<UnitType, LT> {
         /// The base address where this link is stored.
         /// This is the base address of the link that is being deleted.
         base_address: AnyLinkableHash,
-        /// The [`DeleteLink`] action that deleted the link
+        /// The [`DeleteLink`] action that deletes the link
         action: DeleteLink,
     },
     /// This operation registers the [`Action`] for an
@@ -876,7 +876,7 @@ where
         /// The app defined entry with the deserialized
         /// [`Entry`] data.
         app_entry: ET,
-        /// The [`Update`] or [`Create`] action that created this entry
+        /// The [`Update`] or [`Create`] action that creates this entry
         action: EntryCreationAction,
     },
     /// This operation stores the [`Entry`] for an
@@ -884,7 +884,7 @@ where
     CreateAgent {
         /// The agent that was created
         agent: AgentPubKey,
-        /// The [`Update`] or [`Create`] action that created this entry
+        /// The [`Update`] or [`Create`] action that creates this agent's key
         action: EntryCreationAction,
     },
     /// This operation stores the [`Entry`] for the
@@ -897,7 +897,7 @@ where
         /// The app defined entry with the deserialized
         /// [`Entry`] data of the new entry.
         app_entry: ET,
-        /// The [`Update`] action that updated this entry
+        /// The [`Update`] action that updates this entry
         action: Update,
     },
     /// This operation stores the [`Entry`] for an
@@ -909,7 +909,7 @@ where
         original_key: AgentPubKey,
         /// The hash of the original keys [`Action`].
         original_action_hash: ActionHash,
-        /// The [`Update`] action that updated this entry
+        /// The [`Update`] action that updates this entry
         action: Update,
     },
 }
@@ -931,7 +931,7 @@ where
         /// The app defined entry type with the deserialized
         /// [`Entry`] data of the new entry.
         app_entry: ET,
-        /// The action that updated this entry
+        /// The action that updates this entry
         action: Update,
     },
     /// This operation registers an update from
@@ -945,7 +945,7 @@ where
         /// The unit version of the app defined entry type
         /// for the new entry.
         app_entry_type: <ET as UnitEnum>::Unit,
-        /// The action that updated this entry
+        /// The action that updates this entry
         action: Update,
     },
     /// This operation registers an update from
@@ -957,7 +957,7 @@ where
         original_key: AgentPubKey,
         /// The hash of the original original [`Action`].
         original_action_hash: ActionHash,
-        /// The [`Update`] action that updates the entry
+        /// The [`Update`] action that updates the agent's key
         action: Update,
     },
     /// This operation registers an update from
@@ -965,7 +965,7 @@ where
     CapClaim {
         /// The hash of the original original [`Action`].
         original_action_hash: ActionHash,
-        /// The [`Update`] action that updates the entry
+        /// The [`Update`] action that updates the [`CapClaim`]
         action: Update,
     },
     /// This operation registers an update from
@@ -973,7 +973,7 @@ where
     CapGrant {
         /// The hash of the original original [`Action`].
         original_action_hash: ActionHash,
-        /// The [`Update`] action that updates the entry
+        /// The [`Update`] action that updates the [`CapGrant`]
         action: Update,
     },
 }
@@ -987,12 +987,12 @@ where
     /// This operation registers a deletion to the
     /// original [`Entry`].
     Entry {
-        /// The entries original [`EntryCreationAction`].
+        /// The entries original [`Create`] or [`Update`] [`Action`].
         original_action: EntryCreationAction,
         /// The app defined entry type with the deserialized
         /// [`Entry`] data from the deleted entry.
         original_app_entry: ET,
-        /// The [`Delete`] action that deleted this entry
+        /// The [`Delete`] action that deletes this entry
         action: Delete,
     },
     /// This operation registers a deletion to the
@@ -1003,7 +1003,7 @@ where
         /// The unit version of the app defined entry type
         /// of the deleted entry.
         original_app_entry_type: <ET as UnitEnum>::Unit,
-        /// The [`Delete`] action that deleted this entry
+        /// The [`Delete`] action that deletes this entry
         action: Delete,
     },
     /// This operation registers a deletion to an
@@ -1013,7 +1013,7 @@ where
         original_key: AgentPubKey,
         /// The hash of the deleted keys [`Action`].
         original_action: EntryCreationAction,
-        /// The [`Delete`] action that deleted this entry
+        /// The [`Delete`] action that deletes this entry
         action: Delete,
     },
     /// This operation registers a deletion to a
@@ -1021,7 +1021,7 @@ where
     CapClaim {
         /// The deleted Capability Claim's [`Action`].
         original_action: EntryCreationAction,
-        /// The [`Delete`] action that deleted this entry
+        /// The [`Delete`] action that deletes this entry
         action: Delete,
     },
     /// This operation registers a deletion to a
@@ -1029,7 +1029,7 @@ where
     CapGrant {
         /// The deleted Capability Claim's [`Action`].
         original_action: EntryCreationAction,
-        /// The [`Delete`] action that deleted this entry
+        /// The [`Delete`] action that deletes this entry
         action: Delete,
     },
 }
