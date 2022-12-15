@@ -351,28 +351,16 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             },
         }),
         OpType::RegisterDeleteLink {
-            original_action: _,
-            link_type: lt,
-            base_address,
-            target_address,
-            tag,
+            original_action,
             action,
-        } => {
-            let t = ScopedLinkType::try_from(&lt).unwrap();
-            let mut c = CreateLink::arbitrary(&mut ud).unwrap();
-            c.zome_index = t.zome_index;
-            c.link_type = t.zome_type;
-            c.base_address = base_address;
-            c.target_address = target_address;
-            c.tag = tag;
-            Op::RegisterDeleteLink(RegisterDeleteLink {
-                delete_link: SignedHashed {
-                    hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
-                },
-                create_link: c,
-            })
-        }
+            ..
+        } => Op::RegisterDeleteLink(RegisterDeleteLink {
+            delete_link: SignedHashed {
+                hashed: HoloHashed::from_content_sync(action),
+                signature: Signature::arbitrary(&mut ud).unwrap(),
+            },
+            create_link: original_action,
+        }),
         OpType::RegisterUpdate(OpUpdate::Entry {
             original_action,
             original_app_entry: oet,
