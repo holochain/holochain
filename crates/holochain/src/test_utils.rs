@@ -39,6 +39,7 @@ use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::path::Path;
 use std::sync::Arc;
@@ -251,7 +252,6 @@ where
     .await
     .unwrap();
     let respond_task = tokio::task::spawn(async move {
-        use futures::future::FutureExt;
         use tokio_stream::StreamExt;
         while let Some(evt) = recv.next().await {
             if let Some((filter, tx)) = &mut events {
@@ -263,31 +263,27 @@ where
             use holochain_p2p::event::HolochainP2pEvent::*;
             match evt {
                 SignNetworkData { respond, .. } => {
-                    respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
+                    respond.r(ok_fut(Ok([0; 64].into())));
                 }
                 PutAgentInfoSigned { respond, .. } => {
-                    respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                    respond.r(ok_fut(Ok(())));
                 }
                 QueryAgentInfoSigned { respond, .. } => {
-                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    respond.r(ok_fut(Ok(vec![])));
                 }
                 QueryAgentInfoSignedNearBasis { respond, .. } => {
-                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    respond.r(ok_fut(Ok(vec![])));
                 }
                 QueryGossipAgents { respond, .. } => {
-                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    respond.r(ok_fut(Ok(vec![])));
                 }
                 QueryPeerDensity { respond, .. } => {
-                    respond.r(Ok(async move {
-                        Ok(PeerViewQ::new(
-                            Topology::standard_epoch(cutoff),
-                            ArqStrat::default(),
-                            vec![],
-                        )
-                        .into())
-                    }
-                    .boxed()
-                    .into()));
+                    respond.r(ok_fut(Ok(PeerViewQ::new(
+                        Topology::standard_epoch(cutoff),
+                        ArqStrat::default(),
+                        vec![],
+                    )
+                    .into())));
                 }
                 oth => tracing::warn!(?oth, "UnhandledEvent"),
             }

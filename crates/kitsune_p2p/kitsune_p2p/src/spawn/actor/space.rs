@@ -481,7 +481,6 @@ impl SpaceInternalHandler for Space {
                         size: op_hash.maybe_size(),
                         // TODO - get the author from somewhere
                         author: None,
-                        options: None,
                         context: Some(context),
                     });
 

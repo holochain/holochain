@@ -302,7 +302,6 @@ impl ShardedGossipLocal {
             let request = FetchQueuePush {
                 key: FetchKey::Op(hash),
                 author: None,
-                options: None,
                 context: None,
                 space: self.space.clone(),
                 source: source.clone(),
