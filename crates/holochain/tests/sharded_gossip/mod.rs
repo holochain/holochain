@@ -12,7 +12,7 @@ use holochain::test_utils::inline_zomes::{
 };
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
 use holochain::test_utils::{
-    consistency_10s, /*consistency_10s_advanced,*/ consistency_60s, consistency_60s_advanced,
+    consistency_10s, consistency_60s, consistency_60s_advanced,
 };
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
@@ -1196,6 +1196,7 @@ async fn mock_network_sharding() {
                                             dna,
                                             module,
                                             gossip: GossipProtocol::Sharded(
+                                                // TODO: get and send sizes for recent gossip ops
                                                 ShardedGossipWire::missing_op_hashes(
                                                     missing_hashes
                                                         .into_iter()

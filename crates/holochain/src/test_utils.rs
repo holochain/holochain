@@ -127,7 +127,7 @@ pub struct TestNetwork {
     respond_task: Option<tokio::task::JoinHandle<()>>,
     dna_network: HolochainP2pDna,
 
-    /// check op data calls
+    /// List of arguments used for `check_op_data` calls
     #[allow(clippy::type_complexity)]
     pub check_op_data_calls: Arc<
         std::sync::Mutex<

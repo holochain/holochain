@@ -58,7 +58,7 @@ impl<C: FetchResponseConfig> FetchResponseQueue<C> {
         let len = op.size();
 
         if len > u32::MAX as usize {
-            tracing::warn!("op size > u32::MAX");
+            tracing::error!("op size > u32::MAX");
             return;
         }
 

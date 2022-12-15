@@ -27,7 +27,7 @@ pub fn get_region_queue_batch(queue: &mut VecDeque<Region>, batch_size: u32) -> 
     let mut to_fetch = vec![];
     let mut first = true;
     while let Some(region) = queue.front() {
-        // Only op hashes are gossiped now, so we just count the 36 bytes for each has.
+        // Only op hashes are gossiped now, so we just count the 36 bytes for each hash.
         size += region.data.count * 36;
         if first || size <= batch_size {
             to_fetch.push(queue.pop_front().unwrap());

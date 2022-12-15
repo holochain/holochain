@@ -965,7 +965,6 @@ impl ShardedGossipLocal {
                 if (self.gossip_type == GossipType::Historical || state.is_some())
                     && !ops.is_empty()
                 {
-                    //let source = FetchSource::Node(peer_cert);
 
                     if let Some(state) = state.as_ref() {
                         if let Some(agent) = state.remote_agent_list.get(0) {
