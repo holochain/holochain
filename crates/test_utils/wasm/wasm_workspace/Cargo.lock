@@ -904,6 +904,7 @@ dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
  "kitsune_p2p_timestamp",
+ "paste",
  "serde",
  "serde_bytes",
  "subtle",

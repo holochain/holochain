@@ -105,7 +105,7 @@
 //! # hdi::test_utils::set_zome_types(&[(0, 2)], &[(0, 2)]);
 //! # let result: Result<hdi::prelude::ValidateCallbackResult, Box<dyn std::error::Error>> =
 //! match op.to_type()? {
-//!     OpType::StoreEntry(OpEntry::CreateEntry { entry_def, .. }) => match entry_def {
+//!     OpType::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
 //!         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
 //!         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
 //!             "No Bs allowed in this app".to_string(),
