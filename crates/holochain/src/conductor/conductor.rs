@@ -1347,7 +1347,7 @@ mod clone_cell_impls {
                 .find(|(app_role_name, _)| **app_role_name == role_name)
                 .ok_or_else(|| {
                     ConductorError::CloneCellError(
-                        "no base cell found for provided role id".to_string(),
+                        "no base cell found for provided role name".to_string(),
                     )
                 })?;
 
