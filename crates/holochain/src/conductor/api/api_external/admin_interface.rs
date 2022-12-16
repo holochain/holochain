@@ -147,7 +147,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .install_app_bundle(*payload)
                     .await?
                     .into();
-                let dna_definitions = self.conductor_handle.get_dna_definitions();
+                let dna_definitions = self.conductor_handle.get_dna_definitions(&app)?;
                 Ok(AdminResponse::AppInstalled(AppInfo::from_installed_app(
                     &app,
                     &dna_definitions,
