@@ -188,7 +188,7 @@ pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
-    /// The collection of cells associated with this Conductor
+    /// The collection of available, running cells associated with this Conductor
     cells: RwShare<HashMap<CellId, CellItem>>,
 
     /// The config used to create this Conductor
@@ -558,11 +558,11 @@ mod dna_impls {
             app: &InstalledApp,
         ) -> ConductorResult<HashMap<CellId, DnaDefHashed>> {
             let mut dna_defs = HashMap::new();
-            app.all_cells().for_each(|cell_id| {
-                let ribosome = self.get_ribosome(cell_id.dna_hash()).unwrap();
+            for cell_id in app.all_cells() {
+                let ribosome = self.get_ribosome(cell_id.dna_hash())?;
                 let dna_def = ribosome.dna_def();
                 dna_defs.insert(cell_id.to_owned(), dna_def.to_owned());
-            });
+            }
             Ok(dna_defs)
         }
 
@@ -1177,12 +1177,14 @@ mod app_impls {
                 None => conductor_state.installed_apps().keys().collect(),
             };
 
-            let apps_info: Vec<AppInfo> = apps_ids
+            let app_infos: Vec<AppInfo> = apps_ids
                 .into_iter()
-                .filter_map(|app_id| self.get_app_info_inner(app_id, &conductor_state).unwrap())
+                .map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
+                .collect::<Result<Vec<_>, _>>()?
+                .flatten()
                 .collect();
 
-            Ok(apps_info)
+            Ok(app_infos)
         }
 
         /// Get the IDs of all active installed Apps which use this Cell
