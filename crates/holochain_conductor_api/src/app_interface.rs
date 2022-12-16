@@ -255,17 +255,25 @@ impl CellInfo {
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StemCell {
+    /// The Dna that this cell would be instantiated from
     pub dna: DnaHash,
+    /// An optional name to override the cell's bundle name when instantiating
     pub name: Option<String>,
+    /// The Dna modifiers that will be used when instantiate the cell
     pub dna_modifiers: DnaModifiers,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cell {
+    /// The cell's identifying data
     pub cell_id: CellId,
+    /// If this is a cloned cell, a conductor-local identifier for that clone
     pub clone_id: Option<CloneId>,
+    /// The Dna modifiers that were used to instantiate the cell
     pub dna_modifiers: DnaModifiers,
+    /// The name the cell was instantiated with
     pub name: String,
+    /// Whether or not the cell is running
     pub enabled: bool,
 }
 
