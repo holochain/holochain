@@ -189,7 +189,7 @@ pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
     /// The collection of available, running cells associated with this Conductor
-    cells: RwShare<HashMap<CellId, CellItem>>,
+    running_cells: RwShare<HashMap<CellId, CellItem>>,
 
     /// The config used to create this Conductor
     pub config: ConductorConfig,
@@ -269,7 +269,7 @@ mod startup_shutdown_impls {
         ) -> Self {
             Self {
                 spaces,
-                cells: RwShare::new(HashMap::new()),
+                running_cells: RwShare::new(HashMap::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 app_interfaces: RwShare::new(HashMap::new()),
@@ -675,7 +675,7 @@ mod dna_impls {
 
         /// Remove cells from the cell map in the Conductor
         pub(crate) async fn remove_cells(&self, cell_ids: &[CellId]) {
-            let to_cleanup: Vec<_> = self.cells.share_mut(|cells| {
+            let to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
                 cell_ids
                     .iter()
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
@@ -822,7 +822,7 @@ mod network_impls {
 
             let mut space_to_agents = HashMap::new();
 
-            for cell in self.cells.share_ref(|c| {
+            for cell in self.running_cells.share_ref(|c| {
                 <Result<_, one_err::OneErr>>::Ok(c.keys().cloned().collect::<Vec<_>>())
             })? {
                 space_to_agents
@@ -1270,7 +1270,7 @@ mod cell_impls {
     impl Conductor {
         pub(crate) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
             let cell = self
-                .cells
+                .running_cells
                 .share_ref(|c| c.get(cell_id).map(|i| i.cell.clone()))
                 .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
             Ok(cell)
@@ -1279,7 +1279,7 @@ mod cell_impls {
         /// Iterator over only the cells which are fully running. Generally used
         /// to handle conductor interface requests
         pub fn running_cell_ids(&self) -> HashSet<CellId> {
-            self.cells.share_ref(|c| {
+            self.running_cells.share_ref(|c| {
                 c.iter()
                     .filter_map(|(id, item)| {
                         if item.is_running() {
@@ -1294,7 +1294,7 @@ mod cell_impls {
 
         /// List CellIds for Cells which match a status filter
         pub fn list_cell_ids(&self, filter: Option<CellStatusFilter>) -> Vec<CellId> {
-            self.cells.share_ref(|cells| {
+            self.running_cells.share_ref(|cells| {
                 cells
                     .iter()
                     .filter_map(|(id, cell)| {
@@ -1719,7 +1719,7 @@ mod app_status_impls {
         /// Silently ignores Cells that don't exist.
         pub(crate) fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus) {
             for cell_id in cell_ids {
-                self.cells.share_mut(|cells| {
+                self.running_cells.share_mut(|cells| {
                     if let Some(mut cell) = cells.get_mut(cell_id) {
                         cell.status = status.clone();
                     }
@@ -2120,7 +2120,7 @@ impl Conductor {
     /// Add fully constructed cells to the cell map in the Conductor
     fn add_and_initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
         let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
-        self.cells.share_mut(|cells| {
+        self.running_cells.share_mut(|cells| {
             for cell in new_cells {
                 let cell_id = cell.id().clone();
                 tracing::debug!(?cell_id, "added cell");
@@ -2144,7 +2144,7 @@ impl Conductor {
     /// Used to discover which cells need to be joined to the network.
     /// The cells' status are upgraded to `Joining` when this function is called.
     fn mark_pending_cells_as_joining(&self) -> Vec<(CellId, Arc<Cell>)> {
-        self.cells.share_mut(|cells| {
+        self.running_cells.share_mut(|cells| {
             cells
                 .iter_mut()
                 .filter_map(|(id, item)| {
@@ -2169,7 +2169,7 @@ impl Conductor {
             .collect();
 
         // Clean up all cells that will be dropped (leave network, etc.)
-        let to_cleanup: Vec<_> = self.cells.share_mut(|cells| {
+        let to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
             let to_remove = cells
                 .keys()
                 .filter(|id| !keepers.contains(id))
@@ -2238,7 +2238,9 @@ impl Conductor {
 
         // calculate the existing cells so we can filter those out, only creating
         // cells for CellIds that don't have cells
-        let on_cells: HashSet<CellId> = self.cells.share_ref(|c| c.keys().cloned().collect());
+        let on_cells: HashSet<CellId> = self
+            .running_cells
+            .share_ref(|c| c.keys().cloned().collect());
 
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             let handle = self.clone();
