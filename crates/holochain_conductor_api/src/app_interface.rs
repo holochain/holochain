@@ -259,7 +259,7 @@ pub struct StemCell {
     pub dna: DnaHash,
     /// An optional name to override the cell's bundle name when instantiating
     pub name: Option<String>,
-    /// The Dna modifiers that will be used when instantiate the cell
+    /// The Dna modifiers that will be used when instantiating the cell
     pub dna_modifiers: DnaModifiers,
 }
 
