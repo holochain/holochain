@@ -553,18 +553,17 @@ mod dna_impls {
 
         /// Create a hash map of all existing DNA definitions, mapped to cell
         /// ids.
-        pub fn get_dna_definitions(&self) -> HashMap<CellId, DnaDefHashed> {
+        pub fn get_dna_definitions(
+            &self,
+            app: &InstalledApp,
+        ) -> ConductorResult<HashMap<CellId, DnaDefHashed>> {
             let mut dna_defs = HashMap::new();
-            self.cells.share_ref(|cells| {
-                cells.iter().for_each(|(cell_id, cell_item)| {
-                    if let Ok(ribosome) = cell_item.cell.get_ribosome() {
-                        dna_defs.insert(cell_id.to_owned(), ribosome.dna_def().to_owned());
-                    } else {
-                        tracing::error!("no ribosome found for cell id {}", cell_id);
-                    }
-                })
+            app.all_cells().for_each(|cell_id| {
+                let ribosome = self.get_ribosome(cell_id.dna_hash()).unwrap();
+                let dna_def = ribosome.dna_def();
+                dna_defs.insert(cell_id.to_owned(), dna_def.to_owned());
             });
-            dna_defs
+            Ok(dna_defs)
         }
 
         pub(crate) async fn register_dna_wasm(
@@ -1180,7 +1179,7 @@ mod app_impls {
 
             let apps_info: Vec<AppInfo> = apps_ids
                 .into_iter()
-                .filter_map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
+                .filter_map(|app_id| self.get_app_info_inner(app_id, &conductor_state).unwrap())
                 .collect();
 
             Ok(apps_info)
@@ -1243,7 +1242,7 @@ mod app_impls {
             installed_app_id: &InstalledAppId,
         ) -> ConductorResult<Option<AppInfo>> {
             let state = self.get_state().await?;
-            let maybe_app_info = self.get_app_info_inner(installed_app_id, &state);
+            let maybe_app_info = self.get_app_info_inner(installed_app_id, &state)?;
             Ok(maybe_app_info)
         }
 
@@ -1251,12 +1250,12 @@ mod app_impls {
             &self,
             app_id: &InstalledAppId,
             state: &ConductorState,
-        ) -> Option<AppInfo> {
+        ) -> ConductorResult<Option<AppInfo>> {
             match state.installed_apps().get(app_id) {
-                None => None,
+                None => Ok(None),
                 Some(app) => {
-                    let dna_definitions = self.get_dna_definitions();
-                    Some(AppInfo::from_installed_app(app, &dna_definitions))
+                    let dna_definitions = self.get_dna_definitions(app)?;
+                    Ok(Some(AppInfo::from_installed_app(app, &dna_definitions)))
                 }
             }
         }
@@ -1377,7 +1376,7 @@ mod clone_cell_impls {
                 clone_cell_id,
             }: &DisableCloneCellPayload,
         ) -> ConductorResult<()> {
-            let _ = self
+            let (_, removed_cell_id) = self
                 .update_state_prime({
                     let app_id = app_id.to_owned();
                     let clone_cell_id = clone_cell_id.to_owned();
@@ -1390,6 +1389,7 @@ mod clone_cell_impls {
                     }
                 })
                 .await?;
+            self.remove_cells(&[removed_cell_id]).await;
             Ok(())
         }
 

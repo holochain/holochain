@@ -821,21 +821,6 @@ impl Cell {
         Ok(self.call_zome(invocation, None).await??.try_into()?)
     }
 
-    /// Check if this cell is enabled. Currently only applies to clone cells.
-    // TODO: refactor once cell state or cell-app association is implemented
-    pub async fn is_enabled(&self) -> CellResult<bool> {
-        let state = self
-            .conductor_handle
-            .get_state()
-            .await
-            .map_err(|e| CellError::ConductorError(Box::new(e)))?;
-        let is_enabled = !state
-            .enabled_apps()
-            .flat_map(|(_, app)| app.disabled_clone_cell_ids())
-            .any(|cell_id| *cell_id == self.id);
-        Ok(is_enabled)
-    }
-
     /// Function called by the Conductor
     // #[instrument(skip(self, call, workspace_lock))]
     pub async fn call_zome(
@@ -843,9 +828,6 @@ impl Cell {
         call: ZomeCall,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
-        if !self.is_enabled().await? {
-            return Err(CellError::CellDisabled(self.id.clone()));
-        }
         // Only check if init has run if this call is not coming from
         // an already running init call.
         if workspace_lock
