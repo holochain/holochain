@@ -1181,6 +1181,7 @@ mod app_impls {
                 .into_iter()
                 .map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
                 .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
                 .flatten()
                 .collect();
 
