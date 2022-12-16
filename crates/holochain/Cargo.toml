@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0-beta-rc.1"
 description = "Holochain, a framework for distributed applications"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -25,7 +25,7 @@ getrandom = "0.2.7"
 ghost_actor = "0.3.0-alpha.4"
 holo_hash = { version = "^0.1.0-beta-rc.0", path = "../holo_hash", features = ["full"] }
 holochain_cascade = { version = "^0.1.0-beta-rc.0", path = "../holochain_cascade" }
-holochain_conductor_api = { version = "^0.1.0-beta-rc.0", path = "../holochain_conductor_api" }
+holochain_conductor_api = { version = "^0.1.0-beta-rc.1", path = "../holochain_conductor_api" }
 holochain_keystore = { version = "^0.1.0-beta-rc.0", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.1.0-beta-rc.0", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.1.0-beta-rc.0", path = "../holochain_sqlite" }

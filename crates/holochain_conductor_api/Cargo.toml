@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_api"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0-beta-rc.1"
 description = "Message types for Holochain admin and app interface protocols"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
