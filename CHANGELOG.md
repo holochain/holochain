@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221216.203918
+
+## [holochain\_cli-0.1.0-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain-0.1.0-beta-rc.1](crates/holochain/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_conductor\_api-0.1.0-beta-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.1.0-beta-rc.1)
+
+- Fix error while installing app and return app info of newly installed app. [\#1725](https://github.com/holochain/holochain/pull/1725)
+
 # 20221215.173657
 
 - Breaking: Improves Op::to\_type helper to make action info more ergonomic in validation

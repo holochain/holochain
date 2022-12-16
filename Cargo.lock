@@ -2018,7 +2018,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0-beta-rc.1"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2150,7 +2150,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0-beta-rc.1"
 dependencies = [
  "anyhow",
  "futures",
@@ -2213,7 +2213,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0-beta-rc.1"
 dependencies = [
  "derive_more",
  "directories",
