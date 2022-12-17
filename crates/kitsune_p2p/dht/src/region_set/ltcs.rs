@@ -177,9 +177,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
     pub fn regions(&self) -> impl Iterator<Item = Region<D>> + '_ {
         self.coords
             .region_coords_flat()
-            .map(|((ia, ix, it), coords)| {
-                Region::new(coords, self.data[ia][ix][it].clone())
-            })
+            .map(|((ia, ix, it), coords)| Region::new(coords, self.data[ia][ix][it].clone()))
     }
 
     /// Reshape the two region sets so that both match, omitting or merging

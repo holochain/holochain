@@ -104,7 +104,9 @@ impl AccessPeerStore for TestNode {
 
     fn get_arq_set(&self) -> ArqBoundsSet {
         ArqBoundsSet::new(
-            self.arqs.values().map(|arq| arq.to_bounds(&self.store.topo))
+            self.arqs
+                .values()
+                .map(|arq| arq.to_bounds(&self.store.topo))
                 .collect(),
         )
     }
