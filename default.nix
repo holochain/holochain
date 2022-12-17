@@ -1,7 +1,7 @@
 { nixpkgs ? null
 , rustVersion ? {
     track = "stable";
-    version = "1.66.0";
+    version = "1.65.0";
   }
 
 , holonixArgs ? { }
