@@ -178,7 +178,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         self.coords
             .region_coords_flat()
             .map(|((ia, ix, it), coords)| {
-                Region::new(coords, self.data[ia][ix as usize][it as usize].clone())
+                Region::new(coords, self.data[ia][ix][it].clone())
             })
     }
 
@@ -213,7 +213,7 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
             .regions()
             .into_iter()
             .zip(other.regions().into_iter())
-            .filter_map(|(a, b)| (a.data != b.data).then(|| a))
+            .filter_map(|(a, b)| (a.data != b.data).then_some(a))
             .collect();
 
         Ok(regions)
