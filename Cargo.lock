@@ -2150,7 +2150,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.1.0-beta-rc.1"
+version = "0.1.0-beta-rc.2"
 dependencies = [
  "anyhow",
  "futures",

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221219.021856
+
+## [holochain\_cli-0.1.0-beta-rc.2](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.2)
+
 # 20221216.210935
 
 ## [holochain\_cli-0.1.0-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.1)
