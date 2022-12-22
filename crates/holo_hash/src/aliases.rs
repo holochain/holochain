@@ -225,7 +225,7 @@ use holochain_serialized_bytes::prelude::*;
 
 /// A newtype for a collection of EntryHashes, needed for some wasm return types.
 #[cfg(feature = "serialization")]
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct EntryHashes(pub Vec<EntryHash>);
