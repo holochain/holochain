@@ -1,6 +1,6 @@
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{CapSecret, GrantZomeCallCapabilityPayload, RoleName};
+use holochain_zome_types::{CapSecret, GrantZomeCallCapabilityPayload, RoleName, Nonce256Bits};
 use std::collections::BTreeSet;
 
 use crate::fixt::AgentPubKeyFixturator;
@@ -34,7 +34,7 @@ async fn signed_zome_call() {
     let cell_id = app.cells()[0].cell_id();
 
     // generate a cap access public key
-    let cap_access_public_key = fixt!(AgentPubKey);
+    let cap_access_public_key = fixt!(AgentPubKey, fixt::Predictable, 1);
 
     // compute a cap access secret
     let mut buf = arbitrary::Unstructured::new(&[]);
@@ -42,7 +42,7 @@ async fn signed_zome_call() {
 
     // set up functions to grant access to
     let mut functions = BTreeSet::new();
-    let granted_function = ("zome".into(), "create".into());
+    let granted_function = ("create_entry".into(), "get_entry".into());
     functions.insert(granted_function.clone());
 
     // set up assignees which is only the agent key
@@ -90,7 +90,6 @@ async fn signed_zome_call() {
         )
         .await
         .unwrap();
-
     assert!(actual_cap_grant.is_some());
     assert!(actual_cap_grant.unwrap().is_valid(
         &granted_function,
@@ -100,31 +99,31 @@ async fn signed_zome_call() {
 
     // a zome call without the cap secret that enables lookup of the authorized
     // signing key should be rejected
-    // let response = conductor
-    //     .call_zome(
-    //         ZomeCall::try_from_unsigned_zome_call(
-    //             &conductor.keystore(),
-    //             ZomeCallUnsigned {
-    //                 provenance: agent_pub_key.clone(),
-    //                 cell_id: cell_id.clone(),
-    //                 zome_name: zome.coordinator_zome_name(),
-    //                 fn_name: "create_entry".into(),
-    //                 cap_secret: None,
-    //                 payload: ExternIO::encode(()).unwrap(),
-    //                 nonce: Nonce256Bits::from([0; 32]),
-    //                 expires_at: Timestamp(Timestamp::now().as_micros() + 100000),
-    //             },
-    //         )
-    //         .await
-    //         .unwrap(),
-    //     )
-    //     .await
-    //     .unwrap()
-    //     .unwrap();
-    // assert_matches!(
-    //     response,
-    //     holochain_zome_types::ZomeCallResponse::Unauthorized(..)
-    // );
+    let response = conductor
+        .call_zome(
+            ZomeCall::try_from_unsigned_zome_call(
+                &conductor.keystore(),
+                ZomeCallUnsigned {
+                    provenance: cap_access_public_key.clone(),
+                    cell_id: cell_id.clone(),
+                    zome_name: zome.coordinator_zome_name(),
+                    fn_name: "get_entry".into(),
+                    cap_secret: None,
+                    payload: ExternIO::encode(()).unwrap(),
+                    nonce: Nonce256Bits::from([0; 32]),
+                    expires_at: Timestamp(Timestamp::now().as_micros() + 100000),
+                },
+            )
+            .await
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_matches!(
+        response,
+        holochain_zome_types::ZomeCallResponse::Unauthorized(..)
+    );
 
     // a zome call with the cap secret of the authorized signing key should succeed
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
@@ -133,10 +132,10 @@ async fn signed_zome_call() {
             ZomeCall::try_from_unsigned_zome_call(
                 &conductor.keystore(),
                 ZomeCallUnsigned {
-                    provenance: agent_pub_key.clone(),
+                    provenance: cap_access_public_key.clone(),
                     cell_id: cell_id.clone(),
                     zome_name: zome.coordinator_zome_name(),
-                    fn_name: "create_entry".into(),
+                    fn_name: "get_entry".into(),
                     cap_secret: Some(cap_access_secret),
                     payload: ExternIO::encode(()).unwrap(),
                     nonce,
