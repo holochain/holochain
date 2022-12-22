@@ -467,7 +467,7 @@ jobs:
             '
 
       - name: ${{ matrix.testCommand.name }} (build only)
-        continue-on-error: ${{ if matrix.platform.runs-on == 'macos-latest' }}
+        continue-on-error: ${{ matrix.platform.runs-on == 'macos-latest' }}
         if: ${{ matrix.testCommand.hasBuildStep == true }}
         env:
           CARGO_TEST_ARGS: "--no-run"
@@ -484,7 +484,7 @@ jobs:
         timeout-minutes: 720
 
       - name: ${{ matrix.testCommand.name }} (run)
-        continue-on-error: ${{ if matrix.platform.runs-on == 'macos-latest' }}
+        continue-on-error: ${{ matrix.platform.runs-on == 'macos-latest' }}
         uses: nick-fields/retry@v2.8.1
         env:
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}

@@ -4,9 +4,11 @@ use serde_yaml::Value;
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
-    let mut functions: GrantedFunctions = BTreeSet::new();
-    functions.insert((hdk::prelude::zome_info()?.name, "call_info".into()));
-    functions.insert((hdk::prelude::zome_info()?.name, "remote_call_info".into()));
+    let mut fns = BTreeSet::new();
+    fns.insert((hdk::prelude::zome_info()?.name, "call_info".into()));
+    fns.insert((hdk::prelude::zome_info()?.name, "remote_call_info".into()));
+    let functions = GrantedFunctions::Listed(fns);
+
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted
