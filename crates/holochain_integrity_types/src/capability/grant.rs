@@ -1,7 +1,6 @@
 use super::CapSecret;
 use crate::zome::FunctionName;
 use crate::zome::ZomeName;
-use arbitrary::Arbitrary;
 use holo_hash::*;
 use serde::Deserialize;
 use serde::Serialize;
