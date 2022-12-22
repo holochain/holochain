@@ -177,7 +177,8 @@ impl From<(CapSecret, AgentPubKey)> for CapAccess {
 pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Arbitrary)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GrantedFunctions {
     /// grant all zomes all functions
     All,
