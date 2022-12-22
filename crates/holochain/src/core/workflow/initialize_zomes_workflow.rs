@@ -294,7 +294,9 @@ pub mod tests {
                 Entry::CapGrant(CapGrantEntry {
                     tag: "".into(),
                     access: ().into(),
-                    functions: vec![("no-init".into(), "xxx".into())].into_iter().collect(),
+                    functions: GrantedFunctions::Listed(
+                        vec![("no-init".into(), "xxx".into())].into_iter().collect(),
+                    ),
                 }),
                 ChainTopOrdering::default(),
             ))?;
