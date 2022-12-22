@@ -1,4 +1,3 @@
-
 ---
 default_semver_increment_mode: !pre_minor beta-rc
 ---
