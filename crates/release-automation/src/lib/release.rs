@@ -205,7 +205,12 @@ fn bump_release_versions<'a>(
         let maybe_previous_release_version = changelog
             .topmost_release()?
             .map(|change| semver::Version::parse(change.title()))
-            .transpose()?;
+            .transpose()
+            .context(format!(
+                "parsing {:#?} in {:#?} as a semantic version",
+                changelog.topmost_release(),
+                changelog.path(),
+            ))?;
 
         let maybe_semver_increment_mode = changelog
             .front_matter()?
