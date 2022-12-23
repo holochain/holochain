@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221223.031816
+
+## [holochain\_cli-0.1.0-beta-rc.2](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain-0.1.0-beta-rc.2](crates/holochain/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_test\_wasm\_common-0.1.0-beta-rc.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_conductor\_api-0.1.0-beta-rc.2](crates/holochain_conductor_api/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_wasm\_test\_utils-0.1.0-beta-rc.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_cascade-0.1.0-beta-rc.1](crates/holochain_cascade/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_state-0.1.0-beta-rc.1](crates/holochain_state/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_p2p-0.1.0-beta-rc.1](crates/holochain_p2p/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_types-0.1.0-beta-rc.1](crates/holochain_types/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_keystore-0.1.0-beta-rc.1](crates/holochain_keystore/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_sqlite-0.1.0-beta-rc.1](crates/holochain_sqlite/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [hdk-0.1.0-beta-rc.1](crates/hdk/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_zome\_types-0.1.0-beta-rc.1](crates/holochain_zome_types/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [hdi-0.2.0-beta-rc.1](crates/hdi/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [hdk\_derive-0.1.0-beta-rc.1](crates/hdk_derive/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_integrity\_types-0.1.0-beta-rc.1](crates/holochain_integrity_types/CHANGELOG.md#0.1.0-beta-rc.1)
+
+- **BREAKING CHANGE**: Updated capability grant structure `GrantedFunctions` to be an enum with `All` for allowing all zomes all functions to be called, along with `Listed` to specify a zome and function as before. [\#1732](https://github.com/holochain/holochain/pull/1732)
+
 # 20221216.210935
 
 ## [holochain\_cli-0.1.0-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.1)
