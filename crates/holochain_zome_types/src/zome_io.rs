@@ -261,6 +261,9 @@ impl ZomeCallUnsigned {
     /// Prepare the canonical bytes for an unsigned zome call so that it is
     /// always signed and verified in the same way.
     pub fn data_to_sign(&self) -> Result<std::sync::Arc<[u8]>, SerializedBytesError> {
+        tracing::error!("unsigned zome call is {:#?}", self);
+        let hash = holo_hash::encode::blake2b_256(&holochain_serialized_bytes::encode(&self)?);
+        tracing::error!("hash is {:?}", hash);
         Ok(holo_hash::encode::blake2b_256(&holochain_serialized_bytes::encode(&self)?).into())
     }
 }

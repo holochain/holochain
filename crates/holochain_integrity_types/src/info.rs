@@ -70,7 +70,7 @@ pub struct ScopedZomeTypesSet {
     pub links: ScopedZomeTypes<LinkType>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 /// zome types that are in scope for the calling zome.
 pub struct ScopedZomeTypes<T>(pub Vec<(ZomeIndex, Vec<T>)>);
 
