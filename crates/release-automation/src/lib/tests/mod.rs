@@ -1,5 +1,5 @@
-pub(crate) mod cli;
-pub(crate) mod workspace_mocker;
+pub mod cli;
+pub mod workspace_mocker;
 
 use std::path::Path;
 

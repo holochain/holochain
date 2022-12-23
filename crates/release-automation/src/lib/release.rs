@@ -34,7 +34,7 @@ use crate::{
     crate_::ensure_crate_io_owners,
     crate_selection::{ensure_release_order_consistency, Crate},
 };
-pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
+pub use crate_selection::{ReleaseWorkspace, SelectionCriteria};
 
 const TARGET_DIR_SUFFIX: &str = "target/release_automation";
 
@@ -42,7 +42,7 @@ const TARGET_DIR_SUFFIX: &str = "target/release_automation";
 #[bitflags]
 #[repr(u64)]
 #[derive(enum_utils::FromStr, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum ReleaseSteps {
+pub enum ReleaseSteps {
     /// create a new release branch based on develop
     CreateReleaseBranch,
     /// substeps: get crate selection, bump cargo toml versions, rotate
@@ -61,7 +61,7 @@ pub(crate) enum ReleaseSteps {
 /// derive from it the steps that required to proceed with the release.
 ///
 /// For now it is manual and the release phases need to be given as an instruction.
-pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -> CommandResult {
+pub fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -> CommandResult {
     for step in &cmd_args.steps {
         trace!("Processing step '{:?}'", step);
 
@@ -97,10 +97,10 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
     Ok(())
 }
 
-pub(crate) const RELEASE_BRANCH_PREFIX: &str = "release-";
+pub const RELEASE_BRANCH_PREFIX: &str = "release-";
 
 /// Generate a time-derived name for a new release branch.
-pub(crate) fn generate_release_branch_name() -> String {
+pub fn generate_release_branch_name() -> String {
     format!(
         "{}{}",
         RELEASE_BRANCH_PREFIX,
@@ -109,7 +109,7 @@ pub(crate) fn generate_release_branch_name() -> String {
 }
 
 /// Create a new git release branch.
-pub(crate) fn create_release_branch<'a>(
+pub fn create_release_branch<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     cmd_args: &ReleaseArgs,
 ) -> Fallible<()> {
@@ -205,7 +205,12 @@ fn bump_release_versions<'a>(
         let maybe_previous_release_version = changelog
             .topmost_release()?
             .map(|change| semver::Version::parse(change.title()))
-            .transpose()?;
+            .transpose()
+            .context(format!(
+                "parsing {:#?} in {:#?} as a semantic version",
+                changelog.topmost_release(),
+                changelog.path(),
+            ))?;
 
         let maybe_semver_increment_mode = changelog
             .front_matter()?
@@ -384,7 +389,7 @@ fn bump_release_versions<'a>(
     Ok(())
 }
 
-pub(crate) fn publish_to_crates_io<'a>(
+pub fn publish_to_crates_io<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     cmd_args: &'a ReleaseArgs,
 ) -> Fallible<()> {
@@ -437,7 +442,7 @@ fn latest_release_crates<'a>(ws: &'a ReleaseWorkspace<'a>) -> Fallible<Vec<&Crat
 
 /// This models the information in the failure output of `cargo publish --dry-run`.
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
-pub(crate) enum PublishError {
+pub enum PublishError {
     #[error(
         "{package}@{path}: '{dependency}' dependency by {package_found} not found at {location}"
     )]
@@ -491,7 +496,7 @@ pub(crate) enum PublishError {
 }
 
 impl PublishError {
-    pub(crate) fn with_str(package: String, version: String, input: String) -> Self {
+    pub fn with_str(package: String, version: String, input: String) -> Self {
         static PACKAGE_NOT_FOUND_RE: OnceCell<regex::Regex> = OnceCell::new();
         static PACKAGE_VERSION_NOT_FOUND_RE: OnceCell<regex::Regex> = OnceCell::new();
         static ALREADY_UPLOADED_RE: OnceCell<regex::Regex> = OnceCell::new();
@@ -654,7 +659,7 @@ impl PublishError {
 ///
 /// For this to work properly all changed crates need to have their dev versions applied.
 /// If they don't, `cargo publish` will prefer a published crates to the local ones.
-pub(crate) fn do_publish_to_crates_io<'a>(
+pub fn do_publish_to_crates_io<'a>(
     crates: &[&'a Crate<'a>],
     dry_run: bool,
     allow_dirty: bool,
@@ -902,7 +907,7 @@ fn create_crate_tags<'a>(
 }
 
 /// Ensure we're on a branch that starts with `Self::RELEASE_BRANCH_PREFIX`
-pub(crate) fn ensure_release_branch<'a>(ws: &'a ReleaseWorkspace<'a>) -> Fallible<String> {
+pub fn ensure_release_branch<'a>(ws: &'a ReleaseWorkspace<'a>) -> Fallible<String> {
     let branch_name = ws.git_head_branch_name()?;
     if !branch_name.starts_with(RELEASE_BRANCH_PREFIX) {
         bail!(
