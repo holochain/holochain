@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.1.0-beta-rc.1
+
 - **BREAKING CHANGE**: Updated capability grant structure `GrantedFunctions` to be an enum with `All` for allowing all zomes all functions to be called, along with `Listed` to specify a zome and function as before. [\#1732](https://github.com/holochain/holochain/pull/1732)
 
 ## 0.1.0-beta-rc.0
