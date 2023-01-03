@@ -649,12 +649,14 @@ mod dna_impls {
                     ConductorResult::Ok((wasms, defs))
                 })
                 .await?;
+
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
                 let ribosome = RealRibosome::new(dna_file)?;
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
+
             let dnas = futures::future::try_join_all(wasms).await?;
             Ok((dnas, defs))
         }
