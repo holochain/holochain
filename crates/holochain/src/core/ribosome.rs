@@ -25,8 +25,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use derive_more::Constructor;
 use error::RibosomeResult;
@@ -35,7 +33,6 @@ use guest_callback::init::InitHostAccess;
 use guest_callback::migrate_agent::MigrateAgentHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
-use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
@@ -105,7 +102,6 @@ pub enum HostContext {
     MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
     Validate(ValidateHostAccess),
-    ValidationPackage(ValidationPackageHostAccess),
     ZomeCall(ZomeCallHostAccess),
 }
 
@@ -118,7 +114,6 @@ impl From<&HostContext> for HostFnAccess {
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),
             HostContext::MigrateAgent(access) => access.into(),
-            HostContext::ValidationPackage(access) => access.into(),
             HostContext::PostCommit(access) => access.into(),
         }
     }
@@ -132,8 +127,7 @@ impl HostContext {
             | Self::Init(InitHostAccess { workspace, .. })
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
-            Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
-            | Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
+            Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that uses the workspace without providing a workspace"
             ),
@@ -171,7 +165,6 @@ impl HostContext {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
-            | Self::ValidationPackage(ValidationPackageHostAccess { network, .. })
             | Self::Validate(ValidateHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
@@ -647,12 +640,6 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         access: EntryDefsHostAccess,
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult>;
-
-    fn run_validation_package(
-        &self,
-        access: ValidationPackageHostAccess,
-        invocation: ValidationPackageInvocation,
-    ) -> RibosomeResult<ValidationPackageResult>;
 
     fn run_post_commit(
         &self,

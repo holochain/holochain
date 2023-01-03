@@ -54,17 +54,6 @@ impl FetchContextExt for FetchContext {
     }
 }
 
-/// Request a validation package.
-#[derive(Clone, Debug)]
-pub struct GetValidationPackage {
-    /// The dna_hash / space_hash context.
-    pub dna_hash: DnaHash,
-    /// Request the package from this agent.
-    pub request_from: AgentPubKey,
-    /// Request the package for this Action
-    pub action_hash: ActionHash,
-}
-
 #[derive(Clone, Debug)]
 /// Get options help control how the get is processed at various levels.
 /// Fields tagged with ```[Network]``` are network-level controls.

@@ -44,7 +44,6 @@ mod validation_tests;
 
 mod error;
 mod types;
-pub mod validation_package;
 
 const NUM_CONCURRENT_OPS: usize = 50;
 
