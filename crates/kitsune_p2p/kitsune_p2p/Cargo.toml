@@ -50,6 +50,7 @@ arbitrary = { version = "1.0", features = ["derive"] }
 blake2b_simd = { version = "0.5.10", optional = true }
 maplit = { version = "1", optional = true }
 mockall = { version = "0.10.2", optional = true }
+tx4 = { version = "0.0.1", optional = true }
 
 [dev-dependencies]
 # include self with test_utils feature, to allow integration tests to run properly

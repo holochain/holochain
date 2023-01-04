@@ -59,6 +59,8 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
+tx4 = { path = "../tx4/crates/tx4" }
+tx4-signal = { path = "../tx4/crates/tx4-signal" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }

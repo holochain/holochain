@@ -145,6 +145,8 @@ path = "src/bin/holochain/main.rs"
 [features]
 default = ["slow_tests", "glacial_tests", "test_utils", "no-deps"]
 
+tx4 = [ "kitsune_p2p/tx4" ]
+
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
 test_utils = [
