@@ -714,9 +714,22 @@ pub fn do_publish_to_crates_io<'a>(
 
     while let Some(crt) = queue.pop_front() {
         debug!("publish queue loop iter");
-        if !crt.state().changed()
-            && crates_index_helper::is_version_published(&crt.name(), &crt.version(), false)?
-        {
+
+        let state_changed = crt.state().changed();
+
+        debug!("publish queue loop state changed okay");
+
+        let is_version_published = match crates_index_helper::is_version_published(&crt.name(), &crt.version(), false) {
+            Ok(v) => Ok(v),
+            Err(err) => {
+                error!("is_version_published error: {:?}", err);
+                Err(err)
+            }
+        }?;
+
+        debug!("publish queue loop is_version_published okay");
+
+        if !state_changed && is_version_published {
             debug!(
                 "{} is unchanged and already published, skipping..",
                 crt.name_version()

@@ -1043,9 +1043,11 @@ impl<'a> ReleaseWorkspace<'a> {
 
     /// Return all member crates matched by `SelectionCriteria::match_filter`
     pub fn members_matched(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        self.members_matched.get_or_try_init(|| {
+        match self.members_matched.get_or_try_init(|| {
+            debug!("members matched:M1");
             let states = self.members_states()?;
 
+            debug!("members matched:M2");
             self.members().map(|members| {
                 members
                     .into_iter()
@@ -1065,18 +1067,26 @@ impl<'a> ReleaseWorkspace<'a> {
                     .map(|crt| *crt)
                     .collect::<Vec<_>>()
             })
-        })
+        }) {
+            Ok(v) => Ok(v),
+            Err(err) => {
+                error!("members matched {:?}", err);
+                Err(err)
+            }
+        }
     }
 
     /// Returns all non-excluded workspace members.
     /// Members are sorted according to their dependency tree from most independent to most dependent.
     pub fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        self.members_sorted.get_or_try_init(|| -> Fallible<_> {
+        match self.members_sorted.get_or_try_init(|| -> Fallible<_> {
+            debug!("members:M1");
             let mut members = self
                 .members_unsorted()?
                 .iter()
                 .enumerate()
                 .collect::<Vec<_>>();
+            debug!("members:M2");
 
             let workspace_dependencies = self.members_unsorted()?.iter().try_fold(
                 LinkedHashMap::<String, LinkedHashSet<String>>::new(),
@@ -1098,6 +1108,7 @@ impl<'a> ReleaseWorkspace<'a> {
                     Ok(acc)
                 },
             )?;
+            debug!("members:M3");
 
             // ensure members are ordered respecting their dependency tree
             members.sort_unstable_by(move |(a_i, a), (b_i, b)| {
@@ -1132,9 +1143,16 @@ impl<'a> ReleaseWorkspace<'a> {
                 );
                 result
             });
+            debug!("members:M4");
 
             Ok(members.into_iter().map(|(_, member)| member).collect())
-        })
+        }) {
+            Ok(v) => Ok(v),
+            Err(err) => {
+                error!("members {:?}", err);
+                Err(err)
+            }
+        }
     }
 
     /// Return the root path of the workspace.
