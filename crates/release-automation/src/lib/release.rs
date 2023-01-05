@@ -634,6 +634,8 @@ impl PublishError {
                 captures.name("location"),
                 captures.name("retry_after"),
             ) {
+                // TODO FIXME
+                #[allow(deprecated)]
                 let retry_after =
                 chrono::Utc.timestamp(
                     chrono::DateTime::parse_from_rfc2822(retry_after_string.as_str())
@@ -711,6 +713,7 @@ pub fn do_publish_to_crates_io<'a>(
     };
 
     while let Some(crt) = queue.pop_front() {
+        debug!("publish queue loop iter");
         if !crt.state().changed()
             && crates_index_helper::is_version_published(&crt.name(), &crt.version(), false)?
         {
@@ -720,6 +723,7 @@ pub fn do_publish_to_crates_io<'a>(
             );
             skip_cntr += 1;
         }
+        debug!("publish queue loop state/published check complete");
 
         let manifest_path = crt.manifest_path();
         let cargo_target_dir_string = cargo_target_dir

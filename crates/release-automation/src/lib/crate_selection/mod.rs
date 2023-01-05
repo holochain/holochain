@@ -5,7 +5,7 @@ use crate::changelog::{
 };
 use crate::Fallible;
 use cargo::core::Dependency;
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 
 use anyhow::Context;
 use anyhow::{anyhow, bail};
@@ -744,7 +744,8 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     fn members_states(&'a self) -> Fallible<&MemberStates> {
-        self.members_states.get_or_try_init(|| {
+        match self.members_states.get_or_try_init(|| {
+            debug!("members_states:S1");
             let mut members_states = MemberStates::new();
 
             let criteria = &self.criteria;
@@ -754,10 +755,12 @@ impl<'a> ReleaseWorkspace<'a> {
 
                 ..Default::default()
             };
+            debug!("members_states:S2");
 
             let keyword_validation_re = Regex::new("^[a-zA-Z][a-zA-Z_\\-0-9]+$").unwrap();
 
             for member in self.members()? {
+                debug!("members_states:M1");
 
                 // helper macros to access the desired state
                 macro_rules! get_state {
@@ -797,6 +800,7 @@ impl<'a> ReleaseWorkspace<'a> {
                         insert_state!(CrateStateFlags::ManifestKeywordsMoreThan5);
                     }
                 }
+                debug!("members_states:M2");
 
                 // regex matching state
                 if criteria.match_filter.is_match(&member.name())? {
@@ -840,6 +844,7 @@ impl<'a> ReleaseWorkspace<'a> {
                     if !std::path::Path::new(&member.root().join(Self::README_FILENAME)).exists() {
                         insert_state!(CrateStateFlags::MissingReadme);
                     }
+                    debug!("members_states:M3");
 
                     // change related state
                     match member.changelog() {
@@ -902,6 +907,7 @@ impl<'a> ReleaseWorkspace<'a> {
                             }
                         }
                     }
+                    debug!("members_states:M4");
 
                     // dependency state
                     // only dependencies of explicitly matched packages are considered here.
@@ -937,6 +943,7 @@ impl<'a> ReleaseWorkspace<'a> {
                             }
                         }
                     }
+                    debug!("members_states:M5");
 
                     // set DependencyChanged in dependants if this crate changed
                     if get_state!(member.name()).changed() {
@@ -947,12 +954,21 @@ impl<'a> ReleaseWorkspace<'a> {
                             );
                         }
                     }
+                    debug!("members_states:M6");
                 }
 
             }
 
+            debug!("members_states:S3");
+
             Ok(members_states)
-        })
+        }) {
+            Ok(r) => Ok(r),
+            Err(err) => {
+                error!("members_states error {:?}", err);
+                Err(err)
+            }
+        }
     }
 
     fn cargo_workspace(&'a self) -> Fallible<&'a CargoWorkspace> {
