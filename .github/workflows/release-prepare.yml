@@ -252,6 +252,10 @@ jobs:
             echo "::set-output name=releasable_crates::false"
           fi
 
+      - name: Run dmesg on error
+        if: ${{ failure() }}
+        run: dmesg
+
       - name: Append to the environment file and set outputs
         id: write-env-and-tag
         run: |

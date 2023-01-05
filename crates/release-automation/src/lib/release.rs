@@ -719,7 +719,12 @@ pub fn do_publish_to_crates_io<'a>(
 
         debug!("publish queue loop state changed okay");
 
-        let is_version_published = match crates_index_helper::is_version_published(&crt.name(), &crt.version(), false) {
+        let name = crt.name().to_owned();
+        let ver = crt.version().to_owned();
+
+        debug!("is_version_published, name: {:?}, ver: {:?}", &name, &ver);
+
+        let is_version_published = match crates_index_helper::is_version_published(&name, &ver, false) {
             Ok(v) => Ok(v),
             Err(err) => {
                 error!("is_version_published error: {:?}", err);
