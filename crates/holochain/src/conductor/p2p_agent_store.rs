@@ -294,11 +294,11 @@ pub async fn dump_state(
 
         use chrono::{DateTime, Duration, NaiveDateTime, Utc};
         let duration = Duration::milliseconds(info.signed_at_ms as i64);
-        let s = duration.num_seconds() as i64;
+        let s = duration.num_seconds();
         let n = duration.clone().to_std().unwrap().subsec_nanos();
         let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
         let duration = Duration::milliseconds(info.expires_at_ms as i64);
-        let s = duration.num_seconds() as i64;
+        let s = duration.num_seconds();
         let n = duration.clone().to_std().unwrap().subsec_nanos();
         let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
         let now = Utc::now();

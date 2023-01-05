@@ -2,8 +2,7 @@ use super::*;
 use warp::Filter;
 
 pub(crate) fn now(
-) -> impl Filter<Extract = impl warp::Reply + Sized, Error = warp::Rejection> + Clone
-{
+) -> impl Filter<Extract = impl warp::Reply + Sized, Error = warp::Rejection> + Clone {
     warp::post()
         .and(warp::header::exact("X-Op", "now"))
         .and_then(time)

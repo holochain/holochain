@@ -25,6 +25,8 @@ use thiserror::Error;
 /// unstable but when it lands we should use:
 /// <https://docs.rs/try-guard/0.2.0/try_guard/>
 #[derive(Error, Debug)]
+// TODO FIXME
+#[allow(clippy::large_enum_variant)]
 pub enum SysValidationError {
     #[error(transparent)]
     CascadeError(#[from] holochain_cascade::error::CascadeError),

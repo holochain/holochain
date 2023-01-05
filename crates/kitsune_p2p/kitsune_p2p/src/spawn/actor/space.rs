@@ -1515,8 +1515,8 @@ impl Space {
     fn update_metric_exchange_arcset(&mut self) {
         let arc_set = self
             .agent_arcs
-            .iter()
-            .map(|(_, a)| DhtArcSet::from_interval(DhtArcRange::from(a)))
+            .values()
+            .map(|a| DhtArcSet::from_interval(DhtArcRange::from(a)))
             .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
         self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
