@@ -218,7 +218,7 @@ impl Query for GetLinksQuery {
     where
         S: Store,
     {
-        let mut links: Self::Output = state.creates.into_iter().map(|(_, v)| v).collect();
+        let mut links: Self::Output = state.creates.into_values().collect();
         links.sort_by_key(|l| l.timestamp);
         Ok(links)
     }

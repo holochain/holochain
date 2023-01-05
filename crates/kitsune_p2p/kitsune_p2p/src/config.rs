@@ -13,11 +13,15 @@ pub const BOOTSTRAP_SERVICE_DEFAULT: &str = "https://bootstrap-staging.holo.host
 pub const BOOTSTRAP_SERVICE_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
 
 pub(crate) enum KitsuneP2pTx2Backend {
+    #[cfg(feature = "tx2")]
     Mem,
+    #[cfg(feature = "tx2")]
     Quic { bind_to: TxUrl },
+    #[cfg(feature = "tx2")]
     Mock { mock_network: AdapterFactory },
 }
 
+#[cfg(feature = "tx2")]
 pub(crate) enum KitsuneP2pTx2ProxyConfig {
     NoProxy,
     Specific(TxUrl),
@@ -28,6 +32,7 @@ pub(crate) enum KitsuneP2pTx2ProxyConfig {
     },
 }
 
+#[cfg(feature = "tx2")]
 pub(crate) struct KitsuneP2pTx2Config {
     pub backend: KitsuneP2pTx2Backend,
     pub use_proxy: KitsuneP2pTx2ProxyConfig,
@@ -73,6 +78,7 @@ impl KitsuneP2pConfig {
     /// `tx2` is currently designed to use exactly one proxy wrapped transport,
     /// so convert a bunch of the options from the previous transport
     /// paradigm into that pattern.
+    #[cfg(feature = "tx2")]
     pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
         use KitsuneP2pTx2ProxyConfig::*;
         match self.transport_pool.get(0) {
@@ -116,6 +122,8 @@ impl KitsuneP2pConfig {
                 },
                 use_proxy: NoProxy,
             }),
+            #[cfg(feature = "tx4")]
+            Some(TransportConfig::Tx4 { .. }) => Err("Cannot convert tx4 config into tx2".into()),
             None | Some(TransportConfig::Mem {}) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mem,
                 use_proxy: NoProxy,
@@ -142,8 +150,10 @@ impl KitsuneP2pConfig {
 pub enum TransportConfig {
     /// A transport that uses the local memory transport protocol
     /// (this is mainly for testing)
+    #[cfg(feature = "tx2")]
     Mem {},
     /// A transport that uses the QUIC protocol
+    #[cfg(feature = "tx2")]
     Quic {
         /// Network interface / port to bind to
         /// Default: "kitsune-quic://0.0.0.0:0"
@@ -161,6 +171,7 @@ pub enum TransportConfig {
         override_port: Option<u16>,
     },
     /// A transport that TLS tunnels through a sub-transport (ALPN kitsune-proxy/0)
+    #[cfg(feature = "tx2")]
     Proxy {
         /// The 'Proxy' transport is a wrapper around a sub-transport.
         /// We also need to define the sub-transport.
@@ -173,30 +184,40 @@ pub enum TransportConfig {
         proxy_config: ProxyConfig,
     },
     #[serde(skip)]
+    #[cfg(feature = "tx2")]
     /// A mock network for testing
     Mock {
         /// The adaptor for mocking the network
         mock_network: AdapterFactoryMock,
     },
+    #[cfg(feature = "tx4")]
+    /// Configure to use Tx4 for kitsune networking
+    Tx4 {
+        // TODO - Actual config fields here!
+    },
 }
 
+#[cfg(feature = "tx2")]
 #[derive(Clone)]
 /// A simple wrapper around the [`AdaptorFactory`](tx2::tx2_adapter::AdapterFactory)
 /// to allow implementing Debug and PartialEq.
 pub struct AdapterFactoryMock(pub AdapterFactory);
 
+#[cfg(feature = "tx2")]
 impl std::fmt::Debug for AdapterFactoryMock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("AdapterFactoryMock").finish()
     }
 }
 
+#[cfg(feature = "tx2")]
 impl std::cmp::PartialEq for AdapterFactoryMock {
     fn eq(&self, _: &Self) -> bool {
         unimplemented!()
     }
 }
 
+#[cfg(feature = "tx2")]
 impl From<AdapterFactory> for AdapterFactoryMock {
     fn from(adaptor_factory: AdapterFactory) -> Self {
         Self(adaptor_factory)
@@ -206,6 +227,7 @@ impl From<AdapterFactory> for AdapterFactoryMock {
 /// Proxy configuration options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[cfg(feature = "tx2")]
 pub enum ProxyConfig {
     /// We want to be hosted at a remote proxy location.
     RemoteProxyClient {
@@ -236,6 +258,7 @@ pub enum ProxyConfig {
 /// Whether we are willing to proxy on behalf of others
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[cfg(feature = "tx2")]
 pub enum ProxyAcceptConfig {
     /// We will accept all requests to proxy for remotes
     AcceptAll,
@@ -249,7 +272,9 @@ pub enum ProxyAcceptConfig {
 #[serde(rename_all = "snake_case")]
 pub enum NetworkType {
     /// Via bootstrap server to the WAN
+    // MAYBE: Remove the "Quic" from this?
     QuicBootstrap,
     /// Via MDNS to the LAN
+    // MAYBE: Remove the "Quic" from this?
     QuicMdns,
 }

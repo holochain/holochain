@@ -498,7 +498,7 @@ mod interface_impls {
         /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
         /// on it. Useful for specifying port 0 and letting the OS choose a free port.
         pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
-            self.admin_websocket_ports.share_ref(|p| p.get(0).copied())
+            self.admin_websocket_ports.share_ref(|p| p.first().copied())
         }
 
         /// Give a list of networking ports taken up as running app interface tasks
@@ -718,12 +718,7 @@ mod dna_impls {
             ribosome: RealRibosome,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             let dna_def = ribosome.dna_def().clone();
-            let code = ribosome
-                .dna_file()
-                .code()
-                .clone()
-                .into_iter()
-                .map(|(_, c)| c);
+            let code = ribosome.dna_file().code().clone().into_values();
             let zome_defs = get_entry_defs(ribosome).await?;
             self.put_wasm_code(dna_def, code, zome_defs).await
         }

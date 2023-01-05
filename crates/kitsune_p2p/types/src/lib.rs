@@ -186,7 +186,7 @@ impl From<Arc<Vec<u8>>> for Tx2Cert {
 
 impl From<CertDigest> for Tx2Cert {
     fn from(c: CertDigest) -> Self {
-        let b64 = base64::encode_config(&*c, base64::URL_SAFE_NO_PAD);
+        let b64 = base64::encode_config(*c, base64::URL_SAFE_NO_PAD);
         let nick = {
             let (start, _) = b64.split_at(6);
             let (_, end) = b64.split_at(b64.len() - 6);
@@ -329,6 +329,8 @@ pub mod metrics;
 pub mod reverse_semaphore;
 pub mod task_agg;
 pub mod tls;
+
+#[cfg(feature = "tx2")]
 pub mod tx2;
 
 pub use kitsune_p2p_dht as dht;

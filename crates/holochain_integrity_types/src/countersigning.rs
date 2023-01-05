@@ -523,7 +523,7 @@ impl CounterSigningSessionData {
             .iter()
             .position(|(pubkey, _)| pubkey == agent)
         {
-            Some(agent_index) => match self.responses.get(agent_index as usize) {
+            Some(agent_index) => match self.responses.get(agent_index) {
                 Some((agent_state, _)) => Ok(agent_state),
                 None => Err(CounterSigningError::AgentIndexOutOfBounds),
             },

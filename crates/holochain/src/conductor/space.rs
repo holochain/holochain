@@ -313,7 +313,7 @@ impl Spaces {
 
         let db = self.dht_db(dna_hash)?;
         let include_limbo = include_limbo
-            .then(|| "\n")
+            .then_some("\n")
             .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
 
         let intervals = dht_arc_set.intervals();

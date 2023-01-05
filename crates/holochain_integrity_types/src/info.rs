@@ -146,7 +146,7 @@ where
         T: PartialEq,
     {
         iter.into_iter()
-            .find_map(|key| (self.get(key)? == scoped_type).then(|| key))
+            .find_map(|key| (self.get(key)? == scoped_type).then_some(key))
     }
 
     /// Find the [`ZomeTypesKey`] for this [`ScopedZomeType`].

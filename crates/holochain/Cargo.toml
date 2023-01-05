@@ -36,7 +36,7 @@ holochain_wasmer_host = "=0.0.82"
 holochain_websocket = { version = "^0.1.0-beta-rc.0", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.1.0-beta-rc.1", path = "../holochain_zome_types", features = ["full"] }
 human-panic = "1.0.3"
-kitsune_p2p = { version = "^0.1.0-beta-rc.0", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p = { version = "^0.1.0-beta-rc.0", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
 kitsune_p2p_types = { version = "^0.1.0-beta-rc.0", path = "../kitsune_p2p/types" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
@@ -143,8 +143,9 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "glacial_tests", "test_utils", "no-deps"]
+default = ["slow_tests", "glacial_tests", "test_utils", "no-deps", "tx2"]
 
+tx2 = [ "kitsune_p2p/tx2" ]
 tx4 = [ "kitsune_p2p/tx4" ]
 
 # Exposes additional functionality only needed for integration tests.

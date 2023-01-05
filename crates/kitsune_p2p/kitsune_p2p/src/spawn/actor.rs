@@ -871,7 +871,7 @@ impl InternalHandler for KitsuneP2pActor {
         url: TxUrl,
         con: Tx2ConHnd<wire::Wire>,
     ) -> InternalHandlerResult<()> {
-        let spaces = self.spaces.iter().map(|(_, s)| s.get()).collect::<Vec<_>>();
+        let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
         Ok(async move {
             let mut all = Vec::new();
             for (_, space) in futures::future::join_all(spaces).await {
@@ -885,7 +885,7 @@ impl InternalHandler for KitsuneP2pActor {
     }
 
     fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
-        let spaces = self.spaces.iter().map(|(_, s)| s.get()).collect::<Vec<_>>();
+        let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
         Ok(async move {
             let mut all = Vec::new();
             for (_, space) in futures::future::join_all(spaces).await {

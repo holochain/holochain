@@ -163,7 +163,7 @@ impl Query for GetEntryDetailsQuery {
                             entry,
                             actions: state.actions.into_iter().collect(),
                             rejected_actions: state.rejected_actions.into_iter().collect(),
-                            deletes: state.deletes.into_iter().map(|(_, v)| v).collect(),
+                            deletes: state.deletes.into_values().collect(),
                             updates: state.updates.into_iter().collect(),
                             entry_dht_status,
                         }
