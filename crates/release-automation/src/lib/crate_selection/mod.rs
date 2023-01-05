@@ -236,6 +236,7 @@ impl<'a> Crate<'a> {
     }
 
     pub fn state(&self) -> CrateState {
+        debug!("crt.state()");
         self.workspace
             .members_states()
             .expect("should be initialised")
@@ -744,6 +745,7 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     fn members_states(&'a self) -> Fallible<&MemberStates> {
+        debug!("members_states:00");
         match self.members_states.get_or_try_init(|| {
             debug!("members_states:S1");
             let mut members_states = MemberStates::new();
