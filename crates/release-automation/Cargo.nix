@@ -3945,7 +3945,7 @@ rec {
           "vendored-openssl" = [ "openssl-sys/vendored" ];
           "zlib-ng-compat" = [ "libz-sys/zlib-ng" "libssh2-sys/zlib-ng-compat" ];
         };
-        resolvedDefaultFeatures = [ "https" "libssh2-sys" "openssl-sys" "ssh" "ssh_key_from_memory" "vendored" "vendored-openssl" ];
+        resolvedDefaultFeatures = [ "https" "libssh2-sys" "openssl-sys" "ssh" "ssh_key_from_memory" ];
       };
       "libnghttp2-sys" = rec {
         crateName = "libnghttp2-sys";
@@ -4503,24 +4503,6 @@ rec {
         ];
 
       };
-      "openssl-src" = rec {
-        crateName = "openssl-src";
-        version = "111.24.0+1.1.1s";
-        edition = "2015";
-        sha256 = "1gaax9rpf8k1g00qqr0dwbas5lhfxzf00swc4b37h4dhv9cz561l";
-        authors = [
-          "Alex Crichton <alex@alexcrichton.com>"
-        ];
-        dependencies = [
-          {
-            name = "cc";
-            packageId = "cc";
-          }
-        ];
-        features = {
-        };
-        resolvedDefaultFeatures = [ "default" ];
-      };
       "openssl-sys" = rec {
         crateName = "openssl-sys";
         version = "0.9.80";
@@ -4547,11 +4529,6 @@ rec {
             packageId = "cc";
           }
           {
-            name = "openssl-src";
-            packageId = "openssl-src";
-            optional = true;
-          }
-          {
             name = "pkg-config";
             packageId = "pkg-config";
           }
@@ -4568,7 +4545,6 @@ rec {
           "unstable_boringssl" = [ "bssl-sys" ];
           "vendored" = [ "openssl-src" ];
         };
-        resolvedDefaultFeatures = [ "openssl-src" "vendored" ];
       };
       "os_info" = rec {
         crateName = "os_info";
@@ -5468,11 +5444,6 @@ rec {
           {
             name = "itertools";
             packageId = "itertools";
-          }
-          {
-            name = "libgit2-sys";
-            packageId = "libgit2-sys";
-            features = [ "vendored" "vendored-openssl" ];
           }
           {
             name = "linked-hash-map";
