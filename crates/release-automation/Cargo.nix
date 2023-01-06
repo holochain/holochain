@@ -1715,9 +1715,9 @@ rec {
       };
       "crates-index" = rec {
         crateName = "crates-index";
-        version = "0.18.10";
-        edition = "2018";
-        sha256 = "1x7f7xfvqzlacji88iaz9n4k7wip72sk4gfvxvccli0cbf2yqirl";
+        version = "0.18.11";
+        edition = "2021";
+        sha256 = "1wlcxkbh83q57k9n2v73w9fx0dcr0hkh8i9hrfc3b1j0dysng7sr";
         authors = [
           "Corey Farwell <coreyf@rwell.org>"
           "Kornel <kornel@geekhood.net>"
@@ -1775,6 +1775,10 @@ rec {
             name = "smartstring";
             packageId = "smartstring";
             features = [ "serde" ];
+          }
+          {
+            name = "toml";
+            packageId = "toml";
           }
         ];
         features = {
@@ -3566,9 +3570,9 @@ rec {
       };
       "glob" = rec {
         crateName = "glob";
-        version = "0.3.0";
+        version = "0.3.1";
         edition = "2015";
-        sha256 = "0x25wfr7vg3mzxc9x05dcphvd3nwlcmbnxrvwcvrrdwplcrrk4cv";
+        sha256 = "16zca52nglanv23q5qrwd5jinw3d3as5ylya6y1pbx47vkxvrynj";
         authors = [
           "The Rust Project Developers"
         ];
@@ -7473,6 +7477,26 @@ rec {
           "Soveu <marx.tomasz@gmail.com>"
         ];
 
+      };
+      "toml" = rec {
+        crateName = "toml";
+        version = "0.5.10";
+        edition = "2018";
+        sha256 = "13srgxa0d92k8vdjyw8cyyax1pvi66smlyq1s7cs8s7891kwfcqk";
+        authors = [
+          "Alex Crichton <alex@alexcrichton.com>"
+        ];
+        dependencies = [
+          {
+            name = "serde";
+            packageId = "serde";
+          }
+        ];
+        features = {
+          "indexmap" = [ "dep:indexmap" ];
+          "preserve_order" = [ "indexmap" ];
+        };
+        resolvedDefaultFeatures = [ "default" ];
       };
       "toml_datetime" = rec {
         crateName = "toml_datetime";
