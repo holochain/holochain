@@ -25,7 +25,6 @@ serde_yaml = "0.9.11"
 educe = "0.4"
 indoc = "1.0"
 git2 = "0.13.23"
-libgit2-sys = { version = "0.12.26", features = [ "vendored", "vendored-openssl" ] }
 linked_hash_set = "0.1"
 linked-hash-map = "0.5"
 custom_debug = "0.5"
