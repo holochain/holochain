@@ -33,7 +33,7 @@ serde_json = { version = "1", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
 sysinfo = "0.15.9"
 thiserror = "1.0.22"
-tokio = { version = "1.11", features = [ "full" ] }
+tokio = { version = "1.23", features = [ "full" ] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
 url = "2"
 url2 = "0.0.6"

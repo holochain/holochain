@@ -63,7 +63,7 @@ strum = "0.18.0"
 subtle-encoding = "0.5"
 tempfile = "3.3"
 thiserror = "1.0.22"
-tokio = { version = "1.11", features = [ "full"] }
+tokio = { version = "1.23", features = [ "full"] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
 holochain_util = { version = "^0.1.0-beta-rc.0", path = "../holochain_util", features = [ "pw" ] }
 toml = "0.5.6"

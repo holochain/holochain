@@ -28,7 +28,7 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 structopt = "0.3.21"
 sodoken = "=0.0.7"
-tokio = { version = "1.11", features = ["full"] }
+tokio = { version = "1.23", features = ["full"] }
 tokio-tungstenite = "0.14"
 tungstenite = "0.13"
 url2 = "0.0.6"
