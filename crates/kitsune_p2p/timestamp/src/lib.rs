@@ -28,20 +28,20 @@ pub const MM: i64 = 1_000_000;
 ///
 /// It is assumed to be untrustworthy:
 /// it may contain times offset from the UNIX epoch with the full +/- i64 range.
-/// Most of these times are *not* representable by a chrono::DateTime<Utc>
+/// Most of these times are *not* representable by a `chrono::DateTime<Utc>`
 /// (which limits itself to a +/- i32 offset in days from Jan 1, 0AD and from 1970AD).
 ///
 /// Also, most differences between two Timestamps are *not*
-/// representable by either a chrono::Duration (which limits itself to +/- i64 microseconds), *nor*
-/// by core::time::Duration (which limits itself to +'ve u64 seconds).  Many constructions of these
+/// representable by either a `chrono::Duration` (which limits itself to +/- i64 microseconds), *nor*
+/// by `core::time::Duration` (which limits itself to +'ve u64 seconds).  Many constructions of these
 /// chrono and core::time types will panic!, so painful measures must be taken to avoid this outcome
 /// -- it is not acceptable for our core Holochain algorithms to panic when accessing DHT Action
 /// information committed by other random Holochain nodes!
 ///
 /// Timestamp implements `Serialize` and `Display` as rfc3339 time strings (if possible).
 ///
-/// Supports +/- chrono::Duration directly.  There is no Timestamp::now() method, since this is not
-/// supported by WASM; however, holochain_types provides a Timestamp::now() method.
+/// Supports +/- `chrono::Duration` directly.  There is no `Timestamp::now()` method, since this is not
+/// supported by WASM; however, `holochain_types` provides a `Timestamp::now()` method.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(not(feature = "chrono"), derive(Debug))]
