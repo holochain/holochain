@@ -4,6 +4,7 @@
 , rustup
 , coreutils
 , cargo-nextest
+, crate2nix
 
 , holonix
 , hcToplevelDir
@@ -50,6 +51,7 @@ rec {
     nativeBuildInputs = builtins.attrValues (pkgs.core)
       ++ [
       cargo-nextest
+      crate2nix
     ]
       ++ (with holonix.pkgs;[
       sqlcipher
@@ -57,7 +59,6 @@ rec {
       gh
       nixpkgs-fmt
       cargo-sweep
-      crate2nix
     ]);
   };
 
