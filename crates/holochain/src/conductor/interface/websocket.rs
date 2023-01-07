@@ -517,15 +517,14 @@ pub mod test {
             .collect::<Vec<_>>();
         let cell_id_0 = cell_ids_with_proofs.first().cloned().unwrap().0;
 
-        dbg!(&cell_ids_with_proofs);
         let (_tmpdir, conductor_handle) = setup_admin_fake_cells(dnas, cell_ids_with_proofs).await;
-        dbg!(conductor_handle.get_dna_def(cell_id_0.dna_hash()).unwrap());
 
         let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let app_id = "test app".to_string();
 
         // Enable the app
         println!("### ENABLE ###");
+
         let msg = AdminRequest::EnableApp {
             installed_app_id: app_id.clone(),
         };
@@ -547,6 +546,7 @@ pub mod test {
 
         // Now make sure we can call a zome
         println!("### CALL ZOME ###");
+
         call_zome(
             conductor_handle.clone(),
             cell_id_0.clone(),
@@ -595,6 +595,7 @@ pub mod test {
 
         // Now deactivate app
         println!("### DISABLE ###");
+
         let msg = AdminRequest::DisableApp {
             installed_app_id: app_id.clone(),
         };
@@ -639,6 +640,7 @@ pub mod test {
 
         // Enable the app one more time
         println!("### ENABLE ###");
+
         let msg = AdminRequest::EnableApp {
             installed_app_id: app_id.clone(),
         };
@@ -661,6 +663,7 @@ pub mod test {
 
         // Now make sure we can call a zome once again
         println!("### CALL ZOME ###");
+
         call_zome(
             conductor_handle.clone(),
             cell_id_0.clone(),
