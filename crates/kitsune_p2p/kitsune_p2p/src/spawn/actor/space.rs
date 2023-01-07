@@ -759,6 +759,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
         initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
+        dbg!(&space, &agent, &initial_arc);
         if let Some(initial_arc) = initial_arc {
             self.agent_arcs.insert(agent.clone(), initial_arc);
         }
@@ -1559,13 +1560,6 @@ impl Space {
             .await?;
 
             tracing::debug!(?agent_info_signed);
-
-            evt_sender
-                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                    space: space.clone(),
-                    peer_data: vec![agent_info_signed.clone()],
-                })
-                .await?;
 
             // Push to the network as well
             match network_type {

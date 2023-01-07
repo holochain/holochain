@@ -524,7 +524,8 @@ pub mod test {
         let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let app_id = "test app".to_string();
 
-        // Activate the app
+        // Enable the app
+        println!("### ENABLE ###");
         let msg = AdminRequest::EnableApp {
             installed_app_id: app_id.clone(),
         };
@@ -545,6 +546,7 @@ pub mod test {
         let initial_state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
 
         // Now make sure we can call a zome
+        println!("### CALL ZOME ###");
         call_zome(
             conductor_handle.clone(),
             cell_id_0.clone(),
@@ -592,6 +594,7 @@ pub mod test {
         }
 
         // Now deactivate app
+        println!("### DISABLE ###");
         let msg = AdminRequest::DisableApp {
             installed_app_id: app_id.clone(),
         };
@@ -634,7 +637,8 @@ pub mod test {
             assert!(false);
         }
 
-        // Activate the app one more time
+        // Enable the app one more time
+        println!("### ENABLE ###");
         let msg = AdminRequest::EnableApp {
             installed_app_id: app_id.clone(),
         };
@@ -656,6 +660,7 @@ pub mod test {
         assert_eq!(initial_state, state);
 
         // Now make sure we can call a zome once again
+        println!("### CALL ZOME ###");
         call_zome(
             conductor_handle.clone(),
             cell_id_0.clone(),
