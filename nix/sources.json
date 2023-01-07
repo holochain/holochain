@@ -1,14 +1,14 @@
 {
     "crate2nix": {
-        "branch": "pr_change_version",
+        "branch": "patch-1",
         "description": "nix build file generator for rust crates",
         "homepage": "",
-        "owner": "steveeJ-forks",
+        "owner": "steveeJ",
         "repo": "crate2nix",
-        "rev": "0f2d3998c2dd12be209d3414d713a0f7ffe38fe1",
-        "sha256": "1p1dqvmxlmakaywiaaw0wxay52sp6h6cqbpq1a0s1hn1dx57ggrz",
+        "rev": "a1d75c7b854729f99b31f12538144f9eb8978f0f",
+        "sha256": "0nh831l5v58dy0nljgjcsx6q3806136s4ndlxbz2k3vq5q3dj58r",
         "type": "tarball",
-        "url": "https://github.com/steveeJ-forks/crate2nix/archive/0f2d3998c2dd12be209d3414d713a0f7ffe38fe1.tar.gz",
+        "url": "https://github.com/steveeJ/crate2nix/archive/a1d75c7b854729f99b31f12538144f9eb8978f0f.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "holonix": {
