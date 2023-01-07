@@ -13,6 +13,7 @@ use holochain_p2p::{
     dht::{spacetime::Topology, ArqStrat},
     DnaHashExt,
 };
+use holochain_sqlite::prelude::AsP2pStateTxExt;
 use holochain_types::{
     db::PermittedConn,
     prelude::{DhtOpHash, DnaError},
@@ -99,6 +100,21 @@ impl KitsuneHost for KitsuneHostImpl {
         let db = self.spaces.p2p_agents_db(&dna_hash);
         async move {
             Ok(super::p2p_agent_store::get_agent_info_signed(db?.into(), space, agent).await?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn remove_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
+    ) -> KitsuneHostResult<bool> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        let db = self.spaces.p2p_agents_db(&dna_hash);
+        async move {
+            Ok(db?
+                .async_commit(move |txn| txn.p2p_remove_agent(&agent))
+                .await?)
         }
         .boxed()
         .into()

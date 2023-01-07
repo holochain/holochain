@@ -1305,7 +1305,7 @@ pub(crate) struct Space {
     pub(crate) space: Arc<KitsuneSpace>,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    pub(crate) _host_api: HostApi,
+    pub(crate) host_api: HostApi,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
@@ -1503,7 +1503,7 @@ impl Space {
             space,
             i_s,
             evt_sender,
-            _host_api: host_api,
+            host_api,
             local_joined_agents: HashSet::new(),
             agent_arcs: HashMap::new(),
             config,
@@ -1531,6 +1531,8 @@ impl Space {
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let host = self.host_api.clone();
+
         Ok(async move {
             let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
             let expires_at_ms = signed_at_ms + expires_after;
@@ -1560,6 +1562,10 @@ impl Space {
             .await?;
 
             tracing::debug!(?agent_info_signed);
+
+            host.remove_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
+                .await
+                .map_err(KitsuneP2pError::other)?;
 
             // Push to the network as well
             match network_type {
