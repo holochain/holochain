@@ -254,6 +254,7 @@ pub mod test {
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
     use observability;
+    use pretty_assertions::assert_eq;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
     use tempfile::TempDir;
@@ -318,6 +319,39 @@ pub mod test {
         conductor_handle
     }
 
+    async fn call_zome(
+        conductor_handle: ConductorHandle,
+        cell_id: CellId,
+        wasm: TestWasm,
+        function_name: String,
+        respond: holochain_websocket::Response,
+    ) {
+        // Now make sure we can call a zome once again
+        let mut request: ZomeCall =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
+                cell_id.clone(),
+                wasm.into(),
+                function_name,
+                ExternIO::encode(()).unwrap(),
+            ))
+            .next()
+            .unwrap()
+            .into();
+        request.cell_id = cell_id;
+        request = request
+            .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
+            .await
+            .unwrap();
+
+        let msg = AppRequest::CallZome(Box::new(request));
+        let msg = msg.try_into().unwrap();
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, RealAppInterfaceApi::new(conductor_handle.clone()))
+            .await
+            .unwrap();
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn serialization_failure() {
         let (_tmpdir, conductor_handle) = setup_admin().await;
@@ -338,34 +372,36 @@ pub mod test {
         conductor_handle.shutdown();
     }
 
-    // @todo fix test by using new InstallApp call
-    // #[tokio::test(flavor = "multi_thread")]
-    // async fn invalid_request() {
-    //     observability::test_run().ok();
-    //     let (_tmpdir, conductor_handle) = setup_admin().await;
-    //     let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-    //     let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
-    //     let agent_key = fake_agent_pubkey_1();
-    //     let payload = InstallAppPayload {
-    //         dnas: vec![dna_payload],
-    //         installed_app_id: "test app".to_string(),
-    //         agent_key,
-    //     };
-    //     let msg = AdminRequest::InstallApp(Box::new(payload));
-    //     let msg = msg.try_into().unwrap();
-    //     let respond = |bytes: SerializedBytes| {
-    //         let response: AdminResponse = bytes.try_into().unwrap();
-    //         assert_matches!(
-    //             response,
-    //             AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
-    //         );
-    //         async { Ok(()) }.boxed().into()
-    //     };
-    //     let respond = Respond::Request(Box::new(respond));
-    //     let msg = (msg, respond);
-    //     handle_incoming_message(msg, admin_api).await.unwrap();
-    //     conductor_handle.shutdown();
-    // }
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    #[allow(unreachable_code, unused_variables)]
+    async fn invalid_request() {
+        observability::test_run().ok();
+        let (_tmpdir, conductor_handle) = setup_admin().await;
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+        let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
+        let agent_key = fake_agent_pubkey_1();
+        let payload = todo!("Use new payload struct");
+        // let payload = InstallAppPayload {
+        //     dnas: vec![dna_payload],
+        //     installed_app_id: "test app".to_string(),
+        //     agent_key,
+        // };
+        let msg = AdminRequest::InstallApp(Box::new(payload));
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
+            );
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap();
+        conductor_handle.shutdown();
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn websocket_call_zome_function() {
@@ -385,33 +421,21 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
-        let mut request: ZomeCall =
-            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                cell_id.clone(),
-                TestWasm::Foo.into(),
-                "foo".into(),
-                ExternIO::encode(()).unwrap(),
-            ))
-            .next()
-            .unwrap()
-            .into();
-        request.cell_id = cell_id;
-        request = request
-            .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
-            .await
-            .unwrap();
+        let (_tmpdir, _, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
 
-        let msg = AppRequest::CallZome(Box::new(request));
-        let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeCalled { .. });
-            async { Ok(()) }.boxed().into()
-        };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, app_api).await.unwrap();
+        call_zome(
+            handle.clone(),
+            cell_id.clone(),
+            TestWasm::Foo,
+            "foo".into(),
+            Box::new(|bytes: SerializedBytes| {
+                let response: AppResponse = bytes.try_into().unwrap();
+                assert_matches!(response, AppResponse::ZomeCalled { .. });
+                async { Ok(()) }.boxed().into()
+            }),
+        )
+        .await;
+
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
         let shutdown = handle.take_shutdown_handle().unwrap();
@@ -470,14 +494,15 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn enable_disable_app() {
+    async fn enable_disable_enable_app() {
         observability::test_run().ok();
         let agent_key = fake_agent_pubkey_1();
         let mut dnas = Vec::new();
         for _i in 0..2 as u32 {
-            let zomes = vec![TestWasm::Foo.into()];
-            let def = DnaDef::unique_from_zomes(zomes.clone(), Vec::new());
-            dnas.push(DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo)).await);
+            let integrity_zomes = vec![TestWasm::Link.into()];
+            let coordinator_zomes = vec![TestWasm::Link.into()];
+            let def = DnaDef::unique_from_zomes(integrity_zomes, coordinator_zomes);
+            dnas.push(DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Link)).await);
         }
         let dna_map = dnas
             .iter()
@@ -490,8 +515,12 @@ pub mod test {
             .cloned()
             .map(|hash| (CellId::from((hash, agent_key.clone())), None))
             .collect::<Vec<_>>();
+        let cell_id_0 = cell_ids_with_proofs.first().cloned().unwrap().0;
 
+        dbg!(&cell_ids_with_proofs);
         let (_tmpdir, conductor_handle) = setup_admin_fake_cells(dnas, cell_ids_with_proofs).await;
+        dbg!(conductor_handle.get_dna_def(cell_id_0.dna_hash()).unwrap());
+
         let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let app_id = "test app".to_string();
 
@@ -513,7 +542,25 @@ pub mod test {
             .unwrap();
 
         // Get the state
-        let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
+        let initial_state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
+
+        // Now make sure we can call a zome
+        call_zome(
+            conductor_handle.clone(),
+            cell_id_0.clone(),
+            TestWasm::Link,
+            "get_links".into(),
+            Box::new(|bytes: SerializedBytes| {
+                let response: AppResponse = bytes.try_into().unwrap();
+                assert_matches!(response, AppResponse::ZomeCalled { .. });
+                async { Ok(()) }.boxed().into()
+            }),
+        )
+        .await;
+
+        // State should match
+        let state = conductor_handle.get_state_from_handle().await.unwrap();
+        assert_eq!(initial_state, state);
 
         // Check it is running, and get all cells
         let cell_ids: HashSet<CellId> = state
@@ -586,6 +633,41 @@ pub mod test {
         } else {
             assert!(false);
         }
+
+        // Activate the app one more time
+        let msg = AdminRequest::EnableApp {
+            installed_app_id: app_id.clone(),
+        };
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::AppEnabled { .. });
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
+            .await
+            .unwrap();
+
+        // Get the state again after reenabling, make sure it's identical to the initial state.
+        let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
+        assert_eq!(initial_state, state);
+
+        // Now make sure we can call a zome once again
+        call_zome(
+            conductor_handle.clone(),
+            cell_id_0.clone(),
+            TestWasm::Link,
+            "get_links".into(),
+            Box::new(|bytes: SerializedBytes| {
+                let response: AppResponse = bytes.try_into().unwrap();
+                assert_matches!(response, AppResponse::ZomeCalled { .. });
+                async { Ok(()) }.boxed().into()
+            }),
+        )
+        .await;
 
         conductor_handle.shutdown();
         shutdown.await.unwrap().unwrap();
