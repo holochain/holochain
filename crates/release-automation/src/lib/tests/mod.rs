@@ -176,7 +176,7 @@ fn parse_publish_error() {
                 package: "".to_string(),
                 version: "".to_string(),
                 location: "registry at https://crates.io".to_string(),
-                retry_after: chrono::Utc.ymd(2021, 06, 30).and_hms(21, 09, 24),
+                retry_after: chrono::Utc.with_ymd_and_hms(2021, 06, 30).and_hms_opt(21, 09, 24),
             },
         },
     ];
