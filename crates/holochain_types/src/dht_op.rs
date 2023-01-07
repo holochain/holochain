@@ -320,7 +320,7 @@ impl DhtOp {
         }
     }
 
-    /// Extract inner Signature, Action and Option<Entry> from an op
+    /// Extract inner Signature, Action and `Option<Entry>` from an op
     pub fn into_inner(self) -> (Signature, Action, Option<Entry>) {
         match self {
             DhtOp::StoreRecord(s, h, e) => (s, h, e.map(|e| *e)),

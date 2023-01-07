@@ -127,14 +127,14 @@ impl From<(&ShardStrategy, &[u8])> for Path {
         Path::from(sharded)
     }
 }
-/// Wrapper around &Vec<u8> to work the same as &[u8].
+/// Wrapper around `&Vec<u8>` to work the same as &[u8].
 impl From<(&ShardStrategy, &Vec<u8>)> for Path {
     fn from((strategy, bytes): (&ShardStrategy, &Vec<u8>)) -> Path {
         let bytes: &[u8] = bytes.as_ref();
         Path::from((strategy, bytes))
     }
 }
-/// Wrapper around Vec<u8> to work the same as &[u8].
+/// Wrapper around `Vec<u8>` to work the same as &[u8].
 impl From<(&ShardStrategy, Vec<u8>)> for Path {
     fn from((strategy, bytes): (&ShardStrategy, Vec<u8>)) -> Path {
         let bytes: &[u8] = bytes.as_ref();
