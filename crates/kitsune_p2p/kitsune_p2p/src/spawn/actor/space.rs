@@ -1563,6 +1563,9 @@ impl Space {
 
             tracing::debug!(?agent_info_signed);
 
+            // TODO: at some point, we should not remove agents who have left, but rather
+            // there should be a flag indicating they have left. The removed agent may just
+            // get re-gossiped to another local agent in the same space, defeating the purpose.
             host.remove_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
                 .await
                 .map_err(KitsuneP2pError::other)?;
