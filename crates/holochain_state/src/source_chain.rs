@@ -1587,8 +1587,9 @@ pub mod tests {
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let function: GrantedFunction = ("foo".into(), "bar".into());
-        let mut functions: GrantedFunctions = BTreeSet::new();
-        functions.insert(function.clone());
+        let mut fns = BTreeSet::new();
+        fns.insert(function.clone());
+        let functions = GrantedFunctions::Listed(fns);
         let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions.clone());
         let mut agents = AgentPubKeyFixturator::new(Predictable);
         let alice = agents.next().unwrap();

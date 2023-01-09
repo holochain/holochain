@@ -5,10 +5,10 @@
         "homepage": "",
         "owner": "kolloch",
         "repo": "crate2nix",
-        "rev": "78258f27fc3121562a44eb02c652a5ec77cf8d02",
-        "sha256": "0l15czzn8ck315dlwza2gynhrbh2iqy2wm75f52g57cfr1ki4klf",
+        "rev": "8241d5f1069cd0fc2b8eb8b69b13d68933834373",
+        "sha256": "1m4ggqczfjgzn9vyih6j89km8dgnasl0526sk1ahlp9vq2bdgwfv",
         "type": "tarball",
-        "url": "https://github.com/kolloch/crate2nix/archive/78258f27fc3121562a44eb02c652a5ec77cf8d02.tar.gz",
+        "url": "https://github.com/kolloch/crate2nix/archive/8241d5f1069cd0fc2b8eb8b69b13d68933834373.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "holonix": {
@@ -17,10 +17,10 @@
         "homepage": "",
         "owner": "holochain",
         "repo": "holonix",
-        "rev": "2b874668324ae5a7804066f61afbed913ac0cb9c",
-        "sha256": "1brdayg4kaf0ybmgjli6z8v137apyyknq1w9i3cswy9n4yq5mqcv",
+        "rev": "5d54ea8e262202861bad3cbe3df41edf77e162ed",
+        "sha256": "0q8f9iap0s0cmx4hyqdbgg09v5gfz3lmzvq59w7bvvbp2xl84ycd",
         "type": "tarball",
-        "url": "https://github.com/holochain/holonix/archive/2b874668324ae5a7804066f61afbed913ac0cb9c.tar.gz",
+        "url": "https://github.com/holochain/holonix/archive/5d54ea8e262202861bad3cbe3df41edf77e162ed.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nextest": {

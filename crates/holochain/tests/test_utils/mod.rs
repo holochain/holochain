@@ -89,8 +89,9 @@ pub async fn grant_zome_call_capability(
     fn_name: FunctionName,
     signing_key: AgentPubKey,
 ) -> CapSecret {
-    let mut functions = BTreeSet::new();
-    functions.insert((zome_name, fn_name));
+    let mut fns = BTreeSet::new();
+    fns.insert((zome_name, fn_name));
+    let functions = GrantedFunctions::Listed(fns);
 
     let mut assignees = BTreeSet::new();
     assignees.insert(signing_key.clone());

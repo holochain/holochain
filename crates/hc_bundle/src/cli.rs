@@ -370,7 +370,7 @@ impl HcWebAppBundle {
 
 async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&ValidatedDnaManifest::path());
+    let manifest_path = manifest_path.join(ValidatedDnaManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.name())
@@ -378,7 +378,7 @@ async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
 
 async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&AppManifest::path());
+    let manifest_path = manifest_path.join(AppManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: AppManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())
@@ -386,7 +386,7 @@ async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
 
 async fn get_web_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&WebAppManifest::path());
+    let manifest_path = manifest_path.join(WebAppManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: WebAppManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())
