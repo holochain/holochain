@@ -3,6 +3,7 @@ use crate::*;
 use anyhow::{bail, Context};
 use cargo_test_support::git::{self, Repository};
 use cargo_test_support::{Project, ProjectBuilder};
+use cargo_test_support::paths::init_root;
 use educe::Educe;
 use log::debug;
 use std::collections::HashMap;
@@ -49,6 +50,8 @@ pub struct WorkspaceMocker {
 
 impl WorkspaceMocker {
     pub fn try_new(toplevel_changelog: Option<&str>, projects: Vec<MockProject>) -> Fallible<Self> {
+        init_root(None);
+
         let (path, dir) = {
             let dir = tempfile::tempdir()?;
             if std::option_env!("KEEP_MOCK_WORKSPACE")
