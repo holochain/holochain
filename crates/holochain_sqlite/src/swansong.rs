@@ -4,6 +4,7 @@
 pub struct SwanSong<'a, T> {
     #[shrinkwrap(main_field)]
     inner: T,
+    #[allow(clippy::type_complexity)]
     song: Option<Box<dyn FnOnce(&mut T) + 'a>>,
 }
 

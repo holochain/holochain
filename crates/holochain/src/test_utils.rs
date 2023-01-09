@@ -567,7 +567,7 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
 {
     let mut expected_count = 0;
     for (author, db) in all_cell_dbs.iter().map(|(author, a, _)| (author, a)) {
-        let count = get_published_ops(*db, *author).len();
+        let count = get_published_ops(*db, author).len();
         expected_count += count;
     }
     for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
@@ -610,7 +610,7 @@ async fn consistency_dbs_others<AuthorDb, DhtDb>(
 {
     let mut expected_count = 0;
     for (author, db) in all_cell_dbs.iter().map(|(author, a, _)| (author, a)) {
-        let count = get_published_ops(*db, *author).len();
+        let count = get_published_ops(*db, author).len();
         expected_count += count;
     }
     let start = Some(std::time::Instant::now());

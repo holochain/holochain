@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::*;
 
-pub(crate) fn selection_check<'a>(
+pub fn selection_check<'a>(
     cmd_args: &'a crate::cli::CheckArgs,
     ws: &'a crate::crate_selection::ReleaseWorkspace<'a>,
 ) -> Fallible<Vec<&'a crate_selection::Crate<'a>>> {
@@ -29,7 +29,7 @@ pub(crate) fn selection_check<'a>(
 }
 
 #[cfg(test)]
-pub(crate) fn get_dependency_version(manifest_path: &Path, name: &str) -> Fallible<String> {
+pub fn get_dependency_version(manifest_path: &Path, name: &str) -> Fallible<String> {
     let manifest_path = manifest_path
         .parent()
         .ok_or_else(|| anyhow::anyhow!("couldn't get parent of path {}", manifest_path.display()))?
@@ -56,7 +56,7 @@ pub(crate) fn get_dependency_version(manifest_path: &Path, name: &str) -> Fallib
 }
 
 /// Load a file into a String
-pub(crate) fn load_from_file(path: &Path) -> Fallible<String> {
+pub fn load_from_file(path: &Path) -> Fallible<String> {
     let mut file = std::fs::File::open(path)?;
     let mut s = String::new();
     file.read_to_string(&mut s)?;
@@ -65,7 +65,7 @@ pub(crate) fn load_from_file(path: &Path) -> Fallible<String> {
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum SemverIncrementMode {
+pub enum SemverIncrementMode {
     Major,
     Minor,
     Patch,
@@ -82,7 +82,7 @@ impl Default for SemverIncrementMode {
 }
 
 #[derive(thiserror::Error, Debug, PartialEq)]
-pub(crate) enum SemverIncrementError {
+pub enum SemverIncrementError {
     #[error("resulting version ({result}) is lower than on entry ({entry})")]
     ResultingVersionLower {
         result: semver::Version,
@@ -115,10 +115,7 @@ fn evaluate_suffix<'a>(suffix_requested: &'a str, pre: &'a semver::Prerelease) -
 
 /// Implements version incrementation as specified in [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html)
 /// Currently resets [Build metadata](https://semver.org/spec/v2.0.0.html#spec-item-10).
-pub(crate) fn increment_semver<'a>(
-    v: &'a mut semver::Version,
-    mode: SemverIncrementMode,
-) -> Fallible<()> {
+pub fn increment_semver<'a>(v: &'a mut semver::Version, mode: SemverIncrementMode) -> Fallible<()> {
     use SemverIncrementMode::*;
 
     v.build = semver::BuildMetadata::EMPTY;
