@@ -15,6 +15,9 @@ pub trait AsP2pAgentStoreConExt {
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
+    /// Remove an agent from the p2p store
+    fn p2p_remove_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<bool>;
+
     /// List all AgentInfoSigned records within a space in the p2p_agent_store
     fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
@@ -43,6 +46,9 @@ pub trait AsP2pStateTxExt {
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
+    /// Remove an agent from the p2p store
+    fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool>;
+
     /// List all AgentInfoSigned records within a space in the p2p_agent_store
     fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
@@ -64,6 +70,10 @@ pub trait AsP2pStateTxExt {
 impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
     fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_get_agent(agent))
+    }
+
+    fn p2p_remove_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
+        self.with_reader(move |reader| reader.p2p_remove_agent(agent))
     }
 
     fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>> {
@@ -195,6 +205,14 @@ impl AsP2pStateTxExt for Transaction<'_> {
                 Ok(signed)
             })
             .optional()?)
+    }
+
+    fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
+        let mut stmt = self
+            .prepare(sql_p2p_agent_store::DELETE)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+
+        Ok(stmt.execute(named_params! { ":agent": &agent.0 })? > 0)
     }
 
     fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {

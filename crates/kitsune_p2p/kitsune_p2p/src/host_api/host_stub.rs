@@ -58,6 +58,10 @@ impl KitsuneHost for HostStub {
         KitsuneHostDefaultError::get_agent_info_signed(&self.err, input)
     }
 
+    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::remove_agent_info_signed(&self.err, input)
+    }
+
     fn peer_extrapolated_coverage(
         &self,
         space: Arc<KitsuneSpace>,

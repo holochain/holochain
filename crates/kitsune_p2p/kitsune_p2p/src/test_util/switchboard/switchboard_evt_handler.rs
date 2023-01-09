@@ -68,6 +68,18 @@ impl KitsuneHost for SwitchboardEventHandler {
         })))
     }
 
+    fn remove_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(self.sb.share(|state| {
+            let node = state.nodes.get_mut(&self.node).unwrap();
+            node.local_agents
+                .retain(|_, entry| entry.info.agent == agent);
+            true
+        })))
+    }
+
     fn peer_extrapolated_coverage(
         &self,
         _space: Arc<KitsuneSpace>,
