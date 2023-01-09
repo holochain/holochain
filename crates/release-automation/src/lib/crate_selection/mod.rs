@@ -5,7 +5,7 @@ use crate::changelog::{
 };
 use crate::Fallible;
 use cargo::core::Dependency;
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace, warn};
 
 use anyhow::Context;
 use anyhow::{anyhow, bail};
@@ -236,7 +236,6 @@ impl<'a> Crate<'a> {
     }
 
     pub fn state(&self) -> CrateState {
-        debug!("crt.state()");
         self.workspace
             .members_states()
             .expect("should be initialised")
@@ -745,9 +744,7 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     fn members_states(&'a self) -> Fallible<&MemberStates> {
-        debug!("members_states:00");
-        match self.members_states.get_or_try_init(|| {
-            debug!("members_states:S1");
+        self.members_states.get_or_try_init(|| {
             let mut members_states = MemberStates::new();
 
             let criteria = &self.criteria;
@@ -757,12 +754,10 @@ impl<'a> ReleaseWorkspace<'a> {
 
                 ..Default::default()
             };
-            debug!("members_states:S2");
 
             let keyword_validation_re = Regex::new("^[a-zA-Z][a-zA-Z_\\-0-9]+$").unwrap();
 
             for member in self.members()? {
-                debug!("members_states:M1");
 
                 // helper macros to access the desired state
                 macro_rules! get_state {
@@ -802,7 +797,6 @@ impl<'a> ReleaseWorkspace<'a> {
                         insert_state!(CrateStateFlags::ManifestKeywordsMoreThan5);
                     }
                 }
-                debug!("members_states:M2");
 
                 // regex matching state
                 if criteria.match_filter.is_match(&member.name())? {
@@ -846,7 +840,6 @@ impl<'a> ReleaseWorkspace<'a> {
                     if !std::path::Path::new(&member.root().join(Self::README_FILENAME)).exists() {
                         insert_state!(CrateStateFlags::MissingReadme);
                     }
-                    debug!("members_states:M3");
 
                     // change related state
                     match member.changelog() {
@@ -909,7 +902,6 @@ impl<'a> ReleaseWorkspace<'a> {
                             }
                         }
                     }
-                    debug!("members_states:M4");
 
                     // dependency state
                     // only dependencies of explicitly matched packages are considered here.
@@ -945,7 +937,6 @@ impl<'a> ReleaseWorkspace<'a> {
                             }
                         }
                     }
-                    debug!("members_states:M5");
 
                     // set DependencyChanged in dependants if this crate changed
                     if get_state!(member.name()).changed() {
@@ -956,21 +947,12 @@ impl<'a> ReleaseWorkspace<'a> {
                             );
                         }
                     }
-                    debug!("members_states:M6");
                 }
 
             }
 
-            debug!("members_states:S3");
-
             Ok(members_states)
-        }) {
-            Ok(r) => Ok(r),
-            Err(err) => {
-                error!("members_states error {:?}", err);
-                Err(err)
-            }
-        }
+        })
     }
 
     fn cargo_workspace(&'a self) -> Fallible<&'a CargoWorkspace> {
@@ -1043,11 +1025,9 @@ impl<'a> ReleaseWorkspace<'a> {
 
     /// Return all member crates matched by `SelectionCriteria::match_filter`
     pub fn members_matched(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        match self.members_matched.get_or_try_init(|| {
-            debug!("members matched:M1");
+        self.members_matched.get_or_try_init(|| {
             let states = self.members_states()?;
 
-            debug!("members matched:M2");
             self.members().map(|members| {
                 members
                     .into_iter()
@@ -1067,26 +1047,18 @@ impl<'a> ReleaseWorkspace<'a> {
                     .map(|crt| *crt)
                     .collect::<Vec<_>>()
             })
-        }) {
-            Ok(v) => Ok(v),
-            Err(err) => {
-                error!("members matched {:?}", err);
-                Err(err)
-            }
-        }
+        })
     }
 
     /// Returns all non-excluded workspace members.
     /// Members are sorted according to their dependency tree from most independent to most dependent.
     pub fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        match self.members_sorted.get_or_try_init(|| -> Fallible<_> {
-            debug!("members:M1");
+        self.members_sorted.get_or_try_init(|| -> Fallible<_> {
             let mut members = self
                 .members_unsorted()?
                 .iter()
                 .enumerate()
                 .collect::<Vec<_>>();
-            debug!("members:M2");
 
             let workspace_dependencies = self.members_unsorted()?.iter().try_fold(
                 LinkedHashMap::<String, LinkedHashSet<String>>::new(),
@@ -1108,7 +1080,6 @@ impl<'a> ReleaseWorkspace<'a> {
                     Ok(acc)
                 },
             )?;
-            debug!("members:M3");
 
             // ensure members are ordered respecting their dependency tree
             members.sort_unstable_by(move |(a_i, a), (b_i, b)| {
@@ -1143,16 +1114,9 @@ impl<'a> ReleaseWorkspace<'a> {
                 );
                 result
             });
-            debug!("members:M4");
 
             Ok(members.into_iter().map(|(_, member)| member).collect())
-        }) {
-            Ok(v) => Ok(v),
-            Err(err) => {
-                error!("members {:?}", err);
-                Err(err)
-            }
-        }
+        })
     }
 
     /// Return the root path of the workspace.

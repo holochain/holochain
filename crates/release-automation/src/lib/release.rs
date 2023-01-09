@@ -713,26 +713,12 @@ pub fn do_publish_to_crates_io<'a>(
     };
 
     while let Some(crt) = queue.pop_front() {
-        debug!("publish queue loop iter");
-
         let state_changed = crt.state().changed();
-
-        debug!("publish queue loop state changed okay");
 
         let name = crt.name().to_owned();
         let ver = crt.version().to_owned();
 
-        debug!("is_version_published, name: {:?}, ver: {:?}", &name, &ver);
-
-        let is_version_published = match crates_index_helper::is_version_published(&name, &ver, false) {
-            Ok(v) => Ok(v),
-            Err(err) => {
-                error!("is_version_published error: {:?}", err);
-                Err(err)
-            }
-        }?;
-
-        debug!("publish queue loop is_version_published okay");
+        let is_version_published = crates_index_helper::is_version_published(&name, &ver, false)?;
 
         if !state_changed && is_version_published {
             debug!(
@@ -741,7 +727,6 @@ pub fn do_publish_to_crates_io<'a>(
             );
             skip_cntr += 1;
         }
-        debug!("publish queue loop state/published check complete");
 
         let manifest_path = crt.manifest_path();
         let cargo_target_dir_string = cargo_target_dir
