@@ -9,14 +9,19 @@ mod error;
 pub use error::*;
 
 use futures::stream::FuturesUnordered;
+use futures::FutureExt;
 use holochain_types::prelude::*;
+use parking_lot::Mutex;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
+use task_motel::StopListener;
+use task_motel::Task;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
+use tokio::task::JoinError;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::*;
@@ -29,9 +34,6 @@ const CHANNEL_SIZE: usize = 1000;
 /// when it receives a message on the the "stop" channel passed in
 pub(crate) type ManagedTaskHandle = JoinHandle<ManagedTaskResult>;
 pub(crate) type TaskManagerRunHandle = JoinHandle<TaskManagerResult>;
-
-/// A generic function to run when a task completes
-pub type OnDeath = Box<dyn Fn(ManagedTaskResult) -> TaskOutcome + Send + Sync + 'static>;
 
 /// The "kind" of a managed task determines how the Result from the task's
 /// completion will be handled.
@@ -46,80 +48,12 @@ pub enum TaskKind {
     /// If the task returns an error, "freeze" all cells with this dna hash,
     /// but continue running the rest of the conductor and other managed tasks.
     DnaCritical(Arc<DnaHash>),
-    /// A generic callback for handling the result
-    // MAYBE: B-01455: reevaluate whether this should be a callback
-    Generic(OnDeath),
-}
-
-/// A message sent to the TaskManager, registering an ManagedTask of a given kind.
-pub struct ManagedTaskAdd {
-    handle: ManagedTaskHandle,
-    kind: TaskKind,
-    name: String,
-}
-
-impl ManagedTaskAdd {
-    fn new(handle: ManagedTaskHandle, kind: TaskKind, name: &str) -> Self {
-        ManagedTaskAdd {
-            handle,
-            kind,
-            name: name.to_string(),
-        }
-    }
-
-    /// You just want the task in the task manager but don't want
-    /// to react to an error
-    pub fn ignore(handle: ManagedTaskHandle, name: &str) -> Self {
-        Self::new(handle, TaskKind::Ignore, name)
-    }
-
-    /// If this task fails, the entire conductor must be shut down
-    pub fn unrecoverable(handle: ManagedTaskHandle, name: &str) -> Self {
-        Self::new(handle, TaskKind::Unrecoverable, name)
-    }
-
-    /// If this task fails, only the Cell which it runs under must be stopped
-    pub fn cell_critical(handle: ManagedTaskHandle, cell_id: CellId, name: &str) -> Self {
-        Self::new(handle, TaskKind::CellCritical(cell_id), name)
-    }
-
-    /// If this task fails, only the Cells with this DnaHash must be stopped
-    pub fn dna_critical(handle: ManagedTaskHandle, dna_hash: Arc<DnaHash>, name: &str) -> Self {
-        Self::new(handle, TaskKind::DnaCritical(dna_hash), name)
-    }
-
-    /// Handle a task's completion with a generic callback
-    pub fn generic(handle: ManagedTaskHandle, f: OnDeath) -> Self {
-        Self::new(handle, TaskKind::Generic(f), "unnamed")
-    }
-}
-
-impl Future for ManagedTaskAdd {
-    type Output = TaskOutcome;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let p = std::pin::Pin::new(&mut self.handle);
-        match JoinHandle::poll(p, cx) {
-            Poll::Ready(r) => Poll::Ready(handle_completed_task(
-                &self.kind,
-                r.unwrap_or_else(|e| Err(e.into())),
-                self.name.clone(),
-            )),
-            Poll::Pending => Poll::Pending,
-        }
-    }
-}
-
-impl std::fmt::Debug for ManagedTaskAdd {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ManagedTaskAdd").finish()
-    }
 }
 
 /// The outcome of a task that has finished.
 pub enum TaskOutcome {
-    /// Spawn a new managed task.
-    NewTask(ManagedTaskAdd),
+    /// Do nothing
+    Noop,
     /// Log an info trace and take no other action.
     LogInfo(String),
     /// Log an error and take no other action.
@@ -132,32 +66,6 @@ pub enum TaskOutcome {
     /// Either pause or disable all apps which contain the problematic Dna,
     /// depending upon the specific error.
     StopAppsWithDna(Arc<DnaHash>, Box<ManagedTaskError>, String),
-}
-
-struct TaskManager {
-    stream: FuturesUnordered<ManagedTaskAdd>,
-}
-
-impl TaskManager {
-    fn new() -> Self {
-        let stream = FuturesUnordered::new();
-        TaskManager { stream }
-    }
-}
-
-pub(crate) fn spawn_task_manager(
-    handle: ConductorHandle,
-) -> (mpsc::Sender<ManagedTaskAdd>, TaskManagerRunHandle) {
-    let (send, recv) = mpsc::channel(CHANNEL_SIZE);
-    (send, tokio::spawn(run(handle, recv)))
-}
-
-/// A super pessimistic task that is just waiting to die
-/// but gets to live as long as the process
-/// so the task manager doesn't quit
-pub(crate) async fn keep_alive_task(mut die: broadcast::Receiver<()>) -> ManagedTaskResult {
-    die.recv().await?;
-    Ok(())
 }
 
 async fn run(
@@ -181,7 +89,7 @@ async fn run(
             result = task_manager.stream.next() => {
                 tracing::debug!("Task completed. Total tasks: {}", task_manager.stream.len());
                 match result {
-                Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
+                    Some(TaskOutcome::Noop) => (),
                 Some(TaskOutcome::LogInfo(context)) => {
                     debug!("Managed task completed: {}", context)
                 }
@@ -288,24 +196,32 @@ async fn run(
 }
 
 #[tracing::instrument(skip(kind))]
-fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
+fn handle_completed_task(
+    kind: &TaskKind,
+    result: Result<ManagedTaskResult, JoinError>,
+    name: String,
+) -> TaskOutcome {
     use TaskOutcome::*;
     match kind {
         TaskKind::Ignore => match result {
-            Ok(_) => LogInfo(name),
-            Err(err) => MinorError(Box::new(err), name),
+            Err(err) => LogInfo(format!("task completed: {}, join error: {:?}", name, err)),
+            Ok(Ok(_)) => LogInfo(format!("task completed: {}", name)),
+            Ok(Err(err)) => MinorError(Box::new(err), name),
         },
         TaskKind::Unrecoverable => match result {
-            Ok(_) => LogInfo(name),
-            Err(err) => ShutdownConductor(Box::new(err), name),
+            Err(err) => LogInfo(format!("task completed: {}, join error: {:?}", name, err)),
+            Ok(Ok(_)) => LogInfo(format!("task completed: {}", name)),
+            Ok(Err(err)) => ShutdownConductor(Box::new(err), name),
         },
         TaskKind::CellCritical(cell_id) => match result {
-            Ok(_) => LogInfo(name),
-            Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
+            Err(err) => LogInfo(format!("task completed: {}, join error: {:?}", name, err)),
+            Ok(Ok(_)) => LogInfo(format!("task completed: {}", name)),
+            Ok(Err(err)) => StopApps(cell_id.to_owned(), Box::new(err), name),
         },
         TaskKind::DnaCritical(dna_hash) => match result {
-            Ok(_) => LogInfo(name),
-            Err(err) => StopAppsWithDna(dna_hash.to_owned(), Box::new(err), name),
+            Err(err) => LogInfo(format!("task completed: {}, join error: {:?}", name, err)),
+            Ok(Ok(_)) => LogInfo(format!("task completed: {}", name)),
+            Ok(Err(err)) => StopAppsWithDna(dna_hash.to_owned(), Box::new(err), name),
         },
         TaskKind::Generic(f) => f(result),
     }
@@ -332,53 +248,59 @@ pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub enum TaskGroup {
+    Conductor,
+    Cell(CellId),
+}
+
+pub type OutcomeReceiver = futures::channel::mpsc::Receiver<(TaskGroup, Outcome)>;
 /// A collection of channels and handles used by the Conductor to talk to the
 /// TaskManager task
+#[derive(Clone)]
 pub struct TaskManagerClient {
-    /// Channel on which to send info about tasks we want to manage
-    task_add_sender: mpsc::Sender<ManagedTaskAdd>,
-
-    /// Sending a message on this channel will broadcast to all managed tasks,
-    /// telling them to shut down
-    task_stop_broadcaster: StopBroadcaster,
-
-    /// The main task join handle to await on.
-    /// The conductor is intended to live as long as this task does.
-    /// It can be moved out, hence the Option. If this is None, then the
-    /// handle was already moved out.
-    run_handle: Option<TaskManagerRunHandle>,
+    tm: Arc<Mutex<task_motel::TaskManager<TaskGroup, TaskOutcome>>>,
 }
 
 impl TaskManagerClient {
-    /// Constructor
-    pub fn new(
-        task_add_sender: mpsc::Sender<ManagedTaskAdd>,
-        task_stop_broadcaster: StopBroadcaster,
-        run_handle: TaskManagerRunHandle,
-    ) -> Self {
-        Self {
-            task_add_sender,
-            task_stop_broadcaster,
-            run_handle: Some(run_handle),
-        }
+    pub fn new() -> (Self, OutcomeReceiver) {
+        let (tx, outcomes) = futures::channel::mpsc::channel(8);
+        let tm = Self {
+            tm: Arc::new(Mutex::new(task_motel::TaskManager::new(tx, |g| match g {
+                TaskGroup::Conductor => None,
+                TaskGroup::Cell(_) => Some(TaskGroup::Conductor),
+            }))),
+        };
+        (tm, outcomes)
     }
 
-    /// Accessor
-    pub fn task_add_sender(&self) -> &mpsc::Sender<ManagedTaskAdd> {
-        &self.task_add_sender
+    pub fn add_conductor_task(
+        &self,
+        name: &str,
+        task_kind: TaskKind,
+        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send,
+    ) {
+        let f = move |stop| f(stop).map(|t| handle_completed_task(&task_kind, t, name.into()));
+        self.tm.lock().add_task(TaskGroup::Conductor, f)
     }
 
-    /// Accessor
-    pub fn task_stop_broadcaster(&self) -> &StopBroadcaster {
-        &self.task_stop_broadcaster
+    pub fn add_cell_task(
+        &self,
+        name: &str,
+        task_kind: TaskKind,
+        cell_id: CellId,
+        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send,
+    ) {
+        let f = |stop| f(stop).map(|t| handle_completed_task(&task_kind, t, name.into()));
+        self.tm.lock().add_task(TaskGroup::Cell(cell_id), f)
     }
 
-    /// Return the handle to be joined.
-    /// This will return None if the handle was already taken.
-    pub fn take_handle(&mut self) -> Option<TaskManagerRunHandle> {
-        self.run_handle.take()
+    pub fn shutdown(&self) -> ShutdownHandle {
+        self.tm.lock().stop_group(&TaskGroup::Conductor)
     }
 }
+
+pub type ShutdownHandle = task_motel::GroupStop;
 
 #[cfg(test)]
 mod test {

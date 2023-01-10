@@ -66,6 +66,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full"] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
 holochain_util = { version = "^0.1.0-beta-rc.0", path = "../holochain_util", features = [ "pw" ] }
+task-motel = {path = "/home/michael/Holo/task-motel"}
 toml = "0.5.6"
 tracing = "0.1.26"
 tracing-futures = "0.2.5"

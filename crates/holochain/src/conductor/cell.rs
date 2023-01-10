@@ -6,7 +6,6 @@
 
 use super::api::CellConductorHandle;
 use super::interface::SignalBroadcaster;
-use super::manager::ManagedTaskAdd;
 use super::space::Space;
 use super::ConductorHandle;
 use crate::conductor::api::CellConductorApi;
@@ -118,8 +117,6 @@ impl Cell {
         conductor_handle: ConductorHandle,
         space: Space,
         holochain_p2p_cell: holochain_p2p::HolochainP2pDna,
-        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
-        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
 
