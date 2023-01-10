@@ -1,5 +1,5 @@
 // Fixes some warnings introduced by `warp`
-// #![allow(opaque_hidden_inferred_bound)]
+#![allow(opaque_hidden_inferred_bound)]
 
 use std::net::SocketAddr;
 use std::sync::atomic::AtomicUsize;

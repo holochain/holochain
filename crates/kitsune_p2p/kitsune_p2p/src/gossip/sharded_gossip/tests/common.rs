@@ -37,6 +37,14 @@ impl KitsuneHost for StandardResponsesHostApi {
         box_fut(Ok(Some(agent)))
     }
 
+    fn remove_agent_info_signed(
+        &self,
+        _input: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<bool> {
+        // unimplemented
+        box_fut(Ok(false))
+    }
+
     fn peer_extrapolated_coverage(
         &self,
         _space: Arc<KitsuneSpace>,

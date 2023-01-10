@@ -20,7 +20,7 @@ use std::{collections::HashSet, convert::TryInto};
 /// Please see the [serde_yaml docs](https://docs.rs/serde_yaml/0.9.11/serde_yaml/index.html#using-serde-derive)
 /// for several syntax examples.
 #[derive(Clone, Default, Debug, PartialEq, Deserialize, Serialize)]
-pub(crate) struct Frontmatter {
+pub struct Frontmatter {
     #[serde(skip_serializing_if = "Option::is_none")]
     unreleasable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -33,12 +33,12 @@ pub(crate) struct Frontmatter {
 }
 
 impl Frontmatter {
-    pub(crate) fn unreleasable(&self) -> bool {
+    pub fn unreleasable(&self) -> bool {
         self.unreleasable
             .unwrap_or_else(|| self.default_unreleasable.unwrap_or_default())
     }
 
-    pub(crate) fn semver_increment_mode(&self) -> SemverIncrementMode {
+    pub fn semver_increment_mode(&self) -> SemverIncrementMode {
         self.semver_increment_mode.clone().unwrap_or_else(|| {
             self.default_semver_increment_mode
                 .clone()
@@ -46,7 +46,7 @@ impl Frontmatter {
         })
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.unreleasable.is_none()
             && self.default_unreleasable.is_none()
             && self.semver_increment_mode.is_none()
@@ -54,7 +54,7 @@ impl Frontmatter {
     }
 
     /// Remove any non-default values in the frontmatter.
-    pub(crate) fn reset_to_defaults(&mut self) {
+    pub fn reset_to_defaults(&mut self) {
         if self.unreleasable.is_some() {
             self.unreleasable = None;
         }
@@ -66,18 +66,18 @@ impl Frontmatter {
 }
 
 /// Trims potential brackets and spaces
-pub(crate) fn normalize_heading_name(input: &str) -> String {
+pub fn normalize_heading_name(input: &str) -> String {
     input.replace("[", "").replace("]", "").replace(" ", "")
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum ReleaseChange {
+pub enum ReleaseChange {
     CrateReleaseChange(String),
     WorkspaceReleaseChange(String, Vec<String>),
 }
 
 impl ReleaseChange {
-    pub(crate) fn title(&self) -> &str {
+    pub fn title(&self) -> &str {
         match self {
             ReleaseChange::CrateReleaseChange(t) => t,
             ReleaseChange::WorkspaceReleaseChange(t, _) => t,
@@ -86,7 +86,7 @@ impl ReleaseChange {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum ChangeT {
+pub enum ChangeT {
     Release(ReleaseChange),
     Unreleased,
     Changelog,
@@ -94,7 +94,7 @@ pub(crate) enum ChangeT {
 }
 
 impl<'a> ChangeT {
-    pub(crate) fn from_heading_node(
+    pub fn from_heading_node(
         node: &'a comrak::arena_tree::Node<'a, RefCell<Ast>>,
         level: u32,
     ) -> Fallible<Self> {
@@ -168,7 +168,7 @@ impl From<ChangeT> for Option<ReleaseChange> {
 }
 
 impl ChangeT {
-    pub(crate) fn title(&self) -> Option<String> {
+    pub fn title(&self) -> Option<String> {
         match self {
             Self::Release(rc) => Some(rc.title().to_string()),
             _ => None,
@@ -177,7 +177,7 @@ impl ChangeT {
 }
 
 #[derive(custom_debug::Debug)]
-pub(crate) struct Machinery<'a> {
+pub struct Machinery<'a> {
     path: PathBuf,
     #[debug(skip)]
     arena: Arena<AstNode<'a>>,
@@ -188,7 +188,7 @@ pub(crate) struct Machinery<'a> {
 }
 
 impl Machinery<'_> {
-    pub(crate) fn with_path(path: &Path) -> Self {
+    pub fn with_path(path: &Path) -> Self {
         Self {
             path: path.to_owned(),
 
@@ -219,29 +219,29 @@ impl<'a> Default for Machinery<'a> {
 
 /// Workaround until Rust supports passing enum variants as types.
 #[derive(Debug)]
-pub(crate) enum ChangelogType {
+pub enum ChangelogType {
     Crate,
     Workspace,
 }
 
 #[derive(Debug)]
-pub(crate) enum Changelog<'a> {
+pub enum Changelog<'a> {
     Crate(Machinery<'a>),
     Workspace(Machinery<'a>),
 }
 
-pub(crate) const WORKSPACE_RELEASE_HEADING_LEVEL: u32 = 1;
-pub(crate) const CRATE_RELEASE_HEADING_LEVEL: u32 = 2;
+pub const WORKSPACE_RELEASE_HEADING_LEVEL: u32 = 1;
+pub const CRATE_RELEASE_HEADING_LEVEL: u32 = 2;
 
 use core::marker::PhantomData;
 
 #[derive(Debug)]
-pub(crate) struct CrateChangelog;
+pub struct CrateChangelog;
 #[derive(Debug)]
-pub(crate) struct WorkspaceChangelog;
+pub struct WorkspaceChangelog;
 #[derive(Debug)]
-pub(crate) struct ChangelogT<'a, T>(Machinery<'a>, PhantomData<T>);
-pub(crate) trait HeadingLevel {
+pub struct ChangelogT<'a, T>(Machinery<'a>, PhantomData<T>);
+pub trait HeadingLevel {
     const RELEASE_HEADING_LEVEL: u32;
 }
 
@@ -257,7 +257,7 @@ impl<'a, T> ChangelogT<'a, T>
 where
     T: HeadingLevel,
 {
-    pub(crate) fn at_path(path: &Path) -> Self {
+    pub fn at_path(path: &Path) -> Self {
         Self(Machinery::with_path(path), PhantomData::<T>)
     }
 
@@ -268,7 +268,7 @@ where
         })
     }
 
-    pub(crate) fn path(&'a self) -> &'a Path {
+    pub fn path(&'a self) -> &'a Path {
         &self.0.path
     }
 
@@ -280,7 +280,7 @@ where
         &self.0.options
     }
 
-    pub(crate) fn changes(&'a self) -> Fallible<Vec<ChangeT>> {
+    pub fn changes(&'a self) -> Fallible<Vec<ChangeT>> {
         let root = self.root()?;
         let mut changes = vec![];
 
@@ -313,7 +313,7 @@ where
         Ok(self.changes()?.into_iter().filter(filter).collect())
     }
 
-    pub(crate) fn topmost_release(&'a self) -> Fallible<Option<ReleaseChange>> {
+    pub fn topmost_release(&'a self) -> Fallible<Option<ReleaseChange>> {
         Ok(self
             .changes_filtered(|change| matches!(change, ChangeT::Release(_)))?
             .into_iter()
@@ -324,7 +324,7 @@ where
     }
 
     /// Find and parse the frontmatter of this crate's changelog file.
-    pub(crate) fn front_matter(&'a self) -> Fallible<Option<Frontmatter>> {
+    pub fn front_matter(&'a self) -> Fallible<Option<Frontmatter>> {
         for (i, node) in self.root()?.children().enumerate() {
             {
                 let children = node.children().count();
@@ -377,7 +377,7 @@ impl<'a> HeadingLevel for ChangelogT<'a, CrateChangelog> {
 impl<'a> ChangelogT<'a, CrateChangelog> {
     /// Create a new release heading for the items currently under the Unreleased heading.
     /// The target heading will be created regardless of whether one with the same name exists.
-    pub(crate) fn add_release(&'a self, title: String) -> Fallible<()> {
+    pub fn add_release(&'a self, title: String) -> Fallible<()> {
         let root = self.root()?;
 
         let mut unreleased_node = None;
@@ -464,7 +464,7 @@ impl<'a> ChangelogT<'a, CrateChangelog> {
         Ok(())
     }
 
-    pub(crate) fn erase_front_matter(&'a self, write_file: bool) -> Fallible<String> {
+    pub fn erase_front_matter(&'a self, write_file: bool) -> Fallible<String> {
         let frontmatter_re = regex::Regex::new(r"(?ms)^---$.*^---$\w*").unwrap();
         let cl = sanitize(std::fs::read_to_string(self.path())?);
 
@@ -480,7 +480,7 @@ impl<'a> ChangelogT<'a, CrateChangelog> {
     }
 
     /// Writes the given Frontmatter back to the changelog file
-    pub(crate) fn set_front_matter(&'a self, fm: &Frontmatter) -> Fallible<()> {
+    pub fn set_front_matter(&'a self, fm: &Frontmatter) -> Fallible<()> {
         let cl_str = if self.front_matter()?.is_some() {
             self.erase_front_matter(false)?
         } else {
@@ -503,7 +503,7 @@ impl<'a> ChangelogT<'a, CrateChangelog> {
     }
 
     /// Calls `Frontmatter::reset_to_defaults`
-    pub(crate) fn reset_front_matter_to_defaults(&'a self) -> Fallible<()> {
+    pub fn reset_front_matter_to_defaults(&'a self) -> Fallible<()> {
         if let Some(fm) = self.front_matter()? {
             let mut fm_reset = fm.clone();
             fm_reset.reset_to_defaults();
@@ -522,7 +522,7 @@ impl<'a> HeadingLevel for ChangelogT<'a, WorkspaceChangelog> {
 }
 
 impl<'a> ChangelogT<'a, WorkspaceChangelog> {
-    pub(crate) fn aggregate(&'a self, inputs: &[&'a Crate<'a>]) -> Fallible<()> {
+    pub fn aggregate(&'a self, inputs: &[&'a Crate<'a>]) -> Fallible<()> {
         let root = self.root()?;
         let arena = self.arena();
 
@@ -777,7 +777,7 @@ impl<'a> ChangelogT<'a, WorkspaceChangelog> {
     }
 
     /// Add a new release to this WorkspaceChangelog.
-    pub(crate) fn add_release(
+    pub fn add_release(
         &'a self,
         title: String,
         crate_release_headings: &[WorkspaceCrateReleaseHeading<'a>],
@@ -1077,20 +1077,20 @@ fn get_heading_text<'a>(node: &'a comrak::arena_tree::Node<'a, RefCell<Ast>>) ->
 }
 
 /// Used to pass information about the new crate release headings to `WorkspaceChangelog::add_release`.
-pub(crate) struct WorkspaceCrateReleaseHeading<'a> {
-    pub(crate) prefix: String,
-    pub(crate) suffix: String,
-    pub(crate) changelog: &'a ChangelogT<'a, CrateChangelog>,
+pub struct WorkspaceCrateReleaseHeading<'a> {
+    pub prefix: String,
+    pub suffix: String,
+    pub changelog: &'a ChangelogT<'a, CrateChangelog>,
 }
 
 impl<'a> WorkspaceCrateReleaseHeading<'a> {
-    pub(crate) fn title(&self) -> String {
+    pub fn title(&self) -> String {
         format!("{}-{}", self.prefix, self.suffix)
     }
 }
 
 /// Applies an opinionated format to  a Markdown string.
-pub(crate) fn sanitize(s: String) -> String {
+pub fn sanitize(s: String) -> String {
     let arena = Arena::new();
     let mut options = ComrakOptions::default();
     options.parse.smart = true;
@@ -1133,10 +1133,7 @@ fn recursive_detach<'a>(
 }
 
 /// Implements the "aggregate" CLI subcommand.
-pub(crate) fn cmd(
-    args: &crate::cli::Args,
-    cmd_args: &crate::cli::ChangelogArgs,
-) -> crate::CommandResult {
+pub fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ChangelogArgs) -> crate::CommandResult {
     debug!("cmd_args: {:#?}", cmd_args);
 
     let ws = ReleaseWorkspace::try_new_with_criteria(

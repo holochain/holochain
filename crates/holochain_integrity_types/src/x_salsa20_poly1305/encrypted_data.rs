@@ -1,6 +1,6 @@
 use crate::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce;
 
-#[derive(PartialEq, serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct XSalsa20Poly1305EncryptedData {
     nonce: XSalsa20Poly1305Nonce,
     #[serde(with = "serde_bytes")]

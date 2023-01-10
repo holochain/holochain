@@ -604,7 +604,7 @@ mod dna_impls {
             let db = &self.spaces.wasm_db;
 
             // Load out all dna defs
-            let (wasm_tasks, defs) = db
+            let (wasms, defs) = db
                 .async_reader(move |txn| {
                     // Get all the dna defs.
                     let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
@@ -631,7 +631,7 @@ mod dna_impls {
                                 .map(|wasm| (wasm_hash, wasm))
                         })
                         .collect::<ConductorResult<HashMap<_, _>>>()?;
-                    let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                    let wasms = holochain_state::dna_def::get_all(&txn)?
                         .into_iter()
                         .map(|dna_def| {
                             // Load all wasms for each dna_def from the wasm db into memory
@@ -641,20 +641,21 @@ mod dna_impls {
                                 wasms.get(&wasm_hash).cloned()
                             });
                             let wasms = wasms.collect::<Vec<_>>();
-                            async move {
-                                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                                let ribosome = RealRibosome::new(dna_file)?;
-                                ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
-                            }
+                            (dna_def, wasms)
                         })
                         // This needs to happen due to the environment not being Send
                         .collect::<Vec<_>>();
                     let defs = holochain_state::entry_def::get_all(&txn)?;
-                    ConductorResult::Ok((wasm_tasks, defs))
+                    ConductorResult::Ok((wasms, defs))
                 })
                 .await?;
             // try to join all the tasks and return the list of dna files
-            let dnas = futures::future::try_join_all(wasm_tasks).await?;
+            let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
+                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
+                let ribosome = RealRibosome::new(dna_file)?;
+                ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
+            });
+            let dnas = futures::future::try_join_all(wasms).await?;
             Ok((dnas, defs))
         }
 

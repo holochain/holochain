@@ -16,46 +16,46 @@ use crate::{
 };
 
 #[derive(StructOpt, Debug)]
-pub(crate) struct CrateArgs {
+pub struct CrateArgs {
     #[structopt(subcommand)]
-    pub(crate) command: CrateCommands,
+    pub command: CrateCommands,
 }
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct CrateSetVersionArgs {
+pub struct CrateSetVersionArgs {
     #[structopt(long)]
-    pub(crate) crate_name: String,
+    pub crate_name: String,
 
     #[structopt(long)]
-    pub(crate) new_version: Version,
+    pub new_version: Version,
 }
 
-pub(crate) static DEFAULT_DEV_SUFFIX: &str = "dev.0";
+pub static DEFAULT_DEV_SUFFIX: &str = "dev.0";
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct CrateApplyDevVersionsArgs {
+pub struct CrateApplyDevVersionsArgs {
     #[structopt(long, default_value = DEFAULT_DEV_SUFFIX)]
-    pub(crate) dev_suffix: String,
+    pub dev_suffix: String,
 
     #[structopt(long)]
-    pub(crate) dry_run: bool,
+    pub dry_run: bool,
 
     #[structopt(long)]
-    pub(crate) commit: bool,
+    pub commit: bool,
 
     #[structopt(long)]
-    pub(crate) no_verify: bool,
+    pub no_verify: bool,
 }
 
 #[derive(Debug)]
-pub(crate) enum FixupReleases {
+pub enum FixupReleases {
     Latest,
     All,
     Selected(Vec<String>),
 }
 
 /// Parses an input string to an ordered set of release steps.
-pub(crate) fn parse_fixup_releases(input: &str) -> Fallible<FixupReleases> {
+pub fn parse_fixup_releases(input: &str) -> Fallible<FixupReleases> {
     use std::str::FromStr;
 
     let words = input
@@ -76,38 +76,38 @@ pub(crate) fn parse_fixup_releases(input: &str) -> Fallible<FixupReleases> {
 }
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct CrateFixupUnpublishedReleases {
+pub struct CrateFixupUnpublishedReleases {
     #[structopt(long, default_value = DEFAULT_DEV_SUFFIX)]
-    pub(crate) dev_suffix: String,
+    pub dev_suffix: String,
 
     #[structopt(long)]
-    pub(crate) dry_run: bool,
+    pub dry_run: bool,
 
     #[structopt(long, default_value = "latest", parse(try_from_str = parse_fixup_releases))]
-    pub(crate) fixup_releases: FixupReleases,
+    pub fixup_releases: FixupReleases,
 
     #[structopt(long)]
-    pub(crate) commit: bool,
+    pub commit: bool,
 
     #[structopt(long)]
-    pub(crate) no_verify: bool,
+    pub no_verify: bool,
 }
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct CrateDetectMissingReleaseheadings {}
+pub struct CrateDetectMissingReleaseheadings {}
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct CrateCheckArgs {
+pub struct CrateCheckArgs {
     #[structopt(long)]
     offline: bool,
 }
 
 /// These crate.io handles are used as the default minimum crate owners for all published crates.
-pub(crate) const MINIMUM_CRATE_OWNERS: &str =
+pub const MINIMUM_CRATE_OWNERS: &str =
     "github:holochain:core-dev,holochain-release-automation,holochain-release-automation2,zippy,steveeJ";
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct EnsureCrateOwnersArgs {
+pub struct EnsureCrateOwnersArgs {
     #[structopt(long)]
     dry_run: bool,
 
@@ -123,7 +123,7 @@ pub(crate) struct EnsureCrateOwnersArgs {
 }
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct CratePinDepsArgs {
+pub struct CratePinDepsArgs {
     #[structopt(long)]
     dry_run: bool,
 
@@ -134,7 +134,7 @@ pub(crate) struct CratePinDepsArgs {
 }
 
 #[derive(Debug, StructOpt)]
-pub(crate) struct CrateMakePinnedArgs {
+pub struct CrateMakePinnedArgs {
     #[structopt(long)]
     dry_run: bool,
 
@@ -145,7 +145,7 @@ pub(crate) struct CrateMakePinnedArgs {
 }
 
 #[derive(Debug, StructOpt)]
-pub(crate) enum CrateCommands {
+pub enum CrateCommands {
     SetVersion(CrateSetVersionArgs),
     ApplyDevVersions(CrateApplyDevVersionsArgs),
 
@@ -165,7 +165,7 @@ pub(crate) enum CrateCommands {
     MakePinnedDep(CrateMakePinnedArgs),
 }
 
-pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResult {
+pub fn cmd(args: &crate::cli::Args, cmd_args: &CrateArgs) -> CommandResult {
     let ws = ReleaseWorkspace::try_new(args.workspace_path.clone())?;
 
     match &cmd_args.command {
@@ -274,7 +274,7 @@ fn cmd_detect_missing_releaseheadings<'a>(
 ///
 /// uses the workspace changelog as a source of truth for existing crate releases.
 /// this reasonable because the workspace changelog it's only changed on releases it's not prone to manual mistakes.
-pub(crate) fn detect_missing_releaseheadings<'a>(
+pub fn detect_missing_releaseheadings<'a>(
     ws: &'a ReleaseWorkspace<'a>,
 ) -> Fallible<LinkedHashMap<String, LinkedHashSet<String>>> {
     use itertools::Itertools;
@@ -397,7 +397,7 @@ pub(crate) fn detect_missing_releaseheadings<'a>(
 /// To prevent this, we increase crate B's version to a develop version that hasn't been published yet.
 /// This will detect a missing dependency in an attempt to publish crate A, as the dev version of crate B is not found on the registry.
 /// Note that we wouldn't publish the develop version of crate B, as the regular workspace release flow also increases its version according to the configured scheme.
-pub(crate) fn apply_dev_versions<'a>(
+pub fn apply_dev_versions<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     dev_suffix: &str,
     dry_run: bool,
@@ -440,7 +440,7 @@ pub(crate) fn apply_dev_versions<'a>(
     Ok(())
 }
 
-pub(crate) fn apply_dev_vesrions_to_selection<'a>(
+pub fn apply_dev_vesrions_to_selection<'a>(
     applicable_crates: Vec<&'a Crate<'a>>,
     dev_suffix: &str,
     dry_run: bool,
@@ -493,7 +493,7 @@ pub(crate) fn apply_dev_vesrions_to_selection<'a>(
     Ok(msg)
 }
 
-pub(crate) fn fixup_unpublished_releases<'a>(
+pub fn fixup_unpublished_releases<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     dev_suffix: &str,
     fixup: &FixupReleases,
@@ -597,7 +597,7 @@ pub(crate) fn fixup_unpublished_releases<'a>(
 }
 
 /// Ensures that the given crates have at least sent an invite to the given crate.io usernames.
-pub(crate) fn ensure_crate_io_owners<'a>(
+pub fn ensure_crate_io_owners<'a>(
     _ws: &'a ReleaseWorkspace<'a>,
     dry_run: bool,
     crates: &[&Crate],

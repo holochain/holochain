@@ -184,6 +184,7 @@ impl HostContext {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. })
             | Self::Init(InitHostAccess { signal_tx, .. })
+            | Self::PostCommit(PostCommitHostAccess { signal_tx, .. })
             => signal_tx,
             _ => panic!(
                 "Gave access to a host function that uses the signal broadcaster without providing one"

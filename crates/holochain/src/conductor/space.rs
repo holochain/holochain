@@ -312,9 +312,12 @@ impl Spaces {
         let max_ops: u32 = max_ops.try_into().unwrap_or(u32::MAX);
 
         let db = self.dht_db(dna_hash)?;
-        let include_limbo = include_limbo
-            .then_some("\n")
-            .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
+
+        let include_limbo = if include_limbo {
+            "\n"
+        } else {
+            "AND DhtOp.when_integrated IS NOT NULL\n"
+        };
 
         let intervals = dht_arc_set.intervals();
         let sql = if let Some(DhtArcRange::Full) = intervals.first() {
