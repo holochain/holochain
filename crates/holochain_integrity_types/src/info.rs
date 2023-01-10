@@ -70,7 +70,7 @@ pub struct ScopedZomeTypesSet {
     pub links: ScopedZomeTypes<LinkType>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 /// zome types that are in scope for the calling zome.
 pub struct ScopedZomeTypes<T>(pub Vec<(ZomeIndex, Vec<T>)>);
 
@@ -146,7 +146,7 @@ where
         T: PartialEq,
     {
         iter.into_iter()
-            .find_map(|key| (self.get(key)? == scoped_type).then(|| key))
+            .find_map(|key| (self.get(key)? == scoped_type).then_some(key))
     }
 
     /// Find the [`ZomeTypesKey`] for this [`ScopedZomeType`].

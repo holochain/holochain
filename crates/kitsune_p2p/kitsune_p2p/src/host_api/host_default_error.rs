@@ -24,6 +24,15 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
         .into()))
     }
 
+    fn remove_agent_info_signed(&self, _input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "remove_agent_info_signed",
+            Self::NAME
+        )
+        .into()))
+    }
+
     fn peer_extrapolated_coverage(
         &self,
         _space: Arc<KitsuneSpace>,
@@ -122,6 +131,10 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         KitsuneHostDefaultError::get_agent_info_signed(self, input)
+    }
+
+    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::remove_agent_info_signed(self, input)
     }
 
     fn peer_extrapolated_coverage(

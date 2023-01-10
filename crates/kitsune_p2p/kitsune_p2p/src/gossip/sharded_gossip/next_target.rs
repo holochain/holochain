@@ -84,7 +84,7 @@ impl ShardedGossipLocal {
             }
         }
 
-        let remote_nodes = remote_nodes.into_iter().map(|(_, v)| v).collect();
+        let remote_nodes = remote_nodes.into_values().collect();
         let tuning_params = self.tuning_params.clone();
         // We could clone the metrics store out of the lock here but I don't think
         // the next_remote_node will be that slow so we can just choose the next node inline.

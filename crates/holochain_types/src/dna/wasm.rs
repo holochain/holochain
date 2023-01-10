@@ -74,7 +74,7 @@ impl DnaWasm {
         }
     }
 
-    /// get a new Arc to the Vec<u8> bytes for the wasm
+    /// get a new Arc to the `Vec<u8>` bytes for the wasm
     #[allow(clippy::redundant_allocation)]
     pub fn code(&self) -> Arc<Box<[u8]>> {
         Arc::clone(&self.code)

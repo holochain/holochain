@@ -160,7 +160,7 @@ pub async fn spawn_queue_consumer_tasks(
     }
 
     let dna_def = conductor_handle
-        .get_dna_def(&*dna_hash)
+        .get_dna_def(&dna_hash)
         .expect("Dna must be in store");
 
     // App validation
@@ -195,7 +195,7 @@ pub async fn spawn_queue_consumer_tasks(
     }
 
     let dna_def = conductor_handle
-        .get_dna_def(&*dna_hash)
+        .get_dna_def(&dna_hash)
         .expect("Dna must be in store");
 
     // Sys validation

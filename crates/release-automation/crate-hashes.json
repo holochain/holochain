@@ -1,6 +1,7 @@
 {
-  "cargo-test-macro 0.1.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.53.0#4369396ce7d270972955d876eaa4954bea56bcd9)": "1yy1y1d523xdzwg1gc77pigbcwsbawmy4b7vw8v21m7q957sk0c4",
-  "cargo-test-support 0.1.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.53.0#4369396ce7d270972955d876eaa4954bea56bcd9)": "1yy1y1d523xdzwg1gc77pigbcwsbawmy4b7vw8v21m7q957sk0c4",
-  "cargo-util 0.1.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.53.0#4369396ce7d270972955d876eaa4954bea56bcd9)": "1yy1y1d523xdzwg1gc77pigbcwsbawmy4b7vw8v21m7q957sk0c4",
-  "crates-index-helper 0.1.0 (git+https://github.com/holochain/holochain-nixpkgs?rev=d4701b21239be5223409123d7bdd06004af3b044#d4701b21239be5223409123d7bdd06004af3b044)": "1kz89rxrgisy5xykimqpfyy7dxaarrhc6mkccycilg50ndv87jsr"
+  "cargo-test-macro 0.1.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.66.0#d65d197ad5c6c09234369f219f943e291d4f04b9)": "1hbaw0gp7l4njyimf7xaiv6cxcr40ig90ikb1lga31k0a8f5jzqf",
+  "cargo-test-support 0.1.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.66.0#d65d197ad5c6c09234369f219f943e291d4f04b9)": "1hbaw0gp7l4njyimf7xaiv6cxcr40ig90ikb1lga31k0a8f5jzqf",
+  "cargo-util 0.2.2 (git+https://github.com/rust-lang/cargo?branch=rust-1.66.0#d65d197ad5c6c09234369f219f943e291d4f04b9)": "1hbaw0gp7l4njyimf7xaiv6cxcr40ig90ikb1lga31k0a8f5jzqf",
+  "crates-index-helper 0.1.0 (git+https://github.com/holochain/holochain-nixpkgs?rev=d4701b21239be5223409123d7bdd06004af3b044#d4701b21239be5223409123d7bdd06004af3b044)": "1kz89rxrgisy5xykimqpfyy7dxaarrhc6mkccycilg50ndv87jsr",
+  "crates-io 0.34.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.66.0#d65d197ad5c6c09234369f219f943e291d4f04b9)": "1hbaw0gp7l4njyimf7xaiv6cxcr40ig90ikb1lga31k0a8f5jzqf"
 }

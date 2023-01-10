@@ -871,7 +871,7 @@ impl InternalHandler for KitsuneP2pActor {
         url: TxUrl,
         con: Tx2ConHnd<wire::Wire>,
     ) -> InternalHandlerResult<()> {
-        let spaces = self.spaces.iter().map(|(_, s)| s.get()).collect::<Vec<_>>();
+        let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
         Ok(async move {
             let mut all = Vec::new();
             for (_, space) in futures::future::join_all(spaces).await {
@@ -885,7 +885,7 @@ impl InternalHandler for KitsuneP2pActor {
     }
 
     fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
-        let spaces = self.spaces.iter().map(|(_, s)| s.get()).collect::<Vec<_>>();
+        let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
         Ok(async move {
             let mut all = Vec::new();
             for (_, space) in futures::future::join_all(spaces).await {
@@ -1195,19 +1195,23 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                     }
                 }
                 let h = h.clone();
-                let s = s.get();
-                Some(s.then(move |r| async move { (h, r) }))
+                Some((h, s.get()))
             })
             .collect::<Vec<_>>();
-        Ok(async move {
-            let mut all = Vec::new();
-            for (h, (space, _)) in futures::future::join_all(spaces).await {
+        let results = async move {
+            let mut all: Vec<KitsuneP2pFuture<serde_json::Value>> = Vec::new();
+            for (h, (space, _)) in futures::future::join_all(
+                spaces.into_iter().map(|(h, s)| async move { (h, s.await) }),
+            )
+            .await
+            {
                 all.push(space.dump_network_metrics(Some(h)));
             }
             Ok(futures::future::try_join_all(all).await?.into())
         }
         .boxed()
-        .into())
+        .into();
+        Ok(results)
     }
 
     fn handle_get_diagnostics(
