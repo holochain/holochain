@@ -31,7 +31,7 @@ impl Location {
         if let Location::Path(path) = self {
             if path.is_relative() {
                 if let Some(dir) = root_dir {
-                    Ok(Location::Path(ffs::sync::canonicalize(dir.join(&path))?))
+                    Ok(Location::Path(ffs::sync::canonicalize(dir.join(path))?))
                 } else {
                     Err(BundleError::RelativeLocalPath(path.to_owned()).into())
                 }

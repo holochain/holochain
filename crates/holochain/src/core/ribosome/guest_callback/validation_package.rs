@@ -72,7 +72,7 @@ impl TryFrom<ValidationPackageInvocation> for ExternIO {
     fn try_from(
         validation_package_invocation: ValidationPackageInvocation,
     ) -> Result<Self, Self::Error> {
-        Self::encode(&validation_package_invocation.app_entry_def)
+        Self::encode(validation_package_invocation.app_entry_def)
     }
 }
 

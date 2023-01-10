@@ -1001,7 +1001,7 @@ impl AppRoleAssignment {
 
     /// Accessor
     pub fn clone_ids(&self) -> impl Iterator<Item = &CloneId> {
-        self.clones.iter().map(|(clone_id, _)| clone_id)
+        self.clones.keys()
     }
 
     /// Accessor
