@@ -18,7 +18,7 @@ futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
 kitsune_p2p_dht = { version = "^0.1.0-beta-rc.0", path = "../dht" }
 kitsune_p2p_dht_arc = { version = "^0.1.0-beta-rc.0", path = "../dht_arc" }
-lru = "0.6.5"
+lru = "0.8.1"
 mockall = { version = "0.10.2", optional = true }
 nanoid = "0.3"
 observability = "0.1.3"
