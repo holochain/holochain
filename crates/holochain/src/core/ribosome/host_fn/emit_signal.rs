@@ -28,7 +28,11 @@ pub fn emit_signal(
                     .agent_pubkey()
                     .clone(),
             );
-            let signal = Signal::App(cell_id, call_context.zome.zome_name().clone(), input);
+            let signal = Signal::App {
+                cell_id,
+                zome_name: call_context.zome.zome_name().clone(),
+                signal: input,
+            };
             call_context
                 .host_context()
                 .signal_tx()

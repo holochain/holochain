@@ -294,7 +294,7 @@ async fn remote_signals() -> anyhow::Result<()> {
     for mut rx in rxs {
         let r = rx.try_recv();
         // Each handle should recv a signal
-        assert_matches!(r, Ok(Signal::App(_, _, a)) if a == signal);
+        assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
     }
 
     Ok(())
