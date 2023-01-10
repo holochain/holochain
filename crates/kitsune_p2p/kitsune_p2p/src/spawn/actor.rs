@@ -128,6 +128,12 @@ impl KitsuneP2pActor {
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
 
+        if config.is_tx2() {
+            tracing::trace!("tx2");
+        } else if config.is_tx4() {
+            tracing::trace!("tx4");
+        }
+
         let tx2_conf = config.to_tx2().map_err(KitsuneP2pError::other)?;
 
         let mut is_mock = false;

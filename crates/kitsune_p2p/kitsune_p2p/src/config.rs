@@ -75,6 +75,38 @@ fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
 }
 
 impl KitsuneP2pConfig {
+    pub(crate) fn is_tx2(&self) -> bool {
+        #[cfg(feature = "tx2")]
+        {
+            #[cfg(feature = "tx4")]
+            {
+                if let Some(t) = self.transport_pool.get(0) {
+                    !matches!(t, TransportConfig::WebRTC { .. })
+                } else {
+                    true
+                }
+            }
+            #[cfg(not(feature = "tx4"))]
+            {
+                true
+            }
+        }
+        #[cfg(not(feature = "tx2"))]
+        {
+            false
+        }
+    }
+
+    pub(crate) fn is_tx4(&self) -> bool {
+        #[cfg(feature = "tx4")]
+        {
+            if let Some(t) = self.transport_pool.get(0) {
+                return matches!(t, TransportConfig::WebRTC { .. });
+            }
+        }
+        false
+    }
+
     /// `tx2` is currently designed to use exactly one proxy wrapped transport,
     /// so convert a bunch of the options from the previous transport
     /// paradigm into that pattern.
@@ -191,9 +223,10 @@ pub enum TransportConfig {
         mock_network: AdapterFactoryMock,
     },
     #[cfg(feature = "tx4")]
-    /// Configure to use Tx4 for kitsune networking
-    Tx4 {
-        // TODO - Actual config fields here!
+    /// Configure to use Tx4 WebRTC for kitsune networking.
+    WebRTC {
+        /// The url of the signal server to connect to for addressability.
+        signal_url: String,
     },
 }
 
