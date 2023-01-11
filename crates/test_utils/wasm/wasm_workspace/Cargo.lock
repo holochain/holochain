@@ -642,7 +642,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -831,7 +831,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.2.0-beta-rc.1"
+version = "0.2.0"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -846,7 +846,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.1.0-beta-rc.1"
+version = "0.1.0"
 dependencies = [
  "getrandom",
  "hdi",
@@ -865,7 +865,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.1.0-beta-rc.1"
+version = "0.1.0"
 dependencies = [
  "darling 0.14.2",
  "heck 0.4.0",
@@ -912,7 +912,7 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0"
 dependencies = [
  "arbitrary",
  "base64",
@@ -931,7 +931,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.1.0-beta-rc.1"
+version = "0.1.0"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -980,7 +980,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.1.0-beta-rc.1"
+version = "0.1.0"
 dependencies = [
  "hdk",
  "serde",
@@ -1015,7 +1015,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.1.0-beta-rc.1"
+version = "0.1.0"
 dependencies = [
  "derive_builder",
  "fixt",
@@ -1136,7 +1136,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0"
 dependencies = [
  "colored",
  "derivative",
@@ -1158,7 +1158,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -1169,7 +1169,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0"
 dependencies = [
  "arbitrary",
  "chrono",
