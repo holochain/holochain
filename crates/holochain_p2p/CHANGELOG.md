@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor beta-rc
+semver_increment_mode: minor
 ---
 # Changelog
 
