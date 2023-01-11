@@ -1,76 +1,19 @@
-{ callPackage
-, writeShellScriptBin
-
-, hcToplevelDir
-, nixEnvPrefixEval
-
-, jq
-}:
-
 let
-  hcRunCrate = writeShellScriptBin "hc-run-crate" ''
-    set -x
-    ${nixEnvPrefixEval}
+  flake = import ../compat.nix;
 
-    crate=''${1:?The first argument needs to define the crate name}
-    shift
-
-    binary=$(cargo build \
-      --locked \
-      --target-dir=''${NIX_ENV_PREFIX:-?}/target \
-      --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
-      --bin=$crate --message-format=json | \
-        ${jq}/bin/jq \
-          --slurp \
-          --raw-output \
-          'map(select(.executable != null))[0].executable' \
-      )
-
-    $binary $@
-  '';
-
-  hcCrateBinaryPath = writeShellScriptBin "hc-crate-binary-path" ''
-    set -x
-    ${nixEnvPrefixEval}
-
-    crate=''${1:?The first argument needs to define the crate name}
-
-    echo $(cargo build \
-      --locked \
-      --target-dir=''${NIX_ENV_PREFIX:-?}/target \
-      --manifest-path=${hcToplevelDir}/crates/$crate/Cargo.toml \
-      --bin=$crate --message-format=json | \
-        ${jq}/bin/jq \
-          --slurp \
-          --raw-output \
-          'map(select(.executable != null))[0].executable' \
-      )
-  '';
-
-  mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''
-    exec ${hcRunCrate}/bin/hc-run-crate ${crate} $@
-  '';
-
-  hcReleaseAutomation = writeShellScriptBin "hc-ra" ''
-    exec ${hcRunCrate}/bin/hc-run-crate "release-automation" $@
-  '';
-
-  ci = callPackage ./ci.nix { };
-  core = callPackage ./core.nix {
-    inherit hcToplevelDir;
-    releaseAutomation = "${hcReleaseAutomation}/bin/hc-ra";
-  } // {
-    inherit hcReleaseAutomation;
-  };
+  ci = import ./ci.nix;
+  core = import ./core.nix;
   happ = {
-    holochain = mkHolochainBinaryScript "holochain";
-    hc = mkHolochainBinaryScript "hc";
+    inherit (flake.${builtins.currentSystem})
+      happ-holochain
+      happ-hc
+      ;
   };
 
   all = {
     inherit
-      core
       ci
+      core
       happ
       ;
   };

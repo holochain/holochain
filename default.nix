@@ -14,7 +14,8 @@ let
   # point this to your local config.nix file for this project
   # example.config.nix shows and documents a lot of the options
   config = import ./config.nix;
-  sources = import ./nix/sources.nix;
+
+  flake = (import ./nix/compat.nix);
 
   # START HOLONIX IMPORT BOILERPLATE
   holonixPath = config.holonix.pathFn { };
@@ -51,22 +52,7 @@ let
 
       inherit (self.rustPlatform.rust) rustc cargo;
 
-      crate2nix = import sources.crate2nix.outPath { };
-
-      cargo-nextest = self.rustPlatform.buildRustPackage {
-        name = "cargo-nextest";
-
-        src = sources.nextest.outPath;
-        cargoSha256 = "sha256-E25P/vasIBQp4m3zGii7ZotzJ7b2kT6ma9glvmQXcnM=";
-
-        cargoTestFlags = [
-          # TODO: investigate some more why these tests fail in nix
-          "--"
-          "--skip=tests_integration::test_relocated_run"
-          "--skip=tests_integration::test_run"
-          "--skip=tests_integration::test_run_after_build"
-        ];
-      };
+      # crate2nix = flake.inputs.crate2nix.outPath;
     })
 
   ];
@@ -74,7 +60,7 @@ let
   nixpkgs' = import (nixpkgs.path or holonix.pkgs.path) { inherit overlays; };
   inherit (nixpkgs') callPackage;
 
-  pkgs = callPackage ./nix/pkgs/default.nix { };
+  pkgs = import ./nix/pkgs/default.nix;
 in
 {
   inherit
