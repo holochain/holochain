@@ -23,7 +23,7 @@
 
     pathFn = _:
       if use-github
-      then (import ./nix/sources.nix).holonix
+      then (import ./nix/compat.nix).inputs.holonix
       else local.path;
 
     importFn = args: import (pathFn { }) (args // ({
