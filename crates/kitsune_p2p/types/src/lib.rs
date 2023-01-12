@@ -82,6 +82,12 @@ impl CertDigestExt for CertDigest {
 #[derive(Clone)]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
 
+impl From<Tx2Cert> for Arc<[u8; 32]> {
+    fn from(f: Tx2Cert) -> Self {
+        f.0 .0 .0.clone()
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {

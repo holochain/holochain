@@ -75,6 +75,7 @@ fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
 }
 
 impl KitsuneP2pConfig {
+    #[allow(dead_code)] // because of feature flipping
     pub(crate) fn is_tx2(&self) -> bool {
         #[cfg(feature = "tx2")]
         {
@@ -97,6 +98,7 @@ impl KitsuneP2pConfig {
         }
     }
 
+    #[allow(dead_code)] // because of feature flipping
     pub(crate) fn is_tx4(&self) -> bool {
         #[cfg(feature = "tx4")]
         {

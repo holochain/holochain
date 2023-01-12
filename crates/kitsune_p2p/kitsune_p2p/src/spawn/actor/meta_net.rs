@@ -1,4 +1,9 @@
+// because of feature flipping
 #![allow(dead_code)]
+#![allow(irrefutable_let_patterns)]
+#![allow(unused_variables)]
+#![allow(clippy::needless_return)]
+#![allow(clippy::blocks_in_if_conditions)]
 //! Networking abstraction to handle feature flipping.
 
 use crate::*;
@@ -10,18 +15,8 @@ use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
 use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
 use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::*;
 use std::sync::Arc;
-
-/// Networking abstraction to handle feature flipping.
-pub enum MetaNet {
-    /// Tx2 Abstraction
-    #[cfg(feature = "tx2")]
-    Tx2(MetaNetTx2),
-
-    /// Tx4 Abstraction
-    #[cfg(feature = "tx4")]
-    Tx4(MetaNetTx4),
-}
 
 pub type RespondFut = std::pin::Pin<Box<dyn std::future::Future<Output = ()> + 'static + Send>>;
 
@@ -77,20 +72,83 @@ pub enum MetaNetEvt {
 
 pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
     Tx2(Tx2ConHnd<wire::Wire>),
 }
 
-/// Tx2 Abstraction
-#[cfg(feature = "tx2")]
-pub struct MetaNetTx2 {
-    ep_hnd: Tx2EpHnd<wire::Wire>,
+impl MetaNetCon {
+    pub async fn close(&self, code: u32, reason: &str) {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNetCon::Tx2(con) = self {
+                con.close(code, reason).await;
+                return;
+            }
+        }
+    }
+
+    pub fn is_closed(&self) -> bool {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNetCon::Tx2(con) = self {
+                return con.is_closed();
+            }
+        }
+
+        true
+    }
+
+    pub async fn notify(&self, payload: &wire::Wire, timeout: KitsuneTimeout) -> KitsuneResult<()> {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNetCon::Tx2(con) = self {
+                return con.notify(payload, timeout).await;
+            }
+        }
+
+        Err("invalid features".into())
+    }
+
+    pub async fn request(
+        &self,
+        payload: &wire::Wire,
+        timeout: KitsuneTimeout,
+    ) -> KitsuneResult<wire::Wire> {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNetCon::Tx2(con) = self {
+                return con.request(payload, timeout).await;
+            }
+        }
+
+        Err("invalid features".into())
+    }
+
+    pub fn peer_id(&self) -> Arc<[u8; 32]> {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNetCon::Tx2(con) = self {
+                return con.peer_cert().into();
+            }
+        }
+
+        panic!("invalid features");
+    }
 }
 
-/// Tx4 Abstraction
-#[cfg(feature = "tx4")]
-pub struct MetaNetTx4 {}
+/// Networking abstraction to handle feature flipping.
+#[derive(Debug, Clone)]
+pub enum MetaNet {
+    /// Tx2 Abstraction
+    #[cfg(feature = "tx2")]
+    Tx2(Tx2EpHnd<wire::Wire>),
+
+    /// Tx4 Abstraction
+    #[cfg(feature = "tx4")]
+    Tx4,
+}
 
 impl MetaNet {
     /// Construct abstraction with tx2 backend.
@@ -257,7 +315,7 @@ impl MetaNet {
                                 data,
                                 respond: Box::new(move |data| {
                                     let out: RespondFut = Box::pin(async move {
-                                        let _ = respond.respond(data.into_tx2(), timeout).await;
+                                        let _ = respond.respond(data, timeout).await;
                                     });
                                     out
                                 }),
@@ -286,14 +344,60 @@ impl MetaNet {
             }
         });
 
-        Ok((MetaNet::Tx2(MetaNetTx2 { ep_hnd }), evt_recv))
+        Ok((MetaNet::Tx2(ep_hnd), evt_recv))
     }
 
     /// Construct abstraction with tx4 backend.
     #[cfg(feature = "tx4")]
-    pub async fn new_tx4(
-        _config: KitsuneP2pConfig,
-    ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
+    pub async fn new_tx4(_config: KitsuneP2pConfig) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
         todo!()
+    }
+
+    pub fn local_addr(&self) -> KitsuneResult<String> {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNet::Tx2(ep) = self {
+                return ep.local_addr().map(|s| s.to_string());
+            }
+        }
+
+        panic!("invalid features");
+    }
+
+    pub async fn close(&self, code: u32, reason: &str) {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNet::Tx2(ep) = self {
+                ep.close(code, reason).await;
+                return;
+            }
+        }
+    }
+
+    pub async fn get_connection(
+        &self,
+        remote_url: String,
+        timeout: KitsuneTimeout,
+    ) -> KitsuneResult<MetaNetCon> {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNet::Tx2(ep) = self {
+                let con = ep.get_connection(remote_url, timeout).await?;
+                return Ok(MetaNetCon::Tx2(con));
+            }
+        }
+
+        Err("invalid features".into())
+    }
+
+    pub fn local_id(&self) -> Arc<[u8; 32]> {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNet::Tx2(ep) = self {
+                return ep.local_cert().into();
+            }
+        }
+
+        panic!("invalid features");
     }
 }

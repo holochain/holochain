@@ -14,8 +14,6 @@ use futures::stream::StreamExt;
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
-use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -25,7 +23,8 @@ use std::sync::Arc;
 /// See <https://github.com/holochain/bootstrap>
 mod bootstrap;
 mod discover;
-mod meta_net;
+pub(crate) mod meta_net;
+use meta_net::*;
 mod space;
 use ghost_actor::dependencies::tracing;
 use space::*;
@@ -35,7 +34,6 @@ type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
-type WireConHnd = Tx2ConHnd<wire::Wire>;
 type Payload = Box<[u8]>;
 type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
@@ -78,13 +76,13 @@ ghost_actor::ghost_chan! {
         fn resolve_publish_pending_delegates(space: KSpace, op_hash: KOpHash) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: kitsune_p2p_types::tx2::tx2_utils::TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+        fn incoming_gossip(space: KSpace, con: MetaNetCon, remote_url: String, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
 
         /// Incoming Metric Exchange
         fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
 
         /// New Con
-        fn new_con(url: String, con: meta_net::MetaNetCon) -> ();
+        fn new_con(url: String, con: MetaNetCon) -> ();
 
         /// Del Con
         fn del_con(url: String) -> ();
@@ -98,7 +96,7 @@ pub(crate) struct KitsuneP2pActor {
     channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
     internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    ep_hnd: meta_net::MetaNet,
+    ep_hnd: MetaNet,
     host: HostApi,
     #[allow(clippy::type_complexity)]
     spaces: HashMap<
@@ -142,24 +140,36 @@ impl KitsuneP2pActor {
             KitsuneMetrics::count(t, l);
         });
 
-        // is_* fns won't return true if a feature is not enabled
-        // so we don't have to duplicate the feature checks
-        let (ep_hnd, ep_evt) = if config.is_tx2() {
+        let mut ep_hnd = None;
+        let mut ep_evt = None;
+
+        #[cfg(feature = "tx2")]
+        if ep_hnd.is_none() && config.is_tx2() {
             tracing::trace!("tx2");
-            meta_net::MetaNet::new_tx2(config, tls_config, metrics).await?
-        } else if config.is_tx4() {
+            let (h, e) = MetaNet::new_tx2(config.clone(), tls_config, metrics).await?;
+            ep_hnd = Some(h);
+            ep_evt = Some(e);
+        }
+
+        #[cfg(feature = "tx4")]
+        if ep_hnd.is_none() && config.is_tx4() {
             tracing::trace!("tx4");
-            meta_net::MetaNet::new_tx4(config).await?
-        } else {
-            return Err("tx2 or tx4 feature must be enabled".into());
+            let (h, e) = MetaNet::new_tx4(config.clone()).await?;
+            ep_hnd = Some(h);
+            ep_evt = Some(e);
+        }
+
+        let (ep_hnd, ep_evt) = match (ep_hnd, ep_evt) {
+            (Some(h), Some(e)) => (h, e),
+            _ => return Err("tx2 or tx4 feature must be enabled".into()),
         };
 
         struct FetchResponseConfig(kitsune_p2p_types::config::KitsuneP2pTuningParams);
 
         impl kitsune_p2p_fetch::FetchResponseConfig for FetchResponseConfig {
             type User = (
-                Tx2ConHnd<wire::Wire>,
-                TxUrl,
+                MetaNetCon,
+                String,
                 Option<(dht::prelude::RegionCoords, bool)>,
             );
 
@@ -239,352 +249,365 @@ impl KitsuneP2pActor {
             async move {
                 let fetch_response_queue = &fetch_response_queue;
                 let fetch_queue = &fetch_queue;
-                ep_evt.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
-                    let evt_sender = evt_sender.clone();
-                    let host = host.clone();
-                    let tuning_params = tuning_params.clone();
-                    let i_s = i_s.clone();
-                    async move {
-                        let evt_sender = &evt_sender;
-                        match event {
-                            meta_net::MetaNetEvt::Connected { remote_url, con } => {
-                                let _ = i_s.new_con(remote_url, con).await;
-                            }
-                            meta_net::MetaNetEvt::Disconnected { remote_url, con: _ } => {
-                                let _ = i_s.del_con(remote_url).await;
-                            }
-                            meta_net::MetaNetEvt::Request {
-                                remote_url: _,
-                                con: _,
-                                data,
-                                respond,
-                            } => {
-                                match data {
-                                    wire::Wire::Call(wire::Call {
-                                        space,
-                                        to_agent,
-                                        data,
-                                        ..
-                                    }) => {
-                                        let res = match evt_sender
-                                            .call(space, to_agent, data.into())
-                                            .await
-                                        {
-                                            Err(err) => {
-                                                let reason = format!("{:?}", err);
-                                                let fail = wire::Wire::failure(reason);
-                                                respond(fail).await;
-                                                return;
-                                            }
-                                            Ok(r) => r,
-                                        };
-                                        let resp = wire::Wire::call_resp(res.into());
-                                        respond(resp).await;
-                                    }
-                                    wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
-                                        if let Ok(Some(agent_info_signed)) = host
-                                            .get_agent_info_signed(GetAgentInfoSignedEvt {
-                                                space,
-                                                agent,
-                                            })
-                                            .await
-                                        {
-                                            let resp = wire::Wire::peer_get_resp(agent_info_signed);
-                                            respond(resp).await;
-                                        } else {
-                                            let resp = wire::Wire::failure("no such agent".into());
-                                            respond(resp).await;
-                                        }
-                                    }
-                                    wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
-                                        // this *does* go over the network...
-                                        // so we don't want it to be too many
-                                        const LIMIT: u32 = 8;
-                                        let query = QueryAgentsEvt::new(space)
-                                            .near_basis(basis_loc)
-                                            .limit(LIMIT);
-                                        match evt_sender.query_agents(query).await {
-                                            Ok(list) if !list.is_empty() => {
-                                                let resp = wire::Wire::peer_query_resp(list);
-                                                respond(resp).await;
-                                            }
-                                            res => {
-                                                let resp = wire::Wire::failure(format!(
-                                                    "error getting agents: {:?}",
-                                                    res
-                                                ));
-                                                respond(resp).await;
-                                            }
-                                        }
-                                    }
-                                    data => unimplemented!("{:?}", data),
+                ep_evt
+                    .for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
+                        let evt_sender = evt_sender.clone();
+                        let host = host.clone();
+                        let i_s = i_s.clone();
+                        async move {
+                            let evt_sender = &evt_sender;
+                            match event {
+                                MetaNetEvt::Connected { remote_url, con } => {
+                                    let _ = i_s.new_con(remote_url, con).await;
                                 }
-                            }
-                            meta_net::MetaNetEvt::Notify {
-                                remote_url: url,
-                                con,
-                                data,
-                            } => {
-                                match data {
-                                    wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
-                                        space,
-                                        basis,
-                                        to_agent,
-                                        mod_idx,
-                                        mod_cnt,
-                                        data,
-                                    }) => match data {
-                                        BroadcastData::Publish {
-                                            source,
-                                            op_hash_list,
-                                            context,
-                                        } => {
-                                            if let Err(err) = i_s
-                                                .incoming_publish(
-                                                    space,
-                                                    to_agent,
-                                                    source,
-                                                    op_hash_list,
-                                                    context,
-                                                    Some((basis, mod_idx, mod_cnt)),
-                                                )
+                                MetaNetEvt::Disconnected { remote_url, con: _ } => {
+                                    let _ = i_s.del_con(remote_url).await;
+                                }
+                                MetaNetEvt::Request {
+                                    remote_url: _,
+                                    con: _,
+                                    data,
+                                    respond,
+                                } => {
+                                    match data {
+                                        wire::Wire::Call(wire::Call {
+                                            space,
+                                            to_agent,
+                                            data,
+                                            ..
+                                        }) => {
+                                            let res = match evt_sender
+                                                .call(space, to_agent, data.into())
                                                 .await
                                             {
-                                                tracing::warn!(
-                                                    ?err,
-                                                    "failed to handle incoming delegate broadcast"
-                                                );
-                                            }
+                                                Err(err) => {
+                                                    let reason = format!("{:?}", err);
+                                                    let fail = wire::Wire::failure(reason);
+                                                    respond(fail).await;
+                                                    return;
+                                                }
+                                                Ok(r) => r,
+                                            };
+                                            let resp = wire::Wire::call_resp(res.into());
+                                            respond(resp).await;
                                         }
-                                        data => {
-                                            // one might be tempted to notify here
-                                            // as in Broadcast below... but we
-                                            // notify all relevent agents inside
-                                            // the space incoming_delegate_broadcast
-                                            // handler.
-                                            if let Err(err) = i_s
-                                                .incoming_delegate_broadcast(
-                                                    space, basis, to_agent, mod_idx, mod_cnt, data,
-                                                )
-                                                .await
-                                            {
-                                                tracing::warn!(
-                                                    ?err,
-                                                    "failed to handle incoming delegate broadcast"
-                                                );
-                                            }
-                                        }
-                                    },
-                                    wire::Wire::Broadcast(wire::Broadcast {
-                                        space,
-                                        to_agent,
-                                        data,
-                                        ..
-                                    }) => match data {
-                                        BroadcastData::User(data) => {
-                                            // TODO: Should we check if the basis is
-                                            // held before calling notify?
-                                            if let Err(err) =
-                                                evt_sender.notify(space, to_agent, data).await
-                                            {
-                                                tracing::warn!(
-                                                    ?err,
-                                                    "error processing incoming broadcast"
-                                                );
-                                            }
-                                        }
-                                        BroadcastData::AgentInfo(agent_info) => {
-                                            // TODO: Should we check if the basis is
-                                            // held before calling put_agent_info_signed?
-                                            if let Err(err) = evt_sender
-                                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                        wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
+                                            if let Ok(Some(agent_info_signed)) = host
+                                                .get_agent_info_signed(GetAgentInfoSignedEvt {
                                                     space,
-                                                    peer_data: vec![agent_info],
+                                                    agent,
                                                 })
                                                 .await
                                             {
-                                                tracing::warn!(
+                                                let resp =
+                                                    wire::Wire::peer_get_resp(agent_info_signed);
+                                                respond(resp).await;
+                                            } else {
+                                                let resp =
+                                                    wire::Wire::failure("no such agent".into());
+                                                respond(resp).await;
+                                            }
+                                        }
+                                        wire::Wire::PeerQuery(wire::PeerQuery {
+                                            space,
+                                            basis_loc,
+                                        }) => {
+                                            // this *does* go over the network...
+                                            // so we don't want it to be too many
+                                            const LIMIT: u32 = 8;
+                                            let query = QueryAgentsEvt::new(space)
+                                                .near_basis(basis_loc)
+                                                .limit(LIMIT);
+                                            match evt_sender.query_agents(query).await {
+                                                Ok(list) if !list.is_empty() => {
+                                                    let resp = wire::Wire::peer_query_resp(list);
+                                                    respond(resp).await;
+                                                }
+                                                res => {
+                                                    let resp = wire::Wire::failure(format!(
+                                                        "error getting agents: {:?}",
+                                                        res
+                                                    ));
+                                                    respond(resp).await;
+                                                }
+                                            }
+                                        }
+                                        data => unimplemented!("{:?}", data),
+                                    }
+                                }
+                                MetaNetEvt::Notify {
+                                    remote_url: url,
+                                    con,
+                                    data,
+                                } => {
+                                    match data {
+                                        wire::Wire::DelegateBroadcast(
+                                            wire::DelegateBroadcast {
+                                                space,
+                                                basis,
+                                                to_agent,
+                                                mod_idx,
+                                                mod_cnt,
+                                                data,
+                                            },
+                                        ) => match data {
+                                            BroadcastData::Publish {
+                                                source,
+                                                op_hash_list,
+                                                context,
+                                            } => {
+                                                if let Err(err) = i_s
+                                                    .incoming_publish(
+                                                        space,
+                                                        to_agent,
+                                                        source,
+                                                        op_hash_list,
+                                                        context,
+                                                        Some((basis, mod_idx, mod_cnt)),
+                                                    )
+                                                    .await
+                                                {
+                                                    tracing::warn!(
+                                                    ?err,
+                                                    "failed to handle incoming delegate broadcast"
+                                                );
+                                                }
+                                            }
+                                            data => {
+                                                // one might be tempted to notify here
+                                                // as in Broadcast below... but we
+                                                // notify all relevent agents inside
+                                                // the space incoming_delegate_broadcast
+                                                // handler.
+                                                if let Err(err) = i_s
+                                                    .incoming_delegate_broadcast(
+                                                        space, basis, to_agent, mod_idx, mod_cnt,
+                                                        data,
+                                                    )
+                                                    .await
+                                                {
+                                                    tracing::warn!(
+                                                    ?err,
+                                                    "failed to handle incoming delegate broadcast"
+                                                );
+                                                }
+                                            }
+                                        },
+                                        wire::Wire::Broadcast(wire::Broadcast {
+                                            space,
+                                            to_agent,
+                                            data,
+                                            ..
+                                        }) => match data {
+                                            BroadcastData::User(data) => {
+                                                // TODO: Should we check if the basis is
+                                                // held before calling notify?
+                                                if let Err(err) =
+                                                    evt_sender.notify(space, to_agent, data).await
+                                                {
+                                                    tracing::warn!(
+                                                        ?err,
+                                                        "error processing incoming broadcast"
+                                                    );
+                                                }
+                                            }
+                                            BroadcastData::AgentInfo(agent_info) => {
+                                                // TODO: Should we check if the basis is
+                                                // held before calling put_agent_info_signed?
+                                                if let Err(err) = evt_sender
+                                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                                        space,
+                                                        peer_data: vec![agent_info],
+                                                    })
+                                                    .await
+                                                {
+                                                    tracing::warn!(
                                                     ?err,
                                                     "error processing incoming agent info broadcast"
                                                 );
+                                                }
                                             }
-                                        }
-                                        BroadcastData::Publish {
-                                            source,
-                                            op_hash_list,
-                                            context,
-                                        } => {
-                                            if let Err(err) = i_s
-                                                .incoming_publish(
-                                                    space,
-                                                    to_agent,
-                                                    source,
-                                                    op_hash_list,
-                                                    context,
-                                                    None,
-                                                )
+                                            BroadcastData::Publish {
+                                                source,
+                                                op_hash_list,
+                                                context,
+                                            } => {
+                                                if let Err(err) = i_s
+                                                    .incoming_publish(
+                                                        space,
+                                                        to_agent,
+                                                        source,
+                                                        op_hash_list,
+                                                        context,
+                                                        None,
+                                                    )
+                                                    .await
+                                                {
+                                                    tracing::warn!(
+                                                        ?err,
+                                                        "failed to handle incoming broadcast"
+                                                    );
+                                                }
+                                            }
+                                        },
+                                        wire::Wire::Gossip(wire::Gossip {
+                                            space,
+                                            data,
+                                            module,
+                                        }) => {
+                                            let data: Vec<u8> = data.into();
+                                            let data: Box<[u8]> = data.into_boxed_slice();
+                                            if let Err(e) = i_s
+                                                .incoming_gossip(space, con, url, data, module)
                                                 .await
                                             {
                                                 tracing::warn!(
-                                                    ?err,
-                                                    "failed to handle incoming broadcast"
+                                                    "failed to handle incoming gossip: {:?}",
+                                                    e
                                                 );
                                             }
                                         }
-                                    },
-                                    wire::Wire::Gossip(wire::Gossip {
-                                        space,
-                                        data,
-                                        module,
-                                    }) => {
-                                        let data: Vec<u8> = data.into();
-                                        let data: Box<[u8]> = data.into_boxed_slice();
-                                        if let Err(e) =
-                                            i_s.incoming_gossip(space, con, url, data, module).await
-                                        {
-                                            tracing::warn!(
-                                                "failed to handle incoming gossip: {:?}",
-                                                e
-                                            );
-                                        }
-                                    }
-                                    wire::Wire::FetchOp(wire::FetchOp { fetch_list }) => {
-                                        for (space, key_list) in fetch_list {
-                                            let mut hashes = Vec::new();
-                                            let topo = match host.get_topology(space.clone()).await
-                                            {
-                                                Err(_) => continue,
-                                                Ok(topo) => topo,
-                                            };
-                                            let mut regions = Vec::new();
+                                        wire::Wire::FetchOp(wire::FetchOp { fetch_list }) => {
+                                            for (space, key_list) in fetch_list {
+                                                let mut hashes = Vec::new();
+                                                let topo =
+                                                    match host.get_topology(space.clone()).await {
+                                                        Err(_) => continue,
+                                                        Ok(topo) => topo,
+                                                    };
+                                                let mut regions = Vec::new();
 
-                                            for key in key_list {
-                                                match key {
-                                                    FetchKey::Region(region_coords) => {
-                                                        regions.push((
-                                                            region_coords,
-                                                            region_coords.to_bounds(&topo),
-                                                        ));
-                                                    }
-                                                    FetchKey::Op(op_hash) => {
-                                                        hashes.push(op_hash);
+                                                for key in key_list {
+                                                    match key {
+                                                        FetchKey::Region(region_coords) => {
+                                                            regions.push((
+                                                                region_coords,
+                                                                region_coords.to_bounds(&topo),
+                                                            ));
+                                                        }
+                                                        FetchKey::Op(op_hash) => {
+                                                            hashes.push(op_hash);
+                                                        }
                                                     }
                                                 }
-                                            }
 
-                                            if !hashes.is_empty() {
-                                                if let Ok(list) = evt_sender
-                                                    .fetch_op_data(FetchOpDataEvt {
-                                                        space: space.clone(),
-                                                        query: FetchOpDataEvtQuery::Hashes {
-                                                            op_hash_list: hashes,
-                                                            include_limbo: true,
-                                                        },
-                                                    })
-                                                    .await
-                                                {
-                                                    for (_hash, op) in list {
-                                                        fetch_response_queue.enqueue_op(
-                                                            space.clone(),
-                                                            (con.clone(), url.clone(), None),
-                                                            op,
-                                                        );
-                                                    }
-                                                }
-                                            }
-
-                                            for (coord, bound) in regions {
-                                                if let Ok(list) = evt_sender
-                                                    .fetch_op_data(FetchOpDataEvt {
-                                                        space: space.clone(),
-                                                        query: FetchOpDataEvtQuery::Regions(vec![
-                                                            bound,
-                                                        ]),
-                                                    })
-                                                    .await
-                                                {
-                                                    let last_idx = list.len() - 1;
-                                                    for (idx, (_hash, op)) in
-                                                        list.into_iter().enumerate()
+                                                if !hashes.is_empty() {
+                                                    if let Ok(list) = evt_sender
+                                                        .fetch_op_data(FetchOpDataEvt {
+                                                            space: space.clone(),
+                                                            query: FetchOpDataEvtQuery::Hashes {
+                                                                op_hash_list: hashes,
+                                                                include_limbo: true,
+                                                            },
+                                                        })
+                                                        .await
                                                     {
-                                                        fetch_response_queue.enqueue_op(
-                                                            space.clone(),
-                                                            (
-                                                                con.clone(),
-                                                                url.clone(),
-                                                                Some((coord, idx == last_idx)),
+                                                        for (_hash, op) in list {
+                                                            fetch_response_queue.enqueue_op(
+                                                                space.clone(),
+                                                                (con.clone(), url.clone(), None),
+                                                                op,
+                                                            );
+                                                        }
+                                                    }
+                                                }
+
+                                                for (coord, bound) in regions {
+                                                    if let Ok(list) = evt_sender
+                                                        .fetch_op_data(FetchOpDataEvt {
+                                                            space: space.clone(),
+                                                            query: FetchOpDataEvtQuery::Regions(
+                                                                vec![bound],
                                                             ),
-                                                            op,
-                                                        );
+                                                        })
+                                                        .await
+                                                    {
+                                                        let last_idx = list.len() - 1;
+                                                        for (idx, (_hash, op)) in
+                                                            list.into_iter().enumerate()
+                                                        {
+                                                            fetch_response_queue.enqueue_op(
+                                                                space.clone(),
+                                                                (
+                                                                    con.clone(),
+                                                                    url.clone(),
+                                                                    Some((coord, idx == last_idx)),
+                                                                ),
+                                                                op,
+                                                            );
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
-                                    }
-                                    wire::Wire::PushOpData(wire::PushOpData { op_data_list }) => {
-                                        for (space, op_list) in op_data_list {
-                                            for op in op_list {
-                                                // hash the op
-                                                let op_hash =
-                                                    match host.op_hash(op.op_data.clone()).await {
+                                        wire::Wire::PushOpData(wire::PushOpData {
+                                            op_data_list,
+                                        }) => {
+                                            for (space, op_list) in op_data_list {
+                                                for op in op_list {
+                                                    // hash the op
+                                                    let op_hash = match host
+                                                        .op_hash(op.op_data.clone())
+                                                        .await
+                                                    {
                                                         Ok(op_hash) => op_hash,
                                                         Err(_) => continue,
                                                     };
 
-                                                // trigger any delegation
-                                                // that is pending on
-                                                // having this data
-                                                let _ = i_s
-                                                    .resolve_publish_pending_delegates(
-                                                        space.clone(),
-                                                        op_hash.clone(),
-                                                    )
-                                                    .await;
+                                                    // trigger any delegation
+                                                    // that is pending on
+                                                    // having this data
+                                                    let _ = i_s
+                                                        .resolve_publish_pending_delegates(
+                                                            space.clone(),
+                                                            op_hash.clone(),
+                                                        )
+                                                        .await;
 
-                                                // MAYBE: do something with the
-                                                //        is_last bool?
-                                                //        Right now we don't
-                                                //        really care, because
-                                                //        if it's a region
-                                                //        we know it's gossip
-                                                //        so it's okay if
-                                                //        the context is
-                                                //        `None`.
-                                                let key =
-                                                    if let Some((region, _is_last)) = op.region {
+                                                    // MAYBE: do something with the
+                                                    //        is_last bool?
+                                                    //        Right now we don't
+                                                    //        really care, because
+                                                    //        if it's a region
+                                                    //        we know it's gossip
+                                                    //        so it's okay if
+                                                    //        the context is
+                                                    //        `None`.
+                                                    let key = if let Some((region, _is_last)) =
+                                                        op.region
+                                                    {
                                                         FetchKey::Region(region)
                                                     } else {
                                                         FetchKey::Op(op_hash.clone())
                                                     };
-                                                let fetch_context = fetch_queue
-                                                    .remove(&key)
-                                                    .and_then(|i| i.context);
+                                                    let fetch_context = fetch_queue
+                                                        .remove(&key)
+                                                        .and_then(|i| i.context);
 
-                                                // forward the received op
-                                                let _ = evt_sender
-                                                    .receive_ops(
-                                                        space.clone(),
-                                                        vec![op.op_data],
-                                                        fetch_context,
-                                                    )
-                                                    .await;
+                                                    // forward the received op
+                                                    let _ = evt_sender
+                                                        .receive_ops(
+                                                            space.clone(),
+                                                            vec![op.op_data],
+                                                            fetch_context,
+                                                        )
+                                                        .await;
+                                                }
                                             }
                                         }
+                                        wire::Wire::MetricExchange(wire::MetricExchange {
+                                            space,
+                                            msgs,
+                                        }) => {
+                                            let _ = i_s.incoming_metric_exchange(space, msgs).await;
+                                        }
+                                        data => unimplemented!("{:?}", data),
                                     }
-                                    wire::Wire::MetricExchange(wire::MetricExchange {
-                                        space,
-                                        msgs,
-                                    }) => {
-                                        let _ = i_s.incoming_metric_exchange(space, msgs).await;
-                                    }
-                                    data => unimplemented!("{:?}", data),
                                 }
                             }
-                            _ => (),
                         }
-                    }
-                })
-                .await;
+                    })
+                    .await;
                 tracing::warn!("KitsuneP2p tx2:ep poll shutdown");
             }
         });
@@ -733,8 +756,8 @@ impl InternalHandler for KitsuneP2pActor {
     fn handle_incoming_gossip(
         &mut self,
         space: Arc<KitsuneSpace>,
-        con: Tx2ConHnd<wire::Wire>,
-        remote_url: TxUrl,
+        con: MetaNetCon,
+        remote_url: String,
         data: Box<[u8]>,
         module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
@@ -774,11 +797,7 @@ impl InternalHandler for KitsuneP2pActor {
         .into())
     }
 
-    fn handle_new_con(
-        &mut self,
-        url: TxUrl,
-        con: Tx2ConHnd<wire::Wire>,
-    ) -> InternalHandlerResult<()> {
+    fn handle_new_con(&mut self, url: String, con: MetaNetCon) -> InternalHandlerResult<()> {
         let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
         Ok(async move {
             let mut all = Vec::new();
@@ -792,7 +811,7 @@ impl InternalHandler for KitsuneP2pActor {
         .into())
     }
 
-    fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
+    fn handle_del_con(&mut self, url: String) -> InternalHandlerResult<()> {
         let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
         Ok(async move {
             let mut all = Vec::new();
@@ -910,7 +929,9 @@ impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
 impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
         let this_addr = self.ep_hnd.local_addr();
-        Ok(async move { Ok(vec![this_addr?.into()]) }.boxed().into())
+        Ok(async move { Ok(vec![url2::Url2::parse(this_addr?)]) }
+            .boxed()
+            .into())
     }
 
     fn handle_join(
