@@ -19,7 +19,7 @@ futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
 governor = "0.3.2"
 itertools = "0.10"
-kitsune_p2p_fetch = { version = "0.0.1", path = "../fetch" }
+kitsune_p2p_fetch = { version = "^0.0.2-dev.0", path = "../fetch" }
 kitsune_p2p_mdns = { version = "^0.1.0-beta-rc.0", path = "../mdns" }
 kitsune_p2p_proxy = { version = "^0.1.0-beta-rc.0", path = "../proxy" }
 kitsune_p2p_timestamp = { version = "^0.1.0-beta-rc.0", path = "../timestamp", features = ["now"] }
