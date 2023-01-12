@@ -52,7 +52,7 @@ pub async fn spawn_websocket_listener(
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
 pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
-    mut tm: TaskManagerClient,
+    tm: TaskManagerClient,
     handle: ListenerHandle,
     listener: impl futures::stream::Stream<Item = ListenerItem> + Send + 'static,
     api: A,
@@ -63,7 +63,7 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
         tokio::task::spawn(handle.close_on(stop.map(|_| true)).map(Ok))
     });
 
-    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), |stop| {
+    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), |_stop| {
         tokio::task::spawn(async move {
             let num_connections = Arc::new(AtomicIsize::new(0));
             futures::pin_mut!(listener);

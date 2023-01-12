@@ -7,7 +7,6 @@ use holo_hash::HasHash;
 use holochain_state::test_utils::{test_db_dir, test_keystore};
 use holochain_types::prelude::*;
 use holochain_zome_types::action;
-use tokio::sync;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {

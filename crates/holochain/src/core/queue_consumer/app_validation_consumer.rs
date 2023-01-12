@@ -3,7 +3,6 @@
 use super::*;
 use crate::core::workflow::app_validation_workflow::app_validation_workflow;
 use crate::core::workflow::app_validation_workflow::AppValidationWorkspace;
-use futures::stream::StreamExt;
 use holochain_p2p::*;
 use holochain_types::db_cache::DhtDbQueryCache;
 use tracing::*;

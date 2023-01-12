@@ -34,7 +34,7 @@ use std::time::Duration;
 
 use derive_more::Display;
 use futures::future::Either;
-use futures::{Future, FutureExt, Stream, StreamExt};
+use futures::{Future, Stream, StreamExt};
 use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
 use tokio::sync::broadcast;
@@ -634,12 +634,6 @@ pub enum WorkComplete {
 /// The only error possible when attempting to trigger: the channel is closed
 #[derive(Debug, Display, thiserror::Error)]
 pub struct QueueTriggerClosedError;
-
-/// Inform a workflow to run a job or shutdown
-enum Job {
-    Run,
-    Shutdown,
-}
 
 /// Get a stream of triggers which can be terminated by a received Stop
 pub(super) fn trigger_stream(rx: TriggerReceiver, stop: StopReceiver) -> impl Stream<Item = ()> {

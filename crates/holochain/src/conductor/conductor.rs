@@ -180,6 +180,7 @@ impl CellItem {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) type StopBroadcaster = task_motel::StopBroadcaster;
 pub(crate) type StopReceiver = task_motel::StopListener;
 
@@ -310,7 +311,7 @@ mod startup_shutdown_impls {
             tokio::task::spawn(async move {
                 if let Some((manager, task)) = tup {
                     tracing::info!("Sending shutdown signal to all managed tasks.");
-                    let (_, _, r) = futures::join!(ghost_shutdown, manager.shutdown(), task,);
+                    let (_, _, r) = futures::join!(ghost_shutdown, manager.stop_all_tasks(), task,);
                     r?
                 } else {
                     ghost_shutdown.await.map_err(TaskManagerError::internal)

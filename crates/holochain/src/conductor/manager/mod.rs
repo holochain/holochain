@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! We want to have control over certain long running
 //! tasks that we care about.
 //! If a task that is added to the task manager ends
@@ -21,11 +19,6 @@ use tokio_stream::StreamExt;
 use tracing::*;
 
 use super::ConductorHandle;
-
-/// For a task to be "managed" simply means that it will shut itself down
-/// when it receives a message on the the "stop" channel passed in
-pub(crate) type ManagedTaskHandle = JoinHandle<ManagedTaskResult>;
-pub(crate) type TaskManagerRunHandle = JoinHandle<TaskManagerResult>;
 
 /// The "kind" of a managed task determines how the Result from the task's
 /// completion will be handled.
@@ -60,6 +53,8 @@ pub enum TaskOutcome {
     StopAppsWithDna(Arc<DnaHash>, Box<ManagedTaskError>, String),
 }
 
+/// Spawn a task which performs some action after each task has completed,
+/// as recieved by the outcome channel produced by the task manager.
 pub fn spawn_task_outcome_handler(
     conductor: ConductorHandle,
     mut outcomes: OutcomeReceiver,
@@ -210,7 +205,7 @@ pub fn spawn_task_outcome_handler(
 }
 
 #[tracing::instrument(skip(kind))]
-fn handle_completed_task(
+fn produce_task_outcome(
     kind: &TaskKind,
     result: Result<ManagedTaskResult, JoinError>,
     name: String,
@@ -261,13 +256,18 @@ pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>
     }
 }
 
+/// Each task has a group, and here they are
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TaskGroup {
+    /// Tasks which are associated with the conductor as a whole
     Conductor,
+    /// Tasks which are associated with a particular DNA space
     Dna(Arc<DnaHash>),
+    /// Tasks which are associated with a particular running Cell
     Cell(CellId),
 }
 
+/// Channel receiver for task outcomes
 pub type OutcomeReceiver = futures::channel::mpsc::Receiver<(TaskGroup, TaskOutcome)>;
 
 /// A collection of channels and handles used by the Conductor to talk to the
@@ -278,6 +278,7 @@ pub struct TaskManagerClient {
 }
 
 impl TaskManagerClient {
+    /// Construct the TaskManager and the outcome channel receiver
     pub fn new() -> (Self, OutcomeReceiver) {
         let (tx, outcomes) = futures::channel::mpsc::channel(8);
         let tm = Self {
@@ -292,10 +293,13 @@ impl TaskManagerClient {
         (tm, outcomes)
     }
 
-    pub fn shutdown(&self) -> ShutdownHandle {
+    /// Stop all tasks and return a future to await their completion.
+    /// This does not prevent new tasks from being added to the task manager.
+    pub fn stop_all_tasks(&self) -> ShutdownHandle {
         self.tm.lock().stop_group(&TaskGroup::Conductor)
     }
 
+    /// Add a conductor-level task whose outcome is ignored.
     pub fn add_conductor_task_ignored(
         &self,
         name: &str,
@@ -304,6 +308,7 @@ impl TaskManagerClient {
         self.add_conductor_task(name, TaskKind::Ignore, f)
     }
 
+    /// Add a conductor-level task which will cause the conductor to shut down if it fails
     pub fn add_conductor_task_unrecoverable(
         &self,
         name: &str,
@@ -312,6 +317,8 @@ impl TaskManagerClient {
         self.add_conductor_task(name, TaskKind::Unrecoverable, f)
     }
 
+    /// Add a DNA-level task which will cause all cells under that DNA to be disabled if
+    /// the task fails
     pub fn add_dna_task_critical(
         &self,
         name: &str,
@@ -321,6 +328,7 @@ impl TaskManagerClient {
         self.add_dna_task(name, TaskKind::DnaCritical(dna_hash.clone()), dna_hash, f)
     }
 
+    /// Add a Cell-level task whose outcome is ignored
     pub fn add_cell_task_ignored(
         &self,
         name: &str,
@@ -330,6 +338,7 @@ impl TaskManagerClient {
         self.add_cell_task(name, TaskKind::Ignore, cell_id, f)
     }
 
+    /// Add a Cell-level task which will cause that to be disabled if the task fails
     pub fn add_cell_task_critical(
         &self,
         name: &str,
@@ -346,7 +355,7 @@ impl TaskManagerClient {
         f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
     ) {
         let name = name.to_string();
-        let f = move |stop| f(stop).map(move |t| handle_completed_task(&task_kind, t, name));
+        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
         self.tm.lock().add_task(TaskGroup::Conductor, f)
     }
 
@@ -358,7 +367,7 @@ impl TaskManagerClient {
         f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
     ) {
         let name = name.to_string();
-        let f = |stop| f(stop).map(move |t| handle_completed_task(&task_kind, t, name));
+        let f = |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
         self.tm.lock().add_task(TaskGroup::Dna(dna_hash), f)
     }
     fn add_cell_task(
@@ -369,28 +378,18 @@ impl TaskManagerClient {
         f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
     ) {
         let name = name.to_string();
-        let f = |stop| f(stop).map(move |t| handle_completed_task(&task_kind, t, name));
+        let f = |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
         self.tm.lock().add_task(TaskGroup::Cell(cell_id), f)
     }
 }
 
+/// A future which awaits the completion of all managed tasks
 pub type ShutdownHandle = task_motel::GroupStop;
-
-pub struct TaskManagerShim;
-
-impl TaskManagerShim {
-    pub async fn send(task: ManagedTaskAdd) -> TaskManagerResult {
-        todo!()
-    }
-}
-
-pub enum ManagedTaskAdd {}
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::conductor::{error::ConductorError, Conductor};
-    use anyhow::Result;
     use holochain_state::test_utils::test_db_dir;
     use observability;
 

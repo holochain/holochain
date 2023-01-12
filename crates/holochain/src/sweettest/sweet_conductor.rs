@@ -396,7 +396,7 @@ impl SweetConductor {
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
         if let Some(handle) = self.handle.take() {
-            handle.shutdown().await;
+            handle.shutdown().await.unwrap().unwrap();
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }

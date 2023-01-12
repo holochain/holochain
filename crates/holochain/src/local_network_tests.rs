@@ -447,7 +447,7 @@ struct TestHandle {
 
 impl TestHandle {
     async fn shutdown(self) {
-        self.handle.shutdown().await;
+        self.handle.shutdown().await.unwrap().unwrap();
     }
 }
 
