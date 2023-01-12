@@ -66,7 +66,9 @@
       nativeBuildInputs = attrs.nativeBuildInputs ++ (with pkgs; [
         niv
         cargo-readme
-        (import ../crates/release-automation/default.nix { })
+        (import (self + /crates/release-automation/default.nix) {
+          inherit pkgs;
+        })
       ]);
     });
 
