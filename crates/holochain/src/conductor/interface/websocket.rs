@@ -3,10 +3,10 @@
 
 use super::error::InterfaceError;
 use super::error::InterfaceResult;
-use crate::conductor::conductor::StopReceiver;
 use crate::conductor::interface::*;
-use crate::conductor::manager::ManagedTaskHandle;
 use crate::conductor::manager::ManagedTaskResult;
+use crate::conductor::manager::TaskManagerClient;
+use futures::FutureExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
 use holochain_websocket::ListenerHandle;
@@ -51,52 +51,55 @@ pub async fn spawn_websocket_listener(
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
-pub fn spawn_admin_interface_task<A: InterfaceApi>(
+pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
+    mut tm: TaskManagerClient,
     handle: ListenerHandle,
     listener: impl futures::stream::Stream<Item = ListenerItem> + Send + 'static,
     api: A,
-    mut stop_rx: StopReceiver,
-) -> InterfaceResult<ManagedTaskHandle> {
-    Ok(tokio::task::spawn(async move {
-        // Task that will kill the listener and all child connections.
-        tokio::task::spawn(
-            handle.close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) }),
-        );
+    port: u16,
+) {
+    // Task that will kill the listener and all child connections.
+    tm.add_conductor_task_ignored("admin interface websocket closer", |stop| {
+        tokio::task::spawn(handle.close_on(stop.map(|_| true)).map(Ok))
+    });
 
-        let num_connections = Arc::new(AtomicIsize::new(0));
-        futures::pin_mut!(listener);
-        // establish a new connection to a client
-        while let Some(connection) = listener.next().await {
-            match connection {
-                Ok((_, rx_from_iface)) => {
-                    if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
-                        // Max connections so drop this connection
-                        // which will close it.
-                        continue;
-                    };
-                    tokio::task::spawn(recv_incoming_admin_msgs(
-                        api.clone(),
-                        rx_from_iface,
-                        num_connections.clone(),
-                    ));
-                }
-                Err(err) => {
-                    warn!("Admin socket connection failed: {}", err);
+    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), |stop| {
+        tokio::task::spawn(async move {
+            let num_connections = Arc::new(AtomicIsize::new(0));
+            futures::pin_mut!(listener);
+            // establish a new connection to a client
+            while let Some(connection) = listener.next().await {
+                match connection {
+                    Ok((_, rx_from_iface)) => {
+                        if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
+                            // Max connections so drop this connection
+                            // which will close it.
+                            continue;
+                        };
+                        tokio::task::spawn(recv_incoming_admin_msgs(
+                            api.clone(),
+                            rx_from_iface,
+                            num_connections.clone(),
+                        ));
+                    }
+                    Err(err) => {
+                        warn!("Admin socket connection failed: {}", err);
+                    }
                 }
             }
-        }
-        ManagedTaskResult::Ok(())
-    }))
+            ManagedTaskResult::Ok(())
+        })
+    });
 }
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
 pub async fn spawn_app_interface_task<A: InterfaceApi>(
+    tm: TaskManagerClient,
     port: u16,
     api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
-    mut stop_rx: StopReceiver,
-) -> InterfaceResult<(u16, ManagedTaskHandle)> {
+) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
     let (handle, mut listener) = WebsocketListener::bind_with_handle(
         url2!("ws://127.0.0.1:{}", port),
@@ -109,31 +112,33 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
         .port()
         .ok_or(InterfaceError::PortError)?;
     // Task that will kill the listener and all child connections.
-    tokio::task::spawn(
-        handle.close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) }),
-    );
-    let task = tokio::task::spawn(async move {
-        // establish a new connection to a client
-        while let Some(connection) = listener.next().await {
-            match connection {
-                Ok((tx_to_iface, rx_from_iface)) => {
-                    let rx_from_cell = signal_broadcaster.subscribe();
-                    spawn_recv_incoming_msgs_and_outgoing_signals(
-                        api.clone(),
-                        rx_from_iface,
-                        rx_from_cell,
-                        tx_to_iface,
-                    );
-                }
-                Err(err) => {
-                    warn!("Admin socket connection failed: {}", err);
+    tm.add_conductor_task_ignored("app interface websocket closer", |stop| {
+        tokio::task::spawn(handle.close_on(stop.map(|_| true)).map(Ok))
+    });
+    tm.add_conductor_task_ignored("app interface new connection handler", |_stop| {
+        tokio::task::spawn(async move {
+            // establish a new connection to a client
+            while let Some(connection) = listener.next().await {
+                match connection {
+                    Ok((tx_to_iface, rx_from_iface)) => {
+                        let rx_from_cell = signal_broadcaster.subscribe();
+                        spawn_recv_incoming_msgs_and_outgoing_signals(
+                            api.clone(),
+                            rx_from_iface,
+                            rx_from_cell,
+                            tx_to_iface,
+                        );
+                    }
+                    Err(err) => {
+                        warn!("Admin socket connection failed: {}", err);
+                    }
                 }
             }
-        }
 
-        ManagedTaskResult::Ok(())
+            ManagedTaskResult::Ok(())
+        })
     });
-    Ok((port, task))
+    Ok(port)
 }
 
 /// Polls for messages coming in from the external client.

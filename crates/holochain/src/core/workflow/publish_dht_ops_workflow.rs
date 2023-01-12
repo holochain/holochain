@@ -18,6 +18,7 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time;
 use tracing::*;
 
@@ -34,8 +35,8 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 #[instrument(skip(db, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
-    network: &(dyn HolochainP2pDnaT + Send + Sync),
-    trigger_self: &TriggerSender,
+    network: Arc<dyn HolochainP2pDnaT + Send + Sync>,
+    trigger_self: TriggerSender,
     agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;

@@ -100,14 +100,11 @@ async fn async_main() {
     #[cfg(unix)]
     let _ = notify(true, &[NotifyState::Ready]);
 
+    let flat = |r| Ok(r??);
+
     // Await on the main JoinHandle, keeping the process alive until all
     // Conductor activity has ceased
-    let result = conductor
-        .take_shutdown_handle()
-        .expect("The shutdown handle has already been taken.")
-        .await;
-
-    handle_shutdown(result);
+    handle_shutdown(flat(conductor.shutdown().await));
 
     // TODO: on SIGINT/SIGKILL, kill the conductor:
     // conductor.kill().await

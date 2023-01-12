@@ -49,7 +49,6 @@ use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -134,8 +133,6 @@ impl Cell {
                 holochain_p2p_cell.clone(),
                 &space,
                 conductor_handle.clone(),
-                managed_task_add_sender,
-                managed_task_stop_broadcaster,
             )
             .await;
 

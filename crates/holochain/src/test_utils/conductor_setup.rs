@@ -225,9 +225,7 @@ impl ConductorTestData {
 
     /// Shutdown the conductor
     pub async fn shutdown_conductor(&mut self) {
-        let shutdown = self.handle.take_shutdown_handle().unwrap();
-        self.handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        self.handle.shutdown().await;
     }
 
     /// Bring bob online if he isn't already
