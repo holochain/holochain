@@ -98,7 +98,7 @@ pub async fn spawn_queue_consumer_tasks(
         cell_id.clone(),
         authored_db.clone(),
         conductor.clone(),
-        Arc::new(network.clone()),
+        network.clone(),
     );
 
     // Validation Receipt

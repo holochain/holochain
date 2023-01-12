@@ -11,7 +11,7 @@ pub fn spawn_publish_dht_ops_consumer(
     cell_id: CellId,
     env: DbWrite<DbKindAuthored>,
     conductor: ConductorHandle,
-    network: Arc<dyn HolochainP2pDnaT + Send + Sync>,
+    network: impl HolochainP2pDnaT + Send + Sync + Clone + 'static,
 ) -> TriggerSender {
     // Create a trigger with an exponential back off starting at 1 minute
     // and maxing out at 5 minutes.
@@ -30,7 +30,7 @@ pub fn spawn_publish_dht_ops_consumer(
             let env = env.clone();
             let agent = cell_id.agent_pubkey().clone();
             let network = network.clone();
-            let wf = publish_dht_ops_workflow(env, network, tx, agent);
+            let wf = publish_dht_ops_workflow(env, Arc::new(network), tx, agent);
             async move {
                 if conductor
                     .get_config()

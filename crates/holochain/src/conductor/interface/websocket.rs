@@ -443,9 +443,8 @@ pub mod test {
 
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
-        let shutdown = handle.take_shutdown_handle().unwrap();
-        handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+
+        handle.shutdown().await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -493,9 +492,8 @@ pub mod test {
         handle_incoming_message(msg, app_api).await.unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
-        let shutdown = handle.take_shutdown_handle().unwrap();
-        handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+
+        handle.shutdown().await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -524,7 +522,6 @@ pub mod test {
 
         let (_tmpdir, conductor_handle) = setup_admin_fake_cells(dnas, cell_ids_with_proofs).await;
 
-        let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let app_id = "test app".to_string();
 
         // Enable the app
@@ -682,15 +679,13 @@ pub mod test {
         )
         .await;
 
-        conductor_handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn attach_app_interface() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
@@ -702,8 +697,7 @@ pub mod test {
         let respond = Respond::Request(Box::new(respond));
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -719,7 +713,7 @@ pub mod test {
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![dna], vec![(cell_id.clone(), None)]).await;
         let conductor_handle = activate(conductor_handle).await;
-        let shutdown = conductor_handle.take_shutdown_handle().unwrap();
+
         // Allow agents time to join
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
@@ -739,8 +733,7 @@ pub mod test {
         let respond = Respond::Request(Box::new(respond));
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
     async fn make_dna(network_seed: &str, zomes: Vec<TestWasm>) -> DnaFile {

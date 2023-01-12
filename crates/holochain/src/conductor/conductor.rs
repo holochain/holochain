@@ -300,7 +300,7 @@ mod startup_shutdown_impls {
         /// Broadcasts the shutdown signal to all managed tasks.
         /// To actually wait for these tasks to complete, be sure to
         /// `take_shutdown_handle` to await for completion.
-        pub fn shutdown(&self) -> JoinHandle<Result<TaskManagerResult, tokio::task::JoinError>> {
+        pub fn shutdown(&self) -> JoinHandle<TaskManagerResult> {
             self.shutting_down
                 .store(true, std::sync::atomic::Ordering::Relaxed);
 
@@ -311,9 +311,9 @@ mod startup_shutdown_impls {
                 if let Some((manager, task)) = tup {
                     tracing::info!("Sending shutdown signal to all managed tasks.");
                     let (_, _, r) = futures::join!(ghost_shutdown, manager.shutdown(), task,);
-                    r
+                    r?
                 } else {
-                    Ok(ghost_shutdown.await.map_err(TaskManagerError::internal))
+                    ghost_shutdown.await.map_err(TaskManagerError::internal)
                 }
             })
         }
