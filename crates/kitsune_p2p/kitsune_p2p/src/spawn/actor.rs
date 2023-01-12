@@ -12,12 +12,8 @@ use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use kitsune_p2p_fetch::*;
-use kitsune_p2p_proxy::tx2::*;
-use kitsune_p2p_transport_quic::tx2::*;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
-use kitsune_p2p_types::tx2::tx2_pool_promote::*;
-use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::tx2::*;
 use kitsune_p2p_types::*;
@@ -29,6 +25,7 @@ use std::sync::Arc;
 /// See <https://github.com/holochain/bootstrap>
 mod bootstrap;
 mod discover;
+mod meta_net;
 mod space;
 use ghost_actor::dependencies::tracing;
 use space::*;
@@ -87,10 +84,10 @@ ghost_actor::ghost_chan! {
         fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
 
         /// New Con
-        fn new_con(url: TxUrl, con: WireConHnd) -> ();
+        fn new_con(url: String, con: meta_net::MetaNetCon) -> ();
 
         /// Del Con
-        fn del_con(url: TxUrl) -> ();
+        fn del_con(url: String) -> ();
 
         /// Fetch an op from a remote
         fn fetch(key: FetchKey, space: KSpace, source: FetchSource) -> ();
@@ -101,7 +98,7 @@ pub(crate) struct KitsuneP2pActor {
     channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
     internal_sender: ghost_actor::GhostSender<Internal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    ep_hnd: Tx2EpHnd<wire::Wire>,
+    ep_hnd: meta_net::MetaNet,
     host: HostApi,
     #[allow(clippy::type_complexity)]
     spaces: HashMap<
@@ -128,97 +125,6 @@ impl KitsuneP2pActor {
     ) -> KitsuneP2pResult<Self> {
         crate::types::metrics::init();
 
-        if config.is_tx2() {
-            tracing::trace!("tx2");
-        } else if config.is_tx4() {
-            tracing::trace!("tx4");
-        }
-
-        let tx2_conf = config.to_tx2().map_err(KitsuneP2pError::other)?;
-
-        let mut is_mock = false;
-
-        // set up our backend based on config
-        let (f, bind_to) = match tx2_conf.backend {
-            KitsuneP2pTx2Backend::Mem => {
-                let mut conf = MemConfig::default();
-                conf.tls = Some(tls_config.clone());
-                conf.tuning_params = Some(config.tuning_params.clone());
-                (
-                    tx2_mem_adapter(conf)
-                        .await
-                        .map_err(KitsuneP2pError::other)?,
-                    "none:".into(),
-                )
-            }
-            KitsuneP2pTx2Backend::Quic { bind_to } => {
-                let mut conf = QuicConfig::default();
-                conf.tls = Some(tls_config.clone());
-                conf.tuning_params = Some(config.tuning_params.clone());
-                (
-                    tx2_quic_adapter(conf)
-                        .await
-                        .map_err(KitsuneP2pError::other)?,
-                    bind_to,
-                )
-            }
-            KitsuneP2pTx2Backend::Mock { mock_network } => {
-                is_mock = true;
-                (mock_network, "none:".into())
-            }
-        };
-
-        // wrap in restart logic
-        let f = tx2_restart_adapter(f);
-
-        // convert to frontend
-        let f = tx2_pool_promote(f, config.tuning_params.clone());
-
-        // wrap in proxy
-        let f = if !is_mock {
-            let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
-            conf.tuning_params = Some(config.tuning_params.clone());
-            match tx2_conf.use_proxy {
-                KitsuneP2pTx2ProxyConfig::NoProxy => (),
-                KitsuneP2pTx2ProxyConfig::Specific(proxy_url) => {
-                    conf.client_of_remote_proxy = ProxyRemoteType::Specific(proxy_url);
-                }
-                KitsuneP2pTx2ProxyConfig::Bootstrap {
-                    bootstrap_url,
-                    fallback_proxy_url,
-                } => {
-                    conf.client_of_remote_proxy = ProxyRemoteType::Bootstrap {
-                        bootstrap_url,
-                        fallback_proxy_url,
-                    };
-                    conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
-                        Box::pin(async move {
-                            match bootstrap::proxy_list(bootstrap_url.into()).await {
-                                Ok(mut proxy_list) => {
-                                    if proxy_list.is_empty() {
-                                        return None;
-                                    }
-                                    use rand::Rng;
-                                    Some(
-                                        proxy_list
-                                            .remove(
-                                                rand::thread_rng().gen_range(0..proxy_list.len()),
-                                            )
-                                            .into(),
-                                    )
-                                }
-                                _ => None,
-                            }
-                        })
-                    });
-                }
-            }
-            let f = tx2_proxy(f, conf)?;
-            f
-        } else {
-            f
-        };
-
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
             let t = match d {
                 "Wire::Failure" => KitsuneMetrics::Failure,
@@ -236,17 +142,17 @@ impl KitsuneP2pActor {
             KitsuneMetrics::count(t, l);
         });
 
-        // wrap in api
-        let f = tx2_api(f, metrics);
-
-        // bind local endpoint
-        let ep = f
-            .bind(bind_to, config.tuning_params.implicit_timeout())
-            .await
-            .map_err(KitsuneP2pError::other)?;
-
-        // capture endpoint handle
-        let ep_hnd = ep.handle().clone();
+        // is_* fns won't return true if a feature is not enabled
+        // so we don't have to duplicate the feature checks
+        let (ep_hnd, ep_evt) = if config.is_tx2() {
+            tracing::trace!("tx2");
+            meta_net::MetaNet::new_tx2(config, tls_config, metrics).await?
+        } else if config.is_tx4() {
+            tracing::trace!("tx4");
+            meta_net::MetaNet::new_tx4(config).await?
+        } else {
+            return Err("tx2 or tx4 feature must be enabled".into());
+        };
 
         struct FetchResponseConfig(kitsune_p2p_types::config::KitsuneP2pTuningParams);
 
@@ -333,34 +239,26 @@ impl KitsuneP2pActor {
             async move {
                 let fetch_response_queue = &fetch_response_queue;
                 let fetch_queue = &fetch_queue;
-                ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
+                ep_evt.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                     let evt_sender = evt_sender.clone();
                     let host = host.clone();
                     let tuning_params = tuning_params.clone();
                     let i_s = i_s.clone();
                     async move {
-                        macro_rules! resp {
-                            ($r:expr, $e:expr) => {
-                                // this can only error as channel closed
-                                // it would be noise to output tracing errors
-                                let _ = $r.respond($e, tuning_params.implicit_timeout()).await;
-                            };
-                        }
-
                         let evt_sender = &evt_sender;
-                        use tx2_api::Tx2EpEvent::*;
-                        #[allow(clippy::single_match)]
                         match event {
-                            OutgoingConnection(Tx2EpConnection { con, url }) => {
-                                let _ = i_s.new_con(url, con).await;
+                            meta_net::MetaNetEvt::Connected { remote_url, con } => {
+                                let _ = i_s.new_con(remote_url, con).await;
                             }
-                            IncomingConnection(Tx2EpConnection { con, url }) => {
-                                let _ = i_s.new_con(url, con).await;
+                            meta_net::MetaNetEvt::Disconnected { remote_url, con: _ } => {
+                                let _ = i_s.del_con(remote_url).await;
                             }
-                            ConnectionClosed(Tx2EpConnectionClosed { url, .. }) => {
-                                let _ = i_s.del_con(url).await;
-                            }
-                            IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) => {
+                            meta_net::MetaNetEvt::Request {
+                                remote_url: _,
+                                con: _,
+                                data,
+                                respond,
+                            } => {
                                 match data {
                                     wire::Wire::Call(wire::Call {
                                         space,
@@ -375,13 +273,13 @@ impl KitsuneP2pActor {
                                             Err(err) => {
                                                 let reason = format!("{:?}", err);
                                                 let fail = wire::Wire::failure(reason);
-                                                resp!(respond, fail);
+                                                respond(fail).await;
                                                 return;
                                             }
                                             Ok(r) => r,
                                         };
                                         let resp = wire::Wire::call_resp(res.into());
-                                        resp!(respond, resp);
+                                        respond(resp).await;
                                     }
                                     wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
                                         if let Ok(Some(agent_info_signed)) = host
@@ -392,10 +290,10 @@ impl KitsuneP2pActor {
                                             .await
                                         {
                                             let resp = wire::Wire::peer_get_resp(agent_info_signed);
-                                            resp!(respond, resp);
+                                            respond(resp).await;
                                         } else {
                                             let resp = wire::Wire::failure("no such agent".into());
-                                            resp!(respond, resp);
+                                            respond(resp).await;
                                         }
                                     }
                                     wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
@@ -408,21 +306,25 @@ impl KitsuneP2pActor {
                                         match evt_sender.query_agents(query).await {
                                             Ok(list) if !list.is_empty() => {
                                                 let resp = wire::Wire::peer_query_resp(list);
-                                                resp!(respond, resp);
+                                                respond(resp).await;
                                             }
                                             res => {
                                                 let resp = wire::Wire::failure(format!(
                                                     "error getting agents: {:?}",
                                                     res
                                                 ));
-                                                resp!(respond, resp);
+                                                respond(resp).await;
                                             }
                                         }
                                     }
                                     data => unimplemented!("{:?}", data),
                                 }
                             }
-                            IncomingNotify(Tx2EpIncomingNotify { con, data, url, .. }) => {
+                            meta_net::MetaNetEvt::Notify {
+                                remote_url: url,
+                                con,
+                                data,
+                            } => {
                                 match data {
                                     wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
                                         space,

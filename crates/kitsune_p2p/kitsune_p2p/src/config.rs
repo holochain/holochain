@@ -155,7 +155,9 @@ impl KitsuneP2pConfig {
                 use_proxy: NoProxy,
             }),
             #[cfg(feature = "tx4")]
-            Some(TransportConfig::Tx4 { .. }) => Err("Cannot convert tx4 config into tx2".into()),
+            Some(TransportConfig::WebRTC { .. }) => {
+                Err("Cannot convert tx4 config into tx2".into())
+            }
             None | Some(TransportConfig::Mem {}) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mem,
                 use_proxy: NoProxy,
