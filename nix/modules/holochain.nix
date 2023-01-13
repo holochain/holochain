@@ -54,7 +54,11 @@
       inherit cargoArtifacts;
       doInstallCargoArtifacts = true;
       doCheck = false;
+      NIX_DEBUG = 1;
       # cargoExtraArgs = "--features 'build' -p holochain_wasm_test_utils";
+      # preConfigure = lib.optionalString pkgs.stdenv.isDarwin ''
+      #   export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation $NIX_LDFLAGS"
+      # '';
     });
 
     holochain-tests = craneLib.cargoNextest (commonArgs // {

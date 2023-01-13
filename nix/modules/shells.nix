@@ -58,8 +58,13 @@
           cargo-sweep
         ])
         ++ [
+          config.rust.packages.holochain.rustPlatform.rust.rustc
+          config.rust.packages.holochain.rustPlatform.rust.cargo
+        ]
+        # latest crate2nix broken on darwin
+        ++ (lib.optionals pkgs.stdenv.isLinux [
           config.crate2nix
-        ];
+        ]);
     };
 
     devShells.release = self'.devShells.coreDev.overrideAttrs (attrs: {
