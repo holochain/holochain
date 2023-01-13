@@ -25,7 +25,7 @@ pub use app_entry_bytes::*;
 pub use error::*;
 
 /// Entries larger than this number of bytes cannot be created
-pub const ENTRY_SIZE_LIMIT: usize = 4 * 1000 * 1000; // 4MiB
+pub const ENTRY_SIZE_LIMIT: usize = 4 * 1000 * 1000; // 4MB
 
 /// The data type written to the source chain when explicitly granting a capability.
 /// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
