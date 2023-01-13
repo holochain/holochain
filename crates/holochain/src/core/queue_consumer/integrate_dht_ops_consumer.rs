@@ -21,7 +21,7 @@ pub fn spawn_integrate_dht_ops_consumer(
 
     super::queue_consumer_dna_bound(
         "integrate_dht_ops_consumer",
-        dna_hash.clone(),
+        dna_hash,
         tm,
         (tx.clone(), rx),
         move || {

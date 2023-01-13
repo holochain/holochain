@@ -299,7 +299,7 @@ impl TaskManagerClient {
             tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
         } else {
             tracing::warn!("Tried to shutdown task manager while it's already shutting down");
-            tokio::spawn(async move { () })
+            tokio::spawn(async move {})
         }
     }
 
@@ -310,7 +310,7 @@ impl TaskManagerClient {
             tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
         } else {
             // already shutting down
-            tokio::spawn(async move { () })
+            tokio::spawn(async move {})
         }
     }
 
@@ -448,7 +448,7 @@ mod test {
             })
         });
 
-        let (mut tm, main_task) = handle.task_manager.share_mut(|o| o.take().unwrap());
+        let (tm, main_task) = handle.task_manager.share_mut(|o| o.take().unwrap());
 
         // the outcome channel sender lives on the TaskManager, so we need to drop it
         // so that the main_task will end

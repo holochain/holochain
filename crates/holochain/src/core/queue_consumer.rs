@@ -95,7 +95,7 @@ pub async fn spawn_queue_consumer_tasks(
 
     // Publish
     let tx_publish = spawn_publish_dht_ops_consumer(
-        cell_id.clone(),
+        cell_id,
         authored_db.clone(),
         conductor.clone(),
         network.clone(),
@@ -172,7 +172,7 @@ pub async fn spawn_queue_consumer_tasks(
         )
     });
 
-    let tx_cs = queue_consumer_map.spawn_once_countersigning(dna_hash.clone(), || {
+    let tx_cs = queue_consumer_map.spawn_once_countersigning(dna_hash, || {
         spawn_countersigning_consumer(
             space.clone(),
             conductor.task_manager(),
