@@ -158,7 +158,7 @@ impl KitsuneP2pActor {
                 TransportConfig::WebRTC { signal_url } => signal_url.clone(),
                 _ => unreachable!(),
             };
-            let (h, e) = MetaNet::new_tx4(config.tuning_params.clone(), signal_url).await?;
+            let (h, e) = MetaNet::new_tx4(config.tuning_params.clone(), host.clone(), signal_url).await?;
             ep_hnd = Some(h);
             ep_evt = Some(e);
         }

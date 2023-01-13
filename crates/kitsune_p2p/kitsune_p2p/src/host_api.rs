@@ -3,6 +3,7 @@ use must_future::MustBoxFuture;
 use std::sync::Arc;
 
 use kitsune_p2p_types::{
+    dependencies::lair_keystore_api,
     bin_types::KitsuneSpace,
     dht::{
         region::{Region, RegionCoords},
@@ -87,6 +88,18 @@ pub trait KitsuneHost: 'static + Send + Sync {
             async move { Ok(op_hash_list.into_iter().map(|_| false).collect()) },
         )
         .into()
+    }
+
+    /// Get the lair "tag" identifying the id seed to use for crypto signing.
+    /// (this is currently only used in tx4/WebRTC if that feature is enabled.)
+    fn lair_tag(&self) -> Option<Arc<str>> {
+        None
+    }
+
+    /// Get the lair client to use as the backend keystore.
+    /// (this is currently only used in tx4/WebRTC if that feature is enabled.)
+    fn lair_client(&self) -> Option<lair_keystore_api::LairClient> {
+        None
     }
 }
 

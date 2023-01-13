@@ -107,7 +107,7 @@ impl ConductorBuilder {
 
         let network_config = config.network.clone().unwrap_or_default();
         let (cert_digest, cert, cert_priv_key) =
-            keystore.get_or_create_tls_cert_by_tag(tag.0).await?;
+            keystore.get_or_create_tls_cert_by_tag(tag.0.clone()).await?;
         let tls_config =
             holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
                 cert,
@@ -121,6 +121,8 @@ impl ConductorBuilder {
             ribosome_store.clone(),
             network_config.tuning_params.clone(),
             strat,
+            Some(tag.0),
+            Some(keystore.lair_client()),
         );
 
         let (holochain_p2p, p2p_evt) =
@@ -274,6 +276,7 @@ impl ConductorBuilder {
         self.config.environment_path = env_path.to_path_buf().into();
 
         let spaces = Spaces::new(&self.config)?;
+        let tag = spaces.get_state().await?.tag().clone();
 
         let network_config = self.config.network.clone().unwrap_or_default();
         let tuning_params = network_config.tuning_params.clone();
@@ -281,7 +284,7 @@ impl ConductorBuilder {
 
         let ribosome_store = RwShare::new(self.ribosome_store);
         let host =
-            KitsuneHostImpl::new(spaces.clone(), ribosome_store.clone(), tuning_params, strat);
+            KitsuneHostImpl::new(spaces.clone(), ribosome_store.clone(), tuning_params, strat, Some(tag.0), Some(keystore.lair_client()));
 
         let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)

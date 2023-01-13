@@ -470,16 +470,25 @@ impl MetaNet {
     #[cfg(feature = "tx4")]
     pub async fn new_tx4(
         tuning_params: KitsuneP2pTuningParams,
+        host: HostApi,
         signal_url: String,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
 
-        let tx4_config = tx4::DefConfig::default()
+        let mut tx4_config = tx4::DefConfig::default()
             .with_max_send_bytes(tuning_params.tx4_max_send_bytes)
             .with_max_recv_bytes(tuning_params.tx4_max_recv_bytes)
             .with_max_conn_count(tuning_params.tx4_max_conn_count)
             .with_max_conn_init(tuning_params.tx4_max_conn_init());
+
+        if let Some(lair_client) = host.lair_client() {
+            tx4_config.set_lair_client(lair_client);
+        }
+
+        if let Some(lair_tag) = host.lair_tag() {
+            tx4_config.set_lair_tag(lair_tag);
+        }
 
         let (ep_hnd, mut ep_evt) = tx4::Ep::with_config(tx4_config).await?;
 
