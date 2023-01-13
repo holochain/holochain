@@ -47,19 +47,19 @@
     # * everything needed to compile this repos' crates
     # * CI scripts
     devShells.coreDev = hcMkShell {
-      nativeBuildInputs =
-        builtins.attrValues (config.coreScripts)
+      buildInputs =
+        (builtins.attrValues (config.coreScripts))
         ++ (with pkgs;[
           cargo-nextest
-          crate2nix
-        ])
-        ++ (with pkgs;[
           sqlcipher
           gdb
           gh
           nixpkgs-fmt
           cargo-sweep
-        ]);
+        ])
+        ++ [
+          config.crate2nix
+        ];
     };
 
     devShells.release = self'.devShells.coreDev.overrideAttrs (attrs: {

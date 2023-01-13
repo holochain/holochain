@@ -35,10 +35,12 @@
         ./nix/modules/srcCleaned.nix
         ./nix/modules/core.nix
         ./nix/modules/coreScripts.nix
+        ./nix/modules/crate2nix.nix
         ./nix/modules/hnRustClippy.nix
         ./nix/modules/hnRustFmtCheck.nix
         ./nix/modules/hnRustFmtFmt.nix
         ./nix/modules/holochain.nix
+        ./nix/modules/holochain-crate2nix.nix
         ./nix/modules/nixEnvPrefixEval.nix
         ./nix/modules/releaseAutomation.nix
         ./nix/modules/rust
