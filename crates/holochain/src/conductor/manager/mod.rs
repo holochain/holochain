@@ -303,6 +303,16 @@ impl TaskManagerClient {
         }
     }
 
+    /// Stop all tasks for a Cell and await their completion.
+    pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
+        if let Some(tm) = self.tm.lock().as_mut() {
+            tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)))
+        } else {
+            tracing::warn!("Tried to shutdown cell's tasks while they're already shutting down");
+            tokio::spawn(async move {})
+        }
+    }
+
     /// Stop all tasks and return a future to await their completion,
     /// and prevent any new tasks from being added to the manager.
     pub fn shutdown(&mut self) -> ShutdownHandle {
