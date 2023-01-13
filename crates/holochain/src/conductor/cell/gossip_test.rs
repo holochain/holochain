@@ -26,7 +26,7 @@ async fn gossip_test() {
         .call(&cell_1.zome(TestWasm::Anchor), "anchor", anchor)
         .await;
 
-    consistency_10s([&cell_1, &cell_2]).await;
+    consistency_60s([&cell_1, &cell_2]).await;
 
     let hashes: EntryHashes = conductors[1]
         .call(

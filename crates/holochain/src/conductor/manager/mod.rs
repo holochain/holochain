@@ -38,8 +38,8 @@ pub enum TaskKind {
 
 /// The outcome of a task that has finished.
 pub enum TaskOutcome {
-    /// Do nothing
-    Noop,
+    // /// Do nothing
+    // Noop,
     /// Log an info trace and take no other action.
     LogInfo(String),
     /// Log an error and take no other action.
@@ -63,7 +63,7 @@ pub fn spawn_task_outcome_handler(
     tokio::spawn(async move {
         while let Some((_group, result)) = outcomes.next().await {
             match result {
-                TaskOutcome::Noop => (),
+                // TaskOutcome::Noop => (),
                 TaskOutcome::LogInfo(context) => {
                     debug!("Managed task completed: {}", context)
                 }
@@ -403,9 +403,7 @@ impl TaskManagerClient {
         group: TaskGroup,
         f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
-        dbg!();
         if let Some(tm) = self.tm.lock().as_mut() {
-            dbg!();
             tm.add_task(group, f)
         } else {
             tracing::warn!("Tried to add task while task manager is shutting down.");
