@@ -102,10 +102,19 @@ async fn async_main() {
 
     // Await on the main JoinHandle, keeping the process alive until all
     // Conductor activity has ceased
-    handle_shutdown(conductor.shutdown().await);
+    if let Some((tm, main_task)) = conductor.detach_task_management() {
+        ctrlc::set_handler(move || {
+            let tm = tm.clone();
+            tokio::spawn(async move {
+                tracing::info!("Gracefully shutting down conductor...");
+                tm.stop_all_tasks().await.ok();
+                tracing::info!("Conductor ready to shut down.");
+            });
+        })
+        .unwrap_or_else(|e| tracing::error!("Could not handle termination signal: {:?}", e));
 
-    // TODO: on SIGINT/SIGKILL, kill the conductor:
-    // conductor.kill().await
+        handle_shutdown(main_task.await);
+    }
 }
 
 async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {

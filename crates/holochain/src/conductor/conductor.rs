@@ -236,7 +236,7 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
-    use crate::conductor::manager::{spawn_task_outcome_handler, TaskManagerError};
+    use crate::conductor::manager::spawn_task_outcome_handler;
 
     use super::*;
 
@@ -298,6 +298,14 @@ mod startup_shutdown_impls {
             }
         }
 
+        /// Take ownership of the TaskManagerClient as well as the task which completes
+        /// when all managed tasks have completed
+        pub fn detach_task_management(
+            &self,
+        ) -> Option<(TaskManagerClient, JoinHandle<TaskManagerResult>)> {
+            self.task_manager.share_mut(|tm| tm.take())
+        }
+
         /// Broadcasts the shutdown signal to all managed tasks
         /// and returns a future to await for shutdown to complete.
         pub fn shutdown(&self) -> JoinHandle<TaskManagerResult> {
@@ -306,16 +314,11 @@ mod startup_shutdown_impls {
 
             use ghost_actor::GhostControlSender;
             let ghost_shutdown = self.holochain_p2p.ghost_actor_shutdown_immediate();
-            let tup = self.task_manager.share_mut(|tm| tm.take());
+            let (mut manager, task) = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
             tokio::task::spawn(async move {
-                if let Some((mut manager, task)) = tup {
-                    tracing::info!("Sending shutdown signal to all managed tasks.");
-                    let (_, _, r) =
-                        futures::join!(ghost_shutdown, manager.shutdown().boxed(), task,);
-                    r?
-                } else {
-                    ghost_shutdown.await.map_err(TaskManagerError::internal)
-                }
+                tracing::info!("Sending shutdown signal to all managed tasks.");
+                let (_, _, r) = futures::join!(ghost_shutdown, manager.shutdown().boxed(), task,);
+                r?
             })
         }
 
