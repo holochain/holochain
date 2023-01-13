@@ -3073,6 +3073,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "tracing-subscriber 0.2.25",
+ "tx4",
  "url2",
 ]
 
@@ -3322,7 +3323,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing-subscriber 0.2.25",
- "tx4",
  "url 2.3.1",
  "url2",
  "webpki 0.22.0",

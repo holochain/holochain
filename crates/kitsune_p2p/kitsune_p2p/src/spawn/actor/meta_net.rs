@@ -2,6 +2,8 @@
 #![allow(dead_code)]
 #![allow(irrefutable_let_patterns)]
 #![allow(unused_variables)]
+#![allow(unreachable_code)]
+#![allow(unused_imports)]
 #![allow(clippy::needless_return)]
 #![allow(clippy::blocks_in_if_conditions)]
 //! Networking abstraction to handle feature flipping.
@@ -9,12 +11,21 @@
 use crate::*;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
+
+#[cfg(feature = "tx2")]
 use kitsune_p2p_proxy::tx2::*;
+#[cfg(feature = "tx2")]
 use kitsune_p2p_transport_quic::tx2::*;
+#[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::tx2_api::*;
+#[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+#[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
+#[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::*;
+
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
 use std::sync::Arc;
 
@@ -76,6 +87,9 @@ pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
 pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
     Tx2(Tx2ConHnd<wire::Wire>),
+
+    #[cfg(feature = "tx4")]
+    Tx4(tx4::Ep, tx4::Tx4Url),
 }
 
 impl MetaNetCon {
@@ -87,6 +101,8 @@ impl MetaNetCon {
                 return;
             }
         }
+
+        // TODO - no way to close a tx4 con currently
     }
 
     pub fn is_closed(&self) -> bool {
@@ -97,6 +113,13 @@ impl MetaNetCon {
             }
         }
 
+        #[cfg(feature = "tx4")]
+        {
+            // TODO - erm, tx4 connections are never exactly "closed"
+            //        since it's more of a message queue...
+            return false;
+        }
+
         true
     }
 
@@ -105,6 +128,20 @@ impl MetaNetCon {
         {
             if let MetaNetCon::Tx2(con) = self {
                 return con.notify(payload, timeout).await;
+            }
+        }
+
+        #[cfg(feature = "tx4")]
+        {
+            if let MetaNetCon::Tx4(ep, rem_url) = self {
+                let mut writer = tx4::Buf::from_writer().map_err(KitsuneError::other)?;
+                use kitsune_p2p_types::codec::Codec;
+                payload.encode(&mut writer).map_err(KitsuneError::other)?;
+                let data = writer.finish();
+                ep.send(rem_url.clone(), data)
+                    .await
+                    .map_err(KitsuneError::other)?;
+                return Ok(());
             }
         }
 
@@ -147,7 +184,7 @@ pub enum MetaNet {
 
     /// Tx4 Abstraction
     #[cfg(feature = "tx4")]
-    Tx4,
+    Tx4(tx4::Ep, tx4::Tx4Url),
 }
 
 impl MetaNet {
@@ -349,8 +386,89 @@ impl MetaNet {
 
     /// Construct abstraction with tx4 backend.
     #[cfg(feature = "tx4")]
-    pub async fn new_tx4(_config: KitsuneP2pConfig) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
-        todo!()
+    pub async fn new_tx4(
+        tuning_params: KitsuneP2pTuningParams,
+        signal_url: String,
+    ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
+        let (mut evt_send, evt_recv) =
+            futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
+
+        let tx4_config = tx4::DefConfig::default()
+            .with_max_send_bytes(tuning_params.tx4_max_send_bytes)
+            .with_max_recv_bytes(tuning_params.tx4_max_recv_bytes)
+            .with_max_conn_count(tuning_params.tx4_max_conn_count)
+            .with_max_conn_init(tuning_params.tx4_max_conn_init());
+
+        let (ep_hnd, mut ep_evt) = tx4::Ep::with_config(tx4_config).await?;
+
+        let cli_url = ep_hnd.listen(tx4::Tx4Url::new(&signal_url)?).await?;
+
+        let ep_hnd2 = ep_hnd.clone();
+        tokio::task::spawn(async move {
+            while let Some(evt) = ep_evt.recv().await {
+                let evt = match evt {
+                    Ok(evt) => evt,
+                    // TODO - FIXME - handle errors / reconnect?
+                    Err(err) => panic!("{:?}", err),
+                };
+
+                match evt {
+                    tx4::EpEvt::Connected { rem_cli_url } => {
+                        if evt_send
+                            .send(MetaNetEvt::Connected {
+                                remote_url: rem_cli_url.to_string(),
+                                con: MetaNetCon::Tx4(ep_hnd2.clone(), rem_cli_url),
+                            })
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    tx4::EpEvt::Disconnected { rem_cli_url } => {
+                        if evt_send
+                            .send(MetaNetEvt::Disconnected {
+                                remote_url: rem_cli_url.to_string(),
+                                con: MetaNetCon::Tx4(ep_hnd2.clone(), rem_cli_url),
+                            })
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    tx4::EpEvt::Data {
+                        rem_cli_url,
+                        mut data,
+                        permit,
+                    } => {
+                        use kitsune_p2p_types::codec::Codec;
+                        match wire::Wire::decode(&mut data) {
+                            Ok(data) => {
+                                if evt_send
+                                    .send(MetaNetEvt::Notify {
+                                        remote_url: rem_cli_url.to_string(),
+                                        con: MetaNetCon::Tx4(ep_hnd2.clone(), rem_cli_url),
+                                        data,
+                                    })
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
+                                }
+                            }
+                            Err(err) => {
+                                tracing::error!(?err, "decoding error");
+                                // TODO - drop connection??
+                            }
+                        }
+                    }
+                    tx4::EpEvt::Demo { rem_cli_url: _ } => (),
+                }
+            }
+        });
+
+        Ok((MetaNet::Tx4(ep_hnd, cli_url), evt_recv))
     }
 
     pub fn local_addr(&self) -> KitsuneResult<String> {
@@ -358,6 +476,33 @@ impl MetaNet {
         {
             if let MetaNet::Tx2(ep) = self {
                 return ep.local_addr().map(|s| s.to_string());
+            }
+        }
+
+        #[cfg(feature = "tx4")]
+        {
+            if let MetaNet::Tx4(_ep, cli_url) = self {
+                return Ok(cli_url.to_string());
+            }
+        }
+
+        panic!("invalid features");
+    }
+
+    pub fn local_id(&self) -> Arc<[u8; 32]> {
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNet::Tx2(ep) = self {
+                return ep.local_cert().into();
+            }
+        }
+
+        #[cfg(feature = "tx4")]
+        {
+            if let MetaNet::Tx4(_ep, cli_url) = self {
+                if let Some(id) = cli_url.id() {
+                    return Arc::new(id.0);
+                }
             }
         }
 
@@ -372,6 +517,8 @@ impl MetaNet {
                 return;
             }
         }
+
+        // TODO - currently no way to shutdown tx4
     }
 
     pub async fn get_connection(
@@ -387,17 +534,16 @@ impl MetaNet {
             }
         }
 
-        Err("invalid features".into())
-    }
-
-    pub fn local_id(&self) -> Arc<[u8; 32]> {
-        #[cfg(feature = "tx2")]
+        #[cfg(feature = "tx4")]
         {
-            if let MetaNet::Tx2(ep) = self {
-                return ep.local_cert().into();
+            if let MetaNet::Tx4(ep, _cli_url) = self {
+                return Ok(MetaNetCon::Tx4(
+                    ep.clone(),
+                    tx4::Tx4Url::new(remote_url).map_err(KitsuneError::other)?,
+                ));
             }
         }
 
-        panic!("invalid features");
+        Err("invalid features".into())
     }
 }

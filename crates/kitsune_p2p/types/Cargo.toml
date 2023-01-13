@@ -35,7 +35,6 @@ sysinfo = "0.15.9"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full" ] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
-tx4 = { version = "0.0.1", optional = true }
 url = "2"
 url2 = "0.0.6"
 webpki = "0.22.0"

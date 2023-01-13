@@ -154,7 +154,11 @@ impl KitsuneP2pActor {
         #[cfg(feature = "tx4")]
         if ep_hnd.is_none() && config.is_tx4() {
             tracing::trace!("tx4");
-            let (h, e) = MetaNet::new_tx4(config.clone()).await?;
+            let signal_url = match config.transport_pool.get(0).unwrap() {
+                TransportConfig::WebRTC { signal_url } => signal_url.clone(),
+                _ => unreachable!(),
+            };
+            let (h, e) = MetaNet::new_tx4(config.tuning_params.clone(), signal_url).await?;
             ep_hnd = Some(h);
             ep_evt = Some(e);
         }

@@ -41,6 +41,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.11", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
+tx4 = { version = "0.0.1", optional = true }
 url2 = "0.0.6"
 fixt = { path = "../../fixt", version = "^0.1.0-beta-rc.0"}
 
@@ -84,4 +85,3 @@ mock_network = [
 ]
 
 tx2 = [ "kitsune_p2p_types/tx2", "kitsune_p2p_transport_quic" ]
-tx4 = [ "kitsune_p2p_types/tx4" ]
