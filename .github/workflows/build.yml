@@ -14,8 +14,12 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - ubuntu-latest
-          - macos-latest
+          - arch: macos-x86_64
+            runs-on: [macos-latest]
+          - arch: macos-arm64
+            runs-on: [self-hosted, macOS, ARM64]
+          - arch: linux-x86_64
+            runs-on: [ubuntu-latest]
         # nixAttribute:
         #   - main
         #   - develop
@@ -31,7 +35,7 @@ jobs:
         #   - holochain-nixpkgs
         cachixName:
           - davhau
-    runs-on: "${{ matrix.platform }}"
+    runs-on: ${{ matrix.platform.runs-on }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
