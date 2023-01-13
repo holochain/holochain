@@ -32,6 +32,7 @@ holochain_sqlite = { version = "^0.1.0-beta-rc.1", path = "../holochain_sqlite" 
 holochain_serialized_bytes = "=0.0.51"
 holochain_state = { version = "^0.1.0-beta-rc.1", path = "../holochain_state" }
 holochain_types = { version = "^0.1.0-beta-rc.1", path = "../holochain_types" }
+holochain_util = { version = "^0.1.0-beta-rc.0", path = "../holochain_util", features = [ "pw" ] }
 holochain_wasmer_host = "=0.0.82"
 holochain_websocket = { version = "^0.1.0-beta-rc.0", path = "../holochain_websocket" }
 holochain_zome_types = { version = "^0.1.0-beta-rc.1", path = "../holochain_zome_types", features = ["full"] }
@@ -65,8 +66,7 @@ tempfile = "3.3"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full"] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
-holochain_util = { version = "^0.1.0-beta-rc.0", path = "../holochain_util", features = [ "pw" ] }
-task-motel = {path = "/home/michael/Holo/task-motel"}
+task-motel = { git = "https://github.com/maackle/task-motel-rs" }
 toml = "0.5.6"
 tracing = "0.1.26"
 tracing-futures = "0.2.5"

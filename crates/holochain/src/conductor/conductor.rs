@@ -298,9 +298,8 @@ mod startup_shutdown_impls {
             }
         }
 
-        /// Broadcasts the shutdown signal to all managed tasks.
-        /// To actually wait for these tasks to complete, be sure to
-        /// `take_shutdown_handle` to await for completion.
+        /// Broadcasts the shutdown signal to all managed tasks
+        /// and returns a future to await for shutdown to complete.
         pub fn shutdown(&self) -> JoinHandle<TaskManagerResult> {
             self.shutting_down
                 .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -309,9 +308,10 @@ mod startup_shutdown_impls {
             let ghost_shutdown = self.holochain_p2p.ghost_actor_shutdown_immediate();
             let tup = self.task_manager.share_mut(|tm| tm.take());
             tokio::task::spawn(async move {
-                if let Some((manager, task)) = tup {
+                if let Some((mut manager, task)) = tup {
                     tracing::info!("Sending shutdown signal to all managed tasks.");
-                    let (_, _, r) = futures::join!(ghost_shutdown, manager.stop_all_tasks(), task,);
+                    let (_, _, r) =
+                        futures::join!(ghost_shutdown, manager.shutdown().boxed(), task,);
                     r?
                 } else {
                     ghost_shutdown.await.map_err(TaskManagerError::internal)

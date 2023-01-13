@@ -8,6 +8,7 @@
 mod error;
 pub use error::*;
 
+use futures::Future;
 use futures::FutureExt;
 use holochain_types::prelude::*;
 use parking_lot::Mutex;
@@ -257,7 +258,7 @@ pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>
 }
 
 /// Each task has a group, and here they are
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TaskGroup {
     /// Tasks which are associated with the conductor as a whole
     Conductor,
@@ -274,29 +275,43 @@ pub type OutcomeReceiver = futures::channel::mpsc::Receiver<(TaskGroup, TaskOutc
 /// TaskManager task
 #[derive(Clone)]
 pub struct TaskManagerClient {
-    tm: Arc<Mutex<task_motel::TaskManager<TaskGroup, TaskOutcome>>>,
+    tm: Arc<Mutex<Option<task_motel::TaskManager<TaskGroup, TaskOutcome>>>>,
 }
 
 impl TaskManagerClient {
     /// Construct the TaskManager and the outcome channel receiver
     pub fn new() -> (Self, OutcomeReceiver) {
         let (tx, outcomes) = futures::channel::mpsc::channel(8);
+        let tm = task_motel::TaskManager::new(tx, |g| match g {
+            TaskGroup::Conductor => None,
+            TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
+            TaskGroup::Cell(cell_id) => Some(TaskGroup::Dna(Arc::new(cell_id.dna_hash().clone()))),
+        });
         let tm = Self {
-            tm: Arc::new(Mutex::new(task_motel::TaskManager::new(tx, |g| match g {
-                TaskGroup::Conductor => None,
-                TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
-                TaskGroup::Cell(cell_id) => {
-                    Some(TaskGroup::Dna(Arc::new(cell_id.dna_hash().clone())))
-                }
-            }))),
+            tm: Arc::new(Mutex::new(Some(tm))),
         };
         (tm, outcomes)
     }
 
-    /// Stop all tasks and return a future to await their completion.
-    /// This does not prevent new tasks from being added to the task manager.
+    /// Stop all tasks and await their completion.
     pub fn stop_all_tasks(&self) -> ShutdownHandle {
-        self.tm.lock().stop_group(&TaskGroup::Conductor)
+        if let Some(tm) = self.tm.lock().as_mut() {
+            tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
+        } else {
+            tracing::warn!("Tried to shutdown task manager while it's already shutting down");
+            tokio::spawn(async move { () })
+        }
+    }
+
+    /// Stop all tasks and return a future to await their completion,
+    /// and prevent any new tasks from being added to the manager.
+    pub fn shutdown(&mut self) -> ShutdownHandle {
+        if let Some(mut tm) = self.tm.lock().take() {
+            tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
+        } else {
+            // already shutting down
+            tokio::spawn(async move { () })
+        }
     }
 
     /// Add a conductor-level task whose outcome is ignored.
@@ -356,7 +371,7 @@ impl TaskManagerClient {
     ) {
         let name = name.to_string();
         let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
-        self.tm.lock().add_task(TaskGroup::Conductor, f)
+        self.add_task(TaskGroup::Conductor, f)
     }
 
     fn add_dna_task(
@@ -367,9 +382,10 @@ impl TaskManagerClient {
         f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
     ) {
         let name = name.to_string();
-        let f = |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
-        self.tm.lock().add_task(TaskGroup::Dna(dna_hash), f)
+        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
+        self.add_task(TaskGroup::Dna(dna_hash), f)
     }
+
     fn add_cell_task(
         &self,
         name: &str,
@@ -378,13 +394,33 @@ impl TaskManagerClient {
         f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
     ) {
         let name = name.to_string();
-        let f = |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
-        self.tm.lock().add_task(TaskGroup::Cell(cell_id), f)
+        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
+        self.add_task(TaskGroup::Cell(cell_id), f)
+    }
+
+    fn add_task<Fut: Future<Output = TaskOutcome> + Send + 'static>(
+        &self,
+        group: TaskGroup,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        dbg!();
+        if let Some(tm) = self.tm.lock().as_mut() {
+            dbg!();
+            tm.add_task(group, f)
+        } else {
+            tracing::warn!("Tried to add task while task manager is shutting down.");
+        }
     }
 }
 
+// impl Drop for TaskManagerClient {
+//     fn drop(&mut self) {
+//         self.shutdown();
+//     }
+// }
+
 /// A future which awaits the completion of all managed tasks
-pub type ShutdownHandle = task_motel::GroupStop;
+pub type ShutdownHandle = JoinHandle<()>;
 
 #[cfg(test)]
 mod test {
@@ -400,8 +436,11 @@ mod test {
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let tm = handle.task_manager();
         tm.add_conductor_task_unrecoverable("unrecoverable", |_stop| {
+            dbg!();
             tokio::spawn(async {
+                dbg!();
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                dbg!();
                 Err(Box::new(ConductorError::Other(
                     anyhow::anyhow!("Unrecoverable task failed").into(),
                 ))
@@ -409,7 +448,13 @@ mod test {
             })
         });
 
-        let (_, main_task) = handle.task_manager.share_mut(|o| o.take().unwrap());
+        let (mut tm, main_task) = handle.task_manager.share_mut(|o| o.take().unwrap());
+
+        // the outcome channel sender lives on the TaskManager, so we need to drop it
+        // so that the main_task will end
+
+        // tm.shutdown();
+        drop(tm);
 
         main_task
             .await
@@ -433,6 +478,7 @@ mod test {
         });
 
         let (_, main_task) = handle.task_manager.share_mut(|o| o.take().unwrap());
+        drop(tm);
         handle_shutdown(main_task.await);
     }
 }

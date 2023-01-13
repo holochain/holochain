@@ -6107,9 +6107,11 @@ checksum = "c02424087780c9b71cc96799eaeddff35af2bc513278cda5c99fc1f5d026d3c1"
 [[package]]
 name = "task-motel"
 version = "0.1.0"
+source = "git+https://github.com/maackle/task-motel-rs#f830707b97f7d829f0f0a7b8502c01f3c9ef4cf6"
 dependencies = [
  "futures",
  "parking_lot 0.12.1",
+ "tokio",
  "tracing",
 ]
 
