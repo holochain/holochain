@@ -157,7 +157,7 @@ impl KitsuneHost for SwitchboardEventHandler {
                                 .get(loc8)
                                 .map(|o| o.is_integrated)
                                 .unwrap_or_default();
-                            owned && arc.contains(&loc) && t0 <= op.timestamp && op.timestamp < t1
+                            owned && arc.contains(loc) && t0 <= op.timestamp && op.timestamp < t1
                         })
                         .map(second)
                         .cloned()
@@ -289,7 +289,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 // NB: this may be problematic on the receiving end because we
                 // actually care whether this Loc8 is interpreted as u8 or i8,
                 // and we lose that information here.
-                let loc = op.0[0] as u8 as i32;
+                let loc = op.0[0] as i32;
                 if loc == 192 {
                     dbg!((&self.node, loc));
                 }

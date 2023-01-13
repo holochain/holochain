@@ -357,7 +357,7 @@ impl RealRibosome {
 
         Ok(holochain_wasmer_host::module::MODULE_CACHE.write().get(
             self.wasm_cache_key(zome_name)?,
-            &*self.dna_file.get_wasm_for_zome(zome_name)?.code(),
+            &self.dna_file.get_wasm_for_zome(zome_name)?.code(),
         )?)
     }
 

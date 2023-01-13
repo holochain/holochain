@@ -181,3 +181,40 @@ With
 3. Post-release: [Merge release-20220907.100911 back into develop #1561](https://github.com/holochain/holochain/pull/1561)
 
     This PR was created automatically by the release process to merge the release changes back into the _develop_ branch.
+
+
+## Changing multiple frontmatters at once
+
+When we plan to change the versions of many or all workspace crates, there's a command that can be used to overwrite the frontmatter of multiple crates' changelogs in one go:
+
+```console
+nix-shell --pure --argstr flavor release --run 'release-automation --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
+(...)
+EOF
+)
+'
+```
+
+The `--match-filter` argument takes a regular expression to select to filter the crate names.
+The ellipsis give the position of the new YAML code for the frontmatters.
+
+### Example: initiate a beta-rc cycle
+
+
+```console
+nix-shell --pure --argstr flavor release --run 'release-automation --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
+default_semver_increment_mode: !pre_minor beta-rc
+EOF
+)
+'
+```
+
+### Example: initiate a one-time minor version bump
+
+```console
+nix-shell --pure --argstr flavor release --run 'release-automation --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
+semver_increment_mode: !minor
+EOF
+)
+'
+```

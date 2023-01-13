@@ -48,7 +48,7 @@ fixturator!(
     curve Predictable HashTypeAnyLinkable::Entry;
 );
 
-/// A type alias for a Vec<u8> whose fixturator is expected to only return
+/// A type alias for a `Vec<u8>` whose fixturator is expected to only return
 /// a Vec of length 36
 pub type ThirtySixHashBytes = Vec<u8>;
 

@@ -287,7 +287,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DeleteCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .delete_clone_cell(&*payload)
+                    .delete_clone_cell(&payload)
                     .await?;
                 Ok(AdminResponse::CloneCellDeleted)
             }
