@@ -26,7 +26,7 @@
           sqlcipher
         ])
         ++ (lib.optionals pkgs.stdenv.isDarwin
-          (with pkgs.darwin.apple_sdk.frameworks; [
+          (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
             CoreFoundation
             CoreServices
@@ -59,6 +59,13 @@
       # preConfigure = lib.optionalString pkgs.stdenv.isDarwin ''
       #   export NIX_LDFLAGS="-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation $NIX_LDFLAGS"
       # '';
+      NIX_CFLAGS_COMPILE = [ ] ++ lib.optionals pkgs.stdenv.isDarwin [
+        # disable modules, otherwise we get redeclaration errors
+        "-fno-modules"
+        # link AppKit since we don't get it from modules now
+        "-framework"
+        "CoreFoundation"
+      ];
     });
 
     holochain-tests = craneLib.cargoNextest (commonArgs // {
