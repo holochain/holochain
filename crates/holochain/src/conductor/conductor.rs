@@ -207,11 +207,13 @@ pub struct Conductor {
     /// Collection app interface data, keyed by id
     app_interfaces: RwShare<HashMap<AppInterfaceId, AppInterfaceRuntime>>,
 
-    /// The interface to the TaskManager, as well as the JoinHandle for
-    /// the long-running task which processes the outcomes of ended tasks,
+    /// The interface to the task manager
+    task_manager: TaskManagerClient,
+
+    /// The JoinHandle for the long-running task which processes the outcomes of ended tasks,
     /// taking actions like disabling cells or shutting down the conductor on errors.
     /// It terminates only when the TaskManager and all of its tasks have ended and dropped.
-    pub(crate) task_manager: RwShare<Option<(TaskManagerClient, JoinHandle<TaskManagerResult>)>>,
+    pub(crate) outcomes_task: RwShare<Option<JoinHandle<TaskManagerResult>>>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
     ribosome_store: RwShare<RibosomeStore>,
@@ -236,7 +238,7 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
-    use crate::conductor::manager::spawn_task_outcome_handler;
+    use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
 
     use super::*;
 
@@ -268,6 +270,7 @@ mod startup_shutdown_impls {
             holochain_p2p: holochain_p2p::HolochainP2pRef,
             spaces: Spaces,
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
+            outcome_sender: OutcomeSender,
         ) -> Self {
             Self {
                 spaces,
@@ -275,7 +278,9 @@ mod startup_shutdown_impls {
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 app_interfaces: RwShare::new(HashMap::new()),
-                task_manager: RwShare::new(None),
+                task_manager: TaskManagerClient::new(outcome_sender),
+                // Must be initialized later, since it requires an Arc<Conductor>
+                outcomes_task: RwShare::new(None),
                 admin_websocket_ports: RwShare::new(Vec::new()),
                 scheduler: Arc::new(parking_lot::Mutex::new(None)),
                 ribosome_store,
@@ -300,10 +305,8 @@ mod startup_shutdown_impls {
 
         /// Take ownership of the TaskManagerClient as well as the task which completes
         /// when all managed tasks have completed
-        pub fn detach_task_management(
-            &self,
-        ) -> Option<(TaskManagerClient, JoinHandle<TaskManagerResult>)> {
-            self.task_manager.share_mut(|tm| tm.take())
+        pub fn detach_task_management(&self) -> Option<JoinHandle<TaskManagerResult>> {
+            self.outcomes_task.share_mut(|tm| tm.take())
         }
 
         /// Broadcasts the shutdown signal to all managed tasks
@@ -314,28 +317,29 @@ mod startup_shutdown_impls {
 
             use ghost_actor::GhostControlSender;
             let ghost_shutdown = self.holochain_p2p.ghost_actor_shutdown_immediate();
-            let (mut manager, task) = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
+            let mut tm = self.task_manager();
+            let task = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
             tokio::task::spawn(async move {
                 tracing::info!("Sending shutdown signal to all managed tasks.");
-                let (_, _, r) = futures::join!(ghost_shutdown, manager.shutdown().boxed(), task,);
+                let (_, _, r) = futures::join!(ghost_shutdown, tm.shutdown().boxed(), task,);
                 r?
             })
         }
 
         pub(crate) async fn initialize_conductor(
             self: Arc<Self>,
+            outcome_rx: OutcomeReceiver,
             admin_configs: Vec<AdminInterfaceConfig>,
         ) -> ConductorResult<CellStartupErrors> {
             self.load_dnas().await?;
 
             // Start the task manager
-            self.task_manager.share_mut(|lock| {
+            self.outcomes_task.share_mut(|lock| {
                 if lock.is_some() {
                     panic!("Cannot start task manager twice");
                 }
-                let (tm, rx) = TaskManagerClient::new();
-                let task = spawn_task_outcome_handler(self.clone(), rx);
-                *lock = Some((tm, task));
+                let task = spawn_task_outcome_handler(self.clone(), outcome_rx);
+                *lock = Some(task);
             });
 
             self.clone().add_admin_interfaces(admin_configs).await?;
@@ -2051,13 +2055,7 @@ mod accessor_impls {
 
         /// Get a TaskManagerClient
         pub fn task_manager(&self) -> TaskManagerClient {
-            self.task_manager.share_ref(|maybe| {
-                maybe
-                    .as_ref()
-                    .expect("Task manager must be initialized")
-                    .0
-                    .clone()
-            })
+            self.task_manager.clone()
         }
     }
 }

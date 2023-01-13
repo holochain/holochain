@@ -60,11 +60,11 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
 ) {
     // Task that will kill the listener and all child connections.
     tm.add_conductor_task_ignored("admin interface websocket closer", |stop| {
-        tokio::task::spawn(handle.close_on(stop.map(|_| true)).map(Ok))
+        handle.close_on(stop.map(|_| true)).map(Ok)
     });
 
     tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), |_stop| {
-        tokio::task::spawn(async move {
+        async move {
             let num_connections = Arc::new(AtomicIsize::new(0));
             futures::pin_mut!(listener);
             // establish a new connection to a client
@@ -88,7 +88,7 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
                 }
             }
             ManagedTaskResult::Ok(())
-        })
+        }
     });
 }
 
@@ -113,10 +113,10 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
         .ok_or(InterfaceError::PortError)?;
     // Task that will kill the listener and all child connections.
     tm.add_conductor_task_ignored("app interface websocket closer", |stop| {
-        tokio::task::spawn(handle.close_on(stop.map(|_| true)).map(Ok))
+        handle.close_on(stop.map(|_| true)).map(Ok)
     });
     tm.add_conductor_task_ignored("app interface new connection handler", |_stop| {
-        tokio::task::spawn(async move {
+        async move {
             // establish a new connection to a client
             while let Some(connection) = listener.next().await {
                 match connection {
@@ -136,7 +136,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
             }
 
             ManagedTaskResult::Ok(())
-        })
+        }
     });
     Ok(port)
 }

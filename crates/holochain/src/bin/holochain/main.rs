@@ -100,9 +100,11 @@ async fn async_main() {
     #[cfg(unix)]
     let _ = notify(true, &[NotifyState::Ready]);
 
+    let tm = conductor.task_manager();
+
     // Await on the main JoinHandle, keeping the process alive until all
     // Conductor activity has ceased
-    if let Some((tm, main_task)) = conductor.detach_task_management() {
+    if let Some(main_task) = conductor.detach_task_management() {
         tokio::spawn(async move {
             tokio::signal::ctrl_c().await.unwrap_or_else(|e| {
                 tracing::error!("Could not handle termination signal: {:?}", e)

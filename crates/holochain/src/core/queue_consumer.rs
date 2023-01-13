@@ -47,7 +47,6 @@ use sys_validation_consumer::*;
 mod app_validation_consumer;
 use app_validation_consumer::*;
 mod publish_dht_ops_consumer;
-use tokio::task::JoinHandle;
 use validation_receipt_consumer::*;
 mod validation_receipt_consumer;
 use crate::conductor::conductor::{RwShare, StopReceiver};
@@ -645,34 +644,31 @@ pub(super) fn trigger_stream(rx: TriggerReceiver, stop: StopReceiver) -> impl St
     })))
 }
 
-fn queue_consumer_main_task_impl<
+async fn queue_consumer_main_task_impl<
     Fut: 'static + Send + Future<Output = WorkflowResult<WorkComplete>>,
 >(
     name: String,
     (tx, rx): (TriggerSender, TriggerReceiver),
+    stop: StopReceiver,
     mut fut: impl 'static + Send + FnMut() -> Fut,
-) -> impl FnOnce(StopReceiver) -> JoinHandle<ManagedTaskResult> {
-    move |stop| {
-        tokio::spawn(async move {
-            let mut triggers = trigger_stream(rx, stop);
-            loop {
-                if let Some(()) = triggers.next().await {
-                    match fut().await {
-                        Ok(WorkComplete::Incomplete) => {
-                            tracing::debug!("Work incomplete, retriggering workflow");
-                            tx.trigger(&"retrigger")
-                        }
-                        Err(err) => handle_workflow_error(err)?,
-                        _ => (),
-                    }
-                } else {
-                    tracing::info!("Cell is shutting down: stopping queue consumer '{}'", name);
-                    break;
+) -> ManagedTaskResult {
+    let mut triggers = trigger_stream(rx, stop);
+    loop {
+        if let Some(()) = triggers.next().await {
+            match fut().await {
+                Ok(WorkComplete::Incomplete) => {
+                    tracing::debug!("Work incomplete, retriggering workflow");
+                    tx.trigger(&"retrigger")
                 }
+                Err(err) => handle_workflow_error(err)?,
+                _ => (),
             }
-            Ok(())
-        })
+        } else {
+            tracing::info!("Cell is shutting down: stopping queue consumer '{}'", name);
+            break;
+        }
     }
+    ManagedTaskResult::Ok(())
 }
 
 fn queue_consumer_dna_bound<Fut: 'static + Send + Future<Output = WorkflowResult<WorkComplete>>>(
@@ -682,11 +678,10 @@ fn queue_consumer_dna_bound<Fut: 'static + Send + Future<Output = WorkflowResult
     (tx, rx): (TriggerSender, TriggerReceiver),
     fut: impl 'static + Send + FnMut() -> Fut,
 ) {
-    tm.add_dna_task_critical(
-        name,
-        dna_hash,
-        queue_consumer_main_task_impl(name.into(), (tx, rx), fut),
-    );
+    let name_string = name.to_string();
+    tm.add_dna_task_critical(name, dna_hash, move |stop| {
+        queue_consumer_main_task_impl(name_string, (tx, rx), stop, fut)
+    });
 }
 
 fn queue_consumer_cell_bound<
@@ -698,28 +693,11 @@ fn queue_consumer_cell_bound<
     (tx, rx): (TriggerSender, TriggerReceiver),
     fut: impl 'static + Send + FnMut() -> Fut,
 ) {
-    tm.add_cell_task_critical(
-        name,
-        cell_id,
-        queue_consumer_main_task_impl(name.into(), (tx, rx), fut),
-    );
+    let name_string = name.to_string();
+    tm.add_cell_task_critical(name, cell_id, move |stop| {
+        queue_consumer_main_task_impl(name_string, (tx, rx), stop, fut)
+    });
 }
-
-// /// Wait for the next job or exit command
-// async fn next_job_or_exit(rx: &mut TriggerReceiver, stop: &mut StopReceiver) -> Job {
-//     // Check for shutdown or next job
-//     let next_job = rx.listen();
-//     tokio::pin!(next_job);
-//     tokio::pin!(stop);
-
-//     if let Either::Left((Err(_), _)) | Either::Right((_, _)) =
-//         futures::future::select(next_job, stop).await
-//     {
-//         Job::Shutdown
-//     } else {
-//         Job::Run
-//     }
-// }
 
 /// Does nothing.
 /// Does extra nothing and logs about it if the error shouldn't bail the

@@ -14,7 +14,6 @@ use holochain_types::prelude::*;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use task_motel::StopListener;
-use tokio::task::JoinError;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::*;
@@ -206,32 +205,24 @@ pub fn spawn_task_outcome_handler(
 }
 
 #[tracing::instrument(skip(kind))]
-fn produce_task_outcome(
-    kind: &TaskKind,
-    result: Result<ManagedTaskResult, JoinError>,
-    name: String,
-) -> TaskOutcome {
+fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
     use TaskOutcome::*;
     match kind {
         TaskKind::Ignore => match result {
-            Err(err) => LogInfo(format!("task completed: {}, join error: {:?}", name, err)),
-            Ok(Ok(_)) => LogInfo(format!("task completed: {}", name)),
-            Ok(Err(err)) => MinorError(Box::new(err), name),
+            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Err(err) => MinorError(Box::new(err), name),
         },
         TaskKind::Unrecoverable => match result {
-            Err(err) => LogInfo(format!("task completed: {}, join error: {:?}", name, err)),
-            Ok(Ok(_)) => LogInfo(format!("task completed: {}", name)),
-            Ok(Err(err)) => ShutdownConductor(Box::new(err), name),
+            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Err(err) => ShutdownConductor(Box::new(err), name),
         },
         TaskKind::CellCritical(cell_id) => match result {
-            Err(err) => LogInfo(format!("task completed: {}, join error: {:?}", name, err)),
-            Ok(Ok(_)) => LogInfo(format!("task completed: {}", name)),
-            Ok(Err(err)) => StopApps(cell_id.to_owned(), Box::new(err), name),
+            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
         },
         TaskKind::DnaCritical(dna_hash) => match result {
-            Err(err) => LogInfo(format!("task completed: {}, join error: {:?}", name, err)),
-            Ok(Ok(_)) => LogInfo(format!("task completed: {}", name)),
-            Ok(Err(err)) => StopAppsWithDna(dna_hash.to_owned(), Box::new(err), name),
+            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Err(err) => StopAppsWithDna(dna_hash.to_owned(), Box::new(err), name),
         },
     }
 }
@@ -268,6 +259,8 @@ pub enum TaskGroup {
     Cell(CellId),
 }
 
+/// Channel sender for task outcomes
+pub type OutcomeSender = futures::channel::mpsc::Sender<(TaskGroup, TaskOutcome)>;
 /// Channel receiver for task outcomes
 pub type OutcomeReceiver = futures::channel::mpsc::Receiver<(TaskGroup, TaskOutcome)>;
 
@@ -280,17 +273,15 @@ pub struct TaskManagerClient {
 
 impl TaskManagerClient {
     /// Construct the TaskManager and the outcome channel receiver
-    pub fn new() -> (Self, OutcomeReceiver) {
-        let (tx, outcomes) = futures::channel::mpsc::channel(8);
+    pub fn new(tx: OutcomeSender) -> Self {
         let tm = task_motel::TaskManager::new(tx, |g| match g {
             TaskGroup::Conductor => None,
             TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
             TaskGroup::Cell(cell_id) => Some(TaskGroup::Dna(Arc::new(cell_id.dna_hash().clone()))),
         });
-        let tm = Self {
+        Self {
             tm: Arc::new(Mutex::new(Some(tm))),
-        };
-        (tm, outcomes)
+        }
     }
 
     /// Stop all tasks and await their completion.
@@ -325,83 +316,85 @@ impl TaskManagerClient {
     }
 
     /// Add a conductor-level task whose outcome is ignored.
-    pub fn add_conductor_task_ignored(
+    pub fn add_conductor_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
-        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         self.add_conductor_task(name, TaskKind::Ignore, f)
     }
 
     /// Add a conductor-level task which will cause the conductor to shut down if it fails
-    pub fn add_conductor_task_unrecoverable(
+    pub fn add_conductor_task_unrecoverable<
+        Fut: Future<Output = ManagedTaskResult> + Send + 'static,
+    >(
         &self,
         name: &str,
-        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         self.add_conductor_task(name, TaskKind::Unrecoverable, f)
     }
 
     /// Add a DNA-level task which will cause all cells under that DNA to be disabled if
     /// the task fails
-    pub fn add_dna_task_critical(
+    pub fn add_dna_task_critical<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
         dna_hash: Arc<DnaHash>,
-        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         self.add_dna_task(name, TaskKind::DnaCritical(dna_hash.clone()), dna_hash, f)
     }
 
     /// Add a Cell-level task whose outcome is ignored
-    pub fn add_cell_task_ignored(
+    pub fn add_cell_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
         cell_id: CellId,
-        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         self.add_cell_task(name, TaskKind::Ignore, cell_id, f)
     }
 
     /// Add a Cell-level task which will cause that to be disabled if the task fails
-    pub fn add_cell_task_critical(
+    pub fn add_cell_task_critical<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
         cell_id: CellId,
-        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         self.add_cell_task(name, TaskKind::CellCritical(cell_id.clone()), cell_id, f)
     }
 
-    fn add_conductor_task(
+    fn add_conductor_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
         task_kind: TaskKind,
-        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         let name = name.to_string();
         let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
         self.add_task(TaskGroup::Conductor, f)
     }
 
-    fn add_dna_task(
+    fn add_dna_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
         task_kind: TaskKind,
         dna_hash: Arc<DnaHash>,
-        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         let name = name.to_string();
         let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
         self.add_task(TaskGroup::Dna(dna_hash), f)
     }
 
-    fn add_cell_task(
+    fn add_cell_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
         task_kind: TaskKind,
         cell_id: CellId,
-        f: impl FnOnce(StopListener) -> JoinHandle<ManagedTaskResult> + Send + 'static,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         let name = name.to_string();
         let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
@@ -443,20 +436,15 @@ mod test {
         let db_dir = test_db_dir();
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let tm = handle.task_manager();
-        tm.add_conductor_task_unrecoverable("unrecoverable", |_stop| {
-            dbg!();
-            tokio::spawn(async {
-                dbg!();
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                dbg!();
-                Err(Box::new(ConductorError::Other(
-                    anyhow::anyhow!("Unrecoverable task failed").into(),
-                ))
-                .into())
-            })
+        tm.add_conductor_task_unrecoverable("unrecoverable", |_stop| async {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            Err(Box::new(ConductorError::Other(
+                anyhow::anyhow!("Unrecoverable task failed").into(),
+            ))
+            .into())
         });
 
-        let (tm, main_task) = handle.task_manager.share_mut(|o| o.take().unwrap());
+        let main_task = handle.outcomes_task.share_mut(|o| o.take().unwrap());
 
         // the outcome channel sender lives on the TaskManager, so we need to drop it
         // so that the main_task will end
@@ -478,14 +466,12 @@ mod test {
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let tm = handle.task_manager();
 
-        tm.add_conductor_task_unrecoverable("unrecoverable", |_stop| {
-            tokio::spawn(async {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                panic!("Task has panicked")
-            })
+        tm.add_conductor_task_unrecoverable("unrecoverable", |_stop| async {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            panic!("Task has panicked")
         });
 
-        let (_, main_task) = handle.task_manager.share_mut(|o| o.take().unwrap());
+        let main_task = handle.outcomes_task.share_mut(|o| o.take().unwrap());
         drop(tm);
         handle_shutdown(main_task.await);
     }
