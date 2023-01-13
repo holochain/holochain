@@ -6209,8 +6209,9 @@ checksum = "9410d0f6853b1d94f0e519fb95df60f29d2c1eff2d921ffdf01a4c8a3b54f12d"
 
 [[package]]
 name = "task-motel"
-version = "0.1.0"
-source = "git+https://github.com/maackle/task-motel-rs#f830707b97f7d829f0f0a7b8502c01f3c9ef4cf6"
+version = "0.1.0-rc.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fe8f962b0977e46f73f890389fab33e2171777b2baf59d2372534cfba7bd95e"
 dependencies = [
  "futures",
  "parking_lot 0.12.1",
