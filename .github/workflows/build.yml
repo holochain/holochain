@@ -1,0 +1,54 @@
+name: build holochain
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+
+concurrency:
+  group: "${{ github.head_ref }}"
+  cancel-in-progress: true
+
+jobs:
+  holochain-binaries:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - ubuntu-latest
+          - macos-latest
+        # nixAttribute:
+        #   - main
+        #   - develop
+        #   - v0_0_171
+        #   - v0_0_172
+        #   - v0_0_173
+        #   - v0_0_174
+        #   - v0_0_175
+        #   - v0_1_0-beta-rc_0
+        #   - v0_1_0-beta-rc_1
+        #   - v0_1_0-beta-rc_2
+        # nurRepo:
+        #   - holochain-nixpkgs
+        cachixName:
+          - davhau
+    runs-on: "${{ matrix.platform }}"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          lfs: false
+      - name: Install nix
+        uses: cachix/install-nix-action@v18
+        with:
+          extra_nix_config: |
+            experimental-features = flakes nix-command
+      - name: Setup cachix
+        uses: cachix/cachix-action@v12
+        if: "${{ matrix.cachixName != '<YOUR_CACHIX_NAME>' }}"
+        with:
+          name: "${{ matrix.cachixName }}"
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - name: Build derivations
+        env:
+          nix_attribute: "${{ matrix.nixAttribute }}"
+        run: nix build .#holochain -L --no-link
