@@ -4,10 +4,12 @@
 #![allow(unused_variables)]
 #![allow(unreachable_code)]
 #![allow(unused_imports)]
+#![allow(unreachable_patterns)]
 #![allow(clippy::needless_return)]
 #![allow(clippy::blocks_in_if_conditions)]
 //! Networking abstraction to handle feature flipping.
 
+use crate::wire::WireData;
 use crate::*;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
@@ -25,9 +27,35 @@ use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::*;
 
+use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
+
+use parking_lot::Mutex;
+use std::collections::HashMap;
 use std::sync::Arc;
+
+kitsune_p2p_types::write_codec_enum! {
+    /// KitsuneP2p WebRTC wrapper enum.
+    codec WireWrap {
+        /// Notification not needing a response.
+        Notify(0x00) {
+            data.0: WireData,
+        },
+
+        /// Request that expects a response.
+        Request(0x10) {
+            msg_id.0: u64,
+            data.1: WireData,
+        },
+
+        /// Response to a previous request.
+        Response(0x11) {
+            msg_id.0: u64,
+            data.1: WireData,
+        },
+    }
+}
 
 pub type RespondFut = std::pin::Pin<Box<dyn std::future::Future<Output = ()> + 'static + Send>>;
 
@@ -83,14 +111,30 @@ pub enum MetaNetEvt {
 
 pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+type ResStore = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<wire::Wire>>>>;
+
+#[derive(Debug, Clone)]
 pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
     Tx2(Tx2ConHnd<wire::Wire>),
 
     #[cfg(feature = "tx4")]
-    Tx4(tx4::Ep, tx4::Tx4Url),
+    Tx4(tx4::Ep, tx4::Tx4Url, ResStore),
 }
+
+impl PartialEq for MetaNetCon {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            #[cfg(feature = "tx2")]
+            (MetaNetCon::Tx2(a), MetaNetCon::Tx2(b)) => a == b,
+            #[cfg(feature = "tx4")]
+            (MetaNetCon::Tx4(a, _, _), MetaNetCon::Tx4(b, _, _)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for MetaNetCon {}
 
 impl MetaNetCon {
     pub async fn close(&self, code: u32, reason: &str) {
@@ -133,10 +177,12 @@ impl MetaNetCon {
 
         #[cfg(feature = "tx4")]
         {
-            if let MetaNetCon::Tx4(ep, rem_url) = self {
+            if let MetaNetCon::Tx4(ep, rem_url, _res_store) = self {
+                let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                let wrap = WireWrap::notify(WireData(wire));
+
                 let mut writer = tx4::Buf::from_writer().map_err(KitsuneError::other)?;
-                use kitsune_p2p_types::codec::Codec;
-                payload.encode(&mut writer).map_err(KitsuneError::other)?;
+                wrap.encode(&mut writer).map_err(KitsuneError::other)?;
                 let data = writer.finish();
                 ep.send(rem_url.clone(), data)
                     .await
@@ -160,6 +206,34 @@ impl MetaNetCon {
             }
         }
 
+        #[cfg(feature = "tx4")]
+        {
+            if let MetaNetCon::Tx4(ep, rem_url, res_store) = self {
+                static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+                let msg_id = MSG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let (s, r) = tokio::sync::oneshot::channel();
+                res_store.lock().insert(msg_id, s);
+
+                let res_store = res_store.clone();
+                tokio::task::spawn(async move {
+                    // TODO - use tuning_params.implicit_timeout
+                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                    res_store.lock().remove(&msg_id);
+                });
+
+                let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                let wrap = WireWrap::request(msg_id, WireData(wire));
+
+                let mut writer = tx4::Buf::from_writer().map_err(KitsuneError::other)?;
+                wrap.encode(&mut writer).map_err(KitsuneError::other)?;
+                let data = writer.finish();
+                ep.send(rem_url.clone(), data)
+                    .await
+                    .map_err(KitsuneError::other)?;
+                return Ok(r.await.map_err(|_| KitsuneError::other("timeout"))?);
+            }
+        }
+
         Err("invalid features".into())
     }
 
@@ -168,6 +242,14 @@ impl MetaNetCon {
         {
             if let MetaNetCon::Tx2(con) = self {
                 return con.peer_cert().into();
+            }
+        }
+
+        #[cfg(feature = "tx4")]
+        {
+            if let MetaNetCon::Tx4(_con, rem_url, _res_store) = self {
+                let id = rem_url.id().unwrap();
+                return Arc::new(id.0);
             }
         }
 
@@ -184,7 +266,7 @@ pub enum MetaNet {
 
     /// Tx4 Abstraction
     #[cfg(feature = "tx4")]
-    Tx4(tx4::Ep, tx4::Tx4Url),
+    Tx4(tx4::Ep, tx4::Tx4Url, ResStore),
 }
 
 impl MetaNet {
@@ -403,7 +485,10 @@ impl MetaNet {
 
         let cli_url = ep_hnd.listen(tx4::Tx4Url::new(&signal_url)?).await?;
 
+        let res_store = Arc::new(Mutex::new(HashMap::new()));
+
         let ep_hnd2 = ep_hnd.clone();
+        let res_store2 = res_store.clone();
         tokio::task::spawn(async move {
             while let Some(evt) = ep_evt.recv().await {
                 let evt = match evt {
@@ -417,7 +502,11 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: rem_cli_url.to_string(),
-                                con: MetaNetCon::Tx4(ep_hnd2.clone(), rem_cli_url),
+                                con: MetaNetCon::Tx4(
+                                    ep_hnd2.clone(),
+                                    rem_cli_url,
+                                    res_store2.clone(),
+                                ),
                             })
                             .await
                             .is_err()
@@ -429,7 +518,11 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Disconnected {
                                 remote_url: rem_cli_url.to_string(),
-                                con: MetaNetCon::Tx4(ep_hnd2.clone(), rem_cli_url),
+                                con: MetaNetCon::Tx4(
+                                    ep_hnd2.clone(),
+                                    rem_cli_url,
+                                    res_store2.clone(),
+                                ),
                             })
                             .await
                             .is_err()
@@ -442,33 +535,108 @@ impl MetaNet {
                         mut data,
                         permit,
                     } => {
-                        use kitsune_p2p_types::codec::Codec;
-                        match wire::Wire::decode(&mut data) {
-                            Ok(data) => {
-                                if evt_send
-                                    .send(MetaNetEvt::Notify {
-                                        remote_url: rem_cli_url.to_string(),
-                                        con: MetaNetCon::Tx4(ep_hnd2.clone(), rem_cli_url),
-                                        data,
-                                    })
-                                    .await
-                                    .is_err()
-                                {
-                                    break;
+                        let data = match WireWrap::decode(&mut data) {
+                            Ok(WireWrap::Notify(Notify { data })) => {
+                                match wire::Wire::decode_ref(&data) {
+                                    Ok((_, data)) => {
+                                        if evt_send
+                                            .send(MetaNetEvt::Notify {
+                                                remote_url: rem_cli_url.to_string(),
+                                                con: MetaNetCon::Tx4(
+                                                    ep_hnd2.clone(),
+                                                    rem_cli_url,
+                                                    res_store2.clone(),
+                                                ),
+                                                data,
+                                            })
+                                            .await
+                                            .is_err()
+                                        {
+                                            break;
+                                        }
+                                    }
+                                    Err(err) => {
+                                        tracing::error!(?err, "decoding error");
+                                        // TODO - drop connection??
+                                    }
+                                }
+                            }
+                            Ok(WireWrap::Request(Request { msg_id, data })) => {
+                                match wire::Wire::decode_ref(&data) {
+                                    Ok((_, data)) => {
+                                        let ep_hnd = ep_hnd2.clone();
+                                        let rem_cli_url2 = rem_cli_url.clone();
+                                        let respond: Respond = Box::new(move |data| {
+                                            let out: RespondFut = Box::pin(async move {
+                                                let wire = match data.encode_vec() {
+                                                    Ok(wire) => wire,
+                                                    Err(_) => return,
+                                                };
+                                                let wrap =
+                                                    WireWrap::response(msg_id, WireData(wire));
+                                                let mut writer = match tx4::Buf::from_writer() {
+                                                    Ok(writer) => writer,
+                                                    Err(_) => return,
+                                                };
+                                                if wrap.encode(&mut writer).is_err() {
+                                                    return;
+                                                }
+                                                let data = writer.finish();
+                                                let _ = ep_hnd.send(rem_cli_url2, data).await;
+                                            });
+                                            out
+                                        });
+                                        if evt_send
+                                            .send(MetaNetEvt::Request {
+                                                remote_url: rem_cli_url.to_string(),
+                                                con: MetaNetCon::Tx4(
+                                                    ep_hnd2.clone(),
+                                                    rem_cli_url,
+                                                    res_store2.clone(),
+                                                ),
+                                                data,
+                                                respond,
+                                            })
+                                            .await
+                                            .is_err()
+                                        {
+                                            break;
+                                        }
+                                    }
+                                    Err(err) => {
+                                        tracing::error!(?err, "decoding error");
+                                        // TODO - drop connection??
+                                    }
+                                }
+                            }
+                            Ok(WireWrap::Response(Response { msg_id, data })) => {
+                                if let Some(s) = res_store2.lock().remove(&msg_id) {
+                                    match wire::Wire::decode_ref(&data) {
+                                        Ok((_, data)) => {
+                                            let _ = s.send(data);
+                                        }
+                                        Err(err) => {
+                                            tracing::error!(?err, "decoding error");
+                                            // TODO - drop connection??
+                                        }
+                                    }
+                                } else {
+                                    tracing::debug!(%msg_id, "response mismatch");
                                 }
                             }
                             Err(err) => {
                                 tracing::error!(?err, "decoding error");
                                 // TODO - drop connection??
+                                continue;
                             }
-                        }
+                        };
                     }
                     tx4::EpEvt::Demo { rem_cli_url: _ } => (),
                 }
             }
         });
 
-        Ok((MetaNet::Tx4(ep_hnd, cli_url), evt_recv))
+        Ok((MetaNet::Tx4(ep_hnd, cli_url, res_store), evt_recv))
     }
 
     pub fn local_addr(&self) -> KitsuneResult<String> {
@@ -481,7 +649,7 @@ impl MetaNet {
 
         #[cfg(feature = "tx4")]
         {
-            if let MetaNet::Tx4(_ep, cli_url) = self {
+            if let MetaNet::Tx4(_ep, cli_url, _res_store) = self {
                 return Ok(cli_url.to_string());
             }
         }
@@ -499,7 +667,7 @@ impl MetaNet {
 
         #[cfg(feature = "tx4")]
         {
-            if let MetaNet::Tx4(_ep, cli_url) = self {
+            if let MetaNet::Tx4(_ep, cli_url, _res_store) = self {
                 if let Some(id) = cli_url.id() {
                     return Arc::new(id.0);
                 }
@@ -536,10 +704,11 @@ impl MetaNet {
 
         #[cfg(feature = "tx4")]
         {
-            if let MetaNet::Tx4(ep, _cli_url) = self {
+            if let MetaNet::Tx4(ep, _cli_url, res_store) = self {
                 return Ok(MetaNetCon::Tx4(
                     ep.clone(),
                     tx4::Tx4Url::new(remote_url).map_err(KitsuneError::other)?,
+                    res_store.clone(),
                 ));
             }
         }
