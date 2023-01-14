@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **BREAKING CHANGE**: `CreateCloneCell` returns `CellInfo` instead of `InstalledCell`.
 - **BREAKING CHANGE**: `EnableCloneCell` returns `CellInfo` instead of `InstalledCell`.
+- **BREAKING CHANGE**: `CellInfo` variants are renamed to snake case during serde.
 
 ## 0.1.0-beta-rc.2
 
