@@ -103,9 +103,9 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
-    /// The response contains an [`InstalledCell`] with the created clone
-    /// cell's [`CloneId`] and [`CellId`].
-    CloneCellCreated(InstalledCell),
+    /// The response contains the [`CellInfo`] of the created clone
+    /// cell.
+    CloneCellCreated(CellInfo),
 
     /// The successful response to an [`AppRequest::DisableCloneCell`].
     ///
@@ -115,7 +115,7 @@ pub enum AppResponse {
     /// The successful response to an [`AppRequest::EnableCloneCell`].
     ///
     /// A previously disabled clone cell has been enabled.
-    CloneCellEnabled(InstalledCell),
+    CloneCellEnabled(CellInfo),
 
     /// NetworkInfo is returned
     NetworkInfo(Vec<NetworkInfo>),
@@ -221,7 +221,7 @@ pub enum CellInfo {
 }
 
 impl CellInfo {
-    fn new_provisioned(
+    pub fn new_provisioned(
         cell_id: CellId,
         dna_modifiers: DnaModifiers,
         name: String,
@@ -236,7 +236,7 @@ impl CellInfo {
         })
     }
 
-    fn new_cloned(
+    pub fn new_cloned(
         cell_id: CellId,
         clone_id: CloneId,
         dna_modifiers: DnaModifiers,

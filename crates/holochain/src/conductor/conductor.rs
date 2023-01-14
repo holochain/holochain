@@ -85,6 +85,7 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::CellInfo;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
@@ -1314,6 +1315,8 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
+    use holochain_conductor_api::CellInfo;
+
     use super::*;
 
     impl Conductor {
@@ -1325,7 +1328,7 @@ mod clone_cell_impls {
         pub async fn create_clone_cell(
             self: Arc<Self>,
             payload: CreateCloneCellPayload,
-        ) -> ConductorResult<InstalledCell> {
+        ) -> ConductorResult<CellInfo> {
             let CreateCloneCellPayload {
                 app_id,
                 role_name,
@@ -1359,8 +1362,13 @@ mod clone_cell_impls {
                 )
                 .await?;
 
+            let clone_cell_id = if let CellInfo::Cloned(clone_cell) = &installed_clone_cell {
+                clone_cell.cell_id.clone()
+            } else {
+                panic!("create clone cell: created cell is not of type 'cloned'");
+            };
             // run genesis on cloned cell
-            let cells = vec![(installed_clone_cell.as_id().clone(), membrane_proof)];
+            let cells = vec![(clone_cell_id, membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
             self.create_and_add_initialized_cells_for_running_apps(Some(&app_id))
                 .await?;
@@ -1396,7 +1404,8 @@ mod clone_cell_impls {
         pub async fn enable_clone_cell(
             self: Arc<Self>,
             payload: &EnableCloneCellPayload,
-        ) -> ConductorResult<InstalledCell> {
+        ) -> ConductorResult<CellInfo> {
+            let conductor = self.clone();
             let (_, enabled_cell) = self
                 .update_state_prime({
                     let app_id = payload.app_id.to_owned();
@@ -1404,7 +1413,13 @@ mod clone_cell_impls {
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
                         let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
-                        let enabled_cell = app.enable_clone_cell(&clone_id)?;
+                        let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
+                        let ribosome = conductor.get_ribosome(cell_id.dna_hash())?;
+                        let dna = ribosome.dna_file.dna();
+                        let modifiers = dna.modifiers.clone();
+                        let name = dna.name.clone();
+                        let enabled_cell =
+                            CellInfo::new_cloned(cell_id, clone_id, modifiers, name, true);
                         Ok((state, enabled_cell))
                     }
                 })
@@ -2339,7 +2354,7 @@ impl Conductor {
         role_name: RoleName,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
-    ) -> ConductorResult<InstalledCell> {
+    ) -> ConductorResult<CellInfo> {
         let ribosome_store = &self.ribosome_store;
         // retrieve base cell DNA hash from conductor
         let (_, base_cell_dna_hash) = self
@@ -2363,9 +2378,10 @@ impl Conductor {
                 }
             })
             .await?;
+
         // clone cell from base cell DNA
-        let clone_dna = ribosome_store.share_ref(|ds| {
-            let mut dna_file = ds
+        let clone_dna = ribosome_store.share_ref(|rs| {
+            let mut dna_file = rs
                 .get_dna_file(&base_cell_dna_hash)
                 .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
                 .update_modifiers(dna_modifiers);
@@ -2374,7 +2390,10 @@ impl Conductor {
             }
             Ok::<_, DnaError>(dna_file)
         })?;
+        let name = clone_dna.dna().name.clone();
+        let dna_modifiers = clone_dna.dna().modifiers.clone();
         let clone_dna_hash = clone_dna.dna_hash().to_owned();
+
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
@@ -2383,7 +2402,7 @@ impl Conductor {
                 let cell_id = CellId::new(clone_dna_hash, agent_key);
                 let clone_id = app.add_clone(&role_name, &cell_id)?;
                 let installed_clone_cell =
-                    InstalledCell::new(cell_id, clone_id.as_app_role_name().clone());
+                    CellInfo::new_cloned(cell_id, clone_id, dna_modifiers, name, true);
                 Ok((state, installed_clone_cell))
             })
             .await?;
