@@ -10,8 +10,10 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - arch: macos-x86_64
-            runs-on: [macos-latest]
+          - arch: macos-11-x86_64
+            runs-on: [macos-11]
+          - arch: macos-12-x86_64
+            runs-on: [macos-12]
           - arch: macos-arm64
             runs-on: [self-hosted, macOS, ARM64]
           - arch: linux-x86_64
