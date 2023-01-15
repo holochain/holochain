@@ -26,7 +26,7 @@
           sqlcipher
         ])
         ++ (lib.optionals pkgs.stdenv.isDarwin
-          (with pkgs.darwin.apple_sdk.frameworks; [
+          (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
             CoreFoundation
             CoreServices
