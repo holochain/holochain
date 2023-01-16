@@ -354,7 +354,7 @@ pub mod countersigning;
 ///
 /// An example of a coordinator zome with functions to manipulate entries:
 /// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>
-/// 
+///
 /// # CRUD
 ///
 /// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes), representing new states of a shared identity.
