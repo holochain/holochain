@@ -343,7 +343,7 @@ pub mod capability;
 /// etc.
 ///
 /// The integrity layer enforces very little other than the structure of a
-/// countersigned entry, to define the session parameters and uniquness and final
+/// countersigned entry, to define the session parameters and uniqueness and final
 /// signature set. Implementations are expected to drive countersigning sessions
 /// through co-ordinator zomes based on understanding both the expected network
 /// topologies and trust between peers on the network.
