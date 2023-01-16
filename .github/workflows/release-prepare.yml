@@ -170,9 +170,6 @@ jobs:
 
           cp -v $HOME/work/holochain/holochain/.git/config .git/config
 
-          # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
-          git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
-
           git fetch --all --tags --prune --prune-tags --force
           git branch --list --all
           git checkout --force -B ${HOLOCHAIN_SOURCE_BRANCH} remotes/origin/${HOLOCHAIN_SOURCE_BRANCH}
