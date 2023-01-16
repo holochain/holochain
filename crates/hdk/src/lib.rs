@@ -354,15 +354,17 @@ pub mod countersigning;
 ///
 /// An example of a coordinator zome with functions to manipulate entries:
 /// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>
+/// 
+/// # CRUD
 ///
-/// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
+/// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes), representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
 /// This is a key difference between Holochain and blockchains.
-/// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while Holochain lets each participant discover their own truth.
+/// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value, while Holochain lets each participant discover their own truth.
 ///
-/// The practical implication of this is that agents fetch as much information as they can from the network then follow an algorithm to 'walk' or 'reduce' the revisions and discover 'current' for themselves.
+/// The practical implication of this is that agents fetch as much information as they can from the network, then follow an algorithm to 'walk' or 'reduce' the revisions and discover 'current' for themselves.
 ///
-/// In Holochain terms, blockchain consensus is walking all the known 'updates' (blocks) that pass validation then walking/reducing down them to disover the 'chain with the most work' or similar.
+/// In Holochain terms, blockchain consensus is walking all the known 'updates' (blocks) that pass validation, then walking/reducing down them to disover the 'chain with the most work' or similar.
 /// For example, to implement a blockchain in Holochain, attach a proof of work to each update and then follow the updates with the most work to the end.
 ///
 /// There are many other ways to discover the correct path through updates, for example a friendly game of chess between two players could involve consensual re-orgs or 'undos' of moves by countersigning a different update higher up the tree, to branch out a new revision history.
