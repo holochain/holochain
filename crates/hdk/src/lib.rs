@@ -470,8 +470,8 @@ pub mod prelude;
 ///
 /// Note that the secrets are located within the secure lair keystore (@todo actually secretbox puts the secret in WASM, but this will be fixed soon) and never touch WASM memory.
 /// The WASM must provide either the public key for box or an opaque _reference_ to the secret key so that lair can encrypt or decrypt as required.
-///
-/// @todo implement a way to export/send an encrypted shared secret for a peer from lair
+//
+// @todo implement a way to export/send an encrypted shared secret for a peer from lair
 ///
 /// Note that even though the elliptic curve is the same as is used by ed25519, the keypairs cannot be shared because the curve is mathematically translated in the signing vs. encryption algorithms.
 /// In theory the keypairs could also be translated to move between the two algorithms but Holochain doesn't offer a way to do this (yet?).
@@ -558,8 +558,8 @@ pub mod link;
 ///
 /// All function calls use capability grants and claims to authenticate and authorize.
 /// Signals simply forward information about the introduction of new data on the DHT so that agents can push updates to each other rather than relying purely on polling.
-///
-/// @todo introduce a pubsub mechanism
+//
+// @todo introduce a pubsub mechanism
 pub mod p2p;
 
 /// Integrates HDK with the Rust tracing crate.
@@ -576,8 +576,8 @@ pub mod trace;
 /// Everything related to inspecting or responding to time.
 ///
 /// Currently only fetching the host's opinion of the local time is supported.
-///
-/// @todo implement scheduled execution and sleeping
+//
+// @todo implement scheduled execution and sleeping
 pub mod time;
 
 /// Generate cryptographic strength random data
