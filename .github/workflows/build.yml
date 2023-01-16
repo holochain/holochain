@@ -38,10 +38,10 @@ jobs:
 
       - name: Setup cachix
         uses: cachix/cachix-action@v12
-        if: "${{ matrix.cachixName != '<YOUR_CACHIX_NAME>' }}"
         with:
           name: "${{ matrix.cachixName }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        if: "${{ matrix.platform.arch != 'macos-arm64' }}"
 
       - name: Build derivations
         env:
