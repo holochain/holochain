@@ -70,19 +70,12 @@ pub enum AppRequest {
 
     /// Info about networking processes
     NetworkInfo(Box<NetworkInfoRequestPayload>),
-
-    /// Is currently unimplemented and will return
-    /// an [`AppResponse::Unimplemented`].
-    SignalSubscription(SignalSubscription),
 }
 
 /// Represents the possible responses to an [`AppRequest`].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppResponse {
-    /// This request is unimplemented
-    Unimplemented(AppRequest),
-
     /// Can occur in response to any [`AppRequest`].
     ///
     /// There has been an error during the handling of the request.
