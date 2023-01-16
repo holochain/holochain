@@ -10,10 +10,8 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - arch: macos-11-x86_64
-            runs-on: [macos-11]
-          - arch: macos-12-x86_64
-            runs-on: [macos-12]
+          - arch: macos-x86_64
+            runs-on: [macos-latest]
           - arch: macos-arm64
             runs-on: [self-hosted, macOS, ARM64]
           - arch: linux-x86_64
@@ -25,21 +23,26 @@ jobs:
       - name: "Displays Xcode current version"
         run: |
           sudo xcode-select -p || :
+
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           lfs: false
+
       - name: Install nix
         uses: cachix/install-nix-action@v18
         with:
           extra_nix_config: |
             experimental-features = flakes nix-command
+        if: "${{ matrix.platform.arch != 'macos-arm64' }}"
+
       - name: Setup cachix
         uses: cachix/cachix-action@v12
         if: "${{ matrix.cachixName != '<YOUR_CACHIX_NAME>' }}"
         with:
           name: "${{ matrix.cachixName }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
       - name: Build derivations
         env:
           nix_attribute: "${{ matrix.nixAttribute }}"
