@@ -298,11 +298,13 @@ getrandom::register_custom_getrandom!(wasm_getrandom);
 
 /// Capability claims and grants.
 ///
-/// Every exposed function in Holochain uses capability grants/claims to secure access.
+/// Every exposed function in Holochain uses capability grants/claims to secure
+/// access.Capability grants are system entries committed to the source chain
+/// that define access. Capability claims are system entries that reference a
+/// grant on a source chain.
 ///
-/// Capability grants are system entries committed to the source chain that define access.
-///
-/// Capability claims are system entries that reference a grant on a source chain.
+/// # Examples
+/// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/coordinator.rs>
 ///
 /// 0. When Alice wants Bob to be able to call a function on her running conductor she commits a grant for Bob.
 /// 0. Bob commits the grant as a claim on his source chain.
@@ -331,7 +333,7 @@ getrandom::register_custom_getrandom!(wasm_getrandom);
 ///
 /// For best security, assign grants to specific agents if you can as the assignment check _does_ cryptographically validate the caller.
 ///
-/// @todo in the future grant secrets may be moved to lair somehow.
+// @todo in the future grant secrets may be moved to lair somehow.
 pub mod capability;
 
 pub mod countersigning;

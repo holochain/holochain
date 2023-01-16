@@ -17,7 +17,7 @@ use kitsune_p2p_timestamp::Timestamp;
 ///
 /// # Examples
 ///
-/// Validate a new entry: https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/validate/src/integrity.rs
+/// Validate a new entry: <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/validate/src/integrity.rs>
 ///
 /// ## Producing Operations
 /// The following is a list of the operations that can be produced by each [`Action`]:
