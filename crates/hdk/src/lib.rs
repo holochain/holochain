@@ -164,9 +164,6 @@
 //! - `fn validate_create_link(create_link_data: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry link creation validation.
 //!   - Only the zome that created the link is called.
-//! - `fn validate_delete_link(delete_link_data: ValidateDeleteLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
-//!   - Allows the guest to pass/fail/retry link deletion validation.
-//!   - Only the zome that deleted the link is called.
 //! - `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry any operation.
 //!   - Only the originating zome is called.
