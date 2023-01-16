@@ -200,17 +200,18 @@ impl ZomeCall {
     }
 }
 
+///
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CellInfo {
-    // cells provisioned at app installation as defined in the bundle
+    /// Cells provisioned at app installation as defined in the bundle.
     Provisioned(Cell),
 
-    // cells created by cloning
+    // Cells created at runtime by cloning provisioned cells.
     Cloned(Cell),
 
-    // potential cells with deferred installation as defined in the bundle
-    // unimplemented
+    /// Potential cells with deferred installation as defined in the bundle.
+    /// Not yet implemented.
     Stem(StemCell),
 }
 
@@ -247,6 +248,8 @@ impl CellInfo {
     }
 }
 
+/// Cell whose instantiation has been deferred.
+/// Not yet implemented.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StemCell {
     pub dna: DnaHash,
@@ -254,6 +257,7 @@ pub struct StemCell {
     pub dna_modifiers: DnaModifiers,
 }
 
+/// Properties of a cell, either a provisioned or a cloned cell.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cell {
     pub cell_id: CellId,
