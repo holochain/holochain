@@ -1,4 +1,4 @@
-use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
+use crate::ExternalApiWireError;
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
