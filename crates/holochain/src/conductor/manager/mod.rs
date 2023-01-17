@@ -37,8 +37,6 @@ pub enum TaskKind {
 
 /// The outcome of a task that has finished.
 pub enum TaskOutcome {
-    // /// Do nothing
-    // Noop,
     /// Log an info trace and take no other action.
     LogInfo(String),
     /// Log an error and take no other action.
@@ -413,12 +411,6 @@ impl TaskManagerClient {
         }
     }
 }
-
-// impl Drop for TaskManagerClient {
-//     fn drop(&mut self) {
-//         self.shutdown();
-//     }
-// }
 
 /// A future which awaits the completion of all managed tasks
 pub type ShutdownHandle = JoinHandle<()>;
