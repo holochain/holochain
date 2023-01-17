@@ -218,6 +218,7 @@ pub enum CellInfo {
 impl CellInfo {
     pub fn new_provisioned(
         cell_id: CellId,
+        original_dna_hash: DnaHash,
         dna_modifiers: DnaModifiers,
         name: String,
         enabled: bool,
@@ -225,6 +226,7 @@ impl CellInfo {
         Self::Provisioned(Cell {
             cell_id,
             clone_id: None,
+            original_dna_hash,
             dna_modifiers,
             name,
             enabled,
@@ -234,6 +236,7 @@ impl CellInfo {
     pub fn new_cloned(
         cell_id: CellId,
         clone_id: CloneId,
+        original_dna_hash: DnaHash,
         dna_modifiers: DnaModifiers,
         name: String,
         enabled: bool,
@@ -241,6 +244,7 @@ impl CellInfo {
         Self::Cloned(Cell {
             cell_id,
             clone_id: Some(clone_id),
+            original_dna_hash,
             dna_modifiers,
             name,
             enabled,
@@ -252,9 +256,9 @@ impl CellInfo {
 /// Not yet implemented.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StemCell {
-    pub dna: DnaHash,
-    pub name: Option<String>,
+    pub original_dna_hash: DnaHash,
     pub dna_modifiers: DnaModifiers,
+    pub name: Option<String>,
 }
 
 /// Properties of a cell, either a provisioned or a cloned cell.
@@ -262,6 +266,7 @@ pub struct StemCell {
 pub struct Cell {
     pub cell_id: CellId,
     pub clone_id: Option<CloneId>,
+    pub original_dna_hash: DnaHash,
     pub dna_modifiers: DnaModifiers,
     pub name: String,
     pub enabled: bool,
@@ -299,6 +304,7 @@ impl AppInfo {
                     // TODO: populate `enabled` with cell state once it is implemented for a base cell
                     let cell_info = CellInfo::new_provisioned(
                         provisioned_cell.clone(),
+                        dna_def.hash.to_owned(),
                         dna_def.modifiers.to_owned(),
                         dna_def.name.to_owned(),
                         status == AppInfoStatus::Running,
@@ -320,6 +326,7 @@ impl AppInfo {
                         let cell_info = CellInfo::new_cloned(
                             cell_id.to_owned(),
                             clone_id.to_owned(),
+                            dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
                             dna_def.name.to_owned(),
                             true,
@@ -338,6 +345,7 @@ impl AppInfo {
                         let cell_info = CellInfo::new_cloned(
                             cell_id.to_owned(),
                             clone_id.to_owned(),
+                            dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
                             dna_def.name.to_owned(),
                             false,

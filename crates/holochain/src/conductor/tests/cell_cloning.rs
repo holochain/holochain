@@ -100,13 +100,13 @@ async fn create_clone_cell_creates_callable_cell() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
+async fn create_clone_cell_run_twice_returns_correct_clones() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna)])
+        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna.clone())])
         .await
         .unwrap();
 
@@ -122,6 +122,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .await
         .unwrap();
     assert_eq!(clone_cell_0.clone_id.unwrap(), CloneId::new(&role_name, 0)); // clone index starts at 0
+    assert_eq!(clone_cell_0.original_dna_hash, dna.dna_hash().to_owned());
 
     let clone_cell_1 = conductor
         .clone()
@@ -135,6 +136,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .await
         .unwrap();
     assert_eq!(clone_cell_1.clone_id.unwrap(), CloneId::new(&role_name, 1));
+    assert_eq!(clone_cell_1.original_dna_hash, dna.dna_hash().to_owned());
 }
 
 #[tokio::test(flavor = "multi_thread")]

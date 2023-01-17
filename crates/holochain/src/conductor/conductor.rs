@@ -1367,6 +1367,8 @@ mod clone_cell_impls {
                         let app = state.get_app_mut(&app_id)?;
                         let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
                         let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
+                        let app_role = app.role(&clone_id.clone().as_base_role_name())?;
+                        let original_dna_hash = app_role.dna_hash().clone();
                         let ribosome = conductor.get_ribosome(cell_id.dna_hash())?;
                         let dna = ribosome.dna_file.dna();
                         let dna_modifiers = dna.modifiers.clone();
@@ -1374,6 +1376,7 @@ mod clone_cell_impls {
                         let enabled_cell = holochain_conductor_api::Cell {
                             cell_id,
                             clone_id: Some(clone_id),
+                            original_dna_hash,
                             dna_modifiers,
                             name,
                             enabled: true,
@@ -2293,21 +2296,19 @@ impl Conductor {
                 let role_name = role_name.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    let app_role_assignment = app
-                        .roles()
-                        .get(&role_name)
-                        .ok_or_else(|| AppError::RoleNameMissing(role_name.to_owned()))?;
-                    if app_role_assignment.is_clone_limit_reached() {
+                    let app_role = app.role(&role_name)?;
+                    if app_role.is_clone_limit_reached() {
                         return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
-                            app_role_assignment.clone_limit(),
-                            app_role_assignment.clone(),
+                            app_role.clone_limit(),
+                            app_role.clone(),
                         )));
                     }
-                    let parent_dna_hash = app_role_assignment.dna_hash().clone();
-                    Ok((state, parent_dna_hash))
+                    let original_dna_hash = app_role.dna_hash().clone();
+                    Ok((state, original_dna_hash))
                 }
             })
             .await?;
+        let original_dna_hash = base_cell_dna_hash.clone();
 
         // clone cell from base cell DNA
         let clone_dna = ribosome_store.share_ref(|rs| {
@@ -2334,6 +2335,7 @@ impl Conductor {
                 let installed_clone_cell = holochain_conductor_api::Cell {
                     cell_id,
                     clone_id: Some(clone_id),
+                    original_dna_hash,
                     dna_modifiers,
                     name,
                     enabled: true,
