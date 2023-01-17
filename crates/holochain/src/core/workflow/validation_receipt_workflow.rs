@@ -24,7 +24,7 @@ mod tests;
 pub async fn validation_receipt_workflow(
     dna_hash: Arc<DnaHash>,
     vault: DbWrite<DbKindDht>,
-    network: &HolochainP2pDna,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
     conductor: ConductorHandle,
 ) -> WorkflowResult<WorkComplete> {
@@ -117,7 +117,7 @@ pub async fn validation_receipt_workflow(
         // TODO: When networking has a send without response we can use that
         // instead of waiting for response.
         if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipt(
-            network,
+            &network,
             author,
             receipt.try_into()?,
         )
