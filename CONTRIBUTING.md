@@ -53,13 +53,13 @@ When writing your reproduction PR, you can recreate the problematic part of your
 
 The quickest, most preferable way to reproduce a problem is through "inline zomes". Inline zomes are written in terms of a collection of functions, like normal Wasm zomes, but they don't get compiled to wasm, and instead are run inline by Rust directly. This lightweight approach to writing zomes is well suited for quick test cases, or for cases that require a multitude of zomes in order to reproduce a problem.
 
-To create a test based on inline zomes, see existing tests using `InlineZomeSet` or `SweetInlineZomes` for guidance. Just put your test in a place that feels appropriate.
+To create a test based on inline zomes, see [existing tests](https://github.com/holochain/holochain/blob/1cff6c77e9877cbc5d98c289432c548065deb4b7/crates/holochain/src/conductor/conductor/tests.rs#L877-L920) using `InlineZomeSet` or `SweetInlineZomes` for guidance. Just put your test in a place that feels appropriate.
 
 ### How to create a "test wasm"
 
 Holochain has many "test wasms", which are sample zomes written to demonstrate specific functionality.
 
-It may be necessary to write a test wasm if the problem you've encountered has to do with the actual machinery of executing Wasm code. It may also be a good option if you discovered a problem while writing a zome yourself, in which case you can simply copy and paste the offending code into a new test wasm.
+It may be necessary to write a test wasm if the problem you've encountered has to do with the actual machinery of executing Wasm code. It may also be a good option if you discovered a problem while writing a zome yourself, in which case you can simply copy and paste the offending code into a new test wasm. Creating test wasms is not the most streamlined process right now, so please follow these instructions carefully.
 
 To create a test wasm:
 
