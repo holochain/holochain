@@ -1099,7 +1099,7 @@ mod app_impls {
                 network_seed,
             } = payload;
 
-            let bundle: AppBundle = {
+            let bundle = {
                 let original_bundle = source.resolve().await?;
                 if let Some(network_seed) = network_seed {
                     let mut manifest = original_bundle.manifest().to_owned();

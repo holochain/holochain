@@ -135,40 +135,6 @@ async fn role_names_are_unique() {
     );
 }
 
-/// App can't be installed if it contains duplicate RoleNames
-#[tokio::test(flavor = "multi_thread")]
-async fn reject_two_apps_with_same_cell_id(
-    modifiers: DnaModifiersOpt<YamlProperties>,
-) -> (AppBundle, DnaFile) {
-    let dna_wasm = DnaWasmHashed::from_content(DnaWasm::new_invalid()).await;
-    let fake_wasms = vec![dna_wasm.clone().into_content()];
-    let fake_zomes = vec![IntegrityZome::new(
-        "hi".into(),
-        ZomeDef::Wasm(WasmZome::new(dna_wasm.as_hash().clone())).into(),
-    )];
-    let dna_def_1 = DnaDef::unique_from_zomes(fake_zomes.clone(), vec![]);
-    let dna_def_2 = DnaDef::unique_from_zomes(fake_zomes, vec![]);
-
-    let dna1 = DnaFile::new(dna_def_1, fake_wasms.clone()).await;
-    let dna2 = DnaFile::new(dna_def_2, fake_wasms.clone()).await;
-
-    let path1 = PathBuf::from(format!("{}", dna1.dna_hash()));
-
-    let (manifest, _dna_hashes) = app_manifest_fixture(
-        Some(DnaLocation::Bundled(path1.clone())),
-        vec![dna1.dna_def().clone(), dna2.dna_def().clone()],
-        modifiers,
-    )
-    .await;
-
-    let resources = vec![(path1, DnaBundle::from_dna_file(dna1.clone()).await.unwrap())];
-
-    let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
-        .await
-        .unwrap();
-    (bundle, dna1)
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
     let db_dir = test_db_dir();
