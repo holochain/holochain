@@ -630,7 +630,7 @@ impl Spaces {
                 // Note this is not an error because only a validation receipt is proof of a publish.
                 None => return Ok(()),
             };
-            incoming_dht_ops_workflow(&space, trigger, ops, request_validation_receipt).await?;
+            incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
         }
         Ok(())
     }

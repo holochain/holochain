@@ -2163,6 +2163,7 @@ dependencies = [
  "structopt",
  "strum",
  "subtle-encoding",
+ "task-motel",
  "tempfile",
  "test-case 1.2.3",
  "thiserror",
@@ -6205,6 +6206,18 @@ name = "target-lexicon"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9410d0f6853b1d94f0e519fb95df60f29d2c1eff2d921ffdf01a4c8a3b54f12d"
+
+[[package]]
+name = "task-motel"
+version = "0.1.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b07e59b544fff19b6ba207c502e7d714b5a285af880917cab8b41d63c87bf51"
+dependencies = [
+ "futures",
+ "parking_lot 0.12.1",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "tempdir"
