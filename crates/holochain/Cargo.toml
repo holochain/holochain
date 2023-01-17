@@ -66,7 +66,7 @@ tempfile = "3.3"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full"] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
-task-motel = "0.1.0-rc.0"
+task-motel = "0.1.0-rc.1"
 toml = "0.5.6"
 tracing = "0.1.26"
 tracing-futures = "0.2.5"
