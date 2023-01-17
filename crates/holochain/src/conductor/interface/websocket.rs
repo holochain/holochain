@@ -3,10 +3,10 @@
 
 use super::error::InterfaceError;
 use super::error::InterfaceResult;
-use crate::conductor::conductor::StopReceiver;
 use crate::conductor::interface::*;
-use crate::conductor::manager::ManagedTaskHandle;
 use crate::conductor::manager::ManagedTaskResult;
+use crate::conductor::manager::TaskManagerClient;
+use futures::FutureExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::signal::Signal;
 use holochain_websocket::ListenerHandle;
@@ -51,52 +51,55 @@ pub async fn spawn_websocket_listener(
 
 /// Create an Admin Interface, which only receives AdminRequest messages
 /// from the external client
-pub fn spawn_admin_interface_task<A: InterfaceApi>(
+pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
+    tm: TaskManagerClient,
     handle: ListenerHandle,
     listener: impl futures::stream::Stream<Item = ListenerItem> + Send + 'static,
     api: A,
-    mut stop_rx: StopReceiver,
-) -> InterfaceResult<ManagedTaskHandle> {
-    Ok(tokio::task::spawn(async move {
-        // Task that will kill the listener and all child connections.
-        tokio::task::spawn(
-            handle.close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) }),
-        );
+    port: u16,
+) {
+    // Task that will kill the listener and all child connections.
+    tm.add_conductor_task_ignored("admin interface websocket closer", |stop| {
+        handle.close_on(stop.map(|_| true)).map(Ok)
+    });
 
-        let num_connections = Arc::new(AtomicIsize::new(0));
-        futures::pin_mut!(listener);
-        // establish a new connection to a client
-        while let Some(connection) = listener.next().await {
-            match connection {
-                Ok((_, rx_from_iface)) => {
-                    if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
-                        // Max connections so drop this connection
-                        // which will close it.
-                        continue;
-                    };
-                    tokio::task::spawn(recv_incoming_admin_msgs(
-                        api.clone(),
-                        rx_from_iface,
-                        num_connections.clone(),
-                    ));
-                }
-                Err(err) => {
-                    warn!("Admin socket connection failed: {}", err);
+    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), |_stop| {
+        async move {
+            let num_connections = Arc::new(AtomicIsize::new(0));
+            futures::pin_mut!(listener);
+            // establish a new connection to a client
+            while let Some(connection) = listener.next().await {
+                match connection {
+                    Ok((_, rx_from_iface)) => {
+                        if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
+                            // Max connections so drop this connection
+                            // which will close it.
+                            continue;
+                        };
+                        tokio::task::spawn(recv_incoming_admin_msgs(
+                            api.clone(),
+                            rx_from_iface,
+                            num_connections.clone(),
+                        ));
+                    }
+                    Err(err) => {
+                        warn!("Admin socket connection failed: {}", err);
+                    }
                 }
             }
+            ManagedTaskResult::Ok(())
         }
-        ManagedTaskResult::Ok(())
-    }))
+    });
 }
 
 /// Create an App Interface, which includes the ability to receive signals
 /// from Cells via a broadcast channel
 pub async fn spawn_app_interface_task<A: InterfaceApi>(
+    tm: TaskManagerClient,
     port: u16,
     api: A,
     signal_broadcaster: broadcast::Sender<Signal>,
-    mut stop_rx: StopReceiver,
-) -> InterfaceResult<(u16, ManagedTaskHandle)> {
+) -> InterfaceResult<u16> {
     trace!("Initializing App interface");
     let (handle, mut listener) = WebsocketListener::bind_with_handle(
         url2!("ws://127.0.0.1:{}", port),
@@ -109,31 +112,33 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
         .port()
         .ok_or(InterfaceError::PortError)?;
     // Task that will kill the listener and all child connections.
-    tokio::task::spawn(
-        handle.close_on(async move { stop_rx.recv().await.map(|_| true).unwrap_or(true) }),
-    );
-    let task = tokio::task::spawn(async move {
-        // establish a new connection to a client
-        while let Some(connection) = listener.next().await {
-            match connection {
-                Ok((tx_to_iface, rx_from_iface)) => {
-                    let rx_from_cell = signal_broadcaster.subscribe();
-                    spawn_recv_incoming_msgs_and_outgoing_signals(
-                        api.clone(),
-                        rx_from_iface,
-                        rx_from_cell,
-                        tx_to_iface,
-                    );
-                }
-                Err(err) => {
-                    warn!("Admin socket connection failed: {}", err);
+    tm.add_conductor_task_ignored("app interface websocket closer", |stop| {
+        handle.close_on(stop.map(|_| true)).map(Ok)
+    });
+    tm.add_conductor_task_ignored("app interface new connection handler", |_stop| {
+        async move {
+            // establish a new connection to a client
+            while let Some(connection) = listener.next().await {
+                match connection {
+                    Ok((tx_to_iface, rx_from_iface)) => {
+                        let rx_from_cell = signal_broadcaster.subscribe();
+                        spawn_recv_incoming_msgs_and_outgoing_signals(
+                            api.clone(),
+                            rx_from_iface,
+                            rx_from_cell,
+                            tx_to_iface,
+                        );
+                    }
+                    Err(err) => {
+                        warn!("Admin socket connection failed: {}", err);
+                    }
                 }
             }
-        }
 
-        ManagedTaskResult::Ok(())
+            ManagedTaskResult::Ok(())
+        }
     });
-    Ok((port, task))
+    Ok(port)
 }
 
 /// Polls for messages coming in from the external client.
@@ -254,6 +259,7 @@ pub mod test {
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
     use observability;
+    use pretty_assertions::assert_eq;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
     use tempfile::TempDir;
@@ -318,6 +324,39 @@ pub mod test {
         conductor_handle
     }
 
+    async fn call_zome(
+        conductor_handle: ConductorHandle,
+        cell_id: CellId,
+        wasm: TestWasm,
+        function_name: String,
+        respond: holochain_websocket::Response,
+    ) {
+        // Now make sure we can call a zome once again
+        let mut request: ZomeCall =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
+                cell_id.clone(),
+                wasm.into(),
+                function_name,
+                ExternIO::encode(()).unwrap(),
+            ))
+            .next()
+            .unwrap()
+            .into();
+        request.cell_id = cell_id;
+        request = request
+            .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
+            .await
+            .unwrap();
+
+        let msg = AppRequest::CallZome(Box::new(request));
+        let msg = msg.try_into().unwrap();
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, RealAppInterfaceApi::new(conductor_handle.clone()))
+            .await
+            .unwrap();
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn serialization_failure() {
         let (_tmpdir, conductor_handle) = setup_admin().await;
@@ -338,34 +377,36 @@ pub mod test {
         conductor_handle.shutdown();
     }
 
-    // @todo fix test by using new InstallApp call
-    // #[tokio::test(flavor = "multi_thread")]
-    // async fn invalid_request() {
-    //     observability::test_run().ok();
-    //     let (_tmpdir, conductor_handle) = setup_admin().await;
-    //     let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
-    //     let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
-    //     let agent_key = fake_agent_pubkey_1();
-    //     let payload = InstallAppPayload {
-    //         dnas: vec![dna_payload],
-    //         installed_app_id: "test app".to_string(),
-    //         agent_key,
-    //     };
-    //     let msg = AdminRequest::InstallApp(Box::new(payload));
-    //     let msg = msg.try_into().unwrap();
-    //     let respond = |bytes: SerializedBytes| {
-    //         let response: AdminResponse = bytes.try_into().unwrap();
-    //         assert_matches!(
-    //             response,
-    //             AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
-    //         );
-    //         async { Ok(()) }.boxed().into()
-    //     };
-    //     let respond = Respond::Request(Box::new(respond));
-    //     let msg = (msg, respond);
-    //     handle_incoming_message(msg, admin_api).await.unwrap();
-    //     conductor_handle.shutdown();
-    // }
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    #[allow(unreachable_code, unused_variables)]
+    async fn invalid_request() {
+        observability::test_run().ok();
+        let (_tmpdir, conductor_handle) = setup_admin().await;
+        let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
+        let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
+        let agent_key = fake_agent_pubkey_1();
+        let payload = todo!("Use new payload struct");
+        // let payload = InstallAppPayload {
+        //     dnas: vec![dna_payload],
+        //     installed_app_id: "test app".to_string(),
+        //     agent_key,
+        // };
+        let msg = AdminRequest::InstallApp(Box::new(payload));
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(
+                response,
+                AdminResponse::Error(ExternalApiWireError::DnaReadError(_))
+            );
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, admin_api).await.unwrap();
+        conductor_handle.shutdown();
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn websocket_call_zome_function() {
@@ -385,38 +426,25 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
-        let mut request: ZomeCall =
-            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                cell_id.clone(),
-                TestWasm::Foo.into(),
-                "foo".into(),
-                ExternIO::encode(()).unwrap(),
-            ))
-            .next()
-            .unwrap()
-            .into();
-        request.cell_id = cell_id;
-        request = request
-            .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
-            .await
-            .unwrap();
+        let (_tmpdir, _, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
 
-        let msg = AppRequest::CallZome(Box::new(request));
-        let msg = msg.try_into().unwrap();
-        let respond = |bytes: SerializedBytes| {
-            let response: AppResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AppResponse::ZomeCalled { .. });
-            async { Ok(()) }.boxed().into()
-        };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, app_api).await.unwrap();
+        call_zome(
+            handle.clone(),
+            cell_id.clone(),
+            TestWasm::Foo,
+            "foo".into(),
+            Box::new(|bytes: SerializedBytes| {
+                let response: AppResponse = bytes.try_into().unwrap();
+                assert_matches!(response, AppResponse::ZomeCalled { .. });
+                async { Ok(()) }.boxed().into()
+            }),
+        )
+        .await;
+
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
-        let shutdown = handle.take_shutdown_handle().unwrap();
-        handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+
+        handle.shutdown().await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -464,20 +492,20 @@ pub mod test {
         handle_incoming_message(msg, app_api).await.unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
-        let shutdown = handle.take_shutdown_handle().unwrap();
-        handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+
+        handle.shutdown().await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn enable_disable_app() {
+    async fn enable_disable_enable_app() {
         observability::test_run().ok();
         let agent_key = fake_agent_pubkey_1();
         let mut dnas = Vec::new();
         for _i in 0..2 as u32 {
-            let zomes = vec![TestWasm::Foo.into()];
-            let def = DnaDef::unique_from_zomes(zomes.clone(), Vec::new());
-            dnas.push(DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Foo)).await);
+            let integrity_zomes = vec![TestWasm::Link.into()];
+            let coordinator_zomes = vec![TestWasm::Link.into()];
+            let def = DnaDef::unique_from_zomes(integrity_zomes, coordinator_zomes);
+            dnas.push(DnaFile::new(def, Vec::<DnaWasm>::from(TestWasm::Link)).await);
         }
         let dna_map = dnas
             .iter()
@@ -490,12 +518,15 @@ pub mod test {
             .cloned()
             .map(|hash| (CellId::from((hash, agent_key.clone())), None))
             .collect::<Vec<_>>();
+        let cell_id_0 = cell_ids_with_proofs.first().cloned().unwrap().0;
 
         let (_tmpdir, conductor_handle) = setup_admin_fake_cells(dnas, cell_ids_with_proofs).await;
-        let shutdown = conductor_handle.take_shutdown_handle().unwrap();
+
         let app_id = "test app".to_string();
 
-        // Activate the app
+        // Enable the app
+        println!("### ENABLE ###");
+
         let msg = AdminRequest::EnableApp {
             installed_app_id: app_id.clone(),
         };
@@ -513,7 +544,27 @@ pub mod test {
             .unwrap();
 
         // Get the state
-        let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
+        let initial_state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
+
+        // Now make sure we can call a zome
+        println!("### CALL ZOME ###");
+
+        call_zome(
+            conductor_handle.clone(),
+            cell_id_0.clone(),
+            TestWasm::Link,
+            "get_links".into(),
+            Box::new(|bytes: SerializedBytes| {
+                let response: AppResponse = bytes.try_into().unwrap();
+                assert_matches!(response, AppResponse::ZomeCalled { .. });
+                async { Ok(()) }.boxed().into()
+            }),
+        )
+        .await;
+
+        // State should match
+        let state = conductor_handle.get_state_from_handle().await.unwrap();
+        assert_eq!(initial_state, state);
 
         // Check it is running, and get all cells
         let cell_ids: HashSet<CellId> = state
@@ -545,6 +596,8 @@ pub mod test {
         }
 
         // Now deactivate app
+        println!("### DISABLE ###");
+
         let msg = AdminRequest::DisableApp {
             installed_app_id: app_id.clone(),
         };
@@ -587,15 +640,52 @@ pub mod test {
             assert!(false);
         }
 
-        conductor_handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        // Enable the app one more time
+        println!("### ENABLE ###");
+
+        let msg = AdminRequest::EnableApp {
+            installed_app_id: app_id.clone(),
+        };
+        let msg = msg.try_into().unwrap();
+        let respond = |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            assert_matches!(response, AdminResponse::AppEnabled { .. });
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(conductor_handle.clone()))
+            .await
+            .unwrap();
+
+        // Get the state again after reenabling, make sure it's identical to the initial state.
+        let state: ConductorState = conductor_handle.get_state_from_handle().await.unwrap();
+        assert_eq!(initial_state, state);
+
+        // Now make sure we can call a zome once again
+        println!("### CALL ZOME ###");
+
+        call_zome(
+            conductor_handle.clone(),
+            cell_id_0.clone(),
+            TestWasm::Link,
+            "get_links".into(),
+            Box::new(|bytes: SerializedBytes| {
+                let response: AppResponse = bytes.try_into().unwrap();
+                assert_matches!(response, AppResponse::ZomeCalled { .. });
+                async { Ok(()) }.boxed().into()
+            }),
+        )
+        .await;
+
+        conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn attach_app_interface() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let shutdown = conductor_handle.take_shutdown_handle().unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
@@ -607,8 +697,7 @@ pub mod test {
         let respond = Respond::Request(Box::new(respond));
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -624,7 +713,7 @@ pub mod test {
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![dna], vec![(cell_id.clone(), None)]).await;
         let conductor_handle = activate(conductor_handle).await;
-        let shutdown = conductor_handle.take_shutdown_handle().unwrap();
+
         // Allow agents time to join
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
@@ -644,8 +733,7 @@ pub mod test {
         let respond = Respond::Request(Box::new(respond));
         let msg = (msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
-        conductor_handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
     async fn make_dna(network_seed: &str, zomes: Vec<TestWasm>) -> DnaFile {

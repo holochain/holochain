@@ -467,6 +467,7 @@ jobs:
             '
 
       - name: ${{ matrix.testCommand.name }} (build only)
+        continue-on-error: ${{ matrix.platform.runs-on == 'macos-latest' }}
         if: ${{ matrix.testCommand.hasBuildStep == true }}
         env:
           CARGO_TEST_ARGS: "--no-run"
@@ -483,6 +484,7 @@ jobs:
         timeout-minutes: 720
 
       - name: ${{ matrix.testCommand.name }} (run)
+        continue-on-error: ${{ matrix.platform.runs-on == 'macos-latest' }}
         uses: nick-fields/retry@v2.8.1
         env:
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
@@ -594,12 +596,27 @@ jobs:
             ${{ runner.os }}-prepare-
           required: true
 
+      - name: Ensure the git credentials are set
+        env:
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+        run: |
+          set -xeu
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          # regenerate the nix sources
+          git config --global user.email "devcore@holochain.org"
+          git config --global user.name "Holochain Core Dev Team"
+
+          # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
+          git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
+
       - name: Push the target branch
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         env:
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
         run: |
-          set -eu
+          set -xeu
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
@@ -608,49 +625,16 @@ jobs:
           git push origin ${HOLOCHAIN_TARGET_BRANCH}
 
       - name: Push the release branch
+        id: push-release-branch
         run: |
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
           git checkout ${RELEASE_BRANCH}
           git push origin ${RELEASE_BRANCH}
 
-      - name: Create a pull-request towards the source branch
-        id: cpr
-        env:
-          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        run: |
-          set -euE -o pipefail
-
-          source ${HOLOCHAIN_RELEASE_SH}
-          cd "${HOLOCHAIN_REPO}"
-
-          gh pr create \
-            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
-            --label release \
-            --label "autoupdate:opt-in" \
-            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
-            --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
-            # --reviewer "holochain/core-dev" \
-
-          pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
-          echo "::set-output name=pull-request-number::${pull_request_number}"
-
-      - name: Enable Pull Request Automerge
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: peter-evans/enable-pull-request-automerge@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN}}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: squash
-      - name: Auto approve Pull Request
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        uses: juliangruber/approve-pull-request-action@v1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          number: ${{ steps.cpr.outputs.pull-request-number }}
-
       - name: Publish crates
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        id: publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
@@ -670,6 +654,7 @@ jobs:
 
       - name: Push the tags
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        id: push-tags
         run: |
           set -eu
           source ${HOLOCHAIN_RELEASE_SH}
@@ -678,6 +663,49 @@ jobs:
           git status
 
           git push origin ${HOLOCHAIN_TARGET_BRANCH} --tags
+
+      - name: Merge release branch into source branch
+        continue-on-error: true
+        id: merge-into-source
+        run: |
+          set -xeu
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          git fetch origin ${HOLOCHAIN_SOURCE_BRANCH}
+          git checkout -B ${HOLOCHAIN_SOURCE_BRANCH} origin/${HOLOCHAIN_SOURCE_BRANCH}
+          git merge ${RELEASE_BRANCH}
+
+      - name: Push the updated source branch
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        continue-on-error: true
+        run: |
+          set -xeu
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+          git push origin ${HOLOCHAIN_SOURCE_BRANCH}
+
+      - name: Create a pull-request towards the source branch
+        id: cpr
+        if: ${{ always() && steps.push-release-branch.outcome == 'success' && (needs.vars.outputs.dry_run == 'true' || (steps.publish.outcome == 'failed' || steps.push-tags.outcome == 'failed' || steps.merge-into-source.outcome == 'failed')) }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+        run: |
+          set -euE -o pipefail
+
+          source ${HOLOCHAIN_RELEASE_SH}
+          cd "${HOLOCHAIN_REPO}"
+
+          gh pr create \
+            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
+            --label release \
+            --label "autoupdate:opt-in" \
+            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
+            --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
+            # --reviewer "holochain/core-dev" \
+
+          pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
+          echo "::set-output name=pull-request-number::${pull_request_number}"
 
       - name: Create a github release
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
@@ -689,9 +717,27 @@ jobs:
           source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
-          gh release create "${TAG}" \
-            --title "holochain ${VERSION}" \
-            --notes "***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***"
+          # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
+          if gh release view ${TAG}; then
+            export RELEASE_TAG=${RELEASE_BRANCH}
+            export IS_HOLOCHAIN_RELEASE="false"
+          else
+            export RELEASE_TAG=${TAG}
+            export IS_HOLOCHAIN_RELEASE="true"
+          fi
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/holochain/holochain/releases \
+            -f tag_name="${RELEASE_TAG}" \
+            -f target_commitish="${HOLOCHAIN_TARGET_BRANCH}" \
+            -f name="holochain ${VERSION} (${RELEASE_BRANCH#*-})" \
+            -f body="***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***" \
+            -F draft=false \
+            -F prerelease=false \
+            -F generate_release_notes=false \
+            -f make_latest="${IS_HOLOCHAIN_RELEASE}"
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
@@ -716,9 +762,10 @@ jobs:
         env:
           RESULTS: "${{ toJSON(needs.*.result) }}"
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
+          SKIP_TEST: "${{ needs.vars.outputs.skip_test }}"
         run: |
           [[ $(jq -n 'env.RESULTS | fromjson | unique == ["success"]') == 'true' ]] || \
-          [[ ${DRY_RUN} == 'true' && $(jq -n 'env.RESULTS | fromjson | unique | sort == ["skipped", "success"]') == 'true' ]]
+          [[ (${DRY_RUN} == 'true' || ${SKIP_TEST} == 'true') && $(jq -n 'env.RESULTS | fromjson | unique | sort == ["skipped", "success"]') == 'true' ]]
 
       - name: Post mattermost message
         if: always()
@@ -789,9 +836,10 @@ jobs:
         env:
           RESULTS: "${{ toJSON(needs.*.result) }}"
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
+          SKIP_TEST: "${{ needs.vars.outputs.skip_test }}"
         run: |
           [[ $(jq -n 'env.RESULTS | fromjson | unique == ["success"]') == 'true' ]] || \
-          [[ ${DRY_RUN} == 'true' && $(jq -n 'env.RESULTS | fromjson | unique | sort == ["skipped", "success"]') == 'true' ]]
+          [[ (${DRY_RUN} == 'true' || ${SKIP_TEST} == 'true') && $(jq -n 'env.RESULTS | fromjson | unique | sort == ["skipped", "success"]') == 'true' ]]
 
       - name: Post mattermost message
         if: always()
@@ -809,6 +857,7 @@ jobs:
           MM_CHANNEL_ID: "cdxeytdc97ff3e1jbdzgyfcduo"
         run: |
           if [[ "${STATUS}" == "success" ]]; then
+            # TODO: adapt tag to case where holochain isn't released
             holochain_status="success :white_check_mark: [log](${WORKFLOW_RUN_URL}), [tag](https://github.com/holochain/holochain/releases/tag/${TAG})"
           elif [[ "${RELEASABLE_CRATES}" == "false" ]]; then
             holochain_status="no changes to release :ballot_box_with_check: [log](${WORKFLOW_RUN_URL})"

@@ -34,9 +34,10 @@ use std::time::Duration;
 
 use derive_more::Display;
 use futures::future::Either;
+use futures::{Future, Stream, StreamExt};
 use holochain_types::prelude::*;
 use holochain_zome_types::CellId;
-use tokio::sync::{self, broadcast};
+use tokio::sync::broadcast;
 
 // MAYBE: move these to workflow mod
 mod integrate_dht_ops_consumer;
@@ -46,13 +47,13 @@ use sys_validation_consumer::*;
 mod app_validation_consumer;
 use app_validation_consumer::*;
 mod publish_dht_ops_consumer;
-use tokio::task::JoinHandle;
 use validation_receipt_consumer::*;
 mod validation_receipt_consumer;
-use crate::conductor::conductor::RwShare;
+use crate::conductor::conductor::{RwShare, StopReceiver};
+use crate::conductor::manager::TaskManagerClient;
 use crate::conductor::space::Space;
+use crate::conductor::ConductorHandle;
 use crate::conductor::{error::ConductorError, manager::ManagedTaskResult};
-use crate::conductor::{manager::ManagedTaskAdd, ConductorHandle};
 use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::*;
 use publish_dht_ops_consumer::*;
@@ -64,7 +65,7 @@ use countersigning_consumer::*;
 mod tests;
 
 use super::workflow::app_validation_workflow::AppValidationWorkspace;
-use super::workflow::error::WorkflowError;
+use super::workflow::error::{WorkflowError, WorkflowResult};
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 
 /// Spawns several long-running tasks which are responsible for processing work
@@ -77,9 +78,7 @@ pub async fn spawn_queue_consumer_tasks(
     cell_id: CellId,
     network: HolochainP2pDna,
     space: &Space,
-    conductor_handle: ConductorHandle,
-    task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
-    stop: sync::broadcast::Sender<()>,
+    conductor: ConductorHandle,
 ) -> (QueueTriggers, InitialQueueTriggers) {
     let Space {
         authored_db,
@@ -89,83 +88,50 @@ pub async fn spawn_queue_consumer_tasks(
         ..
     } = space;
 
-    let keystore = conductor_handle.keystore().clone();
+    let keystore = conductor.keystore().clone();
     let dna_hash = Arc::new(cell_id.dna_hash().clone());
-    let queue_consumer_map = conductor_handle.get_queue_consumer_workflows();
+    let queue_consumer_map = conductor.get_queue_consumer_workflows();
 
     // Publish
-    let (tx_publish, handle) = spawn_publish_dht_ops_consumer(
-        cell_id.agent_pubkey().clone(),
+    let tx_publish = spawn_publish_dht_ops_consumer(
+        cell_id,
         authored_db.clone(),
-        conductor_handle.clone(),
-        stop.subscribe(),
-        Box::new(network.clone()),
+        conductor.clone(),
+        network.clone(),
     );
-    task_sender
-        .send(ManagedTaskAdd::cell_critical(
-            handle,
-            cell_id.clone(),
-            "publish_dht_ops_consumer",
-        ))
-        .await
-        .expect("Failed to manage workflow handle");
 
     // Validation Receipt
     // One per space.
-    let (tx_receipt, handle) =
-        queue_consumer_map.spawn_once_validation_receipt(dna_hash.clone(), || {
-            spawn_validation_receipt_consumer(
-                dna_hash.clone(),
-                dht_db.clone(),
-                conductor_handle.clone(),
-                stop.subscribe(),
-                network.clone(),
-            )
-        });
 
-    if let Some(handle) = handle {
-        task_sender
-            .send(ManagedTaskAdd::cell_critical(
-                handle,
-                cell_id.clone(),
-                "validation_receipt_consumer",
-            ))
-            .await
-            .expect("Failed to manage workflow handle");
-    }
+    let tx_receipt = queue_consumer_map.spawn_once_validation_receipt(dna_hash.clone(), || {
+        spawn_validation_receipt_consumer(
+            dna_hash.clone(),
+            dht_db.clone(),
+            conductor.clone(),
+            network.clone(),
+        )
+    });
 
     // Integration
     // One per space.
-    let (tx_integration, handle) =
-        queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
-            spawn_integrate_dht_ops_consumer(
-                dna_hash.clone(),
-                dht_db.clone(),
-                dht_query_cache.clone(),
-                stop.subscribe(),
-                tx_receipt.clone(),
-                network.clone(),
-            )
-        });
+    let tx_integration = queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
+        spawn_integrate_dht_ops_consumer(
+            dna_hash.clone(),
+            dht_db.clone(),
+            dht_query_cache.clone(),
+            conductor.task_manager(),
+            tx_receipt.clone(),
+            network.clone(),
+        )
+    });
 
-    if let Some(handle) = handle {
-        task_sender
-            .send(ManagedTaskAdd::cell_critical(
-                handle,
-                cell_id.clone(),
-                "integrate_dht_ops_consumer",
-            ))
-            .await
-            .expect("Failed to manage workflow handle");
-    }
-
-    let dna_def = conductor_handle
-        .get_dna_def(&*dna_hash)
+    let dna_def = conductor
+        .get_dna_def(&dna_hash)
         .expect("Dna must be in store");
 
     // App validation
     // One per space.
-    let (tx_app, handle) = queue_consumer_map.spawn_once_app_validation(dna_hash.clone(), || {
+    let tx_app = queue_consumer_map.spawn_once_app_validation(dna_hash.clone(), || {
         spawn_app_validation_consumer(
             dna_hash.clone(),
             AppValidationWorkspace::new(
@@ -176,31 +142,20 @@ pub async fn spawn_queue_consumer_tasks(
                 keystore.clone(),
                 Arc::new(dna_def),
             ),
-            conductor_handle.clone(),
-            stop.subscribe(),
+            conductor.clone(),
             tx_integration.clone(),
             network.clone(),
             dht_query_cache.clone(),
         )
     });
-    if let Some(handle) = handle {
-        task_sender
-            .send(ManagedTaskAdd::cell_critical(
-                handle,
-                cell_id.clone(),
-                "app_validation_consumer",
-            ))
-            .await
-            .expect("Failed to manage workflow handle");
-    }
 
-    let dna_def = conductor_handle
-        .get_dna_def(&*dna_hash)
+    let dna_def = conductor
+        .get_dna_def(&dna_hash)
         .expect("Dna must be in store");
 
     // Sys validation
     // One per space.
-    let (tx_sys, handle) = queue_consumer_map.spawn_once_sys_validation(dna_hash.clone(), || {
+    let tx_sys = queue_consumer_map.spawn_once_sys_validation(dna_hash.clone(), || {
         spawn_sys_validation_consumer(
             SysValidationWorkspace::new(
                 authored_db.clone().into(),
@@ -210,42 +165,20 @@ pub async fn spawn_queue_consumer_tasks(
                 Arc::new(dna_def),
             ),
             space.clone(),
-            conductor_handle.clone(),
-            stop.subscribe(),
+            conductor.clone(),
             tx_app.clone(),
             network.clone(),
         )
     });
 
-    if let Some(handle) = handle {
-        task_sender
-            .send(ManagedTaskAdd::cell_critical(
-                handle,
-                cell_id.clone(),
-                "sys_validation_consumer",
-            ))
-            .await
-            .expect("Failed to manage workflow handle");
-    }
-
-    let (tx_cs, handle) = queue_consumer_map.spawn_once_countersigning(dna_hash.clone(), || {
+    let tx_cs = queue_consumer_map.spawn_once_countersigning(dna_hash, || {
         spawn_countersigning_consumer(
             space.clone(),
-            stop.subscribe(),
+            conductor.task_manager(),
             network.clone(),
             tx_sys.clone(),
         )
     });
-    if let Some(handle) = handle {
-        task_sender
-            .send(ManagedTaskAdd::cell_critical(
-                handle,
-                cell_id.clone(),
-                "countersigning_consumer",
-            ))
-            .await
-            .expect("Failed to manage workflow handle");
-    }
 
     (
         QueueTriggers {
@@ -278,57 +211,37 @@ impl QueueConsumerMap {
         }
     }
 
-    fn spawn_once_validation_receipt<S>(
-        &self,
-        dna_hash: Arc<DnaHash>,
-        spawn: S,
-    ) -> (TriggerSender, Option<JoinHandle<ManagedTaskResult>>)
+    fn spawn_once_validation_receipt<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
     where
-        S: FnOnce() -> (TriggerSender, JoinHandle<ManagedTaskResult>),
+        S: FnOnce() -> TriggerSender,
     {
         self.spawn_once(QueueEntry(dna_hash, QueueType::Receipt), spawn)
     }
 
-    fn spawn_once_integration<S>(
-        &self,
-        dna_hash: Arc<DnaHash>,
-        spawn: S,
-    ) -> (TriggerSender, Option<JoinHandle<ManagedTaskResult>>)
+    fn spawn_once_integration<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
     where
-        S: FnOnce() -> (TriggerSender, JoinHandle<ManagedTaskResult>),
+        S: FnOnce() -> TriggerSender,
     {
         self.spawn_once(QueueEntry(dna_hash, QueueType::Integration), spawn)
     }
 
-    fn spawn_once_sys_validation<S>(
-        &self,
-        dna_hash: Arc<DnaHash>,
-        spawn: S,
-    ) -> (TriggerSender, Option<JoinHandle<ManagedTaskResult>>)
+    fn spawn_once_sys_validation<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
     where
-        S: FnOnce() -> (TriggerSender, JoinHandle<ManagedTaskResult>),
+        S: FnOnce() -> TriggerSender,
     {
         self.spawn_once(QueueEntry(dna_hash, QueueType::SysValidation), spawn)
     }
 
-    fn spawn_once_app_validation<S>(
-        &self,
-        dna_hash: Arc<DnaHash>,
-        spawn: S,
-    ) -> (TriggerSender, Option<JoinHandle<ManagedTaskResult>>)
+    fn spawn_once_app_validation<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
     where
-        S: FnOnce() -> (TriggerSender, JoinHandle<ManagedTaskResult>),
+        S: FnOnce() -> TriggerSender,
     {
         self.spawn_once(QueueEntry(dna_hash, QueueType::AppValidation), spawn)
     }
 
-    fn spawn_once_countersigning<S>(
-        &self,
-        dna_hash: Arc<DnaHash>,
-        spawn: S,
-    ) -> (TriggerSender, Option<JoinHandle<ManagedTaskResult>>)
+    fn spawn_once_countersigning<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
     where
-        S: FnOnce() -> (TriggerSender, JoinHandle<ManagedTaskResult>),
+        S: FnOnce() -> TriggerSender,
     {
         self.spawn_once(QueueEntry(dna_hash, QueueType::Countersigning), spawn)
     }
@@ -362,19 +275,15 @@ impl QueueConsumerMap {
         self.map.share_ref(|map| map.get(key).cloned())
     }
 
-    fn spawn_once<S>(
-        &self,
-        key: QueueEntry,
-        spawn: S,
-    ) -> (TriggerSender, Option<JoinHandle<ManagedTaskResult>>)
+    fn spawn_once<S>(&self, key: QueueEntry, spawn: S) -> TriggerSender
     where
-        S: FnOnce() -> (TriggerSender, JoinHandle<ManagedTaskResult>),
+        S: FnOnce() -> TriggerSender,
     {
         self.map.share_mut(|map| match map.entry(key) {
-            std::collections::hash_map::Entry::Occupied(o) => (o.get().clone(), None),
+            std::collections::hash_map::Entry::Occupied(o) => o.get().clone(),
             std::collections::hash_map::Entry::Vacant(v) => {
-                let (ts, handle) = spawn();
-                (v.insert(ts).clone(), Some(handle))
+                let ts = spawn();
+                v.insert(ts).clone()
             }
         })
     }
@@ -725,33 +634,69 @@ pub enum WorkComplete {
 #[derive(Debug, Display, thiserror::Error)]
 pub struct QueueTriggerClosedError;
 
-/// Inform a workflow to run a job or shutdown
-enum Job {
-    Run,
-    Shutdown,
+/// Get a stream of triggers which can be terminated by a received Stop
+pub(super) fn trigger_stream(rx: TriggerReceiver, stop: StopReceiver) -> impl Stream<Item = ()> {
+    stop.fuse_with(Box::pin(futures::stream::unfold(rx, |mut rx| async move {
+        match rx.listen().await {
+            Ok(()) => Some(((), rx)),
+            Err(_) => None,
+        }
+    })))
 }
 
-/// Wait for the next job or exit command
-async fn next_job_or_exit(
-    rx: &mut TriggerReceiver,
-    stop: &mut sync::broadcast::Receiver<()>,
-) -> Job {
-    if stop.try_recv().is_ok() {
-        return Job::Shutdown;
+async fn queue_consumer_main_task_impl<
+    Fut: 'static + Send + Future<Output = WorkflowResult<WorkComplete>>,
+>(
+    name: String,
+    (tx, rx): (TriggerSender, TriggerReceiver),
+    stop: StopReceiver,
+    mut fut: impl 'static + Send + FnMut() -> Fut,
+) -> ManagedTaskResult {
+    let mut triggers = trigger_stream(rx, stop);
+    loop {
+        if let Some(()) = triggers.next().await {
+            match fut().await {
+                Ok(WorkComplete::Incomplete) => {
+                    tracing::debug!("Work incomplete, retriggering workflow");
+                    tx.trigger(&"retrigger")
+                }
+                Err(err) => handle_workflow_error(err)?,
+                _ => (),
+            }
+        } else {
+            tracing::info!("Cell is shutting down: stopping queue consumer '{}'", name);
+            break;
+        }
     }
-    // Check for shutdown or next job
-    let next_job = rx.listen();
-    let kill = stop.recv();
-    tokio::pin!(next_job);
-    tokio::pin!(kill);
+    ManagedTaskResult::Ok(())
+}
 
-    if let Either::Left((Err(_), _)) | Either::Right((_, _)) =
-        futures::future::select(next_job, kill).await
-    {
-        Job::Shutdown
-    } else {
-        Job::Run
-    }
+fn queue_consumer_dna_bound<Fut: 'static + Send + Future<Output = WorkflowResult<WorkComplete>>>(
+    name: &str,
+    dna_hash: Arc<DnaHash>,
+    tm: TaskManagerClient,
+    (tx, rx): (TriggerSender, TriggerReceiver),
+    fut: impl 'static + Send + FnMut() -> Fut,
+) {
+    let name_string = name.to_string();
+    tm.add_dna_task_critical(name, dna_hash, move |stop| {
+        queue_consumer_main_task_impl(name_string, (tx, rx), stop, fut)
+    });
+}
+
+fn queue_consumer_cell_bound<
+    Fut: 'static + Send + Future<Output = WorkflowResult<WorkComplete>>,
+>(
+    name: &str,
+    cell_id: CellId,
+    tm: TaskManagerClient,
+    (tx, rx): (TriggerSender, TriggerReceiver),
+    fut: impl 'static + Send + FnMut() -> Fut,
+) {
+    let name_string = name.to_string();
+    tm.add_cell_task_critical(name, cell_id, move |stop| {
+        queue_consumer_main_task_impl(name_string, (tx, rx), stop, fut)
+    });
 }
 
 /// Does nothing.

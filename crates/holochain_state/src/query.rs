@@ -99,10 +99,12 @@ pub trait Query: Clone {
     }
     fn init_fold(&self) -> StateQueryResult<Self::State>;
 
+    #[allow(clippy::type_complexity)]
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         Box::new(|_| true)
     }
 
+    #[allow(clippy::type_complexity)]
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>>;
 
     fn fold(&self, state: Self::State, data: Self::Item) -> StateQueryResult<Self::State>;
@@ -822,6 +824,7 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
         Ok(Box::new(iter))
     }
 
+    #[allow(clippy::type_complexity)]
     fn new_iter<T: 'iter>(
         params: &[Params],
         stmt: Option<&'iter mut Statement>,

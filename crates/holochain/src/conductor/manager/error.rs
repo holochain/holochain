@@ -13,6 +13,9 @@ pub enum TaskManagerError {
     #[error("Task manager failed to start")]
     TaskManagerFailedToStart,
 
+    #[error(transparent)]
+    Join(#[from] tokio::task::JoinError),
+
     #[error("Task manager encountered an internal error: {0}")]
     Internal(Box<dyn std::error::Error + Send + Sync>),
 }

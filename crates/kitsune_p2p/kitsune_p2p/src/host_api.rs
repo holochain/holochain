@@ -28,6 +28,9 @@ pub trait KitsuneHost: 'static + Send + Sync {
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>>;
 
+    /// Remove an agent info from storage
+    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool>;
+
     /// Extrapolated Peer Coverage.
     fn peer_extrapolated_coverage(
         &self,

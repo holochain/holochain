@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.1.0-beta-rc.2
+
+## 0.1.0-beta-rc.1
+
+- Fix error while installing app and return app info of newly installed app. [\#1725](https://github.com/holochain/holochain/pull/1725)
+
 ## 0.1.0-beta-rc.0
 
 - **BREAKING CHANGE**: Remove deprecated Admin and App API calls.

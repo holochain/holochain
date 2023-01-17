@@ -303,6 +303,11 @@ impl KitsuneHostDefaultError for Kd1 {
         .boxed()
         .into()
     }
+
+    fn remove_agent_info_signed(&self, _input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        // hope for the best
+        async move { Ok(false) }.boxed().into()
+    }
 }
 
 impl FetchQueueConfig for Kd1 {
