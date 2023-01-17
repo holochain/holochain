@@ -121,16 +121,17 @@
     "holonix": {
       "flake": false,
       "locked": {
-        "lastModified": 1671749818,
-        "narHash": "sha256-jXmCaBd37b0OTwXvX+n47pWdwHurYQ9JrwxocFVMDmE=",
+        "lastModified": 1673933690,
+        "narHash": "sha256-KphGn6fkxBriVDpa/qo9meM8lETPU80G6ucbvNARW08=",
         "owner": "holochain",
         "repo": "holonix",
-        "rev": "5d54ea8e262202861bad3cbe3df41edf77e162ed",
+        "rev": "08439bec39a2301a18070853569fbe96c3da5011",
         "type": "github"
       },
       "original": {
-        "type": "file",
-        "url": "https://github.com/holochain/holonix"
+        "owner": "holochain",
+        "repo": "holonix",
+        "type": "github"
       }
     },
     "nix-filter": {

@@ -24,7 +24,7 @@
     };
     # eventually this should be removed, but `nix-shell` still requires holonix.
     holonix = {
-      url = "https://github.com/holochain/holonix";
+      url = "github:holochain/holonix";
       flake = false;
     };
   };
