@@ -678,12 +678,16 @@ mod dna_impls {
         /// Remove cells from the cell map in the Conductor
         pub(crate) async fn remove_cells(&self, cell_ids: &[CellId]) {
             let to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
+                dbg!(&cells.len());
                 cell_ids
                     .iter()
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
                     .collect()
             });
+            self.running_cells.share_ref(|cells| dbg!(cells.len()));
+
             for (cell_id, item) in to_cleanup {
+                dbg!(&cell_id);
                 if let Err(err) = item.cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
@@ -1316,6 +1320,7 @@ mod cell_impls {
 /// Methods related to clone cell management
 mod clone_cell_impls {
     use holochain_conductor_api::CellInfo;
+    use itertools::Itertools;
 
     use super::*;
 
@@ -1344,12 +1349,19 @@ mod clone_cell_impls {
             }
             let state = self.get_state().await?;
             let app = state.get_app(&app_id)?;
+
             app.provisioned_cells()
                 .find(|(app_role_name, _)| **app_role_name == role_name)
                 .ok_or_else(|| {
-                    ConductorError::CloneCellError(
-                        "no base cell found for provided role id".to_string(),
-                    )
+                    let role_names = app
+                        .provisioned_cells()
+                        .map(|(role_name, _)| format!("'{}'", role_name))
+                        .join(", ");
+
+                    ConductorError::CloneCellError(format!(
+                        "no base cell found for provided role id. Available role names are: ({})",
+                        role_names
+                    ))
                 })?;
 
             // add cell to app

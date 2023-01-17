@@ -13,6 +13,7 @@ use crate::conductor::{
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
+use holochain_conductor_api::CellInfo;
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -366,6 +367,22 @@ impl SweetConductor {
         }
 
         Ok(SweetAppBatch(apps))
+    }
+
+    /// Call into the underlying create_clone_cell function, and register the
+    /// created dna with SweetConductor so it will be reloaded on restart.
+    pub async fn create_clone_cell(
+        &mut self,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorApiResult<holochain_conductor_api::Cell> {
+        let cell_info = self.raw_handle().create_clone_cell(payload).await?;
+        let clone = match cell_info {
+            CellInfo::Cloned(cell) => cell,
+            _ => panic!("wrong cell type"),
+        };
+        let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
+        self.dnas.push(dna_file);
+        Ok(clone)
     }
 
     /// Get a stream of all Signals emitted on the "sweet-interface" AppInterface.
