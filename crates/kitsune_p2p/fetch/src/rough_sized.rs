@@ -5,6 +5,8 @@ use kitsune_p2p_types::KOpHash;
 /// The granularity once we're > i16::MAX
 const GRAN: usize = 4096;
 
+// TODO: try a u32 -> u16 mapping based on phi, the golden ratio, which keeps the expected error constant
+//       at any scale. These are some initial calculations to try.
 // const G: f64 = 1690.0; // x / (ln_phi 128000000)
 // const LOW: f64 = 15.0 * G;
 // const THRESH: u16 = 30000;

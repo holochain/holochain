@@ -58,7 +58,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::GetAppInfo { installed_app_id } => Ok(AppResponse::AppInfoReturned(
+            AppRequest::AppInfo { installed_app_id } => Ok(AppResponse::AppInfo(
                 self.conductor_handle
                     .get_app_info(&installed_app_id)
                     .await?,
@@ -96,7 +96,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
             AppRequest::DisableCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .disable_clone_cell(&*payload)
+                    .disable_clone_cell(&payload)
                     .await?;
                 Ok(AppResponse::CloneCellDisabled)
             }
@@ -104,7 +104,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 let enabled_cell = self
                     .conductor_handle
                     .clone()
-                    .enable_clone_cell(&*payload)
+                    .enable_clone_cell(&payload)
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }

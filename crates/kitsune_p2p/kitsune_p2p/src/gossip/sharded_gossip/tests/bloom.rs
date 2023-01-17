@@ -253,7 +253,7 @@ fn get_time_bounds(
     let len = window.end - window.start;
     let step = len.unwrap().to_std().unwrap() / n;
     let times = (0..n)
-        .map(|i| (window.start + step * i as u32).unwrap())
+        .map(|i| (window.start + step * i).unwrap())
         .collect::<Vec<_>>();
 
     let mut iter = times[records].iter();

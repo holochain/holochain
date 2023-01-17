@@ -1,10 +1,6 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
-// TODO - RE-ENABLE THIS!!!!
-// #![deny(warnings)]
-
-// TODO - DELETE THIS!!!!
-#![allow(clippy::unit_arg)]
+#![deny(warnings)]
 
 //! Kitsune P2p Fetch Queue Logic
 
@@ -55,16 +51,8 @@ pub struct FetchQueuePush {
     /// same op_hash, but different authors.
     pub author: Option<KAgent>,
 
-    /// Optional arguments related to fetching the data.
-    pub options: Option<FetchOptions>,
-
     /// Opaque "context" to be provided and interpreted by the host.
     pub context: Option<FetchContext>,
-}
-/// Options which affect how the fetch is performed.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
-pub struct FetchOptions {
-    __: (),
 }
 
 /// Usage agnostic context data.

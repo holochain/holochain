@@ -11,7 +11,7 @@ use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
-use holochain_conductor_api::InstalledAppInfoStatus;
+use holochain_conductor_api::AppInfoStatus;
 use holochain_keystore::crude_mock_keystore::*;
 use holochain_state::prelude::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
@@ -29,6 +29,8 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
+    let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(&ConductorConfig {
         environment_path: db_dir.path().to_path_buf().into(),
         ..Default::default()
@@ -41,6 +43,7 @@ async fn can_update_state() {
         holochain_p2p,
         spaces,
         post_commit_sender,
+        outcome_tx,
     );
     let state = conductor.get_state().await.unwrap();
     let mut expect_state = ConductorState::default();
@@ -77,6 +80,8 @@ async fn app_ids_are_unique() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
+    let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(&ConductorConfig {
         environment_path: db_dir.path().to_path_buf().into(),
         ..Default::default()
@@ -89,6 +94,7 @@ async fn app_ids_are_unique() {
         holochain_p2p,
         spaces,
         post_commit_sender,
+        outcome_tx,
     );
 
     let cell_id = fake_cell_id(1);
@@ -487,8 +493,8 @@ async fn test_reenable_app() {
         .unwrap();
     assert_eq!(inactive_apps.len(), 0);
     assert_eq!(active_apps.len(), 1);
-    assert_eq!(active_apps[0].cell_data.len(), 2);
-    assert_matches!(active_apps[0].status, InstalledAppInfoStatus::Running);
+    assert_eq!(active_apps[0].cell_info.len(), 2);
+    assert_matches!(active_apps[0].status, AppInfoStatus::Running);
 
     conductor
         .disable_app("app".to_string(), DisabledAppReason::User)
@@ -505,10 +511,10 @@ async fn test_reenable_app() {
         .unwrap();
     assert_eq!(active_apps.len(), 0);
     assert_eq!(inactive_apps.len(), 1);
-    assert_eq!(inactive_apps[0].cell_data.len(), 2);
+    assert_eq!(inactive_apps[0].cell_info.len(), 2);
     assert_matches!(
         inactive_apps[0].status,
-        InstalledAppInfoStatus::Disabled {
+        AppInfoStatus::Disabled {
             reason: DisabledAppReason::User
         }
     );
@@ -700,12 +706,12 @@ async fn test_app_status_states() {
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
 
     // PAUSED  --start->  RUNNING
 
     conductor.start_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Running);
 
     // RUNNING  --disable->  DISABLED
 
@@ -713,12 +719,12 @@ async fn test_app_status_states() {
         .disable_app("app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --start->  DISABLED
 
     conductor.start_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --pause->  DISABLED
 
@@ -726,12 +732,12 @@ async fn test_app_status_states() {
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --enable->  ENABLED
 
     conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Running);
 
     // RUNNING  --pause->  PAUSED
 
@@ -739,12 +745,12 @@ async fn test_app_status_states() {
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
 
     // PAUSED  --enable->  RUNNING
 
     conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Running);
 }
 
 #[tokio::test(flavor = "multi_thread")]

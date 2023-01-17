@@ -13,7 +13,6 @@ use holochain_types::dht_op::DhtOp;
 use holochain_types::signal::{Signal, SystemSignal};
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::{Entry, SignedAction, ZomeCallResponse};
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use kitsune_p2p_types::tx2::tx2_utils::Share;
 use rusqlite::{named_params, Transaction};
 
@@ -107,9 +106,9 @@ pub(crate) fn incoming_countersigning(
 /// Countersigning workflow that checks for complete sessions and
 /// pushes the complete ops to validation then messages the signers.
 pub(crate) async fn countersigning_workflow(
-    space: &Space,
-    network: &(dyn HolochainP2pDnaT + Send + Sync),
-    sys_validation_trigger: &TriggerSender,
+    space: Space,
+    network: impl HolochainP2pDnaT + Send + Sync,
+    sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Get any complete sessions.
     let complete_sessions = space.countersigning_workspace.get_complete_sessions();
@@ -123,7 +122,7 @@ pub(crate) async fn countersigning_workflow(
             .collect();
         if !non_enzymatic_ops.is_empty() {
             incoming_dht_ops_workflow(
-                space,
+                space.clone(),
                 sys_validation_trigger.clone(),
                 non_enzymatic_ops,
                 false,
@@ -299,26 +298,7 @@ pub(crate) async fn countersigning_success(
             }
             let op = DhtOp::RegisterAgentActivity(signature, action);
             let basis = op.dht_basis();
-            use holochain_p2p::DhtOpHashExt;
-            let hash_sized = OpHashSized::new(
-                DhtOpHash::with_data_sync(&op).to_kitsune(),
-                // MAYBE: figure out the size some day?
-                //        it's not dire for countersigning publishes
-                None,
-            );
-            let ops = vec![hash_sized];
-            if let Err(e) = network
-                .publish(
-                    false,
-                    false,
-                    basis,
-                    author.clone(),
-                    ops,
-                    None,
-                    Some(vec![op]),
-                )
-                .await
-            {
+            if let Err(e) = network.publish_countersign(false, basis, op).await {
                 tracing::error!(
                     "Failed to publish to other countersigners agent authorities because of: {:?}",
                     e
@@ -340,7 +320,7 @@ pub(crate) async fn countersigning_success(
 pub async fn countersigning_publish(
     network: &HolochainP2pDna,
     op: DhtOp,
-    author: AgentPubKey,
+    _author: AgentPubKey,
 ) -> Result<(), ZomeCallResponse> {
     if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {
         if let Err(e) = network
@@ -358,18 +338,7 @@ pub async fn countersigning_publish(
         }
     } else {
         let basis = op.dht_basis();
-        use holochain_p2p::DhtOpHashExt;
-        let hash_sized = OpHashSized::new(
-            DhtOpHash::with_data_sync(&op).to_kitsune(),
-            // MAYBE: figure out the size some day?
-            //        it's not dire for countersigning publishes
-            None,
-        );
-        let ops = vec![hash_sized];
-        if let Err(e) = network
-            .publish(false, true, basis, author, ops, None, Some(vec![op]))
-            .await
-        {
+        if let Err(e) = network.publish_countersign(true, basis, op).await {
             tracing::error!(
                 "Failed to publish to entry authorities for countersigning session because of: {:?}",
                 e

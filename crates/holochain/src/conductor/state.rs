@@ -1,8 +1,8 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
+use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
-use holochain_conductor_api::{config::InterfaceDriver, InstalledAppInfo};
 use holochain_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -187,14 +187,6 @@ impl ConductorState {
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))?;
         let delta = app.status.transition(transition);
         Ok((app, delta))
-    }
-
-    /// Retrieve info about an installed App by its InstalledAppId
-    #[allow(clippy::ptr_arg)]
-    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledAppInfo> {
-        self.installed_apps
-            .get(installed_app_id)
-            .map(InstalledAppInfo::from_installed_app)
     }
 
     /// Returns the interface configuration with the given ID if present

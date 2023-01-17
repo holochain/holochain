@@ -396,7 +396,7 @@ impl SweetConductor {
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
         if let Some(handle) = self.handle.take() {
-            handle.shutdown_and_wait().await;
+            handle.shutdown().await.unwrap().unwrap();
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }
@@ -510,15 +510,7 @@ pub async fn websocket_client_by_port(
 impl Drop for SweetConductor {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            tokio::task::spawn(async move {
-                // Shutdown the conductor
-                if let Some(shutdown) = handle.take_shutdown_handle() {
-                    handle.shutdown();
-                    if let Err(e) = shutdown.await {
-                        tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
-                    }
-                }
-            });
+            tokio::task::spawn(handle.shutdown());
         }
     }
 }

@@ -94,7 +94,7 @@ impl<T: 'static + Send> Share<T> {
 
 /// A version of Share which can never be closed, and thus every
 /// share is infallible (no Err possible).
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct ShareOpen<T: 'static + Send>(Share<T>);
 
 impl<T: 'static + Send> Clone for ShareOpen<T> {

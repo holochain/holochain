@@ -10,6 +10,7 @@ use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
 use ::fixt::prelude::*;
+use futures::FutureExt;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
@@ -39,6 +40,7 @@ use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::path::Path;
 use std::sync::Arc;
@@ -127,7 +129,7 @@ pub struct TestNetwork {
     respond_task: Option<tokio::task::JoinHandle<()>>,
     dna_network: HolochainP2pDna,
 
-    /// check op data calls
+    /// List of arguments used for `check_op_data` calls
     #[allow(clippy::type_complexity)]
     pub check_op_data_calls: Arc<
         std::sync::Mutex<
@@ -251,7 +253,6 @@ where
     .await
     .unwrap();
     let respond_task = tokio::task::spawn(async move {
-        use futures::future::FutureExt;
         use tokio_stream::StreamExt;
         while let Some(evt) = recv.next().await {
             if let Some((filter, tx)) = &mut events {
@@ -263,31 +264,27 @@ where
             use holochain_p2p::event::HolochainP2pEvent::*;
             match evt {
                 SignNetworkData { respond, .. } => {
-                    respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
+                    respond.r(ok_fut(Ok([0; 64].into())));
                 }
                 PutAgentInfoSigned { respond, .. } => {
-                    respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                    respond.r(ok_fut(Ok(())));
                 }
                 QueryAgentInfoSigned { respond, .. } => {
-                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    respond.r(ok_fut(Ok(vec![])));
                 }
                 QueryAgentInfoSignedNearBasis { respond, .. } => {
-                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    respond.r(ok_fut(Ok(vec![])));
                 }
                 QueryGossipAgents { respond, .. } => {
-                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    respond.r(ok_fut(Ok(vec![])));
                 }
                 QueryPeerDensity { respond, .. } => {
-                    respond.r(Ok(async move {
-                        Ok(PeerViewQ::new(
-                            Topology::standard_epoch(cutoff),
-                            ArqStrat::default(),
-                            vec![],
-                        )
-                        .into())
-                    }
-                    .boxed()
-                    .into()));
+                    respond.r(ok_fut(Ok(PeerViewQ::new(
+                        Topology::standard_epoch(cutoff),
+                        ArqStrat::default(),
+                        vec![],
+                    )
+                    .into())));
                 }
                 oth => tracing::warn!(?oth, "UnhandledEvent"),
             }
@@ -571,7 +568,7 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
 {
     let mut expected_count = 0;
     for (author, db) in all_cell_dbs.iter().map(|(author, a, _)| (author, a)) {
-        let count = get_published_ops(*db, *author).len();
+        let count = get_published_ops(*db, author).len();
         expected_count += count;
     }
     for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
@@ -614,7 +611,7 @@ async fn consistency_dbs_others<AuthorDb, DhtDb>(
 {
     let mut expected_count = 0;
     for (author, db) in all_cell_dbs.iter().map(|(author, a, _)| (author, a)) {
-        let count = get_published_ops(*db, *author).len();
+        let count = get_published_ops(*db, author).len();
         expected_count += count;
     }
     let start = Some(std::time::Instant::now());

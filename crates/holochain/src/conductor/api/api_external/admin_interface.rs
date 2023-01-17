@@ -147,9 +147,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .install_app_bundle(*payload)
                     .await?
                     .into();
-                Ok(AdminResponse::AppInstalled(
-                    InstalledAppInfo::from_installed_app(&app),
-                ))
+                let dna_definitions = self.conductor_handle.get_dna_definitions(&app)?;
+                Ok(AdminResponse::AppInstalled(AppInfo::from_installed_app(
+                    &app,
+                    &dna_definitions,
+                )))
             }
             UninstallApp { installed_app_id } => {
                 self.conductor_handle
@@ -260,9 +262,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
                 Ok(AdminResponse::AgentInfoAdded)
             }
-            RequestAgentInfo { cell_id } => {
+            AgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
-                Ok(AdminResponse::AgentInfoRequested(r))
+                Ok(AdminResponse::AgentInfo(r))
             }
             GraftRecords {
                 cell_id,
@@ -285,7 +287,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DeleteCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .delete_clone_cell(&*payload)
+                    .delete_clone_cell(&payload)
                     .await?;
                 Ok(AdminResponse::CloneCellDeleted)
             }
@@ -334,7 +336,7 @@ mod test {
         observability::test_run().ok();
         let env_dir = test_db_dir();
         let handle = Conductor::builder().test(env_dir.path(), &[]).await?;
-        let shutdown = handle.take_shutdown_handle().unwrap();
+
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let network_seed = Uuid::new_v4();
         let dna = fake_dna_zomes(
@@ -449,8 +451,7 @@ mod test {
             AdminResponse::DnaRegistered(hash) if hash != dna_hash
         );
 
-        handle.shutdown();
-        tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
+        tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown())
             .await
             .ok();
         Ok(())

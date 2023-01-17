@@ -238,6 +238,15 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
+    async fn publish_countersign(
+        &self,
+        _flag: bool,
+        _basis_hash: holo_hash::OpBasis,
+        _op: crate::DhtOp,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
     async fn send_validation_receipt(
         &self,
         _to_agent: AgentPubKey,
@@ -427,6 +436,15 @@ impl HolochainP2pDnaT for MockNetwork {
         _op_hash_list: Vec<OpHashSized>,
         _timeout_ms: Option<u64>,
         _reflect_ops: Option<Vec<crate::DhtOp>>,
+    ) -> actor::HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn publish_countersign(
+        &self,
+        _flag: bool,
+        _basis_hash: holo_hash::OpBasis,
+        _op: crate::DhtOp,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }

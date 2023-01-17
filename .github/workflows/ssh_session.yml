@@ -96,6 +96,8 @@ jobs:
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
+        env:
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         if: ${{ always() }}
         with:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow

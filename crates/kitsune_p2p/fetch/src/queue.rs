@@ -16,7 +16,7 @@ use tokio::time::{Duration, Instant};
 use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace /*, Tx2Cert*/};
 use linked_hash_map::{Entry, LinkedHashMap};
 
-use crate::{FetchContext, FetchKey, FetchOptions, FetchQueuePush, RoughInt};
+use crate::{FetchContext, FetchKey, FetchQueuePush, RoughInt};
 
 mod queue_reader;
 pub use queue_reader::*;
@@ -115,8 +115,6 @@ pub struct FetchQueueItem {
     space: KSpace,
     /// Approximate size of the item. If set, the item will be counted towards overall progress.
     size: Option<RoughInt>,
-    /// Options specified for this fetch job
-    options: Option<FetchOptions>,
     /// Opaque user data specified by the host
     pub context: Option<FetchContext>,
     /// The last time we tried fetching this item from any source
@@ -134,8 +132,6 @@ struct SourceRecord {
 pub enum FetchSource {
     /// An agent on a node
     Agent(KAgent),
-    // /// A node, without agent specified
-    // Node(Tx2Cert),
 }
 
 // TODO: move this to host, but for now, for convenience, we just use this one config
@@ -217,7 +213,6 @@ impl State {
         let FetchQueuePush {
             key,
             author,
-            options,
             context,
             space,
             source,
@@ -235,7 +230,6 @@ impl State {
                     sources,
                     space,
                     size,
-                    options,
                     context,
                     last_fetch: None,
                 };
@@ -244,7 +238,6 @@ impl State {
             Entry::Occupied(mut e) => {
                 let v = e.get_mut();
                 v.sources.0.insert(0, SourceRecord::new(source));
-                v.options = options;
                 v.context = match (v.context.take(), context) {
                     (Some(a), Some(b)) => Some(config.merge_fetch_contexts(*a, *b).into()),
                     (a, b) => a.and(b),
@@ -372,7 +365,6 @@ mod tests {
             key: key_op(n),
             author: None,
             context,
-            options: Default::default(),
             space: space(0),
             source,
             size: None,
@@ -387,7 +379,6 @@ mod tests {
         FetchQueueItem {
             sources: Sources(sources.into_iter().map(|s| SourceRecord::new(s)).collect()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
-            options: Default::default(),
             context,
             size: None,
             last_fetch: None,

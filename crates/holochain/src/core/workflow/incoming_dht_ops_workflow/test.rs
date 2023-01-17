@@ -34,7 +34,7 @@ async fn incoming_ops_to_limbo() {
         let space = space.space.clone();
         all.push(tokio::task::spawn(async move {
             let start = std::time::Instant::now();
-            incoming_dht_ops_workflow(&space, sys_validation_trigger, vec![op], false)
+            incoming_dht_ops_workflow(space, sys_validation_trigger, vec![op], false)
                 .await
                 .unwrap();
             println!("IN OP in {} s", start.elapsed().as_secs_f64());

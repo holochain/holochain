@@ -395,7 +395,7 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster);
 );
 
 fixturator!(

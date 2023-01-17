@@ -28,6 +28,8 @@ pub enum CellError {
     ActionError(#[from] ActionError),
     #[error("This cell has not had a successful genesis and cannot be created")]
     CellWithoutGenesis(CellId),
+    #[error("The cell with id {0} is disabled.")]
+    CellDisabled(CellId),
     #[error(
         "The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}"
     )]

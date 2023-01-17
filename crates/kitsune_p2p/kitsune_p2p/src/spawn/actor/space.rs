@@ -481,7 +481,6 @@ impl SpaceInternalHandler for Space {
                         size: op_hash.maybe_size(),
                         // TODO - get the author from somewhere
                         author: None,
-                        options: None,
                         context: Some(context),
                     });
 
@@ -760,6 +759,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
         initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
+        tracing::debug!(?space, ?agent, ?initial_arc, "handle_join");
         if let Some(initial_arc) = initial_arc {
             self.agent_arcs.insert(agent.clone(), initial_arc);
         }
@@ -1305,7 +1305,7 @@ pub(crate) struct Space {
     pub(crate) space: Arc<KitsuneSpace>,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    pub(crate) _host_api: HostApi,
+    pub(crate) host_api: HostApi,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
@@ -1503,7 +1503,7 @@ impl Space {
             space,
             i_s,
             evt_sender,
-            _host_api: host_api,
+            host_api,
             local_joined_agents: HashSet::new(),
             agent_arcs: HashMap::new(),
             config,
@@ -1516,8 +1516,8 @@ impl Space {
     fn update_metric_exchange_arcset(&mut self) {
         let arc_set = self
             .agent_arcs
-            .iter()
-            .map(|(_, a)| DhtArcSet::from_interval(DhtArcRange::from(a)))
+            .values()
+            .map(|a| DhtArcSet::from_interval(DhtArcRange::from(a)))
             .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
         self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
@@ -1531,6 +1531,8 @@ impl Space {
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let host = self.host_api.clone();
+
         Ok(async move {
             let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
             let expires_at_ms = signed_at_ms + expires_after;
@@ -1561,12 +1563,12 @@ impl Space {
 
             tracing::debug!(?agent_info_signed);
 
-            evt_sender
-                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                    space: space.clone(),
-                    peer_data: vec![agent_info_signed.clone()],
-                })
-                .await?;
+            // TODO: at some point, we should not remove agents who have left, but rather
+            // there should be a flag indicating they have left. The removed agent may just
+            // get re-gossiped to another local agent in the same space, defeating the purpose.
+            host.remove_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
+                .await
+                .map_err(KitsuneP2pError::other)?;
 
             // Push to the network as well
             match network_type {

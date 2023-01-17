@@ -30,7 +30,9 @@ fn test_region_queue() {
             .collect()
     }
 
-    const BATCH_SIZE: u32 = 4000;
+    // 5 hashes per batch
+    const BATCH_SIZE: u32 = 36 * 5;
+
     let mut queue: VecDeque<_> = vec![
         fake_region(1, 1000),
         fake_region(2, 2000),
@@ -63,8 +65,12 @@ fn test_region_queue() {
     assert_eq!(r, (vec![8000]));
 
     let r = run(&mut queue, BATCH_SIZE);
+    assert_eq!(queue.len(), initial_len - 6);
+    assert_eq!(r, (vec![1000]));
+
+    let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), initial_len - 7);
-    assert_eq!(r, (vec![1000, 2000]));
+    assert_eq!(r, (vec![2000]));
 
     let r = run(&mut queue, BATCH_SIZE);
     assert_eq!(queue.len(), 0);

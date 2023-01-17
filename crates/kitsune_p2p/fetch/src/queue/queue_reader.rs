@@ -1,14 +1,14 @@
 use std::{collections::HashSet, sync::Arc};
 
-use kitsune_p2p_types::{tx2::tx2_utils::Share, KSpace};
+use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KSpace};
 
 use crate::FetchQueue;
 
 /// Read-only access to the queue
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct FetchQueueReader {
     queue: FetchQueue,
-    max_info: Arc<Share<FetchQueueInfo>>,
+    max_info: Arc<ShareOpen<FetchQueueInfo>>,
 }
 
 impl FetchQueueReader {
@@ -16,7 +16,7 @@ impl FetchQueueReader {
     pub fn new(queue: FetchQueue) -> Self {
         Self {
             queue,
-            max_info: Arc::new(Share::new(Default::default())),
+            max_info: Arc::new(ShareOpen::new(Default::default())),
         }
     }
     /// Get info about the queue, filtered by space
@@ -29,28 +29,34 @@ impl FetchQueueReader {
                 .fold((0, 0), |(c, s), t| (c + 1, s + t))
         });
 
-        let max = self
-            .max_info
-            .share_mut(|i, _| {
-                if count > i.num_ops_to_fetch {
-                    i.num_ops_to_fetch = count;
-                }
-                if bytes > i.op_bytes_to_fetch {
-                    i.op_bytes_to_fetch = bytes;
-                }
-                if count == 0 && bytes == 0 {
-                    i.num_ops_to_fetch = 0;
-                    i.op_bytes_to_fetch = 0;
-                }
-                Ok(i.clone())
-            })
-            .unwrap();
+        let max = self.max_info.share_mut(|i| {
+            if count > i.num_ops_to_fetch {
+                i.num_ops_to_fetch = count;
+            }
+            if bytes > i.op_bytes_to_fetch {
+                i.op_bytes_to_fetch = bytes;
+            }
+            if count == 0 && bytes == 0 {
+                i.num_ops_to_fetch = 0;
+                i.op_bytes_to_fetch = 0;
+            }
+            i.clone()
+        });
 
         let current = FetchQueueInfo {
             op_bytes_to_fetch: bytes,
             num_ops_to_fetch: count,
         };
         FetchQueueInfoStateful { current, max }
+    }
+}
+
+impl std::fmt::Debug for FetchQueueReader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FetchQueueReader")
+            .field("queue", &self.queue)
+            .field("max_info", &self.max_info.share_ref(|i| i.clone()))
+            .finish()
     }
 }
 
@@ -102,7 +108,7 @@ mod tests {
                     config: Arc::new(cfg),
                     state: ShareOpen::new(State { queue }),
                 },
-                max_info: Arc::new(Share::new(Default::default())),
+                max_info: Arc::new(ShareOpen::new(Default::default())),
             }
         };
         let info = q.info([space(0)].into_iter().collect());

@@ -359,7 +359,7 @@ async fn remove_node(app: App, index: usize) {
         let node = state.nodes.remove(index);
         node.conductor.sweet_handle()
     });
-    handle.shutdown_and_wait().await;
+    handle.shutdown().await.unwrap().unwrap();
 }
 
 fn random_node(state: &mut State) -> &Node {

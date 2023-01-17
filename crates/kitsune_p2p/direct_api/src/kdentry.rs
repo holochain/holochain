@@ -104,7 +104,7 @@ pub mod kd_entry {
             D: serde::Deserializer<'de>,
         {
             let s = String::deserialize(deserializer).map_err(serde::de::Error::custom)?;
-            let d = base64::decode(&s).map_err(serde::de::Error::custom)?;
+            let d = base64::decode(s).map_err(serde::de::Error::custom)?;
             Ok(Self(d.into_boxed_slice()))
         }
     }

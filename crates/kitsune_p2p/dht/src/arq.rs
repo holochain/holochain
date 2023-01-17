@@ -511,7 +511,7 @@ pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) 
             "power too large: {}",
             power
         );
-        Arq::new(power as u8, start, count.into())
+        Arq::new(power, start, count.into())
     }
 }
 

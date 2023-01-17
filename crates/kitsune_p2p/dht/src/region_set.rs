@@ -19,7 +19,7 @@ use crate::region::{Region, RegionBounds, RegionCoords, RegionData, RegionDataCo
 /// The generic definition of a set of Regions.
 /// The current representation is very specific to our current algorithm,
 /// but this is an enum to make room for a more generic representation, e.g.
-/// a simple Vec<Region>, if we want a more intricate algorithm later.
+/// a simple `Vec<Region>`, if we want a more intricate algorithm later.
 #[derive(Debug, derive_more::From)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
 pub enum RegionSet<T: RegionDataConstraints = RegionData> {

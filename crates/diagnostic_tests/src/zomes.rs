@@ -125,13 +125,13 @@ pub fn syn_zome() -> InlineIntegrityZome {
         })
         //
         .function("init", move |api, ()| {
-            let mut functions: GrantedFunctions = BTreeSet::new();
+            let mut functions = BTreeSet::new();
             functions.insert((api.zome_info(()).unwrap().name, "recv_remote_signal".into()));
             let cap_grant_entry = CapGrantEntry {
                 tag: "".into(),
                 // empty access converts to unrestricted
                 access: ().into(),
-                functions,
+                functions: GrantedFunctions::Listed(functions),
             };
             api.create(CreateInput::new(
                 EntryDefLocation::CapGrant,

@@ -119,7 +119,7 @@ pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 
 #[instrument(skip(space, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
-    space: &Space,
+    space: Space,
     sys_validation_trigger: TriggerSender,
     mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     request_validation_receipt: bool,
@@ -157,7 +157,7 @@ pub async fn incoming_dht_ops_workflow(
     }
 
     if !request_validation_receipt {
-        ops = filter_existing_ops(dht_db, ops).await?;
+        ops = filter_existing_ops(&dht_db, ops).await?;
     }
 
     for (hash, op) in ops {
@@ -176,7 +176,7 @@ pub async fn incoming_dht_ops_workflow(
     }
 
     let (mut maybe_batch, rcv) =
-        batch_check_insert(incoming_ops_batch, request_validation_receipt, filter_ops);
+        batch_check_insert(&incoming_ops_batch, request_validation_receipt, filter_ops);
 
     let incoming_ops_batch = incoming_ops_batch.clone();
     if maybe_batch.is_some() {

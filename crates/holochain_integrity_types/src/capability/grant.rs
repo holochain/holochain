@@ -96,7 +96,11 @@ impl CapGrant {
                 access, functions, ..
             }) => {
                 // The checked function needs to be in the grant…
-                functions.contains(check_function)
+                let granted = match functions {
+                    GrantedFunctions::All => true,
+                    GrantedFunctions::Listed(fns) => fns.contains(check_function),
+                };
+                granted
                 // The agent needs to be valid…
                 && match access {
                     // The grant is assigned so the agent needs to match…
@@ -171,4 +175,12 @@ impl From<(CapSecret, AgentPubKey)> for CapAccess {
 /// a single zome/function pair
 pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs
-pub type GrantedFunctions = BTreeSet<GrantedFunction>;
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub enum GrantedFunctions {
+    /// grant all zomes all functions
+    All,
+    /// grant to specified zomes and functions
+    Listed(BTreeSet<GrantedFunction>),
+}

@@ -76,6 +76,10 @@ pub enum WireMessage {
     CountersigningSessionNegotiation {
         message: event::CountersigningSessionNegotiationMessage,
     },
+    PublishCountersign {
+        flag: bool,
+        op: DhtOp,
+    },
 }
 
 #[allow(missing_docs)]
@@ -86,6 +90,10 @@ impl WireMessage {
 
     pub fn decode(data: &[u8]) -> Result<Self, SerializedBytesError> {
         holochain_serialized_bytes::decode(&data)
+    }
+
+    pub fn publish_countersign(flag: bool, op: DhtOp) -> WireMessage {
+        Self::PublishCountersign { flag, op }
     }
 
     /// For an outgoing remote call.

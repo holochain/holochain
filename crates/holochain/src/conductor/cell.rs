@@ -6,7 +6,6 @@
 
 use super::api::CellConductorHandle;
 use super::interface::SignalBroadcaster;
-use super::manager::ManagedTaskAdd;
 use super::space::Space;
 use super::ConductorHandle;
 use crate::conductor::api::CellConductorApi;
@@ -50,7 +49,6 @@ use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -97,6 +95,10 @@ impl PartialEq for Cell {
 pub struct Cell {
     id: CellId,
     conductor_api: CellConductorHandle,
+    // NOTE: this got snuck in here, the original purpose was that the Cell would have limited access to
+    // the full Conductor via `CellConductorHandle`. As it stands, it's redundant to have both, but it
+    // may make it easier to a cleanup of the Conductor monolith later if we don't completely remove
+    // the encapsulation of CellConductorHandle, even though the encapsulation is not complete.
     conductor_handle: ConductorHandle,
     space: Space,
     holochain_p2p_cell: HolochainP2pDna,
@@ -118,8 +120,6 @@ impl Cell {
         conductor_handle: ConductorHandle,
         space: Space,
         holochain_p2p_cell: holochain_p2p::HolochainP2pDna,
-        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
-        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
 
@@ -137,8 +137,6 @@ impl Cell {
                 holochain_p2p_cell.clone(),
                 &space,
                 conductor_handle.clone(),
-                managed_task_add_sender,
-                managed_task_stop_broadcaster,
             )
             .await;
 
@@ -159,7 +157,7 @@ impl Cell {
         }
     }
 
-    /// Performs the Genesis workflow the Cell, ensuring that its initial
+    /// Performs the Genesis workflow for the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
@@ -947,22 +945,21 @@ impl Cell {
     }
 
     /// Clean up long-running managed tasks.
-    //
-    // FIXME: this should ensure that the long-running managed tasks,
-    //        i.e. the queue consumers, are stopped. Currently, they
-    //        will continue running because we have no way to target a specific
-    //        Cell's tasks for shutdown.
-    //
-    //        Consider using a separate TaskManager for each Cell, so that all
-    //        of a Cell's tasks can be shut down at once. Perhaps the Conductor
-    //        TaskManager can have these Cell TaskManagers as children.
-    //        [ B-04176 ]
     pub async fn cleanup(&self) -> CellResult<()> {
         use holochain_p2p::HolochainP2pDnaT;
-        self.holochain_p2p_dna()
+        let shutdown = self
+            .conductor_handle
+            .task_manager()
+            .stop_cell_tasks(self.id().clone())
+            .map(|r| CellResult::Ok(r?));
+        let leave = self
+            .holochain_p2p_dna()
             .leave(self.id.agent_pubkey().clone())
-            .await?;
-        tracing::info!("Cell removed, but cleanup is not yet fully implemented.");
+            .map(|r| CellResult::Ok(r?));
+        let (shutdown, leave) = futures::future::join(shutdown, leave).await;
+        shutdown?;
+        leave?;
+        tracing::info!("Cell cleaned up and removed: {:?}", self.id());
         Ok(())
     }
 
