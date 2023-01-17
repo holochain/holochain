@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::sweettest::*;
+use crate::{conductor::error::ConductorError, sweettest::*};
 use futures::future::join_all;
 use holo_hash::DnaHash;
 use holochain_types::prelude::{
@@ -9,6 +9,7 @@ use holochain_types::prelude::{
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::DnaModifiersOpt;
+use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_duplicate_app_for_same_agent() {
@@ -63,9 +64,10 @@ async fn reject_duplicate_app_for_same_agent() {
         })
         .await
         .unwrap();
+    conductor.enable_app("app_1".into()).await.unwrap();
 
-    let resources = vec![(path, DnaBundle::from_dna_file(dna.clone()).await.unwrap())];
-    let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
+    let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).await.unwrap())];
+    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
         .unwrap();
     let duplicate_install = conductor
@@ -78,6 +80,24 @@ async fn reject_duplicate_app_for_same_agent() {
             network_seed: None,
         })
         .await;
-    println!("duplicate install {:?}", duplicate_install);
-    assert!(duplicate_install.is_err());
+    assert_matches!(
+        duplicate_install.unwrap_err(),
+        ConductorError::CellAlreadyActive
+    );
+
+    let resources = vec![(path, DnaBundle::from_dna_file(dna.clone()).await.unwrap())];
+    let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
+        .await
+        .unwrap();
+    let valid_install = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            source: AppBundleSource::Bundle(bundle),
+            agent_key: alice.clone(),
+            installed_app_id: Some("app_2".into()),
+            membrane_proofs: HashMap::new(),
+            network_seed: Some("network".into()),
+        })
+        .await;
+    assert!(valid_install.is_ok());
 }
