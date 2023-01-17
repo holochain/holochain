@@ -322,8 +322,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             break;
         }
     }
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
+
+    handle.shutdown().await.unwrap().unwrap();
     test_db
 }
