@@ -10,7 +10,6 @@ use holochain_types::{
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CloneId, DnaModifiersOpt, RoleName};
-use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_without_modifiers_fails() {
@@ -76,7 +75,7 @@ async fn create_clone_cell_creates_callable_cell() {
         .unwrap();
 
     let clone_name = "test_name".to_string();
-    let clone_cell_info = conductor
+    let clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
@@ -87,16 +86,11 @@ async fn create_clone_cell_creates_callable_cell() {
         })
         .await
         .unwrap();
-    assert_matches!(clone_cell_info, CellInfo::Cloned { .. });
-    let clone_cell_info = match clone_cell_info {
-        CellInfo::Cloned(cell_info) => cell_info,
-        _ => panic!("wrong cell type"),
-    };
-    assert_eq!(clone_cell_info.enabled, true);
-    assert_eq!(clone_cell_info.name, clone_name);
+    assert_eq!(clone_cell.enabled, true);
+    assert_eq!(clone_cell.name, clone_name);
 
     let zome = SweetZome::new(
-        clone_cell_info.cell_id.clone(),
+        clone_cell.cell_id.clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let zome_call_response: Result<ActionHash, _> = conductor
@@ -116,7 +110,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         .await
         .unwrap();
 
-    let clone_cell_info_0 = conductor
+    let clone_cell_0 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
@@ -127,13 +121,9 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         })
         .await
         .unwrap();
-    let cell_0 = match clone_cell_info_0 {
-        CellInfo::Cloned(cell) => cell,
-        _ => panic!("wrong cell type"),
-    };
-    assert_eq!(cell_0.clone_id.unwrap(), CloneId::new(&role_name, 0)); // clone index starts at 0
+    assert_eq!(clone_cell_0.clone_id.unwrap(), CloneId::new(&role_name, 0)); // clone index starts at 0
 
-    let clone_cell_info_1 = conductor
+    let clone_cell_1 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
@@ -144,11 +134,7 @@ async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
         })
         .await
         .unwrap();
-    let cell_1 = match clone_cell_info_1 {
-        CellInfo::Cloned(cell) => cell,
-        _ => panic!("wrong cell type"),
-    };
-    assert_eq!(cell_1.clone_id.unwrap(), CloneId::new(&role_name, 1));
+    assert_eq!(clone_cell_1.clone_id.unwrap(), CloneId::new(&role_name, 1));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -162,7 +148,7 @@ async fn clone_cell_deletion() {
         .setup_app_for_agent(app_id, alice.clone(), [&(role_name.clone(), dna)])
         .await
         .unwrap();
-    let clone_cell_info = conductor
+    let clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.to_string(),
@@ -173,11 +159,7 @@ async fn clone_cell_deletion() {
         })
         .await
         .unwrap();
-    let clone_cell = match clone_cell_info.clone() {
-        CellInfo::Cloned(cell) => cell,
-        _ => panic!("wrong cell type"),
-    };
-    let clone_id = CloneCellId::CloneId(clone_cell.clone_id.unwrap().clone());
+    let clone_id = CloneCellId::CloneId(clone_cell.clone().clone_id.unwrap());
 
     // disable clone cell
     conductor
@@ -200,7 +182,7 @@ async fn clone_cell_deletion() {
     assert!(zome_call_response.is_err());
 
     // enable the disabled clone cell by clone id
-    let enabled_cell_info = conductor
+    let enabled_clone_cell = conductor
         .raw_handle()
         .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
@@ -210,7 +192,7 @@ async fn clone_cell_deletion() {
         .unwrap();
 
     // assert the enabled clone cell is the previously created clone cell
-    assert_eq!(enabled_cell_info, clone_cell_info);
+    assert_eq!(enabled_clone_cell, clone_cell);
 
     // assert that the cell appears in app info's cell data again
     let app_info = conductor
@@ -245,7 +227,7 @@ async fn clone_cell_deletion() {
         .unwrap();
 
     // enable clone cell by cell id
-    let enabled_cell_info = conductor
+    let enabled_clone_cell = conductor
         .raw_handle()
         .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
@@ -255,7 +237,7 @@ async fn clone_cell_deletion() {
         .unwrap();
 
     // assert the enabled clone cell is the previously created clone cell
-    assert_eq!(enabled_cell_info, clone_cell_info);
+    assert_eq!(enabled_clone_cell, clone_cell);
 
     // disable and delete clone cell
     conductor
@@ -296,7 +278,7 @@ async fn conductor_can_startup_with_cloned_cell() {
         .await
         .unwrap();
 
-    let clone_cell_info = conductor
+    let clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
@@ -307,10 +289,6 @@ async fn conductor_can_startup_with_cloned_cell() {
         })
         .await
         .unwrap();
-    let clone_cell = match &clone_cell_info {
-        CellInfo::Cloned(cell) => cell,
-        _ => panic!("wrong cell type"),
-    };
 
     // calling the cell works
     let zome = SweetZome::new(

@@ -96,9 +96,8 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
-    /// The response contains the [`CellInfo`] of the created clone
-    /// cell.
-    CloneCellCreated(CellInfo),
+    /// The response contains the created clone [`Cell`].
+    CloneCellCreated(Cell),
 
     /// The successful response to an [`AppRequest::DisableCloneCell`].
     ///
@@ -107,8 +106,9 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::EnableCloneCell`].
     ///
-    /// A previously disabled clone cell has been enabled.
-    CloneCellEnabled(CellInfo),
+    /// A previously disabled clone cell has been enabled. The clone [`Cell`]
+    /// is returned.
+    CloneCellEnabled(Cell),
 
     /// NetworkInfo is returned
     NetworkInfo(Vec<NetworkInfo>),

@@ -44,11 +44,6 @@ async fn app_info_returns_all_cells_with_info() {
         .await
         .unwrap();
 
-    let clone_1_cell_info = match installed_clone_cell_1 {
-        CellInfo::Cloned(cell_info) => cell_info,
-        _ => panic!("wrong cell type"),
-    };
-
     let clone_name_2 = "clone_2".to_string();
     let installed_clone_cell_2 = conductor
         .clone()
@@ -62,16 +57,11 @@ async fn app_info_returns_all_cells_with_info() {
         .await
         .unwrap();
 
-    let clone_2_cell_info = match installed_clone_cell_2 {
-        CellInfo::Cloned(cell_info) => cell_info,
-        _ => panic!("wrong cell type"),
-    };
-
     // disable clone cell 2
     conductor
         .disable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.clone(),
-            clone_cell_id: CloneCellId::CellId(clone_2_cell_info.cell_id.clone()),
+            clone_cell_id: CloneCellId::CellId(installed_clone_cell_2.cell_id.clone()),
         })
         .await
         .unwrap();
@@ -97,12 +87,12 @@ async fn app_info_returns_all_cells_with_info() {
 
     // clone cell ids match
     assert!(if let CellInfo::Cloned(cell) = &cell_info_for_role_1[1] {
-        cell.cell_id == clone_1_cell_info.cell_id.clone()
+        cell.cell_id == installed_clone_cell_1.cell_id.clone()
     } else {
         false
     });
     assert!(if let CellInfo::Cloned(cell) = &cell_info_for_role_2[1] {
-        cell.cell_id == clone_2_cell_info.cell_id.clone()
+        cell.cell_id == installed_clone_cell_2.cell_id.clone()
     } else {
         false
     });

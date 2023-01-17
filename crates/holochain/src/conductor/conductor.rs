@@ -81,7 +81,6 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
-use holochain_conductor_api::CellInfo;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
@@ -1276,8 +1275,6 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
-    use holochain_conductor_api::CellInfo;
-
     use super::*;
 
     impl Conductor {
@@ -1289,7 +1286,7 @@ mod clone_cell_impls {
         pub async fn create_clone_cell(
             self: Arc<Self>,
             payload: CreateCloneCellPayload,
-        ) -> ConductorResult<CellInfo> {
+        ) -> ConductorResult<holochain_conductor_api::Cell> {
             let CreateCloneCellPayload {
                 app_id,
                 role_name,
@@ -1323,13 +1320,8 @@ mod clone_cell_impls {
                 )
                 .await?;
 
-            let clone_cell_id = if let CellInfo::Cloned(clone_cell) = &installed_clone_cell {
-                clone_cell.cell_id.clone()
-            } else {
-                panic!("create clone cell: created cell is not of type 'cloned'");
-            };
             // run genesis on cloned cell
-            let cells = vec![(clone_cell_id, membrane_proof)];
+            let cells = vec![(installed_clone_cell.cell_id.clone(), membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
             self.create_and_add_initialized_cells_for_running_apps(Some(&app_id))
                 .await?;
@@ -1365,7 +1357,7 @@ mod clone_cell_impls {
         pub async fn enable_clone_cell(
             self: Arc<Self>,
             payload: &EnableCloneCellPayload,
-        ) -> ConductorResult<CellInfo> {
+        ) -> ConductorResult<holochain_conductor_api::Cell> {
             let conductor = self.clone();
             let (_, enabled_cell) = self
                 .update_state_prime({
@@ -1377,10 +1369,15 @@ mod clone_cell_impls {
                         let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
                         let ribosome = conductor.get_ribosome(cell_id.dna_hash())?;
                         let dna = ribosome.dna_file.dna();
-                        let modifiers = dna.modifiers.clone();
+                        let dna_modifiers = dna.modifiers.clone();
                         let name = dna.name.clone();
-                        let enabled_cell =
-                            CellInfo::new_cloned(cell_id, clone_id, modifiers, name, true);
+                        let enabled_cell = holochain_conductor_api::Cell {
+                            cell_id,
+                            clone_id: Some(clone_id),
+                            dna_modifiers,
+                            name,
+                            enabled: true,
+                        };
                         Ok((state, enabled_cell))
                     }
                 })
@@ -2287,7 +2284,7 @@ impl Conductor {
         role_name: RoleName,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
-    ) -> ConductorResult<CellInfo> {
+    ) -> ConductorResult<holochain_conductor_api::Cell> {
         let ribosome_store = &self.ribosome_store;
         // retrieve base cell DNA hash from conductor
         let (_, base_cell_dna_hash) = self
@@ -2334,8 +2331,13 @@ impl Conductor {
                 let agent_key = app.role(&role_name)?.agent_key().to_owned();
                 let cell_id = CellId::new(clone_dna_hash, agent_key);
                 let clone_id = app.add_clone(&role_name, &cell_id)?;
-                let installed_clone_cell =
-                    CellInfo::new_cloned(cell_id, clone_id, dna_modifiers, name, true);
+                let installed_clone_cell = holochain_conductor_api::Cell {
+                    cell_id,
+                    clone_id: Some(clone_id),
+                    dna_modifiers,
+                    name,
+                    enabled: true,
+                };
                 Ok((state, installed_clone_cell))
             })
             .await?;
