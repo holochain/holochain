@@ -32,7 +32,7 @@ mod tests;
 /// (Assuming a baseline 5mbps upload for now... update this
 /// as consumer internet connections trend toward more upload)
 /// Consider splitting large entries up.
-pub const MAX_ENTRY_SIZE: usize = 4_000_000;
+pub const MAX_ENTRY_SIZE: usize = ENTRY_SIZE_LIMIT;
 
 /// 1kb limit on LinkTags.
 /// Tags are used as keys to the database to allow
