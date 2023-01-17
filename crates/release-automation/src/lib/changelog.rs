@@ -966,15 +966,21 @@ impl<'a> ChangelogT<'a, WorkspaceChangelog> {
                             found_heading_text,
                         );
 
-                        if !found_heading_text.contains(&recent_release) {
-                            continue;
-                        }
+                        if found_heading_text != recent_release {
+                            trace!(
+                                "[{:?}] skipping heading with text '{}'",
+                                changelog.path(),
+                                found_heading_text
+                            );
 
-                        trace!(
-                            "[{:?}] found heading with text '{}', queueing for insertion...",
-                            changelog.path(),
-                            found_heading_text
-                        );
+                            continue;
+                        } else {
+                            trace!(
+                                "[{:?}] found heading with text '{}', queueing for insertion...",
+                                changelog.path(),
+                                found_heading_text
+                            );
+                        }
 
                         {
                             // create and append the crate release heading for placement in the workspace changelog
