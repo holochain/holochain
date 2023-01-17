@@ -19,9 +19,16 @@
       buildRustCrateForPkgs = customBuildRustCrateForPkgs;
     };
     holochain = called.workspaceMembers.holochain.build;
-  in {
-    packages.holochain-crate2nix = holochain.override {
-      # runTests = true;
+
+    # `nix flake show` is incompatible with IFD by default
+    # This works around the issue by making the name of the package
+    #   discoverable without IFD.
+    mkNoIfdPackage = name: pkg: {
+      inherit name;
+      inherit (pkg.holochain) drvPath outPath;
+      type = "derivation";
     };
+  in {
+    packages.holochain-crate2nix = mkNoIfdPackage "holochain" holochain;
   };
 }
