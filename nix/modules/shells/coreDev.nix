@@ -26,5 +26,13 @@ hcMkShell {
     # the latest crate2nix is currently broken on darwin
     ++ (lib.optionals pkgs.stdenv.isLinux [
       crate2nix
-    ]);
+    ])
+    ++ (lib.optionals pkgs.stdenv.isDarwin 
+      (with pkgs.darwin; [
+        Security
+        IOKit
+        apple_sdk_11_0.frameworks.CoreFoundation
+      ])
+    )
+    ;
 }
