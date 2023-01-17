@@ -1,8 +1,29 @@
+---
+default_semver_increment_mode: !pre_minor beta-rc
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.1.0-beta-rc.2
+
+## 0.1.0-beta-rc.1
+
+## 0.1.0-beta-rc.0
+
+## 0.0.71
+
+- Added handling of `hc` extensions. This allows for existing executables in the system whose names match `hc-<COMMAND>` to be executed with `hc <COMMAND>`.
+
+## 0.0.70
+
+## 0.0.69
+
+## 0.0.68
+
+## 0.0.67
 
 ## 0.0.66
 

@@ -14,6 +14,9 @@ on:
       HOLOCHAIN_SOURCE_BRANCH:
         type: string
         required: true
+      HOLOCHAIN_TARGET_BRANCH:
+        type: string
+        required: true
       HOLOCHAIN_URL:
         type: string
         required: false
@@ -125,6 +128,7 @@ jobs:
       - name: Prepare the environment file
         env:
           HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
+          HOLOCHAIN_TARGET_BRANCH: ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
           HOLOCHAIN_URL: ${{ inputs.HOLOCHAIN_URL }}
           HOLOCHAIN_NIXPKGS_URL: ${{ inputs.HOLOCHAIN_NIXPKGS_URL }}
           HOLONIX_URL: "https://github.com/holochain/holonix.git"
@@ -137,6 +141,7 @@ jobs:
           export HOLONIX_URL=${HOLONIX_URL:?}
 
           export HOLOCHAIN_SOURCE_BRANCH="${HOLOCHAIN_SOURCE_BRANCH:?}"
+          export HOLOCHAIN_TARGET_BRANCH="${HOLOCHAIN_TARGET_BRANCH:?}"
 
           export HOLOCHAIN_NIXPKGS_REPO=$(mktemp -d)
           export HOLONIX_REPO=$(mktemp -d)
@@ -148,7 +153,7 @@ jobs:
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
-          set -eE -o pipefail
+          set -exE -o pipefail
           source "${HOLOCHAIN_RELEASE_SH}"
 
           if [[ ! -d "${HOLOCHAIN_REPO}" ]]; then
@@ -169,6 +174,7 @@ jobs:
           git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
 
           git fetch --all --tags --prune --prune-tags --force
+          git branch --list --all
           git checkout --force -B ${HOLOCHAIN_SOURCE_BRANCH} remotes/origin/${HOLOCHAIN_SOURCE_BRANCH}
 
           # .gitignore might've changed
@@ -207,7 +213,7 @@ jobs:
         id: bump-versions
         if: ${{ inputs.skip_prepare_logic != 'true' }}
         run: |
-          set -ex
+          set -exu
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
@@ -229,10 +235,10 @@ jobs:
             release-automation \
               --workspace-path=$PWD \
               --log-level=debug \
+              --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
               release \
                 --no-verify-pre \
                 --force-tag-creation \
-                --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
                 --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
                 --disallowed-version-reqs=">=0.2" \
                 --steps=BumpReleaseVersions
@@ -240,11 +246,15 @@ jobs:
             cargo sweep -f
             '
 
-          if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH:?}; then
+          if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH}; then
             echo "::set-output name=releasable_crates::true"
           else
             echo "::set-output name=releasable_crates::false"
           fi
+
+      - name: Run dmesg on error
+        if: ${{ failure() }}
+        run: sudo dmesg
 
       - name: Append to the environment file and set outputs
         id: write-env-and-tag
@@ -253,7 +263,7 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           cat <<EOF >> "${HOLOCHAIN_RELEASE_SH}"
-          export TAG=$(git tag --list | grep holochain- | tail -n1)
+          export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
           export VERSION=\${TAG/holochain-/}
           export VERSION_COMPAT="v\${VERSION//./_}"
           export RELEASE_BRANCH=$(git branch --show-current)
@@ -266,13 +276,18 @@ jobs:
           echo "::set-output name=version_compat::${VERSION_COMPAT}"
           echo "::set-output name=release_branch::${RELEASE_BRANCH}"
 
-      - name: Merge release branch to main
+      - name: Merge release branch to the target branch
         run: |
+          set -exu
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
-          git checkout --force -B main origin/main
-          git merge --ff-only "${RELEASE_BRANCH}"
+          if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
+            git checkout -B ${HOLOCHAIN_TARGET_BRANCH} "${RELEASE_BRANCH}"
+          else
+            git checkout --force -B ${HOLOCHAIN_TARGET_BRANCH} origin/${HOLOCHAIN_TARGET_BRANCH}
+            git merge --ff-only "${RELEASE_BRANCH}"
+          fi
 
       - name: Cache the holochain release repository
         uses: steveeJ-forks/actions-cache/save@main

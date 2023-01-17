@@ -15,7 +15,7 @@ use crate::conductor::ConductorHandle;
 use crate::test_utils::conductor_setup::CellHostFnCaller;
 use crate::test_utils::conductor_setup::ConductorTestData;
 use crate::test_utils::host_fn_caller::Post;
-use crate::test_utils::new_zome_call;
+use crate::test_utils::new_zome_call_unsigned;
 use crate::test_utils::wait_for_integration;
 use holochain_cascade::Cascade;
 use holochain_cascade::DbPair;
@@ -380,9 +380,9 @@ async fn get_custom_package_test() {
             Ok(shh
                 .action()
                 .entry_type()
-                .map(|et| {
-                    if let EntryType::App(aet) = et {
-                        aet.id().index() == 1
+                .map(|entry_type| {
+                    if let EntryType::App(app_entry_def) = entry_type {
+                        app_entry_def.entry_index().index() == 1
                     } else {
                         false
                     }

@@ -1,6 +1,9 @@
 use crate::integrity::*;
 use hdk::prelude::*;
 
+const STANDARD_TIMEOUT_MILLIS: u64 = 5000;
+const FAST_TIMEOUT_MILLIS: u64 = 1300;
+
 #[hdk_extern]
 fn create_a_thing(_: ()) -> ExternResult<ActionHash> {
     create_entry(&EntryTypes::Thing(Thing::Valid))
@@ -14,7 +17,7 @@ fn create_an_invalid_thing(_: ()) -> ExternResult<ActionHash> {
 fn create_countersigned(
     responses: Vec<PreflightResponse>,
     thing: Thing,
-) -> ExternResult<ActionHash> {
+) -> ExternResult<(ActionHash, EntryHash)> {
     let thing = EntryTypes::Thing(thing);
     let entry_def_index = ScopedEntryDefIndex::try_from(&thing)?;
     let visibility = EntryVisibility::from(&thing);
@@ -31,7 +34,7 @@ fn create_countersigned(
         ),
         thing.try_into()?,
     );
-    HDK.with(|h| {
+    let action_hash: ActionHash = HDK.with(|h| {
         h.borrow().create(CreateInput::new(
             entry_def_index,
             visibility,
@@ -39,25 +42,36 @@ fn create_countersigned(
             // Countersigned entries MUST have strict ordering.
             ChainTopOrdering::Strict,
         ))
-    })
+    })?;
+
+    let signed_action: SignedActionHashed = must_get_action(action_hash.clone())?;
+    let entry_hash: EntryHash = signed_action.action().entry_hash().unwrap().clone();
+
+    Ok((action_hash, entry_hash))
 }
 
 #[hdk_extern]
 fn create_an_invalid_countersigned_thing(
     responses: Vec<PreflightResponse>,
 ) -> ExternResult<ActionHash> {
-    create_countersigned(responses, Thing::Invalid)
+    Ok(create_countersigned(responses, Thing::Invalid)?.0)
 }
 
 #[hdk_extern]
 fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResult<ActionHash> {
+    Ok(create_countersigned(responses, Thing::Valid)?.0)
+}
+
+#[hdk_extern]
+fn create_a_countersigned_thing_with_entry_hash(responses: Vec<PreflightResponse>) -> ExternResult<(ActionHash, EntryHash)> {
     create_countersigned(responses, Thing::Valid)
 }
 
 fn generate_preflight_request(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
     thing: Thing,
-    enzymatic: bool
+    enzymatic: bool,
+    session_timeout: u64,
 ) -> ExternResult<PreflightRequest> {
     let hash = hash_entry(&thing)?;
     let thing = EntryTypes::Thing(thing);
@@ -68,7 +82,7 @@ fn generate_preflight_request(
         vec![],
         0,
         enzymatic,
-        session_times_from_millis(5000)?,
+        session_times_from_millis(session_timeout)?,
         ActionBase::Create(CreateBase::new(entry_type)),
         PreflightBytes(vec![]),
     )
@@ -79,28 +93,35 @@ fn generate_preflight_request(
 fn generate_countersigning_preflight_request(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Valid, false)
+    generate_preflight_request(agents, Thing::Valid, false, STANDARD_TIMEOUT_MILLIS)
+}
+
+#[hdk_extern]
+fn generate_countersigning_preflight_request_fast(
+    agents: Vec<(AgentPubKey, Vec<Role>)>,
+) -> ExternResult<PreflightRequest> {
+    generate_preflight_request(agents, Thing::Valid, false, FAST_TIMEOUT_MILLIS)
 }
 
 #[hdk_extern]
 fn generate_countersigning_preflight_request_enzymatic(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Valid, true)
+    generate_preflight_request(agents, Thing::Valid, true, STANDARD_TIMEOUT_MILLIS)
 }
 
 #[hdk_extern]
 fn generate_invalid_countersigning_preflight_request(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Invalid, false)
+    generate_preflight_request(agents, Thing::Invalid, false, STANDARD_TIMEOUT_MILLIS)
 }
 
 #[hdk_extern]
 fn generate_invalid_countersigning_preflight_request_enzymatic(
     agents: Vec<(AgentPubKey, Vec<Role>)>,
 ) -> ExternResult<PreflightRequest> {
-    generate_preflight_request(agents, Thing::Invalid, true)
+    generate_preflight_request(agents, Thing::Invalid, true, STANDARD_TIMEOUT_MILLIS)
 }
 
 #[hdk_extern]

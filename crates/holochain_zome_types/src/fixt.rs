@@ -63,17 +63,17 @@ fixturator!(
 );
 
 fixturator!(
-    AppEntryType;
+    AppEntryDef;
     constructor fn new(U8, U8, EntryVisibility);
 );
 
-impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
-    type Item = AppEntryType;
+impl Iterator for AppEntryDefFixturator<EntryVisibility> {
+    type Item = AppEntryDef;
     fn next(&mut self) -> Option<Self::Item> {
-        let app_entry = AppEntryTypeFixturator::new(Unpredictable).next().unwrap();
-        Some(AppEntryType::new(
-            app_entry.id(),
-            app_entry.zome_id(),
+        let app_entry = AppEntryDefFixturator::new(Unpredictable).next().unwrap();
+        Some(AppEntryDef::new(
+            app_entry.entry_index(),
+            app_entry.zome_index(),
             self.0.curve,
         ))
     }
@@ -94,7 +94,7 @@ fixturator!(
 
 fixturator!(
     CreateLink;
-    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, ZomeId, LinkType, LinkTag);
+    constructor fn from_builder(ActionBuilderCommon, AnyLinkableHash, AnyLinkableHash, ZomeIndex, LinkType, LinkTag);
 );
 
 fixturator!(
@@ -109,7 +109,7 @@ pub struct KnownCreateLink {
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
-    pub zome_id: ZomeId,
+    pub zome_index: ZomeIndex,
     pub link_type: LinkType,
 }
 
@@ -125,7 +125,7 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
-        f.zome_id = self.0.curve.zome_id;
+        f.zome_index = self.0.curve.zome_index;
         f.link_type = self.0.curve.link_type;
         Some(f)
     }
@@ -176,7 +176,7 @@ fixturator!(
 );
 
 fixturator!(
-    ZomeId;
+    ZomeIndex;
     from u8;
 );
 
@@ -187,7 +187,7 @@ fixturator!(
 
 fixturator!(
     ZomeInfo;
-    constructor fn new(ZomeName, ZomeId, SerializedBytes, EntryDefs, FunctionNameVec, ScopedZomeTypesSet);
+    constructor fn new(ZomeName, ZomeIndex, SerializedBytes, EntryDefs, FunctionNameVec, ScopedZomeTypesSet);
 );
 
 fixturator!(
@@ -305,11 +305,11 @@ fixturator!(
                 let mut rng = rng();
                 let number_of_zomes = rng.gen_range(0..5);
 
-                let mut granted_functions: GrantedFunctions = BTreeSet::new();
+                let mut fns = BTreeSet::new();
                 for _ in 0..number_of_zomes {
-                    granted_functions.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
+                    fns.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
                 }
-                granted_functions
+                GrantedFunctions::Listed(fns)
             }, // CurryPayloadsFixturator::new(Empty).next().unwrap(),
         )
     };
@@ -321,15 +321,15 @@ fixturator!(
                 let mut rng = rand::thread_rng();
                 let number_of_zomes = rng.gen_range(0..5);
 
-                let mut granted_functions: GrantedFunctions = BTreeSet::new();
+                let mut fns = BTreeSet::new();
                 for _ in 0..number_of_zomes {
-                    granted_functions.insert(
-                        GrantedFunctionFixturator::new(Unpredictable)
-                            .next()
-                            .unwrap(),
+                    fns.insert(
+                    GrantedFunctionFixturator::new(Unpredictable)
+                        .next()
+                        .unwrap(),
                     );
                 }
-                granted_functions
+                GrantedFunctions::Listed(fns)
             },
             // CurryPayloadsFixturator::new(Unpredictable).next().unwrap(),
         )
@@ -343,14 +343,16 @@ fixturator!(
                 .next()
                 .unwrap(),
             {
-                let mut granted_functions: GrantedFunctions = BTreeSet::new();
-                for _ in 0..get_fixt_index!() % 3 {
-                    granted_functions
-                        .insert(GrantedFunctionFixturator::new(Predictable).next().unwrap());
+                if get_fixt_index!() %2 == 0{
+                    let mut fns = BTreeSet::new();
+                    for _ in 0..get_fixt_index!() % 3 {
+                        fns.insert(GrantedFunctionFixturator::new(Predictable).next().unwrap());
+                    }
+                    GrantedFunctions::Listed(fns)
+                } else {
+                    GrantedFunctions::All
                 }
-                granted_functions
-            },
-            // CurryPayloadsFixturator::new(Predictable).next().unwrap(),
+            }
         )
     };
 );
@@ -532,19 +534,19 @@ fixturator! {
     curve Empty EntryType::AgentPubKey;
     curve Unpredictable match EntryTypeVariant::random() {
         EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
-        EntryTypeVariant::App => EntryType::App(fixt!(AppEntryType)),
+        EntryTypeVariant::App => EntryType::App(fixt!(AppEntryDef)),
         EntryTypeVariant::CapClaim => EntryType::CapClaim,
         EntryTypeVariant::CapGrant => EntryType::CapGrant,
     };
     curve Predictable match EntryTypeVariant::nth(get_fixt_index!()) {
         EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
-        EntryTypeVariant::App => EntryType::App(AppEntryTypeFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
+        EntryTypeVariant::App => EntryType::App(AppEntryDefFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
         EntryTypeVariant::CapClaim => EntryType::CapClaim,
         EntryTypeVariant::CapGrant => EntryType::CapGrant,
     };
     curve PublicCurve {
-        let aet = fixt!(AppEntryType);
-        EntryType::App(AppEntryType::new(aet.id(), aet.zome_id(), EntryVisibility::Public))
+        let app_entry_def = fixt!(AppEntryDef);
+        EntryType::App(AppEntryDef::new(app_entry_def.entry_index(), app_entry_def.zome_index(), EntryVisibility::Public))
     };
 }
 
@@ -584,7 +586,7 @@ fixturator!(
     };
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryDefFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
@@ -620,7 +622,7 @@ fixturator!(
 
     curve Entry {
         let et = match get_fixt_curve!() {
-            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
+            Entry::App(_) | Entry::CounterSign(_, _) => EntryType::App(AppEntryDefFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()),
             Entry::Agent(_) => EntryType::AgentPubKey,
             Entry::CapClaim(_) => EntryType::CapClaim,
             Entry::CapGrant(_) => EntryType::CapGrant,
@@ -740,6 +742,7 @@ fixturator!(
                 .next()
                 .unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
@@ -761,6 +764,7 @@ fixturator!(
                 .next()
                 .unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
@@ -782,6 +786,7 @@ fixturator!(
                 .next()
                 .unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()

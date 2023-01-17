@@ -5,9 +5,7 @@
 //! SourceChain which has already undergone Genesis.
 
 use super::api::CellConductorHandle;
-use super::api::ZomeCall;
 use super::interface::SignalBroadcaster;
-use super::manager::ManagedTaskAdd;
 use super::space::Space;
 use super::ConductorHandle;
 use crate::conductor::api::CellConductorApi;
@@ -34,12 +32,14 @@ use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
+use holochain_conductor_api::ZomeCall;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::fresh_nonce;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
@@ -49,7 +49,6 @@ use rusqlite::Transaction;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
-use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -96,6 +95,10 @@ impl PartialEq for Cell {
 pub struct Cell {
     id: CellId,
     conductor_api: CellConductorHandle,
+    // NOTE: this got snuck in here, the original purpose was that the Cell would have limited access to
+    // the full Conductor via `CellConductorHandle`. As it stands, it's redundant to have both, but it
+    // may make it easier to a cleanup of the Conductor monolith later if we don't completely remove
+    // the encapsulation of CellConductorHandle, even though the encapsulation is not complete.
     conductor_handle: ConductorHandle,
     space: Space,
     holochain_p2p_cell: HolochainP2pDna,
@@ -117,8 +120,6 @@ impl Cell {
         conductor_handle: ConductorHandle,
         space: Space,
         holochain_p2p_cell: holochain_p2p::HolochainP2pDna,
-        managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
-        managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<(Self, InitialQueueTriggers)> {
         let conductor_api = Arc::new(CellConductorApi::new(conductor_handle.clone(), id.clone()));
 
@@ -136,8 +137,6 @@ impl Cell {
                 holochain_p2p_cell.clone(),
                 &space,
                 conductor_handle.clone(),
-                managed_task_add_sender,
-                managed_task_stop_broadcaster,
             )
             .await;
 
@@ -158,7 +157,7 @@ impl Cell {
         }
     }
 
-    /// Performs the Genesis workflow the Cell, ensuring that its initial
+    /// Performs the Genesis workflow for the Cell, ensuring that its initial
     /// records are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
@@ -285,15 +284,42 @@ impl Cell {
                             continue;
                         }
                     };
-                    let invocation = ZomeCall {
+                    let provenance = self.id.agent_pubkey().clone();
+                    let (nonce, expires_at) = match fresh_nonce(now) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            error!("{}", e.to_string());
+                            continue;
+                        }
+                    };
+                    let unsigned_zome_call = ZomeCallUnsigned {
+                        provenance,
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
+                        fn_name: scheduled_fn.fn_name().clone(),
                         cap_secret: None,
                         payload,
-                        provenance: self.id.agent_pubkey().clone(),
-                        fn_name: scheduled_fn.fn_name().clone(),
+                        nonce,
+                        expires_at,
                     };
-                    tasks.push(self.call_zome(invocation, None));
+
+                    tasks.push(
+                        self.call_zome(
+                            match ZomeCall::try_from_unsigned_zome_call(
+                                self.conductor_handle.keystore(),
+                                unsigned_zome_call,
+                            )
+                            .await
+                            {
+                                Ok(zome_call) => zome_call,
+                                Err(e) => {
+                                    error!("{}", e.to_string());
+                                    continue;
+                                }
+                            },
+                            None,
+                        ),
+                    );
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
@@ -364,16 +390,22 @@ impl Cell {
             CallRemote {
                 span_context: _,
                 from_agent,
+                signature,
                 zome_name,
                 fn_name,
                 cap_secret,
                 respond,
                 payload,
+                nonce,
+                expires_at,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, zome_name, fn_name, cap_secret, payload)
+                        .handle_call_remote(
+                            from_agent, signature, zome_name, fn_name, cap_secret, payload, nonce,
+                            expires_at,
+                        )
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -702,13 +734,17 @@ impl Cell {
         // If the action has an app entry type get the entry def
         // from the conductor.
         let required_receipt_count = match action.as_ref().and_then(|h| h.0.entry_type()) {
-            Some(EntryType::App(AppEntryType { zome_id, id, .. })) => {
+            Some(EntryType::App(AppEntryDef {
+                zome_index,
+                entry_index,
+                ..
+            })) => {
                 let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                let zome = ribosome.get_integrity_zome(zome_id);
+                let zome = ribosome.get_integrity_zome(zome_index);
                 match zome {
                     Some(zome) => self
                         .conductor_api
-                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *id))
+                        .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *entry_index))
                         .map(|e| u8::from(e.required_validations)),
                     None => None,
                 }
@@ -753,14 +789,18 @@ impl Cell {
     }
 
     #[instrument(skip(self, from_agent, fn_name, cap_secret, payload))]
+    #[allow(clippy::too_many_arguments)]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCall {
             cell_id: self.id.clone(),
@@ -768,7 +808,10 @@ impl Cell {
             cap_secret,
             payload,
             provenance: from_agent,
+            signature: from_signature,
             fn_name,
+            nonce,
+            expires_at,
         };
         // double ? because
         // - ConductorApiResult
@@ -875,7 +918,7 @@ impl Cell {
         .await?;
 
         // Check if initialization has run
-        if workspace.source_chain().has_initialized()? {
+        if workspace.source_chain().zomes_initialized().await? {
             return Ok(());
         }
         trace!("running init");
@@ -902,22 +945,21 @@ impl Cell {
     }
 
     /// Clean up long-running managed tasks.
-    //
-    // FIXME: this should ensure that the long-running managed tasks,
-    //        i.e. the queue consumers, are stopped. Currently, they
-    //        will continue running because we have no way to target a specific
-    //        Cell's tasks for shutdown.
-    //
-    //        Consider using a separate TaskManager for each Cell, so that all
-    //        of a Cell's tasks can be shut down at once. Perhaps the Conductor
-    //        TaskManager can have these Cell TaskManagers as children.
-    //        [ B-04176 ]
     pub async fn cleanup(&self) -> CellResult<()> {
         use holochain_p2p::HolochainP2pDnaT;
-        self.holochain_p2p_dna()
+        let shutdown = self
+            .conductor_handle
+            .task_manager()
+            .stop_cell_tasks(self.id().clone())
+            .map(|r| CellResult::Ok(r?));
+        let leave = self
+            .holochain_p2p_dna()
             .leave(self.id.agent_pubkey().clone())
-            .await?;
-        tracing::info!("Cell removed, but cleanup is not yet fully implemented.");
+            .map(|r| CellResult::Ok(r?));
+        let (shutdown, leave) = futures::future::join(shutdown, leave).await;
+        shutdown?;
+        leave?;
+        tracing::info!("Cell cleaned up and removed: {:?}", self.id());
         Ok(())
     }
 

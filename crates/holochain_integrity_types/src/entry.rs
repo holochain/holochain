@@ -10,7 +10,7 @@ use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
 use crate::countersigning::CounterSigningSessionData;
 use crate::EntryDefIndex;
-use crate::ZomeId;
+use crate::ZomeIndex;
 use holo_hash::hash_type;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -25,7 +25,7 @@ pub use app_entry_bytes::*;
 pub use error::*;
 
 /// Entries larger than this number of bytes cannot be created
-pub const ENTRY_SIZE_LIMIT: usize = 16 * 1000 * 1000; // 16MiB
+pub const ENTRY_SIZE_LIMIT: usize = 4 * 1000 * 1000; // 4MB
 
 /// The data type written to the source chain when explicitly granting a capability.
 /// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
@@ -46,16 +46,16 @@ pub type EntryHashed = holo_hash::HoloHashed<Entry>;
 pub trait EntryTypesHelper: Sized {
     /// The error associated with this conversion.
     type Error;
-    /// Check if the [`ZomeId`] and [`EntryDefIndex`] matches one of the
+    /// Check if the [`ZomeIndex`] and [`EntryDefIndex`] matches one of the
     /// `ZomeEntryTypesKey::from(Self::variant)` and if
     /// it does deserialize the [`Entry`] into that type.
     fn deserialize_from_type<Z, I>(
-        zome_id: Z,
+        zome_index: Z,
         entry_def_index: I,
         entry: &Entry,
     ) -> Result<Option<Self>, Self::Error>
     where
-        Z: Into<ZomeId>,
+        Z: Into<ZomeIndex>,
         I: Into<EntryDefIndex>;
 }
 
@@ -63,12 +63,12 @@ impl EntryTypesHelper for () {
     type Error = core::convert::Infallible;
 
     fn deserialize_from_type<Z, I>(
-        _zome_id: Z,
+        _zome_index: Z,
         _entry_def_index: I,
         _entry: &Entry,
     ) -> Result<Option<Self>, Self::Error>
     where
-        Z: Into<ZomeId>,
+        Z: Into<ZomeIndex>,
         I: Into<EntryDefIndex>,
     {
         Ok(Some(()))
@@ -172,7 +172,7 @@ impl HashableContent for Entry {
 }
 
 /// Zome input for must_get_valid_record.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct MustGetValidRecordInput(pub ActionHash);
 
 impl MustGetValidRecordInput {
@@ -188,7 +188,7 @@ impl MustGetValidRecordInput {
 }
 
 /// Zome input for must_get_entry.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct MustGetEntryInput(pub EntryHash);
 
 impl MustGetEntryInput {
@@ -204,7 +204,7 @@ impl MustGetEntryInput {
 }
 
 /// Zome input for must_get_action.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct MustGetActionInput(pub ActionHash);
 
 impl MustGetActionInput {

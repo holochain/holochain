@@ -5,10 +5,11 @@ use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueConfig;
 use kitsune_p2p::test_util::hash_op_data;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
-use kitsune_p2p::actor::{BroadcastTo, KitsuneP2pSender};
+use kitsune_p2p::actor::{BroadcastData, KitsuneP2pSender};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::event::*;
 use kitsune_p2p::*;
@@ -302,6 +303,17 @@ impl KitsuneHostDefaultError for Kd1 {
         .boxed()
         .into()
     }
+
+    fn remove_agent_info_signed(&self, _input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        // hope for the best
+        async move { Ok(false) }.boxed().into()
+    }
+}
+
+impl FetchQueueConfig for Kd1 {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
+    }
 }
 
 async fn handle_srv_events(
@@ -561,8 +573,7 @@ async fn handle_srv_events(
                                             root.to_kitsune_space(),
                                             basis,
                                             timeout,
-                                            BroadcastTo::Notify,
-                                            payload,
+                                            BroadcastData::User(payload),
                                         ))
                                     }).map_err(KdError::other)?;
                                     tokio::task::spawn(async move {
@@ -706,7 +717,7 @@ async fn handle_events(
                     .boxed()
                     .into()));
                 }
-                event::KitsuneP2pEvent::Gossip {
+                event::KitsuneP2pEvent::ReceiveOps {
                     respond,
                     space,
                     ops,
@@ -919,7 +930,10 @@ async fn handle_fetch_op_data(
         .map_err(KdError::other)?;
 
     match query {
-        FetchOpDataEvtQuery::Hashes(hashes) => {
+        FetchOpDataEvtQuery::Hashes {
+            op_hash_list: hashes,
+            ..
+        } => {
             for op_hash in hashes {
                 for info in &agent_info_list {
                     let agent = info.agent().clone();

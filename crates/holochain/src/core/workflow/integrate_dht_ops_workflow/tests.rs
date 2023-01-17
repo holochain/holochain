@@ -305,7 +305,7 @@ impl Db {
                     Db::MetaLinkEmpty(link_add) => {
                         let query = GetLinksQuery::new(
                             link_add.base_address.clone(),
-                            LinkTypeFilter::single_type(link_add.zome_id, link_add.link_type),
+                            LinkTypeFilter::single_type(link_add.zome_index, link_add.link_type),
                             Some(link_add.tag.clone()),
                         );
                         let res = query.run(Txn::from(&txn)).unwrap();
@@ -360,7 +360,7 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.clone(), &env.clone().into(), qt, holochain_p2p_cell)
+    integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, holochain_p2p_cell)
         .await
         .unwrap();
 }

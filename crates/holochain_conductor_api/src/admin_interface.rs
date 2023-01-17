@@ -1,11 +1,9 @@
-#![allow(deprecated)]
-
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
-use crate::{FullStateDump, InstalledAppInfo};
+use crate::{AppInfo, FullStateDump};
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -56,13 +54,13 @@ pub enum AdminRequest {
     /// [`AdminResponse::CoordinatorsUpdated`]
     UpdateCoordinators(Box<UpdateCoordinatorsPayload>),
 
-    /// Install an app from a list of DNA paths.
+    /// Install an app using an [`AppBundle`].
     ///
-    /// Triggers genesis to be run on all cells and to be stored.
-    /// An app is intended for use by one and only one agent and for that reason
-    /// it takes an `AgentPubKey` and installs all the DNAs with that `AgentPubKey`
-    /// forming new Cells. See [`InstallAppPayload`] for full details on the
-    /// configuration.  
+    /// Triggers genesis to be run on all Cells and to be stored.
+    /// An app is intended for use by
+    /// one and only one Agent and for that reason it takes an `AgentPubKey` and
+    /// installs all the DNAs with that `AgentPubKey`, forming new cells.
+    /// See [`InstallAppPayload`] for full details on the configuration.
     ///
     /// Note that the new app will not be enabled automatically after installation
     /// and can be enabled by calling [`EnableApp`].
@@ -73,24 +71,6 @@ pub enum AdminRequest {
     ///
     /// [`EnableApp`]: AdminRequest::EnableApp
     InstallApp(Box<InstallAppPayload>),
-
-    /// Install an app using an [`AppBundle`].
-    ///
-    /// Triggers genesis to be run on all Cells and to be stored.
-    /// An app is intended for use by
-    /// one and only one Agent and for that reason it takes an `AgentPubKey` and
-    /// installs all the DNAs with that `AgentPubKey`, forming new cells.
-    /// See [`InstallAppBundlePayload`] for full details on the configuration.
-    ///
-    /// Note that the new app will not be enabled automatically after installation
-    /// and can be enabled by calling [`EnableApp`].
-    ///
-    /// # Returns
-    ///
-    /// [`AdminResponse::AppInstalled`]
-    ///
-    /// [`EnableApp`]: AdminRequest::EnableApp
-    InstallAppBundle(Box<InstallAppBundlePayload>),
 
     /// Uninstalls the app specified by argument `installed_app_id` from the conductor.
     ///
@@ -128,16 +108,6 @@ pub enum AdminRequest {
     /// [`AdminResponse::CellIdsListed`]
     ListCellIds,
 
-    /// List the IDs of all enabled apps in the conductor.
-    ///
-    /// # Returns
-    ///
-    /// [`AdminResponse::ActiveAppsListed`]
-    ListEnabledApps,
-
-    #[deprecated = "alias for ListEnabledApps"]
-    ListActiveApps,
-
     /// List the apps and their information that are installed in the conductor.
     ///
     /// If `status_filter` is `Some(_)`, it will return only the apps with the specified status.
@@ -164,9 +134,6 @@ pub enum AdminRequest {
         installed_app_id: InstalledAppId,
     },
 
-    #[deprecated = "alias for EnableApp"]
-    ActivateApp { installed_app_id: InstalledAppId },
-
     /// Changes the specified app from an enabled to a disabled state in the conductor.
     ///
     /// When an app is disabled, zome calls can no longer be made, and the app will not be
@@ -179,9 +146,6 @@ pub enum AdminRequest {
         /// The app ID to disable
         installed_app_id: InstalledAppId,
     },
-
-    #[deprecated = "alias for DisableApp"]
-    DeactivateApp { installed_app_id: InstalledAppId },
 
     StartApp {
         /// The app ID to (re)start
@@ -291,8 +255,8 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::AgentInfoRequested`]
-    RequestAgentInfo {
+    /// [`AdminResponse::AgentInfo`]
+    AgentInfo {
         /// Optionally choose the agent info of a specific cell.
         cell_id: Option<CellId>,
     },
@@ -355,19 +319,12 @@ pub enum AdminRequest {
     /// [`AdminResponse::ZomeCallCapabilityGranted`]
     GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
 
-    /// Restore a clone cell that was previously archived.
+    /// Delete a clone cell that was previously disabled.
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::CloneCellRestored`]
-    RestoreCloneCell(Box<RestoreCloneCellPayload>),
-
-    /// Delete all clone cells that were previously archived.
-    ///
-    /// # Returns
-    ///
-    /// [`AdminResponse::ArchivedCloneCellsDeleted`]
-    DeleteArchivedCloneCells(Box<DeleteArchivedCloneCellsPayload>),
+    /// [`AdminResponse::CloneCellDeleted`]
+    DeleteCloneCell(Box<DeleteCloneCellPayload>),
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -397,17 +354,10 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::InstallApp`].
     ///
-    /// The resulting [`InstalledAppInfo`] contains the app ID,
-    /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
+    /// The resulting [`AppInfo`] contains the app ID,
+    /// the [`RoleName`]s and, most usefully, [`CellInfo`](crate::CellInfo)s
     /// of the newly installed DNAs.
-    AppInstalled(InstalledAppInfo),
-
-    /// The successful response to an [`AdminRequest::InstallAppBundle`].
-    ///
-    /// The resulting [`InstalledAppInfo`] contains the app ID,
-    /// the [`AppRoleId`]s and, most usefully, the new [`CellId`]s
-    /// of the newly installed DNAs.
-    AppBundleInstalled(InstalledAppInfo),
+    AppInstalled(AppInfo),
 
     /// The successful response to an [`AdminRequest::UninstallApp`].
     ///
@@ -434,18 +384,10 @@ pub enum AdminResponse {
     /// Contains a list of all the cell IDs in the conductor.
     CellIdsListed(Vec<CellId>),
 
-    /// The successful response to an [`AdminRequest::ListEnabledApps`].
-    ///
-    /// Contains a list of all the active app IDs in the conductor.
-    EnabledAppsListed(Vec<InstalledAppId>),
-
-    #[deprecated = "alias for EnabledAppsListed"]
-    ActiveAppsListed(Vec<InstalledAppId>),
-
     /// The successful response to an [`AdminRequest::ListApps`].
     ///
     /// Contains a list of the `InstalledAppInfo` of the installed apps in the conductor.
-    AppsListed(Vec<InstalledAppInfo>),
+    AppsListed(Vec<AppInfo>),
 
     /// The successful response to an [`AdminRequest::AttachAppInterface`].
     ///
@@ -466,13 +408,7 @@ pub enum AdminResponse {
     /// put the app in a running state, it will be running, otherwise it will
     /// be paused.
     AppEnabled {
-        app: InstalledAppInfo,
-        errors: Vec<(CellId, String)>,
-    },
-
-    #[deprecated = "alias for AppEnabled"]
-    AppActivated {
-        app: InstalledAppInfo,
+        app: AppInfo,
         errors: Vec<(CellId, String)>,
     },
 
@@ -488,8 +424,6 @@ pub enum AdminResponse {
     /// failed to start.
     /// TODO: add reason why app couldn't start
     AppStarted(bool),
-    #[deprecated = "alias for AppDisabled"]
-    AppDeactivated,
 
     /// The successful response to an [`AdminRequest::DumpState`].
     ///
@@ -515,10 +449,10 @@ pub enum AdminResponse {
     /// This means the agent info was successfully added to the peer store.
     AgentInfoAdded,
 
-    /// The successful response to an [`AdminRequest::RequestAgentInfo`].
+    /// The successful response to an [`AdminRequest::AgentInfo`].
     ///
     /// This is all the agent info that was found for the request.
-    AgentInfoRequested(Vec<AgentInfoSigned>),
+    AgentInfo(Vec<AgentInfoSigned>),
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,
@@ -526,11 +460,8 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
     ZomeCallCapabilityGranted,
 
-    // The successful response to an [`AdminRequest::RestoreCloneCell`].
-    CloneCellRestored(InstalledCell),
-
-    /// The successful response to an [`AdminRequest::DeleteArchivedCloneCells`].
-    ArchivedCloneCellsDeleted,
+    /// The successful response to an [`AdminRequest::DeleteCloneCell`].
+    CloneCellDeleted,
 }
 
 /// Error type that goes over the websocket wire.

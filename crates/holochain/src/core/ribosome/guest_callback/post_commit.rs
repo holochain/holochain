@@ -1,3 +1,4 @@
+use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
@@ -32,6 +33,7 @@ pub struct PostCommitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
     pub network: HolochainP2pDna,
+    pub signal_tx: SignalBroadcaster,
 }
 
 impl std::fmt::Debug for PostCommitHostAccess {
@@ -99,6 +101,7 @@ pub async fn send_post_commit(
                     workspace: workspace.clone().into(),
                     keystore: keystore.clone(),
                     network: network.clone(),
+                    signal_tx: conductor_handle.signal_broadcaster(),
                 },
                 invocation: PostCommitInvocation::new(zome, actions.clone()),
                 cell_id: cell_id.clone(),

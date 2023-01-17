@@ -6,6 +6,342 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20221223.034701
+
+## [holochain\_cli-0.1.0-beta-rc.2](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain-0.1.0-beta-rc.2](crates/holochain/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_test\_wasm\_common-0.1.0-beta-rc.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_conductor\_api-0.1.0-beta-rc.2](crates/holochain_conductor_api/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_wasm\_test\_utils-0.1.0-beta-rc.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_cascade-0.1.0-beta-rc.1](crates/holochain_cascade/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_state-0.1.0-beta-rc.1](crates/holochain_state/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_p2p-0.1.0-beta-rc.1](crates/holochain_p2p/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_types-0.1.0-beta-rc.1](crates/holochain_types/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_keystore-0.1.0-beta-rc.1](crates/holochain_keystore/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_sqlite-0.1.0-beta-rc.1](crates/holochain_sqlite/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [hdk-0.1.0-beta-rc.1](crates/hdk/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_zome\_types-0.1.0-beta-rc.1](crates/holochain_zome_types/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [hdi-0.2.0-beta-rc.1](crates/hdi/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [hdk\_derive-0.1.0-beta-rc.1](crates/hdk_derive/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_integrity\_types-0.1.0-beta-rc.1](crates/holochain_integrity_types/CHANGELOG.md#0.1.0-beta-rc.1)
+
+- **BREAKING CHANGE**: Updated capability grant structure `GrantedFunctions` to be an enum with `All` for allowing all zomes all functions to be called, along with `Listed` to specify a zome and function as before. [\#1732](https://github.com/holochain/holochain/pull/1732)
+
+# 20221216.210935
+
+## [holochain\_cli-0.1.0-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain-0.1.0-beta-rc.1](crates/holochain/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_conductor\_api-0.1.0-beta-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.1.0-beta-rc.1)
+
+- Fix error while installing app and return app info of newly installed app. [\#1725](https://github.com/holochain/holochain/pull/1725)
+
+# 20221215.173657
+
+- Breaking: Improves Op::to\_type helper to make action info more ergonomic in validation
+
+## [holochain\_cli-0.1.0-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_cli\_sandbox-0.1.0-beta-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_cli\_bundle-0.1.0-beta-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain-0.1.0-beta-rc.0](crates/holochain/CHANGELOG.md#0.1.0-beta-rc.0)
+
+- All zome calls must now be signed by the provenance, the signature is of the hash of the unsigned zome call, a unique nonce and expiry is also required [1510](https://github.com/holochain/holochain/pull/1510/files)
+
+## [holochain\_websocket-0.1.0-beta-rc.0](crates/holochain_websocket/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_test\_wasm\_common-0.1.0-beta-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_conductor\_api-0.1.0-beta-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.1.0-beta-rc.0)
+
+- **BREAKING CHANGE**: Remove deprecated Admin and App API calls.
+
+- **BREAKING CHANGE**: Remove call `InstallApp`.
+
+- **BREAKING CHANGE**: Rename `InstallAppBundle` to `InstallApp`.
+
+- **BREAKING CHANGE**: Rename `ZomeCall` to `CallZome`. [\#1707](https://github.com/holochain/holochain/pull/1707)
+
+- **BREAKING CHANGE**: Rename ArchiveCloneCell to DisableCloneCell.
+
+- **BREAKING CHANGE**: Rename RestoreArchivedCloneCell to EnableCloneCell.
+
+- **BREAKING CHANGE**: Move EnableCloneCell to App API.
+
+- **BREAKING CHANGE**: Refactor DeleteCloneCell to delete a single disabled clone cell. [\#1704](https://github.com/holochain/holochain/pull/1704)
+
+- **BREAKING CHANGE**: Refactor `AppInfo` to return all cells and DNA modifiers.
+
+- **BREAKING CHANGE**: Rename `RequestAgentInfo` to `AgentInfo`. [\#1719](https://github.com/holochain/holochain/pull/1719)
+
+## [holochain\_wasm\_test\_utils-0.1.0-beta-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_cascade-0.1.0-beta-rc.0](crates/holochain_cascade/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_state-0.1.0-beta-rc.0](crates/holochain_state/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_p2p-0.1.0-beta-rc.0](crates/holochain_p2p/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_types-0.1.0-beta-rc.0](crates/holochain_types/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_keystore-0.1.0-beta-rc.0](crates/holochain_keystore/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_sqlite-0.1.0-beta-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [kitsune\_p2p-0.1.0-beta-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.1.0-beta-rc.0)
+
+- **BREAKING CHANGE:** The gossip and publishing algorithms have undergone a significant rework, making this version incompatible with previous versions. Rather than gossiping and publishing entire Ops, only hashes are sent, which the recipient uses to maintain a queue of items which need to be fetched from various other sources on the DHT. This allows for finer-grained control over receiving Ops from multiple sources, and allows each node to manage their own incoming data flow. [\#1662](https://github.com/holochain/holochain/pull/1662)
+- **BREAKING CHANGE:** `AppRequest::GossipInfo` is renamed to `AppRequest::NetworkInfo`, and the fields have changed. Since ops are no longer sent during gossip, there is no way to track overall gossip progress over a discrete time interval. There is now only a description of the total number of ops and total number of bytes waiting to be received. As ops are received, these numbers decrement.
+
+## [kitsune\_p2p\_proxy-0.1.0-beta-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.1.0-beta-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [kitsune\_p2p\_mdns-0.1.0-beta-rc.0](crates/kitsune_p2p_mdns/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [kitsune\_p2p\_fetch-0.0.1](crates/kitsune_p2p_fetch/CHANGELOG.md#0.0.1)
+
+## [kitsune\_p2p\_types-0.1.0-beta-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [mr\_bundle-0.1.0-beta-rc.0](crates/mr_bundle/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_util-0.1.0-beta-rc.0](crates/holochain_util/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [hdk-0.1.0-beta-rc.0](crates/hdk/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_zome\_types-0.1.0-beta-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [kitsune\_p2p\_dht-0.1.0-beta-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [hdi-0.2.0-beta-rc.0](crates/hdi/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [hdk\_derive-0.1.0-beta-rc.0](crates/hdk_derive/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_integrity\_types-0.1.0-beta-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [kitsune\_p2p\_timestamp-0.1.0-beta-rc.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holo\_hash-0.1.0-beta-rc.0](crates/holo_hash/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [kitsune\_p2p\_dht\_arc-0.1.0-beta-rc.0](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [fixt-0.1.0-beta-rc.0](crates/fixt/CHANGELOG.md#0.1.0-beta-rc.0)
+
+# 20221207.011003
+
+## [holochain\_cli-0.0.71](crates/holochain_cli/CHANGELOG.md#0.0.71)
+
+- Added handling of `hc` extensions. This allows for existing executables in the system whose names match `hc-<COMMAND>` to be executed with `hc <COMMAND>`.
+
+# 20221130.011217
+
+## [holochain\_cli-0.0.70](crates/holochain_cli/CHANGELOG.md#0.0.70)
+
+## [holochain\_cli\_sandbox-0.0.66](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.66)
+
+## [holochain\_cli\_bundle-0.0.65](crates/holochain_cli_bundle/CHANGELOG.md#0.0.65)
+
+## [holochain-0.0.175](crates/holochain/CHANGELOG.md#0.0.175)
+
+- BREAKING CHANGE - `ZomeId` and `zome_id` renamed to `ZomeIndex` and `zome_index` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppEntryType.id` renamed to `AppEntryType.entry_index` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppEntryType` renamed to `AppEntryDef` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppEntryDefName` renamed to `AppEntryName` [\#1667](https://github.com/holochain/holochain/pull/1667)
+- BREAKING CHANGE - `AppRoleId` renamed to `RoleName` [\#1667](https://github.com/holochain/holochain/pull/1667)
+
+## [holochain\_test\_wasm\_common-0.0.64](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.64)
+
+## [holochain\_conductor\_api-0.0.72](crates/holochain_conductor_api/CHANGELOG.md#0.0.72)
+
+## [holochain\_wasm\_test\_utils-0.0.71](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.71)
+
+## [holochain\_cascade-0.0.74](crates/holochain_cascade/CHANGELOG.md#0.0.74)
+
+## [holochain\_state-0.0.72](crates/holochain_state/CHANGELOG.md#0.0.72)
+
+## [holochain\_p2p-0.0.69](crates/holochain_p2p/CHANGELOG.md#0.0.69)
+
+## [holochain\_types-0.0.69](crates/holochain_types/CHANGELOG.md#0.0.69)
+
+## [holochain\_keystore-0.0.67](crates/holochain_keystore/CHANGELOG.md#0.0.67)
+
+## [holochain\_sqlite-0.0.66](crates/holochain_sqlite/CHANGELOG.md#0.0.66)
+
+## [mr\_bundle-0.0.20](crates/mr_bundle/CHANGELOG.md#0.0.20)
+
+## [hdk-0.0.163](crates/hdk/CHANGELOG.md#0.0.163)
+
+## [holochain\_zome\_types-0.0.58](crates/holochain_zome_types/CHANGELOG.md#0.0.58)
+
+## [hdi-0.1.10](crates/hdi/CHANGELOG.md#0.1.10)
+
+## [hdk\_derive-0.0.56](crates/hdk_derive/CHANGELOG.md#0.0.56)
+
+## [holochain\_integrity\_types-0.0.25](crates/holochain_integrity_types/CHANGELOG.md#0.0.25)
+
+# 20221123.011302
+
+## [holochain\_cli-0.0.69](crates/holochain_cli/CHANGELOG.md#0.0.69)
+
+## [holochain\_cli\_sandbox-0.0.65](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.65)
+
+## [holochain\_cli\_bundle-0.0.64](crates/holochain_cli_bundle/CHANGELOG.md#0.0.64)
+
+## [holochain-0.0.174](crates/holochain/CHANGELOG.md#0.0.174)
+
+- BREAKING CHANGE - The max entry size has been lowered to 4MB (strictly 4,000,000 bytes) [\#1659](https://github.com/holochain/holochain/pull/1659)
+- BREAKING CHANGE - `emit_signal` permissions are changed so that it can be called during `post_commit`, which previously was not allowed [\#1661](https://github.com/holochain/holochain/pull/1661)
+
+## [holochain\_test\_wasm\_common-0.0.63](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.63)
+
+## [holochain\_conductor\_api-0.0.71](crates/holochain_conductor_api/CHANGELOG.md#0.0.71)
+
+## [holochain\_wasm\_test\_utils-0.0.70](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.70)
+
+## [holochain\_cascade-0.0.73](crates/holochain_cascade/CHANGELOG.md#0.0.73)
+
+## [holochain\_state-0.0.71](crates/holochain_state/CHANGELOG.md#0.0.71)
+
+## [holochain\_p2p-0.0.68](crates/holochain_p2p/CHANGELOG.md#0.0.68)
+
+## [holochain\_types-0.0.68](crates/holochain_types/CHANGELOG.md#0.0.68)
+
+## [holochain\_keystore-0.0.66](crates/holochain_keystore/CHANGELOG.md#0.0.66)
+
+## [holochain\_sqlite-0.0.65](crates/holochain_sqlite/CHANGELOG.md#0.0.65)
+
+## [kitsune\_p2p-0.0.52](crates/kitsune_p2p/CHANGELOG.md#0.0.52)
+
+- The soft maximum gossip batch size has been lowered to 1MB (entries larger than this will just be in a batch alone), and the default timeouts have been increased from 30 seconds to 60 seconds. This is NOT a breaking change, though the usefulness is negated unless the majority of peers are running with the same settings.  [\#1659](https://github.com/holochain/holochain/pull/1659)
+
+## [kitsune\_p2p\_proxy-0.0.39](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.39)
+
+## [kitsune\_p2p\_transport\_quic-0.0.39](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.39)
+
+## [kitsune\_p2p\_types-0.0.39](crates/kitsune_p2p_types/CHANGELOG.md#0.0.39)
+
+## [mr\_bundle-0.0.19](crates/mr_bundle/CHANGELOG.md#0.0.19)
+
+## [hdk-0.0.162](crates/hdk/CHANGELOG.md#0.0.162)
+
+## [holochain\_zome\_types-0.0.57](crates/holochain_zome_types/CHANGELOG.md#0.0.57)
+
+## [kitsune\_p2p\_dht-0.0.11](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.11)
+
+## [hdi-0.1.9](crates/hdi/CHANGELOG.md#0.1.9)
+
+## [hdk\_derive-0.0.55](crates/hdk_derive/CHANGELOG.md#0.0.55)
+
+## [holochain\_integrity\_types-0.0.24](crates/holochain_integrity_types/CHANGELOG.md#0.0.24)
+
+## [kitsune\_p2p\_timestamp-0.0.15](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.0.15)
+
+# 20221116.012050
+
+## [holochain\_cli-0.0.68](crates/holochain_cli/CHANGELOG.md#0.0.68)
+
+## [holochain\_cli\_sandbox-0.0.64](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.64)
+
+## [holochain\_cli\_bundle-0.0.63](crates/holochain_cli_bundle/CHANGELOG.md#0.0.63)
+
+## [holochain-0.0.173](crates/holochain/CHANGELOG.md#0.0.173)
+
+## [holochain\_test\_wasm\_common-0.0.62](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.62)
+
+## [holochain\_conductor\_api-0.0.70](crates/holochain_conductor_api/CHANGELOG.md#0.0.70)
+
+## [holochain\_wasm\_test\_utils-0.0.69](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.69)
+
+## [holochain\_cascade-0.0.72](crates/holochain_cascade/CHANGELOG.md#0.0.72)
+
+## [holochain\_state-0.0.70](crates/holochain_state/CHANGELOG.md#0.0.70)
+
+## [holochain\_p2p-0.0.67](crates/holochain_p2p/CHANGELOG.md#0.0.67)
+
+## [holochain\_types-0.0.67](crates/holochain_types/CHANGELOG.md#0.0.67)
+
+## [holochain\_keystore-0.0.65](crates/holochain_keystore/CHANGELOG.md#0.0.65)
+
+## [holochain\_sqlite-0.0.64](crates/holochain_sqlite/CHANGELOG.md#0.0.64)
+
+## [kitsune\_p2p-0.0.51](crates/kitsune_p2p/CHANGELOG.md#0.0.51)
+
+- `rpc_multi` now only actually makes a single request. This greatly simplifies the code path and eliminates a source of network bandwidth congestion, but removes the redundancy of aggregating the results of multiple peers. [\#1651](https://github.com/holochain/holochain/pull/1651)
+
+## [kitsune\_p2p\_proxy-0.0.38](crates/kitsune_p2p_proxy/CHANGELOG.md#0.0.38)
+
+## [kitsune\_p2p\_transport\_quic-0.0.38](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.0.38)
+
+## [kitsune\_p2p\_types-0.0.38](crates/kitsune_p2p_types/CHANGELOG.md#0.0.38)
+
+## [mr\_bundle-0.0.18](crates/mr_bundle/CHANGELOG.md#0.0.18)
+
+## [holochain\_util-0.0.13](crates/holochain_util/CHANGELOG.md#0.0.13)
+
+## [hdk-0.0.161](crates/hdk/CHANGELOG.md#0.0.161)
+
+## [holochain\_zome\_types-0.0.56](crates/holochain_zome_types/CHANGELOG.md#0.0.56)
+
+## [kitsune\_p2p\_dht-0.0.10](crates/kitsune_p2p_dht/CHANGELOG.md#0.0.10)
+
+# 20221109.012313
+
+## [holochain\_cli-0.0.67](crates/holochain_cli/CHANGELOG.md#0.0.67)
+
+## [holochain\_cli\_sandbox-0.0.63](crates/holochain_cli_sandbox/CHANGELOG.md#0.0.63)
+
+## [holochain\_cli\_bundle-0.0.62](crates/holochain_cli_bundle/CHANGELOG.md#0.0.62)
+
+## [holochain-0.0.172](crates/holochain/CHANGELOG.md#0.0.172)
+
+- BREAKING CHANGE - Update wasmer crate dependency [\#1620](https://github.com/holochain/holochain/pull/1620)
+
+## [holochain\_test\_wasm\_common-0.0.61](crates/holochain_test_wasm_common/CHANGELOG.md#0.0.61)
+
+## [holochain\_conductor\_api-0.0.69](crates/holochain_conductor_api/CHANGELOG.md#0.0.69)
+
+## [holochain\_wasm\_test\_utils-0.0.68](crates/holochain_wasm_test_utils/CHANGELOG.md#0.0.68)
+
+## [holochain\_cascade-0.0.71](crates/holochain_cascade/CHANGELOG.md#0.0.71)
+
+## [holochain\_state-0.0.69](crates/holochain_state/CHANGELOG.md#0.0.69)
+
+## [holochain\_p2p-0.0.66](crates/holochain_p2p/CHANGELOG.md#0.0.66)
+
+## [holochain\_types-0.0.66](crates/holochain_types/CHANGELOG.md#0.0.66)
+
+## [holochain\_keystore-0.0.64](crates/holochain_keystore/CHANGELOG.md#0.0.64)
+
+## [holochain\_sqlite-0.0.63](crates/holochain_sqlite/CHANGELOG.md#0.0.63)
+
+## [hdk-0.0.160](crates/hdk/CHANGELOG.md#0.0.160)
+
+## [holochain\_zome\_types-0.0.55](crates/holochain_zome_types/CHANGELOG.md#0.0.55)
+
+**BREAKING CHANGE**: Rename `AuthorizeZomeCallSigningKey` to `GrantZomeCallCapability` & remove parameter `provenance`. [\#1647](https://github.com/holochain/holochain/pull/1647)
+
+## [hdi-0.1.8](crates/hdi/CHANGELOG.md#0.1.8)
+
+## [hdk\_derive-0.0.54](crates/hdk_derive/CHANGELOG.md#0.0.54)
+
 # 20221103.145333
 
 ## [holochain\_cli-0.0.66](crates/holochain_cli/CHANGELOG.md#0.0.66)

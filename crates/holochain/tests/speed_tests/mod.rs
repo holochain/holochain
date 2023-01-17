@@ -25,6 +25,7 @@ use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
 use holochain::test_utils::setup_app;
+use holochain_state::nonce::fresh_nonce;
 use holochain_wasm_test_utils::TestZomes;
 use tempfile::TempDir;
 
@@ -127,6 +128,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
             },
             integrity_zomes: vec![TestZomes::from(TestWasm::Anchor).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::Anchor).coordinator.into_inner()],
@@ -190,46 +192,67 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
 
     // ALICE DOING A CALL
 
-    fn new_zome_call<P>(
+    async fn new_zome_call<P>(
         cell_id: CellId,
-        func: &str,
+        fn_name: FunctionName,
         payload: P,
-    ) -> Result<ZomeCall, SerializedBytesError>
+    ) -> Result<ZomeCallUnsigned, SerializedBytesError>
     where
         P: serde::Serialize + std::fmt::Debug,
     {
-        Ok(ZomeCall {
+        let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+        Ok(ZomeCallUnsigned {
             cell_id: cell_id.clone(),
             zome_name: TestWasm::Anchor.into(),
             cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-            fn_name: func.into(),
+            fn_name,
             payload: ExternIO::encode(payload)?,
             provenance: cell_id.agent_pubkey().clone(),
+            nonce,
+            expires_at,
         })
     }
 
-    let anchor_invocation = |anchor: &str, cell_id, i: usize| {
-        let anchor = AnchorInput(anchor.into(), i.to_string());
-        new_zome_call(cell_id, "anchor", anchor)
+    let anchor_invocation = |anchor: String, cell_id, i: usize| async move {
+        let anchor = AnchorInput(anchor.clone(), i.to_string());
+        new_zome_call(cell_id, "anchor".into(), anchor).await
     };
 
     async fn call(
         app_interface: &mut WebsocketSender,
         invocation: ZomeCall,
     ) -> WebsocketResult<AppResponse> {
-        let request = AppRequest::ZomeCall(Box::new(invocation));
+        let request = AppRequest::CallZome(Box::new(invocation));
         app_interface.request(request).await
     }
 
     let timer = std::time::Instant::now();
 
     for i in 0..num {
-        let invocation = anchor_invocation("alice", alice_cell_id.clone(), i).unwrap();
-        let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCall(_));
-        let invocation = anchor_invocation("bobbo", bob_cell_id.clone(), i).unwrap();
-        let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCall(_));
+        let invocation = anchor_invocation("alice".to_string(), alice_cell_id.clone(), i)
+            .await
+            .unwrap();
+        let response = call(
+            &mut app_interface,
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                .await
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_matches!(response, AppResponse::ZomeCalled(_));
+        let invocation = anchor_invocation("bobbo".to_string(), bob_cell_id.clone(), i)
+            .await
+            .unwrap();
+        let response = call(
+            &mut app_interface,
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                .await
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_matches!(response, AppResponse::ZomeCalled(_));
     }
 
     let mut alice_done = false;
@@ -241,13 +264,21 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             bobbo_attempts += 1;
             let invocation = new_zome_call(
                 alice_cell_id.clone(),
-                "list_anchor_addresses",
+                "list_anchor_addresses".into(),
                 "bobbo".to_string(),
             )
+            .await
             .unwrap();
-            let response = call(&mut app_interface, invocation).await.unwrap();
+            let response = call(
+                &mut app_interface,
+                ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                    .await
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
             let hashes: EntryHashes = match response {
-                AppResponse::ZomeCall(r) => r.decode().unwrap(),
+                AppResponse::ZomeCalled(r) => r.decode().unwrap(),
                 _ => unreachable!(),
             };
             bobbo_done = hashes.0.len() == num;
@@ -257,13 +288,21 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             alice_attempts += 1;
             let invocation = new_zome_call(
                 bob_cell_id.clone(),
-                "list_anchor_addresses",
+                "list_anchor_addresses".into(),
                 "alice".to_string(),
             )
+            .await
             .unwrap();
-            let response = call(&mut app_interface, invocation).await.unwrap();
+            let response = call(
+                &mut app_interface,
+                ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                    .await
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
             let hashes: EntryHashes = match response {
-                AppResponse::ZomeCall(r) => r.decode().unwrap(),
+                AppResponse::ZomeCalled(r) => r.decode().unwrap(),
                 _ => unreachable!(),
             };
             alice_done = hashes.0.len() == num;
@@ -283,8 +322,7 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
             break;
         }
     }
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
+
+    handle.shutdown().await.unwrap().unwrap();
     test_db
 }

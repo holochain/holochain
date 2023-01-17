@@ -21,7 +21,7 @@ pub fn root_hash() -> ExternResult<AnyLinkableHash> {
 
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
 /// Technically it's moving each string component in as bytes.
-/// If this is a problem for you simply build the components yourself as a Vec<Vec<u8>>.
+/// If this is a problem for you simply build the components yourself as a `Vec<Vec<u8>>`.
 ///
 /// See `impl From<String> for Path` below.
 pub const DELIMITER: &str = ".";
@@ -214,7 +214,7 @@ impl AsRef<Vec<Component>> for Path {
 /// some disambiguation logic is not included in higher level abstractions.
 ///
 /// This supports sharding strategies from a small inline DSL.
-/// Start each component with <width>:<depth># to get shards out of the string.
+/// Start each component with `<width>:<depth>#` to get shards out of the string.
 ///
 /// e.g.
 /// - foo.barbaz => normal path as above ["foo", "barbaz"]
@@ -311,7 +311,7 @@ impl Path {
 }
 
 impl TypedPath {
-    /// Create a new [`TypedPath`] by attaching a [`ZomeId`] and [`LinkType`] to a [`Path`].
+    /// Create a new [`TypedPath`] by attaching a [`ZomeIndex`] and [`LinkType`] to a [`Path`].
     pub fn new(link_type: impl Into<ScopedLinkType>, path: Path) -> Self {
         Self {
             link_type: link_type.into(),
@@ -326,7 +326,7 @@ impl TypedPath {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
                 root_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
                 Some(self.make_tag()?),
             )?
             .iter()
@@ -339,7 +339,7 @@ impl TypedPath {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
                 parent.path_entry_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
                 Some(self.make_tag()?),
             )?
             .iter()
@@ -388,7 +388,7 @@ impl TypedPath {
         Self::ensure(self)?;
         let mut unwrapped = get_links(
             self.path_entry_hash()?,
-            LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
             None,
         )?;
         // Only need one of each hash to build the tree.
@@ -437,7 +437,7 @@ impl TypedPath {
         Self::ensure(self)?;
         get_link_details(
             self.path_entry_hash()?,
-            LinkTypeFilter::single_type(self.link_type.zome_id, self.link_type.zome_type),
+            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
             Some(holochain_zome_types::link::LinkTag::new([])),
         )
     }

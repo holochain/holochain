@@ -28,8 +28,11 @@ mod error;
 mod tests;
 
 /// 16mb limit on Entries due to websocket limits.
+/// 4mb limit to constrain bandwidth usage on uploading.
+/// (Assuming a baseline 5mbps upload for now... update this
+/// as consumer internet connections trend toward more upload)
 /// Consider splitting large entries up.
-pub const MAX_ENTRY_SIZE: usize = 16_000_000;
+pub const MAX_ENTRY_SIZE: usize = ENTRY_SIZE_LIMIT;
 
 /// 1kb limit on LinkTags.
 /// Tags are used as keys to the database to allow
@@ -266,11 +269,11 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
     }
 }
 
-/// Check the AppEntryType is valid for the zome.
-/// Check the EntryDefId and ZomeId are in range.
-pub async fn check_app_entry_type(
+/// Check the AppEntryDef is valid for the zome.
+/// Check the EntryDefId and ZomeIndex are in range.
+pub async fn check_app_entry_def(
     dna_hash: &DnaHash,
-    entry_type: &AppEntryType,
+    entry_type: &AppEntryDef,
     conductor: &Conductor,
 ) -> SysValidationResult<EntryDef> {
     // We want to be careful about holding locks open to the conductor api
@@ -281,12 +284,12 @@ pub async fn check_app_entry_type(
 
     // Check if the zome is found
     let zome = ribosome
-        .get_integrity_zome(&entry_type.zome_id())
-        .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
+        .get_integrity_zome(&entry_type.zome_index())
+        .ok_or_else(|| ValidationOutcome::ZomeIndex(entry_type.clone()))?
         .into_inner()
         .1;
 
-    let entry_def = get_entry_def(entry_type.id(), zome, dna_hash, conductor).await?;
+    let entry_def = get_entry_def(entry_type.entry_index(), zome, dna_hash, conductor).await?;
 
     // Check the visibility and return
     match entry_def {
@@ -596,9 +599,14 @@ impl IncomingDhtOpSender {
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(record) {
             let ops = vec![op];
-            incoming_dht_ops_workflow(self.space.as_ref(), self.sys_validation_trigger, ops, false)
-                .await
-                .map_err(Box::new)?;
+            incoming_dht_ops_workflow(
+                self.space.as_ref().clone(),
+                self.sys_validation_trigger,
+                ops,
+                false,
+            )
+            .await
+            .map_err(Box::new)?;
         }
         Ok(())
     }

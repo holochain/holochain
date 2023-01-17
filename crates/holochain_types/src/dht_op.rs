@@ -262,44 +262,44 @@ impl DhtOp {
     ) -> DhtOpLight {
         let basis = self.dht_basis();
         match self {
-            DhtOp::StoreRecord(_, h, _) => {
-                let e = h.entry_data().map(|(e, _)| e.clone());
-                let h = ActionHash::with_data_sync(h);
+            DhtOp::StoreRecord(_, a, _) => {
+                let e = a.entry_data().map(|(e, _)| e.clone());
+                let h = ActionHash::with_data_sync(a);
                 DhtOpLight::StoreRecord(h, e, basis)
             }
-            DhtOp::StoreEntry(_, h, _) => {
-                let e = h.entry().clone();
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::StoreEntry(_, a, _) => {
+                let e = a.entry().clone();
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::StoreEntry(h, e, basis)
             }
-            DhtOp::RegisterAgentActivity(_, h) => {
-                let h = ActionHash::with_data_sync(h);
+            DhtOp::RegisterAgentActivity(_, a) => {
+                let h = ActionHash::with_data_sync(a);
                 DhtOpLight::RegisterAgentActivity(h, basis)
             }
-            DhtOp::RegisterUpdatedContent(_, h, _) => {
-                let e = h.entry_hash.clone();
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterUpdatedContent(_, a, _) => {
+                let e = a.entry_hash.clone();
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterUpdatedContent(h, e, basis)
             }
-            DhtOp::RegisterUpdatedRecord(_, h, _) => {
-                let e = h.entry_hash.clone();
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterUpdatedRecord(_, a, _) => {
+                let e = a.entry_hash.clone();
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterUpdatedRecord(h, e, basis)
             }
-            DhtOp::RegisterDeletedBy(_, h) => {
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterDeletedBy(_, a) => {
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterDeletedBy(h, basis)
             }
-            DhtOp::RegisterDeletedEntryAction(_, h) => {
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterDeletedEntryAction(_, a) => {
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterDeletedEntryAction(h, basis)
             }
-            DhtOp::RegisterAddLink(_, h) => {
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterAddLink(_, a) => {
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterAddLink(h, basis)
             }
-            DhtOp::RegisterRemoveLink(_, h) => {
-                let h = ActionHash::with_data_sync(&Action::from(h.clone()));
+            DhtOp::RegisterRemoveLink(_, a) => {
+                let h = ActionHash::with_data_sync(&Action::from(a.clone()));
                 DhtOpLight::RegisterRemoveLink(h, basis)
             }
         }
@@ -320,7 +320,7 @@ impl DhtOp {
         }
     }
 
-    /// Extract inner Signature, Action and Option<Entry> from an op
+    /// Extract inner Signature, Action and `Option<Entry>` from an op
     pub fn into_inner(self) -> (Signature, Action, Option<Entry>) {
         match self {
             DhtOp::StoreRecord(s, h, e) => (s, h, e.map(|e| *e)),
@@ -356,7 +356,7 @@ impl DhtOp {
     pub fn entry(&self) -> Option<&Entry> {
         match self {
             DhtOp::StoreRecord(_, _, e) => e.as_ref().map(|b| &**b),
-            DhtOp::StoreEntry(_, _, e) => Some(&*e),
+            DhtOp::StoreEntry(_, _, e) => Some(e),
             DhtOp::RegisterUpdatedContent(_, _, e) => e.as_ref().map(|b| &**b),
             DhtOp::RegisterUpdatedRecord(_, _, e) => e.as_ref().map(|b| &**b),
             DhtOp::RegisterAgentActivity(_, _) => None,

@@ -4,7 +4,55 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
-use kitsune_p2p::gossip::sharded_gossip::GossipDiagnostics;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
+use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
+
+/// Holochain-specific FetchContext extension trait.
+pub trait FetchContextExt {
+    /// Applies the "request_validation_receipt" flag *if* the param is true
+    /// otherwise, leaves the flag unchanged.
+    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self;
+
+    /// Returns true if the "request_validation_receipt" flag is set.
+    fn has_request_validation_receipt(&self) -> bool;
+
+    /// Applies the "countersigning_session" flag *if* the param is true
+    /// otherwise, leaves the flag unchanged.
+    fn with_countersigning_session(&self, countersigning_session: bool) -> Self;
+
+    /// Returns true if the "countersigning_session" flag is set.
+    fn has_countersigning_session(&self) -> bool;
+}
+
+const FLAG_REQ_VAL_RCPT: u32 = 1 << 0;
+const FLAG_CNTR_SSN: u32 = 1 << 1;
+
+impl FetchContextExt for FetchContext {
+    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self {
+        if request_validation_receipt {
+            FetchContext(self.0 | FLAG_REQ_VAL_RCPT)
+        } else {
+            *self
+        }
+    }
+
+    fn has_request_validation_receipt(&self) -> bool {
+        self.0 & FLAG_REQ_VAL_RCPT > 0
+    }
+
+    fn with_countersigning_session(&self, countersigning_session: bool) -> Self {
+        if countersigning_session {
+            FetchContext(self.0 | FLAG_CNTR_SSN)
+        } else {
+            *self
+        }
+    }
+
+    fn has_countersigning_session(&self) -> bool {
+        self.0 & FLAG_CNTR_SSN > 0
+    }
+}
 
 /// Request a validation package.
 #[derive(Clone, Debug)]
@@ -218,11 +266,14 @@ ghost_actor::ghost_chan! {
         fn call_remote(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
+            signature: Signature,
             to_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap_secret: Option<CapSecret>,
             payload: ExternIO,
+            nonce: Nonce256Bits,
+            expires_at: Timestamp,
         ) -> SerializedBytes;
 
         /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -232,11 +283,13 @@ ghost_actor::ghost_chan! {
         fn remote_signal(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            to_agent_list: Vec<AgentPubKey>,
+            to_agent_list: Vec<(Signature, AgentPubKey)>,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap: Option<CapSecret>,
             payload: ExternIO,
+            nonce: Nonce256Bits,
+            expires_at: Timestamp,
         ) -> ();
 
         /// Publish data to the correct neighborhood.
@@ -245,9 +298,19 @@ ghost_actor::ghost_chan! {
             request_validation_receipt: bool,
             countersigning_session: bool,
             basis_hash: holo_hash::OpBasis,
-            ops: Vec<holochain_types::dht_op::DhtOp>,
+            source: AgentPubKey,
+            op_hash_list: Vec<OpHashSized>,
             timeout_ms: Option<u64>,
-        ) -> usize;
+            reflect_ops: Option<Vec<DhtOp>>,
+        ) -> ();
+
+        /// Publish a countersigning op.
+        fn publish_countersign(
+            dna_hash: DnaHash,
+            flag: bool,
+            basis_hash: holo_hash::OpBasis,
+            op: DhtOp,
+        ) -> ();
 
         /// Get an entry from the DHT.
         fn get(
@@ -307,14 +370,14 @@ ghost_actor::ghost_chan! {
         ) -> String;
 
         /// Get struct for diagnostic data
-        fn get_diagnostics(dna_hash: DnaHash) -> GossipDiagnostics;
+        fn get_diagnostics(dna_hash: DnaHash) -> KitsuneDiagnostics;
     }
 }
 
 /// Convenience type for referring to the HolochainP2p GhostSender
 pub type HolochainP2pRef = ghost_actor::GhostSender<HolochainP2p>;
 
-/// Extension trait for converting GhostSender<HolochainP2p> into HolochainP2pDna
+/// Extension trait for converting `GhostSender<HolochainP2p>` into HolochainP2pDna
 pub trait HolochainP2pRefToDna {
     /// Partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific dna context.

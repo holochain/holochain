@@ -265,9 +265,9 @@ async fn check_update_reference_test() {
     let mut ec = fixt!(Create);
     let mut eu = fixt!(Update);
     let et_cap = EntryType::CapClaim;
-    let mut aet_fixt = AppEntryTypeFixturator::new(Predictable).map(EntryType::App);
-    let et_app_1 = aet_fixt.next().unwrap();
-    let et_app_2 = aet_fixt.next().unwrap();
+    let mut app_entry_def_fixt = AppEntryDefFixturator::new(Predictable).map(EntryType::App);
+    let et_app_1 = app_entry_def_fixt.next().unwrap();
+    let et_app_2 = app_entry_def_fixt.next().unwrap();
 
     // Same entry type
     ec.entry_type = et_app_1.clone();
@@ -318,7 +318,7 @@ async fn check_link_tag_size_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn check_app_entry_type_test() {
+async fn check_app_entry_def_test() {
     observability::test_run().ok();
     let TestWasmPair::<DnaWasm> {
         integrity,
@@ -327,11 +327,12 @@ async fn check_app_entry_type_test() {
     // Setup test data
     let dna_file = DnaFile::new(
         DnaDef {
-            name: "app_entry_type_test".to_string(),
+            name: "app_entry_def_test".to_string(),
             modifiers: DnaModifiers {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
             },
             integrity_zomes: vec![TestZomes::from(TestWasm::EntryDefs).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
@@ -349,51 +350,51 @@ async fn check_app_entry_type_test() {
     let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
 
     // ## Dna is missing
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
+    let app_entry_def_0 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_0, &conductor_handle).await,
         Err(SysValidationError::DnaMissing(_))
     );
 
     // # Dna but no entry def in buffer
-    // ## ZomeId out of range
+    // ## ZomeIndex out of range
     conductor_handle.register_dna(dna_file).await.unwrap();
 
     // ## EntryId is out of range
-    let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
+    let app_entry_def_1 = AppEntryDef::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_1, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryDefId(_)
         ))
     );
 
-    let aet = AppEntryType::new(0.into(), 100.into(), EntryVisibility::Public);
+    let app_entry_def_2 = AppEntryDef::new(0.into(), 100.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_2, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::ZomeId(_)
+            ValidationOutcome::ZomeIndex(_)
         ))
     );
 
     // ## EntryId is in range for dna
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
+    let app_entry_def_3 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_3, &conductor_handle).await,
         Ok(_)
     );
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
+    let app_entry_def_4 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_4, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryVisibility(_)
         ))
     );
 
     // ## Can get the entry from the entry def
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
+    let app_entry_def_5 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_type(&dna_hash, &aet, &conductor_handle).await,
+        check_app_entry_def(&dna_hash, &app_entry_def_5, &conductor_handle).await,
         Ok(_)
     );
 }
@@ -425,8 +426,8 @@ async fn incoming_ops_filters_private_entry() {
     let private_entry = fixt!(Entry);
     let mut create = fixt!(Create);
     let author = keystore.new_sign_keypair_random().await.unwrap();
-    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
-    create.entry_type = EntryType::App(aet);
+    let app_entry_def = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
+    create.entry_type = EntryType::App(app_entry_def);
     create.entry_hash = EntryHash::with_data_sync(&private_entry);
     create.author = author.clone();
     let action = Action::Create(create);

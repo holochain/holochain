@@ -136,9 +136,15 @@ pub mod tuning_params_struct {
         /// given Op.
         gossip_redundancy_target: f64 = 100.0,
 
-        /// The max number of bytes of op data to send in a single message.
-        /// Payloads larger than this are split into multiple batches.
-        gossip_max_batch_size: u32 = 16_000_000,
+        /// The max number of bytes of data to send in a single message.
+        ///
+        /// This setting was more relevant when entire Ops were being gossiped,
+        /// but now that only hashes are gossiped, it would take a lot of hashes
+        /// to reach this limit (1MB = approx 277k hashes).
+        ///
+        /// Payloads larger than this are split into multiple batches
+        /// when possible.
+        gossip_max_batch_size: u32 = 1_000_000,
 
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = true,
@@ -152,8 +158,8 @@ pub mod tuning_params_struct {
         /// what you are doing.
         gossip_single_storage_arc_per_space: bool = false,
 
-        /// Default timeout for rpc single. [Default: 30s]
-        default_rpc_single_timeout_ms: u32 = 1000 * 30,
+        /// Default timeout for rpc single. [Default: 60s]
+        default_rpc_single_timeout_ms: u32 = 1000 * 60,
 
         /// Default agent count for rpc multi. [Default: 3]
         default_rpc_multi_remote_agent_count: u8 = 3,
@@ -186,8 +192,8 @@ pub mod tuning_params_struct {
         concurrent_limit_per_thread: usize = 4096,
 
         /// tx2 quic max_idle_timeout
-        /// [Default: 30 seconds]
-        tx2_quic_max_idle_timeout_ms: u32 = 1000 * 30,
+        /// [Default: 60 seconds]
+        tx2_quic_max_idle_timeout_ms: u32 = 1000 * 60,
 
         /// tx2 pool max connection count
         /// [Default: 4096]
@@ -199,8 +205,8 @@ pub mod tuning_params_struct {
 
         /// tx2 timeout used for passive background operations
         /// like reads / responds.
-        /// [Default: 30 seconds]
-        tx2_implicit_timeout_ms: u32 = 1000 * 30,
+        /// [Default: 60 seconds]
+        tx2_implicit_timeout_ms: u32 = 1000 * 60,
 
         /// tx2 initial connect retry delay
         /// (note, this delay is currenty exponentially backed off--
@@ -218,7 +224,9 @@ pub mod tuning_params_struct {
         danger_tls_keylog: String = "no_keylog".to_string(),
 
         /// Set the cutoff time when gossip switches over from recent
-        /// to historical gossip. This is dangerous, because gossip may not be
+        /// to historical gossip.
+        ///
+        /// This is dangerous to change, because gossip may not be
         /// possible with nodes using a different setting for this threshold.
         /// Do not change this except in testing environments.
         /// [Default: 15 minutes]

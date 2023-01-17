@@ -82,7 +82,7 @@ pub async fn app_validation_workflow(
 async fn app_validation_workflow_inner(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
-    conductor_handle: ConductorHandle,
+    conductor: ConductorHandle,
     network: &HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
@@ -99,7 +99,7 @@ async fn app_validation_workflow_inner(
         let workspace = workspace.clone();
         move |so| {
             let network = network.clone();
-            let conductor_handle = conductor_handle.clone();
+            let conductor = conductor.clone();
             let workspace = workspace.clone();
             let dna_hash = dna_hash.clone();
             async move {
@@ -122,8 +122,7 @@ async fn app_validation_workflow_inner(
                 let mut cascade = workspace.full_cascade(network.clone());
                 let r = match dhtop_to_op(op, &mut cascade).await {
                     Ok(op) => {
-                        validate_op_outer(dna_hash, &op, &conductor_handle, &(*workspace), &network)
-                            .await
+                        validate_op_outer(dna_hash, &op, &conductor, &workspace, &network).await
                     }
                     Err(e) => Err(e),
                 };
@@ -514,16 +513,21 @@ pub fn entry_creation_zomes_to_invoke(
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match action {
         EntryCreationAction::Create(Create {
-            entry_type: EntryType::App(aet),
+            entry_type: EntryType::App(app_entry_def),
             ..
         })
         | EntryCreationAction::Update(Update {
-            entry_type: EntryType::App(aet),
+            entry_type: EntryType::App(app_entry_def),
             ..
         }) => {
-            let zome = ribosome.get_integrity_zome(&aet.zome_id()).ok_or_else(|| {
-                Outcome::rejected(&format!("Zome does not exist for {:?}", aet.zome_id()))
-            })?;
+            let zome = ribosome
+                .get_integrity_zome(&app_entry_def.zome_index())
+                .ok_or_else(|| {
+                    Outcome::rejected(format!(
+                        "Zome does not exist for {:?}",
+                        app_entry_def.zome_index()
+                    ))
+                })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }
         _ => Ok(ZomesToInvoke::AllIntegrity),
@@ -535,9 +539,9 @@ fn create_link_zomes_to_invoke(
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     let zome = ribosome
-        .get_integrity_zome(&create_link.zome_id)
+        .get_integrity_zome(&create_link.zome_index)
         .ok_or_else(|| {
-            Outcome::rejected(&format!(
+            Outcome::rejected(format!(
                 "Zome does not exist for {:?}",
                 create_link.link_type
             ))
@@ -553,15 +557,15 @@ fn store_record_zomes_to_invoke(
     match action {
         Action::CreateLink(create_link) => create_link_zomes_to_invoke(create_link, ribosome),
         Action::Create(Create {
-            entry_type: EntryType::App(AppEntryType { zome_id, .. }),
+            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
             ..
         })
         | Action::Update(Update {
-            entry_type: EntryType::App(AppEntryType { zome_id, .. }),
+            entry_type: EntryType::App(AppEntryDef { zome_index, .. }),
             ..
         }) => {
-            let zome = ribosome.get_integrity_zome(zome_id).ok_or_else(|| {
-                Outcome::rejected(&format!("Zome does not exist for {:?}", zome_id))
+            let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {
+                Outcome::rejected(format!("Zome does not exist for {:?}", zome_index))
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }

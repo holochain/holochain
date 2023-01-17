@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use crate::{event::*, KitsuneHost};
 use futures::FutureExt;
+use kitsune_p2p_fetch::{FetchQueueConfig, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::combinators::second;
@@ -14,6 +15,7 @@ use kitsune_p2p_types::dht::hash::RegionHash;
 use kitsune_p2p_types::dht::prelude::{
     array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetLtcs, RegionData,
 };
+use kitsune_p2p_types::dht::region::RegionCoords;
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, TimeQuantum};
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
 use kitsune_p2p_types::*;
@@ -45,6 +47,12 @@ impl SwitchboardEventHandler {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEventHandler {}
 impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
 
+impl FetchQueueConfig for SwitchboardEventHandler {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
+    }
+}
+
 impl KitsuneHost for SwitchboardEventHandler {
     fn get_agent_info_signed(
         &self,
@@ -57,6 +65,18 @@ impl KitsuneHost for SwitchboardEventHandler {
                 .get(&loc)
                 .map(|e| e.info.to_owned())
                 .or_else(|| node.remote_agents.get(&loc).cloned())
+        })))
+    }
+
+    fn remove_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(self.sb.share(|state| {
+            let node = state.nodes.get_mut(&self.node).unwrap();
+            node.local_agents
+                .retain(|_, entry| entry.info.agent == agent);
+            true
         })))
     }
 
@@ -137,7 +157,7 @@ impl KitsuneHost for SwitchboardEventHandler {
                                 .get(loc8)
                                 .map(|o| o.is_integrated)
                                 .unwrap_or_default();
-                            owned && arc.contains(&loc) && t0 <= op.timestamp && op.timestamp < t1
+                            owned && arc.contains(loc) && t0 <= op.timestamp && op.timestamp < t1
                         })
                         .map(second)
                         .cloned()
@@ -164,6 +184,18 @@ impl KitsuneHost for SwitchboardEventHandler {
         _space: Arc<KitsuneSpace>,
     ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
         box_fut(Ok(self.sb.topology.clone()))
+    }
+
+    fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
+        todo!()
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: RegionCoords,
+    ) -> crate::KitsuneHostResult<Vec<OpHashSized>> {
+        todo!()
     }
 }
 
@@ -239,10 +271,11 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         todo!()
     }
 
-    fn handle_gossip(
+    fn handle_receive_ops(
         &mut self,
         _space: Arc<KitsuneSpace>,
         ops: Vec<KOp>,
+        _context: Option<kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();
@@ -256,7 +289,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 // NB: this may be problematic on the receiving end because we
                 // actually care whether this Loc8 is interpreted as u8 or i8,
                 // and we lose that information here.
-                let loc = op.0[0] as u8 as i32;
+                let loc = op.0[0] as i32;
                 if loc == 192 {
                     dbg!((&self.node, loc));
                 }
@@ -326,7 +359,10 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         FetchOpDataEvt { space, query }: FetchOpDataEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
         ok_fut(Ok(self.sb.share(|sb| match query {
-            FetchOpDataEvtQuery::Hashes(hashes) => hashes
+            FetchOpDataEvtQuery::Hashes {
+                op_hash_list: hashes,
+                ..
+            } => hashes
                 .into_iter()
                 .map(|hash| {
                     let loc = hash.get_loc().as_loc8();

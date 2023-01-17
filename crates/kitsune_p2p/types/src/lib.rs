@@ -186,7 +186,7 @@ impl From<Arc<Vec<u8>>> for Tx2Cert {
 
 impl From<CertDigest> for Tx2Cert {
     fn from(c: CertDigest) -> Self {
-        let b64 = base64::encode_config(&*c, base64::URL_SAFE_NO_PAD);
+        let b64 = base64::encode_config(*c, base64::URL_SAFE_NO_PAD);
         let nick = {
             let (start, _) = b64.split_at(6);
             let (_, end) = b64.split_at(b64.len() - 6);
@@ -333,6 +333,17 @@ pub mod tx2;
 
 pub use kitsune_p2p_dht as dht;
 pub use kitsune_p2p_dht_arc as dht_arc;
+
+/// KitsuneAgent in an Arc
+pub type KAgent = Arc<bin_types::KitsuneAgent>;
+/// KitsuneBasis in an Arc
+pub type KBasis = Arc<bin_types::KitsuneBasis>;
+/// KitsuneOpHash in an Arc
+pub type KOpHash = Arc<bin_types::KitsuneOpHash>;
+/// KitsuneSpace in an Arc
+pub type KSpace = Arc<bin_types::KitsuneSpace>;
+/// KitsuneOpData in an Arc
+pub type KOpData = Arc<bin_types::KitsuneOpData>;
 
 use metrics::metric_task;
 

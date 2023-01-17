@@ -1,8 +1,25 @@
+---
+default_semver_increment_mode: !pre_minor beta-rc
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+- BREAKING CHANGE - Added zome name to the signal emitted when using `emit_signal`.
+
+## 0.1.0-beta-rc.1
+
+## 0.1.0-beta-rc.0
+
+## 0.0.69
+
+## 0.0.68
+
+## 0.0.67
+
+## 0.0.66
 
 ## 0.0.65
 

@@ -2,6 +2,7 @@
 , callPackage
 , lib
 , writeShellScriptBin
+, crate2nix
 
 , holonix
 , holonixPath
@@ -34,7 +35,7 @@ rec {
 
     # run all the cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test ''${1-}
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
@@ -75,12 +76,12 @@ rec {
         ${releaseAutomation} \
             --workspace-path=''${TEST_WORKSPACE:?} \
             --log-level=${logLevel} \
+            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
           release \
             --no-verify-pre \
             --force-branch-creation \
             --disallowed-version-reqs=">=0.1" \
             --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
             --steps=CreateReleaseBranch,BumpReleaseVersions
       '';
     in
@@ -259,7 +260,7 @@ rec {
   hcRegenNixExpressions = writeShellScriptBin "hc-regen-nix-expressions" ''
     set -xe
     pushd ${hcToplevelDir}
-    crate2nix generate \
+    ${crate2nix}/bin/crate2nix generate \
         -f crates/release-automation/Cargo.toml \
         -o crates/release-automation/Cargo.nix
     git commit crates/release-automation/Cargo.nix -m "chore: hc-regen-nix-expressions"

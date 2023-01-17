@@ -11,13 +11,20 @@ impl RoundStateMap {
     /// Check if round has timed out and remove it if it has.
     pub(super) fn check_timeout(&mut self, key: &StateKey) -> bool {
         let mut timed_out = false;
+        let mut finished = false;
         if let Some(state) = self.map.get(key) {
             if state.last_touch.elapsed() > state.round_timeout {
                 if let Some(v) = self.map.remove(key) {
                     self.timed_out.push((key.clone(), v));
                 }
                 timed_out = true;
+            } else if state.is_finished() {
+                finished = true;
             }
+        }
+        // MD: I added this just to be safe. It made a difference.
+        if finished {
+            self.map.remove(key);
         }
         timed_out
     }

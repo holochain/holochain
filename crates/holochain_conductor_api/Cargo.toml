@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_api"
-version = "0.0.68"
+version = "0.1.0-beta-rc.2"
 description = "Message types for Holochain admin and app interface protocols"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,20 +11,21 @@ edition = "2021"
 [dependencies]
 directories = "2.0.2"
 derive_more = "0.99.3"
-kitsune_p2p = { version = "^0.0.50", path = "../kitsune_p2p/kitsune_p2p" }
-holo_hash = { version = "^0.0.35", path = "../holo_hash", features = ["full"] }
-holochain_p2p = { version = "^0.0.65", path = "../holochain_p2p" }
-holochain_state = { version = "^0.0.68", path = "../holochain_state" }
+kitsune_p2p = { version = "^0.1.0-beta-rc.0", path = "../kitsune_p2p/kitsune_p2p" }
+holo_hash = { version = "^0.1.0-beta-rc.0", path = "../holo_hash", features = ["full"] }
+holochain_p2p = { version = "^0.1.0-beta-rc.1", path = "../holochain_p2p" }
+holochain_state = { version = "^0.1.0-beta-rc.1", path = "../holochain_state" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_types = { version = "^0.0.65", path = "../holochain_types" }
-holochain_zome_types = { version = "^0.0.54", path = "../holochain_zome_types" }
+holochain_types = { version = "^0.1.0-beta-rc.1", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.1.0-beta-rc.1", path = "../holochain_zome_types" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_derive = "1.0"
-serde_yaml = "0.8"
+serde_yaml = "0.9"
 structopt = "0.3"
 tracing = "0.1.26"
 thiserror = "1.0.22"
 url2 = "0.0.6"
+holochain_keystore = { version = "^0.1.0-beta-rc.1", path = "../holochain_keystore" }
 
 [dev-dependencies]
 matches = {version = "0.1.8"}

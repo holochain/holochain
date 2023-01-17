@@ -199,8 +199,15 @@ async fn run_test(
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 
-    let invocation =
-        new_zome_call(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
+    let invocation = new_zome_call(
+        conductors[1].raw_handle().keystore(),
+        &bob_cell_id,
+        "always_validates",
+        (),
+        TestWasm::Validate,
+    )
+    .await
+    .unwrap();
     conductors[1].call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 3 ops in it
@@ -245,8 +252,15 @@ async fn run_test(
         assert_eq!(num_valid(&txn), expected_count - 1);
     });
 
-    let invocation =
-        new_zome_call(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
+    let invocation = new_zome_call(
+        conductors[1].raw_handle().keystore(),
+        &bob_cell_id,
+        "add_valid_link",
+        (),
+        TestWasm::ValidateLink,
+    )
+    .await
+    .unwrap();
     conductors[1].call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 6 ops in it
@@ -269,11 +283,13 @@ async fn run_test(
     });
 
     let invocation = new_invocation(
+        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "add_invalid_link",
         (),
         TestWasm::ValidateLink.coordinator_zome(),
     )
+    .await
     .unwrap();
     let invalid_link_hash: ActionHash = call_zome_directly(
         &bob_cell_id,
@@ -306,11 +322,13 @@ async fn run_test(
     });
 
     let invocation = new_invocation(
+        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "remove_valid_link",
         (),
         TestWasm::ValidateLink.coordinator_zome(),
     )
+    .await
     .unwrap();
     call_zome_directly(
         &bob_cell_id,
@@ -341,11 +359,13 @@ async fn run_test(
     });
 
     let invocation = new_invocation(
+        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "remove_invalid_link",
         (),
         TestWasm::ValidateLink.coordinator_zome(),
     )
+    .await
     .unwrap();
     let invalid_remove_hash: ActionHash = call_zome_directly(
         &bob_cell_id,
@@ -432,12 +452,12 @@ async fn commit_invalid(
     let entry = ThisWasmEntry::NeverValidates;
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
-    let zome_id = call_data.get_entry_type(TestWasm::Validate, 0).zome_id;
+    let zome_index = call_data.get_entry_type(TestWasm::Validate, 0).zome_index;
     // 4
     let invalid_action_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, 0),
+            EntryDefLocation::app(zome_index, 0),
             EntryVisibility::Public,
         )
         .await;
@@ -460,14 +480,14 @@ async fn commit_invalid_post(
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
     let call_data = HostFnCaller::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
-    let zome_id = call_data
+    let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
-        .zome_id;
+        .zome_index;
     // 9
     let invalid_action_hash = call_data
         .commit_entry(
             entry.clone().try_into().unwrap(),
-            EntryDefLocation::app(zome_id, POST_INDEX),
+            EntryDefLocation::app(zome_index, POST_INDEX),
             EntryVisibility::Public,
         )
         .await;

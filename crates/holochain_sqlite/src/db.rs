@@ -247,7 +247,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                     // For some reason calling pragma_update is necessary to prove the database file is valid.
                     .and_then(|mut c| {
                         crate::conn::initialize_connection(&mut c, sync_level)?;
-                        c.pragma_update(None, "synchronous", &"0".to_string())
+                        c.pragma_update(None, "synchronous", "0".to_string())
                     }) {
                     Ok(_) => (),
                     // These are the two errors that can
@@ -286,7 +286,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         let pool = new_connection_pool(path.as_ref().map(|p| p.as_ref()), sync_level);
         let mut conn = pool.get()?;
         // set to faster write-ahead-log mode
-        conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
+        conn.pragma_update(None, "journal_mode", "WAL".to_string())?;
         crate::table::initialize_database(&mut conn, kind.kind())?;
 
         Ok(DbWrite(DbRead {
@@ -444,6 +444,10 @@ pub struct DbKindCache(pub Arc<DnaHash>);
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used by a Conductor
 pub struct DbKindConductor;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+/// Specifies the environment used to witness nonces.
+pub struct DbKindNonce;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used to save wasm

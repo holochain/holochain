@@ -49,12 +49,12 @@ impl Query for GetLinkDetailsQuery {
             Action::CreateLink(CreateLink {
                 base_address,
                 tag,
-                zome_id,
+                zome_index,
                 link_type,
                 ..
             }) => {
                 *base_address == *base_filter
-                    && type_query_filter.contains(zome_id, link_type)
+                    && type_query_filter.contains(zome_index, link_type)
                     && tag_filter
                         .as_ref()
                         .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))

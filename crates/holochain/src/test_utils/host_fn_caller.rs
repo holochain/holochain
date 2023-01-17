@@ -13,6 +13,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::call_zome_function_authorized;
 use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -215,7 +216,7 @@ impl HostFnCaller {
         index: impl Into<EntryDefIndex>,
     ) -> ScopedEntryDefIndex {
         let TestWasmPair { integrity, .. } = zome.into();
-        let zome_id = self
+        let zome_index = self
             .ribosome
             .dna_def()
             .integrity_zomes
@@ -225,7 +226,7 @@ impl HostFnCaller {
         let zome_types = self
             .ribosome
             .zome_types()
-            .in_scope_subset(&[ZomeId(zome_id as u8)]);
+            .in_scope_subset(&[ZomeIndex(zome_index as u8)]);
         zome_types
             .entries
             .get(ZomeTypesKey {
@@ -240,7 +241,7 @@ impl HostFnCaller {
         index: impl Into<LinkType>,
     ) -> ScopedLinkType {
         let TestWasmPair { integrity, .. } = zome.into();
-        let zome_id = self
+        let zome_index = self
             .ribosome
             .dna_def()
             .integrity_zomes
@@ -250,7 +251,7 @@ impl HostFnCaller {
         let zome_types = self
             .ribosome
             .zome_types()
-            .in_scope_subset(&[ZomeId(zome_id as u8)]);
+            .in_scope_subset(&[ZomeIndex(zome_index as u8)]);
         zome_types
             .links
             .get(ZomeTypesKey {
@@ -337,7 +338,7 @@ impl HostFnCaller {
         &self,
         base: AnyLinkableHash,
         target: AnyLinkableHash,
-        zome_id: impl Into<ZomeId>,
+        zome_index: impl Into<ZomeIndex>,
         link_type: impl Into<LinkType>,
         link_tag: LinkTag,
     ) -> ActionHash {
@@ -345,7 +346,7 @@ impl HostFnCaller {
         let input = CreateLinkInput::new(
             base,
             target,
-            zome_id.into(),
+            zome_index.into(),
             link_type.into(),
             link_tag,
             ChainTopOrdering::default(),
@@ -435,15 +436,17 @@ impl HostFnCaller {
     pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> ExternIO {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
 
-        let output = {
+        let (_, output) = {
             let host_access = call_context.host_context();
             let zcha = unwrap_to!(host_access => HostContext::ZomeCall).clone();
-            ribosome.call_zome_function(zcha, invocation).unwrap()
+            call_zome_function_authorized((*ribosome).clone(), zcha, invocation)
+                .await
+                .unwrap()
         };
 
         // Write
         workspace_lock.flush(&self.network).await.unwrap();
-        unwrap_to!(output => ZomeCallResponse::Ok).to_owned()
+        unwrap_to!(output.unwrap() => ZomeCallResponse::Ok).to_owned()
     }
 }
 

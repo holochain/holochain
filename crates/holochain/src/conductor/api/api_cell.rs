@@ -15,6 +15,7 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_types::prelude::*;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
@@ -189,12 +190,20 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
+    /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
+    async fn witness_nonce_from_calling_agent(
+        &self,
+        agent: AgentPubKey,
+        nonce: Nonce256Bits,
+        expires: Timestamp,
+    ) -> ConductorApiResult<WitnessNonceResult>;
+
     /// Find the first cell ID across all apps the given cell id is in that
     /// is assigned to the given role.
     async fn find_cell_with_role_alongside_cell(
         &self,
         cell_id: &CellId,
-        role_id: &AppRoleId,
+        role_name: &RoleName,
     ) -> ConductorResult<Option<CellId>>;
 }
 
@@ -226,13 +235,25 @@ impl CellConductorReadHandleT for CellConductorApi {
         CellConductorApiT::get_entry_def(self, key)
     }
 
+    async fn witness_nonce_from_calling_agent(
+        &self,
+        agent: AgentPubKey,
+        nonce: Nonce256Bits,
+        expires: Timestamp,
+    ) -> ConductorApiResult<WitnessNonceResult> {
+        Ok(self
+            .conductor_handle
+            .witness_nonce_from_calling_agent(agent, nonce, expires)
+            .await?)
+    }
+
     async fn find_cell_with_role_alongside_cell(
         &self,
         cell_id: &CellId,
-        role_id: &AppRoleId,
+        role_name: &RoleName,
     ) -> ConductorResult<Option<CellId>> {
         self.conductor_handle
-            .find_cell_with_role_alongside_cell(cell_id, role_id)
+            .find_cell_with_role_alongside_cell(cell_id, role_name)
             .await
     }
 }

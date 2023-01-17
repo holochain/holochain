@@ -7,6 +7,7 @@ use crate::scratch::Scratch;
 use crate::validation_db::ValidationLimboStatus;
 use holo_hash::encode::blake2b_256;
 use holo_hash::*;
+use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
@@ -18,6 +19,7 @@ use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
 use holochain_types::sql::AsSql;
 use holochain_zome_types::entry::EntryHashed;
+use holochain_zome_types::zome_io::Nonce256Bits;
 use holochain_zome_types::*;
 use std::str::FromStr;
 
@@ -258,6 +260,20 @@ pub fn insert_conductor_state(
     Ok(())
 }
 
+pub fn insert_nonce(
+    txn: &Transaction<'_>,
+    agent: &AgentPubKey,
+    nonce: Nonce256Bits,
+    expires: Timestamp,
+) -> DatabaseResult<()> {
+    sql_insert!(txn, Nonce, {
+        "agent": agent,
+        "nonce": nonce.into_inner(),
+        "expires": expires,
+    })?;
+    Ok(())
+}
+
 /// Set the validation status of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_validation_status(
     txn: &mut Transaction,
@@ -425,7 +441,7 @@ pub fn insert_action(
                 "author": author,
                 "prev_hash": prev_hash,
                 "base_hash": create_link.base_address,
-                "zome_id": create_link.zome_id.0,
+                "zome_index": create_link.zome_index.0,
                 "link_type": create_link.link_type.0,
                 "tag": create_link.tag.as_sql(),
                 "blob": to_blob(&signed_action)?,

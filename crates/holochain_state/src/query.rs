@@ -12,7 +12,7 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
-use holochain_sqlite::sql::sql_cell::FETCH_OP;
+use holochain_sqlite::sql::sql_cell::FETCH_PUBLISHABLE_OP;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpType;
@@ -99,10 +99,12 @@ pub trait Query: Clone {
     }
     fn init_fold(&self) -> StateQueryResult<Self::State>;
 
+    #[allow(clippy::type_complexity)]
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         Box::new(|_| true)
     }
 
+    #[allow(clippy::type_complexity)]
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>>;
 
     fn fold(&self, state: Self::State, data: Self::Item) -> StateQueryResult<Self::State>;
@@ -822,6 +824,7 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
         Ok(Box::new(iter))
     }
 
+    #[allow(clippy::type_complexity)]
     fn new_iter<T: 'iter>(
         params: &[Params],
         stmt: Option<&'iter mut Statement>,
@@ -942,7 +945,7 @@ pub fn get_public_op_from_db(
     op_hash: &DhtOpHash,
 ) -> StateQueryResult<Option<DhtOpHashed>> {
     let result = txn.query_row_and_then(
-        FETCH_OP,
+        FETCH_PUBLISHABLE_OP,
         named_params! {
             ":hash": op_hash,
         },

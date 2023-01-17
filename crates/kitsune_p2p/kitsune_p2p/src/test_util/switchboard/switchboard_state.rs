@@ -46,7 +46,7 @@ static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
 /// Wrapper around the shared state for a Switchboard network. This state
 /// represents the shared state across all nodes in a space.
 ///
-/// This is essentially an Arc<Clone<SwitchboardState>>, which is passed to
+/// This is essentially an `Arc<Clone<SwitchboardState>>`, which is passed to
 /// SwitchboardEventHandler and is also accessible to your test, so that you can
 /// manually modify state while gossip is modifying the same state.
 ///
@@ -141,6 +141,7 @@ impl Switchboard {
             self.gossip_type,
             bandwidth,
             Default::default(),
+            kitsune_p2p_fetch::FetchQueue::new_bitwise_or(),
         );
         let gossip_module = GossipModule(gossip.clone());
 

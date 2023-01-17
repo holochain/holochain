@@ -14,8 +14,9 @@ impl From<Zomes> for ZomeName {
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
-    let mut functions: GrantedFunctions = BTreeSet::new();
-    functions.insert((zome_info()?.name, "whoami".into()));
+    let mut fns = BTreeSet::new();
+    fns.insert((zome_info()?.name, "whoami".into()));
+    let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted
@@ -72,9 +73,9 @@ fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
 }
 
 #[hdk_extern]
-fn who_are_they_role(role_id: AppRoleId) -> ExternResult<AgentInfo> {
+fn who_are_they_role(role_name: RoleName) -> ExternResult<AgentInfo> {
     let zome_call_response: ZomeCallResponse = call(
-        CallTargetCell::OtherRole(role_id),
+        CallTargetCell::OtherRole(role_name),
         zome_info()?.name,
         "whoami".to_string().into(),
         None,

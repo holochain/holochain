@@ -15,6 +15,7 @@ use hdk::prelude::CellId;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_keystore::AgentPubKeyExt;
+use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -350,11 +351,13 @@ async fn init_all(handles: &[TestHandle]) -> Vec<ActionHash> {
         let f = async move {
             let large_msg = std::iter::repeat(b"a"[0]).take(20_000).collect::<Vec<_>>();
             let invocation = new_zome_call(
+                h.keystore(),
                 &h.cell_id,
                 "create_post",
                 Post(format!("{}{}", i, String::from_utf8_lossy(&large_msg))),
                 TestWasm::Create,
             )
+            .await
             .unwrap();
             h.call_zome(invocation).await.unwrap().unwrap()
         };
@@ -400,8 +403,15 @@ async fn check_gossip(
     )
     .await;
     for hash in posts {
-        let invocation =
-            new_zome_call(&handle.cell_id, "get_post", hash, TestWasm::Create).unwrap();
+        let invocation = new_zome_call(
+            handle.keystore(),
+            &handle.cell_id,
+            "get_post",
+            hash,
+            TestWasm::Create,
+        )
+        .await
+        .unwrap();
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
         let result: Option<Record> = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
             .decode()
@@ -437,9 +447,7 @@ struct TestHandle {
 
 impl TestHandle {
     async fn shutdown(self) {
-        let shutdown = self.handle.take_shutdown_handle().unwrap();
-        self.handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        self.handle.shutdown().await.unwrap().unwrap();
     }
 }
 
@@ -462,6 +470,7 @@ async fn setup(
                 network_seed,
                 properties: SerializedBytes::try_from(()).unwrap(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                quantum_time: STANDARD_QUANTUM_TIME,
             },
             integrity_zomes: zomes
                 .clone()

@@ -297,7 +297,7 @@ async fn test_wasm_memory() {
     #[derive(Debug, Serialize)]
     struct Post(String);
 
-    let data = String::from_utf8(vec![0u8; 10_000_000]).unwrap();
+    let data = String::from_utf8(vec![0u8; 3_000_000]).unwrap();
 
     let mut cum = 0;
     for i in 0..100 {
