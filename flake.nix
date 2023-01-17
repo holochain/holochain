@@ -44,7 +44,7 @@
         ./nix/modules/nixEnvPrefixEval.nix
         ./nix/modules/releaseAutomation.nix
         ./nix/modules/rust
-        ./nix/modules/shells.nix
+        ./nix/modules/shells
       ];
       systems = [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" ];
       perSystem = { config, self', inputs', ... }: {
