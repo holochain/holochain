@@ -16,7 +16,7 @@ use holochain_serialized_bytes::prelude::*;
 
 /// a chain record containing the signed action along with the
 /// entry if the action type has one.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Record<A = SignedActionHashed> {
     /// The signed action for this record

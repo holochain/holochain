@@ -110,7 +110,7 @@ async fn sys_validation_workflow_inner(
 
                 let r = validate_op(
                     &op,
-                    &(*workspace),
+                    &workspace,
                     network,
                     conductor_handle.as_ref(),
                     Some(incoming_dht_ops_sender),

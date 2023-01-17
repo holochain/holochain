@@ -121,13 +121,13 @@ macro_rules! to_and_from_kitsune {
         $(
             /// Extension trait for holo/kitsune conversion
             pub trait $i: ::std::clone::Clone + Sized {
-                /// convert into Arc<Kitsune> type
+                /// convert into `Arc<Kitsune>` type
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
 
                 /// convert into Kitsune type
                 fn into_kitsune_raw(self) -> $k;
 
-                /// to Arc<Kitsune> type
+                /// to `Arc<Kitsune>` type
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
@@ -171,13 +171,13 @@ macro_rules! to_kitsune {
         $(
             /// Extension trait for holo/kitsune conversion
             pub trait $i: ::std::clone::Clone + Sized {
-                /// convert into Arc<Kitsune> type
+                /// convert into `Arc<Kitsune>` type
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
 
                 /// convert into Kitsune type
                 fn into_kitsune_raw(self) -> $k;
 
-                /// to Arc<Kitsune> type
+                /// to `Arc<Kitsune>` type
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }

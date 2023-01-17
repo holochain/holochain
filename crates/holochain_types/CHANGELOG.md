@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- BREAKING CHANGE - Added zome name to the signal emitted when using `emit_signal`.
+
 ## 0.1.0-beta-rc.1
 
 ## 0.1.0-beta-rc.0

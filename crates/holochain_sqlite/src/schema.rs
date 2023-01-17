@@ -86,7 +86,7 @@ impl Schema {
                     // set the DB user_version so that next time we don't run
                     // the same migration
                     let new_user_version = (self.current_index + 1) as u16;
-                    conn.pragma_update(None, "user_version", &new_user_version)?;
+                    conn.pragma_update(None, "user_version", new_user_version)?;
                     tracing::info!(
                         "database forward migrated: {} from {} to {}",
                         db_kind,

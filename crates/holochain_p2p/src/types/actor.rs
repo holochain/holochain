@@ -366,7 +366,7 @@ ghost_actor::ghost_chan! {
 /// Convenience type for referring to the HolochainP2p GhostSender
 pub type HolochainP2pRef = ghost_actor::GhostSender<HolochainP2p>;
 
-/// Extension trait for converting GhostSender<HolochainP2p> into HolochainP2pDna
+/// Extension trait for converting `GhostSender<HolochainP2p>` into HolochainP2pDna
 pub trait HolochainP2pRefToDna {
     /// Partially apply dna_hash && agent_pub_key to this sender,
     /// binding it to a specific dna context.

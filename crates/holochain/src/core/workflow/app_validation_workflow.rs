@@ -121,7 +121,7 @@ async fn app_validation_workflow_inner(
                 let mut cascade = workspace.full_cascade(network.clone());
                 let r = match dhtop_to_op(op, &mut cascade).await {
                     Ok(op) => {
-                        validate_op_outer(dna_hash, &op, &conductor, &(*workspace), &network).await
+                        validate_op_outer(dna_hash, &op, &conductor, &workspace, &network).await
                     }
                     Err(e) => Err(e),
                 };
@@ -522,7 +522,7 @@ pub fn entry_creation_zomes_to_invoke(
             let zome = ribosome
                 .get_integrity_zome(&app_entry_def.zome_index())
                 .ok_or_else(|| {
-                    Outcome::rejected(&format!(
+                    Outcome::rejected(format!(
                         "Zome does not exist for {:?}",
                         app_entry_def.zome_index()
                     ))
@@ -540,7 +540,7 @@ fn create_link_zomes_to_invoke(
     let zome = ribosome
         .get_integrity_zome(&create_link.zome_index)
         .ok_or_else(|| {
-            Outcome::rejected(&format!(
+            Outcome::rejected(format!(
                 "Zome does not exist for {:?}",
                 create_link.link_type
             ))
@@ -564,7 +564,7 @@ fn store_record_zomes_to_invoke(
             ..
         }) => {
             let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {
-                Outcome::rejected(&format!("Zome does not exist for {:?}", zome_index))
+                Outcome::rejected(format!("Zome does not exist for {:?}", zome_index))
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }

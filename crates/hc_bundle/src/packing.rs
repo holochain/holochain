@@ -78,7 +78,7 @@ pub async fn pack<M: Manifest>(
     name: String,
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
-    let manifest_path = dir_path.join(&M::path());
+    let manifest_path = dir_path.join(M::path());
     let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path).await?;
     let target_path = match target_path {
         Some(target_path) => {

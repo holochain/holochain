@@ -152,7 +152,7 @@ impl<Kind: DbKindT> TestDb<Kind> {
 
     /// Dump db to a location.
     pub fn dump(&self, out: &Path) -> std::io::Result<()> {
-        std::fs::create_dir(&out).ok();
+        std::fs::create_dir(out).ok();
         for entry in std::fs::read_dir(self.tmpdir.path())? {
             let entry = entry?;
             let path = entry.path();

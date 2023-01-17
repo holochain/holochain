@@ -29,6 +29,8 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
+    let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(&ConductorConfig {
         environment_path: db_dir.path().to_path_buf().into(),
         ..Default::default()
@@ -41,6 +43,7 @@ async fn can_update_state() {
         holochain_p2p,
         spaces,
         post_commit_sender,
+        outcome_tx,
     );
     let state = conductor.get_state().await.unwrap();
     let mut expect_state = ConductorState::default();
@@ -77,6 +80,8 @@ async fn app_ids_are_unique() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
+    let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(&ConductorConfig {
         environment_path: db_dir.path().to_path_buf().into(),
         ..Default::default()
@@ -89,6 +94,7 @@ async fn app_ids_are_unique() {
         holochain_p2p,
         spaces,
         post_commit_sender,
+        outcome_tx,
     );
 
     let cell_id = fake_cell_id(1);
