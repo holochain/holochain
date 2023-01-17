@@ -598,10 +598,12 @@ async fn test_enable_disable_enable_clone_cell() {
     // - should not be able to call a zome fn on a disabled clone cell
     let result: Result<Option<Record>, _> =
         conductor.call_fallible(&zome, "get", hash.clone()).await;
-    dbg!(&result);
+
     assert!(matches!(
-        result.unwrap_err(),
-        ConductorApiError::ConductorError(ConductorError::CellMissing(_))
+        result,
+        Err(ConductorApiError::ConductorError(
+            ConductorError::CellMissing(_)
+        ))
     ));
 
     conductor.shutdown().await;
@@ -618,8 +620,10 @@ async fn test_enable_disable_enable_clone_cell() {
         let result: Result<Option<Record>, _> =
             conductor.call_fallible(&zome, "get", hash.clone()).await;
         assert!(matches!(
-            result.unwrap_err(),
-            ConductorApiError::ConductorError(ConductorError::CellMissing(_))
+            result,
+            Err(ConductorApiError::ConductorError(
+                ConductorError::CellMissing(_)
+            ))
         ));
     }
 

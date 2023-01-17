@@ -678,7 +678,6 @@ mod dna_impls {
         /// Remove cells from the cell map in the Conductor
         pub(crate) async fn remove_cells(&self, cell_ids: &[CellId]) {
             let to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
-                dbg!(&cells.len());
                 cell_ids
                     .iter()
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
@@ -687,7 +686,6 @@ mod dna_impls {
             self.running_cells.share_ref(|cells| dbg!(cells.len()));
 
             for (cell_id, item) in to_cleanup {
-                dbg!(&cell_id);
                 if let Err(err) = item.cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
@@ -2242,7 +2240,7 @@ impl Conductor {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
                 if app.status().is_running() {
-                    app.all_cells().into_iter().cloned().collect()
+                    app.all_enabled_cells().into_iter().cloned().collect()
                 } else {
                     HashSet::new()
                 }
@@ -2254,7 +2252,7 @@ impl Conductor {
                     .installed_apps()
                     .iter()
                     .filter(|(_, app)| app.status().is_running())
-                    .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
+                    .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
                     .cloned()
                     .collect()
             }
