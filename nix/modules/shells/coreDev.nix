@@ -23,7 +23,7 @@ hcMkShell {
       cargo
       rustc
     ]
-    # latest crate2nix broken on darwin
+    # the latest crate2nix is currently broken on darwin
     ++ (lib.optionals pkgs.stdenv.isLinux [
       crate2nix
     ]);

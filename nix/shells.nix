@@ -41,17 +41,12 @@ let
       input
     ];
   };
-in
 
-rec {
-  # shell for HC core development. included dependencies:
-  # * everything needed to compile this repos' crates
-  # * CI scripts
-  coreDev = hcMkShell {
+  # monkey patching the old Shell as the plan is to get rid of holonix
+  _coreDevOld = hcMkShell {
     nativeBuildInputs = builtins.attrValues (pkgs.core)
       ++ [
       cargo-nextest
-      crate2nix
     ]
       ++ (with holonix.pkgs;[
       sqlcipher
@@ -59,8 +54,31 @@ rec {
       gh
       nixpkgs-fmt
       cargo-sweep
+    ])
+    # the latest crate2nix is currently broken on darwin
+     ++ (lib.optionals stdenv.isLinux [
+      crate2nix
     ]);
   };
+
+  replacePackage = pkg: let
+    pname = pkg.pname or null;
+  in
+    if pname == "nix"
+    then pkgs.nix
+    else pkg;
+
+in
+
+rec {
+  # shell for HC core development. included dependencies:
+  # * everything needed to compile this repos' crates
+  # * CI scripts
+
+  # monkey patching the old Shell as the plan is to get rid of holonix
+  coreDev = _coreDevOld.overrideAttrs (old: {
+    nativeBuildInputs = map replacePackage old.nativeBuildInputs;
+  });
 
   release = coreDev.overrideAttrs (attrs: {
     nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
