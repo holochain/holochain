@@ -26,7 +26,7 @@ pub enum HashableContentBytes {
 }
 
 /// A default HashableContent implementation, suitable for content which
-/// is already TryInto<SerializedBytes>, and uses a PrimitiveHashType
+/// is already `TryInto<SerializedBytes>`, and uses a PrimitiveHashType
 #[macro_export]
 macro_rules! impl_hashable_content {
     ($n: ident, $t: ident) => {

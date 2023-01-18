@@ -1,7 +1,7 @@
 { nixpkgs ? null
 , rustVersion ? {
     track = "stable";
-    version = "1.60.0";
+    version = "1.66.0";
   }
 
 , holonixArgs ? { }
@@ -51,8 +51,6 @@ let
 
       inherit (self.rustPlatform.rust) rustc cargo;
 
-      crate2nix = import sources.crate2nix.outPath { };
-
       cargo-nextest = self.rustPlatform.buildRustPackage {
         name = "cargo-nextest";
 
@@ -69,8 +67,14 @@ let
       };
     })
 
-  ];
+  ]
+  ++ [(
+    self: super: {
+      inherit crate2nix;
+    }
+  )];
 
+  crate2nix = (import (nixpkgs.path or holonix.pkgs.path) {}).crate2nix;
   nixpkgs' = import (nixpkgs.path or holonix.pkgs.path) { inherit overlays; };
   inherit (nixpkgs') callPackage;
 

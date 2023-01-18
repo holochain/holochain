@@ -25,7 +25,7 @@ pub use app_entry_bytes::*;
 pub use error::*;
 
 /// Entries larger than this number of bytes cannot be created
-pub const ENTRY_SIZE_LIMIT: usize = 16 * 1000 * 1000; // 16MiB
+pub const ENTRY_SIZE_LIMIT: usize = 4 * 1000 * 1000; // 4MB
 
 /// The data type written to the source chain when explicitly granting a capability.
 /// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
@@ -172,7 +172,7 @@ impl HashableContent for Entry {
 }
 
 /// Zome input for must_get_valid_record.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct MustGetValidRecordInput(pub ActionHash);
 
 impl MustGetValidRecordInput {
@@ -188,7 +188,7 @@ impl MustGetValidRecordInput {
 }
 
 /// Zome input for must_get_entry.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct MustGetEntryInput(pub EntryHash);
 
 impl MustGetEntryInput {
@@ -204,7 +204,7 @@ impl MustGetEntryInput {
 }
 
 /// Zome input for must_get_action.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct MustGetActionInput(pub ActionHash);
 
 impl MustGetActionInput {

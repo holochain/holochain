@@ -15,6 +15,10 @@ use kitsune_p2p_timestamp::Timestamp;
 /// Every [`Action`] produces a set of operations.
 /// These operations are each sent to an authority for validation.
 ///
+/// # Examples
+///
+/// Validate a new entry: <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/validate/src/integrity.rs>
+///
 /// ## Producing Operations
 /// The following is a list of the operations that can be produced by each [`Action`]:
 /// - Every [`Action`] produces a [`Op::RegisterAgentActivity`] and a [`Op::StoreRecord`].
@@ -126,7 +130,7 @@ pub struct StoreRecord {
     pub record: Record,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 /// Stores a new [`Entry`] in the DHT.
 /// This is the act of creating a either a [`Action::Create`] or
@@ -140,7 +144,7 @@ pub struct StoreEntry {
     pub entry: Entry,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 /// Registers an update from an instance of an [`Entry`] in the DHT.
 /// This is the act of creating a [`Action::Update`] and
@@ -166,7 +170,7 @@ pub struct RegisterUpdate {
     pub original_entry: Option<Entry>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 /// Registers a deletion of an instance of an [`Entry`] in the DHT.
 /// This is the act of creating a [`Action::Delete`] and
@@ -204,7 +208,7 @@ impl AsRef<SignedActionHashed> for RegisterAgentActivity {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 /// Registers a link between two [`Entry`]s.
 /// This is the act of creating a [`Action::CreateLink`] and
@@ -215,7 +219,7 @@ pub struct RegisterCreateLink {
     pub create_link: SignedHashed<CreateLink>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
 /// Deletes a link between two [`Entry`]s.
 /// This is the act of creating a [`Action::DeleteLink`] and

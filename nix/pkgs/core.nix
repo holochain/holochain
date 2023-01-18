@@ -2,7 +2,7 @@
 , callPackage
 , lib
 , writeShellScriptBin
-
+, crate2nix
 , holonix
 , holonixPath
 , hcToplevelDir
@@ -259,7 +259,7 @@ rec {
   hcRegenNixExpressions = writeShellScriptBin "hc-regen-nix-expressions" ''
     set -xe
     pushd ${hcToplevelDir}
-    crate2nix generate \
+    ${crate2nix}/bin/crate2nix generate \
         -f crates/release-automation/Cargo.toml \
         -o crates/release-automation/Cargo.nix
     git commit crates/release-automation/Cargo.nix -m "chore: hc-regen-nix-expressions"
