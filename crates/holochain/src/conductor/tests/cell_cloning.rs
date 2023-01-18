@@ -121,7 +121,7 @@ async fn create_clone_cell_run_twice_returns_correct_clones() {
         })
         .await
         .unwrap();
-    assert_eq!(clone_cell_0.clone_id.unwrap(), CloneId::new(&role_name, 0)); // clone index starts at 0
+    assert_eq!(clone_cell_0.clone_id, CloneId::new(&role_name, 0)); // clone index starts at 0
     assert_eq!(clone_cell_0.original_dna_hash, dna.dna_hash().to_owned());
 
     let clone_cell_1 = conductor
@@ -135,7 +135,7 @@ async fn create_clone_cell_run_twice_returns_correct_clones() {
         })
         .await
         .unwrap();
-    assert_eq!(clone_cell_1.clone_id.unwrap(), CloneId::new(&role_name, 1));
+    assert_eq!(clone_cell_1.clone_id, CloneId::new(&role_name, 1));
     assert_eq!(clone_cell_1.original_dna_hash, dna.dna_hash().to_owned());
 }
 
@@ -161,7 +161,7 @@ async fn clone_cell_deletion() {
         })
         .await
         .unwrap();
-    let clone_id = CloneCellId::CloneId(clone_cell.clone().clone_id.unwrap());
+    let clone_id = CloneCellId::CloneId(clone_cell.clone().clone_id);
 
     // disable clone cell
     conductor

@@ -81,6 +81,7 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::ClonedCell;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
@@ -1275,6 +1276,8 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
+    use holochain_conductor_api::ClonedCell;
+
     use super::*;
 
     impl Conductor {
@@ -1286,7 +1289,7 @@ mod clone_cell_impls {
         pub async fn create_clone_cell(
             self: Arc<Self>,
             payload: CreateCloneCellPayload,
-        ) -> ConductorResult<holochain_conductor_api::Cell> {
+        ) -> ConductorResult<ClonedCell> {
             let CreateCloneCellPayload {
                 app_id,
                 role_name,
@@ -1311,7 +1314,7 @@ mod clone_cell_impls {
                 })?;
 
             // add cell to app
-            let installed_clone_cell = self
+            let clone_cell = self
                 .add_clone_cell_to_app(
                     app_id.clone(),
                     role_name.clone(),
@@ -1321,11 +1324,11 @@ mod clone_cell_impls {
                 .await?;
 
             // run genesis on cloned cell
-            let cells = vec![(installed_clone_cell.cell_id.clone(), membrane_proof)];
+            let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
             self.create_and_add_initialized_cells_for_running_apps(Some(&app_id))
                 .await?;
-            Ok(installed_clone_cell)
+            Ok(clone_cell)
         }
 
         /// Disable a clone cell.
@@ -1357,7 +1360,7 @@ mod clone_cell_impls {
         pub async fn enable_clone_cell(
             self: Arc<Self>,
             payload: &EnableCloneCellPayload,
-        ) -> ConductorResult<holochain_conductor_api::Cell> {
+        ) -> ConductorResult<ClonedCell> {
             let conductor = self.clone();
             let (_, enabled_cell) = self
                 .update_state_prime({
@@ -1373,9 +1376,9 @@ mod clone_cell_impls {
                         let dna = ribosome.dna_file.dna();
                         let dna_modifiers = dna.modifiers.clone();
                         let name = dna.name.clone();
-                        let enabled_cell = holochain_conductor_api::Cell {
+                        let enabled_cell = ClonedCell {
                             cell_id,
-                            clone_id: Some(clone_id),
+                            clone_id,
                             original_dna_hash,
                             dna_modifiers,
                             name,
@@ -2287,7 +2290,7 @@ impl Conductor {
         role_name: RoleName,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
-    ) -> ConductorResult<holochain_conductor_api::Cell> {
+    ) -> ConductorResult<ClonedCell> {
         let ribosome_store = &self.ribosome_store;
         // retrieve base cell DNA hash from conductor
         let (_, base_cell_dna_hash) = self
@@ -2332,9 +2335,9 @@ impl Conductor {
                 let agent_key = app.role(&role_name)?.agent_key().to_owned();
                 let cell_id = CellId::new(clone_dna_hash, agent_key);
                 let clone_id = app.add_clone(&role_name, &cell_id)?;
-                let installed_clone_cell = holochain_conductor_api::Cell {
+                let installed_clone_cell = ClonedCell {
                     cell_id,
-                    clone_id: Some(clone_id),
+                    clone_id,
                     original_dna_hash,
                     dna_modifiers,
                     name,
