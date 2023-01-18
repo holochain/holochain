@@ -502,8 +502,12 @@ jobs:
           max_attempts: ${{ matrix.testCommand.max_attempts }}
           command: |
             set -e
-            source "${HOLOCHAIN_RELEASE_SH}"
-            cd "${HOLOCHAIN_REPO}"
+            if [ -e "$HOLOCHAIN_RELEASE_SH" ]; then
+              source "${HOLOCHAIN_RELEASE_SH}"
+              cd "${HOLOCHAIN_REPO}"
+            else
+              echo "ignoring HOLOCHAIN_RELEASE_SH as its unset and fallback to local checkout"
+            fi
 
             ${{ matrix.testCommand.run }}
 
