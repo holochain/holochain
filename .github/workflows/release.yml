@@ -479,7 +479,7 @@ jobs:
           # CARGO_BUILD_JOBS: "2"
         run: |
           set -e
-          if [ -n "$HOLOCHAIN_RELEASE_SH" ]; then
+          if [ -e "$HOLOCHAIN_RELEASE_SH" ]; then
             source "${HOLOCHAIN_RELEASE_SH}"
             cd "${HOLOCHAIN_REPO}"
           else
