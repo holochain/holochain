@@ -59,9 +59,6 @@ rec {
       nixpkgs-fmt
       cargo-sweep
     ])
-    ++ (lib.optionals stdenv.isLinux [
-      crate2nix
-    ])
     ++ (lib.optionals stdenv.isDarwin
       (with holonix.pkgs.darwin; [
         Security
