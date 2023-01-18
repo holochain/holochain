@@ -187,20 +187,21 @@ jobs:
   prepare:
     needs: [vars]
     # uses: ./.github/workflows/release-prepare.yml
-    run: echo "release-prepare temporarily disabled"
-    with:
-      dry_run: ${{ needs.vars.outputs.dry_run }}
-      debug: ${{ needs.vars.outputs.debug }}
-      skip_prepare_logic: ${{ needs.vars.outputs.skip_prepare_logic }}
-      HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
-      HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
-      HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
-      CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
-    secrets:
-      CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
+    steps:
+      - run: echo "release-prepare temporarily disabled"
+    # with:
+    #   dry_run: ${{ needs.vars.outputs.dry_run }}
+    #   debug: ${{ needs.vars.outputs.debug }}
+    #   skip_prepare_logic: ${{ needs.vars.outputs.skip_prepare_logic }}
+    #   HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
+    #   HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
+    #   HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
+    #   HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
+    #   CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
+    # secrets:
+    #   CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    #   CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    #   HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
 
   test:
     needs: [vars, prepare]
