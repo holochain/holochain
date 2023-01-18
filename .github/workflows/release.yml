@@ -343,7 +343,7 @@ jobs:
               nix-shell \
                 --pure \
                 --keep VERSION_COMPAT \
-                --arg flavors '["release"]' \
+                --argstr flavor release \
                 --run 'hnixpkgs-update-single ${VERSION_COMPAT}'
               nix-build . -A packages.holochain.holochainAllBinariesWithDeps.${VERSION_COMPAT} --no-link
 
