@@ -71,8 +71,8 @@
       '';
       # cargoExtraArgs = "--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption";
       # CARGO_PROFILE = "release";
-      checkPhaseCargoCommand = ''
-        cargo nextest run --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests
+      cargoExtraArgs = ''
+        --test-threads 2 --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests
       '';
     });
 

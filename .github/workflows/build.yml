@@ -9,6 +9,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        nixAttribute:
+          - holochain
+          - holochain-tests-nextest
         platform:
           - arch: macos-x86_64
             runs-on: [macos-latest]
@@ -34,14 +37,12 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = flakes nix-command
-        if: "${{ matrix.platform.arch != 'macos-arm64' }}"
 
       - name: Setup cachix
         uses: cachix/cachix-action@v12
         with:
           name: "${{ matrix.cachixName }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        if: "${{ matrix.platform.arch != 'macos-arm64' }}"
 
       - name: Build derivations
         env:
