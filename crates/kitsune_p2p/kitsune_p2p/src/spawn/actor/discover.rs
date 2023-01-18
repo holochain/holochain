@@ -76,7 +76,7 @@ pub(crate) fn search_and_discover_peer_connect(
                                 {
                                     tracing::error!(
                                         ?err,
-                                        "search_and_discover error putting agent info"
+                                        "search_and_discover_peer_connect: error putting agent info"
                                     );
                                 }
 
