@@ -305,30 +305,36 @@ jobs:
             run: |
               set -x
 
-              # remove everything that wouldn't be on github either
-              git clean -fdx
+              if [ -e "$HOLOCHAIN_RELEASE_SH" ]; then
 
-              # we use this git daemon to not rely on the published tag
-              git daemon --reuseaddr --base-path=. --export-all --verbose --detach
+                # remove everything that wouldn't be on github either
+                git clean -fdx
 
-              git clone "${HOLOCHAIN_NIXPKGS_URL}" "${HOLOCHAIN_NIXPKGS_REPO}" -b ${HOLOCHAIN_NIXPKGS_SOURCE_BRANCH} --depth=1
-              cd "${HOLOCHAIN_NIXPKGS_REPO}"
+                # we use this git daemon to not rely on the published tag
+                git daemon --reuseaddr --base-path=. --export-all --verbose --detach
 
-              git checkout -b "${RELEASE_BRANCH}"
+                git clone "${HOLOCHAIN_NIXPKGS_URL}" "${HOLOCHAIN_NIXPKGS_REPO}" -b ${HOLOCHAIN_NIXPKGS_SOURCE_BRANCH} --depth=1
+                cd "${HOLOCHAIN_NIXPKGS_REPO}"
 
-              if grep --quiet ${VERSION_COMPAT} packages/holochain/versions/update_config.toml; then
-                export VERSION_COMPAT="${VERSION_COMPAT}-ci"
-                export TAG="${TAG}-ci"
-                git -C "${HOLOCHAIN_REPO}" tag --force "${TAG}"
+                git checkout -b "${RELEASE_BRANCH}"
+
+                if grep --quiet ${VERSION_COMPAT} packages/holochain/versions/update_config.toml; then
+                  export VERSION_COMPAT="${VERSION_COMPAT}-ci"
+                  export TAG="${TAG}-ci"
+                  git -C "${HOLOCHAIN_REPO}" tag --force "${TAG}"
+                fi
+
+                # TODO: use a util from the holochain-nixpkgs repo to make this change as this can get out of sync
+                cat <<EOF >> packages/holochain/versions/update_config.toml
+
+                [${VERSION_COMPAT}]
+                git-src = "revision:${TAG}"
+                git-repo = "git://localhost/"
+                EOF
+              else
+                echo "skip git logic because HOLOCHAIN_RELEASE_SH unset"
+                export HOLOCHAIN_NIXPKGS_REPO ./holochain-nixpkgs
               fi
-
-              # TODO: use a util from the holochain-nixpkgs repo to make this change as this can get out of sync
-              cat <<EOF >> packages/holochain/versions/update_config.toml
-
-              [${VERSION_COMPAT}]
-              git-src = "revision:${TAG}"
-              git-repo = "git://localhost/"
-              EOF
 
               # regenerate the nix sources
               git config --global user.email "devcore@holochain.org"
