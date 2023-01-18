@@ -219,8 +219,8 @@ jobs:
                 - local
               nix:
                 - cachix
-          - arch: macos-x86_64
-            runs-on: [macos-latest]
+          - arch: macos-arm64
+            runs-on: [self-hosted, macOS, arm64]
             largeCacheStorage:
               nix:
                 - cachix
