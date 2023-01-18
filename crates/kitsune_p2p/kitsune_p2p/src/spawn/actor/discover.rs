@@ -64,7 +64,7 @@ pub(crate) fn search_and_discover_peer_connect(
                         let payload = wire::Wire::peer_get(inner.space.clone(), to_agent.clone());
                         match con_hnd.request(&payload, timeout).await {
                             Ok(wire::Wire::PeerGetResp(wire::PeerGetResp {
-                                agent_info_signed,
+                                agent_info_signed: Some(agent_info_signed),
                             })) => {
                                 if let Err(err) = inner
                                     .evt_sender
@@ -84,13 +84,27 @@ pub(crate) fn search_and_discover_peer_connect(
                                 // return the try-to-connect future
                                 return peer_connect(inner, &agent_info_signed, timeout).await;
                             }
+                            Ok(wire::Wire::PeerGetResp(wire::PeerGetResp {
+                                agent_info_signed: None,
+                            })) => {
+                                // No agent found, move on to the next node.
+                                continue;
+                            }
                             peer_resp => {
-                                tracing::warn!(?peer_resp, "unexpected peer resp 1");
+                                // This node is sending us something unexpected, so let's warn about that.
+                                tracing::warn!(
+                                    ?peer_resp,
+                                    "search_and_discover_peer_connect: unexpected peer response"
+                                );
                             }
                         }
                     }
                 }
             }
+
+            tracing::info!(
+                "search_and_discover_peer_connect: no peers found, retrying after delay."
+            );
 
             backoff.wait().await;
         }
@@ -218,7 +232,10 @@ pub(crate) fn search_remotes_covering_basis(
                             break;
                         }
                         peer_resp => {
-                            tracing::warn!(?peer_resp, "unexpected peer resp 2");
+                            tracing::warn!(
+                                ?peer_resp,
+                                "search_remotes_covering_basis: unexpected peer response"
+                            );
                         }
                     }
                 }
