@@ -512,7 +512,7 @@ jobs:
             ${{ matrix.testCommand.run }}
 
       - name: Garbage-collection post-run procedure
-        if: ${{ always() && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
+        if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
         env:
           MATRIX: ${{ toJSON(matrix) }}
         run: |
