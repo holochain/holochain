@@ -421,35 +421,35 @@ jobs:
       - name: Set NIX_PATH (FIXME)
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
-      - name: Restore the holochain release repository
-        uses: MartijnHols/actions-cache/restore@v3.0.11b
-        with:
-          path: |
-            /var/tmp/holochain_release.sh
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
-          required: true
+      # - name: Restore the holochain release repository
+      #   uses: MartijnHols/actions-cache/restore@v3.0.11b
+      #   with:
+      #     path: |
+      #       /var/tmp/holochain_release.sh
+      #       # asterisk is a workaround for https://github.com/actions/cache/issues/494
+      #       /var/tmp/holochain_repo/*
+      #       !/var/tmp/holochain_repo/.cargo/
+      #       !/var/tmp/holochain_repo/target/
+      #     key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
+      #     required: true
 
-      - name: Restore cargo related state and build files
-        uses: MartijnHols/actions-cache/restore@v3.0.11b
-        if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
-        with:
-          path: |
-            /var/tmp/holochain_repo/.cargo/bin/
-            /var/tmp/holochain_repo/.cargo/registry/index/
-            /var/tmp/holochain_repo/.cargo/registry/cache/
-            /var/tmp/holochain_repo/.cargo/git/db/
-            /var/tmp/holochain_repo/target/
-          key: ${{ runner.os }}-test-${{ matrix.testCommand.name }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ matrix.testCommand.name }}
-            ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
-            ${{ runner.os }}-prepare-${{ github.run_id }}
-            ${{ runner.os }}-prepare
-          required: false
+      # - name: Restore cargo related state and build files
+      #   uses: MartijnHols/actions-cache/restore@v3.0.11b
+      #   if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
+      #   with:
+      #     path: |
+      #       /var/tmp/holochain_repo/.cargo/bin/
+      #       /var/tmp/holochain_repo/.cargo/registry/index/
+      #       /var/tmp/holochain_repo/.cargo/registry/cache/
+      #       /var/tmp/holochain_repo/.cargo/git/db/
+      #       /var/tmp/holochain_repo/target/
+      #     key: ${{ runner.os }}-test-${{ matrix.testCommand.name }}-${{ github.run_id }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-test-${{ matrix.testCommand.name }}
+      #       ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
+      #       ${{ runner.os }}-prepare-${{ github.run_id }}
+      #       ${{ runner.os }}-prepare
+      #     required: false
 
       - name: Garbage-collection pre-run procedure
         if: ${{ contains(matrix.testCommand.largeCacheStorage, 'generic') }}
