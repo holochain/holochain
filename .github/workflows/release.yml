@@ -451,22 +451,22 @@ jobs:
       #       ${{ runner.os }}-prepare
       #     required: false
 
-      - name: Garbage-collection pre-run procedure
-        if: ${{ contains(matrix.testCommand.largeCacheStorage, 'generic') }}
-        env:
-          MATRIX: ${{ toJSON(matrix) }}
-        run: |
-          set -ex
-          cat "${HOLOCHAIN_RELEASE_SH}"
-          source "${HOLOCHAIN_RELEASE_SH}"
-          cd "${HOLOCHAIN_REPO}"
+      # - name: Garbage-collection pre-run procedure
+      #   if: ${{ contains(matrix.testCommand.largeCacheStorage, 'generic') }}
+      #   env:
+      #     MATRIX: ${{ toJSON(matrix) }}
+      #   run: |
+      #     set -ex
+      #     cat "${HOLOCHAIN_RELEASE_SH}"
+      #     source "${HOLOCHAIN_RELEASE_SH}"
+      #     cd "${HOLOCHAIN_REPO}"
 
-          # TODO: handle this when we go back to parallel test runs
-          echo ${MATRIX}
+      #     # TODO: handle this when we go back to parallel test runs
+      #     echo ${MATRIX}
 
-          nix-shell --pure --run '
-              cargo sweep -i
-              cargo sweep -s
+      #     nix-shell --pure --run '
+      #         cargo sweep -i
+      #         cargo sweep -s
             '
 
       - name: ${{ matrix.testCommand.name }} (build only)
