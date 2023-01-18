@@ -8,7 +8,7 @@ use holochain_types::prelude::{
     CellProvisioning, DnaBundle, DnaLocation, DnaVersionSpec, InstallAppPayload,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::DnaModifiersOpt;
+use holochain_zome_types::{CellId, DnaModifiersOpt};
 use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -25,6 +25,7 @@ async fn reject_duplicate_app_for_same_agent() {
             .map(|dna| async move { DnaHash::with_data_sync(&dna).into() }),
     )
     .await;
+    let cell_id = CellId::new(dna.dna_hash().to_owned(), alice.clone());
 
     let version = DnaVersionSpec::from(hashes.clone()).into();
 
@@ -84,7 +85,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .await;
     assert_matches!(
         duplicate_install_with_app_disabled.unwrap_err(),
-        ConductorError::CellAlreadyActive
+        ConductorError::CellAlreadyExists(id) if id == cell_id
     );
 
     // enable app
@@ -109,7 +110,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .await;
     assert_matches!(
         duplicate_install_with_app_enabled.unwrap_err(),
-        ConductorError::CellAlreadyActive
+        ConductorError::CellAlreadyExists(id) if id == cell_id
     );
 
     let resources = vec![(path, DnaBundle::from_dna_file(dna.clone()).await.unwrap())];

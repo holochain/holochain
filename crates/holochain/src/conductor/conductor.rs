@@ -1085,12 +1085,15 @@ mod app_impls {
                 .installed_apps()
                 .values()
                 .flat_map(|app| app.all_cells());
-            if cells_to_create.iter().any(|(cell_id, _)| {
+            let maybe_duplicate_cell_id = cells_to_create.iter().find(|(cell_id, _)| {
                 all_cells
                     .find(|existing_cell_id| existing_cell_id == &cell_id)
                     .is_some()
-            }) {
-                return Err(ConductorError::CellAlreadyActive);
+            });
+            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
+                return Err(ConductorError::CellAlreadyExists(
+                    duplicate_cell_id.to_owned(),
+                ));
             };
 
             for (dna, _) in ops.dnas_to_register {
