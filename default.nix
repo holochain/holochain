@@ -51,8 +51,6 @@ let
 
       inherit (self.rustPlatform.rust) rustc cargo;
 
-      crate2nix = import sources.crate2nix.outPath { };
-
       cargo-nextest = self.rustPlatform.buildRustPackage {
         name = "cargo-nextest";
 
