@@ -1079,10 +1079,17 @@ mod app_impls {
 
             let cells_to_create = ops.cells_to_create();
 
-            if cells_to_create
-                .iter()
-                .any(|(cell_id, _)| self.cell_by_id(cell_id).is_ok())
-            {
+            // check if cells_to_create contains a cell identical to an existing one
+            let state = self.get_state().await?;
+            let mut all_cells = state
+                .installed_apps()
+                .values()
+                .flat_map(|app| app.all_cells());
+            if cells_to_create.iter().any(|(cell_id, _)| {
+                all_cells
+                    .find(|existing_cell_id| existing_cell_id == &cell_id)
+                    .is_some()
+            }) {
                 return Err(ConductorError::CellAlreadyActive);
             };
 

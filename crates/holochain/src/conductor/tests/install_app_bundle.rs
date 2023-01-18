@@ -64,13 +64,15 @@ async fn reject_duplicate_app_for_same_agent() {
         })
         .await
         .unwrap();
-    conductor.enable_app("app_1".into()).await.unwrap();
 
-    let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).await.unwrap())];
+    let resources = vec![(
+        path.clone(),
+        DnaBundle::from_dna_file(dna.clone()).await.unwrap(),
+    )];
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
         .unwrap();
-    let duplicate_install = conductor
+    let duplicate_install_with_app_disabled = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             source: AppBundleSource::Bundle(bundle),
@@ -81,7 +83,32 @@ async fn reject_duplicate_app_for_same_agent() {
         })
         .await;
     assert_matches!(
-        duplicate_install.unwrap_err(),
+        duplicate_install_with_app_disabled.unwrap_err(),
+        ConductorError::CellAlreadyActive
+    );
+
+    // enable app
+    conductor.enable_app("app_1".into()).await.unwrap();
+
+    let resources = vec![(
+        path.clone(),
+        DnaBundle::from_dna_file(dna.clone()).await.unwrap(),
+    )];
+    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
+        .await
+        .unwrap();
+    let duplicate_install_with_app_enabled = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            source: AppBundleSource::Bundle(bundle),
+            agent_key: alice.clone(),
+            installed_app_id: Some("app_2".into()),
+            membrane_proofs: HashMap::new(),
+            network_seed: None,
+        })
+        .await;
+    assert_matches!(
+        duplicate_install_with_app_enabled.unwrap_err(),
         ConductorError::CellAlreadyActive
     );
 
@@ -89,7 +116,7 @@ async fn reject_duplicate_app_for_same_agent() {
     let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
         .await
         .unwrap();
-    let valid_install = conductor
+    let valid_install_of_second_app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             source: AppBundleSource::Bundle(bundle),
@@ -99,5 +126,5 @@ async fn reject_duplicate_app_for_same_agent() {
             network_seed: Some("network".into()),
         })
         .await;
-    assert!(valid_install.is_ok());
+    assert!(valid_install_of_second_app.is_ok());
 }
