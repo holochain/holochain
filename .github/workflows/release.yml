@@ -493,7 +493,7 @@ jobs:
 
       - name: ${{ matrix.testCommand.name }} (run)
         continue-on-error: ${{ matrix.platform.runs-on == 'macos-latest' }}
-        uses: nick-fields/retry@v2.8.1
+        uses: nick-fields/retry@v2.8.3
         env:
           HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
           HOLONIX_SOURCE_BRANCH: ${{ needs.vars.outputs.holonix_source_branch }}
