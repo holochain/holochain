@@ -467,7 +467,7 @@ jobs:
       #     nix-shell --pure --run '
       #         cargo sweep -i
       #         cargo sweep -s
-            '
+      #       '
 
       - name: ${{ matrix.testCommand.name }} (build only)
         continue-on-error: ${{ matrix.platform.runs-on == 'macos-latest' }}
