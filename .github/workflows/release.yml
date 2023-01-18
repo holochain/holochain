@@ -333,7 +333,7 @@ jobs:
                 EOF
               else
                 echo "skip git logic because HOLOCHAIN_RELEASE_SH unset"
-                export HOLOCHAIN_NIXPKGS_REPO ./holochain-nixpkgs
+                export HOLOCHAIN_NIXPKGS_REPO=./holochain-nixpkgs
               fi
 
               # regenerate the nix sources
