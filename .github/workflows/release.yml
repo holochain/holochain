@@ -189,6 +189,7 @@ jobs:
     # uses: ./.github/workflows/release-prepare.yml
     steps:
       - run: echo "release-prepare temporarily disabled"
+    runs-on: ["ubuntu-latest"]
     # with:
     #   dry_run: ${{ needs.vars.outputs.dry_run }}
     #   debug: ${{ needs.vars.outputs.debug }}
