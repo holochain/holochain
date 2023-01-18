@@ -67,8 +67,14 @@ let
       };
     })
 
-  ];
+  ]
+  ++ [(
+    self: super: {
+      inherit crate2nix;
+    }
+  )];
 
+  crate2nix = (import (nixpkgs.path or holonix.pkgs.path) {}).crate2nix;
   nixpkgs' = import (nixpkgs.path or holonix.pkgs.path) { inherit overlays; };
   inherit (nixpkgs') callPackage;
 
