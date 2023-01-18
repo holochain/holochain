@@ -423,6 +423,7 @@ jobs:
 
       - name: Restore the holochain release repository
         uses: DavHau/actions-cache/restore@retry
+        if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
         with:
           path: |
             /var/tmp/holochain_release.sh
@@ -478,8 +479,12 @@ jobs:
           # CARGO_BUILD_JOBS: "2"
         run: |
           set -e
-          source "${HOLOCHAIN_RELEASE_SH}"
-          cd "${HOLOCHAIN_REPO}"
+          if [ -n "$HOLOCHAIN_RELEASE_SH" ]; then
+            source "${HOLOCHAIN_RELEASE_SH}"
+            cd "${HOLOCHAIN_REPO}"
+          else
+            echo "ignoring HOLOCHAIN_RELEASE_SH as its unset and fallback to local checkout"
+          fi
 
           nix-shell --pure --run "cargo fetch --locked"
 
