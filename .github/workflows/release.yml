@@ -453,7 +453,7 @@ jobs:
           required: false
 
       - name: Garbage-collection pre-run procedure
-        if: ${{ contains(matrix.testCommand.largeCacheStorage, 'generic') }}
+        if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
         env:
           MATRIX: ${{ toJSON(matrix) }}
         run: |
