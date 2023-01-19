@@ -139,18 +139,6 @@ jobs:
         run: |
           set -exE -o pipefail
 
-          if [[ ! -d "${HOLOCHAIN_REPO}" ]]; then
-            rm -rf "${HOLOCHAIN_REPO}"
-            mkdir -p "${HOLOCHAIN_REPO}"
-          fi
-
-          cd "${HOLOCHAIN_REPO}"
-
-          if ! git status; then
-            git init
-            git remote add origin "${HOLOCHAIN_URL}"
-          fi
-
           # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
           git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
 
