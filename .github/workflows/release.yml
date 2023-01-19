@@ -77,7 +77,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       HOLOCHAIN_REPO: ${{ steps.eval.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ steps.eval.outputs.HOLOCHAIN_RELEASE_SH}}
       CACHIX_REV: ${{ steps.eval.outputs.CACHIX_REV}}
 
       # holochain_url: ${{ steps.eval.outputs.holochain_url }}
@@ -181,8 +180,7 @@ jobs:
             echo "::set-output name=skip_prepare_logic::false"
           fi
 
-          echo "::set-output name=HOLOCHAIN_REPO::/var/tmp/holochain_repo"
-          echo "::set-output name=HOLOCHAIN_RELEASE_SH::/var/tmp/holochain_release.sh"
+          echo "::set-output name=HOLOCHAIN_REPO::./holochain_repo"
           echo "::set-output name=CACHIX_REV::v1.0.1"
   prepare:
     needs: [vars]
@@ -197,7 +195,6 @@ jobs:
       HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
       HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
     secrets:
       CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -208,9 +205,8 @@ jobs:
     needs: [vars, prepare]
     if: ${{ github.event_name != 'pull_request' && needs.vars.outputs.skip_test != 'true' }}
     env:
-      HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
+      HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
     strategy:
       fail-fast: false
       matrix:
@@ -342,6 +338,7 @@ jobs:
                 --run 'hnixpkgs-update-single ${VERSION_COMPAT}'
               nix-build . -A packages.holochain.holochainAllBinariesWithDeps.${VERSION_COMPAT} --no-link
 
+              export HOLONIX_REPO=./holonix-repo
               git clone "${HOLONIX_URL}" "${HOLONIX_REPO}" -b ${HOLONIX_SOURCE_BRANCH} --depth=1
               cd "${HOLONIX_REPO}"
 
@@ -426,15 +423,10 @@ jobs:
       - name: Restore the holochain release repository
         run: |
           echo "nix_store_holochain_repo: ${{ needs.prepare.outputs.nix_store_holochain_repo }}"
-          echo "nix_store_release_sh: ${{ needs.prepare.outputs.nix_store_release_sh }}"
           nix copy --from "https://holochain-ci.cachix.org" ${{ needs.prepare.outputs.nix_store_holochain_repo }}
-          nix copy --from "https://holochain-ci.cachix.org" ${{ needs.prepare.outputs.nix_store_release_sh }}
 
-          export HOLOCHAIN_RELEASE_SH=${{ needs.prepare.outputs.nix_store_release_sh }}
-          export HOLOCHAIN_REPO=$(mktemp -d)
-
-          source $HOLOCHAIN_RELEASE_SH
-
+          cp -r ${{ needs.prepare.outputs.nix_store_holochain_repo }}" $HOLOCHAIN_REPO
+          chmod +w $HOLOCHAIN_REPO
 
       # - name: Restore the holochain release repository
       #   uses: DavHau/actions-cache/restore@retry
@@ -471,8 +463,6 @@ jobs:
           MATRIX: ${{ toJSON(matrix) }}
         run: |
           set -ex
-          cat "${HOLOCHAIN_RELEASE_SH}"
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
           # TODO: handle this when we go back to parallel test runs
@@ -492,7 +482,6 @@ jobs:
           # CARGO_BUILD_JOBS: "2"
         run: |
           set -e
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
           nix-shell --pure --run "cargo fetch --locked"
@@ -511,7 +500,6 @@ jobs:
           max_attempts: ${{ matrix.testCommand.max_attempts }}
           command: |
             set -e
-            source "${HOLOCHAIN_RELEASE_SH}"
             cd "${HOLOCHAIN_REPO}"
 
             ${{ matrix.testCommand.run }}
@@ -522,7 +510,6 @@ jobs:
           MATRIX: ${{ toJSON(matrix) }}
         run: |
           set -e
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
           # TODO: handle this
@@ -560,8 +547,9 @@ jobs:
     needs: [vars, prepare, test]
     env:
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      TAG: ${{ needs.prepare.outputs.tag }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -584,7 +572,6 @@ jobs:
         uses: DavHau/actions-cache/restore@retry
         with:
           path: |
-            /var/tmp/holochain_release.sh
             # asterisk is a workaround for https://github.com/actions/cache/issues/494
             /var/tmp/holochain_repo/*
             !/var/tmp/holochain_repo/.cargo/
@@ -594,7 +581,6 @@ jobs:
 
       - name: Copy the git credentials
         run: |
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
           cp -v $HOME/work/holochain/holochain/.git/config .git/config
 
@@ -618,7 +604,6 @@ jobs:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
           set -xeu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           # regenerate the nix sources
@@ -634,7 +619,6 @@ jobs:
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
         run: |
           set -xeu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git status
@@ -644,7 +628,6 @@ jobs:
       - name: Push the release branch
         id: push-release-branch
         run: |
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
           git checkout ${RELEASE_BRANCH}
           git push origin ${RELEASE_BRANCH}
@@ -655,7 +638,6 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           nix-shell \
@@ -674,7 +656,6 @@ jobs:
         id: push-tags
         run: |
           set -eu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git status
@@ -686,7 +667,6 @@ jobs:
         id: merge-into-source
         run: |
           set -xeu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git fetch origin ${HOLOCHAIN_SOURCE_BRANCH}
@@ -698,7 +678,6 @@ jobs:
         continue-on-error: true
         run: |
           set -xeu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
           git push origin ${HOLOCHAIN_SOURCE_BRANCH}
 
@@ -710,7 +689,6 @@ jobs:
         run: |
           set -euE -o pipefail
 
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           gh pr create \
@@ -731,7 +709,6 @@ jobs:
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
         run: |
           set -eu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain

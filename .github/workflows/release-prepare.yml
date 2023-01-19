@@ -32,9 +32,6 @@ on:
       HOLOCHAIN_REPO:
         type: string
         required: true
-      HOLOCHAIN_RELEASE_SH:
-        type: string
-        required: true
       CACHIX_REV:
         type: string
         required: true
@@ -67,8 +64,12 @@ jobs:
   prepare:
     env:
       HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ inputs.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ inputs.CACHIX_REV }}
+      HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
+      HOLOCHAIN_TARGET_BRANCH: ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
+      HOLOCHAIN_URL: ${{ inputs.HOLOCHAIN_URL }}
+      HOLOCHAIN_NIXPKGS_URL: ${{ inputs.HOLOCHAIN_NIXPKGS_URL }}
+      HOLONIX_URL: "https://github.com/holochain/holonix.git"
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.write-env-and-tag.outputs.tag }}
@@ -105,7 +106,6 @@ jobs:
         uses: steveeJ-forks/actions-cache/restore@retry
         with:
           path: |
-            /var/tmp/holochain_release.sh
             # asterisk is a workaround for https://github.com/actions/cache/issues/494
             /var/tmp/holochain_repo/*
             !/var/tmp/holochain_repo/.cargo/
@@ -133,35 +133,11 @@ jobs:
             ${{ runner.os }}
           required: false
 
-      - name: Prepare the environment file
-        env:
-          HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
-          HOLOCHAIN_TARGET_BRANCH: ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
-          HOLOCHAIN_URL: ${{ inputs.HOLOCHAIN_URL }}
-          HOLOCHAIN_NIXPKGS_URL: ${{ inputs.HOLOCHAIN_NIXPKGS_URL }}
-          HOLONIX_URL: "https://github.com/holochain/holonix.git"
-        run: |
-          cat <<EOF > "${HOLOCHAIN_RELEASE_SH}"
-          export PATH="~/.cargo/bin:\$PATH"
-
-          export HOLOCHAIN_URL=${HOLOCHAIN_URL:?}
-          export HOLOCHAIN_NIXPKGS_URL=${HOLOCHAIN_NIXPKGS_URL:?}
-          export HOLONIX_URL=${HOLONIX_URL:?}
-
-          export HOLOCHAIN_SOURCE_BRANCH="${HOLOCHAIN_SOURCE_BRANCH:?}"
-          export HOLOCHAIN_TARGET_BRANCH="${HOLOCHAIN_TARGET_BRANCH:?}"
-
-          export HOLONIX_REPO=$(mktemp -d)
-          EOF
-
-          cat ${HOLOCHAIN_RELEASE_SH}
-
       - name: Prepare the holochain repository
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
           set -exE -o pipefail
-          source "${HOLOCHAIN_RELEASE_SH}"
 
           if [[ ! -d "${HOLOCHAIN_REPO}" ]]; then
             rm -rf "${HOLOCHAIN_REPO}"
@@ -197,7 +173,6 @@ jobs:
         if: ${{ inputs.skip_prepare_logic != 'true' }}
         run: |
           set -ex
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
           nix-shell --argstr flavor release --pure --run '
@@ -212,7 +187,6 @@ jobs:
       - name: Generate crate READMEs from doc comments
         if: ${{ inputs.skip_prepare_logic != 'true' }}
         run: |
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
           nix-shell --pure --argstr flavor release --run "./scripts/generate_readmes.sh"
 
@@ -221,7 +195,6 @@ jobs:
         if: ${{ inputs.skip_prepare_logic != 'true' }}
         run: |
           set -exu
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
           nix-shell --argstr flavor release --pure --run '
@@ -266,17 +239,7 @@ jobs:
       - name: Append to the environment file and set outputs
         id: write-env-and-tag
         run: |
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
-
-          cat <<EOF >> "${HOLOCHAIN_RELEASE_SH}"
-          export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
-          export VERSION=\${TAG/holochain-/}
-          export VERSION_COMPAT="v\${VERSION//./_}"
-          export RELEASE_BRANCH=$(git branch --show-current)
-          EOF
-
-          source "${HOLOCHAIN_RELEASE_SH}"
 
           echo "::set-output name=tag::${TAG}"
           echo "::set-output name=version::${VERSION}"
@@ -286,7 +249,6 @@ jobs:
       - name: Merge release branch to the target branch
         run: |
           set -exu
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
           if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
@@ -302,10 +264,6 @@ jobs:
           export nix_store_holochain_repo=$(nix store add-path "$HOLOCHAIN_REPO")
           echo "nix_store_holochain_repo: $nix_store_holochain_repo"
           echo "::set-output name=nix_store_holochain_repo::$nix_store_holochain_repo"
-
-          export nix_store_release_sh=$(nix store add-path /var/tmp/holochain_release.sh)
-          echo "nix_store_release_sh: $nix_store_release_sh"
-          echo "::set-output name=nix_store_release_sh::$nix_store_release_sh"
 
       # - name: Cache the holochain release repository
       #   uses: steveeJ-forks/actions-cache/save@main
