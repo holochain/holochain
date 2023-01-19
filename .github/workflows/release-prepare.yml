@@ -262,6 +262,8 @@ jobs:
       - name: Cache the holochain release repository (nix)
         id: cache
         run: |
+          realpath $HOLOCHAIN_REPO
+          ls -alh $HOLOCHAIN_REPO
           export nix_store_holochain_repo=$(nix store add-path "$HOLOCHAIN_REPO")
           echo "nix_store_holochain_repo: $nix_store_holochain_repo"
           echo "::set-output name=nix_store_holochain_repo::$nix_store_holochain_repo"

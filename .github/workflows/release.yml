@@ -180,7 +180,7 @@ jobs:
             echo "::set-output name=skip_prepare_logic::false"
           fi
 
-          echo "::set-output name=HOLOCHAIN_REPO::./holochain_repo"
+          echo "::set-output name=HOLOCHAIN_REPO::./holochain-repo/holochain"
           echo "::set-output name=CACHIX_REV::v1.0.1"
   prepare:
     needs: [vars]
@@ -464,6 +464,7 @@ jobs:
         run: |
           set -ex
           cd "${HOLOCHAIN_REPO}"
+          ls -lah
 
           # TODO: handle this when we go back to parallel test runs
           echo ${MATRIX}
