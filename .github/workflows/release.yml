@@ -425,7 +425,7 @@ jobs:
           echo "nix_store_holochain_repo: ${{ needs.prepare.outputs.nix_store_holochain_repo }}"
           nix copy --from "https://holochain-ci.cachix.org" ${{ needs.prepare.outputs.nix_store_holochain_repo }}
 
-          cp -r ${{ needs.prepare.outputs.nix_store_holochain_repo }}" $HOLOCHAIN_REPO
+          cp -r "${{ needs.prepare.outputs.nix_store_holochain_repo }}" $HOLOCHAIN_REPO
           chmod +w $HOLOCHAIN_REPO
 
       # - name: Restore the holochain release repository
