@@ -12,6 +12,7 @@ use crate::{
 };
 use ::fixt::prelude::*;
 use holochain_conductor_api::AppInfoStatus;
+use holochain_conductor_api::CellInfo;
 use holochain_keystore::crude_mock_keystore::*;
 use holochain_state::prelude::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
@@ -29,6 +30,8 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
+    let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(&ConductorConfig {
         environment_path: db_dir.path().to_path_buf().into(),
         ..Default::default()
@@ -41,6 +44,7 @@ async fn can_update_state() {
         holochain_p2p,
         spaces,
         post_commit_sender,
+        outcome_tx,
     );
     let state = conductor.get_state().await.unwrap();
     let mut expect_state = ConductorState::default();
@@ -77,6 +81,8 @@ async fn app_ids_are_unique() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
+
+    let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(&ConductorConfig {
         environment_path: db_dir.path().to_path_buf().into(),
         ..Default::default()
@@ -89,6 +95,7 @@ async fn app_ids_are_unique() {
         holochain_p2p,
         spaces,
         post_commit_sender,
+        outcome_tx,
     );
 
     let cell_id = fake_cell_id(1);
@@ -535,13 +542,10 @@ async fn test_enable_disable_enable_app() {
     conductor.enable_app("app".to_string()).await.unwrap();
 
     // - We can still make a zome call after reactivation
-assert!(conductor
+    assert!(conductor
         .call_fallible::<_, Option<Record>, _>(&cell.zome("zome"), "get", hash.clone())
         .await
         .is_ok());
-        .call_fallible(&cell.zome("zome"), "get", hash)
-        .await
-        .unwrap();
 
     // - Ensure that the app is active
 
@@ -588,7 +592,7 @@ async fn test_enable_disable_enable_clone_cell() {
     let zome = SweetZome::new(clone.cell_id.clone(), "zome".into());
     let hash: ActionHash = conductor.call(&zome, "create", ()).await;
 
-    let clone_cell_id = CloneCellId::CloneId(clone.clone_id.unwrap());
+    let clone_cell_id = CloneCellId::CloneId(clone.clone_id);
     conductor
         .disable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.clone(),
@@ -653,7 +657,7 @@ async fn test_enable_disable_enable_clone_cell() {
     }
 }
 
-fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_conductor_api::Cell {
+fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_conductor_api::ClonedCell {
     match cell_info {
         CellInfo::Cloned(cell) => cell,
         _ => panic!("wrong cell type: {:?}", cell_info),

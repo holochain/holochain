@@ -13,7 +13,6 @@ use crate::conductor::{
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_conductor_api::CellInfo;
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -374,12 +373,8 @@ impl SweetConductor {
     pub async fn create_clone_cell(
         &mut self,
         payload: CreateCloneCellPayload,
-    ) -> ConductorApiResult<holochain_conductor_api::Cell> {
-        let cell_info = self.raw_handle().create_clone_cell(payload).await?;
-        let clone = match cell_info {
-            CellInfo::Cloned(cell) => cell,
-            _ => panic!("wrong cell type"),
-        };
+    ) -> ConductorApiResult<holochain_conductor_api::ClonedCell> {
+        let clone = self.raw_handle().create_clone_cell(payload).await?;
         let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
         self.dnas.push(dna_file);
         Ok(clone)
@@ -413,7 +408,7 @@ impl SweetConductor {
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
         if let Some(handle) = self.handle.take() {
-            handle.shutdown_and_wait().await;
+            handle.shutdown().await.unwrap().unwrap();
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }
@@ -527,15 +522,7 @@ pub async fn websocket_client_by_port(
 impl Drop for SweetConductor {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            tokio::task::spawn(async move {
-                // Shutdown the conductor
-                if let Some(shutdown) = handle.take_shutdown_handle() {
-                    handle.shutdown();
-                    if let Err(e) = shutdown.await {
-                        tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
-                    }
-                }
-            });
+            tokio::task::spawn(handle.shutdown());
         }
     }
 }
