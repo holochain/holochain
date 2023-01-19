@@ -20,7 +20,7 @@ mod tests;
 #[instrument(skip(vault, trigger_receipt, network, dht_query_cache))]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
-    dht_query_cache: &DhtDbQueryCache,
+    dht_query_cache: DhtDbQueryCache,
     trigger_receipt: TriggerSender,
     network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {

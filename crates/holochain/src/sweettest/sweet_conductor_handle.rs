@@ -101,20 +101,6 @@ impl SweetConductorHandle {
         self.0.signal_broadcaster().subscribe_merged()
     }
 
-    /// Manually await shutting down the conductor.
-    /// Conductors are already cleaned up on drop but this
-    /// is useful if you need to know when it's finished cleaning up.
-    pub async fn shutdown_and_wait(&self) {
-        let c = &self.0;
-        if let Some(shutdown) = c.take_shutdown_handle() {
-            c.shutdown();
-            shutdown
-                .await
-                .expect("Failed to await shutdown handle")
-                .expect("Conductor shutdown error");
-        }
-    }
-
     /// Intentionally private clone function, only to be used internally
     pub(super) fn clone_privately(&self) -> Self {
         Self(self.0.clone())
