@@ -297,8 +297,11 @@ jobs:
       - name: Cache the holochain release repository (nix)
         run: |
           export nix_store_holochain_repo=$(nix store add-path "$HOLOCHAIN_REPO")
+          echo "nix_store_holochain_repo: $nix_store_holochain_repo"
           echo "::set-output name=nix_store_holochain_repo::$nix_store_holochain_repo"
+
           export nix_store_release_sh=$(nix store add-path /var/tmp/holochain_release.sh)
+          echo "nix_store_release_sh: $nix_store_release_sh"
           echo "::set-output name=nix_store_release_sh::$nix_store_release_sh"
 
       # - name: Cache the holochain release repository
