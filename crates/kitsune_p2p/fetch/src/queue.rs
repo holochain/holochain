@@ -107,7 +107,7 @@ pub struct StateIter<'a> {
 type SharedSource = ShareOpen<SourceRecord>;
 
 /// Fetch item within the fetch queue state.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default)]
 struct Sources(Vec<SharedSource>);
 
 impl Sources {
@@ -131,8 +131,27 @@ impl Sources {
     }
 }
 
+#[cfg(test)]
+impl PartialEq for Sources {
+    fn eq(&self, other: &Self) -> bool {
+        self.0
+            .iter()
+            .map(|s| s.share_ref(|s| s.clone()))
+            .collect::<Vec<SourceRecord>>()
+            == other
+                .0
+                .iter()
+                .map(|s| s.share_ref(|s| s.clone()))
+                .collect::<Vec<SourceRecord>>()
+    }
+}
+
+#[cfg(test)]
+impl Eq for Sources {}
+
 /// An item in the queue, corresponding to a single op or region to fetch
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct FetchQueueItem {
     /// Known sources from whom we can fetch this item.
     /// Sources will always be tried in order.
@@ -147,7 +166,7 @@ pub struct FetchQueueItem {
     last_fetch: Option<Instant>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct SourceRecord {
     source: FetchSource,
     last_request: Option<Instant>,
@@ -469,6 +488,10 @@ mod tests {
         FetchSource::Agent(Arc::new(KitsuneAgent::new(vec![i; 36])))
     }
 
+    pub(super) fn sources(ix: impl IntoIterator<Item = u8>) -> Vec<FetchSource> {
+        ix.into_iter().map(source).collect()
+    }
+
     pub(super) fn ctx(c: u32) -> Option<FetchContext> {
         Some(c.into())
     }
@@ -540,13 +563,13 @@ mod tests {
         let mut ss = TestSources::new(cfg.clone());
         let mut q = {
             let queue = [
-                (key_op(1), ss.item(0..=2, ctx(1))),
-                (key_op(2), ss.item(1..=3, ctx(1))),
-                (key_op(3), ss.item(2..=4, ctx(1))),
+                (key_op(1), ss.item([0, 1, 2], ctx(1))),
+                (key_op(2), ss.item([1, 2, 3], ctx(1))),
+                (key_op(3), ss.item([2, 3, 4], ctx(1))),
             ];
             // Set the last_fetch time of one of the sources to something a bit earlier,
             // so it won't show up in next() right away
-            queue[1].1.sources.0[1]
+            ss.sources.0[2]
                 .share_mut(|s| s.last_request = Some(Instant::now() - Duration::from_secs(3)));
 
             let queue = queue.into_iter().collect();
@@ -554,17 +577,20 @@ mod tests {
             State { queue, sources }
         };
 
+        let list = |q: &mut State| -> Vec<FetchSource> { q.iter_mut(&cfg).map(|i| i.2).collect() };
+
         // We can try fetching items one source at a time by waiting 1 sec in between
 
-        assert_eq!(q.iter_mut(&cfg).count(), 3);
+        // The first fetch will return 3 sources, skipping 2 because of its last_request time
+        assert_eq!(list(&mut q), sources([0, 1, 3]));
 
         tokio::time::advance(Duration::from_secs(1)).await;
 
-        assert_eq!(q.iter_mut(&cfg).count(), 3);
+        assert_eq!(list(&mut q), sources([4]));
 
         tokio::time::advance(Duration::from_secs(1)).await;
 
-        assert_eq!(q.iter_mut(&cfg).count(), 2);
+        assert_eq!(list(&mut q), sources([]));
 
         // Wait for manually modified source to be ready
         // (5 + 1 + 1 + 3 = 10)
@@ -573,7 +599,7 @@ mod tests {
         // The next (and only) item will be the one with the timestamp explicitly set
         assert_eq!(
             q.iter_mut(&cfg).collect::<Vec<_>>(),
-            vec![(key_op(2), space(0), source(2), ctx(1))]
+            vec![(key_op(1), space(0), source(2), ctx(1))]
         );
         assert_eq!(q.iter_mut(&cfg).count(), 0);
 
