@@ -10,7 +10,7 @@
 //! order of last_fetch time, but they are guaranteed to be at least as old as the specified
 //! interval.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::time::{Duration, Instant};
 
 use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace /*, Tx2Cert*/};
@@ -84,6 +84,8 @@ pub trait FetchQueueConfig: 'static + Send + Sync {
 pub struct State {
     /// Items ready to be fetched
     queue: LinkedHashMap<FetchKey, FetchQueueItem>,
+    /// The list of sources used throughout the lifetime of the FetchQueue
+    sources: HashMap<FetchSource, SharedSource>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -91,6 +93,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             queue: Default::default(),
+            sources: Default::default(),
         }
     }
 }
@@ -101,9 +104,32 @@ pub struct StateIter<'a> {
     config: &'a dyn FetchQueueConfig,
 }
 
+type SharedSource = ShareOpen<SourceRecord>;
+
 /// Fetch item within the fetch queue state.
-#[derive(Debug, PartialEq, Eq)]
-struct Sources(Vec<SourceRecord>);
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Sources(Vec<SharedSource>);
+
+impl Sources {
+    // /// Create new shareable list from sources. These sources have not been shared
+    // /// anywhere else.
+    // #[cfg(test)]
+    // fn from_new(sources: impl IntoIterator<Item = FetchSource>) -> Self {
+    //     Self(
+    //         sources
+    //             .into_iter()
+    //             .map(|s| ShareOpen::new(SourceRecord::new(s)))
+    //             .collect(),
+    //     )
+    // }
+
+    /// Create new shareable list from records. These sources have not been shared
+    /// anywhere else.
+    #[cfg(test)]
+    fn from_records(sources: impl IntoIterator<Item = SourceRecord>) -> Self {
+        Self(sources.into_iter().map(|s| ShareOpen::new(s)).collect())
+    }
+}
 
 /// An item in the queue, corresponding to a single op or region to fetch
 #[derive(Debug, PartialEq, Eq)]
@@ -219,13 +245,14 @@ impl State {
             size,
         } = args;
 
+        let sources = if let Some(author) = author {
+            Sources(self.shared_sources([source, FetchSource::Agent(author)]))
+        } else {
+            Sources(self.shared_sources([source]))
+        };
+
         match self.queue.entry(key) {
             Entry::Vacant(e) => {
-                let sources = if let Some(author) = author {
-                    Sources(vec![SourceRecord::new(source), SourceRecord::agent(author)])
-                } else {
-                    Sources(vec![SourceRecord::new(source)])
-                };
                 let item = FetchQueueItem {
                     sources,
                     space,
@@ -237,7 +264,9 @@ impl State {
             }
             Entry::Occupied(mut e) => {
                 let v = e.get_mut();
-                v.sources.0.insert(0, SourceRecord::new(source));
+                for source in sources.0.into_iter().rev() {
+                    v.sources.0.insert(0, source);
+                }
                 v.context = match (v.context.take(), context) {
                     (Some(a), Some(b)) => Some(config.merge_fetch_contexts(*a, *b).into()),
                     (a, b) => a.and(b),
@@ -260,6 +289,18 @@ impl State {
     /// When an item has been successfully fetched, we can remove it from the queue.
     pub fn remove(&mut self, key: &FetchKey) -> Option<FetchQueueItem> {
         self.queue.remove(key)
+    }
+
+    fn shared_sources(&self, sources: impl IntoIterator<Item = FetchSource>) -> Vec<SharedSource> {
+        sources
+            .into_iter()
+            .map(|s| {
+                self.sources
+                    .get(&s)
+                    .cloned()
+                    .unwrap_or_else(|| ShareOpen::new(SourceRecord::new(s)))
+            })
+            .collect()
     }
 }
 
@@ -300,28 +341,25 @@ impl SourceRecord {
         }
     }
 
-    fn agent(agent: KAgent) -> Self {
-        Self {
-            source: FetchSource::Agent(agent),
-            last_request: None,
-        }
+    /// True if this source requested more than `interval` ago
+    /// or it was never requested.
+    fn is_ready(&self, interval: Duration) -> bool {
+        self.last_request
+            .map(|t| t.elapsed() >= interval)
+            .unwrap_or(true)
     }
 }
 
 impl Sources {
     fn next(&mut self, interval: Duration) -> Option<FetchSource> {
-        if let Some((i, agent)) = self
-            .0
-            .iter()
-            .enumerate()
-            .find(|(_, s)| {
-                s.last_request
-                    .map(|t| t.elapsed() >= interval)
-                    .unwrap_or(true)
+        if let Some((i, agent)) =
+            self.0.iter_mut().enumerate().find_map(|(i, s)| {
+                s.share_ref(|s| s.is_ready(interval).then(|| (i, s.source.clone())))
             })
-            .map(|(i, s)| (i, s.source.clone()))
         {
-            self.0[i].last_request = Some(Instant::now());
+            self.0[i].share_mut(|s| {
+                s.last_request = Some(Instant::now());
+            });
             self.0.rotate_left(i + 1);
             Some(agent)
         } else {
@@ -340,7 +378,59 @@ mod tests {
 
     use super::*;
 
-    pub(super) struct Config(pub u32, pub u32);
+    #[derive(Clone, Debug)]
+    pub struct Config(pub u32, pub u32);
+
+    pub struct TestSources {
+        _config: Config,
+        sources: Sources,
+    }
+
+    impl TestSources {
+        pub fn new(_config: Config) -> Self {
+            Self {
+                _config,
+                sources: Sources(vec![]),
+            }
+        }
+
+        pub fn item(
+            &mut self,
+            indices: impl IntoIterator<Item = u8>,
+            context: Option<FetchContext>,
+        ) -> FetchQueueItem {
+            let sources = Sources(
+                indices
+                    .into_iter()
+                    .map(|i| {
+                        if let Some(s) = self.sources.0.get(i as usize).cloned() {
+                            s
+                        } else {
+                            let s = ShareOpen::new(SourceRecord::new(source(i)));
+                            self.sources.0.insert(i.into(), s.clone());
+                            s
+                        }
+                    })
+                    .collect(),
+            );
+            FetchQueueItem {
+                sources,
+                space: Arc::new(KitsuneSpace::new(vec![0; 36])),
+                context,
+                size: None,
+                last_fetch: None,
+            }
+        }
+
+        pub(super) fn into_hashmap(self) -> HashMap<FetchSource, SharedSource> {
+            self.sources
+                .0
+                .into_iter()
+                .enumerate()
+                .map(|(i, s)| (source(i as u8), s))
+                .collect()
+        }
+    }
 
     impl FetchQueueConfig for Config {
         fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
@@ -371,30 +461,12 @@ mod tests {
         }
     }
 
-    pub(super) fn item(
-        _cfg: &dyn FetchQueueConfig,
-        sources: Vec<FetchSource>,
-        context: Option<FetchContext>,
-    ) -> FetchQueueItem {
-        FetchQueueItem {
-            sources: Sources(sources.into_iter().map(|s| SourceRecord::new(s)).collect()),
-            space: Arc::new(KitsuneSpace::new(vec![0; 36])),
-            context,
-            size: None,
-            last_fetch: None,
-        }
-    }
-
     pub(super) fn space(i: u8) -> KSpace {
         Arc::new(KitsuneSpace::new(vec![i; 36]))
     }
 
     pub(super) fn source(i: u8) -> FetchSource {
         FetchSource::Agent(Arc::new(KitsuneAgent::new(vec![i; 36])))
-    }
-
-    pub(super) fn sources(ix: impl IntoIterator<Item = u8>) -> Vec<FetchSource> {
-        ix.into_iter().map(source).collect()
     }
 
     pub(super) fn ctx(c: u32) -> Option<FetchContext> {
@@ -404,7 +476,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn source_rotation() {
         let sec1 = Duration::from_secs(10);
-        let mut ss = Sources(vec![
+        let mut ss = Sources::from_records(vec![
             SourceRecord {
                 source: source(1),
                 last_request: Some(Instant::now()),
@@ -443,17 +515,18 @@ mod tests {
     #[test]
     fn queue_push() {
         let mut q = State::default();
-        let c = Config(1, 1);
+        let cfg = Config(1, 1);
+        let mut ss = TestSources::new(cfg.clone());
 
         // note: new sources get added to the front of the list
-        q.push(&c, req(1, ctx(1), source(1)));
-        q.push(&c, req(1, ctx(0), source(0)));
+        q.push(&cfg, req(1, ctx(1), source(1)));
+        q.push(&cfg, req(1, ctx(0), source(0)));
 
-        q.push(&c, req(2, ctx(0), source(0)));
+        q.push(&cfg, req(2, ctx(0), source(0)));
 
         let expected_ready = [
-            (key_op(1), item(&c, sources(0..=1), ctx(1))),
-            (key_op(2), item(&c, sources([0]), ctx(0))),
+            (key_op(1), ss.item(0..=1, ctx(1))),
+            (key_op(2), ss.item([0], ctx(0))),
         ]
         .into_iter()
         .collect();
@@ -464,18 +537,21 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn queue_next() {
         let cfg = Config(1, 10);
+        let mut ss = TestSources::new(cfg.clone());
         let mut q = {
-            let mut queue = [
-                (key_op(1), item(&cfg, sources(0..=2), ctx(1))),
-                (key_op(2), item(&cfg, sources(1..=3), ctx(1))),
-                (key_op(3), item(&cfg, sources(2..=4), ctx(1))),
+            let queue = [
+                (key_op(1), ss.item(0..=2, ctx(1))),
+                (key_op(2), ss.item(1..=3, ctx(1))),
+                (key_op(3), ss.item(2..=4, ctx(1))),
             ];
             // Set the last_fetch time of one of the sources to something a bit earlier,
             // so it won't show up in next() right away
-            queue[1].1.sources.0[1].last_request = Some(Instant::now() - Duration::from_secs(3));
+            queue[1].1.sources.0[1]
+                .share_mut(|s| s.last_request = Some(Instant::now() - Duration::from_secs(3)));
 
             let queue = queue.into_iter().collect();
-            State { queue }
+            let sources = ss.into_hashmap();
+            State { queue, sources }
         };
 
         // We can try fetching items one source at a time by waiting 1 sec in between
@@ -507,4 +583,7 @@ mod tests {
 
         assert_eq!(q.iter_mut(&cfg).count(), 3);
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn queue_expiry() {}
 }

@@ -48,11 +48,12 @@ mod tests {
     #[test]
     fn queue_info() {
         let cfg = Config(1, 1);
+        let mut ss = TestSources::new(cfg.clone());
         let q = {
             let mut queue = [
-                (key_op(1), item(&cfg, sources(0..=2), ctx(1))),
-                (key_op(2), item(&cfg, sources(1..=3), ctx(1))),
-                (key_op(3), item(&cfg, sources(2..=4), ctx(1))),
+                (key_op(1), ss.item(0..=2, ctx(1))),
+                (key_op(2), ss.item(1..=3, ctx(1))),
+                (key_op(3), ss.item(2..=4, ctx(1))),
             ];
 
             queue[0].1.size = Some(100.into());
@@ -61,7 +62,10 @@ mod tests {
             let queue = queue.into_iter().collect();
             FetchQueueReader(FetchQueue {
                 config: Arc::new(cfg),
-                state: ShareOpen::new(State { queue }),
+                state: ShareOpen::new(State {
+                    queue,
+                    sources: ss.into_hashmap(),
+                }),
             })
         };
         let info = q.info([space(0)].into_iter().collect());
