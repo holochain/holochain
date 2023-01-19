@@ -76,8 +76,8 @@ jobs:
       version_compat: ${{ steps.write-env-and-tag.outputs.version_compat }}
       release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
       releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
-      nix_store_holochain_repo: ${{ steps.bump-versions.outputs.nix_store_holochain_repo }}
-      nix_store_release_sh: ${{ steps.bump-versions.outputs.nix_store_release_sh }}
+      nix_store_holochain_repo: ${{ steps.cache.outputs.nix_store_holochain_repo }}
+      nix_store_release_sh: ${{ steps.cache.outputs.nix_store_release_sh }}
 
     steps:
       - name: Checkout repository
@@ -297,6 +297,7 @@ jobs:
           fi
 
       - name: Cache the holochain release repository (nix)
+        id: cache
         run: |
           export nix_store_holochain_repo=$(nix store add-path "$HOLOCHAIN_REPO")
           echo "nix_store_holochain_repo: $nix_store_holochain_repo"
