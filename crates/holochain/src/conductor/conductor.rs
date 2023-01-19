@@ -81,6 +81,7 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::ClonedCell;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
@@ -643,6 +644,8 @@ mod dna_impls {
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
                     .collect()
             });
+            self.running_cells.share_ref(|cells| dbg!(cells.len()));
+
             for (cell_id, item) in to_cleanup {
                 if let Err(err) = item.cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
@@ -1060,7 +1063,7 @@ mod app_impls {
                 network_seed,
             } = payload;
 
-            let bundle: AppBundle = {
+            let bundle = {
                 let original_bundle = source.resolve().await?;
                 if let Some(network_seed) = network_seed {
                     let mut manifest = original_bundle.manifest().to_owned();
@@ -1078,6 +1081,22 @@ mod app_impls {
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
+
+            // check if cells_to_create contains a cell identical to an existing one
+            let state = self.get_state().await?;
+            let all_cells: HashSet<_> = state
+                .installed_apps()
+                .values()
+                .flat_map(|app| app.all_cells())
+                .collect();
+            let maybe_duplicate_cell_id = cells_to_create
+                .iter()
+                .find(|(cell_id, _)| all_cells.contains(cell_id));
+            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
+                return Err(ConductorError::CellAlreadyExists(
+                    duplicate_cell_id.to_owned(),
+                ));
+            };
 
             for (dna, _) in ops.dnas_to_register {
                 self.clone().register_dna(dna).await?;
@@ -1275,6 +1294,9 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
+    use holochain_conductor_api::ClonedCell;
+    use itertools::Itertools;
+
     use super::*;
 
     impl Conductor {
@@ -1286,7 +1308,7 @@ mod clone_cell_impls {
         pub async fn create_clone_cell(
             self: Arc<Self>,
             payload: CreateCloneCellPayload,
-        ) -> ConductorResult<InstalledCell> {
+        ) -> ConductorResult<ClonedCell> {
             let CreateCloneCellPayload {
                 app_id,
                 role_name,
@@ -1302,16 +1324,23 @@ mod clone_cell_impls {
             }
             let state = self.get_state().await?;
             let app = state.get_app(&app_id)?;
+
             app.provisioned_cells()
                 .find(|(app_role_name, _)| **app_role_name == role_name)
                 .ok_or_else(|| {
-                    ConductorError::CloneCellError(
-                        "no base cell found for provided role id".to_string(),
-                    )
+                    let role_names = app
+                        .provisioned_cells()
+                        .map(|(role_name, _)| format!("'{}'", role_name))
+                        .join(", ");
+
+                    ConductorError::CloneCellError(format!(
+                        "no base cell found for provided role id. Available role names are: ({})",
+                        role_names
+                    ))
                 })?;
 
             // add cell to app
-            let installed_clone_cell = self
+            let clone_cell = self
                 .add_clone_cell_to_app(
                     app_id.clone(),
                     role_name.clone(),
@@ -1321,11 +1350,11 @@ mod clone_cell_impls {
                 .await?;
 
             // run genesis on cloned cell
-            let cells = vec![(installed_clone_cell.as_id().clone(), membrane_proof)];
+            let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
             self.create_and_add_initialized_cells_for_running_apps(Some(&app_id))
                 .await?;
-            Ok(installed_clone_cell)
+            Ok(clone_cell)
         }
 
         /// Disable a clone cell.
@@ -1357,7 +1386,8 @@ mod clone_cell_impls {
         pub async fn enable_clone_cell(
             self: Arc<Self>,
             payload: &EnableCloneCellPayload,
-        ) -> ConductorResult<InstalledCell> {
+        ) -> ConductorResult<ClonedCell> {
+            let conductor = self.clone();
             let (_, enabled_cell) = self
                 .update_state_prime({
                     let app_id = payload.app_id.to_owned();
@@ -1365,7 +1395,21 @@ mod clone_cell_impls {
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
                         let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
-                        let enabled_cell = app.enable_clone_cell(&clone_id)?;
+                        let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
+                        let app_role = app.role(&clone_id.as_base_role_name())?;
+                        let original_dna_hash = app_role.dna_hash().clone();
+                        let ribosome = conductor.get_ribosome(cell_id.dna_hash())?;
+                        let dna = ribosome.dna_file.dna();
+                        let dna_modifiers = dna.modifiers.clone();
+                        let name = dna.name.clone();
+                        let enabled_cell = ClonedCell {
+                            cell_id,
+                            clone_id,
+                            original_dna_hash,
+                            dna_modifiers,
+                            name,
+                            enabled: true,
+                        };
                         Ok((state, enabled_cell))
                     }
                 })
@@ -2157,7 +2201,7 @@ impl Conductor {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
                 if app.status().is_running() {
-                    app.all_cells().into_iter().cloned().collect()
+                    app.all_enabled_cells().into_iter().cloned().collect()
                 } else {
                     HashSet::new()
                 }
@@ -2169,7 +2213,7 @@ impl Conductor {
                     .installed_apps()
                     .iter()
                     .filter(|(_, app)| app.status().is_running())
-                    .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
+                    .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
                     .cloned()
                     .collect()
             }
@@ -2272,7 +2316,7 @@ impl Conductor {
         role_name: RoleName,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
-    ) -> ConductorResult<InstalledCell> {
+    ) -> ConductorResult<ClonedCell> {
         let ribosome_store = &self.ribosome_store;
         // retrieve base cell DNA hash from conductor
         let (_, base_cell_dna_hash) = self
@@ -2281,24 +2325,23 @@ impl Conductor {
                 let role_name = role_name.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    let app_role_assignment = app
-                        .roles()
-                        .get(&role_name)
-                        .ok_or_else(|| AppError::RoleNameMissing(role_name.to_owned()))?;
-                    if app_role_assignment.is_clone_limit_reached() {
+                    let app_role = app.role(&role_name)?;
+                    if app_role.is_clone_limit_reached() {
                         return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
-                            app_role_assignment.clone_limit(),
-                            app_role_assignment.clone(),
+                            app_role.clone_limit(),
+                            app_role.clone(),
                         )));
                     }
-                    let parent_dna_hash = app_role_assignment.dna_hash().clone();
-                    Ok((state, parent_dna_hash))
+                    let original_dna_hash = app_role.dna_hash().clone();
+                    Ok((state, original_dna_hash))
                 }
             })
             .await?;
+        let original_dna_hash = base_cell_dna_hash.clone();
+
         // clone cell from base cell DNA
-        let clone_dna = ribosome_store.share_ref(|ds| {
-            let mut dna_file = ds
+        let clone_dna = ribosome_store.share_ref(|rs| {
+            let mut dna_file = rs
                 .get_dna_file(&base_cell_dna_hash)
                 .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
                 .update_modifiers(dna_modifiers);
@@ -2307,7 +2350,10 @@ impl Conductor {
             }
             Ok::<_, DnaError>(dna_file)
         })?;
+        let name = clone_dna.dna().name.clone();
+        let dna_modifiers = clone_dna.dna().modifiers.clone();
         let clone_dna_hash = clone_dna.dna_hash().to_owned();
+
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
@@ -2315,8 +2361,14 @@ impl Conductor {
                 let agent_key = app.role(&role_name)?.agent_key().to_owned();
                 let cell_id = CellId::new(clone_dna_hash, agent_key);
                 let clone_id = app.add_clone(&role_name, &cell_id)?;
-                let installed_clone_cell =
-                    InstalledCell::new(cell_id, clone_id.as_app_role_name().clone());
+                let installed_clone_cell = ClonedCell {
+                    cell_id,
+                    clone_id,
+                    original_dna_hash,
+                    dna_modifiers,
+                    name,
+                    enabled: true,
+                };
                 Ok((state, installed_clone_cell))
             })
             .await?;
@@ -2472,7 +2524,6 @@ pub(crate) async fn genesis_cells(
 
         Err(ConductorError::GenesisFailed { errors })
     } else {
-        // No errors so return the cells
         Ok(())
     }
 }

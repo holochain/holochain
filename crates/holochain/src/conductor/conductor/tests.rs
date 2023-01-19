@@ -12,6 +12,7 @@ use crate::{
 };
 use ::fixt::prelude::*;
 use holochain_conductor_api::AppInfoStatus;
+use holochain_conductor_api::CellInfo;
 use holochain_keystore::crude_mock_keystore::*;
 use holochain_state::prelude::test_keystore;
 use holochain_types::inline_zome::InlineZomeSet;
@@ -456,9 +457,8 @@ async fn test_signing_error_during_genesis() {
 
 pub(crate) fn simple_create_entry_zome() -> InlineIntegrityZome {
     let unit_entry_def = EntryDef::from_id("unit");
-    InlineIntegrityZome::new_unique(vec![unit_entry_def.clone()], 0).function(
-        "create",
-        move |api, ()| {
+    InlineIntegrityZome::new_unique(vec![unit_entry_def.clone()], 0)
+        .function("create", move |api, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
@@ -467,12 +467,19 @@ pub(crate) fn simple_create_entry_zome() -> InlineIntegrityZome {
                 ChainTopOrdering::default(),
             ))?;
             Ok(hash)
-        },
-    )
+        })
+        .function("get", move |api, hash: ActionHash| {
+            let record = api
+                .get(vec![GetInput::new(hash.into(), Default::default())])?
+                .pop()
+                .unwrap();
+
+            Ok(record)
+        })
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_reenable_app() {
+async fn test_enable_disable_enable_app() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -495,6 +502,13 @@ async fn test_reenable_app() {
     assert_eq!(active_apps.len(), 1);
     assert_eq!(active_apps[0].cell_info.len(), 2);
     assert_matches!(active_apps[0].status, AppInfoStatus::Running);
+
+    let (_, cell) = app.into_tuple();
+
+    let hash: ActionHash = conductor
+        .call_fallible(&cell.zome("zome"), "create", ())
+        .await
+        .unwrap();
 
     conductor
         .disable_app("app".to_string(), DisabledAppReason::User)
@@ -519,20 +533,19 @@ async fn test_reenable_app() {
         }
     );
 
-    conductor.enable_app("app".to_string()).await.unwrap();
-    conductor
-        .raw_handle()
-        .reconcile_cell_status_with_app_status()
+    // - We can't make a zome call while disabled
+    assert!(conductor
+        .call_fallible::<_, Option<Record>, _>(&cell.zome("zome"), "get", hash.clone())
         .await
-        .unwrap();
+        .is_err());
 
-    let (_, cell) = app.into_tuple();
+    conductor.enable_app("app".to_string()).await.unwrap();
 
     // - We can still make a zome call after reactivation
-    let _: ActionHash = conductor
-        .call_fallible(&cell.zome("zome"), "create", ())
+    assert!(conductor
+        .call_fallible::<_, Option<Record>, _>(&cell.zome("zome"), "get", hash.clone())
         .await
-        .unwrap();
+        .is_ok());
 
     // - Ensure that the app is active
 
@@ -547,6 +560,108 @@ async fn test_reenable_app() {
         .unwrap();
     assert_eq!(active_apps.len(), 1);
     assert_eq!(inactive_apps.len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_enable_disable_enable_clone_cell() {
+    observability::test_run().ok();
+    let zome = simple_create_entry_zome();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = common_genesis_test_app(&mut conductor, ("zome", zome))
+        .await
+        .unwrap();
+    let app_id = app.installed_app_id().clone();
+
+    let (clone, role_name) = {
+        let (_, cell) = app.into_tuple();
+        let role_name = cell.cell_id().dna_hash().to_string();
+
+        let clone = conductor
+            .create_clone_cell(CreateCloneCellPayload {
+                app_id: app_id.clone(),
+                role_name: role_name.clone(),
+                modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
+                membrane_proof: None,
+                name: None,
+            })
+            .await
+            .unwrap();
+
+        (clone, role_name)
+    };
+    let zome = SweetZome::new(clone.cell_id.clone(), "zome".into());
+    let hash: ActionHash = conductor.call(&zome, "create", ()).await;
+
+    let clone_cell_id = CloneCellId::CloneId(clone.clone_id);
+    conductor
+        .disable_clone_cell(&DisableCloneCellPayload {
+            app_id: app_id.clone(),
+            clone_cell_id: clone_cell_id.clone(),
+        })
+        .await
+        .unwrap();
+
+    // - should not be able to call a zome fn on a disabled clone cell
+    let result: Result<Option<Record>, _> =
+        conductor.call_fallible(&zome, "get", hash.clone()).await;
+
+    assert!(matches!(
+        result,
+        Err(ConductorApiError::ConductorError(
+            ConductorError::CellMissing(_)
+        ))
+    ));
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    {
+        // - cell should still be disabled after restart
+        let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+        let cell = unwrap_cell_info_clone(app_info.cell_info.get(&role_name).unwrap()[1].clone());
+        assert!(!cell.enabled);
+    }
+    {
+        // - should *still* not be able to call a zome fn on a disabled clone cell after restart
+        let result: Result<Option<Record>, _> =
+            conductor.call_fallible(&zome, "get", hash.clone()).await;
+        assert!(matches!(
+            result,
+            Err(ConductorApiError::ConductorError(
+                ConductorError::CellMissing(_)
+            ))
+        ));
+    }
+
+    conductor
+        .raw_handle()
+        .enable_clone_cell(&EnableCloneCellPayload {
+            app_id: app_id.clone(),
+            clone_cell_id,
+        })
+        .await
+        .unwrap();
+
+    {
+        // - cell should still be enabled now
+        let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+        let cell = unwrap_cell_info_clone(app_info.cell_info.get(&role_name).unwrap()[1].clone());
+        assert!(cell.enabled);
+    }
+    {
+        // - can call clone again
+        let _: Option<Record> = conductor
+            .call_fallible(&zome, "get", hash)
+            .await
+            .expect("can call zome fn now");
+    }
+}
+
+fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_conductor_api::ClonedCell {
+    match cell_info {
+        CellInfo::Cloned(cell) => cell,
+        _ => panic!("wrong cell type: {:?}", cell_info),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
