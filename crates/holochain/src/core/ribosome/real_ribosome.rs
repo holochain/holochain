@@ -546,7 +546,11 @@ impl RealRibosome {
                 "__hc__x_salsa20_poly1305_decrypt_1",
                 x_salsa20_poly1305_decrypt,
             )
-            .with_host_function(&mut ns, "__hc__create_x25519_keypair_1", create_x25519_keypair)
+            .with_host_function(
+                &mut ns,
+                "__hc__create_x25519_keypair_1",
+                create_x25519_keypair,
+            )
             .with_host_function(
                 &mut ns,
                 "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
@@ -574,7 +578,11 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__get_agent_activity_1", get_agent_activity)
             .with_host_function(&mut ns, "__hc__must_get_entry_1", must_get_entry)
             .with_host_function(&mut ns, "__hc__must_get_action_1", must_get_action)
-            .with_host_function(&mut ns, "__hc__must_get_valid_record_1", must_get_valid_record)
+            .with_host_function(
+                &mut ns,
+                "__hc__must_get_valid_record_1",
+                must_get_valid_record,
+            )
             .with_host_function(
                 &mut ns,
                 "__hc__must_get_agent_activity_1",
@@ -1029,7 +1037,65 @@ pub mod wasm_test {
         }
     }
 
-    #[ignore = "turn this back on when we set the cost_function to return non-0"]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn wasm_tooling_test() {
+        observability::test_run().ok();
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crud]).await;
+        let ribosome = super::RealRibosome::new(dna_file).unwrap();
+        let module = ribosome
+            .module(&TestWasm::Crud.coordinator_zome_name())
+            .unwrap();
+        assert_eq!(
+            vec![
+                "__hc__get_agent_activity_1",
+                "__hc__query_1",
+                "__hc__sign_1",
+                "__hc__sign_ephemeral_1",
+                "__hc__create_1",
+                "__hc__update_1",
+                "__hc__delete_1",
+                "__hc__get_1",
+                "__hc__get_details_1",
+                "__hc__accept_countersigning_preflight_request_1",
+                "__hc__agent_info_1",
+                "__hc__call_info_1",
+                "__hc__create_link_1",
+                "__hc__delete_link_1",
+                "__hc__get_links_1",
+                "__hc__get_link_details_1",
+                "__hc__call_1",
+                "__hc__emit_signal_1",
+                "__hc__remote_signal_1",
+                "__hc__random_bytes_1",
+                "__hc__sys_time_1",
+                "__hc__schedule_1",
+                "__hc__sleep_1",
+                "__hc__x_salsa20_poly1305_shared_secret_create_random_1",
+                "__hc__x_salsa20_poly1305_shared_secret_export_1",
+                "__hc__x_salsa20_poly1305_shared_secret_ingest_1",
+                "__hc__x_salsa20_poly1305_encrypt_1",
+                "__hc__create_x25519_keypair_1",
+                "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
+                "__hc__verify_signature_1",
+                "__hc__hash_1",
+                "__hc__must_get_entry_1",
+                "__hc__must_get_action_1",
+                "__hc__must_get_valid_record_1",
+                "__hc__must_get_agent_activity_1",
+                "__hc__dna_info_1",
+                "__hc__zome_info_1",
+                "__hc__trace_1",
+                "__hc__x_salsa20_poly1305_decrypt_1",
+                "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
+            ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>(),
+            module
+                .imports()
+                .map(|import| import.name().to_string())
+                .collect::<Vec<String>>()
+        );
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn the_incredible_halt_test() {
         observability::test_run().ok();
