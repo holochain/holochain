@@ -24,10 +24,7 @@ use kitsune_p2p::{
     event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
 use kitsune_p2p_types::{
-    dependencies::lair_keystore_api,
-    config::KitsuneP2pTuningParams,
-    KOpData,
-    KOpHash,
+    config::KitsuneP2pTuningParams, dependencies::lair_keystore_api, KOpData, KOpHash,
 };
 
 /// Implementation of the Kitsune Host API.

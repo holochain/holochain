@@ -503,11 +503,22 @@ impl InstalledAppCommon {
             .chain(self.disabled_clone_cell_ids())
     }
 
+    /// Iterator of all running cells, both provisioned and cloned.
+    /// Provisioned cells will always be running if the app is running,
+    /// but some cloned cells may be disabled and will not be returned.
+    pub fn all_enabled_cells(&self) -> impl Iterator<Item = &CellId> {
+        self.provisioned_cells()
+            .map(|(_, c)| c)
+            .chain(self.clone_cell_ids())
+    }
+
     /// Iterator of all "required" cells, meaning Cells which must be running
-    /// for this App to be able to run. The notion of "required cells" is not
-    /// yet solidified, so for now this placeholder equates to "all cells".
+    /// for this App to be able to run.
+    ///
+    /// Currently this is simply all provisioned cells, but this concept may
+    /// become more nuanced in the future.
     pub fn required_cells(&self) -> impl Iterator<Item = &CellId> {
-        self.all_cells()
+        self.provisioned_cells().map(|(_, c)| c)
     }
 
     /// Accessor for particular role

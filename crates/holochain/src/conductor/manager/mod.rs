@@ -8,30 +8,17 @@
 mod error;
 pub use error::*;
 
-use futures::stream::FuturesUnordered;
+use futures::Future;
+use futures::FutureExt;
 use holochain_types::prelude::*;
-use std::future::Future;
-use std::pin::Pin;
+use parking_lot::Mutex;
 use std::sync::Arc;
-use std::task::Context;
-use std::task::Poll;
-use tokio::sync::broadcast;
-use tokio::sync::mpsc;
+use task_motel::StopListener;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::*;
 
-use super::{conductor::StopBroadcaster, ConductorHandle};
-
-const CHANNEL_SIZE: usize = 1000;
-
-/// For a task to be "managed" simply means that it will shut itself down
-/// when it receives a message on the the "stop" channel passed in
-pub(crate) type ManagedTaskHandle = JoinHandle<ManagedTaskResult>;
-pub(crate) type TaskManagerRunHandle = JoinHandle<TaskManagerResult>;
-
-/// A generic function to run when a task completes
-pub type OnDeath = Box<dyn Fn(ManagedTaskResult) -> TaskOutcome + Send + Sync + 'static>;
+use super::ConductorHandle;
 
 /// The "kind" of a managed task determines how the Result from the task's
 /// completion will be handled.
@@ -46,80 +33,10 @@ pub enum TaskKind {
     /// If the task returns an error, "freeze" all cells with this dna hash,
     /// but continue running the rest of the conductor and other managed tasks.
     DnaCritical(Arc<DnaHash>),
-    /// A generic callback for handling the result
-    // MAYBE: B-01455: reevaluate whether this should be a callback
-    Generic(OnDeath),
-}
-
-/// A message sent to the TaskManager, registering an ManagedTask of a given kind.
-pub struct ManagedTaskAdd {
-    handle: ManagedTaskHandle,
-    kind: TaskKind,
-    name: String,
-}
-
-impl ManagedTaskAdd {
-    fn new(handle: ManagedTaskHandle, kind: TaskKind, name: &str) -> Self {
-        ManagedTaskAdd {
-            handle,
-            kind,
-            name: name.to_string(),
-        }
-    }
-
-    /// You just want the task in the task manager but don't want
-    /// to react to an error
-    pub fn ignore(handle: ManagedTaskHandle, name: &str) -> Self {
-        Self::new(handle, TaskKind::Ignore, name)
-    }
-
-    /// If this task fails, the entire conductor must be shut down
-    pub fn unrecoverable(handle: ManagedTaskHandle, name: &str) -> Self {
-        Self::new(handle, TaskKind::Unrecoverable, name)
-    }
-
-    /// If this task fails, only the Cell which it runs under must be stopped
-    pub fn cell_critical(handle: ManagedTaskHandle, cell_id: CellId, name: &str) -> Self {
-        Self::new(handle, TaskKind::CellCritical(cell_id), name)
-    }
-
-    /// If this task fails, only the Cells with this DnaHash must be stopped
-    pub fn dna_critical(handle: ManagedTaskHandle, dna_hash: Arc<DnaHash>, name: &str) -> Self {
-        Self::new(handle, TaskKind::DnaCritical(dna_hash), name)
-    }
-
-    /// Handle a task's completion with a generic callback
-    pub fn generic(handle: ManagedTaskHandle, f: OnDeath) -> Self {
-        Self::new(handle, TaskKind::Generic(f), "unnamed")
-    }
-}
-
-impl Future for ManagedTaskAdd {
-    type Output = TaskOutcome;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let p = std::pin::Pin::new(&mut self.handle);
-        match JoinHandle::poll(p, cx) {
-            Poll::Ready(r) => Poll::Ready(handle_completed_task(
-                &self.kind,
-                r.unwrap_or_else(|e| Err(e.into())),
-                self.name.clone(),
-            )),
-            Poll::Pending => Poll::Pending,
-        }
-    }
-}
-
-impl std::fmt::Debug for ManagedTaskAdd {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ManagedTaskAdd").finish()
-    }
 }
 
 /// The outcome of a task that has finished.
 pub enum TaskOutcome {
-    /// Spawn a new managed task.
-    NewTask(ManagedTaskAdd),
     /// Log an info trace and take no other action.
     LogInfo(String),
     /// Log an error and take no other action.
@@ -134,61 +51,26 @@ pub enum TaskOutcome {
     StopAppsWithDna(Arc<DnaHash>, Box<ManagedTaskError>, String),
 }
 
-struct TaskManager {
-    stream: FuturesUnordered<ManagedTaskAdd>,
-}
-
-impl TaskManager {
-    fn new() -> Self {
-        let stream = FuturesUnordered::new();
-        TaskManager { stream }
-    }
-}
-
-pub(crate) fn spawn_task_manager(
-    handle: ConductorHandle,
-) -> (mpsc::Sender<ManagedTaskAdd>, TaskManagerRunHandle) {
-    let (send, recv) = mpsc::channel(CHANNEL_SIZE);
-    (send, tokio::spawn(run(handle, recv)))
-}
-
-/// A super pessimistic task that is just waiting to die
-/// but gets to live as long as the process
-/// so the task manager doesn't quit
-pub(crate) async fn keep_alive_task(mut die: broadcast::Receiver<()>) -> ManagedTaskResult {
-    die.recv().await?;
-    Ok(())
-}
-
-async fn run(
+/// Spawn a task which performs some action after each task has completed,
+/// as recieved by the outcome channel produced by the task manager.
+pub fn spawn_task_outcome_handler(
     conductor: ConductorHandle,
-    mut new_task_channel: mpsc::Receiver<ManagedTaskAdd>,
-) -> TaskManagerResult {
-    let mut task_manager = TaskManager::new();
-    // Need to have at least one item in the stream or it will exit early
-    if let Some(new_task) = new_task_channel.recv().await {
-        task_manager.stream.push(new_task);
-    } else {
-        error!("All senders to task manager were dropped before starting");
-        return Err(TaskManagerError::TaskManagerFailedToStart);
-    }
-    loop {
-        tokio::select! {
-            Some(new_task) = new_task_channel.recv() => {
-                task_manager.stream.push(new_task);
-                tracing::debug!("Task added. Total tasks: {}", task_manager.stream.len());
-            }
-            result = task_manager.stream.next() => {
-                tracing::debug!("Task completed. Total tasks: {}", task_manager.stream.len());
-                match result {
-                Some(TaskOutcome::NewTask(new_task)) => task_manager.stream.push(new_task),
-                Some(TaskOutcome::LogInfo(context)) => {
+    mut outcomes: OutcomeReceiver,
+) -> JoinHandle<TaskManagerResult> {
+    tokio::spawn(async move {
+        while let Some((_group, result)) = outcomes.next().await {
+            match result {
+                // TaskOutcome::Noop => (),
+                TaskOutcome::LogInfo(context) => {
                     debug!("Managed task completed: {}", context)
                 }
-                Some(TaskOutcome::MinorError(error, context)) => {
-                    error!("Minor error during managed task: {:?}\nContext: {}", error, context)
+                TaskOutcome::MinorError(error, context) => {
+                    error!(
+                        "Minor error during managed task: {:?}\nContext: {}",
+                        error, context
+                    )
                 }
-                Some(TaskOutcome::ShutdownConductor(error, context)) => {
+                TaskOutcome::ShutdownConductor(error, context) => {
                     let error = match *error {
                         ManagedTaskError::Join(error) => {
                             match error.try_into_panic() {
@@ -201,12 +83,18 @@ async fn run(
                         }
                         error => error,
                     };
-                    error!("Shutting down conductor due to unrecoverable error: {:?}\nContext: {}", error, context);
+                    error!(
+                        "Shutting down conductor due to unrecoverable error: {:?}\nContext: {}",
+                        error, context
+                    );
                     return Err(TaskManagerError::Unrecoverable(Box::new(error)));
-                },
-                Some(TaskOutcome::StopApps(cell_id, error, context)) => {
+                }
+                TaskOutcome::StopApps(cell_id, error, context) => {
                     tracing::error!("About to automatically stop apps");
-                    let app_ids = conductor.list_running_apps_for_dependent_cell_id(&cell_id).await.map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor
+                        .list_running_apps_for_dependent_cell_id(&cell_id)
+                        .await
+                        .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
                         conductor.remove_cells(&[cell_id]).await;
 
@@ -223,7 +111,10 @@ async fn run(
                         //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
                         //   can be set to the specific error message encountered here, rather than having to read it from
                         //   the logs.
-                        let delta = conductor.reconcile_app_status_with_cell_status(None).await.map_err(TaskManagerError::internal)?;
+                        let delta = conductor
+                            .reconcile_app_status_with_cell_status(None)
+                            .await
+                            .map_err(TaskManagerError::internal)?;
                         tracing::debug!(delta = ?delta);
 
                         tracing::error!("Apps paused.");
@@ -237,16 +128,30 @@ async fn run(
                             context
                         );
                         for app_id in app_ids.iter() {
-                            conductor.clone().disable_app(app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                            conductor
+                                .clone()
+                                .disable_app(
+                                    app_id.to_string(),
+                                    DisabledAppReason::Error(error.to_string()),
+                                )
+                                .await
+                                .map_err(TaskManagerError::internal)?;
                         }
                         tracing::error!("Apps disabled.");
                     }
-                },
-                Some(TaskOutcome::StopAppsWithDna(dna_hash, error, context)) => {
+                }
+                TaskOutcome::StopAppsWithDna(dna_hash, error, context) => {
                     tracing::error!("About to automatically stop apps with dna {}", dna_hash);
-                    let app_ids = conductor.list_running_apps_for_dependent_dna_hash(dna_hash.as_ref()).await.map_err(TaskManagerError::internal)?;
+                    let app_ids = conductor
+                        .list_running_apps_for_dependent_dna_hash(dna_hash.as_ref())
+                        .await
+                        .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
-                        let cells_with_same_dna: Vec<_> = conductor.list_cell_ids(None).into_iter().filter(|id| id.dna_hash() == dna_hash.as_ref()).collect();
+                        let cells_with_same_dna: Vec<_> = conductor
+                            .list_cell_ids(None)
+                            .into_iter()
+                            .filter(|id| id.dna_hash() == dna_hash.as_ref())
+                            .collect();
                         conductor.remove_cells(&cells_with_same_dna).await;
 
                         // The following message assumes that only the app_ids calculated will be paused, but other apps
@@ -262,7 +167,10 @@ async fn run(
                         //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
                         //   can be set to the specific error message encountered here, rather than having to read it from
                         //   the logs.
-                        let delta = conductor.reconcile_app_status_with_cell_status(None).await.map_err(TaskManagerError::internal)?;
+                        let delta = conductor
+                            .reconcile_app_status_with_cell_status(None)
+                            .await
+                            .map_err(TaskManagerError::internal)?;
                         tracing::debug!(delta = ?delta);
 
                         tracing::error!("Apps paused.");
@@ -276,38 +184,44 @@ async fn run(
                             context
                         );
                         for app_id in app_ids.iter() {
-                            conductor.clone().disable_app(app_id.to_string(), DisabledAppReason::Error(error.to_string())).await.map_err(TaskManagerError::internal)?;
+                            conductor
+                                .clone()
+                                .disable_app(
+                                    app_id.to_string(),
+                                    DisabledAppReason::Error(error.to_string()),
+                                )
+                                .await
+                                .map_err(TaskManagerError::internal)?;
                         }
                         tracing::error!("Apps disabled.");
                     }
-                },
-                None => return Ok(()),
-            }}
-        };
-    }
+                }
+            };
+        }
+        Ok(())
+    })
 }
 
 #[tracing::instrument(skip(kind))]
-fn handle_completed_task(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
+fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
     use TaskOutcome::*;
     match kind {
         TaskKind::Ignore => match result {
-            Ok(_) => LogInfo(name),
+            Ok(_) => LogInfo(format!("task completed: {}", name)),
             Err(err) => MinorError(Box::new(err), name),
         },
         TaskKind::Unrecoverable => match result {
-            Ok(_) => LogInfo(name),
+            Ok(_) => LogInfo(format!("task completed: {}", name)),
             Err(err) => ShutdownConductor(Box::new(err), name),
         },
         TaskKind::CellCritical(cell_id) => match result {
-            Ok(_) => LogInfo(name),
+            Ok(_) => LogInfo(format!("task completed: {}", name)),
             Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
         },
         TaskKind::DnaCritical(dna_hash) => match result {
-            Ok(_) => LogInfo(name),
+            Ok(_) => LogInfo(format!("task completed: {}", name)),
             Err(err) => StopAppsWithDna(dna_hash.to_owned(), Box::new(err), name),
         },
-        TaskKind::Generic(f) => f(result),
     }
 }
 
@@ -332,128 +246,203 @@ pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>
     }
 }
 
+/// Each task has a group, and here they are
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TaskGroup {
+    /// Tasks which are associated with the conductor as a whole
+    Conductor,
+    /// Tasks which are associated with a particular DNA space
+    Dna(Arc<DnaHash>),
+    /// Tasks which are associated with a particular running Cell
+    Cell(CellId),
+}
+
+/// Channel sender for task outcomes
+pub type OutcomeSender = futures::channel::mpsc::Sender<(TaskGroup, TaskOutcome)>;
+/// Channel receiver for task outcomes
+pub type OutcomeReceiver = futures::channel::mpsc::Receiver<(TaskGroup, TaskOutcome)>;
+
 /// A collection of channels and handles used by the Conductor to talk to the
 /// TaskManager task
+#[derive(Clone)]
 pub struct TaskManagerClient {
-    /// Channel on which to send info about tasks we want to manage
-    task_add_sender: mpsc::Sender<ManagedTaskAdd>,
-
-    /// Sending a message on this channel will broadcast to all managed tasks,
-    /// telling them to shut down
-    task_stop_broadcaster: StopBroadcaster,
-
-    /// The main task join handle to await on.
-    /// The conductor is intended to live as long as this task does.
-    /// It can be moved out, hence the Option. If this is None, then the
-    /// handle was already moved out.
-    run_handle: Option<TaskManagerRunHandle>,
+    tm: Arc<Mutex<Option<task_motel::TaskManager<TaskGroup, TaskOutcome>>>>,
 }
 
 impl TaskManagerClient {
-    /// Constructor
-    pub fn new(
-        task_add_sender: mpsc::Sender<ManagedTaskAdd>,
-        task_stop_broadcaster: StopBroadcaster,
-        run_handle: TaskManagerRunHandle,
-    ) -> Self {
+    /// Construct the TaskManager and the outcome channel receiver
+    pub fn new(tx: OutcomeSender) -> Self {
+        let tm = task_motel::TaskManager::new(tx, |g| match g {
+            TaskGroup::Conductor => None,
+            TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
+            TaskGroup::Cell(cell_id) => Some(TaskGroup::Dna(Arc::new(cell_id.dna_hash().clone()))),
+        });
         Self {
-            task_add_sender,
-            task_stop_broadcaster,
-            run_handle: Some(run_handle),
+            tm: Arc::new(Mutex::new(Some(tm))),
         }
     }
 
-    /// Accessor
-    pub fn task_add_sender(&self) -> &mpsc::Sender<ManagedTaskAdd> {
-        &self.task_add_sender
+    /// Stop all tasks and await their completion.
+    pub fn stop_all_tasks(&self) -> ShutdownHandle {
+        if let Some(tm) = self.tm.lock().as_mut() {
+            tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
+        } else {
+            tracing::warn!("Tried to shutdown task manager while it's already shutting down");
+            tokio::spawn(async move {})
+        }
     }
 
-    /// Accessor
-    pub fn task_stop_broadcaster(&self) -> &StopBroadcaster {
-        &self.task_stop_broadcaster
+    /// Stop all tasks for a Cell and await their completion.
+    pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
+        if let Some(tm) = self.tm.lock().as_mut() {
+            tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)))
+        } else {
+            tracing::warn!("Tried to shutdown cell's tasks while they're already shutting down");
+            tokio::spawn(async move {})
+        }
     }
 
-    /// Return the handle to be joined.
-    /// This will return None if the handle was already taken.
-    pub fn take_handle(&mut self) -> Option<TaskManagerRunHandle> {
-        self.run_handle.take()
+    /// Stop all tasks and return a future to await their completion,
+    /// and prevent any new tasks from being added to the manager.
+    pub fn shutdown(&mut self) -> ShutdownHandle {
+        if let Some(mut tm) = self.tm.lock().take() {
+            tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
+        } else {
+            // already shutting down
+            tokio::spawn(async move {})
+        }
+    }
+
+    /// Add a conductor-level task whose outcome is ignored.
+    pub fn add_conductor_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        self.add_conductor_task(name, TaskKind::Ignore, f)
+    }
+
+    /// Add a conductor-level task which will cause the conductor to shut down if it fails
+    pub fn add_conductor_task_unrecoverable<
+        Fut: Future<Output = ManagedTaskResult> + Send + 'static,
+    >(
+        &self,
+        name: &str,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        self.add_conductor_task(name, TaskKind::Unrecoverable, f)
+    }
+
+    /// Add a DNA-level task which will cause all cells under that DNA to be disabled if
+    /// the task fails
+    pub fn add_dna_task_critical<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        dna_hash: Arc<DnaHash>,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        self.add_dna_task(name, TaskKind::DnaCritical(dna_hash.clone()), dna_hash, f)
+    }
+
+    /// Add a Cell-level task whose outcome is ignored
+    pub fn add_cell_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        cell_id: CellId,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        self.add_cell_task(name, TaskKind::Ignore, cell_id, f)
+    }
+
+    /// Add a Cell-level task which will cause that to be disabled if the task fails
+    pub fn add_cell_task_critical<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        cell_id: CellId,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        self.add_cell_task(name, TaskKind::CellCritical(cell_id.clone()), cell_id, f)
+    }
+
+    fn add_conductor_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        task_kind: TaskKind,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        let name = name.to_string();
+        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
+        self.add_task(TaskGroup::Conductor, f)
+    }
+
+    fn add_dna_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        task_kind: TaskKind,
+        dna_hash: Arc<DnaHash>,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        let name = name.to_string();
+        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
+        self.add_task(TaskGroup::Dna(dna_hash), f)
+    }
+
+    fn add_cell_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        task_kind: TaskKind,
+        cell_id: CellId,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        let name = name.to_string();
+        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
+        self.add_task(TaskGroup::Cell(cell_id), f)
+    }
+
+    fn add_task<Fut: Future<Output = TaskOutcome> + Send + 'static>(
+        &self,
+        group: TaskGroup,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        if let Some(tm) = self.tm.lock().as_mut() {
+            tm.add_task(group, f)
+        } else {
+            tracing::warn!("Tried to add task while task manager is shutting down.");
+        }
     }
 }
+
+/// A future which awaits the completion of all managed tasks
+pub type ShutdownHandle = JoinHandle<()>;
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::conductor::{error::ConductorError, Conductor};
-    use anyhow::Result;
     use holochain_state::test_utils::test_db_dir;
     use observability;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn spawn_and_handle_dying_task() -> Result<()> {
+    async fn unrecoverable_error() {
         observability::test_run().ok();
         let db_dir = test_db_dir();
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
-        let (send_task_handle, main_task) = spawn_task_manager(handle);
-        let handle = tokio::spawn(async {
+        let tm = handle.task_manager();
+        tm.add_conductor_task_unrecoverable("unrecoverable", |_stop| async {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             Err(Box::new(ConductorError::Other(
-                anyhow::anyhow!("This task gotta die").into(),
+                anyhow::anyhow!("Unrecoverable task failed").into(),
             ))
             .into())
         });
-        let handle = ManagedTaskAdd::generic(
-            handle,
-            Box::new(|result| match result {
-                Ok(_) => panic!("Task should have died"),
-                Err(ManagedTaskError::Conductor(err))
-                    if matches!(*err, ConductorError::Other(_)) =>
-                {
-                    let handle = tokio::spawn(async { Ok(()) });
-                    let handle = ManagedTaskAdd::ignore(handle, "respawned task");
-                    TaskOutcome::NewTask(handle)
-                }
-                Err(_) => unreachable!("No other error is created by this test."),
-            }),
-        );
-        // Check that the main task doesn't close straight away
-        let main_handle = tokio::spawn(main_task);
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-        // Now send the handle
-        if let Err(_) = send_task_handle.send(handle).await {
-            panic!("Failed to send the handle");
-        }
-        main_handle.await???;
-        Ok(())
-    }
+        let main_task = handle.outcomes_task.share_mut(|o| o.take().unwrap());
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn unrecoverable_error() {
-        observability::test_run().ok();
-        let (_tx, rx) = tokio::sync::broadcast::channel(1);
-        let db_dir = test_db_dir();
-        let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
-        let (send_task_handle, main_task) = spawn_task_manager(handle);
-        send_task_handle
-            .send(ManagedTaskAdd::ignore(
-                tokio::spawn(keep_alive_task(rx)),
-                "",
-            ))
-            .await
-            .unwrap();
+        // the outcome channel sender lives on the TaskManager, so we need to drop it
+        // so that the main_task will end
 
-        send_task_handle
-            .send(ManagedTaskAdd::unrecoverable(
-                tokio::spawn(async {
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    Err(Box::new(ConductorError::Other(
-                        anyhow::anyhow!("Unrecoverable task failed").into(),
-                    ))
-                    .into())
-                }),
-                "",
-            ))
-            .await
-            .unwrap();
+        // tm.shutdown();
+        drop(tm);
 
         main_task
             .await
@@ -465,29 +454,17 @@ mod test {
     #[ignore = "panics in tokio break other tests, this test is here to confirm behavior but cannot be run on ci"]
     async fn unrecoverable_panic() {
         observability::test_run().ok();
-        let (_tx, rx) = tokio::sync::broadcast::channel(1);
         let db_dir = test_db_dir();
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
-        let (send_task_handle, main_task) = spawn_task_manager(handle);
-        send_task_handle
-            .send(ManagedTaskAdd::ignore(
-                tokio::spawn(keep_alive_task(rx)),
-                "",
-            ))
-            .await
-            .unwrap();
+        let tm = handle.task_manager();
 
-        send_task_handle
-            .send(ManagedTaskAdd::unrecoverable(
-                tokio::spawn(async {
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    panic!("Task has panicked")
-                }),
-                "",
-            ))
-            .await
-            .unwrap();
+        tm.add_conductor_task_unrecoverable("unrecoverable", |_stop| async {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            panic!("Task has panicked")
+        });
 
+        let main_task = handle.outcomes_task.share_mut(|o| o.take().unwrap());
+        drop(tm);
         handle_shutdown(main_task.await);
     }
 }

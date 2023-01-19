@@ -3,8 +3,8 @@ use must_future::MustBoxFuture;
 use std::sync::Arc;
 
 use kitsune_p2p_types::{
-    dependencies::lair_keystore_api,
     bin_types::KitsuneSpace,
+    dependencies::lair_keystore_api,
     dht::{
         region::{Region, RegionCoords},
         region_set::RegionSetLtcs,

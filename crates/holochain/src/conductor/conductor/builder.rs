@@ -2,6 +2,7 @@ use holochain_p2p::dht::ArqStrat;
 
 use super::*;
 use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
+use crate::conductor::manager::OutcomeReceiver;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 
@@ -106,8 +107,9 @@ impl ConductorBuilder {
         let tag = spaces.get_state().await?.tag().clone();
 
         let network_config = config.network.clone().unwrap_or_default();
-        let (cert_digest, cert, cert_priv_key) =
-            keystore.get_or_create_tls_cert_by_tag(tag.0.clone()).await?;
+        let (cert_digest, cert, cert_priv_key) = keystore
+            .get_or_create_tls_cert_by_tag(tag.0.clone())
+            .await?;
         let tls_config =
             holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
                 cert,
@@ -131,6 +133,8 @@ impl ConductorBuilder {
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
+        let (outcome_tx, outcome_rx) = futures::channel::mpsc::channel(8);
+
         let conductor = Conductor::new(
             config.clone(),
             ribosome_store,
@@ -138,6 +142,7 @@ impl ConductorBuilder {
             holochain_p2p,
             spaces,
             post_commit_sender,
+            outcome_tx,
         );
 
         let shutting_down = conductor.shutting_down.clone();
@@ -165,19 +170,20 @@ impl ConductorBuilder {
             config,
             p2p_evt,
             post_commit_receiver,
+            outcome_rx,
             self.no_print_setup,
         )
         .await
     }
 
-    pub(crate) fn spawn_post_commit(
+    pub(crate) async fn spawn_post_commit(
         conductor_handle: ConductorHandle,
         receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
+        stop: StopReceiver,
     ) {
         let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
-        tokio::task::spawn(receiver_stream.for_each_concurrent(
-            POST_COMMIT_CONCURRENT_LIMIT,
-            move |post_commit_args| {
+        stop.fuse_with(receiver_stream)
+            .for_each_concurrent(POST_COMMIT_CONCURRENT_LIMIT, move |post_commit_args| {
                 let conductor_handle = conductor_handle.clone();
                 async move {
                     let PostCommitArgs {
@@ -202,8 +208,8 @@ impl ConductorBuilder {
                         }
                     }
                 }
-            },
-        ));
+            })
+            .await;
     }
 
     pub(crate) async fn finish(
@@ -211,6 +217,7 @@ impl ConductorBuilder {
         conductor_config: ConductorConfig,
         p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
+        outcome_receiver: OutcomeReceiver,
         no_print_setup: bool,
     ) -> ConductorResult<ConductorHandle> {
         conductor
@@ -220,10 +227,17 @@ impl ConductorBuilder {
 
         tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()));
 
-        Self::spawn_post_commit(conductor.clone(), post_commit_receiver);
+        let tm = conductor.task_manager();
+        let conductor2 = conductor.clone();
+        tm.add_conductor_task_unrecoverable("post_commit_receiver", move |stop| {
+            Self::spawn_post_commit(conductor2, post_commit_receiver, stop).map(Ok)
+        });
 
         let configs = conductor_config.admin_interfaces.unwrap_or_default();
-        let cell_startup_errors = conductor.clone().initialize_conductor(configs).await?;
+        let cell_startup_errors = conductor
+            .clone()
+            .initialize_conductor(outcome_receiver, configs)
+            .await?;
 
         // TODO: This should probably be emitted over the admin interface
         if !cell_startup_errors.is_empty() {
@@ -283,8 +297,14 @@ impl ConductorBuilder {
         let strat = ArqStrat::from_params(tuning_params.gossip_redundancy_target);
 
         let ribosome_store = RwShare::new(self.ribosome_store);
-        let host =
-            KitsuneHostImpl::new(spaces.clone(), ribosome_store.clone(), tuning_params, strat, Some(tag.0), Some(keystore.lair_client()));
+        let host = KitsuneHostImpl::new(
+            spaces.clone(),
+            ribosome_store.clone(),
+            tuning_params,
+            strat,
+            Some(tag.0),
+            Some(keystore.lair_client()),
+        );
 
         let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host)
@@ -293,6 +313,8 @@ impl ConductorBuilder {
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
+        let (outcome_tx, outcome_rx) = futures::channel::mpsc::channel(8);
+
         let conductor = Conductor::new(
             self.config.clone(),
             ribosome_store,
@@ -300,6 +322,7 @@ impl ConductorBuilder {
             holochain_p2p,
             spaces,
             post_commit_sender,
+            outcome_tx,
         );
 
         let conductor = Self::update_fake_state(self.state, conductor).await?;
@@ -323,6 +346,7 @@ impl ConductorBuilder {
             self.config,
             p2p_evt,
             post_commit_receiver,
+            outcome_rx,
             self.no_print_setup,
         )
         .await

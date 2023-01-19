@@ -49,9 +49,7 @@ async fn direct_validation_test() {
 
     run_test(alice_cell_id, handle.clone()).await;
 
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
+    handle.shutdown().await.unwrap().unwrap();
 }
 
 /// - Commit a valid update should pass

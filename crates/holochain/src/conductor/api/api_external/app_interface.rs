@@ -86,12 +86,12 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 }
             }
             AppRequest::CreateCloneCell(payload) => {
-                let installed_clone_cell = self
+                let clone_cell = self
                     .conductor_handle
                     .clone()
                     .create_clone_cell(*payload)
                     .await?;
-                Ok(AppResponse::CloneCellCreated(installed_clone_cell))
+                Ok(AppResponse::CloneCellCreated(clone_cell))
             }
             AppRequest::DisableCloneCell(payload) => {
                 self.conductor_handle
@@ -112,7 +112,6 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 let info = self.conductor_handle.network_info(&payload.dnas).await?;
                 Ok(AppResponse::NetworkInfo(info))
             }
-            AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
         }
     }
 }

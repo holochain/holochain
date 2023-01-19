@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 /// Locks the local chain to commence a countersigning session.
+///
 /// The `PreflightRequestAcceptance` MUST be sent back to the session initiator
 /// so that the corresponding entry can be built for everyone to sign.
 /// This function MUST be called by every signer in the signing session.

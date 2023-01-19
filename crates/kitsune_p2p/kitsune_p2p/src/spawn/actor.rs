@@ -158,7 +158,8 @@ impl KitsuneP2pActor {
                 TransportConfig::WebRTC { signal_url } => signal_url.clone(),
                 _ => unreachable!(),
             };
-            let (h, e) = MetaNet::new_tx4(config.tuning_params.clone(), host.clone(), signal_url).await?;
+            let (h, e) =
+                MetaNet::new_tx4(config.tuning_params.clone(), host.clone(), signal_url).await?;
             ep_hnd = Some(h);
             ep_evt = Some(e);
         }
@@ -296,21 +297,20 @@ impl KitsuneP2pActor {
                                             respond(resp).await;
                                         }
                                         wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
-                                            if let Ok(Some(agent_info_signed)) = host
+                                            let resp = match host
                                                 .get_agent_info_signed(GetAgentInfoSignedEvt {
                                                     space,
                                                     agent,
                                                 })
                                                 .await
                                             {
-                                                let resp =
-                                                    wire::Wire::peer_get_resp(agent_info_signed);
-                                                respond(resp).await;
-                                            } else {
-                                                let resp =
-                                                    wire::Wire::failure("no such agent".into());
-                                                respond(resp).await;
-                                            }
+                                                Ok(info) => wire::Wire::peer_get_resp(info),
+                                                Err(err) => wire::Wire::failure(format!(
+                                                    "Error getting agent: {:?}",
+                                                    err,
+                                                )),
+                                            };
+                                            respond(resp).await;
                                         }
                                         wire::Wire::PeerQuery(wire::PeerQuery {
                                             space,
@@ -322,19 +322,14 @@ impl KitsuneP2pActor {
                                             let query = QueryAgentsEvt::new(space)
                                                 .near_basis(basis_loc)
                                                 .limit(LIMIT);
-                                            match evt_sender.query_agents(query).await {
-                                                Ok(list) if !list.is_empty() => {
-                                                    let resp = wire::Wire::peer_query_resp(list);
-                                                    respond(resp).await;
-                                                }
-                                                res => {
-                                                    let resp = wire::Wire::failure(format!(
-                                                        "error getting agents: {:?}",
-                                                        res
-                                                    ));
-                                                    respond(resp).await;
-                                                }
-                                            }
+                                            let resp = match evt_sender.query_agents(query).await {
+                                                Ok(list) => wire::Wire::peer_query_resp(list),
+                                                Err(err) => wire::Wire::failure(format!(
+                                                    "Error querying agents: {:?}",
+                                                    err,
+                                                )),
+                                            };
+                                            respond(resp).await;
                                         }
                                         data => unimplemented!("{:?}", data),
                                     }
