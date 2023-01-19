@@ -250,7 +250,7 @@ jobs:
           set -exu
           cd "${HOLOCHAIN_REPO}"
 
-          RELEASE_BRANCH="${{ steps.write-env-and-tag.outputs.release_branch }}""
+          RELEASE_BRANCH="${{ steps.write-env-and-tag.outputs.release_branch }}"
 
           if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
             git checkout -B ${HOLOCHAIN_TARGET_BRANCH} "${RELEASE_BRANCH}"
