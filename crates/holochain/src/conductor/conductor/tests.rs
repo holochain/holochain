@@ -535,7 +535,10 @@ async fn test_enable_disable_enable_app() {
     conductor.enable_app("app".to_string()).await.unwrap();
 
     // - We can still make a zome call after reactivation
-    let _: Option<Record> = conductor
+assert!(conductor
+        .call_fallible::<_, Option<Record>, _>(&cell.zome("zome"), "get", hash.clone())
+        .await
+        .is_ok());
         .call_fallible(&cell.zome("zome"), "get", hash)
         .await
         .unwrap();
@@ -555,7 +558,6 @@ async fn test_enable_disable_enable_app() {
     assert_eq!(inactive_apps.len(), 0);
 }
 
-// RUST_LOG=info cargo test --package holochain --lib --all-features -- conductor::conductor::tests::test_enable_disable_enable_clone_cell --exact --nocapture
 #[tokio::test(flavor = "multi_thread")]
 async fn test_enable_disable_enable_clone_cell() {
     observability::test_run().ok();
