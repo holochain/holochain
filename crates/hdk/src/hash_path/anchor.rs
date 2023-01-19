@@ -108,7 +108,7 @@ where
     path.path_entry_hash()
 }
 
-/// Returns every entry hash in a vector from the root of an anchor.
+/// Returns every hash in a vector from the root of an anchor.
 /// Hashes are sorted in the same way that paths sort children.
 pub fn list_anchor_type_addresses<T, E>(link_type: T) -> ExternResult<Vec<AnyLinkableHash>>
 where
@@ -124,7 +124,7 @@ where
     Ok(links)
 }
 
-/// Returns every entry hash in a vector from the second level of an anchor.
+/// Returns every hash in a vector from the second level of an anchor.
 /// Uses the string argument to build the path from the root.
 /// Hashes are sorted in the same way that paths sort children.
 pub fn list_anchor_addresses<T, E>(
