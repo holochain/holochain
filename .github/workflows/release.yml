@@ -209,6 +209,9 @@ jobs:
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
       HOLOCHAIN_NIXPKGS_URL: "https://github.com/holochain/holochain-nixpkgs"
       HOLONIX_URL: "https://github.com/holochain/holonix"
+      RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
+      VERSION_COMPAT: ${{ needs.prepare.outputs.version_compat }}
+      TAG: ${{ needs.prepare.outputs.tag }}
     strategy:
       fail-fast: false
       matrix:
@@ -555,6 +558,8 @@ jobs:
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
       VERSION: ${{ needs.prepare.outputs.version }}
       TAG: ${{ needs.prepare.outputs.tag }}
+      RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
+      VERSION_COMPAT: ${{ needs.prepare.outputs.version_compat }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
