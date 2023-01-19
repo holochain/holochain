@@ -26,7 +26,7 @@ properties = ["holochain_zome_types/properties"]
 hdi = { version = "=0.2.0-beta-rc.2", path = "../hdi", features = ["trace"] }
 hdk_derive = { version = "^0.1.0-beta-rc.2", path = "../hdk_derive" }
 holo_hash = { version = "^0.1.0-beta-rc.1", path = "../holo_hash" }
-holochain_wasmer_guest = "=0.0.82"
+holochain_wasmer_guest = "=0.0.83"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
 holochain_zome_types = { version = "^0.1.0-beta-rc.2", path = "../holochain_zome_types", default-features = false }
