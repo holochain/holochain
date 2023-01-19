@@ -207,7 +207,8 @@ jobs:
     env:
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_NIXPKGS_URL: ${{ inputs.HOLOCHAIN_NIXPKGS_URL }}
+      HOLOCHAIN_NIXPKGS_URL: "https://github.com/holochain/holochain-nixpkgs"
+      HOLONIX_URL: "https://github.com/holochain/holonix"
     strategy:
       fail-fast: false
       matrix:
