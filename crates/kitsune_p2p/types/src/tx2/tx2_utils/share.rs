@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::*;
 
 /// Synchronized droppable share-lock around internal state date.
@@ -85,6 +87,13 @@ impl<T: 'static + Send> Share<T> {
     }
 }
 
+impl<T: 'static + Send + Debug> Debug for Share<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.share_ref(|s| Ok(f.debug_tuple("Share").field(s).finish()))
+            .unwrap()
+    }
+}
+
 /// A version of Share which can never be closed, and thus every
 /// share is infallible (no Err possible).
 #[derive(PartialEq, Eq, Hash)]
@@ -120,5 +129,11 @@ impl<T: 'static + Send> ShareOpen<T> {
         self.0
             .share_mut(|s, _| Ok(f(s)))
             .expect("ShareOpen state is never dropped")
+    }
+}
+
+impl<T: 'static + Send + Debug> Debug for ShareOpen<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.share_ref(|s| f.debug_tuple("ShareOpen").field(s).finish())
     }
 }
