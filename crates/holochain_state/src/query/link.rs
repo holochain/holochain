@@ -228,6 +228,7 @@ fn link_from_action(action: Action) -> StateQueryResult<Link> {
     let hash = ActionHash::with_data_sync(&action);
     match action {
         Action::CreateLink(action) => Ok(Link {
+            author: action.author,
             target: action.target_address,
             timestamp: action.timestamp,
             zome_index: action.zome_index,
