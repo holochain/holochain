@@ -305,24 +305,22 @@ jobs:
             run: |
               set -x
 
-              if [ -e "$HOLOCHAIN_RELEASE_SH" ]; then
+              # remove everything that wouldn't be on github either
+              git clean -fdx
 
-                # remove everything that wouldn't be on github either
-                git clean -fdx
+              # we use this git daemon to not rely on the published tag
+              git daemon --reuseaddr --base-path=. --export-all --verbose --detach
 
-                # we use this git daemon to not rely on the published tag
-                git daemon --reuseaddr --base-path=. --export-all --verbose --detach
+              git clone "${HOLOCHAIN_NIXPKGS_URL}" "${HOLOCHAIN_NIXPKGS_REPO}" -b ${HOLOCHAIN_NIXPKGS_SOURCE_BRANCH} --depth=1
+              cd "${HOLOCHAIN_NIXPKGS_REPO}"
 
-                git clone "${HOLOCHAIN_NIXPKGS_URL}" "${HOLOCHAIN_NIXPKGS_REPO}" -b ${HOLOCHAIN_NIXPKGS_SOURCE_BRANCH} --depth=1
-                cd "${HOLOCHAIN_NIXPKGS_REPO}"
+              git checkout -b "${RELEASE_BRANCH}"
 
-                git checkout -b "${RELEASE_BRANCH}"
-
-                if grep --quiet ${VERSION_COMPAT} packages/holochain/versions/update_config.toml; then
-                  export VERSION_COMPAT="${VERSION_COMPAT}-ci"
-                  export TAG="${TAG}-ci"
-                  git -C "${HOLOCHAIN_REPO}" tag --force "${TAG}"
-                fi
+              if grep --quiet ${VERSION_COMPAT} packages/holochain/versions/update_config.toml; then
+                export VERSION_COMPAT="${VERSION_COMPAT}-ci"
+                export TAG="${TAG}-ci"
+                git -C "${HOLOCHAIN_REPO}" tag --force "${TAG}"
+              fi
 
               # TODO: use a util from the holochain-nixpkgs repo to make this change as this can get out of sync
               cat <<EOF >> packages/holochain/versions/update_config.toml
@@ -332,18 +330,13 @@ jobs:
               git-repo = "git://localhost/"
               EOF
 
-              else
-                echo "skip git logic because HOLOCHAIN_RELEASE_SH unset"
-                export HOLOCHAIN_NIXPKGS_REPO=./holochain-nixpkgs
-              fi
-
               # regenerate the nix sources
               git config --global user.email "devcore@holochain.org"
               git config --global user.name "Holochain Core Dev Team"
               nix-shell \
                 --pure \
                 --keep VERSION_COMPAT \
-                --argstr flavor release \
+                --arg flavors '["release"]' \
                 --run 'hnixpkgs-update-single ${VERSION_COMPAT}'
               nix-build . -A packages.holochain.holochainAllBinariesWithDeps.${VERSION_COMPAT} --no-link
 
@@ -430,7 +423,6 @@ jobs:
 
       - name: Restore the holochain release repository
         uses: DavHau/actions-cache/restore@retry
-        if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
         with:
           path: |
             /var/tmp/holochain_release.sh
@@ -460,7 +452,6 @@ jobs:
           required: false
 
       - name: Garbage-collection pre-run procedure
-        if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
         env:
           MATRIX: ${{ toJSON(matrix) }}
         run: |
@@ -509,12 +500,8 @@ jobs:
           max_attempts: ${{ matrix.testCommand.max_attempts }}
           command: |
             set -e
-            if [ -e "$HOLOCHAIN_RELEASE_SH" ]; then
-              source "${HOLOCHAIN_RELEASE_SH}"
-              cd "${HOLOCHAIN_REPO}"
-            else
-              echo "ignoring HOLOCHAIN_RELEASE_SH as its unset and fallback to local checkout"
-            fi
+            source "${HOLOCHAIN_RELEASE_SH}"
+            cd "${HOLOCHAIN_REPO}"
 
             ${{ matrix.testCommand.run }}
 
