@@ -560,9 +560,10 @@ pub mod info;
 /// At a high level:
 ///
 /// - Can implement direct or indirect circular references
-/// - Have a base and target entry
+/// - Reference data by its hash
+/// - Have a base and target entry, action or external hash
 /// - Can either exist or be deleted (i.e. there is no revision history, deleting removes a link permanently)
-/// - Many links can point from/to the same entry
+/// - Many links can point from/to the same hash
 /// - Links reference entry hashes not actions
 ///
 /// Links are retrived from the DHT by performing [ `link::get_links` ] or [ `link::get_link_details` ] against the _base_ of a link.
