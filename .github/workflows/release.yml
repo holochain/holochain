@@ -582,7 +582,6 @@ jobs:
       - name: Copy the git credentials
         run: |
           cd "${HOLOCHAIN_REPO}"
-          cp -v $HOME/work/holochain/holochain/.git/config .git/config
 
       - name: Restore cargo related state and build files
         uses: DavHau/actions-cache/restore@retry
