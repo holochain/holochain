@@ -3,7 +3,6 @@
 , lib
 , writeShellScriptBin
 , crate2nix
-
 , holonix
 , holonixPath
 , hcToplevelDir
