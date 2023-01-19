@@ -225,6 +225,7 @@ jobs:
       - name: Append to the environment file and set outputs
         id: write-env-and-tag
         run: |
+          set -x
           cd "${HOLOCHAIN_REPO}"
           RELEASE_BRANCH=$(git branch --show-current)
 
