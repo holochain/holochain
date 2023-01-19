@@ -644,6 +644,8 @@ mod dna_impls {
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
                     .collect()
             });
+            self.running_cells.share_ref(|cells| dbg!(cells.len()));
+
             for (cell_id, item) in to_cleanup {
                 if let Err(err) = item.cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
@@ -1061,7 +1063,7 @@ mod app_impls {
                 network_seed,
             } = payload;
 
-            let bundle: AppBundle = {
+            let bundle = {
                 let original_bundle = source.resolve().await?;
                 if let Some(network_seed) = network_seed {
                     let mut manifest = original_bundle.manifest().to_owned();
@@ -1079,6 +1081,22 @@ mod app_impls {
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
+
+            // check if cells_to_create contains a cell identical to an existing one
+            let state = self.get_state().await?;
+            let all_cells: HashSet<_> = state
+                .installed_apps()
+                .values()
+                .flat_map(|app| app.all_cells())
+                .collect();
+            let maybe_duplicate_cell_id = cells_to_create
+                .iter()
+                .find(|(cell_id, _)| all_cells.contains(cell_id));
+            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
+                return Err(ConductorError::CellAlreadyExists(
+                    duplicate_cell_id.to_owned(),
+                ));
+            };
 
             for (dna, _) in ops.dnas_to_register {
                 self.clone().register_dna(dna).await?;
@@ -1277,6 +1295,7 @@ mod cell_impls {
 /// Methods related to clone cell management
 mod clone_cell_impls {
     use holochain_conductor_api::ClonedCell;
+    use itertools::Itertools;
 
     use super::*;
 
@@ -1305,12 +1324,19 @@ mod clone_cell_impls {
             }
             let state = self.get_state().await?;
             let app = state.get_app(&app_id)?;
+
             app.provisioned_cells()
                 .find(|(app_role_name, _)| **app_role_name == role_name)
                 .ok_or_else(|| {
-                    ConductorError::CloneCellError(
-                        "no base cell found for provided role id".to_string(),
-                    )
+                    let role_names = app
+                        .provisioned_cells()
+                        .map(|(role_name, _)| format!("'{}'", role_name))
+                        .join(", ");
+
+                    ConductorError::CloneCellError(format!(
+                        "no base cell found for provided role id. Available role names are: ({})",
+                        role_names
+                    ))
                 })?;
 
             // add cell to app
@@ -2175,7 +2201,7 @@ impl Conductor {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
                 if app.status().is_running() {
-                    app.all_cells().into_iter().cloned().collect()
+                    app.all_enabled_cells().into_iter().cloned().collect()
                 } else {
                     HashSet::new()
                 }
@@ -2187,7 +2213,7 @@ impl Conductor {
                     .installed_apps()
                     .iter()
                     .filter(|(_, app)| app.status().is_running())
-                    .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
+                    .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
                     .cloned()
                     .collect()
             }
@@ -2498,7 +2524,6 @@ pub(crate) async fn genesis_cells(
 
         Err(ConductorError::GenesisFailed { errors })
     } else {
-        // No errors so return the cells
         Ok(())
     }
 }

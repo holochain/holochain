@@ -318,7 +318,7 @@ impl TypedPath {
             path,
         }
     }
-    /// Does an entry exist at the hash we expect?
+    /// Does data exist at the hash we expect?
     pub fn exists(&self) -> ExternResult<bool> {
         if self.0.is_empty() {
             Ok(false)

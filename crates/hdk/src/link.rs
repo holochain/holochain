@@ -2,22 +2,21 @@ use crate::prelude::*;
 
 pub use hdi::link::*;
 
-/// Create a link from a base entry to a target entry, with an optional tag.
+/// Create a link from a base hash to a target hash, with an optional tag.
 ///
-/// Links represent the general idea of relationships between entries.
+/// Links represent the general idea of relationships between data.
 ///
 /// Links are different from the tree of CRUD relationships:
 ///
 /// Links:
 ///
-/// - reference two entries (base and target) not actions
+/// - reference two hashes, base and target, and can be a local entry/action or some external hash
 /// - there is only one way to create a link, validation logic depends on only the base+target+tag
-/// - can represent circular references because only entry hashes are needed
+/// - can represent circular references because only hashes are needed
 /// - support arbitrary bytes of data (i.e. "tag") that can be read or used to filter gets
 /// - deletes always point to a _specific_ link creation event, not the link itself
 /// - model dynamic sets of or relationships between things
-/// - can reference any entry regardless of type (e.g. posts can link to comments)
-/// - cannot reference other links or crud actions (@todo maybe we can do this in the future)
+/// - can reference any hash regardless of type (e.g. posts can link to comments)
 ///
 /// Note: There is a hard limit of 1kb of data for the tag.
 ///
@@ -33,16 +32,15 @@ pub use hdi::link::*;
 /// See [ `get_details` ] and get for more information about CRUD
 /// See [ `get_links` ] and [ `get_link_details` ] for more information about filtering by tag
 ///
-/// Generally links and CRUDs _do not interact_ beyond the fact that links need entry hashes to
+/// Generally links and CRUDs _do not interact_ beyond the fact that links need hashes to
 /// reference for the base and target to already exist due to a prior create or update.
-/// The entry value only needs to exist on the DHT for the link to validate, it doesn't need to be
+/// The referenced data only needs to exist on the DHT for the link to validate, it doesn't need to be
 /// live and can have any combination of valid/invalid crud actions.
 /// i.e. if you use link_entries! to create relationships between two entries, then update_entry
 /// on the base, the links will still only be visible to get_link(s_details)! against the original
 /// base, there is no logic to "bring forward" links to the updated entry because:
 ///
 /// - as per CRUD tree docs there is no "one size fits all" way to walk a tree of CRUDs
-/// - links point at entries not actions so all create/update/delete information is in actions
 /// - links are very generic and could even represent a comment thread against a specific revision
 ///   such as those found against individual updates in a wiki/CMS tool so they need to stay where
 ///   they were explicitly placed
@@ -95,7 +93,7 @@ where
 /// and the delete is not simply a renamed mirror of the create (i.e. with base and target).
 ///
 /// Consider what would happen if the system simply had "create link" and "delete link" pointing at
-/// the entry base and target without pairing:
+/// the base and target without pairing:
 /// - there would be no way to revert a specific link creation
 /// - a delete may be intended for an create you haven't seen yet, so network unpredictability
 ///   would cause re-ording of any view on create/deletes which means an agent can see more deletes
@@ -113,7 +111,7 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
     })
 }
 
-/// Returns all links that reference a base entry hash, optionally filtered by link type and tag.
+/// Returns all links that reference a base hash, optionally filtered by link type and tag.
 ///
 /// Type can be filtered by providing a variant of the link types or the full range operator. Get links of
 /// all types like this: `get_links(base, .., None)`. Refer to the `get_links` function in
@@ -155,7 +153,7 @@ pub fn get_links(
         .unwrap())
 }
 
-/// Get all link creates and deletes that reference a base entry hash, optionally filtered by type or tag.
+/// Get all link creates and deletes that reference a base hash, optionally filtered by type or tag.
 ///
 /// Type can be filtered by providing a variant of the link types, or a range of them. To get links of
 /// all types, the full range operator can be used: `get_links(base, .., None)`. Furthermore, vectors of

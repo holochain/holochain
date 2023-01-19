@@ -336,6 +336,27 @@ getrandom::register_custom_getrandom!(wasm_getrandom);
 // @todo in the future grant secrets may be moved to lair somehow.
 pub mod capability;
 
+/// Signing a single chain entry between multiple participants.
+///
+/// The basic goal is to enable a kind of atomicity across multiple source chains
+/// in an environment where countersigners trust each other in some ways but not
+/// entirely. Countersigning provides several trust models, including nominating
+/// a single party to gather signatures, M of N signers, majority signing buckets,
+/// etc.
+///
+/// The integrity layer enforces very little other than the structure of a
+/// countersigned entry, to define the session parameters and uniqueness and final
+/// signature set. Implementations are expected to drive countersigning sessions
+/// through coordinator zomes based on understanding both the expected network
+/// topologies and trust between peers on the network.
+///
+/// As various models for driving and finalising systems on the network are
+/// defined and implemented they all end up in the countersigning crate.
+///
+/// This is a network level implementation of countersigning which has pros and
+/// cons. There are also cryptographic methods of countersigning such as
+/// threshold signatures that produce a single proof between multiple
+/// participants, which are NOT included in this crate.
 pub mod countersigning;
 
 /// Working with app and system entries.
@@ -539,9 +560,10 @@ pub mod info;
 /// At a high level:
 ///
 /// - Can implement direct or indirect circular references
-/// - Have a base and target entry
+/// - Reference data by its hash
+/// - Have a base and target entry, action or external hash
 /// - Can either exist or be deleted (i.e. there is no revision history, deleting removes a link permanently)
-/// - Many links can point from/to the same entry
+/// - Many links can point from/to the same hash
 /// - Links reference entry hashes not actions
 ///
 /// Links are retrived from the DHT by performing [ `link::get_links` ] or [ `link::get_link_details` ] against the _base_ of a link.

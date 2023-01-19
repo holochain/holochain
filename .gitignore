@@ -23,3 +23,5 @@ test_cert
 .my-shell.nix
 .DS_Store
 .cov
+
+.direnv
