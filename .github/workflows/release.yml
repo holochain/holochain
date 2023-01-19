@@ -207,6 +207,7 @@ jobs:
     env:
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
+      HOLOCHAIN_NIXPKGS_URL: ${{ inputs.HOLOCHAIN_NIXPKGS_URL }}
     strategy:
       fail-fast: false
       matrix:
@@ -307,6 +308,7 @@ jobs:
               # we use this git daemon to not rely on the published tag
               git daemon --reuseaddr --base-path=. --export-all --verbose --detach
 
+              export HOLOCHAIN_REPO=$(realpath $HOLOCHAIN_REPO)
               export HOLOCHAIN_NIXPKGS_REPO=$(mktemp -d)
 
               git clone "${HOLOCHAIN_NIXPKGS_URL}" "${HOLOCHAIN_NIXPKGS_REPO}" -b ${HOLOCHAIN_NIXPKGS_SOURCE_BRANCH} --depth=1
@@ -427,7 +429,7 @@ jobs:
 
           mkdir -p $(dirname $HOLOCHAIN_REPO)
           cp -r "${{ needs.prepare.outputs.nix_store_holochain_repo }}" $HOLOCHAIN_REPO
-          chmod +w $HOLOCHAIN_REPO
+          chmod -R +w $HOLOCHAIN_REPO
 
       # - name: Restore the holochain release repository
       #   uses: DavHau/actions-cache/restore@retry
