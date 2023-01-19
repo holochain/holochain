@@ -180,7 +180,7 @@ jobs:
             echo "::set-output name=skip_prepare_logic::false"
           fi
 
-          echo "::set-output name=HOLOCHAIN_REPO::./holochain-repo/holochain"
+          echo "::set-output name=HOLOCHAIN_REPO::."
           echo "::set-output name=CACHIX_REV::v1.0.1"
   prepare:
     needs: [vars]
