@@ -1088,7 +1088,10 @@ pub mod wasm_test {
                 "__hc__trace_1",
                 "__hc__x_salsa20_poly1305_decrypt_1",
                 "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
-            ].into_iter().map(|s| s.to_string()).collect::<Vec<String>>(),
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>(),
             module
                 .imports()
                 .map(|import| import.name().to_string())
