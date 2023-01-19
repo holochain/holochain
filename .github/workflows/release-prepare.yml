@@ -238,6 +238,7 @@ jobs:
         id: write-env-and-tag
         run: |
           cd "${HOLOCHAIN_REPO}"
+          RELEASE_BRANCH=$(git branch --show-current)
 
           echo "::set-output name=tag::${TAG}"
           echo "::set-output name=version::${VERSION}"
@@ -248,6 +249,8 @@ jobs:
         run: |
           set -exu
           cd "${HOLOCHAIN_REPO}"
+
+          RELEASE_BRANCH="${{ steps.write-env-and-tag.outputs.release_branch }}""
 
           if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
             git checkout -B ${HOLOCHAIN_TARGET_BRANCH} "${RELEASE_BRANCH}"
