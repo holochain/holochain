@@ -378,19 +378,20 @@ impl KitsuneP2pActor {
                                         resp!(respond, resp);
                                     }
                                     wire::Wire::PeerGet(wire::PeerGet { space, agent }) => {
-                                        if let Ok(Some(agent_info_signed)) = host
+                                        let resp = match host
                                             .get_agent_info_signed(GetAgentInfoSignedEvt {
                                                 space,
                                                 agent,
                                             })
                                             .await
                                         {
-                                            let resp = wire::Wire::peer_get_resp(agent_info_signed);
-                                            resp!(respond, resp);
-                                        } else {
-                                            let resp = wire::Wire::failure("no such agent".into());
-                                            resp!(respond, resp);
-                                        }
+                                            Ok(info) => wire::Wire::peer_get_resp(info),
+                                            Err(err) => wire::Wire::failure(format!(
+                                                "Error getting agent: {:?}",
+                                                err
+                                            )),
+                                        };
+                                        resp!(respond, resp);
                                     }
                                     wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
                                         // this *does* go over the network...
@@ -399,19 +400,14 @@ impl KitsuneP2pActor {
                                         let query = QueryAgentsEvt::new(space)
                                             .near_basis(basis_loc)
                                             .limit(LIMIT);
-                                        match evt_sender.query_agents(query).await {
-                                            Ok(list) if !list.is_empty() => {
-                                                let resp = wire::Wire::peer_query_resp(list);
-                                                resp!(respond, resp);
-                                            }
-                                            res => {
-                                                let resp = wire::Wire::failure(format!(
-                                                    "error getting agents: {:?}",
-                                                    res
-                                                ));
-                                                resp!(respond, resp);
-                                            }
-                                        }
+                                        let resp = match evt_sender.query_agents(query).await {
+                                            Ok(list) => wire::Wire::peer_query_resp(list),
+                                            Err(err) => wire::Wire::failure(format!(
+                                                "Error querying agents: {:?}",
+                                                err
+                                            )),
+                                        };
+                                        resp!(respond, resp);
                                     }
                                     data => unimplemented!("{:?}", data),
                                 }
