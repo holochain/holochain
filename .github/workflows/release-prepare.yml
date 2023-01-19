@@ -102,18 +102,18 @@ jobs:
       - name: Set NIX_PATH (FIXME)
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
-      - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@retry
-        with:
-          path: |
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-finalize-release-
-          restore-keys: |
-            holochain-repo-
-          required: false
+      # - name: Restore the holochain release repository
+      #   uses: steveeJ-forks/actions-cache/restore@retry
+      #   with:
+      #     path: |
+      #       # asterisk is a workaround for https://github.com/actions/cache/issues/494
+      #       /var/tmp/holochain_repo/*
+      #       !/var/tmp/holochain_repo/.cargo/
+      #       !/var/tmp/holochain_repo/target/
+      #     key: holochain-repo-finalize-release-
+      #     restore-keys: |
+      #       holochain-repo-
+      #     required: false
 
       - name: Restore holochain cargo related state and build files
         if: ${{ inputs.skip_prepare_logic != 'true' }}
