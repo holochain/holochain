@@ -311,6 +311,8 @@ jobs:
               # we use this git daemon to not rely on the published tag
               git daemon --reuseaddr --base-path=. --export-all --verbose --detach
 
+              export HOLOCHAIN_NIXPKGS_REPO=$(mktemp -d)
+
               git clone "${HOLOCHAIN_NIXPKGS_URL}" "${HOLOCHAIN_NIXPKGS_REPO}" -b ${HOLOCHAIN_NIXPKGS_SOURCE_BRANCH} --depth=1
               cd "${HOLOCHAIN_NIXPKGS_REPO}"
 
@@ -422,16 +424,27 @@ jobs:
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
       - name: Restore the holochain release repository
-        uses: DavHau/actions-cache/restore@retry
-        with:
-          path: |
-            /var/tmp/holochain_release.sh
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
-          required: true
+        run: |
+          nix copy --from "https://holochain-ci.cachix.org" ${{ needs.prepare.outputs.nix_store_holochain_repo }}
+          nix copy --from "https://holochain-ci.cachix.org" ${{ needs.prepare.outputs.nix_store_release_sh }}
+
+          export HOLOCHAIN_RELEASE_SH=${{ needs.prepare.outputs.nix_store_release_sh }}
+          export HOLOCHAIN_REPO=$(mktemp -d)
+
+          source $HOLOCHAIN_RELEASE_SH
+
+
+      # - name: Restore the holochain release repository
+      #   uses: DavHau/actions-cache/restore@retry
+      #   with:
+      #     path: |
+      #       /var/tmp/holochain_release.sh
+      #       # asterisk is a workaround for https://github.com/actions/cache/issues/494
+      #       /var/tmp/holochain_repo/*
+      #       !/var/tmp/holochain_repo/.cargo/
+      #       !/var/tmp/holochain_repo/target/
+      #     key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
+      #     required: true
 
       - name: Restore cargo related state and build files
         uses: DavHau/actions-cache/restore@retry
@@ -477,12 +490,8 @@ jobs:
           # CARGO_BUILD_JOBS: "2"
         run: |
           set -e
-          if [ -e "$HOLOCHAIN_RELEASE_SH" ]; then
-            source "${HOLOCHAIN_RELEASE_SH}"
-            cd "${HOLOCHAIN_REPO}"
-          else
-            echo "ignoring HOLOCHAIN_RELEASE_SH as its unset and fallback to local checkout"
-          fi
+          source "${HOLOCHAIN_RELEASE_SH}"
+          cd "${HOLOCHAIN_REPO}"
 
           nix-shell --pure --run "cargo fetch --locked"
 

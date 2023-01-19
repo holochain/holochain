@@ -56,6 +56,12 @@ on:
       tag:
         description: "which holochain tag, if one, will be released"
         value: ${{ jobs.prepare.outputs.tag }}
+      nix_store_holochain_repo:
+        description: "the store path containing the holochain repo"
+        value: ${{ jobs.prepare.outputs.nix_store_holochain_repo }}
+      nix_store_release_sh:
+        description: "the store path containing the release.sh"
+        value: ${{ jobs.prepare.outputs.nix_store_release_sh }}
 
 jobs:
   prepare:
@@ -143,7 +149,6 @@ jobs:
           export HOLOCHAIN_SOURCE_BRANCH="${HOLOCHAIN_SOURCE_BRANCH:?}"
           export HOLOCHAIN_TARGET_BRANCH="${HOLOCHAIN_TARGET_BRANCH:?}"
 
-          export HOLOCHAIN_NIXPKGS_REPO=$(mktemp -d)
           export HOLONIX_REPO=$(mktemp -d)
           EOF
 
@@ -289,16 +294,23 @@ jobs:
             git merge --ff-only "${RELEASE_BRANCH}"
           fi
 
-      - name: Cache the holochain release repository
-        uses: steveeJ-forks/actions-cache/save@main
-        with:
-          path: |
-            /var/tmp/holochain_release.sh
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
+      - name: Cache the holochain release repository (nix)
+        run: |
+          export nix_store_holochain_repo=$(nix store add-path "$HOLOCHAIN_REPO")
+          echo "::set-output name=nix_store_holochain_repo::$nix_store_holochain_repo"
+          export nix_store_release_sh=$(nix store add-path /var/tmp/holochain_release.sh)
+          echo "::set-output name=nix_store_release_sh::$nix_store_release_sh"
+
+      # - name: Cache the holochain release repository
+      #   uses: steveeJ-forks/actions-cache/save@main
+      #   with:
+      #     path: |
+      #       /var/tmp/holochain_release.sh
+      #       # asterisk is a workaround for https://github.com/actions/cache/issues/494
+      #       /var/tmp/holochain_repo/*
+      #       !/var/tmp/holochain_repo/.cargo/
+      #       !/var/tmp/holochain_repo/target/
+      #     key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
 
       - name: Cache cargo related build files
         uses: steveeJ-forks/actions-cache/save@main
