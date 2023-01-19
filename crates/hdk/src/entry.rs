@@ -18,8 +18,8 @@ pub fn create(create_input: CreateInput) -> ExternResult<ActionHash> {
 /// General function that can update any entry type.
 ///
 /// This is used under the hood by [`update_entry`], [`update_cap_grant`] and `update_cap_claim`.
-///
-/// @todo implement update_cap_claim
+//
+// @todo implement update_cap_claim
 ///
 /// The host builds an [`Update`] action for the passed entry value and commits a new update to the
 /// chain.
@@ -33,8 +33,8 @@ pub fn update(input: UpdateInput) -> ExternResult<ActionHash> {
 /// General function that can delete any entry type.
 ///
 /// This is used under the hood by [`delete_entry`], [`delete_cap_grant`] and `delete_cap_claim`.
-///
-/// @todo implement delete_cap_claim
+//
+// @todo implement delete_cap_claim
 ///
 /// The host builds a [`Delete`] action for the passed entry and commits a new record to the chain.
 ///
@@ -150,9 +150,9 @@ where
 /// let foo_zero_action_hash: ActionHash = create_entry(EntryTypes::Foo(Foo(0)))?;
 /// let foo_ten_update_action_hash: ActionHash = update_entry(foo_zero_action_hash, EntryTypes::Foo(Foo(10)))?;
 /// ```
-///
-/// @todo in the future this will be true because we will have the concept of 'redirects':
-/// Works as an app entry delete+create.
+//
+// @todo in the future this will be true because we will have the concept of 'redirects':
+// Works as an app entry delete+create.
 ///
 /// See [`create_entry`]
 /// See [`update`]

@@ -225,9 +225,9 @@ pub fn init_sys_info_poll() {
 
             loop {
                 system.refresh_process(pid);
-                system.get_networks_mut().refresh();
+                system.networks_mut().refresh();
 
-                let proc = system.get_process(pid).unwrap();
+                let proc = system.process(pid).unwrap();
 
                 let mem = proc.memory();
                 USED_MEM_KB.store(mem, Ordering::Relaxed);
@@ -237,9 +237,9 @@ pub fn init_sys_info_poll() {
 
                 let mut tx = 0;
                 let mut rx = 0;
-                for (_n, network) in system.get_networks().iter() {
-                    tx += network.get_transmitted();
-                    rx += network.get_received();
+                for (_n, network) in system.networks().iter() {
+                    tx += network.transmitted();
+                    rx += network.received();
                 }
                 tx_avg.push(tx);
                 rx_avg.push(rx);
