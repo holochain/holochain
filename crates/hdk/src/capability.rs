@@ -79,9 +79,9 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 /// The most specific and strict [`CapGrant`] that validates will be used. For example, if a user
 /// provided a valid transferable secret to a function that is currently unrestricted, the zome
 /// call will be executed with the stricter transferable access.
-///
-/// @todo this is more relevant when partial application exists in the future
-/// @todo predictably disambiguate multiple CapGrants of the same specificity
+//
+// @todo this is more relevant when partial application exists in the future
+// @todo predictably disambiguate multiple CapGrants of the same specificity
 ///       (also potentially not needed when we enforce uniqueness - see below)
 ///
 /// [`CapGrant`] entries can be updated and deleted in the same way as standard app entries.
@@ -91,22 +91,22 @@ pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> ExternResult<ActionHa
 /// - updates function like delete+create so that old grants are immediately revoked by a new grant
 /// - deletes immediately revoke the referenced grant
 /// - version histories are linear so there can never be a branching history of updates and deletes
-///
-/// @todo ensure linear history in sys validation
+//
+// @todo ensure linear history in sys validation
 ///
 /// Secrets must be unique across all grants and claims in a source chain and should be generated
 /// using the [`generate_cap_secret`] function that sources the correct number of cryptographically
 /// strong random bytes from the host.
-///
-/// @todo ensure uniqueness of secrets in sys validation
+//
+// @todo ensure uniqueness of secrets in sys validation
 ///
 /// If _any_ [`CapGrant`] is valid for a zome call invocation it will execute. Given that secrets must
 /// be unique across all grants and claims this is easy to ensure for assigned and transferable
 /// access. Special care is required for Unrestricted grants as several may apply to a single
 /// extern at one time, or may apply in addition to a stricter grant. In this case, revoking a
 /// stricter grant, or failing to revoke all Unrestricted grants will leave the function open.
-///
-/// @todo administration functions to query active grants
+//
+// @todo administration functions to query active grants
 ///
 /// There is an apparent "chicken or the egg" situation where [`CapGrant`] are required for remote
 /// agents to call externs, so how does an agent request a grant in the first place?

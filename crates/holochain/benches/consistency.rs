@@ -53,7 +53,7 @@ fn consistency(bench: &mut Criterion) {
     cells.extend(others.cells.clone());
     runtime.spawn(async move {
         producer.run().await;
-        producer.conductor.shutdown_and_wait().await;
+        producer.conductor.shutdown().await;
     });
     group.bench_function(BenchmarkId::new("test", format!("test")), |b| {
         b.iter(|| {
@@ -64,10 +64,10 @@ fn consistency(bench: &mut Criterion) {
         // The line below was added when migrating to rust edition 2021, per
         // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
         let _ = &others;
-        consumer.conductor.shutdown_and_wait().await;
+        consumer.conductor.shutdown().await;
         drop(consumer);
-        for c in others.conductors {
-            c.shutdown_and_wait().await;
+        for mut c in others.conductors {
+            c.shutdown().await;
             drop(c);
         }
     });
