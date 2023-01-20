@@ -128,7 +128,7 @@ jobs:
          - run:
               name: Run the standard tests (nextest)
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run "HC_ADD_FEATURES=,tx5 hc-test-standard-nextest"
+              command: nix-shell --fallback --pure --argstr flavor "coreDev" -p go --run "HC_ADD_FEATURES=,tx5 hc-test-standard-nextest"
 
    wasm-test:
       docker:
