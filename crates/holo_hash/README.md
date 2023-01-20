@@ -116,7 +116,7 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Copyright (C) 2019 - 2022, Holochain Foundation
+Copyright (C) 2019 - 2023, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,
