@@ -9,7 +9,7 @@ jobs:
       fail-fast: false
       matrix:
         nixCommand:
-          - "nix build .#holochain"
+          - "nix build .#holochain --no-link"
           # TODO:
           #   This currently doesn't make a lot of sense, because holonix
           #     will reference another version of holochain
@@ -45,4 +45,4 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: "Test comand ${{ matrix.nixCommand }}"
-        run: "${{ matrix.nixCommand }} -L --no-link"
+        run: "${{ matrix.nixCommand }} -L --show-trace"
