@@ -71,18 +71,18 @@ pub use mockall;
 macro_rules! holochain_externs {
     () => {
         holochain_wasmer_guest::host_externs!(
-            __trace,
-            __hash,
-            __unreachable,
-            __verify_signature,
-            __zome_info,
-            __dna_info,
-            __must_get_entry,
-            __must_get_valid_record,
-            __must_get_action,
-            __must_get_agent_activity,
-            __x_salsa20_poly1305_decrypt,
-            __x_25519_x_salsa20_poly1305_decrypt
+            trace:1,
+            hash:1,
+            unreachable:1,
+            verify_signature:1,
+            zome_info:1,
+            dna_info:1,
+            must_get_entry:1,
+            must_get_valid_record:1,
+            must_get_action:1,
+            must_get_agent_activity:1,
+            x_salsa20_poly1305_decrypt:1,
+            x_25519_x_salsa20_poly1305_decrypt:1
         );
     };
 }

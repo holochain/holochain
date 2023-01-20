@@ -460,33 +460,33 @@ impl HdkT for HostHdk {
         get_agent_activity_input: GetAgentActivityInput,
     ) -> ExternResult<AgentActivity> {
         host_call::<GetAgentActivityInput, AgentActivity>(
-            __get_agent_activity,
+            __hc__get_agent_activity_1,
             get_agent_activity_input,
         )
     }
     fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>> {
-        host_call::<ChainQueryFilter, Vec<Record>>(__query, filter)
+        host_call::<ChainQueryFilter, Vec<Record>>(__hc__query_1, filter)
     }
     fn sign(&self, sign: Sign) -> ExternResult<Signature> {
-        host_call::<Sign, Signature>(__sign, sign)
+        host_call::<Sign, Signature>(__hc__sign_1, sign)
     }
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures> {
-        host_call::<SignEphemeral, EphemeralSignatures>(__sign_ephemeral, sign_ephemeral)
+        host_call::<SignEphemeral, EphemeralSignatures>(__hc__sign_ephemeral_1, sign_ephemeral)
     }
     fn create(&self, create_input: CreateInput) -> ExternResult<ActionHash> {
-        host_call::<CreateInput, ActionHash>(__create, create_input)
+        host_call::<CreateInput, ActionHash>(__hc__create_1, create_input)
     }
     fn update(&self, update_input: UpdateInput) -> ExternResult<ActionHash> {
-        host_call::<UpdateInput, ActionHash>(__update, update_input)
+        host_call::<UpdateInput, ActionHash>(__hc__update_1, update_input)
     }
     fn delete(&self, hash: DeleteInput) -> ExternResult<ActionHash> {
-        host_call::<DeleteInput, ActionHash>(__delete, hash)
+        host_call::<DeleteInput, ActionHash>(__hc__delete_1, hash)
     }
     fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>> {
-        host_call::<Vec<GetInput>, Vec<Option<Record>>>(__get, get_inputs)
+        host_call::<Vec<GetInput>, Vec<Option<Record>>>(__hc__get_1, get_inputs)
     }
     fn get_details(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
-        host_call::<Vec<GetInput>, Vec<Option<Details>>>(__get_details, get_inputs)
+        host_call::<Vec<GetInput>, Vec<Option<Details>>>(__hc__get_details_1, get_inputs)
     }
     // CounterSigning
     fn accept_countersigning_preflight_request(
@@ -494,51 +494,51 @@ impl HdkT for HostHdk {
         preflight_request: PreflightRequest,
     ) -> ExternResult<PreflightRequestAcceptance> {
         host_call::<PreflightRequest, PreflightRequestAcceptance>(
-            __accept_countersigning_preflight_request,
+            __hc__accept_countersigning_preflight_request_1,
             preflight_request,
         )
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
-        host_call::<(), AgentInfo>(__agent_info, ())
+        host_call::<(), AgentInfo>(__hc__agent_info_1, ())
     }
     fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
-        host_call::<(), CallInfo>(__call_info, ())
+        host_call::<(), CallInfo>(__hc__call_info_1, ())
     }
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<ActionHash> {
-        host_call::<CreateLinkInput, ActionHash>(__create_link, create_link_input)
+        host_call::<CreateLinkInput, ActionHash>(__hc__create_link_1, create_link_input)
     }
     fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<ActionHash> {
-        host_call::<DeleteLinkInput, ActionHash>(__delete_link, delete_link_input)
+        host_call::<DeleteLinkInput, ActionHash>(__hc__delete_link_1, delete_link_input)
     }
     fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>> {
-        host_call::<Vec<GetLinksInput>, Vec<Vec<Link>>>(__get_links, get_links_input)
+        host_call::<Vec<GetLinksInput>, Vec<Vec<Link>>>(__hc__get_links_1, get_links_input)
     }
     fn get_link_details(
         &self,
         get_links_input: Vec<GetLinksInput>,
     ) -> ExternResult<Vec<LinkDetails>> {
-        host_call::<Vec<GetLinksInput>, Vec<LinkDetails>>(__get_link_details, get_links_input)
+        host_call::<Vec<GetLinksInput>, Vec<LinkDetails>>(__hc__get_link_details_1, get_links_input)
     }
     fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
-        host_call::<Vec<Call>, Vec<ZomeCallResponse>>(__call, call)
+        host_call::<Vec<Call>, Vec<ZomeCallResponse>>(__hc__call_1, call)
     }
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()> {
-        host_call::<AppSignal, ()>(__emit_signal, app_signal)
+        host_call::<AppSignal, ()>(__hc__emit_signal_1, app_signal)
     }
     fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()> {
-        host_call::<RemoteSignal, ()>(__remote_signal, remote_signal)
+        host_call::<RemoteSignal, ()>(__hc__remote_signal_1, remote_signal)
     }
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes> {
-        host_call::<u32, Bytes>(__random_bytes, number_of_bytes)
+        host_call::<u32, Bytes>(__hc__random_bytes_1, number_of_bytes)
     }
     fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
-        host_call::<(), Timestamp>(__sys_time, ())
+        host_call::<(), Timestamp>(__hc__sys_time_1, ())
     }
     fn schedule(&self, scheduled_fn: String) -> ExternResult<()> {
-        host_call::<String, ()>(__schedule, scheduled_fn)
+        host_call::<String, ()>(__hc__schedule_1, scheduled_fn)
     }
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()> {
-        host_call::<std::time::Duration, ()>(__sleep, wake_after)
+        host_call::<std::time::Duration, ()>(__hc__sleep_1, wake_after)
     }
 
     fn x_salsa20_poly1305_shared_secret_create_random(
@@ -546,7 +546,7 @@ impl HdkT for HostHdk {
         key_ref: Option<XSalsa20Poly1305KeyRef>,
     ) -> ExternResult<XSalsa20Poly1305KeyRef> {
         host_call::<Option<XSalsa20Poly1305KeyRef>, XSalsa20Poly1305KeyRef>(
-            __x_salsa20_poly1305_shared_secret_create_random,
+            __hc__x_salsa20_poly1305_shared_secret_create_random_1,
             key_ref,
         )
     }
@@ -556,7 +556,7 @@ impl HdkT for HostHdk {
         x_salsa20_poly1305_shared_secret_export: XSalsa20Poly1305SharedSecretExport,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
         host_call::<XSalsa20Poly1305SharedSecretExport, XSalsa20Poly1305EncryptedData>(
-            __x_salsa20_poly1305_shared_secret_export,
+            __hc__x_salsa20_poly1305_shared_secret_export_1,
             x_salsa20_poly1305_shared_secret_export,
         )
     }
@@ -566,7 +566,7 @@ impl HdkT for HostHdk {
         x_salsa20_poly1305_shared_secret_ingest: XSalsa20Poly1305SharedSecretIngest,
     ) -> ExternResult<XSalsa20Poly1305KeyRef> {
         host_call::<XSalsa20Poly1305SharedSecretIngest, XSalsa20Poly1305KeyRef>(
-            __x_salsa20_poly1305_shared_secret_ingest,
+            __hc__x_salsa20_poly1305_shared_secret_ingest_1,
             x_salsa20_poly1305_shared_secret_ingest,
         )
     }
@@ -576,13 +576,13 @@ impl HdkT for HostHdk {
         x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
         host_call::<XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(
-            __x_salsa20_poly1305_encrypt,
+            __hc__x_salsa20_poly1305_encrypt_1,
             x_salsa20_poly1305_encrypt,
         )
     }
 
     fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
-        host_call::<(), X25519PubKey>(__create_x25519_keypair, ())
+        host_call::<(), X25519PubKey>(__hc__create_x25519_keypair_1, ())
     }
 
     fn x_25519_x_salsa20_poly1305_encrypt(
@@ -590,7 +590,7 @@ impl HdkT for HostHdk {
         x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
         host_call::<X25519XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(
-            __x_25519_x_salsa20_poly1305_encrypt,
+            __hc__x_25519_x_salsa20_poly1305_encrypt_1,
             x_25519_x_salsa20_poly1305_encrypt,
         )
     }
