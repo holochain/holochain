@@ -8,8 +8,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        nixAttribute:
-          - holochain
+        nixCommand:
+          - "nix build .#holochain"
+          # TODO:
+          #   This currently doesn't make a lot of sense, because holonix
+          #     will reference another version of holochain
+          - "nix run .#holonix-integration-test"
         platform:
           - arch: macos-x86_64
             runs-on: [macos-latest]
@@ -40,7 +44,5 @@ jobs:
           name: "${{ matrix.cachixName }}"
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
-      - name: Build derivations
-        env:
-          nix_attribute: "${{ matrix.nixAttribute }}"
-        run: nix build .#${{ matrix.nixAttribute }} -L --no-link
+      - name: "Test comand ${{ matrix.nixCommand }}"
+        run: "${{ matrix.nixCommand }} -L --no-link"
