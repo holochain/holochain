@@ -89,12 +89,19 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
+#[cfg(not(test))]
 /// one hundred giga ops
 const WASM_METERING_LIMIT: u64 = 100_000_000_000;
+
+#[cfg(test)]
+
+/// one hundred mega ops. We don't want tests to run forever.
+const WASM_METERING_LIMIT: u64 = 100_000_000;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
+
 pub struct RealRibosome {
     // NOTE - Currently taking a full DnaFile here.
     //      - It would be an optimization to pre-ensure the WASM bytecode
@@ -1109,7 +1116,7 @@ pub mod wasm_test {
         // This will run infinitely unless our metering kicks in and traps it.
         // Also we stop it running after 10 seconds.
         let result: Result<Result<(), _>, _> = tokio::time::timeout(
-            std::time::Duration::from_millis(10000),
+            std::time::Duration::from_secs(10),
             conductor.call_fallible(&alice, "smash", ()),
         )
         .await;
@@ -1118,7 +1125,7 @@ pub mod wasm_test {
         // The same thing will happen when we commit an entry due to a loop in
         // the validation logic.
         let create_result: Result<Result<(), _>, _> = tokio::time::timeout(
-            std::time::Duration::from_millis(10000),
+            std::time::Duration::from_secs(10),
             conductor.call_fallible(&alice, "create_a_thing", ()),
         )
         .await;
