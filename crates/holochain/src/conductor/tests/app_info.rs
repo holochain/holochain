@@ -73,6 +73,9 @@ async fn app_info_returns_all_cells_with_info() {
 
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
 
+    // agent pub key matches
+    assert_eq!(app_info.agent_pub_key, agent_pub_key);
+
     // app info has cell info for two role names
     assert_eq!(app_info.cell_info.len(), 2);
 
