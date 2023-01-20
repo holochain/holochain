@@ -61,7 +61,6 @@
     # derivation with the main crates
     holochain = craneLib.buildPackage (commonArgs // {
       cargoArtifacts = holochainDeps;
-      doInstallCargoArtifacts = true;
       doCheck = false;
     });
 
