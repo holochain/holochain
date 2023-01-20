@@ -39,6 +39,15 @@ where
 
 /// Wrapper for __call_remote host function.
 ///
+/// Remote calls differ from local calls because they run on a different agent on
+/// the same DNA. Remote calls are synchronous and require an active network
+/// connection between local and the remote peer. The remote peer may reject the
+/// incoming call and manage capability grants to determine who to selectively
+/// grant access to. The call on the remote will run exactly as a local call, all
+/// commits will be to the _remote_ source chain NOT the local chain. The only
+/// difference between the remote calling itself vs. accepting an incoming remote
+/// call will be the provenance of the call visible on the call info.
+///
 /// There are several positional arguments:
 ///
 /// - agent: The address of the agent to call the RPC style remote function on.
