@@ -217,7 +217,7 @@ mod tests {
                 let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
                 Node {
                     agent_info_list: vec![info],
-                    cert: purl.digest().into(),
+                    cert: purl.digest().0,
                     url,
                 }
             })
