@@ -118,8 +118,8 @@ pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
     Tx2(Tx2ConHnd<wire::Wire>),
 
-    #[cfg(feature = "tx4")]
-    Tx4(tx4::Ep, tx4::Tx4Url, ResStore),
+    #[cfg(feature = "tx5")]
+    Tx5(tx5::Ep, tx5::Tx5Url, ResStore),
 }
 
 impl PartialEq for MetaNetCon {
@@ -127,8 +127,8 @@ impl PartialEq for MetaNetCon {
         match (self, other) {
             #[cfg(feature = "tx2")]
             (MetaNetCon::Tx2(a), MetaNetCon::Tx2(b)) => a == b,
-            #[cfg(feature = "tx4")]
-            (MetaNetCon::Tx4(a, _, _), MetaNetCon::Tx4(b, _, _)) => a == b,
+            #[cfg(feature = "tx5")]
+            (MetaNetCon::Tx5(a, _, _), MetaNetCon::Tx5(b, _, _)) => a == b,
             _ => false,
         }
     }
@@ -146,7 +146,7 @@ impl MetaNetCon {
             }
         }
 
-        // TODO - no way to close a tx4 con currently
+        // TODO - no way to close a tx5 con currently
     }
 
     pub fn is_closed(&self) -> bool {
@@ -157,9 +157,9 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx4")]
+        #[cfg(feature = "tx5")]
         {
-            // TODO - erm, tx4 connections are never exactly "closed"
+            // TODO - erm, tx5 connections are never exactly "closed"
             //        since it's more of a message queue...
             return false;
         }
@@ -175,13 +175,13 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx4")]
+        #[cfg(feature = "tx5")]
         {
-            if let MetaNetCon::Tx4(ep, rem_url, _res_store) = self {
+            if let MetaNetCon::Tx5(ep, rem_url, _res_store) = self {
                 let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                 let wrap = WireWrap::notify(WireData(wire));
 
-                let mut writer = tx4::Buf::from_writer().map_err(KitsuneError::other)?;
+                let mut writer = tx5::Buf::from_writer().map_err(KitsuneError::other)?;
                 wrap.encode(&mut writer).map_err(KitsuneError::other)?;
                 let data = writer.finish();
                 ep.send(rem_url.clone(), data)
@@ -206,9 +206,9 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx4")]
+        #[cfg(feature = "tx5")]
         {
-            if let MetaNetCon::Tx4(ep, rem_url, res_store) = self {
+            if let MetaNetCon::Tx5(ep, rem_url, res_store) = self {
                 static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
                 let msg_id = MSG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 let (s, r) = tokio::sync::oneshot::channel();
@@ -224,7 +224,7 @@ impl MetaNetCon {
                 let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                 let wrap = WireWrap::request(msg_id, WireData(wire));
 
-                let mut writer = tx4::Buf::from_writer().map_err(KitsuneError::other)?;
+                let mut writer = tx5::Buf::from_writer().map_err(KitsuneError::other)?;
                 wrap.encode(&mut writer).map_err(KitsuneError::other)?;
                 let data = writer.finish();
                 ep.send(rem_url.clone(), data)
@@ -245,9 +245,9 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx4")]
+        #[cfg(feature = "tx5")]
         {
-            if let MetaNetCon::Tx4(_con, rem_url, _res_store) = self {
+            if let MetaNetCon::Tx5(_con, rem_url, _res_store) = self {
                 let id = rem_url.id().unwrap();
                 return Arc::new(id.0);
             }
@@ -264,9 +264,9 @@ pub enum MetaNet {
     #[cfg(feature = "tx2")]
     Tx2(Tx2EpHnd<wire::Wire>),
 
-    /// Tx4 Abstraction
-    #[cfg(feature = "tx4")]
-    Tx4(tx4::Ep, tx4::Tx4Url, ResStore),
+    /// Tx5 Abstraction
+    #[cfg(feature = "tx5")]
+    Tx5(tx5::Ep, tx5::Tx5Url, ResStore),
 }
 
 impl MetaNet {
@@ -466,9 +466,9 @@ impl MetaNet {
         Ok((MetaNet::Tx2(ep_hnd), evt_recv))
     }
 
-    /// Construct abstraction with tx4 backend.
-    #[cfg(feature = "tx4")]
-    pub async fn new_tx4(
+    /// Construct abstraction with tx5 backend.
+    #[cfg(feature = "tx5")]
+    pub async fn new_tx5(
         tuning_params: KitsuneP2pTuningParams,
         host: HostApi,
         signal_url: String,
@@ -476,23 +476,23 @@ impl MetaNet {
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
 
-        let mut tx4_config = tx4::DefConfig::default()
-            .with_max_send_bytes(tuning_params.tx4_max_send_bytes)
-            .with_max_recv_bytes(tuning_params.tx4_max_recv_bytes)
-            .with_max_conn_count(tuning_params.tx4_max_conn_count)
-            .with_max_conn_init(tuning_params.tx4_max_conn_init());
+        let mut tx5_config = tx5::DefConfig::default()
+            .with_max_send_bytes(tuning_params.tx5_max_send_bytes)
+            .with_max_recv_bytes(tuning_params.tx5_max_recv_bytes)
+            .with_max_conn_count(tuning_params.tx5_max_conn_count)
+            .with_max_conn_init(tuning_params.tx5_max_conn_init());
 
         if let Some(lair_client) = host.lair_client() {
-            tx4_config.set_lair_client(lair_client);
+            tx5_config.set_lair_client(lair_client);
         }
 
         if let Some(lair_tag) = host.lair_tag() {
-            tx4_config.set_lair_tag(lair_tag);
+            tx5_config.set_lair_tag(lair_tag);
         }
 
-        let (ep_hnd, mut ep_evt) = tx4::Ep::with_config(tx4_config).await?;
+        let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
 
-        let cli_url = ep_hnd.listen(tx4::Tx4Url::new(&signal_url)?).await?;
+        let cli_url = ep_hnd.listen(tx5::Tx5Url::new(&signal_url)?).await?;
 
         let res_store = Arc::new(Mutex::new(HashMap::new()));
 
@@ -507,11 +507,11 @@ impl MetaNet {
                 };
 
                 match evt {
-                    tx4::EpEvt::Connected { rem_cli_url } => {
+                    tx5::EpEvt::Connected { rem_cli_url } => {
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: rem_cli_url.to_string(),
-                                con: MetaNetCon::Tx4(
+                                con: MetaNetCon::Tx5(
                                     ep_hnd2.clone(),
                                     rem_cli_url,
                                     res_store2.clone(),
@@ -523,11 +523,11 @@ impl MetaNet {
                             break;
                         }
                     }
-                    tx4::EpEvt::Disconnected { rem_cli_url } => {
+                    tx5::EpEvt::Disconnected { rem_cli_url } => {
                         if evt_send
                             .send(MetaNetEvt::Disconnected {
                                 remote_url: rem_cli_url.to_string(),
-                                con: MetaNetCon::Tx4(
+                                con: MetaNetCon::Tx5(
                                     ep_hnd2.clone(),
                                     rem_cli_url,
                                     res_store2.clone(),
@@ -539,7 +539,7 @@ impl MetaNet {
                             break;
                         }
                     }
-                    tx4::EpEvt::Data {
+                    tx5::EpEvt::Data {
                         rem_cli_url,
                         mut data,
                         permit,
@@ -551,7 +551,7 @@ impl MetaNet {
                                         if evt_send
                                             .send(MetaNetEvt::Notify {
                                                 remote_url: rem_cli_url.to_string(),
-                                                con: MetaNetCon::Tx4(
+                                                con: MetaNetCon::Tx5(
                                                     ep_hnd2.clone(),
                                                     rem_cli_url,
                                                     res_store2.clone(),
@@ -583,7 +583,7 @@ impl MetaNet {
                                                 };
                                                 let wrap =
                                                     WireWrap::response(msg_id, WireData(wire));
-                                                let mut writer = match tx4::Buf::from_writer() {
+                                                let mut writer = match tx5::Buf::from_writer() {
                                                     Ok(writer) => writer,
                                                     Err(_) => return,
                                                 };
@@ -598,7 +598,7 @@ impl MetaNet {
                                         if evt_send
                                             .send(MetaNetEvt::Request {
                                                 remote_url: rem_cli_url.to_string(),
-                                                con: MetaNetCon::Tx4(
+                                                con: MetaNetCon::Tx5(
                                                     ep_hnd2.clone(),
                                                     rem_cli_url,
                                                     res_store2.clone(),
@@ -640,12 +640,12 @@ impl MetaNet {
                             }
                         };
                     }
-                    tx4::EpEvt::Demo { rem_cli_url: _ } => (),
+                    tx5::EpEvt::Demo { rem_cli_url: _ } => (),
                 }
             }
         });
 
-        Ok((MetaNet::Tx4(ep_hnd, cli_url, res_store), evt_recv))
+        Ok((MetaNet::Tx5(ep_hnd, cli_url, res_store), evt_recv))
     }
 
     pub fn local_addr(&self) -> KitsuneResult<String> {
@@ -656,9 +656,9 @@ impl MetaNet {
             }
         }
 
-        #[cfg(feature = "tx4")]
+        #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx4(_ep, cli_url, _res_store) = self {
+            if let MetaNet::Tx5(_ep, cli_url, _res_store) = self {
                 return Ok(cli_url.to_string());
             }
         }
@@ -674,9 +674,9 @@ impl MetaNet {
             }
         }
 
-        #[cfg(feature = "tx4")]
+        #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx4(_ep, cli_url, _res_store) = self {
+            if let MetaNet::Tx5(_ep, cli_url, _res_store) = self {
                 if let Some(id) = cli_url.id() {
                     return Arc::new(id.0);
                 }
@@ -695,7 +695,7 @@ impl MetaNet {
             }
         }
 
-        // TODO - currently no way to shutdown tx4
+        // TODO - currently no way to shutdown tx5
     }
 
     pub async fn get_connection(
@@ -711,12 +711,12 @@ impl MetaNet {
             }
         }
 
-        #[cfg(feature = "tx4")]
+        #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx4(ep, _cli_url, res_store) = self {
-                return Ok(MetaNetCon::Tx4(
+            if let MetaNet::Tx5(ep, _cli_url, res_store) = self {
+                return Ok(MetaNetCon::Tx5(
                     ep.clone(),
-                    tx4::Tx4Url::new(remote_url).map_err(KitsuneError::other)?,
+                    tx5::Tx5Url::new(remote_url).map_err(KitsuneError::other)?,
                     res_store.clone(),
                 ));
             }

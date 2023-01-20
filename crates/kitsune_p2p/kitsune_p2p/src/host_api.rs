@@ -91,13 +91,13 @@ pub trait KitsuneHost: 'static + Send + Sync {
     }
 
     /// Get the lair "tag" identifying the id seed to use for crypto signing.
-    /// (this is currently only used in tx4/WebRTC if that feature is enabled.)
+    /// (this is currently only used in tx5/WebRTC if that feature is enabled.)
     fn lair_tag(&self) -> Option<Arc<str>> {
         None
     }
 
     /// Get the lair client to use as the backend keystore.
-    /// (this is currently only used in tx4/WebRTC if that feature is enabled.)
+    /// (this is currently only used in tx5/WebRTC if that feature is enabled.)
     fn lair_client(&self) -> Option<lair_keystore_api::LairClient> {
         None
     }

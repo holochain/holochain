@@ -79,7 +79,7 @@ impl KitsuneP2pConfig {
     pub(crate) fn is_tx2(&self) -> bool {
         #[cfg(feature = "tx2")]
         {
-            #[cfg(feature = "tx4")]
+            #[cfg(feature = "tx5")]
             {
                 if let Some(t) = self.transport_pool.get(0) {
                     !matches!(t, TransportConfig::WebRTC { .. })
@@ -87,7 +87,7 @@ impl KitsuneP2pConfig {
                     true
                 }
             }
-            #[cfg(not(feature = "tx4"))]
+            #[cfg(not(feature = "tx5"))]
             {
                 true
             }
@@ -99,8 +99,8 @@ impl KitsuneP2pConfig {
     }
 
     #[allow(dead_code)] // because of feature flipping
-    pub(crate) fn is_tx4(&self) -> bool {
-        #[cfg(feature = "tx4")]
+    pub(crate) fn is_tx5(&self) -> bool {
+        #[cfg(feature = "tx5")]
         {
             if let Some(t) = self.transport_pool.get(0) {
                 return matches!(t, TransportConfig::WebRTC { .. });
@@ -156,9 +156,9 @@ impl KitsuneP2pConfig {
                 },
                 use_proxy: NoProxy,
             }),
-            #[cfg(feature = "tx4")]
+            #[cfg(feature = "tx5")]
             Some(TransportConfig::WebRTC { .. }) => {
-                Err("Cannot convert tx4 config into tx2".into())
+                Err("Cannot convert tx5 config into tx2".into())
             }
             None | Some(TransportConfig::Mem {}) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mem,
@@ -226,8 +226,8 @@ pub enum TransportConfig {
         /// The adaptor for mocking the network
         mock_network: AdapterFactoryMock,
     },
-    #[cfg(feature = "tx4")]
-    /// Configure to use Tx4 WebRTC for kitsune networking.
+    #[cfg(feature = "tx5")]
+    /// Configure to use Tx5 WebRTC for kitsune networking.
     WebRTC {
         /// The url of the signal server to connect to for addressability.
         signal_url: String,

@@ -151,22 +151,22 @@ impl KitsuneP2pActor {
             ep_evt = Some(e);
         }
 
-        #[cfg(feature = "tx4")]
-        if ep_hnd.is_none() && config.is_tx4() {
-            tracing::trace!("tx4");
+        #[cfg(feature = "tx5")]
+        if ep_hnd.is_none() && config.is_tx5() {
+            tracing::trace!("tx5");
             let signal_url = match config.transport_pool.get(0).unwrap() {
                 TransportConfig::WebRTC { signal_url } => signal_url.clone(),
                 _ => unreachable!(),
             };
             let (h, e) =
-                MetaNet::new_tx4(config.tuning_params.clone(), host.clone(), signal_url).await?;
+                MetaNet::new_tx5(config.tuning_params.clone(), host.clone(), signal_url).await?;
             ep_hnd = Some(h);
             ep_evt = Some(e);
         }
 
         let (ep_hnd, ep_evt) = match (ep_hnd, ep_evt) {
             (Some(h), Some(e)) => (h, e),
-            _ => return Err("tx2 or tx4 feature must be enabled".into()),
+            _ => return Err("tx2 or tx5 feature must be enabled".into()),
         };
 
         struct FetchResponseConfig(kitsune_p2p_types::config::KitsuneP2pTuningParams);
