@@ -95,8 +95,9 @@ const WASM_METERING_LIMIT: u64 = 100_000_000_000;
 
 #[cfg(test)]
 
-/// one hundred mega ops. We don't want tests to run forever.
-const WASM_METERING_LIMIT: u64 = 100_000_000;
+/// ten mega ops.
+/// We don't want tests to run forever, and it can take several minutes for 100 giga ops to run.
+const WASM_METERING_LIMIT: u64 = 10_000_000;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -1113,10 +1114,10 @@ pub mod wasm_test {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
 
-        // This will run infinitely unless our metering kicks in and traps it.
+        // This will run infinitely until our metering kicks in and traps it.
         // Also we stop it running after 10 seconds.
         let result: Result<Result<(), _>, _> = tokio::time::timeout(
-            std::time::Duration::from_secs(10),
+            std::time::Duration::from_secs(60),
             conductor.call_fallible(&alice, "smash", ()),
         )
         .await;
@@ -1125,7 +1126,7 @@ pub mod wasm_test {
         // The same thing will happen when we commit an entry due to a loop in
         // the validation logic.
         let create_result: Result<Result<(), _>, _> = tokio::time::timeout(
-            std::time::Duration::from_secs(10),
+            std::time::Duration::from_secs(60),
             conductor.call_fallible(&alice, "create_a_thing", ()),
         )
         .await;
