@@ -141,4 +141,4 @@ Holochain is licensed under the Cryptographic Autonomy License [![License: CAL v
 
 Other components, applications, and libraries we build are typically shared under the [Apache License v2](http://www.apache.org/licenses/LICENSE-2.0) as a simple, lighweight, and flexible way to share code.
 
-Copyright (C) 2017 - 2022, Holochain Foundation
+Copyright (C) 2019 - 2023, Holochain Foundation

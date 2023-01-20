@@ -28,7 +28,7 @@ impl DnaBundle {
     /// Constructor
     pub fn new(
         manifest: ValidatedDnaManifest,
-        resources: Vec<(PathBuf, Vec<u8>)>,
+        resources: Vec<(PathBuf, ResourceBytes)>,
         root_dir: PathBuf,
     ) -> DnaResult<Self> {
         Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
@@ -144,7 +144,7 @@ impl DnaBundle {
         let manifest = Self::manifest_from_dna_def(dna.into_content())?;
         let resources = code
             .into_iter()
-            .map(|(hash, wasm)| (PathBuf::from(hash.to_string()), wasm.code.to_vec()))
+            .map(|(hash, wasm)| (PathBuf::from(hash.to_string()), wasm.code.to_vec().into()))
             .collect();
         DnaBundle::new(manifest.try_into()?, resources, PathBuf::from("."))
     }
@@ -226,7 +226,7 @@ pub(super) async fn hash_bytes(
             .expect("resource referenced in manifest must exist");
         let zome_name = z.name;
         let expected_hash = z.hash.map(WasmHash::from);
-        let wasm = DnaWasm::from(bytes);
+        let wasm = DnaWasm::from(bytes.into_inner());
         let dependencies = z.dependencies.map_or(Vec::with_capacity(0), |deps| {
             deps.into_iter().map(|d| d.name).collect()
         });
@@ -286,7 +286,7 @@ mod tests {
             },
             coordinator: CoordinatorManifest { zomes: vec![] },
         };
-        let resources = vec![(path1, wasm1), (path2, wasm2)];
+        let resources = vec![(path1, wasm1.into()), (path2, wasm2.into())];
 
         // - Show that conversion fails due to hash mismatch
         let bad_bundle: DnaBundle = mr_bundle::Bundle::new_unchecked(
