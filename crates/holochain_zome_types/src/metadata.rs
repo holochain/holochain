@@ -11,9 +11,9 @@ use holochain_serialized_bytes::prelude::*;
 /// ActionHash returns a Record.
 /// EntryHash returns an Entry.
 pub enum Details {
-    /// Variant holding a specific record. Returned when [`get_details`] was passed an action hash.
+    /// Variant holding a specific record. Returned when an action hash was passed.
     Record(RecordDetails),
-    /// Variant holding all information on a record. Returned when [`get_details`] was passed an entry hash.
+    /// Variant holding all information on a record. Returned when an entry hash was passed.
     Entry(EntryDetails),
 }
 
