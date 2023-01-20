@@ -400,9 +400,7 @@ impl From<StoppedApp> for InstalledApp {
 pub struct InstalledAppCommon {
     /// The unique identifier for an installed app in this conductor
     installed_app_id: InstalledAppId,
-    /// The agent key used to install this app. Currently this is meaningless,
-    /// but I'm leaving it here as a placeholder in case we ever want it to
-    /// have formal significance.
+    /// The agent key used to install this app.
     agent_key: AgentPubKey,
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
     role_assignments: HashMap<RoleName, AppRoleAssignment>,
