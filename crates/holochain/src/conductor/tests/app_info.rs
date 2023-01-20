@@ -1,6 +1,7 @@
 use holochain_conductor_api::CellInfo;
 use holochain_types::prelude::{
-    CloneCellId, CreateCloneCellPayload, DisableCloneCellPayload, InstalledAppId,
+    CloneCellId, CreateCloneCellPayload, DisableCloneCellPayload, EnableCloneCellPayload,
+    InstalledAppId,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{DnaModifiersOpt, RoleName};
@@ -31,8 +32,9 @@ async fn app_info_returns_all_cells_with_info() {
         .await
         .unwrap();
 
+    // create 1 clone cell for role 1 = clone cell 1
     let clone_name_1 = "clone_1".to_string();
-    let installed_clone_cell_1 = conductor
+    let clone_cell_1 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.clone(),
@@ -43,9 +45,11 @@ async fn app_info_returns_all_cells_with_info() {
         })
         .await
         .unwrap();
+    assert_eq!(clone_cell_1.original_dna_hash, dna_1.dna_hash().clone());
 
+    // create 1 clone cell for role 2 = clone cell 2
     let clone_name_2 = "clone_2".to_string();
-    let installed_clone_cell_2 = conductor
+    let clone_cell_2 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.clone(),
@@ -56,43 +60,48 @@ async fn app_info_returns_all_cells_with_info() {
         })
         .await
         .unwrap();
+    assert_eq!(clone_cell_2.original_dna_hash, dna_2.dna_hash().clone());
 
     // disable clone cell 2
     conductor
         .disable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.clone(),
-            clone_cell_id: CloneCellId::CellId(installed_clone_cell_2.as_id().clone()),
+            clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
         })
         .await
         .unwrap();
 
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
 
+    // agent pub key matches
+    assert_eq!(app_info.agent_pub_key, agent_pub_key);
+
     // app info has cell info for two role names
     assert_eq!(app_info.cell_info.len(), 2);
 
     // check cell info for role name 1
     let cell_info_for_role_1 = app_info.cell_info.get(&role_name_1).unwrap();
-    // first cell in cell info is provisioned cell
+    // cell 1 in cell info is provisioned cell
     matches!(cell_info_for_role_1[0], CellInfo::Provisioned(_));
-    // second cell in cell info is clone cell
+    // cell 2 in cell info is clone cell
     matches!(cell_info_for_role_1[1], CellInfo::Cloned(_));
 
     // check cell info for role name 2
     let cell_info_for_role_2 = app_info.cell_info.get(&role_name_2).unwrap();
-    // first cell in cell info is provisioned cell
+    // cell 1 in cell info is provisioned cell
     matches!(cell_info_for_role_2[0], CellInfo::Provisioned(_));
-    // second cell in cell info is clone cell
+    // cell 2 in cell info is clone cell
     matches!(cell_info_for_role_2[1], CellInfo::Cloned(_));
 
     // clone cell ids match
     assert!(if let CellInfo::Cloned(cell) = &cell_info_for_role_1[1] {
-        cell.cell_id == installed_clone_cell_1.as_id().clone()
+        cell.cell_id == clone_cell_1.cell_id.clone()
     } else {
         false
     });
+
     assert!(if let CellInfo::Cloned(cell) = &cell_info_for_role_2[1] {
-        cell.cell_id == installed_clone_cell_2.as_id().clone()
+        cell.cell_id == clone_cell_2.cell_id.clone()
     } else {
         false
     });
@@ -101,7 +110,26 @@ async fn app_info_returns_all_cells_with_info() {
     conductor.startup().await;
 
     // make sure app info is identical after conductor restart
-    let app_info_after_restart = conductor.get_app_info(&app_id).await.unwrap().unwrap();
-    // println!("app info before {:#?}\nand after restart {:#?}", app_info, app_info_after_restart);
+    let app_info_after_restart = conductor
+        .clone()
+        .get_app_info(&app_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(app_info, app_info_after_restart);
+
+    // make sure the re-enabled clone cell's original DNA hash matches
+    // tests that the enable_clone_cell fn returns the right DNA hash
+    let reenabled_clone_cell = conductor
+        .clone()
+        .enable_clone_cell(&EnableCloneCellPayload {
+            app_id: app_id.clone(),
+            clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        reenabled_clone_cell.original_dna_hash,
+        dna_2.dna_hash().clone()
+    );
 }

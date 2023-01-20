@@ -823,7 +823,7 @@ impl RibosomeT for RealRibosome {
                         .map_or(Ok(None), |func| Ok(Some(func.call()?)))
                         .map_err(|e: RuntimeError| {
                             RibosomeError::WasmRuntimeError(
-                                wasm_error!(WasmErrorInner::Host(format!("{}", e))).into(),
+                                wasm_error!(WasmErrorInner::Host(format!("Failed during call to wasm function. Zome Name: {}, Fn Name: {}, Error: {}", zome.zome_name(), name, e))).into(),
                             )
                         })?;
 
