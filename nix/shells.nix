@@ -3,6 +3,8 @@
 , mkShell
 , rustup
 , coreutils
+, cargo-nextest
+, crate2nix
 
 , holonix
 , hcToplevelDir
@@ -20,14 +22,20 @@ let
 
       {
         shellHook = ''
-          echo Using "$NIX_ENV_PREFIX" as target prefix...
+          >&2 echo Using "$NIX_ENV_PREFIX" as target prefix...
 
           export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
           mkdir -p $HC_TEST_WASM_DIR
 
           export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
           mkdir -p $HC_WASM_CACHE_PATH
-        '';
+        ''
+        # workaround to make cargo-nextest work on darwin
+        # see: https://github.com/nextest-rs/nextest/issues/267
+        + (lib.strings.optionalString stdenv.isDarwin ''
+          export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
+        '')
+        ;
       }
 
       input
@@ -41,19 +49,29 @@ rec {
   # * CI scripts
   coreDev = hcMkShell {
     nativeBuildInputs = builtins.attrValues (pkgs.core)
-      ++ (with holonix.pkgs;[
+      ++ [
+      cargo-nextest
+    ]
+    ++ (with holonix.pkgs;[
       sqlcipher
       gdb
       gh
       nixpkgs-fmt
       cargo-sweep
-    ]);
+    ])
+    ++ (lib.optionals stdenv.isDarwin
+      (with holonix.pkgs.darwin; [
+        Security
+        IOKit
+        apple_sdk_11_0.frameworks.CoreFoundation
+      ])
+    );
   };
 
   release = coreDev.overrideAttrs (attrs: {
     nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
       niv
-      crate2nix
+      cargo-readme
       (import ../crates/release-automation/default.nix { })
     ]);
   });

@@ -112,14 +112,26 @@ pub fn holo_dht_location_bytes(data: &[u8]) -> Vec<u8> {
     out
 }
 
+/// Arbitrary (within limits) output length blake2b
+pub fn blake2b_n(data: &[u8], length: usize) -> Result<Vec<u8>, HoloHashError> {
+    // blake2b_simd does an assert on the hash length and we allow happ devs
+    // to set this so we have to put a result guarding against the bounds.
+    if !(1..=blake2b_simd::OUTBYTES).contains(&length) {
+        return Err(HoloHashError::BadHashSize);
+    }
+    Ok(blake2b_simd::Params::new()
+        .hash_length(length)
+        .hash(data)
+        .as_bytes()
+        .to_vec())
+}
+
 /// internal compute a 32 byte blake2b hash
 pub fn blake2b_256(data: &[u8]) -> Vec<u8> {
-    let hash = blake2b_simd::Params::new().hash_length(32).hash(data);
-    hash.as_bytes().to_vec()
+    blake2b_n(data, 32).unwrap()
 }
 
 /// internal compute a 16 byte blake2b hash
 pub fn blake2b_128(data: &[u8]) -> Vec<u8> {
-    let hash = blake2b_simd::Params::new().hash_length(16).hash(data);
-    hash.as_bytes().to_vec()
+    blake2b_n(data, 16).unwrap()
 }

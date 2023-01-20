@@ -4,9 +4,20 @@
 
 use std::sync::Arc;
 
-use crate::event::*;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
+use crate::{event::*, KitsuneHost};
+use futures::FutureExt;
+use kitsune_p2p_fetch::{FetchQueueConfig, OpHashSized};
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bin_types::*;
+use kitsune_p2p_types::combinators::second;
+use kitsune_p2p_types::dht::hash::RegionHash;
+use kitsune_p2p_types::dht::prelude::{
+    array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetLtcs, RegionData,
+};
+use kitsune_p2p_types::dht::region::RegionCoords;
+use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, TimeQuantum};
+use kitsune_p2p_types::dht_arc::{DhtArc, DhtLocation};
 use kitsune_p2p_types::*;
 
 use super::switchboard_state::{NodeEp, NodeOpEntry, OpEntry, Switchboard};
@@ -36,12 +47,160 @@ impl SwitchboardEventHandler {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEventHandler {}
 impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
 
-#[allow(warnings)]
-impl KitsuneP2pEventHandler for SwitchboardEventHandler {
-    fn handle_k_gen_req(&mut self, _: KGenReq) -> KitsuneP2pEventHandlerResult<KGenRes> {
-        Err("unimplemented".into())
+impl FetchQueueConfig for SwitchboardEventHandler {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
+    }
+}
+
+impl KitsuneHost for SwitchboardEventHandler {
+    fn get_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
+        box_fut(Ok(self.sb.share(|state| {
+            let node = state.nodes.get_mut(&self.node).unwrap();
+            let loc = agent.get_loc().as_loc8();
+            node.local_agents
+                .get(&loc)
+                .map(|e| e.info.to_owned())
+                .or_else(|| node.remote_agents.get(&loc).cloned())
+        })))
     }
 
+    fn remove_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(self.sb.share(|state| {
+            let node = state.nodes.get_mut(&self.node).unwrap();
+            node.local_agents
+                .retain(|_, entry| entry.info.agent == agent);
+            true
+        })))
+    }
+
+    fn peer_extrapolated_coverage(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _dht_arc_set: dht_arc::DhtArcSet,
+    ) -> crate::KitsuneHostResult<Vec<f64>> {
+        unimplemented!()
+    }
+
+    fn record_metrics(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _records: Vec<MetricRecord>,
+    ) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn query_size_limited_regions(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _size_limit: u32,
+        regions: Vec<dht::region::Region>,
+    ) -> crate::KitsuneHostResult<Vec<dht::region::Region>> {
+        // This false implementation will work fine as long as we're not trying
+        // to test situations with regions with a large byte count getting broken up
+        box_fut(Ok(regions))
+    }
+
+    fn query_region_set(
+        &self,
+        space: Arc<KitsuneSpace>,
+        dht_arc_set: Arc<dht_arc::DhtArcSet>,
+    ) -> crate::KitsuneHostResult<dht::region_set::RegionSetLtcs> {
+        async move {
+            let topo = self.get_topology(space).await?;
+            let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
+                .expect("an arq could not be quantized");
+
+            // NOTE: If this were implemented correctly, it would take the recent_threshold
+            //       (default 1 hour) into account, so that historical gossip doesn't overlap
+            //       with recent gossip. But since the Switchboard only runs one gossip type
+            //       at a time, it seems safer to just run historical gossip for all of time.
+            let current = Timestamp::now();
+            let times =
+                TelescopingTimes::new(TimeQuantum::from_timestamp(&self.sb.topology, current));
+            let coord_set = RegionCoordSetLtcs::new(times, arq_set);
+            coord_set.into_region_set(|(_, coords)| {
+                let bounds = coords.to_bounds(&self.sb.topology);
+                let RegionBounds {
+                    x: (x0, x1),
+                    t: (t0, t1),
+                } = bounds;
+                let ops: Vec<_> = self.sb.share(|sb| {
+                    let all_ops = &sb.ops;
+                    let node_ops = &sb.nodes;
+
+                    // let held: Vec<Loc8> = sb
+                    // .nodes
+                    // .get(&self.node)
+                    // .unwrap()
+                    // .ops
+                    // .iter()
+                    // .filter(|(_, o)| o.is_integrated)
+                    // .map(|(loc8, _)| loc8)
+                    // .collect();
+
+                    all_ops
+                        .iter()
+                        .filter(move |(loc8, op)| {
+                            let loc = DhtLocation::from(**loc8);
+                            let arc = DhtArc::from_bounds(x0, x1);
+                            let owned = node_ops
+                                .get(&self.node)
+                                .unwrap()
+                                .ops
+                                .get(loc8)
+                                .map(|o| o.is_integrated)
+                                .unwrap_or_default();
+                            owned && arc.contains(loc) && t0 <= op.timestamp && op.timestamp < t1
+                        })
+                        .map(second)
+                        .cloned()
+                        .collect()
+                });
+                let hash = ops.iter().fold([0; 32], |mut h, o| {
+                    array_xor(&mut h, o.hash.get_bytes().try_into().unwrap());
+                    h
+                });
+
+                Ok(RegionData {
+                    hash: RegionHash::from(hash),
+                    count: ops.len() as u32,
+                    size: ops.len() as u32,
+                })
+            })
+        }
+        .boxed()
+        .into()
+    }
+
+    fn get_topology(
+        &self,
+        _space: Arc<KitsuneSpace>,
+    ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
+        box_fut(Ok(self.sb.topology.clone()))
+    }
+
+    fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
+        todo!()
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: RegionCoords,
+    ) -> crate::KitsuneHostResult<Vec<OpHashSized>> {
+        todo!()
+    }
+}
+
+#[allow(warnings)]
+impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_put_agent_info_signed(
         &mut self,
         PutAgentInfoSignedEvt { space, peer_data }: PutAgentInfoSignedEvt,
@@ -59,20 +218,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 );
         });
         ok_fut(Ok(()))
-    }
-
-    fn handle_get_agent_info_signed(
-        &mut self,
-        GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        ok_fut(Ok(self.sb.share(|state| {
-            let node = state.nodes.get_mut(&self.node).unwrap();
-            let loc = agent.get_loc().as_loc8();
-            node.local_agents
-                .get(&loc)
-                .map(|e| e.info.to_owned())
-                .or_else(|| node.remote_agents.get(&loc).cloned())
-        })))
     }
 
     fn handle_query_agents(
@@ -104,7 +249,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         &mut self,
         space: Arc<KitsuneSpace>,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht_arc::PeerViewBeta> {
+    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
         todo!()
     }
 
@@ -126,18 +271,32 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
         todo!()
     }
 
-    fn handle_gossip(
+    fn handle_receive_ops(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        ops: Vec<KOp>,
+        _context: Option<kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         ok_fut(Ok(self.sb.share(|sb| {
             let node = sb.nodes.get_mut(&self.node).unwrap();
-            for (hash, op_data) in ops {
-                let loc8 = hash.get_loc().as_loc8();
+            for op in ops {
+                // As a hack, we just set the first bytes of the op data to the
+                // loc8 location. This mimics the real world usage, where the
+                // location would be able to be extracted from the real op data,
+                // but is just a hack here since we're not even bothering to
+                // deserialize.
+                //
+                // NB: this may be problematic on the receiving end because we
+                // actually care whether this Loc8 is interpreted as u8 or i8,
+                // and we lose that information here.
+                let loc = op.0[0] as i32;
+                if loc == 192 {
+                    dbg!((&self.node, loc));
+                }
+
                 // TODO: allow setting integration status
                 node.ops.insert(
-                    loc8,
+                    loc.into(),
                     NodeOpEntry {
                         is_integrated: true,
                     },
@@ -158,16 +317,20 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
         ok_fut(Ok(self.sb.share(|sb| {
             let (ops, timestamps): (Vec<_>, Vec<_>) = sb
-                .ops
+                .get_ops_loc8(&self.node)
                 .iter()
-                .filter(|(op_loc8, op)| {
-                    // Does the op fall within the time window?
-                    window.contains(&op.timestamp)
-                    // Does the op fall within one of the specified arcsets
-                    // with the correct integration/limbo criteria?
-                        && arc_set.contains((**op_loc8).into())
+                .filter_map(|op_loc8| {
+                    let op = sb.ops.get(op_loc8).unwrap();
+                    (
+                        // Does the op fall within the time window?
+                        window.contains(&op.timestamp)
+                        // Does the op fall within one of the specified arcsets
+                        // with the correct integration/limbo criteria?
+                        && arc_set.contains((*op_loc8).into())
+                    )
+                    .then(|| op)
                 })
-                .map(|(_, op)| (op.hash.clone(), op.timestamp))
+                .map(|op| (op.hash.clone(), op.timestamp))
                 .take(max_ops)
                 .unzip();
 
@@ -193,16 +356,30 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
 
     fn handle_fetch_op_data(
         &mut self,
-        FetchOpDataEvt { space, op_hashes }: FetchOpDataEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
-        ok_fut(Ok(self.sb.share(|sb| {
-            op_hashes
+        FetchOpDataEvt { space, query }: FetchOpDataEvt,
+    ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<KitsuneOpHash>, KOp)>> {
+        ok_fut(Ok(self.sb.share(|sb| match query {
+            FetchOpDataEvtQuery::Hashes {
+                op_hash_list: hashes,
+                ..
+            } => hashes
                 .into_iter()
                 .map(|hash| {
-                    let e: &OpEntry = sb.ops.get(&hash.get_loc().as_loc8()).unwrap();
-                    (e.hash.to_owned(), e.data.to_owned())
+                    let loc = hash.get_loc().as_loc8();
+                    let e: &OpEntry = sb.ops.get(&loc).unwrap();
+                    (e.hash.to_owned(), KitsuneOpData::new(vec![loc.as_u8()]))
                 })
-                .collect()
+                .collect(),
+            FetchOpDataEvtQuery::Regions(bounds) => bounds
+                .into_iter()
+                .flat_map(|b| {
+                    // dbg!(&b);
+                    sb.ops.iter().filter_map(move |(loc, o)| {
+                        let contains = b.contains(&DhtLocation::from(*loc), &o.timestamp);
+                        contains.then(|| (o.hash.clone(), KitsuneOpData::new(vec![loc.as_u8()])))
+                    })
+                })
+                .collect(),
         })))
     }
 

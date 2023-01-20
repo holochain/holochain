@@ -1,12 +1,162 @@
 ---
-unreleasable: false
-default_unreleasable: true
+default_semver_increment_mode: !pre_minor beta-rc
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/holochain/holochain/compare/hdk-v0.0.100...HEAD)
+## Unreleased
+- Fix typos and links in docs and add links to wasm examples.
+
+## 0.1.0-beta-rc.2
+
+## 0.1.0-beta-rc.1
+
+## 0.1.0-beta-rc.0
+
+## 0.0.163
+
+## 0.0.162
+
+## 0.0.161
+
+## 0.0.160
+
+## 0.0.159
+
+## 0.0.158
+
+## 0.0.157
+
+- Pin the *hdi* dependency version. [\#1605](https://github.com/holochain/holochain/pull/1605)
+
+## 0.0.156
+
+## 0.0.155
+
+## 0.0.154
+
+## 0.0.153
+
+## 0.0.152
+
+## 0.0.151
+
+## 0.0.150
+
+## 0.0.149
+
+## 0.0.148
+
+## 0.0.147
+
+## 0.0.146
+
+## 0.0.145
+
+## 0.0.144
+
+- Docs: Add example how to get a typed path from a path to `path` module [\#1505](https://github.com/holochain/holochain/pull/1505)
+- Exposed `TypedPath` type in the hdk prelude for easy access from zomes.
+
+## 0.0.143
+
+- Docs: Add documentation on `get_links` argument `link_type`. [\#1486](https://github.com/holochain/holochain/pull/1486)
+- Docs: Intra-link to `wasm_error` and `WasmErrorInner`. [\#1486](https://github.com/holochain/holochain/pull/1486)
+
+## 0.0.142
+
+## 0.0.141
+
+- Docs: Add section on coordinator zomes and link to HDI crate.
+
+## 0.0.140
+
+## 0.0.139
+
+- **BREAKING CHANGE:** Anchor functions, `TypedPath` and `create_link` take `ScopedLinkType: TryFrom<T>` instead of `LinkType: From<T>`.
+- **BREAKING CHANGE:** `create_entry` takes `ScopedEntryDefIndex: TryFrom<T>` instead of `EntryDefIndex: TryFrom<T>`.
+- **BREAKING CHANGE:** `get_links` and `get_link_details` take `impl LinkTypeFilterExt` instead of `TryInto<LinkTypeRanges>`.
+- hdk: **BREAKING CHANGE** `x_salsa20_poly1305_*` functions have been properly implemented. Any previous `KeyRef`s will no longer work. These new functions DO NOT work with legacy lair `v0.0.z`, you must use NEW lair `v0.y.z` (v0.2.0 as of this PR). [\#1446](https://github.com/holochain/holochain/pull/1446)
+- Fixed `hdk::query`, which was showing some incorrect behavior [\#1402](https://github.com/holochain/holochain/pull/1402):
+  - When using `ChainQueryFilterRange::ActionHashRange`, extraneous elements from other authors could be returned.
+  - Certain combinations of filters, like hash-bounded ranges and header type filters, are currently implemented incorrectly and lead to undefined behavior. Filter combinations which are unsupported now result in `SourceChainError::UnsupportedQuery`.
+
+## 0.0.138
+
+- hdk: Bump rand version + fix getrandom (used by rand\_core and rand) to fetch randomness from host system when compiled to WebAssembly. [\#1445](https://github.com/holochain/holochain/pull/1445)
+
+## 0.0.137
+
+- hdk: Use newest wasmer and introduces `wasm_error!` macro to capture line numbers for wasm errors [\#1380](https://github.com/holochain/holochain/pull/1380)
+- Docs: Restructure main page sections and add several intra-doc lnks [\#1418](https://github.com/holochain/holochain/pull/1418)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_create_random` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_export` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- hdk: Add functional stub for `x_salsa20_poly1305_shared_secret_ingest` [\#1410](https://github.com/holochain/holochain/pull/1410)
+- Bump wasmer to 0.0.80 [\#1386](https://github.com/holochain/holochain/pull/1386)
+
+### Integrity / Coordinator Changes [\#1325](https://github.com/holochain/holochain/pull/1325)
+
+### Added
+
+- `get_links` and `get_link_details` take a `TryInto<LinkTypesRages>`. See the link test wasm for examples.
+
+### Removed
+
+- `entry_def_index` and `entry_type` macros are no longer needed.
+
+### Changed
+
+- `call` and `call_remote` now take an `Into<ZomeName>` instead of a `ZomeName`.
+- `create_link` takes a `TryInto<LinkType>` instead of an `Into<LinkType>`.
+- `update` takes `UpdateInput` instead of a `HeaderHash` and `CreateInput`.
+- `create_entry` takes a type that can try into an `EntryDefIndex` and `EntryVisibility` instead of implementing `EntryDefRegistration`.
+- `update_entry` takes the previous header hash and a try into `Entry` instead of a `EntryDefRegistration`.
+- `Path` now must be `typed(LinkType)` to use any functionality that creates or gets links.
+
+## 0.0.136
+
+- Docs: Crate README generated from crate level doc comments [\#1392](https://github.com/holochain/holochain/pull/1392).
+
+## 0.0.135
+
+## 0.0.134
+
+## 0.0.133
+
+## 0.0.132
+
+- hdk: Provide `Into<AnyLinkableHash>` impl for `EntryHash` and `HeaderHash`. This allows `create_link` and `get_links` to be used directly with EntryHash and HeaderHash arguments, rather than needing to construct an `AnyLinkableHash` explicitly.
+
+## 0.0.131
+
+- Docs: Fix intra-doc links in all crates [\#1323](https://github.com/holochain/holochain/pull/1323)
+
+## 0.0.130
+
+## 0.0.129
+
+## 0.0.128
+
+*NOTE: this release has not been published to crates.io*
+
+- hdk: Adds external hash type for data that has a DHT location but does not exist on the DHT [\#1298](https://github.com/holochain/holochain/pull/1298)
+- hdk: Adds compound hash type for linkable hashes [\#1308](https://github.com/holochain/holochain/pull/1308)
+- hdk: Missing dependencies are fetched async for validation [\#1268](https://github.com/holochain/holochain/pull/1268)
+
+## 0.0.127
+
+## 0.0.126
+
+- Docs: Explain how hashes in Holochain are composed and its components on the module page for `hdk::hash` [\#1299](https://github.com/holochain/holochain/pull/1299).
+
+## 0.0.125
+
+- hdk: link base and target are no longer required to exist on the current DHT and aren’t made available via. validation ops (use must\_get\_entry instead) [\#1266](https://github.com/holochain/holochain/pull/1266)
+
+## 0.0.124
+
+## 0.0.123
 
 ## 0.0.122
 

@@ -1,21 +1,28 @@
 [package]
 name = "test_wasm_hash_entry"
 version = "0.0.1"
-authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+authors = ["thedavidmeister", "thedavidmeister@gmail.com"]
+edition = "2021"
 
 [lib]
 name = "test_wasm_hash_entry"
-crate-type = [ "cdylib", "rlib" ]
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "integrity_test_wasm_hash_entry"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-hdk = { path = "../../../../hdk" }
 serde = "1.0"
+hdk = { path = "../../../../hdk", optional = true }
+hdi = { path = "../../../../hdi" }
+
+[features]
+default = ["hdk"]
+integrity = []
+mock = ["hdk/mock"]
 
 [dev-dependencies]
 hdk = { path = "../../../../hdk", features = ["fixturators"] }
 fixt = { path = "../../../../fixt" }
-
-[features]
-default = []
-mock = ["hdk/mock"]

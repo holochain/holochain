@@ -13,7 +13,7 @@ pub struct JsonDump {
     pub integration_dump: IntegrationStateDump,
 }
 
-#[derive(Serialize, Clone, Debug, Deserialize)]
+#[derive(Serialize, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct FullStateDump {
     pub peer_dump: P2pAgentsDump,
     pub source_chain_dump: SourceChainJsonDump,
@@ -41,7 +41,7 @@ pub struct IntegrationStateDump {
     pub integrated: usize,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 /// A full view of the DHT shard of the Cell.
 /// Ops start in the validation limbo then proceed
 /// to the integration limbo then finally are integrated.
@@ -63,7 +63,7 @@ pub struct FullIntegrationStateDump {
     pub dht_ops_cursor: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 /// State dump of all the peer info
 pub struct P2pAgentsDump {
     /// The info of this agents cell.
@@ -76,7 +76,7 @@ pub struct P2pAgentsDump {
     pub peers: Vec<AgentInfoDump>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 /// Agent info dump with the agent,
 /// space, signed time, expires in and
 /// urls printed in a pretty way.
@@ -98,8 +98,8 @@ impl std::fmt::Display for JsonDump {
         )?;
         writeln!(
             f,
-            "Elements authored: {}, Ops published: {}",
-            s.elements.len(),
+            "Records authored: {}, Ops published: {}",
+            s.records.len(),
             s.published_ops_count
         )
     }

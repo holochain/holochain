@@ -6,7 +6,6 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holo_hash::AnyDhtHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
@@ -31,6 +30,12 @@ pub struct InitHostAccess {
     pub network: HolochainP2pDna,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
+}
+
+impl std::fmt::Debug for InitHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InitHostAccess").finish()
+    }
 }
 
 impl From<InitHostAccess> for HostContext {
@@ -78,8 +83,8 @@ pub enum InitResult {
     Fail(ZomeName, String),
     /// no init failed but some zome has unresolved dependencies
     /// ZomeName is the first zome that has unresolved dependencies
-    /// Vec<EntryHash> is the list of all missing dependency addresses
-    UnresolvedDependencies(ZomeName, Vec<AnyDhtHash>),
+    /// `Vec<EntryHash>` is the list of all missing dependency addresses
+    UnresolvedDependencies(ZomeName, UnresolvedDependencies),
 }
 
 impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
@@ -92,7 +97,7 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
                 // unresolved deps overrides pass but not fail
                 InitCallbackResult::UnresolvedDependencies(ud) => match acc {
                     Self::Fail(_, _) => acc,
-                    _ => Self::UnresolvedDependencies(zome_name, ud.into_iter().collect()),
+                    _ => Self::UnresolvedDependencies(zome_name, ud),
                 },
                 // passing callback allows the acc to carry forward
                 InitCallbackResult::Pass => acc,
@@ -121,7 +126,7 @@ mod test {
         let result_ud = || {
             InitResult::UnresolvedDependencies(
                 ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
-                vec![],
+                UnresolvedDependencies::Hashes(vec![]),
             )
         };
         let result_fail = || {
@@ -140,7 +145,7 @@ mod test {
         let cb_ud = || {
             (
                 ZomeNameFixturator::new(::fixt::Predictable).next().unwrap(),
-                InitCallbackResult::UnresolvedDependencies(vec![]),
+                InitCallbackResult::UnresolvedDependencies(UnresolvedDependencies::Hashes(vec![])),
             )
         };
         let cb_fail = || {
@@ -164,7 +169,7 @@ mod test {
             results.shuffle(&mut rng);
 
             // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
+            let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
                 match maybe_extra {

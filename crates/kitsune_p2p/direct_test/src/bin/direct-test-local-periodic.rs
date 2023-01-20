@@ -1,7 +1,7 @@
 #![allow(clippy::field_reassign_with_default)]
 use futures::future::FutureExt;
 use kitsune_p2p_direct::dependencies::kitsune_p2p::event::full_time_window;
-use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::ArcInterval;
+use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::DhtArcRange;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
 use kitsune_p2p_direct_test::direct_test_local_periodic::*;
@@ -16,6 +16,9 @@ async fn main() {
     config.periodic_agent_hook_interval_ms = Some(1000);
     config.periodic_agent_hook = Box::new(|input| {
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &input;
             let AgentHookInput {
                 root,
                 app_entry_hash,
@@ -66,7 +69,7 @@ async fn main() {
                         test.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        ArcInterval::Full.into(),
+                        DhtArcRange::Full.into(),
                     )
                     .await
                     .unwrap()

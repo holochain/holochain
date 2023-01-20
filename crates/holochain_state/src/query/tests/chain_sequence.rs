@@ -1,5 +1,5 @@
-use crate::{source_chain::SourceChainResult, test_utils::test_cell_env};
-use holo_hash::HeaderHash;
+use crate::{source_chain::SourceChainResult, test_utils::test_cell_db};
+use holo_hash::ActionHash;
 use holochain_sqlite::prelude::*;
 use matches::assert_matches;
 use observability;
@@ -7,13 +7,13 @@ use observability;
 #[tokio::test(flavor = "multi_thread")]
 async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
     observability::test_run().ok();
-    let test_env = test_cell_env();
-    let arc = test_env.env();
+    let test_db = test_cell_db();
+    let arc = test_db.env();
     {
         let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
         assert_eq!(buf.chain_head(), None);
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0,
             ])
@@ -22,15 +22,15 @@ async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         assert_eq!(
             buf.chain_head(),
             Some(
-                &HeaderHash::from_raw_36(vec![
+                &ActionHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0
                 ])
                 .into()
             )
         );
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 1,
             ])
@@ -39,15 +39,15 @@ async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         assert_eq!(
             buf.chain_head(),
             Some(
-                &HeaderHash::from_raw_36(vec![
+                &ActionHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1
                 ])
                 .into()
             )
         );
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 2,
             ])
@@ -56,7 +56,7 @@ async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         assert_eq!(
             buf.chain_head(),
             Some(
-                &HeaderHash::from_raw_36(vec![
+                &ActionHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2
                 ])
@@ -69,20 +69,20 @@ async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn chain_sequence_functionality() -> SourceChainResult<()> {
-    let test_env = test_cell_env();
-    let arc = test_env.env();
+    let test_db = test_cell_db();
+    let arc = test_db.env();
 
     {
         let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0,
             ])
             .into(),
         )?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 1,
             ])
@@ -91,15 +91,15 @@ async fn chain_sequence_functionality() -> SourceChainResult<()> {
         assert_eq!(
             buf.chain_head(),
             Some(
-                &HeaderHash::from_raw_36(vec![
+                &ActionHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1
                 ])
                 .into()
             )
         );
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 2,
             ])
@@ -115,7 +115,7 @@ async fn chain_sequence_functionality() -> SourceChainResult<()> {
         assert_eq!(
             buf.chain_head(),
             Some(
-                &HeaderHash::from_raw_36(vec![
+                &ActionHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2
                 ])
@@ -134,22 +134,22 @@ async fn chain_sequence_functionality() -> SourceChainResult<()> {
 
     {
         let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 3,
             ])
             .into(),
         )?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 4,
             ])
             .into(),
         )?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 5,
             ])
@@ -165,7 +165,7 @@ async fn chain_sequence_functionality() -> SourceChainResult<()> {
         assert_eq!(
             buf.chain_head(),
             Some(
-                &HeaderHash::from_raw_36(vec![
+                &ActionHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 5
                 ])
@@ -187,31 +187,31 @@ async fn chain_sequence_functionality() -> SourceChainResult<()> {
 /// under us, error
 #[tokio::test(flavor = "multi_thread")]
 async fn chain_sequence_head_moved_triggers_error() -> anyhow::Result<()> {
-    let test_env = test_cell_env();
-    let arc1 = test_env.env();
-    let arc2 = test_env.env();
+    let test_db = test_cell_db();
+    let arc1 = test_db.env();
+    let arc2 = test_db.env();
     let (tx1, rx1) = tokio::sync::oneshot::channel();
     let (tx2, rx2) = tokio::sync::oneshot::channel();
 
     // Attempt to move the chain concurrently-- this one fails
     let task1 = tokio::spawn(async move {
         let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0,
             ])
             .into(),
         )?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 1,
             ])
             .into(),
         )?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 2,
             ])
@@ -232,22 +232,22 @@ async fn chain_sequence_head_moved_triggers_error() -> anyhow::Result<()> {
     let task2 = tokio::spawn(async move {
         rx1.await.unwrap();
         let mut buf = ChainSequenceBuf::new(arc2.clone().into())?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 3,
             ])
             .into(),
         )?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 4,
             ])
             .into(),
         )?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 5,
             ])
@@ -263,7 +263,7 @@ async fn chain_sequence_head_moved_triggers_error() -> anyhow::Result<()> {
 
     let (result1, result2) = tokio::join!(task1, task2);
 
-    let expected_hash = HeaderHash::from_raw_36(vec![
+    let expected_hash = ActionHash::from_raw_36(vec![
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 5,
     ])
@@ -287,23 +287,23 @@ async fn chain_sequence_head_moved_triggers_error() -> anyhow::Result<()> {
 /// chain head ourselves, proceed as usual
 #[tokio::test(flavor = "multi_thread")]
 async fn chain_sequence_head_moved_triggers_no_error_if_clean() -> anyhow::Result<()> {
-    let test_env = test_cell_env();
-    let arc1 = test_env.env();
-    let arc2 = test_env.env();
+    let test_db = test_cell_db();
+    let arc1 = test_db.env();
+    let arc2 = test_db.env();
     let (tx1, rx1) = tokio::sync::oneshot::channel();
     let (tx2, rx2) = tokio::sync::oneshot::channel();
 
     // Add a few things to start with
     let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
-    buf.put_header(
-        HeaderHash::from_raw_36(vec![
+    buf.put_action(
+        ActionHash::from_raw_36(vec![
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0,
         ])
         .into(),
     )?;
-    buf.put_header(
-        HeaderHash::from_raw_36(vec![
+    buf.put_action(
+        ActionHash::from_raw_36(vec![
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 1,
         ])
@@ -313,7 +313,7 @@ async fn chain_sequence_head_moved_triggers_no_error_if_clean() -> anyhow::Resul
         .unwrap()
         .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
 
-    // Modify the chain without adding a header -- this succeeds
+    // Modify the chain without adding an action -- this succeeds
     let task1 = tokio::spawn(async move {
         let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
         buf.complete_dht_op(0)?;
@@ -328,12 +328,12 @@ async fn chain_sequence_head_moved_triggers_no_error_if_clean() -> anyhow::Resul
             .with_commit(|mut writer| buf.flush_to_txn(&mut writer))
     });
 
-    // Add a header to the chain -- there is no collision, so this succeeds
+    // Add an action to the chain -- there is no collision, so this succeeds
     let task2 = tokio::spawn(async move {
         rx1.await.unwrap();
         let mut buf = ChainSequenceBuf::new(arc2.clone().into())?;
-        buf.put_header(
-            HeaderHash::from_raw_36(vec![
+        buf.put_action(
+            ActionHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 2,
             ])

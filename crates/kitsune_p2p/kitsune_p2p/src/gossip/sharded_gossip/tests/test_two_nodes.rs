@@ -33,7 +33,7 @@ async fn sharded_sanity_test() {
     )
     .await;
 
-    // - Bob try's to initiate.
+    // - Bob tries to initiate.
     let (_, _, bob_outgoing) = bob.try_initiate().await.unwrap().unwrap();
     let alices_cert = bob
         .inner
@@ -141,13 +141,18 @@ async fn partial_missing_doesnt_finish() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -158,7 +163,7 @@ async fn partial_missing_doesnt_finish() {
     .await;
 
     // - Send a missing ops message that isn't marked as finished.
-    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+    let incoming = ShardedGossipWire::MissingOpHashes(MissingOpHashes {
         ops: vec![],
         finished: MissingOpsStatus::ChunkComplete as u8,
     });
@@ -189,13 +194,18 @@ async fn missing_ops_finishes() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -206,7 +216,7 @@ async fn missing_ops_finishes() {
     .await;
 
     // Send a message marked as finished.
-    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+    let incoming = ShardedGossipWire::MissingOpHashes(MissingOpHashes {
         ops: vec![],
         finished: MissingOpsStatus::AllComplete as u8,
     });
@@ -238,13 +248,18 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: false,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -255,7 +270,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     .await;
 
     // - Send a message marked as finished.
-    let incoming = ShardedGossipWire::MissingOps(MissingOps {
+    let incoming = ShardedGossipWire::MissingOpHashes(MissingOpHashes {
         ops: vec![],
         finished: MissingOpsStatus::AllComplete as u8,
     });
@@ -287,13 +302,18 @@ async fn bloom_response_finishes() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 0,
-                    received_all_incoming_ops_blooms: false,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 0,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -304,7 +324,7 @@ async fn bloom_response_finishes() {
     .await;
 
     // - Send the final ops bloom message.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBloom(OpBloom {
         missing_hashes: empty_bloom(),
         finished: true,
     });
@@ -336,13 +356,18 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
             round_map: maplit::hashmap! {
                 cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: false,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -353,7 +378,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
     .await;
 
     // - Send the final ops bloom message.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBloom(OpBloom {
         missing_hashes: empty_bloom(),
         finished: true,
     });
@@ -388,13 +413,18 @@ async fn no_data_still_finishes() {
             round_map: maplit::hashmap! {
                 bob_cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 0,
-                    received_all_incoming_ops_blooms: false,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 0,
+                    received_all_incoming_op_blooms: false,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -411,13 +441,18 @@ async fn no_data_still_finishes() {
             round_map: maplit::hashmap! {
                 alice_cert.clone() => RoundState {
                     remote_agent_list: vec![],
-                    common_arc_set: Arc::new(ArcInterval::Full.into()),
-                    num_sent_ops_blooms: 1,
-                    received_all_incoming_ops_blooms: true,
+                    common_arc_set: Arc::new(DhtArcSet::Full),
+                    num_expected_op_blooms: 1,
+                    received_all_incoming_op_blooms: true,
+                    has_pending_historical_op_data: false,
+                    regions_are_queued: true,
+                    id: nanoid::nanoid!(),
                     last_touch: Instant::now(),
                     round_timeout: std::time::Duration::MAX,
                     bloom_batch_cursor: None,
                     ops_batch_queue: OpsBatchQueue::new(),
+                    region_set_sent: None,
+                    region_diffs: Default::default(),
                 }
             }
             .into(),
@@ -428,7 +463,7 @@ async fn no_data_still_finishes() {
     .await;
 
     // - Send the final ops bloom message to alice.
-    let incoming = ShardedGossipWire::Ops(Ops {
+    let incoming = ShardedGossipWire::OpBloom(OpBloom {
         missing_hashes: empty_bloom(),
         finished: true,
     });
@@ -469,8 +504,8 @@ async fn no_data_still_finishes() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-/// This test checks that when two players concurrently
-/// initiate a round it is handle correctly.
+/// This test checks that when two players simultaneously
+/// initiate a round it is handled correctly.
 async fn double_initiate_is_handled() {
     let agents = agents_with_infos(2).await;
     // - Set up two players with themselves as local agents.
@@ -493,8 +528,8 @@ async fn double_initiate_is_handled() {
     .await;
 
     // - Both players try to initiate and only have the other as a remote agent.
-    let (alice_cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
-    let (bob_cert, _, bob_initiate) = bob.try_initiate().await.unwrap().unwrap();
+    let (bob_cert, _, alice_initiate) = alice.try_initiate().await.unwrap().unwrap();
+    let (alice_cert, _, bob_initiate) = bob.try_initiate().await.unwrap().unwrap();
 
     // - Both players process the initiate.
     let alice_outgoing = alice

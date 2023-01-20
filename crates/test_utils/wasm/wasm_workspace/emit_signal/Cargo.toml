@@ -2,11 +2,17 @@
 name = "test_wasm_emit_signal"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "test_wasm_emit_signal"
 crate-type = [ "cdylib", "rlib" ]
+
+[[example]]
+name = "integrity_test_wasm_emit_signal"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 
 [dependencies]
 hdk = { path = "../../../../hdk" }

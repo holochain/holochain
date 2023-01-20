@@ -1,10 +1,10 @@
 #![forbid(missing_docs)]
 //! Binary `hc-dna` command executable.
 
-use holochain_types::prelude::{AppManifest, DnaManifest};
+use holochain_types::prelude::{AppManifest, DnaManifest, ValidatedDnaManifest};
 use holochain_types::web_app::WebAppManifest;
 use holochain_util::ffs;
-use mr_bundle::Manifest;
+use mr_bundle::{Location, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -73,6 +73,12 @@ pub enum HcDnaBundle {
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
+        /// Don't attempt to parse the manifest. Useful if you have a manifest
+        /// of an outdated format. This command will allow you to unpack the
+        /// manifest so that it may be modified and repacked into a valid bundle.
+        #[structopt(short = "r", long)]
+        raw: bool,
+
         /// Overwrite an existing directory, if one exists
         #[structopt(short = "f", long)]
         force: bool,
@@ -109,6 +115,11 @@ pub enum HcAppBundle {
         /// provided working directory.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
+
+        /// Also run `dna pack` on all DNAs manifests
+        /// that have their location bundled
+        #[structopt(short, long)]
+        recursive: bool,
     },
 
     /// Unpack parts of the `.happ` bundle file into a specific directory.
@@ -130,6 +141,12 @@ pub enum HcAppBundle {
         /// bundle file, with the same name as the bundle file name.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
+
+        /// Don't attempt to parse the manifest. Useful if you have a manifest
+        /// of an outdated format. This command will allow you to unpack the
+        /// manifest so that it may be modified and repacked into a valid bundle.
+        #[structopt(short = "r", long)]
+        raw: bool,
 
         /// Overwrite an existing directory, if one exists
         #[structopt(short = "f", long)]
@@ -167,6 +184,11 @@ pub enum HcWebAppBundle {
         /// provided working directory.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
+
+        /// Also run `app pack` and `dna pack` on all App and DNAs manifests
+        /// that have their location bundled
+        #[structopt(short, long)]
+        recursive: bool,
     },
 
     /// Unpack parts of the `.webhapp` bundle file into a specific directory.
@@ -189,6 +211,12 @@ pub enum HcWebAppBundle {
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
+        /// Don't attempt to parse the manifest. Useful if you have a manifest
+        /// of an outdated format. This command will allow you to unpack the
+        /// manifest so that it may be modified and repacked into a valid bundle.
+        #[structopt(short = "r", long)]
+        raw: bool,
+
         /// Overwrite an existing directory, if one exists
         #[structopt(short = "f", long)]
         force: bool,
@@ -205,17 +233,33 @@ impl HcDnaBundle {
             Self::Pack { path, output } => {
                 let name = get_dna_name(&path).await?;
                 let (bundle_path, _) =
-                    crate::packing::pack::<DnaManifest>(&path, output, name).await?;
+                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
                 path,
                 output,
+                raw,
                 force,
             } => {
-                let dir_path =
-                    crate::packing::unpack::<DnaManifest>(DNA_BUNDLE_EXT, &path, output, force)
-                        .await?;
+                let dir_path = if raw {
+                    crate::packing::unpack_raw(
+                        DNA_BUNDLE_EXT,
+                        &path,
+                        output,
+                        ValidatedDnaManifest::path().as_ref(),
+                        force,
+                    )
+                    .await?
+                } else {
+                    crate::packing::unpack::<ValidatedDnaManifest>(
+                        DNA_BUNDLE_EXT,
+                        &path,
+                        output,
+                        force,
+                    )
+                    .await?
+                };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
         }
@@ -230,8 +274,17 @@ impl HcAppBundle {
             Self::Init { path } => {
                 crate::init::init_app(path).await?;
             }
-            Self::Pack { path, output } => {
+            Self::Pack {
+                path,
+                output,
+                recursive,
+            } => {
                 let name = get_app_name(&path).await?;
+
+                if recursive {
+                    app_pack_recursive(&path).await?;
+                }
+
                 let (bundle_path, _) =
                     crate::packing::pack::<AppManifest>(&path, output, name).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
@@ -239,11 +292,22 @@ impl HcAppBundle {
             Self::Unpack {
                 path,
                 output,
+                raw,
                 force,
             } => {
-                let dir_path =
+                let dir_path = if raw {
+                    crate::packing::unpack_raw(
+                        APP_BUNDLE_EXT,
+                        &path,
+                        output,
+                        AppManifest::path().as_ref(),
+                        force,
+                    )
+                    .await?
+                } else {
                     crate::packing::unpack::<AppManifest>(APP_BUNDLE_EXT, &path, output, force)
-                        .await?;
+                        .await?
+                };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
         }
@@ -258,8 +322,17 @@ impl HcWebAppBundle {
             Self::Init { path } => {
                 crate::init::init_web_app(path).await?;
             }
-            Self::Pack { path, output } => {
+            Self::Pack {
+                path,
+                output,
+                recursive,
+            } => {
                 let name = get_web_app_name(&path).await?;
+
+                if recursive {
+                    web_app_pack_recursive(&path).await?;
+                }
+
                 let (bundle_path, _) =
                     crate::packing::pack::<WebAppManifest>(&path, output, name).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
@@ -267,15 +340,27 @@ impl HcWebAppBundle {
             Self::Unpack {
                 path,
                 output,
+                raw,
                 force,
             } => {
-                let dir_path = crate::packing::unpack::<WebAppManifest>(
-                    WEB_APP_BUNDLE_EXT,
-                    &path,
-                    output,
-                    force,
-                )
-                .await?;
+                let dir_path = if raw {
+                    crate::packing::unpack_raw(
+                        WEB_APP_BUNDLE_EXT,
+                        &path,
+                        output,
+                        WebAppManifest::path().as_ref(),
+                        force,
+                    )
+                    .await?
+                } else {
+                    crate::packing::unpack::<WebAppManifest>(
+                        WEB_APP_BUNDLE_EXT,
+                        &path,
+                        output,
+                        force,
+                    )
+                    .await?
+                };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
         }
@@ -285,7 +370,7 @@ impl HcWebAppBundle {
 
 async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&DnaManifest::path());
+    let manifest_path = manifest_path.join(ValidatedDnaManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.name())
@@ -293,7 +378,7 @@ async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
 
 async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&AppManifest::path());
+    let manifest_path = manifest_path.join(AppManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: AppManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())
@@ -301,8 +386,92 @@ async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
 
 async fn get_web_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&WebAppManifest::path());
+    let manifest_path = manifest_path.join(WebAppManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: WebAppManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())
+}
+
+// Pack the app's manifest and all its DNAs if their location is bundled
+async fn web_app_pack_recursive(web_app_workdir_path: &PathBuf) -> anyhow::Result<()> {
+    let canonical_web_app_workdir_path = ffs::canonicalize(web_app_workdir_path).await?;
+
+    let web_app_manifest_path = canonical_web_app_workdir_path.join(WebAppManifest::path());
+
+    let web_app_manifest: WebAppManifest =
+        serde_yaml::from_reader(std::fs::File::open(&web_app_manifest_path)?)?;
+
+    let app_bundle_location = web_app_manifest.happ_bundle_location();
+
+    if let Location::Bundled(mut bundled_app_location) = app_bundle_location {
+        // Remove the "APP_NAME.happ" portion of the path
+        bundled_app_location.pop();
+
+        // Join the web-app manifest location with the location of the app's workdir location
+        let app_workdir_location = PathBuf::new()
+            .join(web_app_workdir_path)
+            .join(bundled_app_location);
+
+        // Pack all the bundled DNAs and the app's manifest
+        HcAppBundle::Pack {
+            path: ffs::canonicalize(app_workdir_location).await?,
+            output: None,
+            recursive: true,
+        }
+        .run()
+        .await?;
+    }
+
+    Ok(())
+}
+
+// Pack all the app's DNAs if their location is bundled
+async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
+    let app_workdir_path = ffs::canonicalize(app_workdir_path).await?;
+
+    let app_manifest_path = app_workdir_path.join(AppManifest::path());
+    let f = std::fs::File::open(&app_manifest_path)?;
+
+    let manifest: AppManifest = serde_yaml::from_reader(f)?;
+
+    let dnas_workdir_locations =
+        bundled_dnas_workdir_locations(&app_manifest_path, &manifest).await?;
+
+    for dna_workdir_location in dnas_workdir_locations {
+        HcDnaBundle::Pack {
+            path: dna_workdir_location,
+            output: None,
+        }
+        .run()
+        .await?;
+    }
+
+    Ok(())
+}
+
+// Returns all the locations of the workdirs for the bundled DNAs in the given app manifest
+async fn bundled_dnas_workdir_locations(
+    app_manifest_path: &Path,
+    app_manifest: &AppManifest,
+) -> anyhow::Result<Vec<PathBuf>> {
+    let mut dna_locations: Vec<PathBuf> = vec![];
+
+    let mut app_workdir_location = app_manifest_path.to_path_buf();
+    app_workdir_location.pop();
+
+    for app_role in app_manifest.app_roles() {
+        if let Some(Location::Bundled(mut dna_bundle_location)) = app_role.dna.location {
+            // Remove the "DNA_NAME.yaml" portion of the path
+            dna_bundle_location.pop();
+
+            // Join the app's workdir location with the DNA bundle location, which is relative to it
+            let dna_workdir_location = PathBuf::new()
+                .join(&app_workdir_location)
+                .join(&dna_bundle_location);
+
+            dna_locations.push(ffs::canonicalize(dna_workdir_location).await?);
+        }
+    }
+
+    Ok(dna_locations)
 }

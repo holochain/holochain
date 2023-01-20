@@ -17,6 +17,8 @@ pub enum AppValidationError {
     #[error("Dna is missing {0:?}. Cannot validate without dna.")]
     DnaMissing(DnaHash),
     #[error(transparent)]
+    DhtOpError(#[from] DhtOpError),
+    #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
@@ -26,8 +28,8 @@ pub enum AppValidationError {
     RibosomeError(#[from] RibosomeError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
-    #[error("The app entry type {0:?} zome id was out of range")]
-    ZomeId(ZomeId),
+    #[error("The app entry type {0:?} zome index was out of range")]
+    ZomeIndex(ZomeIndex),
 }
 
 pub type AppValidationResult<T> = Result<T, AppValidationError>;
@@ -46,3 +48,4 @@ from_sub_error!(AppValidationError, RibosomeError);
 from_sub_error!(AppValidationError, CascadeError);
 from_sub_error!(AppValidationError, EntryDefStoreError);
 from_sub_error!(AppValidationError, SourceChainError);
+from_sub_error!(AppValidationError, DhtOpError);

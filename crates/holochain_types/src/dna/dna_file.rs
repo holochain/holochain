@@ -3,6 +3,10 @@ use crate::prelude::*;
 use holo_hash::*;
 use holochain_zome_types::ZomeName;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
+
+#[cfg(test)]
+mod test;
 
 /// Wasms need to be an ordered map from WasmHash to a wasm::DnaWasm
 #[derive(
@@ -66,20 +70,85 @@ impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
 
 impl DnaFile {
     /// Construct a new DnaFile instance.
-    pub async fn new(
-        dna: DnaDef,
-        wasm: impl IntoIterator<Item = wasm::DnaWasm>,
-    ) -> Result<Self, DnaError> {
+    pub async fn new(dna: DnaDef, wasm: impl IntoIterator<Item = wasm::DnaWasm>) -> Self {
         let mut code = BTreeMap::new();
         for wasm in wasm {
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
         let dna = DnaDefHashed::from_content_sync(dna);
-        Ok(Self {
+        Self {
             dna,
             code: code.into(),
-        })
+        }
+    }
+
+    /// Update coordinator zomes for this dna.
+    pub async fn update_coordinators(
+        &mut self,
+        coordinator_zomes: CoordinatorZomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> Result<Vec<WasmHash>, DnaError> {
+        let dangling_dep = coordinator_zomes.iter().find_map(|(coord_name, def)| {
+            def.as_any_zome_def()
+                .dependencies()
+                .iter()
+                .find_map(|zome_name| {
+                    (!self.dna.is_integrity_zome(zome_name))
+                        .then(|| (zome_name.to_string(), coord_name.to_string()))
+                })
+        });
+        if let Some((dangling_dep, zome_name)) = dangling_dep {
+            return Err(DnaError::DanglingZomeDependency(dangling_dep, zome_name));
+        }
+        // Get the previous coordinators.
+        let previous_coordinators = std::mem::replace(
+            &mut self.dna.content.coordinator_zomes,
+            Vec::with_capacity(0),
+        );
+
+        // Save the order they were installed.
+        let mut coordinator_order: Vec<_> = previous_coordinators
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect();
+
+        // Turn into a map.
+        let mut coordinators: HashMap<_, _> = previous_coordinators.into_iter().collect();
+
+        let mut old_wasm_hashes = Vec::with_capacity(coordinator_zomes.len());
+
+        // For each new coordinator insert it to the map.
+        for (name, def) in coordinator_zomes {
+            match coordinators.insert(name.clone(), def) {
+                Some(replaced_coordinator) => {
+                    // If this is replacing a previous coordinator then
+                    // remove the old wasm.
+                    let wasm_hash = replaced_coordinator.wasm_hash(&name)?;
+                    self.code.0.remove(&wasm_hash);
+                    old_wasm_hashes.push(wasm_hash);
+                }
+                None => {
+                    // If this is a brand new coordinator then add it
+                    // to the order.
+                    coordinator_order.push(name);
+                }
+            }
+        }
+
+        // Insert all the new wasms.
+        for wasm in wasms {
+            let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
+            self.code.0.insert(wasm_hash, wasm);
+        }
+
+        // Insert all the coordinators in the correct order.
+        self.dna.content.coordinator_zomes = coordinator_order
+            .into_iter()
+            .filter_map(|name| coordinators.remove_entry(&name))
+            .collect();
+
+        Ok(old_wasm_hashes)
     }
 
     /// Construct a DnaFile from its constituent parts
@@ -133,17 +202,17 @@ impl DnaFile {
 
     /// Transform this DnaFile into a new DnaFile with different properties
     /// and, hence, a different DnaHash.
-    pub async fn with_properties(self, properties: SerializedBytes) -> Result<Self, DnaError> {
+    pub async fn with_properties(self, properties: SerializedBytes) -> Self {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.properties = properties;
+        dna.modifiers.properties = properties;
         DnaFile::new(dna, wasm).await
     }
 
-    /// Transform this DnaFile into a new DnaFile with a different UID
+    /// Transform this DnaFile into a new DnaFile with a different network seed
     /// and, hence, a different DnaHash.
-    pub async fn with_uid(self, uid: String) -> Result<Self, DnaError> {
+    pub async fn with_network_seed(self, network_seed: NetworkSeed) -> Self {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
-        dna.uid = uid;
+        dna.modifiers.network_seed = network_seed;
         DnaFile::new(dna, wasm).await
     }
 
@@ -176,14 +245,19 @@ impl DnaFile {
         .expect("blocking thread panic!d - panicing here too")
     }
 
-    /// Change the "phenotype" of this DNA -- the UID and properties -- while
-    /// leaving the "genotype" of actual DNA code intact
-    pub fn modify_phenotype(&self, uid: Uid, properties: YamlProperties) -> DnaResult<Self> {
+    /// Set the DNA's name.
+    pub fn set_name(&self, name: String) -> Self {
         let mut clone = self.clone();
-        clone.dna = DnaDefHashed::from_content_sync(
-            clone.dna.modify_phenotype(uid, properties.try_into()?),
-        );
-        Ok(clone)
+        clone.dna = DnaDefHashed::from_content_sync(clone.dna.set_name(name));
+        clone
+    }
+
+    /// Change the DNA modifiers -- the network seed, origin time and properties -- while
+    /// leaving the actual DNA code intact.
+    pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
+        let mut clone = self.clone();
+        clone.dna = DnaDefHashed::from_content_sync(clone.dna.update_modifiers(dna_modifiers));
+        clone
     }
 }
 

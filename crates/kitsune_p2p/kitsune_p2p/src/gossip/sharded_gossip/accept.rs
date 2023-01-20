@@ -7,7 +7,7 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_accept(
         &self,
         peer_cert: Tx2Cert,
-        remote_arc_set: Vec<ArcInterval>,
+        remote_arc_set: Vec<DhtArcRange>,
         remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, when_initiated, accept_is_from_target) =
@@ -47,18 +47,18 @@ impl ShardedGossipLocal {
         }
 
         // Get the local intervals.
-        let local_agent_arcs =
+        let local_agent_arcs: Vec<_> =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents)
                 .await?
                 .into_iter()
-                .map(|(_, a)| a)
+                .map(|(_, a)| a.into())
                 .collect();
 
         let mut gossip = Vec::new();
 
         // Generate the bloom filters and new state.
         let state = self
-            .generate_blooms(
+            .generate_blooms_or_regions(
                 remote_agent_list.clone(),
                 local_agent_arcs,
                 remote_arc_set,
@@ -70,8 +70,12 @@ impl ShardedGossipLocal {
             // TODO: What happen if we are in the middle of a new outgoing and
             // a stale accept comes in for the same peer cert?
             // Maybe we need to check timestamps on messages or have unique round ids?
+
+            let mut metrics = inner.metrics.write();
+            metrics.update_current_round(&peer_cert, self.gossip_type.into(), &state);
+            metrics.record_initiate(&remote_agent_list, self.gossip_type.into());
+
             inner.round_map.insert(peer_cert.clone(), state);
-            inner.metrics.write().record_initiate(&remote_agent_list);
             Ok(())
         })?;
         Ok(gossip)

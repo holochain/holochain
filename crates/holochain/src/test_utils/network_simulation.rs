@@ -9,12 +9,13 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_p2p::dht_arc::{ArcInterval, DhtArc, DhtLocation};
+use holochain_p2p::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::db::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
 use holochain_state::test_utils::fresh_reader_test;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed, DhtOpType};
+use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::KitsuneP2pConfig;
@@ -24,7 +25,6 @@ use rand::distributions::Standard;
 use rand::Rng;
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
-use crate::conductor::handle::DevSettingsDelta;
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 
 #[derive(SerializedBytes, serde::Serialize, serde::Deserialize, Debug)]
@@ -50,12 +50,15 @@ pub struct MockNetworkData {
     pub op_to_loc: HashMap<Arc<DhtOpHash>, DhtLocation>,
     /// The DhtOps
     pub ops: HashMap<Arc<DhtOpHash>, DhtOpHashed>,
-    /// The uuid for the dna.
-    pub uuid: String,
+    /// The uuid for the integrity zome (also for the dna).
+    pub integrity_uuid: String,
+    /// The uuid for the coordinator zome.
+    pub coordinator_uuid: String,
 }
 
 struct GeneratedData {
-    uuid: String,
+    integrity_uuid: String,
+    coordinator_uuid: String,
     peer_data: Vec<AgentInfoSigned>,
     authored: HashMap<Arc<AgentPubKey>, Vec<Arc<DhtOpHash>>>,
     ops: HashMap<Arc<DhtOpHash>, DhtOpHashed>,
@@ -64,7 +67,8 @@ struct GeneratedData {
 impl MockNetworkData {
     fn new(data: GeneratedData) -> Self {
         let GeneratedData {
-            uuid,
+            integrity_uuid,
+            coordinator_uuid,
             peer_data,
             authored,
             ops,
@@ -112,7 +116,8 @@ impl MockNetworkData {
             ops_by_loc,
             op_to_loc,
             ops,
-            uuid,
+            integrity_uuid,
+            coordinator_uuid,
         }
     }
 
@@ -139,11 +144,11 @@ impl MockNetworkData {
 
     /// Hashes that an agent is an authority for.
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
-        let arc = self.agent_to_arc[agent].interval();
+        let arc = self.agent_to_arc[agent].inner();
         match arc {
-            ArcInterval::Empty => Vec::with_capacity(0),
-            ArcInterval::Full => self.ops_by_loc.values().flatten().cloned().collect(),
-            ArcInterval::Bounded(start, end) => {
+            DhtArcRange::Empty => Vec::with_capacity(0),
+            DhtArcRange::Full => self.ops_by_loc.values().flatten().cloned().collect(),
+            DhtArcRange::Bounded(start, end) => {
                 if start <= end {
                     self.ops_by_loc
                         .range(start..=end)
@@ -181,24 +186,36 @@ pub async fn generate_test_data(
     let is_cached = cached.is_some();
     let (data, dna_hash) = match cached {
         Some(cached) => {
-            let uuid = cached.uuid.clone();
-            let dna_file = data_zome(uuid).await;
+            let dna_file = data_zome(
+                cached.integrity_uuid.clone(),
+                cached.coordinator_uuid.clone(),
+            )
+            .await;
             let dna_hash = dna_file.dna_hash().clone();
             (cached, dna_hash)
         }
         None => {
-            let uuid = nanoid::nanoid!();
+            let integrity_uuid = nanoid::nanoid!();
+            let coordinator_uuid = nanoid::nanoid!();
 
-            let dna_file = data_zome(uuid.clone()).await;
+            let dna_file = data_zome(integrity_uuid.clone(), coordinator_uuid.clone()).await;
             let dna_hash = dna_file.dna_hash().clone();
-            let data = create_test_data(num_agents, min_num_ops_held, dna_file, uuid).await;
+            let data = create_test_data(
+                num_agents,
+                min_num_ops_held,
+                dna_file,
+                integrity_uuid,
+                coordinator_uuid,
+            )
+            .await;
             (data, dna_hash)
         }
     };
     let generated_data = GeneratedData {
         ops: data.ops,
         peer_data: reset_peer_data(data.peer_data, &dna_hash).await,
-        uuid: data.uuid,
+        integrity_uuid: data.integrity_uuid,
+        coordinator_uuid: data.coordinator_uuid,
         authored: data.authored,
     };
     let data = MockNetworkData::new(generated_data);
@@ -240,7 +257,8 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     txn.execute(
         "
         CREATE TABLE IF NOT EXISTS Uuid(
-            uuid TEXT NOT NULL
+            integrity_uuid TEXT NOT NULL,
+            coordinator_uuid TEXT NOT NULL
         )
         ",
         [],
@@ -248,12 +266,12 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     .unwrap();
     txn.execute(
         "
-        INSERT INTO Uuid (uuid) VALUES(?)
+        INSERT INTO Uuid (integrity_uuid, coordinator_uuid) VALUES(?)
         ",
-        [&data.uuid],
+        [&data.integrity_uuid, &data.coordinator_uuid],
     )
     .unwrap();
-    for op in data.ops.values().cloned() {
+    for op in data.ops.values() {
         holochain_state::test_utils::mutations_helpers::insert_valid_integrated_op(&mut txn, op)
             .unwrap();
     }
@@ -280,14 +298,19 @@ fn get_cached() -> Option<GeneratedData> {
     let p = std::env::temp_dir()
         .join("mock_test_data")
         .join("mock_test_data.sqlite3");
-    p.exists().then(|| ()).and_then(|_| {
+    p.exists().then_some(()).and_then(|_| {
         let mut conn = Connection::open(p).ok()?;
         let mut txn = conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)
             .unwrap();
         // If there's no uuid then there's no data.
-        let uuid = txn
-            .query_row("SELECT uuid FROM Uuid", [], |row| row.get(0))
+        let integrity_uuid = txn
+            .query_row("SELECT integrity_uuid FROM Uuid", [], |row| row.get(0))
+            .optional()
+            .ok()
+            .flatten()?;
+        let coordinator_uuid = txn
+            .query_row("SELECT coordinator_uuid FROM Uuid", [], |row| row.get(0))
             .optional()
             .ok()
             .flatten()?;
@@ -305,7 +328,8 @@ fn get_cached() -> Option<GeneratedData> {
             });
 
         Some(GeneratedData {
-            uuid,
+            integrity_uuid,
+            coordinator_uuid,
             peer_data,
             authored,
             ops,
@@ -317,13 +341,14 @@ async fn create_test_data(
     num_agents: usize,
     approx_num_ops_held: usize,
     dna_file: DnaFile,
-    uuid: String,
+    integrity_uuid: String,
+    coordinator_uuid: String,
 ) -> GeneratedData {
     let coverage = ((50.0 / num_agents as f64) * 2.0).clamp(0.0, 1.0);
     let num_storage_buckets = (1.0 / coverage).round() as u32;
     let bucket_size = u32::MAX / num_storage_buckets;
     let buckets = (0..num_storage_buckets)
-        .map(|i| ArcInterval::new(i * bucket_size, i * bucket_size + bucket_size))
+        .map(|i| DhtArcRange::from_bounds(i * bucket_size, i * bucket_size + bucket_size))
         .collect::<Vec<_>>();
     let mut bucket_counts = vec![0; buckets.len()];
     let mut entries = Vec::with_capacity(buckets.len() * approx_num_ops_held);
@@ -337,7 +362,7 @@ async fn create_test_data(
         let entry = Entry::app(d.try_into().unwrap()).unwrap();
         let hash = EntryHash::with_data_sync(&entry);
         let loc = hash.get_loc();
-        if let Some(index) = buckets.iter().position(|b| b.contains(&loc)) {
+        if let Some(index) = buckets.iter().position(|b| b.contains(loc)) {
             if bucket_counts[index] < approx_num_ops_held * 100 {
                 entries.push(entry);
                 bucket_counts[index] += 1;
@@ -356,6 +381,7 @@ async fn create_test_data(
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "none".to_string();
+    tuning.disable_publish = true;
 
     let mut network = KitsuneP2pConfig::default();
     network.tuning_params = Arc::new(tuning);
@@ -364,10 +390,6 @@ async fn create_test_data(
         ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
-    conductor.update_dev_settings(DevSettingsDelta {
-        publish: Some(false),
-        ..Default::default()
-    });
     let mut agents = Vec::new();
     dbg!("generating agents");
     for i in 0..num_agents {
@@ -394,14 +416,16 @@ async fn create_test_data(
     for (i, cell) in cells.iter().enumerate() {
         eprintln!("Calling {}", i);
         let e = entries.take(approx_num_ops_held).collect::<Vec<_>>();
-        let _: () = conductor.call(&cell.zome("zome1"), "create_many", e).await;
+        conductor
+            .call::<_, (), _>(&cell.zome("zome1"), "create_many", e)
+            .await;
     }
     let mut authored = HashMap::new();
     let mut ops = HashMap::new();
     for (i, cell) in cells.iter().enumerate() {
         eprintln!("Extracting data {}", i);
-        let env = cell.authored_env().clone();
-        let data = fresh_reader_test(env, |mut txn| {
+        let db = cell.authored_db().clone();
+        let data = fresh_reader_test(db, |mut txn| {
             get_authored_ops(&mut txn, cell.agent_pubkey())
         });
         let hashes = data.keys().cloned().collect::<Vec<_>>();
@@ -412,7 +436,8 @@ async fn create_test_data(
     let peer_data = conductor.get_agent_infos(None).await.unwrap();
     dbg!("Done");
     GeneratedData {
-        uuid,
+        integrity_uuid,
+        coordinator_uuid,
         peer_data,
         authored,
         ops,
@@ -454,21 +479,21 @@ fn get_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, DhtOpHashed> {
     txn.prepare(
         "
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                Header.blob AS header_blob, Entry.blob AS entry_blob
+                Action.blob AS action_blob, Entry.blob AS entry_blob
                 FROM DHtOp
-                JOIN Header ON DhtOp.header_hash = Header.hash
-                LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                JOIN Action ON DhtOp.action_hash = Action.hash
+                LEFT JOIN Entry ON Action.entry_hash = Entry.hash
             ",
     )
     .unwrap()
     .query_map([], |row| {
-        let header = from_blob::<SignedHeader>(row.get("header_blob")?).unwrap();
+        let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
         let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, header, entry).unwrap();
+        let op = DhtOp::from_type(op_type, action, entry).unwrap();
         let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })
@@ -484,23 +509,23 @@ fn get_authored_ops(
     txn.prepare(
         "
                 SELECT DhtOp.hash, DhtOp.type AS dht_type,
-                Header.blob AS header_blob, Entry.blob AS entry_blob
+                Action.blob AS action_blob, Entry.blob AS entry_blob
                 FROM DHtOp
-                JOIN Header ON DhtOp.header_hash = Header.hash
-                LEFT JOIN Entry ON Header.entry_hash = Entry.hash
+                JOIN Action ON DhtOp.action_hash = Action.hash
+                LEFT JOIN Entry ON Action.entry_hash = Entry.hash
                 WHERE
-                Header.author = ?
+                Action.author = ?
             ",
     )
     .unwrap()
     .query_map([author], |row| {
-        let header = from_blob::<SignedHeader>(row.get("header_blob")?).unwrap();
+        let action = from_blob::<SignedAction>(row.get("action_blob")?).unwrap();
         let op_type: DhtOpType = row.get("dht_type")?;
         let hash: DhtOpHash = row.get("hash")?;
         // Check the entry isn't private before gossiping it.
         let e: Option<Vec<u8>> = row.get("entry_blob")?;
         let entry = e.map(|entry| from_blob::<Entry>(entry).unwrap());
-        let op = DhtOp::from_type(op_type, header, entry).unwrap();
+        let op = DhtOp::from_type(op_type, action, entry).unwrap();
         let op = DhtOpHashed::with_pre_hashed(op, hash.clone());
         Ok((Arc::new(hash), op))
     })
@@ -512,30 +537,41 @@ fn get_authored_ops(
 /// The zome to use for this simulation.
 /// Currently this is a limitation of this prototype that
 /// you must use the data generation zome in the actual simulation
-/// so the Dna element matches.
+/// so the Dna record matches.
 /// Hopefully this limitation can be overcome in the future.
-pub async fn data_zome(uuid: String) -> DnaFile {
-    let entry_def = EntryDef::default_with_id("entrydef");
+pub async fn data_zome(integrity_uuid: String, coordinator_uuid: String) -> DnaFile {
+    let integrity_zome_name = "integrity_zome1";
+    let coordinator_zome_name = "zome1";
 
-    let zome = InlineZome::new(uuid.clone(), vec![entry_def.clone()])
-        .callback("create_many", move |api, entries: Vec<Entry>| {
-            let entry_def_id: EntryDefId = entry_def.id.clone();
+    let zomes = InlineZomeSet::new(
+        [(
+            integrity_zome_name,
+            integrity_uuid.clone(),
+            InlineEntryTypes::entry_defs(),
+            0,
+        )],
+        [(coordinator_zome_name, coordinator_uuid)],
+    )
+    .function(
+        coordinator_zome_name,
+        "create_many",
+        move |api, entries: Vec<Entry>| {
             for entry in entries {
                 api.create(CreateInput::new(
-                    entry_def_id.clone(),
+                    InlineZomeSet::get_entry_location(&api, InlineEntryTypes::A),
+                    EntryVisibility::Public,
                     entry,
                     ChainTopOrdering::default(),
                 ))?;
             }
             Ok(())
-        })
-        .callback("read", |api, hash: HeaderHash| {
-            api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
-                .map(|e| e.into_iter().next().unwrap())
-                .map_err(Into::into)
-        });
-    let (dna_file, _) = SweetDnaFile::from_inline_zome(uuid, "zome1", zome)
-        .await
-        .unwrap();
+        },
+    )
+    .function(coordinator_zome_name, "read", |api, hash: ActionHash| {
+        api.get(vec![GetInput::new(hash.into(), GetOptions::default())])
+            .map(|e| e.into_iter().next().unwrap())
+            .map_err(Into::into)
+    });
+    let (dna_file, _, _) = SweetDnaFile::from_inline_zomes(integrity_uuid, zomes).await;
     dna_file
 }

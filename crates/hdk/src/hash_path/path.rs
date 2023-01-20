@@ -3,23 +3,28 @@ use crate::hash_path::shard::SHARDEND;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
-use holochain_zome_types::validate::RequiredValidationType;
 use std::str::FromStr;
+
+#[cfg(all(test, feature = "mock"))]
+mod test;
+
+/// Root for all paths.
+pub const ROOT: &[u8; 2] = &[0x00, 0x01];
+
+pub fn root_hash() -> ExternResult<AnyLinkableHash> {
+    hash_entry(Entry::App(
+        AppEntryBytes::try_from(SerializedBytes::from(UnsafeBytes::from(ROOT.to_vec())))
+            .expect("This cannot fail as it's under the max entry bytes"),
+    ))
+    .map(Into::into)
+}
 
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
 /// Technically it's moving each string component in as bytes.
-/// If this is a problem for you simply build the components yourself as a Vec<Vec<u8>>.
+/// If this is a problem for you simply build the components yourself as a `Vec<Vec<u8>>`.
 ///
 /// See `impl From<String> for Path` below.
 pub const DELIMITER: &str = ".";
-
-/// All paths use the same link tag and entry def id.
-/// Different pathing schemes/systems/implementations should namespace themselves by their path
-/// components rather than trying to layer different link namespaces over the same path components.
-/// Similarly there is no need to define different entry types for different pathing strategies.
-/// The DHT_PREFIX ends up as both the prefix of the link tags and also in the
-/// `PathEntry` struct itself to mitigate collisions on the DHT.
-pub const DHT_PREFIX: u8 = 0;
 
 /// Each path component is arbitrary bytes to be hashed together in a predictable way when the path
 /// is hashed to create something that can be linked and discovered by all DHT participants.
@@ -138,68 +143,37 @@ impl TryFrom<&Component> for String {
     }
 }
 
-/// A [ `Path` ] is a vector of [ `Component` ].
+/// A [`Path`] is a vector of [`Component`]s.
+///
 /// It represents a single traversal of a tree structure down to some arbitrary point.
 /// The main intent is that we can recursively walk back up the tree, hashing, committing and
 /// linking each sub-path along the way until we reach the root.
-/// At this point it is possible to follow DHT links from the root back up the path.
+///
+/// At this point it is possible to follow DHT links from the root back up the path,
 /// i.e. the ahead-of-time predictability of the hashes of a given path allows us to travel "up"
-/// the tree and the linking functionality of the holochain DHT allows us to travel "down" the tree
+/// the tree and the linking functionality of the Holochain DHT allows us to travel "down" the tree
 /// after at least one DHT participant has followed the path "up".
-/// Note that the `Path` is not literally committed and/or linked from/to as
-/// base and target. For this the [ `PathEntry` ] exists, which achieves a
-/// constant size for the DHT representation of each node of the `Path`.
 #[derive(
     Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
 )]
 #[repr(transparent)]
 pub struct Path(Vec<Component>);
 
-entry_def!(Path EntryDef {
-    id: "hdk.path".into(),
-    crdt_type: CrdtType,
-    required_validations: RequiredValidations::default(),
-    visibility: EntryVisibility::Public,
-    required_validation_type: RequiredValidationType::default(),
-});
-
-/// A [ `PathEntry` ] is the hash of a [ `Path` ] and the [ `DHT_PREFIX` ].
-/// This is what is committed and shared on the DHT to build links off as their
-/// base and target. If we committed the `Path` directly then the size of each
-/// node entry content would be the size of all the components of the path.
-/// Given that `ensure` populates all the ancestor nodes committing [ A, B, C ]
-/// would create entries with content [ A ], [ A, B ], [ A, B, C ]. For deep
-/// paths, or paths with a large component (in bytes) at any node, this would
-/// create a lot of redundant data in every descendent entry.
-/// Instead, we commit a `PathEntry` so each node is constant size, just the
-/// hash of the full `Path` up to that point. This means that committing
-/// `PathEntry` instead of `Path` for `[A, B, C]` results in entries with
-/// content [ HashA ], [ HashAB ], [ HashABC ]. Note that if A + B + C is much
-/// less than the size of a holochain hash (~40 bytes) then this approach is
-/// worse than simply committing the `Path` but in practise this is often not
-/// the case, and `PathEntry` becomes a more scalable generalised solution.
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
-pub struct PathEntry(#[serde(with = "serde_bytes")] Vec<u8>);
-
-impl PathEntry {
-    pub fn new(entry_hash: EntryHash) -> Self {
-        Self(
-            [DHT_PREFIX]
-                .iter()
-                .chain(entry_hash.get_raw_32())
-                .cloned()
-                .collect(),
-        )
-    }
+/// A [`LinkType`] applied to a [`Path`].
+///
+/// All links committed from this path will have this link type.
+///
+/// Get a typed path from a path and a link type:
+/// ```ignore
+/// let typed_path = path.typed(LinkTypes::MyLink)?;
+/// ```
+pub struct TypedPath {
+    /// The [`LinkType`] within the scope of the zome where it's defined.
+    pub link_type: ScopedLinkType,
+    /// The [`Path`] that is using this [`LinkType`].
+    pub path: Path,
 }
-
-entry_def!(PathEntry EntryDef {
-    id: "hdk.path_entry".into(),
-    crdt_type: CrdtType,
-    required_validations: RequiredValidations::default(),
-    visibility: EntryVisibility::Public,
-    required_validation_type: RequiredValidationType::default(),
-});
 
 /// Wrap components vector.
 impl From<Vec<Component>> for Path {
@@ -240,7 +214,7 @@ impl AsRef<Vec<Component>> for Path {
 /// some disambiguation logic is not included in higher level abstractions.
 ///
 /// This supports sharding strategies from a small inline DSL.
-/// Start each component with <width>:<depth># to get shards out of the string.
+/// Start each component with `<width>:<depth>#` to get shards out of the string.
 ///
 /// e.g.
 /// - foo.barbaz => normal path as above ["foo", "barbaz"]
@@ -285,45 +259,112 @@ impl From<String> for Path {
 }
 
 impl Path {
-    pub fn path_entry(&self) -> ExternResult<PathEntry> {
-        Ok(PathEntry::new(hash_entry(self)?))
+    /// Attach a [`LinkType`] to this path
+    /// so its type is known for [`create_link`] and [`get_links`].
+    pub fn into_typed(self, link_type: impl Into<ScopedLinkType>) -> TypedPath {
+        TypedPath::new(link_type, self)
     }
 
+    /// Try attaching a [`LinkType`] to this path
+    /// so its type is known for [`create_link`] and [`get_links`].
+    pub fn typed<TY, E>(self, link_type: TY) -> Result<TypedPath, WasmError>
+    where
+        ScopedLinkType: TryFrom<TY, Error = E>,
+        WasmError: From<E>,
+    {
+        Ok(TypedPath::new(ScopedLinkType::try_from(link_type)?, self))
+    }
     /// What is the hash for the current [ `Path` ]?
     pub fn path_entry_hash(&self) -> ExternResult<holo_hash::EntryHash> {
-        hash_entry(self.path_entry()?)
+        hash_entry(Entry::App(AppEntryBytes(
+            SerializedBytes::try_from(self).map_err(|e| wasm_error!(e))?,
+        )))
     }
 
-    /// Does an entry exist at the hash we expect?
+    /// Mutate this `Path` into a child of itself by appending a `Component`.
+    pub fn append_component(&mut self, component: Component) {
+        self.0.push(component);
+    }
+
+    /// Accessor for the last `Component` of this `Path`.
+    /// This can be thought of as the leaf of the implied tree structure of
+    /// which this `Path` is one branch of.
+    pub fn leaf(&self) -> Option<&Component> {
+        self.0.last()
+    }
+
+    /// Make the [`LinkTag`] for this [`Path`].
+    pub fn make_tag(&self) -> ExternResult<LinkTag> {
+        Ok(LinkTag::new(match self.leaf() {
+            None => <Vec<u8>>::with_capacity(0),
+            Some(component) => {
+                UnsafeBytes::from(SerializedBytes::try_from(component).map_err(|e| wasm_error!(e))?)
+                    .into()
+            }
+        }))
+    }
+
+    /// Check if this [`Path`] is the root.
+    pub fn is_root(&self) -> bool {
+        self.0.len() == 1
+    }
+}
+
+impl TypedPath {
+    /// Create a new [`TypedPath`] by attaching a [`ZomeIndex`] and [`LinkType`] to a [`Path`].
+    pub fn new(link_type: impl Into<ScopedLinkType>, path: Path) -> Self {
+        Self {
+            link_type: link_type.into(),
+            path,
+        }
+    }
+    /// Does data exist at the hash we expect?
     pub fn exists(&self) -> ExternResult<bool> {
-        Ok(get(self.path_entry_hash()?, GetOptions::content())?.is_some())
+        if self.0.is_empty() {
+            Ok(false)
+        } else if self.is_root() {
+            let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
+            let exists = get_links(
+                root_hash()?,
+                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
+                Some(self.make_tag()?),
+            )?
+            .iter()
+            .any(|Link { target, .. }| *target == this_paths_hash);
+            Ok(exists)
+        } else {
+            let parent = self
+                .parent()
+                .expect("Must have parent if not empty or root");
+            let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
+            let exists = get_links(
+                parent.path_entry_hash()?,
+                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
+                Some(self.make_tag()?),
+            )?
+            .iter()
+            .any(|Link { target, .. }| *target == this_paths_hash);
+            Ok(exists)
+        }
     }
 
     /// Recursively touch this and every parent that doesn't exist yet.
     pub fn ensure(&self) -> ExternResult<()> {
         if !self.exists()? {
-            create_entry(self.path_entry()?)?;
-            if let Some(parent) = self.parent() {
+            if self.is_root() {
+                create_link(
+                    root_hash()?,
+                    self.path_entry_hash()?,
+                    self.link_type,
+                    self.make_tag()?,
+                )?;
+            } else if let Some(parent) = self.parent() {
                 parent.ensure()?;
                 create_link(
                     parent.path_entry_hash()?,
                     self.path_entry_hash()?,
-                    LinkTag::new(
-                        [DHT_PREFIX]
-                            .iter()
-                            .chain(
-                                match self.leaf() {
-                                    None => <Vec<u8>>::with_capacity(0),
-                                    Some(component) => {
-                                        UnsafeBytes::from(SerializedBytes::try_from(component)?)
-                                            .into()
-                                    }
-                                }
-                                .iter(),
-                            )
-                            .cloned()
-                            .collect::<Vec<u8>>(),
-                    ),
+                    self.link_type,
+                    self.make_tag()?,
                 )?;
             }
         }
@@ -331,10 +372,11 @@ impl Path {
     }
 
     /// The parent of the current path is simply the path truncated one level.
-    pub fn parent(&self) -> Option<Path> {
-        if self.as_ref().len() > 1 {
-            let parent_vec: Vec<Component> = self.as_ref()[0..self.as_ref().len() - 1].to_vec();
-            Some(parent_vec.into())
+    pub fn parent(&self) -> Option<Self> {
+        if self.path.as_ref().len() > 1 {
+            let parent_vec: Vec<Component> =
+                self.path.as_ref()[0..self.path.as_ref().len() - 1].to_vec();
+            Some(Path::from(parent_vec).into_typed(self.link_type))
         } else {
             None
         }
@@ -346,7 +388,8 @@ impl Path {
         Self::ensure(self)?;
         let mut unwrapped = get_links(
             self.path_entry_hash()?,
-            Some(holochain_zome_types::link::LinkTag::new([DHT_PREFIX])),
+            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
+            None,
         )?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
@@ -366,14 +409,14 @@ impl Path {
         let components: ExternResult<Vec<Option<Component>>> = children
             .into_iter()
             .map(|link| {
-                let component_bytes = &link.tag.0[1..];
+                let component_bytes = &link.tag.0[..];
                 if component_bytes.is_empty() {
                     Ok(None)
                 } else {
                     Ok(Some(
                         SerializedBytes::from(UnsafeBytes::from(component_bytes.to_vec()))
                             .try_into()
-                            .map_err(WasmError::Serialize)?,
+                            .map_err(|e: SerializedBytesError| wasm_error!(e))?,
                     ))
                 }
             })
@@ -381,11 +424,11 @@ impl Path {
         Ok(components?
             .into_iter()
             .map(|maybe_component| {
-                let mut new_path = self.clone();
+                let mut new_path = self.path.clone();
                 if let Some(component) = maybe_component {
                     new_path.append_component(component);
                 }
-                new_path
+                new_path.into_typed(self.link_type)
             })
             .collect())
     }
@@ -394,20 +437,23 @@ impl Path {
         Self::ensure(self)?;
         get_link_details(
             self.path_entry_hash()?,
-            Some(holochain_zome_types::link::LinkTag::new([DHT_PREFIX])),
+            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
+            Some(holochain_zome_types::link::LinkTag::new([])),
         )
     }
+}
 
-    /// Mutate this `Path` into a child of itself by appending a `Component`.
-    pub fn append_component(&mut self, component: Component) {
-        self.0.push(component);
+impl std::ops::Deref for TypedPath {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        &self.path
     }
+}
 
-    /// Accessor for the last `Component` of this `Path`.
-    /// This can be thought of as the leaf of the implied tree structure of
-    /// which this `Path` is one branch of.
-    pub fn leaf(&self) -> Option<&Component> {
-        self.0.last()
+impl From<TypedPath> for Path {
+    fn from(p: TypedPath) -> Self {
+        p.path
     }
 }
 

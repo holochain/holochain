@@ -3,7 +3,8 @@
 use crate::prelude::*;
 use crate::sql::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::{ArcInterval, DhtArcSet};
+use kitsune_p2p::dht_arc::DhtArcRange;
+use kitsune_p2p::dht_arc::DhtArcSet;
 use kitsune_p2p::KitsuneAgent;
 use rusqlite::*;
 use std::sync::Arc;
@@ -13,6 +14,9 @@ use std::sync::Arc;
 pub trait AsP2pAgentStoreConExt {
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
+
+    /// Remove an agent from the p2p store
+    fn p2p_remove_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<bool>;
 
     /// List all AgentInfoSigned records within a space in the p2p_agent_store
     fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>>;
@@ -42,6 +46,9 @@ pub trait AsP2pStateTxExt {
     /// Get an AgentInfoSigned record from the p2p_store
     fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>>;
 
+    /// Remove an agent from the p2p store
+    fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool>;
+
     /// List all AgentInfoSigned records within a space in the p2p_agent_store
     fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
@@ -63,6 +70,10 @@ pub trait AsP2pStateTxExt {
 impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
     fn p2p_get_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_get_agent(agent))
+    }
+
+    fn p2p_remove_agent(&mut self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
+        self.with_reader(move |reader| reader.p2p_remove_agent(agent))
     }
 
     fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>> {
@@ -93,7 +104,7 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
 
 /// Put an AgentInfoSigned record into the p2p_store
 pub async fn p2p_put(
-    db: &DbWrite<DbKindP2pAgentStore>,
+    db: &DbWrite<DbKindP2pAgents>,
     signed: &AgentInfoSigned,
 ) -> DatabaseResult<()> {
     let record = P2pRecord::from_signed(signed)?;
@@ -102,7 +113,7 @@ pub async fn p2p_put(
 
 /// Put an iterator of AgentInfoSigned records into the p2p_store
 pub async fn p2p_put_all(
-    db: &DbWrite<DbKindP2pAgentStore>,
+    db: &DbWrite<DbKindP2pAgents>,
     signed: impl Iterator<Item = &AgentInfoSigned>,
 ) -> DatabaseResult<()> {
     let mut records = Vec::new();
@@ -146,14 +157,32 @@ fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
 }
 
 /// Prune all expired AgentInfoSigned records from the p2p_store
-pub async fn p2p_prune(db: &DbWrite<DbKindP2pAgentStore>) -> DatabaseResult<()> {
+pub async fn p2p_prune(
+    db: &DbWrite<DbKindP2pAgents>,
+    local_agents: Vec<Arc<KitsuneAgent>>,
+) -> DatabaseResult<()> {
+    let mut agent_list = Vec::with_capacity(local_agents.len() * 36);
+    for agent in local_agents.iter() {
+        agent_list.extend_from_slice(agent.as_ref());
+    }
+    if agent_list.is_empty() {
+        // this is a hack around an apparent bug in sqlite
+        // where the delete doesn't run if the subquery returns no rows
+        agent_list.extend_from_slice(&[0; 36]);
+    }
     db.async_commit(move |txn| {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
 
-        txn.execute(sql_p2p_agent_store::PRUNE, named_params! { ":now": now })?;
+        txn.execute(
+            sql_p2p_agent_store::PRUNE,
+            named_params! {
+                ":now": now,
+                ":agent_list": agent_list,
+            },
+        )?;
         DatabaseResult::Ok(())
     })
     .await?;
@@ -176,6 +205,14 @@ impl AsP2pStateTxExt for Transaction<'_> {
                 Ok(signed)
             })
             .optional()?)
+    }
+
+    fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
+        let mut stmt = self
+            .prepare(sql_p2p_agent_store::DELETE)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+
+        Ok(stmt.execute(named_params! { ":agent": &agent.0 })? > 0)
     }
 
     fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
@@ -226,7 +263,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
             },
         )? {
             let info = r?;
-            let interval = info.storage_arc.interval();
+            let interval = DhtArcRange::from(info.storage_arc);
             if arcset.overlap(&interval.into()) {
                 out.push(info);
             }
@@ -267,7 +304,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
 
         for interval in dht_arc_set.intervals() {
             match interval {
-                ArcInterval::Full => {
+                DhtArcRange::Full => {
                     out.push(stmt.query_row(
                         named_params! {
                             ":now": now,
@@ -277,7 +314,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
                         |r| r.get(0),
                     )?);
                 }
-                ArcInterval::Bounded(start, end) => {
+                DhtArcRange::Bounded(start, end) => {
                     out.push(stmt.query_row(
                         named_params! {
                             ":now": now,
@@ -335,11 +372,11 @@ impl P2pRecord {
         let expires_at_ms = signed.expires_at_ms;
         let arc = signed.storage_arc;
 
-        let storage_center_loc = arc.center_loc().into();
+        let storage_center_loc = arc.start_loc().into();
 
         let is_active = !signed.url_list.is_empty();
 
-        let (storage_start_loc, storage_end_loc) = arc.primitive_range_detached();
+        let (storage_start_loc, storage_end_loc) = arc.to_primitive_bounds_detached();
 
         Ok(Self {
             agent,

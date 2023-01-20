@@ -5,9 +5,13 @@ use crate::zome::ZomeName;
 use crate::ExternIO;
 use holo_hash::AgentPubKey;
 
+/// Identifier for an App Role, a foundational concept in the App manifest.
+pub type RoleName = String;
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CallTargetCell {
-    Other(CellId),
+    OtherCell(CellId),
+    OtherRole(RoleName),
     Local,
 }
 

@@ -4,12 +4,12 @@ use std::path::PathBuf;
 
 use holochain_types::prelude::InstalledAppId;
 
-use crate::calls::InstallAppBundle;
+use crate::calls::InstallApp;
 use crate::cmds::*;
 use crate::run::run_async;
 use crate::CmdRunner;
 
-/// Generates a new sandbox with a default [`ConductorConfig`]
+/// Generates a new sandbox with a default [`ConductorConfig`](holochain_conductor_api::config::conductor::ConductorConfig)
 /// and optional network.
 /// Then installs the dnas with a new app per dna.
 pub async fn default_with_network(
@@ -23,11 +23,11 @@ pub async fn default_with_network(
     let path = crate::generate::generate(network.map(|n| n.into_inner().into()), root, directory)?;
     let conductor = run_async(holochain_path, path.clone(), None).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
-    let install_bundle = InstallAppBundle {
+    let install_bundle = InstallApp {
         app_id: Some(app_id),
         agent_key: None,
         path: happ,
-        uid: None,
+        network_seed: None,
     };
     crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
     Ok(path)

@@ -3,9 +3,10 @@
 use crate::types::persist::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
-use kitsune_p2p::dht_arc::DhtArcSet;
-use kitsune_p2p::dht_arc::PeerStratBeta;
+use kitsune_p2p::dht::spacetime::Topology;
+use kitsune_p2p::dht_arc::{DhtArcSet, DhtLocation};
 use kitsune_p2p::event::TimeWindow;
+use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::tls::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use std::collections::hash_map::Entry;
@@ -308,7 +309,7 @@ impl AsKdPersist for PersistMem {
                 .await
                 .map_err(KdError::other)?;
             let mut out = [0; 64];
-            out.copy_from_slice(&*sig.read_lock());
+            out.copy_from_slice(&sig.read_lock());
             Ok(Arc::new(out))
         }
         .boxed()
@@ -370,7 +371,7 @@ impl AsKdPersist for PersistMem {
             let mut with_dist = store
                 .get_all()?
                 .into_iter()
-                .map(|info| (info.basis_distance_to_storage(basis_loc), info))
+                .map(|info| (info.basis_distance_to_storage(basis_loc.into()), info))
                 .collect::<Vec<_>>();
             with_dist.sort_by(|a, b| a.0.cmp(&b.0));
             Ok(with_dist
@@ -386,30 +387,28 @@ impl AsKdPersist for PersistMem {
         &self,
         root: KdHash,
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht_arc::PeerViewBeta>> {
+    ) -> BoxFuture<'static, KdResult<kitsune_p2p_types::dht::PeerView>> {
+        let topo = Topology::standard_epoch_full();
         let store = self.0.share_mut(move |i, _| match i.agent_info.get(&root) {
             Some(store) => Ok(store.clone()),
             None => Err("root not found".into()),
         });
         async move {
             let store = match store {
-                Err(_) => return Ok(PeerStratBeta::default().view_unchecked(dht_arc, &[])),
+                Err(_) => return Ok(PeerStrat::default().view(topo.clone(), dht_arc, &[])),
                 Ok(store) => store,
             };
             let arcs: Vec<_> = store
                 .get_all()?
                 .into_iter()
-                .filter_map(|v| {
-                    if dht_arc.contains(v.agent().as_loc()) {
-                        Some(*v.storage_arc())
-                    } else {
-                        None
-                    }
+                .map(|v| {
+                    let loc = DhtLocation::from(v.agent().as_loc());
+                    DhtArc::from_parts(*v.storage_arc(), loc)
                 })
                 .collect();
 
             // contains is already checked in the iterator
-            Ok(PeerStratBeta::default().view_unchecked(dht_arc, arcs.as_slice()))
+            Ok(PeerStrat::default().view(topo, dht_arc, arcs.as_slice()))
         }
         .boxed()
     }

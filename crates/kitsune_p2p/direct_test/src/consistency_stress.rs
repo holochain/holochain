@@ -1,7 +1,8 @@
 //! bunch of nodes gossip consistency test
 
 use kitsune_p2p_direct::dependencies::kitsune_p2p::event::full_time_window;
-use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::ArcInterval;
+use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::DhtArcRange;
+use kitsune_p2p_direct::dependencies::kitsune_p2p_types::dht_arc::DhtArcSet;
 use kitsune_p2p_direct::dependencies::*;
 use kitsune_p2p_direct::prelude::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
@@ -286,9 +287,23 @@ struct Test {
     app_entry_hash: KdHash,
     nodes: Vec<TestNode>,
 
+    bootstrap_close: Option<Box<dyn FnOnce() + 'static + Send>>,
+    proxy_close: Option<Box<dyn FnOnce() + 'static + Send>>,
+
     time_test_start: std::time::Instant,
     #[allow(dead_code)]
     time_round_start: std::time::Instant,
+}
+
+impl Drop for Test {
+    fn drop(&mut self) {
+        if let Some(close) = self.bootstrap_close.take() {
+            close();
+        }
+        if let Some(close) = self.proxy_close.take() {
+            close();
+        }
+    }
 }
 
 impl Test {
@@ -302,11 +317,11 @@ impl Test {
     ) -> Self {
         let time_test_start = std::time::Instant::now();
 
-        let (bootstrap_url, driver, _bootstrap_close) =
+        let (bootstrap_url, driver, bootstrap_close) =
             new_quick_bootstrap_v1(tuning_params.clone()).await.unwrap();
         tokio::task::spawn(driver);
 
-        let (proxy_url, driver, _proxy_close) =
+        let (proxy_url, driver, proxy_close) =
             new_quick_proxy_v1(tuning_params.clone()).await.unwrap();
         tokio::task::spawn(driver);
 
@@ -341,6 +356,13 @@ impl Test {
             app_entry,
             app_entry_hash,
             nodes: Vec::new(),
+
+            bootstrap_close: Some(Box::new(move || {
+                tokio::task::spawn(bootstrap_close(0, ""));
+            })),
+            proxy_close: Some(Box::new(move || {
+                tokio::task::spawn(proxy_close(0, ""));
+            })),
 
             time_test_start,
             time_round_start: std::time::Instant::now(),
@@ -508,7 +530,7 @@ impl Test {
                         self.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        ArcInterval::Full.into(),
+                        DhtArcSet::from(DhtArcRange::Full),
                     )
                     .await
                     .unwrap()
@@ -532,7 +554,7 @@ impl Test {
                         self.root.clone(),
                         agent.clone(),
                         full_time_window(),
-                        ArcInterval::Full.into(),
+                        DhtArcSet::from(DhtArcRange::Full),
                     )
                     .await
                     .unwrap()

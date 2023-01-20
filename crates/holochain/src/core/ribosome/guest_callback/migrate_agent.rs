@@ -29,6 +29,12 @@ pub struct MigrateAgentHostAccess {
     pub workspace: HostFnWorkspace,
 }
 
+impl std::fmt::Debug for MigrateAgentHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MigrateAgentHostAccess").finish()
+    }
+}
+
 impl From<MigrateAgentHostAccess> for HostContext {
     fn from(migrate_agent_host_access: MigrateAgentHostAccess) -> Self {
         Self::MigrateAgent(migrate_agent_host_access)
@@ -72,7 +78,7 @@ impl Invocation for MigrateAgentInvocation {
 impl TryFrom<MigrateAgentInvocation> for ExternIO {
     type Error = SerializedBytesError;
     fn try_from(migrate_agent_invocation: MigrateAgentInvocation) -> Result<Self, Self::Error> {
-        ExternIO::encode(&migrate_agent_invocation.migrate_agent)
+        ExternIO::encode(migrate_agent_invocation.migrate_agent)
     }
 }
 
@@ -151,7 +157,7 @@ mod test {
             results.shuffle(&mut rng);
 
             // number of times a callback result appears should not change the final result
-            let number_of_extras = rng.gen_range(0, 5);
+            let number_of_extras = rng.gen_range(0..5);
             for _ in 0..number_of_extras {
                 let maybe_extra = results.choose(&mut rng).cloned();
                 match maybe_extra {

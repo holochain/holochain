@@ -6,9 +6,8 @@ use warp::Filter;
 
 pub(crate) fn random(
     store: Store,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = impl warp::Reply + Sized, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::header::exact("content-type", "application/octet"))
         .and(warp::header::exact("X-Op", "random"))
         .and(warp::body::content_length_limit(SIZE_LIMIT))
         .and(warp::body::bytes())
@@ -55,7 +54,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_random() {
-        let store = Store::new();
+        let store = Store::new(vec![]);
         let filter = super::random(store.clone());
         let space: Arc<KitsuneSpace> = Arc::new(fixt!(KitsuneSpace));
         let mut peers = Vec::new();

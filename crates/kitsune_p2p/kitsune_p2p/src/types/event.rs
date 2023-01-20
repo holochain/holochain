@@ -2,7 +2,11 @@
 
 use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::dht_arc::{DhtArcSet, DhtLocation};
+use kitsune_p2p_types::{
+    bin_types::KOp,
+    dht::region::RegionBounds,
+    dht_arc::{DhtArcSet, DhtLocation},
+};
 use std::{collections::HashSet, sync::Arc};
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
@@ -27,8 +31,24 @@ pub struct QueryOpHashesEvt {
 pub struct FetchOpDataEvt {
     /// The "space" context.
     pub space: KSpace,
-    /// The op-hashes to fetch
-    pub op_hashes: Vec<KOpHash>,
+    /// The criteria to query by
+    pub query: FetchOpDataEvtQuery,
+}
+
+/// Multiple ways to fetch op data
+#[derive(Debug, derive_more::From)]
+pub enum FetchOpDataEvtQuery {
+    /// Fetch all ops with the hashes specified
+    Hashes {
+        /// list of ops to fetch
+        op_hash_list: Vec<KOpHash>,
+
+        /// should we include limbo ops
+        include_limbo: bool,
+    },
+
+    /// Fetch all ops within the time and space bounds specified
+    Regions(Vec<RegionBounds>),
 }
 
 /// Request that our implementor sign some data on behalf of an agent.
@@ -148,6 +168,7 @@ const METRIC_KIND_LATENCY_MICROS: &str = "LatencyMicros";
 const METRIC_KIND_AGG_EXTRAP_COV: &str = "AggExtrapCov";
 
 /// The type of metric recorded
+#[derive(Debug)]
 pub enum MetricRecordKind {
     /// Failure to parse metric kind
     Unknown,
@@ -190,12 +211,13 @@ impl MetricRecordKind {
 }
 
 /// An individual metric record
+#[derive(Debug)]
 pub struct MetricRecord {
     /// kind of this record
     pub kind: MetricRecordKind,
 
     /// agent associated with this metric (if applicable)
-    pub agent: Option<Arc<super::KitsuneAgent>>,
+    pub agent: Option<KAgent>,
 
     /// timestamp this metric was recorded at
     pub recorded_at_utc: Timestamp,
@@ -207,61 +229,26 @@ pub struct MetricRecord {
     pub data: serde_json::Value,
 }
 
-/// Generic Kitsune Request of the implementor
-/// This enum may be easier to add variants to for future updates,
-/// rather than adding a full new top-level event message type.
-pub enum KGenReq {
-    /// Extrapolated Peer Coverage
-    PeerExtrapCov {
-        /// The space to extrapolate coverage
-        space: Arc<super::KitsuneSpace>,
-
-        /// Storage arcs of joined agents
-        dht_arc_set: DhtArcSet,
-    },
-
-    /// Record a set of metric records
-    RecordMetrics {
-        /// The space to associate the records with
-        space: Arc<super::KitsuneSpace>,
-
-        /// The records to record
-        records: Vec<MetricRecord>,
-    },
-}
-
-/// Generic Kitsune Respons from the imlementor
-pub enum KGenRes {
-    /// Extrapolated Peer Coverage
-    PeerExtrapCov(Vec<f64>),
-    /// Record a set of metric records
-    RecordMetrics(()),
-}
-
 type KSpace = Arc<super::KitsuneSpace>;
 type KAgent = Arc<super::KitsuneAgent>;
 type KOpHash = Arc<super::KitsuneOpHash>;
 type Payload = Vec<u8>;
-type Ops = Vec<(KOpHash, Payload)>;
+type Ops = Vec<KOp>;
+type MaybeContext = Option<kitsune_p2p_fetch::FetchContext>;
 
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
-        /// Generic Kitsune Request of the implementor
-        fn k_gen_req(arg: KGenReq) -> KGenRes;
 
         /// We need to store signed agent info.
         fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
 
         /// We need to get previously stored agent info.
-        fn get_agent_info_signed(input: GetAgentInfoSignedEvt) -> Option<crate::types::agent_store::AgentInfoSigned>;
-
-        /// We need to get previously stored agent info.
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerViewBeta;
+        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht::PeerView;
 
         /// We are receiving a request from a remote node.
         fn call(space: KSpace, to_agent: KAgent, payload: Payload) -> Vec<u8>;
@@ -269,8 +256,13 @@ ghost_actor::ghost_chan! {
         /// We are receiving a notification from a remote node.
         fn notify(space: KSpace, to_agent: KAgent, payload: Payload) -> ();
 
-        /// We are receiving a dht op we may need to hold distributed via gossip.
-        fn gossip(space: KSpace, ops: Ops) -> ();
+        /// We have received ops to be integrated,
+        /// either through gossip or publish.
+        fn receive_ops(
+            space: KSpace,
+            ops: Ops,
+            context: MaybeContext,
+        ) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
         /// Get the oldest and newest times for ops within a time window and max number of ops.
@@ -278,7 +270,7 @@ ghost_actor::ghost_chan! {
         fn query_op_hashes(input: QueryOpHashesEvt) -> Option<(Vec<KOpHash>, TimeWindowInclusive)>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
-        fn fetch_op_data(input: FetchOpDataEvt) -> Vec<(KOpHash, Vec<u8>)>;
+        fn fetch_op_data(input: FetchOpDataEvt) -> Vec<(KOpHash, KOp)>;
 
         /// Request that our implementor sign some data on behalf of an agent.
         fn sign_network_data(input: SignNetworkDataEvt) -> super::KitsuneSignature;

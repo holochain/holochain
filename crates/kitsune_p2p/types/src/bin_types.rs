@@ -138,6 +138,83 @@ These metadata "Operations" each also have unique OpHashes."#,
     KitsuneOpHash,
 }
 
+/// The op data with its location
+#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct KitsuneOpData(
+    /// The op bytes
+    #[serde(with = "serde_bytes")]
+    pub Vec<u8>,
+);
+
+impl KitsuneOpData {
+    /// Constructor
+    pub fn new(op: Vec<u8>) -> KOp {
+        KOp::new(Self(op))
+    }
+
+    /// Size in bytes of this Op
+    pub fn size(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl From<Vec<u8>> for KitsuneOpData {
+    fn from(d: Vec<u8>) -> Self {
+        Self(d)
+    }
+}
+
+/// Helpful pattern for debug formatting many bytes.
+/// If the size is > 32 bytes, only the first 8 and last 8 bytes will be displayed.
+pub fn fmt_many_bytes(
+    name: &str,
+    f: &mut std::fmt::Formatter<'_>,
+    bytes: &[u8],
+) -> std::fmt::Result {
+    if bytes.len() <= 32 {
+        let mut t = f.debug_tuple(name);
+        t.field(&bytes).finish()
+    } else {
+        let mut t = f.debug_struct(name);
+        let l = bytes.len();
+        t.field("length", &l);
+        t.field(
+            "bytes",
+            &format!(
+                "[{},{},{},{},{},{},{},{},...,{},{},{},{},{},{},{},{}]",
+                bytes[0],
+                bytes[1],
+                bytes[2],
+                bytes[3],
+                bytes[4],
+                bytes[5],
+                bytes[6],
+                bytes[7],
+                bytes[l - 1],
+                bytes[l - 2],
+                bytes[l - 3],
+                bytes[l - 4],
+                bytes[l - 5],
+                bytes[l - 6],
+                bytes[l - 7],
+                bytes[l - 8],
+            ),
+        )
+        .finish()
+    }
+}
+
+impl std::fmt::Debug for KitsuneOpData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt_many_bytes("KitsuneOpData", f, self.0.as_slice())
+    }
+}
+
+/// Convenience type
+pub type KOp = std::sync::Arc<KitsuneOpData>;
+
 /// A cryptographic signature.
 #[derive(
     Clone,

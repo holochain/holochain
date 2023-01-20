@@ -9,25 +9,31 @@ use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::QueueTriggers;
 use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::RibosomeT;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
+use holochain_state::prelude::test_db_dir;
+use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_wasm_test_utils::TestZomes;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use tempfile::TempDir;
 
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
-    pub authored_env: DbWrite<DbKindAuthored>,
-    pub dht_env: DbWrite<DbKindDht>,
+    pub authored_db: DbWrite<DbKindAuthored>,
+    pub dht_db: DbWrite<DbKindDht>,
+    pub dht_db_cache: DhtDbQueryCache,
     pub cache: DbWrite<DbKindCache>,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pDna,
@@ -38,21 +44,30 @@ pub struct CellHostFnCaller {
 }
 
 impl CellHostFnCaller {
-    pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
-        let authored_env = handle.get_authored_env(cell_id.dna_hash()).unwrap();
-        let dht_env = handle.get_dht_env(cell_id.dna_hash()).unwrap();
-        let cache = handle.get_cache_env(cell_id).unwrap();
+    pub async fn new(
+        cell_id: &CellId,
+        handle: &ConductorHandle,
+        dna_file: &DnaFile,
+        chc: Option<ChcImpl>,
+    ) -> Self {
+        let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
+        let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
+        let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
+        let cache = handle.get_cache_db(cell_id).unwrap();
         let keystore = handle.keystore().clone();
-        let network = handle.holochain_p2p().to_dna(cell_id.dna_hash().clone());
+        let network = handle
+            .holochain_p2p()
+            .to_dna(cell_id.dna_hash().clone(), chc);
         let triggers = handle.get_cell_triggers(cell_id).unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
-        let ribosome = RealRibosome::new(dna_file.clone());
-        let signal_tx = handle.signal_broadcaster().await;
+        let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
+        let signal_tx = handle.signal_broadcaster();
         CellHostFnCaller {
             cell_id: cell_id.clone(),
-            authored_env,
-            dht_env,
+            authored_db,
+            dht_db,
+            dht_db_cache,
             cache,
             ribosome,
             network,
@@ -69,8 +84,9 @@ impl CellHostFnCaller {
         let zome_path = (self.cell_id.clone(), zome_name).into();
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         HostFnCaller {
-            authored_env: self.authored_env.clone(),
-            dht_env: self.dht_env.clone(),
+            authored_db: self.authored_db.clone(),
+            dht_db: self.dht_db.clone(),
+            dht_db_cache: self.dht_db_cache.clone(),
             cache: self.cache.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
@@ -83,16 +99,16 @@ impl CellHostFnCaller {
 }
 
 /// Everything you need to run a test that uses the conductor
-// TODO: rewrite as sweettests if possible
+// MAYBE: rewrite as sweettests if possible
 pub struct ConductorTestData {
-    _envs: TestEnvs,
+    _db_dir: TempDir,
     handle: ConductorHandle,
     cell_apis: BTreeMap<CellId, CellHostFnCaller>,
 }
 
 impl ConductorTestData {
     pub async fn new(
-        envs: TestEnvs,
+        envs: TempDir,
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,
@@ -114,8 +130,8 @@ impl ConductorTestData {
             cell_id_by_dna_file.push((dna_file, cell_ids));
         }
 
-        let (_envs, _app_api, handle) = setup_app_inner(
-            envs,
+        let (_app_api, handle) = setup_app_inner(
+            envs.path(),
             vec![("test_app", cells)],
             dna_files.clone(),
             Some(network_config),
@@ -128,13 +144,13 @@ impl ConductorTestData {
             for cell_id in cell_ids {
                 cell_apis.insert(
                     cell_id.clone(),
-                    CellHostFnCaller::new(cell_id, &handle, dna_file).await,
+                    CellHostFnCaller::new(cell_id, &handle, dna_file, None).await,
                 );
             }
         }
 
         let this = Self {
-            _envs,
+            _db_dir: envs,
             // app_api,
             handle,
             cell_apis,
@@ -168,15 +184,28 @@ impl ConductorTestData {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
-                uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
-                origin_time: Timestamp::now(),
-                zomes: zomes.clone().into_iter().map(Into::into).collect(),
+                modifiers: DnaModifiers {
+                    network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                    properties: SerializedBytes::try_from(()).unwrap(),
+                    origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                    quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
+                },
+                integrity_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.integrity.into_inner())
+                    .collect(),
+                coordinator_zomes: zomes
+                    .clone()
+                    .into_iter()
+                    .map(TestZomes::from)
+                    .map(|z| z.coordinator.into_inner())
+                    .collect(),
             },
-            zomes.into_iter().map(Into::into),
+            zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
         )
-        .await
-        .unwrap();
+        .await;
 
         let mut agents = vec![fake_agent_pubkey_1()];
         if with_bob {
@@ -184,7 +213,7 @@ impl ConductorTestData {
         }
 
         let (this, _) = Self::new(
-            test_environments(),
+            test_db_dir(),
             vec![dna_file],
             agents,
             network.unwrap_or_default(),
@@ -196,9 +225,7 @@ impl ConductorTestData {
 
     /// Shutdown the conductor
     pub async fn shutdown_conductor(&mut self) {
-        let shutdown = self.handle.take_shutdown_handle().unwrap();
-        self.handle.shutdown();
-        shutdown.await.unwrap().unwrap();
+        self.handle.shutdown().await.unwrap().unwrap();
     }
 
     /// Bring bob online if he isn't already
@@ -212,7 +239,7 @@ impl ConductorTestData {
             install_app("bob_app", cell_data, vec![dna_file.clone()], self.handle()).await;
             self.cell_apis.insert(
                 bob_cell_id.clone(),
-                CellHostFnCaller::new(&bob_cell_id, &self.handle(), &dna_file).await,
+                CellHostFnCaller::new(&bob_cell_id, &self.handle(), &dna_file, None).await,
             );
         }
     }

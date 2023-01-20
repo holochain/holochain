@@ -4,9 +4,11 @@
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::sync::Arc;
 
 mod types;
+pub use types::actor::FetchContextExt;
 pub use types::actor::HolochainP2pRef;
 pub use types::actor::HolochainP2pSender;
 pub use types::AgentPubKeyExt; // why is this not included by * above???
@@ -22,6 +24,7 @@ pub use test::HolochainP2pDnaFixturator;
 pub use kitsune_p2p;
 
 #[mockall::automock]
+#[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
@@ -30,20 +33,28 @@ pub trait HolochainP2pDnaT {
     fn dna_hash(&self) -> DnaHash;
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-    async fn join(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
+    async fn join(
+        &self,
+        agent: AgentPubKey,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
+    ) -> actor::HolochainP2pResult<()>;
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
     async fn leave(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
+    #[allow(clippy::too_many_arguments)]
     async fn call_remote(
         &self,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -53,11 +64,13 @@ pub trait HolochainP2pDnaT {
     async fn remote_signal(
         &self,
         from_agent: AgentPubKey,
-        to_agent_list: Vec<AgentPubKey>,
+        to_agent_list: Vec<(Signature, AgentPubKey)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()>;
 
     /// Publish data to the correct neighborhood.
@@ -66,17 +79,20 @@ pub trait HolochainP2pDnaT {
         &self,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        basis_hash: holo_hash::OpBasis,
+        source: AgentPubKey,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
+        reflect_ops: Option<Vec<DhtOp>>,
     ) -> actor::HolochainP2pResult<()>;
 
-    /// Request a validation package.
-    async fn get_validation_package(
+    /// Publish a countersigning op.
+    async fn publish_countersign(
         &self,
-        request_from: AgentPubKey,
-        header_hash: HeaderHash,
-    ) -> actor::HolochainP2pResult<ValidationPackageResponse>;
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> actor::HolochainP2pResult<()>;
 
     /// Get an entry from the DHT.
     async fn get(
@@ -105,7 +121,14 @@ pub trait HolochainP2pDnaT {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>>;
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>>;
+
+    /// Get agent deterministic activity from the DHT.
+    async fn must_get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
 
     /// Send a validation receipt to a remote node.
     async fn send_validation_receipt(
@@ -117,19 +140,21 @@ pub trait HolochainP2pDnaT {
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(
         &self,
-        dht_hash: holo_hash::AnyDhtHash,
+        basis: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool>;
 
-    /// Response from an authority to agents that are
-    /// part of a session.
-    async fn countersigning_authority_response(
+    /// Messages between agents driving a countersigning session.
+    async fn countersigning_session_negotiation(
         &self,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedHeader>,
+        message: event::CountersigningSessionNegotiationMessage,
     ) -> actor::HolochainP2pResult<()>;
 
     /// New data has been integrated and is ready for gossiping.
     async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()>;
+
+    /// Access to the specified CHC
+    fn chc(&self) -> Option<ChcImpl>;
 }
 
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
@@ -138,7 +163,11 @@ pub trait HolochainP2pDnaT {
 pub struct HolochainP2pDna {
     sender: ghost_actor::GhostSender<actor::HolochainP2p>,
     dna_hash: Arc<DnaHash>,
+    chc: Option<ChcImpl>,
 }
+
+/// A CHC implementation
+pub type ChcImpl = Arc<dyn Send + Sync + ChainHeadCoordinator<Item = SignedActionHashed>>;
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for HolochainP2pDna {
@@ -148,8 +177,14 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-    async fn join(&self, agent: AgentPubKey) -> actor::HolochainP2pResult<()> {
-        self.sender.join((*self.dna_hash).clone(), agent).await
+    async fn join(
+        &self,
+        agent: AgentPubKey,
+        initial_arc: Option<crate::dht_arc::DhtArc>,
+    ) -> actor::HolochainP2pResult<()> {
+        self.sender
+            .join((*self.dna_hash).clone(), agent, initial_arc)
+            .await
     }
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
@@ -161,21 +196,27 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn call_remote(
         &self,
         from_agent: AgentPubKey,
+        from_signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
             .call_remote(
                 (*self.dna_hash).clone(),
                 from_agent,
+                from_signature,
                 to_agent,
                 zome_name,
                 fn_name,
                 cap_secret,
                 payload,
+                nonce,
+                expires_at,
             )
             .await
     }
@@ -187,11 +228,13 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn remote_signal(
         &self,
         from_agent: AgentPubKey,
-        to_agent_list: Vec<AgentPubKey>,
+        to_agent_list: Vec<(Signature, AgentPubKey)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
             .remote_signal(
@@ -202,6 +245,8 @@ impl HolochainP2pDnaT for HolochainP2pDna {
                 fn_name,
                 cap,
                 payload,
+                nonce,
+                expires_at,
             )
             .await
     }
@@ -211,38 +256,39 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         &self,
         request_validation_receipt: bool,
         countersigning_session: bool,
-        dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        basis_hash: holo_hash::OpBasis,
+        source: AgentPubKey,
+        op_hash_list: Vec<OpHashSized>,
         timeout_ms: Option<u64>,
+        reflect_ops: Option<Vec<DhtOp>>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
             .publish(
                 (*self.dna_hash).clone(),
                 request_validation_receipt,
                 countersigning_session,
-                dht_hash,
-                ops,
+                basis_hash,
+                source,
+                op_hash_list,
                 timeout_ms,
+                reflect_ops,
             )
             .await
     }
 
-    /// Request a validation package.
-    async fn get_validation_package(
+    /// Publish a countersigning op.
+    async fn publish_countersign(
         &self,
-        request_from: AgentPubKey,
-        header_hash: HeaderHash,
-    ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
+        flag: bool,
+        basis_hash: holo_hash::OpBasis,
+        op: DhtOp,
+    ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .get_validation_package(actor::GetValidationPackage {
-                dna_hash: (*self.dna_hash).clone(),
-                request_from,
-                header_hash,
-            })
+            .publish_countersign((*self.dna_hash).clone(), flag, basis_hash, op)
             .await
     }
 
-    /// Get an entry from the DHT.
+    /// Get [`DhtOp::StoreRecord`] or [`DhtOp::StoreEntry`] from the DHT.
     async fn get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,
@@ -282,9 +328,19 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: actor::GetActivityOptions,
-    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<HeaderHash>>> {
+    ) -> actor::HolochainP2pResult<Vec<AgentActivityResponse<ActionHash>>> {
         self.sender
             .get_agent_activity((*self.dna_hash).clone(), agent, query, options)
+            .await
+    }
+
+    async fn must_get_agent_activity(
+        &self,
+        author: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> actor::HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
+        self.sender
+            .must_get_agent_activity((*self.dna_hash).clone(), author, filter)
             .await
     }
 
@@ -302,20 +358,20 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(
         &self,
-        dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: holo_hash::OpBasis,
     ) -> actor::HolochainP2pResult<bool> {
         self.sender
             .authority_for_hash((*self.dna_hash).clone(), dht_hash)
             .await
     }
 
-    async fn countersigning_authority_response(
+    async fn countersigning_session_negotiation(
         &self,
         agents: Vec<AgentPubKey>,
-        response: Vec<SignedHeader>,
+        message: event::CountersigningSessionNegotiationMessage,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .countersigning_authority_response((*self.dna_hash).clone(), agents, response)
+            .countersigning_session_negotiation((*self.dna_hash).clone(), agents, message)
             .await
     }
 
@@ -324,8 +380,13 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .new_integrated_data((*self.dna_hash).clone())
             .await
     }
+
+    fn chc(&self) -> Option<ChcImpl> {
+        self.chc.clone()
+    }
 }
 
+pub use kitsune_p2p::dht;
 pub use kitsune_p2p::dht_arc;
 
 mod test;

@@ -104,7 +104,7 @@ pub mod kd_entry {
             D: serde::Deserializer<'de>,
         {
             let s = String::deserialize(deserializer).map_err(serde::de::Error::custom)?;
-            let d = base64::decode(&s).map_err(serde::de::Error::custom)?;
+            let d = base64::decode(s).map_err(serde::de::Error::custom)?;
             Ok(Self(d.into_boxed_slice()))
         }
     }
@@ -219,7 +219,6 @@ impl KdEntrySigned {
         let hash = *arrayref::array_ref![parsed.hash, 0, 39];
         let hash = KdHash::from_bytes(hash);
         let binary_len = parsed.binary_len;
-        drop(parsed);
         let wire_data = wire.into();
         Ok(Self(Arc::new(KdEntrySignedInner {
             content,

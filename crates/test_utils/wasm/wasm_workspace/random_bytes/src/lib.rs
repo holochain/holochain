@@ -5,7 +5,15 @@ fn random_bytes(bytes: u32) -> ExternResult<Bytes> {
     hdk::prelude::random_bytes(bytes)
 }
 
-#[cfg(test)]
+#[hdk_extern]
+fn rand_random_bytes(bytes: u32) -> ExternResult<Bytes> {
+    use rand::Rng;
+    let mut bytes = vec![0; bytes as usize];
+    rand::rngs::OsRng.fill(&mut bytes[..]);
+    Ok(Bytes::from(bytes))
+}
+
+#[cfg(all(test, feature = "mock"))]
 pub mod tests {
     #[test]
     fn random_bytes_smoke() {

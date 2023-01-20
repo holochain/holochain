@@ -11,24 +11,25 @@ use crate::prelude::*;
 /// - fn_name: The name of the function in the zome you are calling.
 /// - cap_secret: The capability secret if required.
 /// - payload: The arguments to the function you are calling.
-pub fn call<I>(
+pub fn call<I, Z>(
     to_cell: CallTargetCell,
-    zome_name: ZomeName,
+    zome_name: Z,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
     I: serde::Serialize + std::fmt::Debug,
+    Z: Into<ZomeName>,
 {
     Ok(HDK
         .with(|h| {
             h.borrow().call(vec![Call::new(
                 CallTarget::ConductorCell(to_cell),
-                zome_name,
+                zome_name.into(),
                 fn_name,
                 cap_secret,
-                ExternIO::encode(payload)?,
+                ExternIO::encode(payload).map_err(|e| wasm_error!(e))?,
             )])
         })?
         .into_iter()
@@ -37,6 +38,15 @@ where
 }
 
 /// Wrapper for __call_remote host function.
+///
+/// Remote calls differ from local calls because they run on a different agent on
+/// the same DNA. Remote calls are synchronous and require an active network
+/// connection between local and the remote peer. The remote peer may reject the
+/// incoming call and manage capability grants to determine who to selectively
+/// grant access to. The call on the remote will run exactly as a local call, all
+/// commits will be to the _remote_ source chain NOT the local chain. The only
+/// difference between the remote calling itself vs. accepting an incoming remote
+/// call will be the provenance of the call visible on the call info.
 ///
 /// There are several positional arguments:
 ///
@@ -59,24 +69,25 @@ where
 /// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serializable_payload)?;
 /// ...
 /// ```
-pub fn call_remote<I>(
+pub fn call_remote<I, Z>(
     agent: AgentPubKey,
-    zome: ZomeName,
+    zome: Z,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
     payload: I,
 ) -> ExternResult<ZomeCallResponse>
 where
     I: serde::Serialize + std::fmt::Debug,
+    Z: Into<ZomeName>,
 {
     Ok(HDK
         .with(|h| {
             h.borrow().call(vec![Call::new(
                 CallTarget::NetworkAgent(agent),
-                zome,
+                zome.into(),
                 fn_name,
                 cap_secret,
-                ExternIO::encode(payload)?,
+                ExternIO::encode(payload).map_err(|e| wasm_error!(e))?,
             )])
         })?
         .into_iter()
@@ -89,17 +100,21 @@ where
 /// Only clients who have subscribed to signals from this Cell with the proper
 /// filters will receive it.
 ///
-/// TODO: we could consider adding a (optional?) "type" parameter, so that
-/// statically typed languages can more easily get a hint of what type to
-/// deserialize to. This of course requires a corresponding change to the
-/// Signal type.
+/// # Examples
+/// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/emit_signal/src/lib.rs>
+//
+// TODO: we could consider adding a (optional?) "type" parameter, so that
+// statically typed languages can more easily get a hint of what type to
+// deserialize to. This of course requires a corresponding change to the
+// Signal type.
 pub fn emit_signal<I>(input: I) -> ExternResult<()>
 where
     I: serde::Serialize + std::fmt::Debug,
 {
     HDK.with(|h| {
-        h.borrow()
-            .emit_signal(AppSignal::new(ExternIO::encode(input)?))
+        h.borrow().emit_signal(AppSignal::new(
+            ExternIO::encode(input).map_err(|e| wasm_error!(e))?,
+        ))
     })
 }
 
@@ -136,7 +151,7 @@ where
 {
     HDK.with(|h| {
         h.borrow().remote_signal(RemoteSignal {
-            signal: ExternIO::encode(input)?,
+            signal: ExternIO::encode(input).map_err(|e| wasm_error!(e))?,
             agents,
         })
     })

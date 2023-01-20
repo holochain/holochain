@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht_arc::{ArcInterval, DhtArc, DhtArcSet};
+use kitsune_p2p::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p::{KitsuneAgent, KitsuneSignature, KitsuneSpace};
 use rand::Rng;
 use std::sync::Arc;
@@ -29,11 +29,11 @@ fn rand_signed_at_ms() -> u64 {
         .unwrap()
         .as_millis() as u64;
 
-    now - rng.gen_range(1000, 2000)
+    now - rng.gen_range(1000..2000)
 }
 
 async fn rand_insert(
-    db: &DbWrite<DbKindP2pAgentStore>,
+    db: &DbWrite<DbKindP2pAgents>,
     space: &Arc<KitsuneSpace>,
     agent: &Arc<KitsuneAgent>,
     long: bool,
@@ -43,16 +43,16 @@ async fn rand_insert(
     let signed_at_ms = rand_signed_at_ms();
 
     let expires_at_ms = if long {
-        signed_at_ms + rng.gen_range(10000, 20000)
+        signed_at_ms + rng.gen_range(10000..20000)
     } else {
-        signed_at_ms + rng.gen_range(100, 200)
+        signed_at_ms + rng.gen_range(100..200)
     };
 
-    let half_len = match rng.gen_range(0_u8, 9_u8) {
+    let half_len = match rng.gen_range(0_u8..9_u8) {
         0 => 0,
         1 => u32::MAX,
-        2 => rng.gen_range(0, u32::MAX / 2),
-        _ => rng.gen_range(0, u32::MAX / 1000),
+        2 => rng.gen_range(0..u32::MAX / 2),
+        _ => rng.gen_range(0..u32::MAX / 1000),
     };
 
     let signed = AgentInfoSigned::sign(
@@ -80,7 +80,7 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKindP2pAgentStore(space.clone())).unwrap();
+    let db = DbWrite::test(tmp_dir.path(), DbKindP2pAgents(space.clone())).unwrap();
 
     let mut example_agent = rand_agent();
 
@@ -91,7 +91,7 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
     }
 
     let permit = db.conn_permit().await;
-    let mut con = db.from_permit(permit).unwrap();
+    let mut con = db.with_permit(permit).unwrap();
 
     let res = con.p2p_extrapolated_coverage(DhtArcSet::Full).unwrap();
     println!("{:?}", res);
@@ -100,8 +100,8 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
     let res = con
         .p2p_extrapolated_coverage(DhtArcSet::from(
             &[
-                ArcInterval::from_bounds((1.into(), (u32::MAX / 2 - 1).into())),
-                ArcInterval::from_bounds(((u32::MAX / 2 + 1).into(), (u32::MAX - 1).into())),
+                DhtArcRange::from_bounds(1u32, u32::MAX / 2 - 1),
+                DhtArcRange::from_bounds(u32::MAX / 2 + 1, u32::MAX - 1),
             ][..],
         ))
         .unwrap();
@@ -121,7 +121,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKindP2pAgentStore(space.clone())).unwrap();
+    let db = DbWrite::test(tmp_dir.path(), DbKindP2pAgents(space.clone())).unwrap();
 
     let mut example_agent = rand_agent();
 
@@ -135,7 +135,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     }
 
     let permit = db.conn_permit().await;
-    let mut con = db.from_permit(permit).unwrap();
+    let mut con = db.with_permit(permit).unwrap();
 
     // check that we only get 20 results
     let all = con.p2p_list_agents().unwrap();
@@ -158,7 +158,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         .p2p_gossip_query_agents(
             u64::MIN,
             u64::MAX,
-            DhtArc::new(0, u32::MAX).interval().into(),
+            DhtArcRange::from_bounds(0, u32::MAX).into(),
         )
         .unwrap();
     assert_eq!(all.len(), num_nonzero);
@@ -168,14 +168,14 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         .p2p_gossip_query_agents(
             u64::MIN,
             u64::MIN,
-            DhtArc::new(0, u32::MAX).interval().into(),
+            DhtArcRange::from_bounds(0, u32::MAX).into(),
         )
         .unwrap();
     assert_eq!(all.len(), 0);
 
     // check that gossip query over zero arc returns zero results
     let all = con
-        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArc::new(0, 0).interval().into())
+        .p2p_gossip_query_agents(u64::MIN, u64::MAX, DhtArcRange::Empty.into())
         .unwrap();
     assert_eq!(all.len(), 0);
 
@@ -185,7 +185,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         .p2p_gossip_query_agents(
             u64::MIN,
             u64::MAX,
-            DhtArc::new(0, u32::MAX / 4).interval().into(),
+            DhtArcRange::from_bounds(0, u32::MAX as u64 / 4).into(),
         )
         .unwrap();
     // NOTE - not sure this is right with <= num_nonzero... but it breaks
@@ -238,7 +238,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
     }
 
     // prune everything by expires time
-    p2p_prune(&db).await.unwrap();
+    p2p_prune(&db, vec![]).await.unwrap();
 
     // after prune, make sure all are pruned
     let all = con.p2p_list_agents().unwrap();

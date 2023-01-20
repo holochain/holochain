@@ -3,7 +3,7 @@
 
 use crate::*;
 use holochain_zome_types::signature::Signature;
-use kitsune_p2p::{agent_store::AgentInfoSigned, event::*};
+use kitsune_p2p::{agent_store::AgentInfoSigned, dht::region::RegionBounds, event::*};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 /// The data required for a get request.
@@ -25,9 +25,9 @@ pub struct GetOptions {
     /// Whether the remote-end should follow redirects or just return the
     /// requested entry.
     pub follow_redirects: bool,
-    /// Return all live headers even if there is deletes.
+    /// Return all live actions even if there is deletes.
     /// Useful for metadata calls.
-    pub all_live_headers_with_metadata: bool,
+    pub all_live_actions_with_metadata: bool,
     /// The type of data this get request requires.
     pub request_type: GetRequest,
 }
@@ -36,7 +36,7 @@ impl From<&actor::GetOptions> for GetOptions {
     fn from(a: &actor::GetOptions) -> Self {
         Self {
             follow_redirects: a.follow_redirects,
-            all_live_headers_with_metadata: a.all_live_headers_with_metadata,
+            all_live_actions_with_metadata: a.all_live_actions_with_metadata,
             request_type: a.request_type.clone(),
         }
     }
@@ -71,13 +71,13 @@ impl From<&actor::GetLinksOptions> for GetLinksOptions {
 /// Get agent activity options help control how the get is processed at various levels.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GetActivityOptions {
-    /// Include the activity headers in the response
+    /// Include the activity actions in the response
     pub include_valid_activity: bool,
-    /// Include any rejected headers in the response.
+    /// Include any rejected actions in the response.
     pub include_rejected_activity: bool,
-    /// Include the full signed headers and hashes in the response
+    /// Include the full signed actions and hashes in the response
     /// instead of just the hashes.
-    pub include_full_headers: bool,
+    pub include_full_actions: bool,
 }
 
 impl Default for GetActivityOptions {
@@ -85,7 +85,7 @@ impl Default for GetActivityOptions {
         Self {
             include_valid_activity: true,
             include_rejected_activity: false,
-            include_full_headers: false,
+            include_full_actions: false,
         }
     }
 }
@@ -95,7 +95,53 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
         Self {
             include_valid_activity: a.include_valid_activity,
             include_rejected_activity: a.include_rejected_activity,
-            include_full_headers: a.include_full_headers,
+            include_full_actions: a.include_full_actions,
+        }
+    }
+}
+
+/// Message between agents actively driving/negotiating a countersigning session.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub enum CountersigningSessionNegotiationMessage {
+    /// An authority has a complete set of signed actions and is responding with
+    /// them back to the counterparties.
+    AuthorityResponse(Vec<SignedAction>),
+    /// Counterparties are sending their signed action to an enzyme instead of
+    /// authorities as part of an enzymatic session.
+    EnzymePush(Box<DhtOp>),
+}
+
+/// Multiple ways to fetch op data
+#[derive(Debug, derive_more::From)]
+pub enum FetchOpDataQuery {
+    /// Fetch all ops with the hashes specified
+    Hashes {
+        /// list of ops to fetch
+        op_hash_list: Vec<holo_hash::DhtOpHash>,
+
+        /// should we include limbo ops
+        include_limbo: bool,
+    },
+
+    /// Fetch all ops within the time and space bounds specified
+    Regions(Vec<RegionBounds>),
+}
+
+impl FetchOpDataQuery {
+    /// Convert from the kitsune form of this query
+    pub fn from_kitsune(kit: FetchOpDataEvtQuery) -> Self {
+        match kit {
+            FetchOpDataEvtQuery::Hashes {
+                op_hash_list,
+                include_limbo,
+            } => Self::Hashes {
+                op_hash_list: op_hash_list
+                    .into_iter()
+                    .map(|h| DhtOpHash::from_kitsune(&h))
+                    .collect::<Vec<_>>(),
+                include_limbo,
+            },
+            FetchOpDataEvtQuery::Regions(coords) => Self::Regions(coords),
         }
     }
 }
@@ -104,14 +150,9 @@ ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
-        /// Generic Kitsune Request of the implementor
-        fn k_gen_req(dna_hash: DnaHash, arg: KGenReq) -> KGenRes;
 
         /// We need to store signed agent info.
         fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
-
-        /// We need to get previously stored agent info.
-        fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Option<AgentInfoSigned>;
 
         /// We need to get previously stored agent info.
         fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<std::collections::HashSet<Arc<kitsune_p2p::KitsuneAgent>>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
@@ -130,17 +171,20 @@ ghost_actor::ghost_chan! {
         fn query_agent_info_signed_near_basis(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, basis_loc: u32, limit: u32) -> Vec<AgentInfoSigned>;
 
         /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht_arc::PeerViewBeta;
+        fn query_peer_density(dna_hash: DnaHash, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht::PeerView;
 
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
             dna_hash: DnaHash,
-            to_agent: AgentPubKey,
             from_agent: AgentPubKey,
+            signature: Signature,
+            to_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap_secret: Option<CapSecret>,
             payload: ExternIO,
+            nonce: Nonce256Bits,
+            expires_at: Timestamp,
         ) -> SerializedBytes;
 
         /// A remote node is publishing data in a range we claim to be holding.
@@ -148,17 +192,8 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             request_validation_receipt: bool,
             countersigning_session: bool,
-            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+            ops: Vec<holochain_types::dht_op::DhtOp>,
         ) -> ();
-
-        /// A remote node is requesting a validation package.
-        fn get_validation_package(
-            // The dna_hash / space_hash context.
-            dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
-            to_agent: AgentPubKey,
-            header_hash: HeaderHash,
-        ) -> ValidationPackageResponse;
 
         /// A remote node is requesting entry data from us.
         fn get(
@@ -191,7 +226,15 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> AgentActivityResponse<HeaderHash>;
+        ) -> AgentActivityResponse<ActionHash>;
+
+        /// A remote node is requesting agent activity from us.
+        fn must_get_agent_activity(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            author: AgentPubKey,
+            filter: holochain_zome_types::chain::ChainFilter,
+        ) -> MustGetAgentActivityResponse;
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(
@@ -215,7 +258,7 @@ ghost_actor::ghost_chan! {
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_data(
             dna_hash: DnaHash,
-            op_hashes: Vec<holo_hash::DhtOpHash>,
+            query: FetchOpDataQuery,
         ) -> Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
@@ -228,12 +271,11 @@ ghost_actor::ghost_chan! {
             data: Vec<u8>,
         ) -> Signature;
 
-        /// Response from an authority to agents that are
-        /// part of a session.
-        fn countersigning_authority_response(
+        /// Messages between agents that drive a countersigning session.
+        fn countersigning_session_negotiation(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            signed_headers: Vec<SignedHeader>,
+            message: CountersigningSessionNegotiationMessage,
         ) -> ();
     }
 }
@@ -243,15 +285,14 @@ macro_rules! match_p2p_evt {
     ($h:ident => |$i:ident| { $($t:tt)* }, { $($t2:tt)* }) => {
         match $h {
             HolochainP2pEvent::CallRemote { $i, .. } => { $($t)* }
-            HolochainP2pEvent::GetValidationPackage { $i, .. } => { $($t)* }
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
+            HolochainP2pEvent::MustGetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
-            HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
-            HolochainP2pEvent::CountersigningAuthorityResponse { $i, .. } => { $($t)* }
+            HolochainP2pEvent::CountersigningSessionNegotiation { $i, .. } => { $($t)* }
             $($t2)*
         }
     };
@@ -261,7 +302,6 @@ impl HolochainP2pEvent {
     /// The dna_hash associated with this network p2p event.
     pub fn dna_hash(&self) -> &DnaHash {
         match_p2p_evt!(self => |dna_hash| { dna_hash }, {
-            HolochainP2pEvent::KGenReq { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::Publish { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::FetchOpData { dna_hash, .. } => { dna_hash }
             HolochainP2pEvent::QueryOpHashes { dna_hash, .. } => { dna_hash }
@@ -276,7 +316,6 @@ impl HolochainP2pEvent {
     /// The agent_pub_key associated with this network p2p event.
     pub fn target_agents(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
-            HolochainP2pEvent::KGenReq { .. } => { unimplemented!("There is no single agent target for KGenReq") }
             HolochainP2pEvent::Publish { .. } => { unimplemented!("There is no single agent target for Publish") }
             HolochainP2pEvent::FetchOpData { .. } => { unimplemented!("There is no single agent target for FetchOpData") }
             HolochainP2pEvent::QueryOpHashes { .. } => { unimplemented!("There is no single agent target for QueryOpHashes") }

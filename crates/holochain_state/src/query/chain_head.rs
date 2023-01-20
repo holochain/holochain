@@ -16,17 +16,17 @@ impl ChainHeadQuery {
 }
 
 impl Query for ChainHeadQuery {
-    type Item = Judged<SignedHeaderHashed>;
-    type State = Option<SignedHeaderHashed>;
-    type Output = Option<(HeaderHash, u32, Timestamp)>;
+    type Item = Judged<SignedActionHashed>;
+    type State = Option<SignedActionHashed>;
+    type Output = Option<(ActionHash, u32, Timestamp)>;
 
     fn query(&self) -> String {
         "
         SELECT blob, hash FROM (
-            SELECT Header.blob, Header.hash, MAX(header.seq)
-            FROM Header
-            JOIN DhtOp ON DhtOp.header_hash = Header.hash
-            WHERE Header.author = :author
+            SELECT Action.blob, Action.hash, MAX(action.seq)
+            FROM Action
+            JOIN DhtOp ON DhtOp.action_hash = Action.hash
+            WHERE Action.author = :author
         ) WHERE hash IS NOT NULL
         "
         .into()
@@ -46,9 +46,9 @@ impl Query for ChainHeadQuery {
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let author = self.0.clone();
         // NB: it's a little redundant to filter on author, since we should never
-        // be putting any headers by other authors in our scratch, but it
+        // be putting any actions by other authors in our scratch, but it
         // certainly doesn't hurt to be consistent.
-        let f = move |header: &SignedHeaderHashed| *header.header().author() == *author;
+        let f = move |action: &SignedActionHashed| *action.action().author() == *author;
         Box::new(f)
     }
 
@@ -59,7 +59,7 @@ impl Query for ChainHeadQuery {
         Ok(Some(match state {
             None => sh,
             Some(old) => {
-                if sh.header().header_seq() > old.header().header_seq() {
+                if sh.action().action_seq() > old.action().action_seq() {
                     sh
                 } else {
                     old
@@ -73,15 +73,15 @@ impl Query for ChainHeadQuery {
         S: Store,
     {
         Ok(state.map(|sh| {
-            let seq = sh.header().header_seq();
-            let timestamp = sh.header().timestamp();
-            let hash = sh.into_inner().1;
+            let seq = sh.action().action_seq();
+            let timestamp = sh.action().timestamp();
+            let hash = sh.hashed.hash;
             (hash, seq, timestamp)
         }))
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
-        let f = row_blob_and_hash_to_header("blob", "hash");
+        let f = row_blob_and_hash_to_action("blob", "hash");
         // Valid because the data is authored.
         Arc::new(move |r| Ok(Judged::valid(f(r)?)))
     }
@@ -90,7 +90,7 @@ impl Query for ChainHeadQuery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mutations::{insert_header, insert_op_lite};
+    use crate::mutations::{insert_action, insert_op_lite};
     use ::fixt::prelude::*;
     use holochain_sqlite::schema::SCHEMA_CELL;
     use holochain_types::dht_op::DhtOpLight;
@@ -101,7 +101,6 @@ mod tests {
         observability::test_run().ok();
         let mut conn = Connection::open_in_memory().unwrap();
         SCHEMA_CELL.initialize(&mut conn, None).unwrap();
-        let zome = fixt!(Zome);
 
         let mut txn = conn
             .transaction_with_behavior(TransactionBehavior::Exclusive)
@@ -109,29 +108,29 @@ mod tests {
 
         let author = fixt!(AgentPubKey);
 
-        // Create 5 consecutive headers for the authoring agent,
-        // as well as 5 other random headers, interspersed.
+        // Create 5 consecutive actions for the authoring agent,
+        // as well as 5 other random actions, interspersed.
         let shhs: Vec<_> = vec![
-            fixt!(HeaderBuilderCommon),
-            fixt!(HeaderBuilderCommon),
-            fixt!(HeaderBuilderCommon),
-            fixt!(HeaderBuilderCommon),
-            fixt!(HeaderBuilderCommon),
+            fixt!(ActionBuilderCommon),
+            fixt!(ActionBuilderCommon),
+            fixt!(ActionBuilderCommon),
+            fixt!(ActionBuilderCommon),
+            fixt!(ActionBuilderCommon),
         ]
         .into_iter()
         .enumerate()
-        .flat_map(|(seq, random_header)| {
-            let mut chain_header = random_header.clone();
-            chain_header.header_seq = seq as u32;
-            chain_header.author = author.clone();
-            vec![chain_header, random_header]
+        .flat_map(|(seq, random_action)| {
+            let mut chain_action = random_action.clone();
+            chain_action.action_seq = seq as u32;
+            chain_action.author = author.clone();
+            vec![chain_action, random_action]
         })
         .map(|b| {
-            SignedHeaderHashed::with_presigned(
-                // A chain made entirely of InitZomesComplete headers is totally invalid,
+            SignedActionHashed::with_presigned(
+                // A chain made entirely of InitZomesComplete actions is totally invalid,
                 // but we don't need a valid chain for this test,
-                // we just need an ordered sequence of headers
-                HeaderHashed::from_content_sync(InitZomesComplete::from_builder(b).into()),
+                // we just need an ordered sequence of actions
+                ActionHashed::from_content_sync(InitZomesComplete::from_builder(b).into()),
                 fixt!(Signature),
             )
         })
@@ -140,26 +139,26 @@ mod tests {
         let expected_head = shhs[8].clone();
 
         for shh in &shhs[..6] {
-            let hash = shh.header_address();
-            let op = DhtOpLight::StoreElement(hash.clone(), None, hash.clone().into());
-            let op_order = OpOrder::new(op.get_type(), shh.header().timestamp());
-            insert_header(&mut txn, shh.clone()).unwrap();
+            let hash = shh.action_address();
+            let op = DhtOpLight::StoreRecord(hash.clone(), None, hash.clone().into());
+            let op_order = OpOrder::new(op.get_type(), shh.action().timestamp());
+            insert_action(&mut txn, shh).unwrap();
             insert_op_lite(
                 &mut txn,
-                op,
-                fixt!(DhtOpHash),
-                op_order,
-                shh.header().timestamp(),
+                &op,
+                &fixt!(DhtOpHash),
+                &op_order,
+                &shh.action().timestamp(),
             )
             .unwrap();
         }
 
         let mut scratch = Scratch::new();
 
-        // It's also totally invalid for a call_zome scratch to contain headers
+        // It's also totally invalid for a call_zome scratch to contain actions
         // from other authors, but it doesn't matter here
         for shh in &shhs[6..] {
-            scratch.add_header(Some(zome.clone()), shh.clone(), ChainTopOrdering::default());
+            scratch.add_action(shh.clone(), ChainTopOrdering::default());
         }
 
         let query = ChainHeadQuery::new(Arc::new(author));
@@ -170,8 +169,8 @@ mod tests {
             head.unwrap(),
             (
                 expected_head.as_hash().clone(),
-                expected_head.header().header_seq(),
-                expected_head.header().timestamp()
+                expected_head.action().action_seq(),
+                expected_head.action().timestamp()
             )
         );
     }

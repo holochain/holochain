@@ -30,10 +30,10 @@ async fn test_p2p_metric_store_sanity() {
 
     let space = rand_space();
 
-    let db = DbWrite::test(&tmp_dir, DbKindP2pMetrics(space.clone())).unwrap();
+    let db = DbWrite::test(tmp_dir.path(), DbKindP2pMetrics(space.clone())).unwrap();
 
     let permit = db.conn_permit().await;
-    let mut con = db.from_permit(permit).unwrap();
+    let mut con = db.with_permit(permit).unwrap();
 
     con.p2p_log_metrics(vec![
         // -- reachability quotient -- //

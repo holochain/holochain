@@ -14,13 +14,13 @@ use std::convert::TryInto;
 // hCYk 4868 <Buffer 84 26 24>
 // hCck 4996 <Buffer 84 27 24>
 // hCgk 5124 <Buffer 84 28 24>
-// hCkk 5252 <Buffer 84 29 24> * HEADER
+// hCkk 5252 <Buffer 84 29 24> * ACTION
 // hCok 5380 <Buffer 84 2a 24> * WASM
 // hCsk 5508 <Buffer 84 2b 24>
 // hCwk 5636 <Buffer 84 2c 24>
 // hC0k 5764 <Buffer 84 2d 24> * DNA
 // hC4k 5892 <Buffer 84 2e 24>
-// hC8k 6020 <Buffer 84 2f 24>
+// hC8k 6020 <Buffer 84 2f 24> * EXTERNAL
 
 // Valid Holo.Host options for prefixes:
 // hhAk 2054 <Buffer 86 10 24> * HOST KEY
@@ -45,8 +45,9 @@ pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 3
 pub(crate) const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
 pub(crate) const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
 pub(crate) const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
-pub(crate) const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
+pub(crate) const ACTION_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
 pub(crate) const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
+pub(crate) const EXTERNAL_PREFIX: &[u8] = &[0x84, 0x2f, 0x24]; // uhC8k [132, 47, 36]
 
 /// A PrimitiveHashType is one with a multihash prefix.
 /// In contrast, a non-primitive hash type could be one of several primitive
@@ -165,18 +166,31 @@ primitive_hash_type!(Agent, AgentPubKey, AgentVisitor, AGENT_PREFIX);
 primitive_hash_type!(Entry, EntryHash, EntryVisitor, ENTRY_PREFIX);
 primitive_hash_type!(Dna, DnaHash, DnaVisitor, DNA_PREFIX);
 primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
-primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
+primitive_hash_type!(Action, ActionHash, ActionVisitor, ACTION_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
+primitive_hash_type!(External, ExternalHash, ExternalVisitor, EXTERNAL_PREFIX);
 
 // DhtOps are mostly hashes
 impl HashTypeSync for DhtOp {}
 // Entries are capped at 16MB, which is small enough to hash synchronously
 impl HashTypeSync for Entry {}
-// Headers are only a few hundred bytes at most
-impl HashTypeSync for Header {}
+// Actions are only a few hundred bytes at most
+impl HashTypeSync for Action {}
 // A DnaHash is a hash of the DnaDef, which excludes the wasm bytecode
 impl HashTypeSync for Dna {}
+
+// We don't know what external data might be getting hashed but typically it
+// would be small, like a reference to something in an external system such as
+// a hash in a different DHT, an IPFS hash or a UUID, etc.
+/// External hashes have a DHT location and hash prefix like all other native
+/// holochain hashes but are NOT found/fetchable on the DHT.
+/// External hashing makes no assumptions about the data that was digested to
+/// create the hash so arbitrary bytes can be passed in.
+/// It is valid to EITHER use an existing 32 byte hash/data as literal bytes
+/// for an external hash (literal+prefix, no data loss) OR digest arbitrary
+/// data into an external hash (support all data, opaque result).
+impl HashTypeAsync for External {}
 
 impl HashTypeAsync for NetId {}
 impl HashTypeAsync for Wasm {}

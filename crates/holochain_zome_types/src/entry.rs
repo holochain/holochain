@@ -5,44 +5,46 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::capability::CapClaim;
-use crate::capability::CapGrant;
-use crate::capability::ZomeCallCapGrant;
-use crate::countersigning::CounterSigningSessionData;
-use crate::header::ChainTopOrdering;
-use holo_hash::hash_type;
-use holo_hash::AgentPubKey;
-use holo_hash::EntryHash;
-use holo_hash::HashableContent;
-use holo_hash::HashableContentBytes;
-use holo_hash::HeaderHash;
+use crate::action::ChainTopOrdering;
+use holochain_integrity_types::EntryDefIndex;
+use holochain_integrity_types::EntryVisibility;
+use holochain_integrity_types::ScopedEntryDefIndex;
+use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
-mod error;
 pub use app_entry_bytes::*;
-pub use error::*;
 
-/// Entries larger than this number of bytes cannot be created
-pub const ENTRY_SIZE_LIMIT: usize = 16 * 1000 * 1000; // 16MiB
+pub use holochain_integrity_types::entry::*;
 
-/// The data type written to the source chain when explicitly granting a capability.
-/// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
-/// grant is already implied by `Entry::Agent`, so that should not be committed
-/// to a chain. This is a type alias because if we add other capability types
-/// in the future, we may want to include them
-pub type CapGrantEntry = ZomeCallCapGrant;
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+/// Either an [`EntryDefIndex`] or one of:
+/// - [`EntryType::CapGrant`](crate::prelude::EntryType::CapGrant)
+/// - [`EntryType::CapClaim`](crate::prelude::EntryType::CapClaim)
+/// Which don't have an index.
+pub enum EntryDefLocation {
+    /// App defined entries always have a unique [`u8`] index
+    /// within the Dna.
+    App(AppEntryDefLocation),
+    /// [`crate::EntryDefId::CapClaim`] is committed to and
+    /// validated by all integrity zomes in the dna.
+    CapClaim,
+    /// [`crate::EntryDefId::CapGrant`] is committed to and
+    /// validated by all integrity zomes in the dna.
+    CapGrant,
+}
 
-/// The data type written to the source chain to denote a capability claim
-pub type CapClaimEntry = CapClaim;
-
-/// An Entry paired with its EntryHash
-pub type EntryHashed = holo_hash::HoloHashed<Entry>;
-
-impl From<EntryHashed> for Entry {
-    fn from(entry_hashed: EntryHashed) -> Self {
-        entry_hashed.into_content()
-    }
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+/// The location of an app entry definition.
+pub struct AppEntryDefLocation {
+    /// The zome that defines this entry type.
+    pub zome_index: ZomeIndex,
+    /// The entry type within the zome.
+    pub entry_def_index: EntryDefIndex,
 }
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -104,93 +106,13 @@ pub enum GetStrategy {
     Content,
 }
 
-/// Structure holding the entry portion of a chain element.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[serde(tag = "entry_type", content = "entry")]
-pub enum Entry {
-    /// The `Agent` system entry, the third entry of every source chain,
-    /// which grants authoring capability for this agent.
-    Agent(AgentPubKey),
-    /// The application entry data for entries that aren't system created entries
-    App(AppEntryBytes),
-    /// Application entry data for entries that need countersigning to move forward multiple chains together.
-    CounterSign(Box<CounterSigningSessionData>, AppEntryBytes),
-    /// The capability claim system entry which allows committing a granted permission
-    /// for later use
-    CapClaim(CapClaimEntry),
-    /// The capability grant system entry which allows granting of application defined
-    /// capabilities
-    CapGrant(CapGrantEntry),
-}
-
-impl Entry {
-    /// If this entry represents a capability grant, return a `CapGrant`.
-    pub fn as_cap_grant(&self) -> Option<CapGrant> {
-        match self {
-            Entry::Agent(key) => Some(CapGrant::ChainAuthor(key.clone())),
-            Entry::CapGrant(data) => Some(CapGrant::RemoteAgent(data.clone())),
-            _ => None,
-        }
-    }
-
-    /// If this entry represents a capability claim, return a `CapClaim`.
-    pub fn as_cap_claim(&self) -> Option<&CapClaim> {
-        match self {
-            Entry::CapClaim(claim) => Some(claim),
-            _ => None,
-        }
-    }
-
-    /// Create an Entry::App from SerializedBytes
-    pub fn app(sb: SerializedBytes) -> Result<Self, EntryError> {
-        Ok(Entry::App(AppEntryBytes::try_from(sb)?))
-    }
-
-    /// Create an Entry::App from SerializedBytes
-    pub fn app_fancy<
-        E: Into<EntryError>,
-        SB: TryInto<SerializedBytes, Error = SerializedBytesError>,
-    >(
-        sb: SB,
-    ) -> Result<Self, EntryError> {
-        Ok(Entry::App(AppEntryBytes::try_from(sb.try_into()?)?))
-    }
-}
-
-impl HashableContent for Entry {
-    type HashType = hash_type::Entry;
-
-    fn hash_type(&self) -> Self::HashType {
-        hash_type::Entry
-    }
-
-    fn hashable_content(&self) -> HashableContentBytes {
-        match self {
-            Entry::Agent(agent_pubkey) => {
-                // We must retype this AgentPubKey as an EntryHash so that the
-                // prefix bytes match the Entry prefix
-                HashableContentBytes::Prehashed39(
-                    agent_pubkey
-                        .clone()
-                        .retype(holo_hash::hash_type::Entry)
-                        .into_inner(),
-                )
-            }
-            entry => HashableContentBytes::Content(
-                entry
-                    .try_into()
-                    .expect("Could not serialize HashableContent"),
-            ),
-        }
-    }
-}
-
 /// Zome input to create an entry.
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CreateInput {
-    /// EntryDefId for the created entry.
-    pub entry_def_id: crate::entry_def::EntryDefId,
+    /// The global type index for this entry (if it has one).
+    pub entry_location: EntryDefLocation,
+    /// The visibility of this entry.
+    pub entry_visibility: EntryVisibility,
     /// Entry body.
     pub entry: crate::entry::Entry,
     /// ChainTopBehaviour for the write.
@@ -200,12 +122,14 @@ pub struct CreateInput {
 impl CreateInput {
     /// Constructor.
     pub fn new(
-        entry_def_id: crate::entry_def::EntryDefId,
+        entry_location: impl Into<EntryDefLocation>,
+        entry_visibility: EntryVisibility,
         entry: crate::entry::Entry,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
-            entry_def_id,
+            entry_location: entry_location.into(),
+            entry_visibility,
             entry,
             chain_top_ordering,
         }
@@ -228,12 +152,6 @@ impl AsRef<crate::Entry> for CreateInput {
     }
 }
 
-impl AsRef<crate::EntryDefId> for CreateInput {
-    fn as_ref(&self) -> &crate::EntryDefId {
-        &self.entry_def_id
-    }
-}
-
 /// Zome input for get and get_details calls.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct GetInput {
@@ -253,78 +171,22 @@ impl GetInput {
     }
 }
 
-/// Zome input for must_get_valid_element.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct MustGetValidElementInput(HeaderHash);
-
-impl MustGetValidElementInput {
-    /// Constructor.
-    pub fn new(header_hash: HeaderHash) -> Self {
-        Self(header_hash)
-    }
-
-    /// Consumes self for inner.
-    pub fn into_inner(self) -> HeaderHash {
-        self.0
-    }
-}
-
-/// Zome input for must_get_entry.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct MustGetEntryInput(EntryHash);
-
-impl MustGetEntryInput {
-    /// Constructor.
-    pub fn new(entry_hash: EntryHash) -> Self {
-        Self(entry_hash)
-    }
-
-    /// Consumes self for inner.
-    pub fn into_inner(self) -> EntryHash {
-        self.0
-    }
-}
-
-/// Zome input for must_get_header.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct MustGetHeaderInput(HeaderHash);
-
-impl MustGetHeaderInput {
-    /// Constructor.
-    pub fn new(header_hash: HeaderHash) -> Self {
-        Self(header_hash)
-    }
-
-    /// Consumes self for inner.
-    pub fn into_inner(self) -> HeaderHash {
-        self.0
-    }
-}
-
 /// Zome input type for all update operations.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateInput {
-    /// Header of the element being updated.
-    pub original_header_address: holo_hash::HeaderHash,
-    /// Create portion of the update.
-    pub create_input: CreateInput,
-}
-
-impl UpdateInput {
-    /// Constructor.
-    pub fn new(original_header_address: holo_hash::HeaderHash, create_input: CreateInput) -> Self {
-        Self {
-            original_header_address,
-            create_input,
-        }
-    }
+    /// Action of the record being updated.
+    pub original_action_address: holo_hash::ActionHash,
+    /// Entry body.
+    pub entry: crate::entry::Entry,
+    /// ChainTopBehaviour for the write.
+    pub chain_top_ordering: ChainTopOrdering,
 }
 
 /// Zome input for all delete operations.
 #[derive(PartialEq, Debug, Deserialize, Serialize, Clone)]
 pub struct DeleteInput {
-    /// Header of the element being deleted.
-    pub deletes_header_hash: holo_hash::HeaderHash,
+    /// Action of the record being deleted.
+    pub deletes_action_hash: holo_hash::ActionHash,
     /// Chain top ordering behaviour for the delete.
     pub chain_top_ordering: ChainTopOrdering,
 }
@@ -332,22 +194,50 @@ pub struct DeleteInput {
 impl DeleteInput {
     /// Constructor.
     pub fn new(
-        deletes_header_hash: holo_hash::HeaderHash,
+        deletes_action_hash: holo_hash::ActionHash,
         chain_top_ordering: ChainTopOrdering,
     ) -> Self {
         Self {
-            deletes_header_hash,
+            deletes_action_hash,
             chain_top_ordering,
         }
     }
 }
 
-impl From<holo_hash::HeaderHash> for DeleteInput {
+impl From<holo_hash::ActionHash> for DeleteInput {
     /// Sets [`ChainTopOrdering`] to `default` = `Strict` when created from a hash.
-    fn from(deletes_header_hash: holo_hash::HeaderHash) -> Self {
+    fn from(deletes_action_hash: holo_hash::ActionHash) -> Self {
         Self {
-            deletes_header_hash,
+            deletes_action_hash,
             chain_top_ordering: ChainTopOrdering::default(),
         }
+    }
+}
+
+impl EntryDefLocation {
+    /// Create an [`EntryDefLocation::App`].
+    pub fn app(
+        zome_index: impl Into<ZomeIndex>,
+        entry_def_index: impl Into<EntryDefIndex>,
+    ) -> Self {
+        Self::App(AppEntryDefLocation {
+            zome_index: zome_index.into(),
+            entry_def_index: entry_def_index.into(),
+        })
+    }
+}
+
+impl From<ScopedEntryDefIndex> for AppEntryDefLocation {
+    fn from(s: ScopedEntryDefIndex) -> Self {
+        Self {
+            zome_index: s.zome_index,
+            entry_def_index: s.zome_type,
+        }
+    }
+}
+
+impl From<ScopedEntryDefIndex> for EntryDefLocation {
+    fn from(s: ScopedEntryDefIndex) -> Self {
+        Self::App(s.into())
     }
 }

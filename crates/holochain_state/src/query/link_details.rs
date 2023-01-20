@@ -11,29 +11,17 @@ pub struct GetLinkDetailsQuery {
 }
 
 impl GetLinkDetailsQuery {
-    pub fn new(base: EntryHash, zome_id: ZomeId, tag: Option<LinkTag>) -> Self {
+    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>) -> Self {
         Self {
-            query: LinksQuery::new(base, zome_id, tag),
-        }
-    }
-
-    pub fn base(base: EntryHash, zome_id: ZomeId) -> Self {
-        Self {
-            query: LinksQuery::base(base, zome_id),
-        }
-    }
-
-    pub fn tag(base: EntryHash, zome_id: ZomeId, tag: LinkTag) -> Self {
-        Self {
-            query: LinksQuery::tag(base, zome_id, tag),
+            query: LinksQuery::new(base, type_query, tag),
         }
     }
 }
 
 impl Query for GetLinkDetailsQuery {
-    type Item = Judged<SignedHeaderHashed>;
-    type State = HashMap<HeaderHash, (Option<SignedHeaderHashed>, HashSet<SignedHeaderHashed>)>;
-    type Output = Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>;
+    type Item = Judged<SignedActionHashed>;
+    type State = HashMap<ActionHash, (Option<SignedActionHashed>, HashSet<SignedActionHashed>)>;
+    type Output = Vec<(SignedActionHashed, Vec<SignedActionHashed>)>;
     fn query(&self) -> String {
         self.query.query()
     }
@@ -47,7 +35,7 @@ impl Query for GetLinkDetailsQuery {
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
-        let f = row_blob_to_header("header_blob");
+        let f = row_blob_to_action("action_blob");
         // Data is valid because it is filtered in the sql query.
         Arc::new(move |row| Ok(Judged::valid(f(row)?)))
     }
@@ -55,23 +43,23 @@ impl Query for GetLinkDetailsQuery {
     fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
         let query = &self.query;
         let base_filter = query.base.clone();
-        let zome_id_filter = query.zome_id;
+        let type_query_filter = query.type_query.clone();
         let tag_filter = query.tag.clone();
-        let f = move |header: &QueryData<Self>| match header.header() {
-            Header::CreateLink(CreateLink {
+        let f = move |action: &QueryData<Self>| match action.action() {
+            Action::CreateLink(CreateLink {
                 base_address,
-                zome_id,
                 tag,
+                zome_index,
+                link_type,
                 ..
             }) => {
                 *base_address == *base_filter
-                    && *zome_id == zome_id_filter
+                    && type_query_filter.contains(zome_index, link_type)
                     && tag_filter
                         .as_ref()
-                        .map(|t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
-                        .unwrap_or(true)
+                        .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
             }
-            Header::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
+            Action::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
             _ => false,
         };
         Box::new(f)
@@ -79,22 +67,22 @@ impl Query for GetLinkDetailsQuery {
 
     fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         let shh = data.data;
-        let header = shh.header();
-        match header {
-            Header::CreateLink(_) => {
+        let action = shh.action();
+        match action {
+            Action::CreateLink(_) => {
                 state
                     .entry(shh.as_hash().clone())
                     .or_insert((Some(shh), HashSet::new()));
             }
-            Header::DeleteLink(delete_link) => {
+            Action::DeleteLink(delete_link) => {
                 let entry = state
                     .entry(delete_link.link_add_address.clone())
                     .or_insert((None, HashSet::new()));
                 entry.1.insert(shh);
             }
             _ => {
-                return Err(StateQueryError::UnexpectedHeader(
-                    shh.header().header_type(),
+                return Err(StateQueryError::UnexpectedAction(
+                    shh.action().action_type(),
                 ))
             }
         }
@@ -113,12 +101,12 @@ impl Query for GetLinkDetailsQuery {
             .filter_map(|(_, (create, deletes))| {
                 create.map(|create| {
                     let mut deletes = deletes.into_iter().collect::<Vec<_>>();
-                    deletes.sort_by_key(|l| l.header().timestamp());
+                    deletes.sort_by_key(|l| l.action().timestamp());
                     (create, deletes.into_iter().collect())
                 })
             })
             .collect::<Vec<_>>();
-        r.sort_by_key(|l| l.0.header().timestamp());
+        r.sort_by_key(|l| l.0.action().timestamp());
         Ok(r)
     }
 }

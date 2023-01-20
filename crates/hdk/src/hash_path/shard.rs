@@ -127,14 +127,14 @@ impl From<(&ShardStrategy, &[u8])> for Path {
         Path::from(sharded)
     }
 }
-/// Wrapper around &Vec<u8> to work the same as &[u8].
+/// Wrapper around `&Vec<u8>` to work the same as &[u8].
 impl From<(&ShardStrategy, &Vec<u8>)> for Path {
     fn from((strategy, bytes): (&ShardStrategy, &Vec<u8>)) -> Path {
         let bytes: &[u8] = bytes.as_ref();
         Path::from((strategy, bytes))
     }
 }
-/// Wrapper around Vec<u8> to work the same as &[u8].
+/// Wrapper around `Vec<u8>` to work the same as &[u8].
 impl From<(&ShardStrategy, Vec<u8>)> for Path {
     fn from((strategy, bytes): (&ShardStrategy, Vec<u8>)) -> Path {
         let bytes: &[u8] = bytes.as_ref();
@@ -164,13 +164,14 @@ impl From<(&ShardStrategy, &str)> for Path {
         ))
     }
 }
-/// [ `&String` ] wrapper mimicing [ `&str` ] for [ `Path` ] building.
+
+/// [`&String`](std::string::String) wrapper mimicking [`&str`] for [`Path`] building.
 impl From<(&ShardStrategy, &String)> for Path {
     fn from((strategy, s): (&ShardStrategy, &String)) -> Path {
         Path::from((strategy, s.as_str()))
     }
 }
-// [ `String` ] wrapper mimicing [ `&str` ] for [ `Path` ] building.
+// [`String`] wrapper mimicking [`&str`] for [`Path`] building.
 impl From<(&ShardStrategy, String)> for Path {
     fn from((strategy, s): (&ShardStrategy, String)) -> Path {
         Path::from((strategy, s.as_str()))

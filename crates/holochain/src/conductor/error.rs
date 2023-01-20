@@ -5,6 +5,7 @@ use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
+use holochain_wasmer_host::prelude::WasmErrorInner;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -30,11 +31,17 @@ pub enum ConductorError {
     #[error("Cell is already active.")]
     CellAlreadyActive,
 
+    #[error("Cell already exists. CellId: {0:?}")]
+    CellAlreadyExists(CellId),
+
     #[error("Cell is not initialized.")]
     CellNotInitialized,
 
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
+
+    #[error("Error while cloning cell: {0}")]
+    CloneCellError(String),
 
     #[error(transparent)]
     ConductorConfigError(#[from] ConductorConfigError),
@@ -104,6 +111,9 @@ pub enum ConductorError {
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
 
     #[error(transparent)]
+    SourceChainError(#[from] holochain_state::source_chain::SourceChainError),
+
+    #[error(transparent)]
     StateQueryError(#[from] holochain_state::query::StateQueryError),
 
     #[error(transparent)]
@@ -114,6 +124,9 @@ pub enum ConductorError {
 
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
+
+    #[error(transparent)]
+    RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
 
     /// Other
     #[error("Other: {0}")]
@@ -130,5 +143,11 @@ impl ConductorError {
 impl From<one_err::OneErr> for ConductorError {
     fn from(e: one_err::OneErr) -> Self {
         Self::other(e)
+    }
+}
+
+impl From<ConductorError> for WasmErrorInner {
+    fn from(e: ConductorError) -> Self {
+        Self::Host(e.to_string())
     }
 }

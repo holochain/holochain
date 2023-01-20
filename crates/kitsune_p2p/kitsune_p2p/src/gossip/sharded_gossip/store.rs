@@ -8,11 +8,13 @@ use crate::event::{
     PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow, TimeWindowInclusive,
 };
 use crate::types::event::KitsuneP2pEventSender;
+use crate::HostApi;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
-    dht_arc::{ArcInterval, DhtArcSet},
+    dht_arc::{DhtArc, DhtArcSet},
     KitsuneError, KitsuneResult,
 };
 
@@ -23,10 +25,10 @@ pub(super) async fn all_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    Ok(evt_sender
+    evt_sender
         .query_agents(QueryAgentsEvt::new(space.clone()))
         .await
-        .map_err(KitsuneError::other)?)
+        .map_err(KitsuneError::other)
 }
 
 /// Get all `AgentInfoSigned` for agents in a space.
@@ -36,10 +38,10 @@ pub(super) async fn query_agent_info(
     agents: &HashSet<Arc<KitsuneAgent>>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
     let query = QueryAgentsEvt::new(space.clone()).by_agents(agents.clone());
-    Ok(evt_sender
+    evt_sender
         .query_agents(query)
         .await
-        .map_err(KitsuneError::other)?)
+        .map_err(KitsuneError::other)
 }
 
 /// Get the arc intervals for specified agent, paired with their respective agent.
@@ -47,11 +49,11 @@ pub(super) async fn local_agent_arcs(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, ArcInterval)>> {
+) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
     Ok(query_agent_info(evt_sender, space, local_agents)
         .await?
         .into_iter()
-        .map(|info| (info.agent.clone(), info.storage_arc.interval()))
+        .map(|info| (info.agent.clone(), info.storage_arc))
         .collect::<Vec<_>>())
 }
 
@@ -60,7 +62,7 @@ pub(super) async fn local_arcs(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<ArcInterval>> {
+) -> KitsuneResult<Vec<DhtArc>> {
     Ok(local_agent_arcs(evt_sender, space, local_agents)
         .await?
         .into_iter()
@@ -90,7 +92,7 @@ pub(super) async fn agents_within_arcset(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     arc_set: Arc<DhtArcSet>,
-) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, ArcInterval)>> {
+) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
     Ok(evt_sender
         .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
         .await
@@ -109,7 +111,7 @@ pub(super) async fn all_op_hashes_within_arcset(
     max_ops: usize,
     include_limbo: bool,
 ) -> KitsuneResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
-    Ok(evt_sender
+    evt_sender
         .query_op_hashes(QueryOpHashesEvt {
             space: space.clone(),
             arc_set: common_arc_set,
@@ -118,7 +120,7 @@ pub(super) async fn all_op_hashes_within_arcset(
             include_limbo,
         })
         .await
-        .map_err(KitsuneError::other)?)
+        .map_err(KitsuneError::other)
 }
 
 /// A chunk of hashes.
@@ -258,6 +260,17 @@ pub(super) fn hash_chunks_query(
     Box::pin(f)
 }
 
+pub(super) async fn query_region_set<'a>(
+    host_api: HostApi,
+    space: Arc<KitsuneSpace>,
+    common_arc_set: Arc<DhtArcSet>,
+) -> KitsuneResult<RegionSetLtcs> {
+    host_api
+        .query_region_set(space, common_arc_set)
+        .await
+        .map_err(KitsuneError::other)
+}
+
 /// Add new agent info to the p2p store.
 pub(super) async fn put_agent_info(
     evt_sender: &EventSender,
@@ -272,19 +285,5 @@ pub(super) async fn put_agent_info(
         })
         .await
         .map_err(KitsuneError::other)?;
-    Ok(())
-}
-
-/// Put new ops into agents that should hold them.
-pub(super) async fn put_ops(
-    evt_sender: &EventSender,
-    space: &Arc<KitsuneSpace>,
-    ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
-) -> KitsuneResult<()> {
-    evt_sender
-        .gossip(space.clone(), ops)
-        .await
-        .map_err(KitsuneError::other)?;
-
     Ok(())
 }

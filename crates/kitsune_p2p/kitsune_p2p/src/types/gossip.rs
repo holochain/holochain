@@ -1,5 +1,7 @@
 use crate::metrics::*;
 use crate::types::*;
+use crate::HostApi;
+use kitsune_p2p_fetch::FetchQueue;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
@@ -9,8 +11,6 @@ use std::sync::Arc;
 #[derive(Clone, Debug, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 /// The type of gossip module running this gossip.
 pub enum GossipModuleType {
-    /// Simple bloom.
-    Simple,
     /// Recent sharded gossip.
     ShardedRecent,
     /// Historical sharded gossip.
@@ -70,28 +70,41 @@ impl std::fmt::Debug for GossipModule {
 
 /// Represents an interchangeable gossip strategy module factory
 pub trait AsGossipModuleFactory: 'static + Send + Sync {
+    #[allow(clippy::too_many_arguments)]
     fn spawn_gossip_task(
         &self,
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        host: HostApi,
         metrics: MetricsSync,
+        fetch_queue: FetchQueue,
     ) -> GossipModule;
 }
 
 pub struct GossipModuleFactory(pub Arc<dyn AsGossipModuleFactory>);
 
 impl GossipModuleFactory {
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn_gossip_task(
         &self,
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
         ep_hnd: Tx2EpHnd<wire::Wire>,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
+        host: HostApi,
         metrics: MetricsSync,
+        fetch_queue: FetchQueue,
     ) -> GossipModule {
-        self.0
-            .spawn_gossip_task(tuning_params, space, ep_hnd, evt_sender, metrics)
+        self.0.spawn_gossip_task(
+            tuning_params,
+            space,
+            ep_hnd,
+            evt_sender,
+            host,
+            metrics,
+            fetch_queue,
+        )
     }
 }

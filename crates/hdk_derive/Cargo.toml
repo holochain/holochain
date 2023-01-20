@@ -1,6 +1,6 @@
 [package]
 name = "hdk_derive"
-version = "0.0.24"
+version = "0.1.0-beta-rc.2"
 description = "derive macros for the holochain hdk"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -8,19 +8,22 @@ documentation = "https://docs.rs/hdk_derive"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "hdk" ]
 categories = [ "cryptography" ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 proc-macro = true
 
 [dependencies]
-syn = { version = "1", features = [ "full", "extra-traits" ] }
+syn = { version = "1", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
 paste = "=1.0.5"
+darling = "0.14.1"
+heck = "0.4"
 # it's important that we depend on holochain_zome_types with no default
-# features, both here AND in hdk, to reduce code bloat
-holochain_zome_types = { version = "0.0.24", path = "../holochain_zome_types", default-features = false }
+# features, both here AND in hdi, to reduce code bloat
+holochain_integrity_types = { version = "^0.1.0-beta-rc.2", path = "../holochain_integrity_types", default-features = false }
+proc-macro-error = "1.0.4"
 
 [features]
 default = []

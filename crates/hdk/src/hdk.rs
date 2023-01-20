@@ -1,19 +1,18 @@
 use crate::prelude::*;
-
-#[cfg(feature = "mock")]
-use mockall::*;
+use hdi::hdi::HdiT;
 
 pub const HDK_NOT_REGISTERED: &str = "HDK not registered";
 
 /// This is a cell so it can be set many times.
 /// Every test needs its own mock so each test needs to set it.
 use core::cell::RefCell;
+use std::rc::Rc;
 
 #[cfg(any(feature = "mock", not(target_arch = "wasm32")))]
-thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(ErrHdk)));
+thread_local!(pub static HDK: RefCell<Rc<dyn HdkT>> = RefCell::new(Rc::new(ErrHdk)));
 
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
-thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(HostHdk)));
+thread_local!(pub static HDK: RefCell<Rc<dyn HdkT>> = RefCell::new(Rc::new(HostHdk)));
 
 /// When mocking is enabled the mockall crate automatically builds a MockHdkT for us.
 /// ```ignore
@@ -21,34 +20,22 @@ thread_local!(pub static HDK: RefCell<Box<dyn HdkT>> = RefCell::new(Box::new(Hos
 /// mock_hdk.expect_foo().times(1).etc().etc();
 /// set_hdk(mock_hdk);
 /// ```
-#[cfg_attr(feature = "mock", automock)]
-pub trait HdkT: Send + Sync {
+pub trait HdkT: HdiT {
     // Chain
     fn get_agent_activity(
         &self,
         get_agent_activity_input: GetAgentActivityInput,
     ) -> ExternResult<AgentActivity>;
-    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>>;
+    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
     // Ed25519
     fn sign(&self, sign: Sign) -> ExternResult<Signature>;
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
-    fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
     // Entry
-    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash>;
-    fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash>;
-    fn delete(&self, delete_input: DeleteInput) -> ExternResult<HeaderHash>;
-    fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
-    fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>>;
+    fn create(&self, create_input: CreateInput) -> ExternResult<ActionHash>;
+    fn update(&self, update_input: UpdateInput) -> ExternResult<ActionHash>;
+    fn delete(&self, delete_input: DeleteInput) -> ExternResult<ActionHash>;
+    fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>>;
     fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
-    fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
-    fn must_get_header(
-        &self,
-        must_get_header_input: MustGetHeaderInput,
-    ) -> ExternResult<SignedHeaderHashed>;
-    fn must_get_valid_element(
-        &self,
-        must_get_valid_element_input: MustGetValidElementInput,
-    ) -> ExternResult<Element>;
     // CounterSigning
     fn accept_countersigning_preflight_request(
         &self,
@@ -56,12 +43,10 @@ pub trait HdkT: Send + Sync {
     ) -> ExternResult<PreflightRequestAcceptance>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
-    fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
-    fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
     // Link
-    fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash>;
-    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash>;
+    fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<ActionHash>;
+    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<ActionHash>;
     fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>>;
     fn get_link_details(
         &self,
@@ -77,26 +62,133 @@ pub trait HdkT: Send + Sync {
     fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
     fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
-    // Trace
-    fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
     // XSalsa20Poly1305
-    fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
-    fn x_salsa20_poly1305_decrypt(
+    fn x_salsa20_poly1305_shared_secret_create_random(
         &self,
-        x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
-    ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+        key_ref: Option<XSalsa20Poly1305KeyRef>,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef>;
+    fn x_salsa20_poly1305_shared_secret_export(
+        &self,
+        x_salsa20_poly1305_shared_secret_export: XSalsa20Poly1305SharedSecretExport,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        &self,
+        x_salsa20_poly1305_shared_secret_ingest: XSalsa20Poly1305SharedSecretIngest,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef>;
     fn x_salsa20_poly1305_encrypt(
         &self,
         x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
     fn x_25519_x_salsa20_poly1305_encrypt(
         &self,
         x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
-    fn x_25519_x_salsa20_poly1305_decrypt(
-        &self,
-        x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
-    ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+}
+
+#[cfg(feature = "mock")]
+mockall::mock! {
+    pub HdkT {}
+
+    impl HdkT for HdkT {
+        // Chain
+        fn get_agent_activity(
+            &self,
+            get_agent_activity_input: GetAgentActivityInput,
+        ) -> ExternResult<AgentActivity>;
+        fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>>;
+        // Ed25519
+        fn sign(&self, sign: Sign) -> ExternResult<Signature>;
+        fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures>;
+        // Entry
+        fn create(&self, create_input: CreateInput) -> ExternResult<ActionHash>;
+        fn update(&self, update_input: UpdateInput) -> ExternResult<ActionHash>;
+        fn delete(&self, delete_input: DeleteInput) -> ExternResult<ActionHash>;
+        fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>>;
+        fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
+        // CounterSigning
+        fn accept_countersigning_preflight_request(
+            &self,
+            preflight_request: PreflightRequest,
+        ) -> ExternResult<PreflightRequestAcceptance>;
+        // Info
+        fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
+        fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
+        // Link
+        fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<ActionHash>;
+        fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<ActionHash>;
+        fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>>;
+        fn get_link_details(
+            &self,
+            get_links_input: Vec<GetLinksInput>,
+        ) -> ExternResult<Vec<LinkDetails>>;
+        // P2P
+        fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
+        fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
+        fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
+        // Random
+        fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
+        // Time
+        fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
+        fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
+        fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
+        // XSalsa20Poly1305
+        fn x_salsa20_poly1305_shared_secret_create_random(
+            &self,
+            key_ref: Option<XSalsa20Poly1305KeyRef>,
+        ) -> ExternResult<XSalsa20Poly1305KeyRef>;
+        fn x_salsa20_poly1305_shared_secret_export(
+            &self,
+            x_salsa20_poly1305_shared_secret_export: XSalsa20Poly1305SharedSecretExport,
+        ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+        fn x_salsa20_poly1305_shared_secret_ingest(
+            &self,
+            x_salsa20_poly1305_shared_secret_ingest: XSalsa20Poly1305SharedSecretIngest,
+        ) -> ExternResult<XSalsa20Poly1305KeyRef>;
+        fn x_salsa20_poly1305_encrypt(
+            &self,
+            x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
+        ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+        fn create_x25519_keypair(&self, create_x25519_keypair_input: ()) -> ExternResult<X25519PubKey>;
+        fn x_25519_x_salsa20_poly1305_encrypt(
+            &self,
+            x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
+        ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+
+    }
+
+    impl HdiT for HdkT {
+        fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
+        fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
+        fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
+        fn must_get_action(
+            &self,
+            must_get_action_input: MustGetActionInput,
+        ) -> ExternResult<SignedActionHashed>;
+        fn must_get_valid_record(
+            &self,
+            must_get_valid_record_input: MustGetValidRecordInput,
+        ) -> ExternResult<Record>;
+        fn must_get_agent_activity(
+            &self,
+            must_get_agent_activity_input: MustGetAgentActivityInput,
+        ) -> ExternResult<Vec<RegisterAgentActivity>>;
+        // Info
+        fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
+        fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
+        // Trace
+        fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()>;
+        // XSalsa20Poly1305
+        fn x_salsa20_poly1305_decrypt(
+            &self,
+            x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
+        ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+        fn x_25519_x_salsa20_poly1305_decrypt(
+            &self,
+            x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
+        ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+    }
+
 }
 
 /// Used as a placeholder before any other Hdk is registered.
@@ -105,7 +197,74 @@ pub struct ErrHdk;
 
 impl ErrHdk {
     fn err<T>() -> ExternResult<T> {
-        Err(WasmError::Guest(HDK_NOT_REGISTERED.to_string()))
+        Err(wasm_error!(WasmErrorInner::Guest(
+            HDK_NOT_REGISTERED.to_string()
+        )))
+    }
+}
+
+/// Every call is an error for the ErrHdk.
+impl HdiT for ErrHdk {
+    fn verify_signature(&self, _verify_signature: VerifySignature) -> ExternResult<bool> {
+        Self::err()
+    }
+
+    fn hash(&self, _hash_input: HashInput) -> ExternResult<HashOutput> {
+        Self::err()
+    }
+
+    fn must_get_entry(
+        &self,
+        _must_get_entry_input: MustGetEntryInput,
+    ) -> ExternResult<EntryHashed> {
+        Self::err()
+    }
+
+    fn must_get_action(
+        &self,
+        _must_get_action_input: MustGetActionInput,
+    ) -> ExternResult<SignedActionHashed> {
+        Self::err()
+    }
+
+    fn must_get_valid_record(
+        &self,
+        _must_get_valid_record_input: MustGetValidRecordInput,
+    ) -> ExternResult<Record> {
+        Self::err()
+    }
+
+    fn must_get_agent_activity(
+        &self,
+        _: MustGetAgentActivityInput,
+    ) -> ExternResult<Vec<RegisterAgentActivity>> {
+        Self::err()
+    }
+
+    fn dna_info(&self, _dna_info_input: ()) -> ExternResult<DnaInfo> {
+        Self::err()
+    }
+
+    fn zome_info(&self, _zome_info_input: ()) -> ExternResult<ZomeInfo> {
+        Self::err()
+    }
+
+    fn trace(&self, _: TraceMsg) -> ExternResult<()> {
+        Self::err()
+    }
+
+    fn x_salsa20_poly1305_decrypt(
+        &self,
+        _x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        Self::err()
+    }
+
+    fn x_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        _x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        Self::err()
     }
 }
 
@@ -114,7 +273,7 @@ impl HdkT for ErrHdk {
     fn get_agent_activity(&self, _: GetAgentActivityInput) -> ExternResult<AgentActivity> {
         Self::err()
     }
-    fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Element>> {
+    fn query(&self, _: ChainQueryFilter) -> ExternResult<Vec<Record>> {
         Self::err()
     }
     fn sign(&self, _: Sign) -> ExternResult<Signature> {
@@ -123,34 +282,19 @@ impl HdkT for ErrHdk {
     fn sign_ephemeral(&self, _: SignEphemeral) -> ExternResult<EphemeralSignatures> {
         Self::err()
     }
-    fn verify_signature(&self, _: VerifySignature) -> ExternResult<bool> {
+    fn create(&self, _: CreateInput) -> ExternResult<ActionHash> {
         Self::err()
     }
-    fn create(&self, _: CreateInput) -> ExternResult<HeaderHash> {
+    fn update(&self, _: UpdateInput) -> ExternResult<ActionHash> {
         Self::err()
     }
-    fn update(&self, _: UpdateInput) -> ExternResult<HeaderHash> {
+    fn delete(&self, _: DeleteInput) -> ExternResult<ActionHash> {
         Self::err()
     }
-    fn delete(&self, _: DeleteInput) -> ExternResult<HeaderHash> {
-        Self::err()
-    }
-    fn hash(&self, _: HashInput) -> ExternResult<HashOutput> {
-        Self::err()
-    }
-    fn get(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
+    fn get(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>> {
         Self::err()
     }
     fn get_details(&self, _: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
-        Self::err()
-    }
-    fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
-        Self::err()
-    }
-    fn must_get_header(&self, _: MustGetHeaderInput) -> ExternResult<SignedHeaderHashed> {
-        Self::err()
-    }
-    fn must_get_valid_element(&self, _: MustGetValidElementInput) -> ExternResult<Element> {
         Self::err()
     }
     // CounterSigning
@@ -163,20 +307,14 @@ impl HdkT for ErrHdk {
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         Self::err()
     }
-    fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
-        Self::err()
-    }
-    fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
-        Self::err()
-    }
     fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
         Self::err()
     }
     // Link
-    fn create_link(&self, _: CreateLinkInput) -> ExternResult<HeaderHash> {
+    fn create_link(&self, _: CreateLinkInput) -> ExternResult<ActionHash> {
         Self::err()
     }
-    fn delete_link(&self, _: DeleteLinkInput) -> ExternResult<HeaderHash> {
+    fn delete_link(&self, _: DeleteLinkInput) -> ExternResult<ActionHash> {
         Self::err()
     }
     fn get_links(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>> {
@@ -209,42 +347,107 @@ impl HdkT for ErrHdk {
     fn sleep(&self, _: std::time::Duration) -> ExternResult<()> {
         Self::err()
     }
-    // Trace
-    fn trace(&self, _: TraceMsg) -> ExternResult<()> {
-        Self::err()
-    }
     // XSalsa20Poly1305
-    fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
-        Self::err()
-    }
-    fn x_salsa20_poly1305_decrypt(
+    fn x_salsa20_poly1305_shared_secret_create_random(
         &self,
-        _: XSalsa20Poly1305Decrypt,
-    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        _key_ref: Option<XSalsa20Poly1305KeyRef>,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef> {
         Self::err()
     }
+
+    fn x_salsa20_poly1305_shared_secret_export(
+        &self,
+        _x_salsa20_poly1305_shared_secret_export: XSalsa20Poly1305SharedSecretExport,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        Self::err()
+    }
+
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        &self,
+        _x_salsa20_poly1305_shared_secret_ingest: XSalsa20Poly1305SharedSecretIngest,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef> {
+        Self::err()
+    }
+
     fn x_salsa20_poly1305_encrypt(
         &self,
-        _: XSalsa20Poly1305Encrypt,
+        _x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
         Self::err()
     }
+
+    fn create_x25519_keypair(
+        &self,
+        _create_x25519_keypair_input: (),
+    ) -> ExternResult<X25519PubKey> {
+        Self::err()
+    }
+
     fn x_25519_x_salsa20_poly1305_encrypt(
         &self,
-        _: X25519XSalsa20Poly1305Encrypt,
+        _x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
-        Self::err()
-    }
-    fn x_25519_x_salsa20_poly1305_decrypt(
-        &self,
-        _: X25519XSalsa20Poly1305Decrypt,
-    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
         Self::err()
     }
 }
 
 /// The HDK implemented as externs provided by the host.
 pub struct HostHdk;
+
+#[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
+use hdi::hdi::HostHdi;
+
+#[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
+impl HdiT for HostHdk {
+    fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
+        HostHdi::new().verify_signature(verify_signature)
+    }
+    fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput> {
+        HostHdi::new().hash(hash_input)
+    }
+    fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
+        HostHdi::new().must_get_entry(must_get_entry_input)
+    }
+    fn must_get_action(
+        &self,
+        must_get_action_input: MustGetActionInput,
+    ) -> ExternResult<SignedActionHashed> {
+        HostHdi::new().must_get_action(must_get_action_input)
+    }
+    fn must_get_valid_record(
+        &self,
+        must_get_valid_record_input: MustGetValidRecordInput,
+    ) -> ExternResult<Record> {
+        HostHdi::new().must_get_valid_record(must_get_valid_record_input)
+    }
+    fn must_get_agent_activity(
+        &self,
+        must_get_agent_activity_input: MustGetAgentActivityInput,
+    ) -> ExternResult<Vec<RegisterAgentActivity>> {
+        HostHdi::new().must_get_agent_activity(must_get_agent_activity_input)
+    }
+    fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
+        HostHdi::new().dna_info(())
+    }
+    fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
+        HostHdi::new().zome_info(())
+    }
+    fn trace(&self, m: TraceMsg) -> ExternResult<()> {
+        HostHdi::new().trace(m)
+    }
+    fn x_salsa20_poly1305_decrypt(
+        &self,
+        x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        HostHdi::new().x_salsa20_poly1305_decrypt(x_salsa20_poly1305_decrypt)
+    }
+    fn x_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        HostHdi::new().x_25519_x_salsa20_poly1305_decrypt(x_25519_x_salsa20_poly1305_decrypt)
+    }
+}
 
 /// The real hdk implements `host_call` for every hdk function.
 /// This is deferring to the standard `holochain_wasmer_guest` crate functionality.
@@ -261,8 +464,8 @@ impl HdkT for HostHdk {
             get_agent_activity_input,
         )
     }
-    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Element>> {
-        host_call::<ChainQueryFilter, Vec<Element>>(__query, filter)
+    fn query(&self, filter: ChainQueryFilter) -> ExternResult<Vec<Record>> {
+        host_call::<ChainQueryFilter, Vec<Record>>(__query, filter)
     }
     fn sign(&self, sign: Sign) -> ExternResult<Signature> {
         host_call::<Sign, Signature>(__sign, sign)
@@ -270,47 +473,20 @@ impl HdkT for HostHdk {
     fn sign_ephemeral(&self, sign_ephemeral: SignEphemeral) -> ExternResult<EphemeralSignatures> {
         host_call::<SignEphemeral, EphemeralSignatures>(__sign_ephemeral, sign_ephemeral)
     }
-    fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
-        host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
+    fn create(&self, create_input: CreateInput) -> ExternResult<ActionHash> {
+        host_call::<CreateInput, ActionHash>(__create, create_input)
     }
-    fn create(&self, create_input: CreateInput) -> ExternResult<HeaderHash> {
-        host_call::<CreateInput, HeaderHash>(__create, create_input)
+    fn update(&self, update_input: UpdateInput) -> ExternResult<ActionHash> {
+        host_call::<UpdateInput, ActionHash>(__update, update_input)
     }
-    fn update(&self, update_input: UpdateInput) -> ExternResult<HeaderHash> {
-        host_call::<UpdateInput, HeaderHash>(__update, update_input)
+    fn delete(&self, hash: DeleteInput) -> ExternResult<ActionHash> {
+        host_call::<DeleteInput, ActionHash>(__delete, hash)
     }
-    fn delete(&self, hash: DeleteInput) -> ExternResult<HeaderHash> {
-        host_call::<DeleteInput, HeaderHash>(__delete, hash)
-    }
-    fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput> {
-        host_call::<HashInput, HashOutput>(__hash, hash_input)
-    }
-    fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Element>>> {
-        host_call::<Vec<GetInput>, Vec<Option<Element>>>(__get, get_inputs)
+    fn get(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>> {
+        host_call::<Vec<GetInput>, Vec<Option<Record>>>(__get, get_inputs)
     }
     fn get_details(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
         host_call::<Vec<GetInput>, Vec<Option<Details>>>(__get_details, get_inputs)
-    }
-    fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
-        host_call::<MustGetEntryInput, EntryHashed>(__must_get_entry, must_get_entry_input)
-    }
-    fn must_get_header(
-        &self,
-        must_get_header_input: MustGetHeaderInput,
-    ) -> ExternResult<SignedHeaderHashed> {
-        host_call::<MustGetHeaderInput, SignedHeaderHashed>(
-            __must_get_header,
-            must_get_header_input,
-        )
-    }
-    fn must_get_valid_element(
-        &self,
-        must_get_valid_element_input: MustGetValidElementInput,
-    ) -> ExternResult<Element> {
-        host_call::<MustGetValidElementInput, Element>(
-            __must_get_valid_element,
-            must_get_valid_element_input,
-        )
     }
     // CounterSigning
     fn accept_countersigning_preflight_request(
@@ -325,20 +501,14 @@ impl HdkT for HostHdk {
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__agent_info, ())
     }
-    fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
-        host_call::<(), DnaInfo>(__dna_info, ())
-    }
-    fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
-        host_call::<(), ZomeInfo>(__zome_info, ())
-    }
     fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
         host_call::<(), CallInfo>(__call_info, ())
     }
-    fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<HeaderHash> {
-        host_call::<CreateLinkInput, HeaderHash>(__create_link, create_link_input)
+    fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<ActionHash> {
+        host_call::<CreateLinkInput, ActionHash>(__create_link, create_link_input)
     }
-    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<HeaderHash> {
-        host_call::<DeleteLinkInput, HeaderHash>(__delete_link, delete_link_input)
+    fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<ActionHash> {
+        host_call::<DeleteLinkInput, ActionHash>(__delete_link, delete_link_input)
     }
     fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>> {
         host_call::<Vec<GetLinksInput>, Vec<Vec<Link>>>(__get_links, get_links_input)
@@ -370,21 +540,37 @@ impl HdkT for HostHdk {
     fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()> {
         host_call::<std::time::Duration, ()>(__sleep, wake_after)
     }
-    fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
-        host_call::<TraceMsg, ()>(__trace, trace_msg)
-    }
-    fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
-        host_call::<(), X25519PubKey>(__create_x25519_keypair, ())
-    }
-    fn x_salsa20_poly1305_decrypt(
+
+    fn x_salsa20_poly1305_shared_secret_create_random(
         &self,
-        x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
-    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-        host_call::<XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(
-            __x_salsa20_poly1305_decrypt,
-            x_salsa20_poly1305_decrypt,
+        key_ref: Option<XSalsa20Poly1305KeyRef>,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef> {
+        host_call::<Option<XSalsa20Poly1305KeyRef>, XSalsa20Poly1305KeyRef>(
+            __x_salsa20_poly1305_shared_secret_create_random,
+            key_ref,
         )
     }
+
+    fn x_salsa20_poly1305_shared_secret_export(
+        &self,
+        x_salsa20_poly1305_shared_secret_export: XSalsa20Poly1305SharedSecretExport,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        host_call::<XSalsa20Poly1305SharedSecretExport, XSalsa20Poly1305EncryptedData>(
+            __x_salsa20_poly1305_shared_secret_export,
+            x_salsa20_poly1305_shared_secret_export,
+        )
+    }
+
+    fn x_salsa20_poly1305_shared_secret_ingest(
+        &self,
+        x_salsa20_poly1305_shared_secret_ingest: XSalsa20Poly1305SharedSecretIngest,
+    ) -> ExternResult<XSalsa20Poly1305KeyRef> {
+        host_call::<XSalsa20Poly1305SharedSecretIngest, XSalsa20Poly1305KeyRef>(
+            __x_salsa20_poly1305_shared_secret_ingest,
+            x_salsa20_poly1305_shared_secret_ingest,
+        )
+    }
+
     fn x_salsa20_poly1305_encrypt(
         &self,
         x_salsa20_poly1305_encrypt: XSalsa20Poly1305Encrypt,
@@ -394,6 +580,11 @@ impl HdkT for HostHdk {
             x_salsa20_poly1305_encrypt,
         )
     }
+
+    fn create_x25519_keypair(&self, _: ()) -> ExternResult<X25519PubKey> {
+        host_call::<(), X25519PubKey>(__create_x25519_keypair, ())
+    }
+
     fn x_25519_x_salsa20_poly1305_encrypt(
         &self,
         x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
@@ -401,15 +592,6 @@ impl HdkT for HostHdk {
         host_call::<X25519XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(
             __x_25519_x_salsa20_poly1305_encrypt,
             x_25519_x_salsa20_poly1305_encrypt,
-        )
-    }
-    fn x_25519_x_salsa20_poly1305_decrypt(
-        &self,
-        x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
-    ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-        host_call::<X25519XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(
-            __x_25519_x_salsa20_poly1305_decrypt,
-            x_25519_x_salsa20_poly1305_decrypt,
         )
     }
 }
@@ -421,7 +603,12 @@ pub fn set_hdk<H: 'static>(hdk: H)
 where
     H: HdkT,
 {
+    let hdk = Rc::new(hdk);
+    let hdk2 = hdk.clone();
     HDK.with(|h| {
-        *h.borrow_mut() = Box::new(hdk);
+        *h.borrow_mut() = hdk2;
+    });
+    hdi::hdi::HDI.with(|h| {
+        *h.borrow_mut() = hdk;
     });
 }

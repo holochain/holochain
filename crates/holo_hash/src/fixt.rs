@@ -2,18 +2,20 @@
 
 use crate::encode::holo_dht_location_bytes;
 use crate::hash_type;
+use crate::ActionHash;
+use crate::ActionHashB64;
 use crate::AgentPubKey;
 use crate::AgentPubKeyB64;
 use crate::AnyDhtHash;
 use crate::AnyDhtHashB64;
+use crate::AnyLinkableHash;
+use crate::AnyLinkableHashB64;
 use crate::DhtOpHash;
 use crate::DhtOpHashB64;
 use crate::DnaHash;
 use crate::DnaHashB64;
 use crate::EntryHash;
 use crate::EntryHashB64;
-use crate::HeaderHash;
-use crate::HeaderHashB64;
 use crate::NetIdHash;
 use crate::NetIdHashB64;
 use crate::WasmHash;
@@ -23,6 +25,7 @@ use std::convert::TryFrom;
 
 pub type HashTypeEntry = hash_type::Entry;
 pub type HashTypeAnyDht = hash_type::AnyDht;
+pub type HashTypeAnyLinkable = hash_type::AnyLinkable;
 
 // TODO: use strum to do this:
 //
@@ -33,12 +36,19 @@ pub type HashTypeAnyDht = hash_type::AnyDht;
 
 fixturator!(
     HashTypeAnyDht;
-    curve Empty HashTypeAnyDht::Header;
-    curve Unpredictable HashTypeAnyDht::Header;
-    curve Predictable HashTypeAnyDht::Header;
+    curve Empty HashTypeAnyDht::Action;
+    curve Unpredictable HashTypeAnyDht::Action;
+    curve Predictable HashTypeAnyDht::Action;
 );
 
-/// A type alias for a Vec<u8> whose fixturator is expected to only return
+fixturator!(
+    HashTypeAnyLinkable;
+    curve Empty HashTypeAnyLinkable::External;
+    curve Unpredictable HashTypeAnyLinkable::Action;
+    curve Predictable HashTypeAnyLinkable::Entry;
+);
+
+/// A type alias for a `Vec<u8>` whose fixturator is expected to only return
 /// a Vec of length 36
 pub type ThirtySixHashBytes = Vec<u8>;
 
@@ -125,12 +135,12 @@ fixturator!(
 
 fixturator!(
     with_vec 0 5;
-    HeaderHash;
+    ActionHash;
     constructor fn from_raw_36(ThirtySixHashBytes);
 );
 fixturator!(
-    HeaderHashB64;
-    constructor fn new(HeaderHash);
+    ActionHashB64;
+    constructor fn new(ActionHash);
 );
 
 fixturator!(
@@ -158,4 +168,13 @@ fixturator!(
 fixturator!(
     AnyDhtHashB64;
     constructor fn new(AnyDhtHash);
+);
+
+fixturator!(
+    AnyLinkableHash;
+    constructor fn from_raw_36_and_type(ThirtySixHashBytes, HashTypeAnyLinkable);
+);
+fixturator!(
+    AnyLinkableHashB64;
+    constructor fn new(AnyLinkableHash);
 );

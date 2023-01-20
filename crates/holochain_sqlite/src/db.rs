@@ -115,17 +115,17 @@ pub struct PConnGuard(#[shrinkwrap(main_field)] pub PConn, OwnedSemaphorePermit)
 pub struct PConnPermit(OwnedSemaphorePermit);
 
 pub trait PermittedConn {
-    fn from_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard>;
+    fn with_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard>;
 }
 
 impl<Kind: DbKindT> PermittedConn for DbRead<Kind> {
-    fn from_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
+    fn with_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
         Ok(PConnGuard(self.conn()?, permit.0))
     }
 }
 
 impl<Kind: DbKindT> PermittedConn for DbWrite<Kind> {
-    fn from_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
+    fn with_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard> {
         Ok(PConnGuard(self.conn()?, permit.0))
     }
 }
@@ -222,65 +222,71 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         sync_level: DbSyncLevel,
     ) -> DatabaseResult<Self> {
         DATABASE_HANDLES.get_or_insert(&kind, path_prefix, |kind| {
-            Self::new(path_prefix, kind, sync_level)
+            Self::new(Some(path_prefix), kind, sync_level)
         })
     }
 
     pub(crate) fn new(
-        path_prefix: &Path,
+        path_prefix: Option<&Path>,
         kind: Kind,
         sync_level: DbSyncLevel,
     ) -> DatabaseResult<Self> {
-        let path = path_prefix.join(kind.filename());
-        let parent = path
-            .parent()
-            .ok_or_else(|| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
-        if !parent.is_dir() {
-            std::fs::create_dir_all(parent)
-                .map_err(|_e| DatabaseError::DatabaseMissing(parent.to_owned()))?;
-        }
-        // Check if the database is valid and take the appropriate
-        // action if it isn't.
-        match Connection::open(&path)
-            // For some reason calling pragma_update is necessary to prove the database file is valid.
-            .and_then(|mut c| {
-                crate::conn::initialize_connection(&mut c, sync_level)?;
-                c.pragma_update(None, "synchronous", &"0".to_string())
-            }) {
-            Ok(_) => (),
-            // These are the two errors that can
-            // occur if the database is not valid.
-            err @ Err(Error::SqliteFailure(
-                rusqlite::ffi::Error {
-                    code: ErrorCode::DatabaseCorrupt,
-                    ..
-                },
-                ..,
-            ))
-            | err @ Err(Error::SqliteFailure(
-                rusqlite::ffi::Error {
-                    code: ErrorCode::NotADatabase,
-                    ..
-                },
-                ..,
-            )) => {
-                // Check if this database kind requires wiping.
-                if kind.if_corrupt_wipe() {
-                    std::fs::remove_file(&path)?;
-                } else {
-                    // If we don't wipe we need to return an error.
-                    err?;
+        let path = match path_prefix {
+            Some(path_prefix) => {
+                let path = path_prefix.join(kind.filename());
+                let parent = path
+                    .parent()
+                    .ok_or_else(|| DatabaseError::DatabaseMissing(path_prefix.to_owned()))?;
+                if !parent.is_dir() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|_e| DatabaseError::DatabaseMissing(parent.to_owned()))?;
                 }
+                // Check if the database is valid and take the appropriate
+                // action if it isn't.
+                match Connection::open(&path)
+                    // For some reason calling pragma_update is necessary to prove the database file is valid.
+                    .and_then(|mut c| {
+                        crate::conn::initialize_connection(&mut c, sync_level)?;
+                        c.pragma_update(None, "synchronous", "0".to_string())
+                    }) {
+                    Ok(_) => (),
+                    // These are the two errors that can
+                    // occur if the database is not valid.
+                    err @ Err(Error::SqliteFailure(
+                        rusqlite::ffi::Error {
+                            code: ErrorCode::DatabaseCorrupt,
+                            ..
+                        },
+                        ..,
+                    ))
+                    | err @ Err(Error::SqliteFailure(
+                        rusqlite::ffi::Error {
+                            code: ErrorCode::NotADatabase,
+                            ..
+                        },
+                        ..,
+                    )) => {
+                        // Check if this database kind requires wiping.
+                        if kind.if_corrupt_wipe() {
+                            std::fs::remove_file(&path)?;
+                        } else {
+                            // If we don't wipe we need to return an error.
+                            err?;
+                        }
+                    }
+                    // Another error has occurred when trying to open the db.
+                    Err(e) => return Err(e.into()),
+                }
+                Some(path)
             }
-            // Another error has occurred when trying to open the db.
-            Err(e) => return Err(e.into()),
-        }
+            None => None,
+        };
 
         // Now we know the database file is valid we can open a connection pool.
-        let pool = new_connection_pool(&path, sync_level);
+        let pool = new_connection_pool(path.as_ref().map(|p| p.as_ref()), sync_level);
         let mut conn = pool.get()?;
         // set to faster write-ahead-log mode
-        conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
+        conn.pragma_update(None, "journal_mode", "WAL".to_string())?;
         crate::table::initialize_database(&mut conn, kind.kind())?;
 
         Ok(DbWrite(DbRead {
@@ -289,7 +295,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             max_readers: num_read_threads(),
             num_readers: Arc::new(AtomicUsize::new(0)),
             kind,
-            path,
+            path: path.unwrap_or_default(),
             connection_pool: pool,
         }))
     }
@@ -315,8 +321,13 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// Create a unique db in a temp dir with no static management of the
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn test(tmpdir: &tempfile::TempDir, kind: Kind) -> DatabaseResult<Self> {
-        Self::new(tmpdir.path(), kind, DbSyncLevel::default())
+    pub fn test(path: &Path, kind: Kind) -> DatabaseResult<Self> {
+        Self::new(Some(path), kind, DbSyncLevel::default())
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn test_in_mem(kind: Kind) -> DatabaseResult<Self> {
+        Self::new(None, kind, DbSyncLevel::default())
     }
 
     /// Remove the db and directory
@@ -340,6 +351,16 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             .await
             .map_err(DatabaseError::from)?;
         r
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
+    pub fn test_commit<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut Transaction) -> R,
+    {
+        let mut conn = self.conn().expect("Failed to open connection");
+        conn.with_commit_test(f)
+            .expect("Database transaction failed")
     }
 
     /// If possible prefer async_commit as this is slower and can starve chained futures.
@@ -425,12 +446,16 @@ pub struct DbKindCache(pub Arc<DnaHash>);
 pub struct DbKindConductor;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+/// Specifies the environment used to witness nonces.
+pub struct DbKindNonce;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used to save wasm
 pub struct DbKindWasm;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// State of the p2p network (one per space).
-pub struct DbKindP2pAgentStore(pub Arc<KitsuneSpace>);
+pub struct DbKindP2pAgents(pub Arc<KitsuneSpace>);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Metrics for peers on p2p network (one per space).
@@ -541,7 +566,7 @@ impl DbKindT for DbKindWasm {
     }
 }
 
-impl DbKindT for DbKindP2pAgentStore {
+impl DbKindT for DbKindP2pAgents {
     fn kind(&self) -> DbKind {
         DbKind::P2pAgentStore(self.0.clone())
     }
@@ -602,7 +627,7 @@ pub trait WriteManager<'e> {
     // /// which can properly recover from and manage write failures
     // fn writer_unmanaged(&'e mut self) -> DatabaseResult<Writer<'e>>;
 
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     fn with_commit_test<R, F>(&'e mut self, f: F) -> Result<R, DatabaseError>
     where
         F: 'e + FnOnce(&mut Transaction) -> R,

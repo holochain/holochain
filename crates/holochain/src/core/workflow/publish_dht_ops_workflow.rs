@@ -5,7 +5,7 @@
 //! For now, Publish links on private entries
 // TODO: B-01827 Make story about: later consider adding a flag to make a link private and not publish it.
 //       Even for those private links, we may need to publish them to the author of the private entry
-//       (and we'd have to reference its header  which actually exists on the DHT to make that work,
+//       (and we'd have to reference its action  which actually exists on the DHT to make that work,
 //       rather than the entry which does not exist on the DHT).
 //!
 //!
@@ -16,8 +16,9 @@ use crate::core::queue_consumer::WorkComplete;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
-use holochain_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time;
 use tracing::*;
 
@@ -31,38 +32,54 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 /// flooding the network with spurious publishes.
 pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 5);
 
-#[instrument(skip(env, network, trigger_self))]
+#[instrument(skip(db, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
-    env: DbWrite<DbKindAuthored>,
-    network: &(dyn HolochainP2pDnaT + Send + Sync),
-    trigger_self: &TriggerSender,
+    db: DbWrite<DbKindAuthored>,
+    network: Arc<impl HolochainP2pDnaT + Send + Sync>,
+    trigger_self: TriggerSender,
     agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
-    let to_publish = publish_dht_ops_workflow_inner(env.clone().into(), agent).await?;
+    let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
 
     // Commit to the network
-    tracing::info!("sending to {} basis locations", to_publish.len());
+    tracing::info!("publishing to {} nodes", to_publish.len());
     let mut success = Vec::new();
-    for (basis, ops) in to_publish {
-        let hashes: Vec<_> = ops.iter().map(|(h, _)| h.clone()).collect();
-        if let Err(e) = network.publish(true, false, basis, ops, None).await {
-            // If we get a routing error it means the space hasn't started yet and we should try publishing again.
-            if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
-                complete = WorkComplete::Incomplete;
+    for (basis, list) in to_publish {
+        let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
+        match network
+            .publish(
+                true,
+                false,
+                basis,
+                agent.clone(),
+                op_hash_list.clone(),
+                None,
+                Some(op_data_list),
+            )
+            .await
+        {
+            Err(e) => {
+                // If we get a routing error it means the space hasn't started yet and we should try publishing again.
+                if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
+                    complete = WorkComplete::Incomplete;
+                }
+                tracing::warn!(failed_to_send_publish = ?e);
             }
-            tracing::info!(failed_to_send_publish = ?e);
-        } else {
-            success.extend(hashes);
+            Ok(()) => {
+                success.extend(op_hash_list);
+            }
         }
     }
 
-    tracing::info!("sent {} ops", success.len());
+    tracing::info!("published {} ops", success.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-    let continue_publish = env
+    let continue_publish = db
         .async_commit(move |writer| {
             for hash in success {
-                mutations::set_last_publish_time(writer, hash, now)?;
+                use holochain_p2p::DhtOpHashExt;
+                let hash = DhtOpHash::from_kitsune(hash.data_ref());
+                mutations::set_last_publish_time(writer, &hash, now)?;
             }
             WorkflowResult::Ok(publish_query::num_still_needing_publish(writer)? > 0)
         })
@@ -75,7 +92,7 @@ pub async fn publish_dht_ops_workflow(
         trigger_self.pause_loop();
     }
 
-    tracing::info!("committed sent ops");
+    tracing::debug!("committed published ops");
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     Ok(complete)
@@ -83,18 +100,17 @@ pub async fn publish_dht_ops_workflow(
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
-    env: DbRead<DbKindAuthored>,
+    db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
-) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
+) -> WorkflowResult<HashMap<OpBasis, Vec<(OpHashSized, crate::prelude::DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for op_hashed in publish_query::get_ops_to_publish(agent, &env).await? {
-        let (op, op_hash) = op_hashed.into_inner();
+    for (basis, op_hash, op) in publish_query::get_ops_to_publish(agent, &db).await? {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
-            .entry(op.dht_basis())
+            .entry(basis)
             .or_insert_with(Vec::new)
             .push((op_hash, op));
     }
@@ -115,6 +131,8 @@ mod tests {
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
+    use holochain_types::db_cache::DhtDbQueryCache;
+    use holochain_types::prelude::*;
     use observability;
     use rusqlite::Transaction;
     use std::collections::HashMap;
@@ -131,7 +149,7 @@ mod tests {
 
     /// publish ops setup
     async fn setup(
-        env: DbWrite<DbKindAuthored>,
+        db: DbWrite<DbKindAuthored>,
         num_agents: u32,
         num_hash: u32,
         panic_on_publish: bool,
@@ -147,7 +165,7 @@ mod tests {
         let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
         let author = fake_agent_pubkey_1();
 
-        env.conn()
+        db.conn()
             .unwrap()
             .with_commit_sync(|txn| {
                 for _ in 0..num_hash {
@@ -159,7 +177,7 @@ mod tests {
                     let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    mutations::insert_op(txn, op_hashed)?;
+                    mutations::insert_op(txn, &op_hashed)?;
                 }
                 StateMutationResult::Ok(())
             })
@@ -215,7 +233,7 @@ mod tests {
         // Join some agents onto the network
         // Skip the first agent as it has already joined
         for agent in agents.into_iter().skip(1) {
-            HolochainP2pRef::join(&network, dna.clone(), agent)
+            HolochainP2pRef::join(&network, dna.clone(), agent, None)
                 .await
                 .unwrap();
         }
@@ -225,14 +243,19 @@ mod tests {
 
     /// Call the workflow
     async fn call_workflow(
-        env: DbWrite<DbKindAuthored>,
+        db: DbWrite<DbKindAuthored>,
         dna_network: HolochainP2pDna,
         author: AgentPubKey,
     ) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(env.clone().into(), &dna_network, &trigger_sender, author)
-            .await
-            .unwrap();
+        publish_dht_ops_workflow(
+            db.clone().into(),
+            Arc::new(dna_network),
+            trigger_sender,
+            author,
+        )
+        .await
+        .unwrap();
     }
 
     /// There is a test that shows that network messages would be sent to all agents via broadcast.
@@ -245,19 +268,20 @@ mod tests {
     #[test_case(100, 1)]
     #[test_case(100, 10)]
     #[test_case(100, 100)]
+    #[ignore = "(david.b) tests should be re-written using mock network"]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
-            // Create test env
-            let test_env = test_authored_env();
-            let env = test_env.env();
+            // Create test db
+            let test_db = test_authored_db();
+            let db = test_db.to_db();
 
             // Setup
             let (_network, dna_network, author, recv_task, rx_complete) =
-                setup(env.clone(), num_agents, num_hash, false).await;
+                setup(db.clone(), num_agents, num_hash, false).await;
 
-            call_workflow(env.clone().into(), dna_network, author).await;
+            call_workflow(db.clone().into(), dna_network, author).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -269,7 +293,7 @@ mod tests {
 
             let check = async move {
                 recv_task.await.unwrap();
-                fresh_reader_test!(env, |txn: Transaction| {
+                fresh_reader_test!(db, |txn: Transaction| {
                     let unpublished_ops: bool = txn
                         .query_row(
                             "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE last_publish_time IS NULL)",
@@ -303,16 +327,16 @@ mod tests {
         tokio_helper::block_forever_on(async {
             observability::test_run().ok();
 
-            // Create test env
-            let test_env = test_authored_env();
-            let env = test_env.env();
+            // Create test db
+            let test_db = test_authored_db();
+            let db = test_db.to_db();
 
             // Setup
             let (_network, dna_network, author, _, _) =
-                setup(env.clone(), num_agents, num_hash, true).await;
+                setup(db.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have complete receipts
-            env.conn()
+            db.conn()
                 .unwrap()
                 .with_commit_test(|txn| {
                     txn.execute("UPDATE DhtOp SET receipts_complete = 1", [])
@@ -321,7 +345,7 @@ mod tests {
                 .unwrap();
 
             // Call the workflow
-            call_workflow(env.clone().into(), dna_network, author).await;
+            call_workflow(db.clone().into(), dna_network, author).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
             tokio::time::sleep(Duration::from_millis(
@@ -340,27 +364,27 @@ mod tests {
     /// - Add / Remove links: Currently publish all.
     /// ## Explication
     /// This test is a little big so a quick run down:
-    /// 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterUpdatedContent)
+    /// 1. All ops that can contain entries are created with entries (StoreRecord, StoreEntry and RegisterUpdatedContent)
     /// 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
     /// 3. The workflow is run and the ops are sent to the network receiver
     /// 4. We check that the correct number of ops are received (so we know there were no other ops sent)
     /// 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
-    /// 6. Every op that is received (StoreElement and RegisterUpdatedContent) is checked to match the expected versions (entries removed)
+    /// 6. Every op that is received (StoreRecord and RegisterUpdatedContent) is checked to match the expected versions (entries removed)
     /// 7. Each op also has a count to check for duplicates
     #[test_case(1)]
     #[test_case(10)]
     #[test_case(100)]
+    #[ignore = "(david.b) tests should be re-written using mock network"]
     fn test_private_entries(num_agents: u32) {
         tokio_helper::block_forever_on(
             async {
                 observability::test_run().ok();
 
-                // Create test env
-                let test_env = test_authored_env();
+                // Create test db
+                let test_db = test_authored_db();
                 let keystore = holochain_state::test_utils::test_keystore();
-                let dht_env = test_dht_env();
-                let env = test_env.env();
-                let zome = fixt!(Zome);
+                let dht_db = test_dht_db();
+                let db = test_db.to_db();
 
                 let dna = fixt!(DnaHash);
                 let filter_events = |evt: &_| match evt {
@@ -387,33 +411,33 @@ mod tests {
                 // Make them private
                 let visibility = EntryVisibility::Private;
                 let mut entry_type_fixt =
-                    AppEntryTypeFixturator::new(visibility.clone()).map(EntryType::App);
+                    AppEntryDefFixturator::new(visibility.clone()).map(EntryType::App);
                 let ec_entry_type = entry_type_fixt.next().unwrap();
                 let eu_entry_type = entry_type_fixt.next().unwrap();
 
                 // Genesis and produce ops to clear these from the chains
-                fake_genesis(env.clone(), dht_env.env(), keystore.clone())
+                fake_genesis(db.clone(), dht_db.to_db(), keystore.clone())
                     .await
                     .unwrap();
-                env.conn()
+                db.conn()
                     .unwrap()
                     .execute("UPDATE DhtOp SET receipts_complete = 1", [])
                     .unwrap();
                 let author = fake_agent_pubkey_1();
 
-                // Put data in elements
+                // Put data in records
                 let source_chain = SourceChain::new(
-                    env.clone().into(),
-                    dht_env.env(),
+                    db.clone().into(),
+                    dht_db.to_db(),
+                    DhtDbQueryCache::new(dht_db.clone().into()),
                     keystore.clone(),
                     author.clone(),
                 )
                 .await
                 .unwrap();
                 // Produces 3 ops but minus 1 for store entry so 2 ops.
-                let original_header_address = source_chain
-                    .put(
-                        Some(zome.clone()),
+                let original_action_address = source_chain
+                    .put_weightless(
                         builder::Create {
                             entry_type: ec_entry_type,
                             entry_hash: original_entry_hash.clone(),
@@ -426,12 +450,11 @@ mod tests {
 
                 // Produces 5 ops but minus 1 for store entry so 4 ops.
                 let entry_update_hash = source_chain
-                    .put(
-                        Some(zome.clone()),
+                    .put_weightless(
                         builder::Update {
                             entry_type: eu_entry_type,
                             entry_hash: new_entry_hash,
-                            original_header_address: original_header_address.clone(),
+                            original_action_address: original_action_address.clone(),
                             original_entry_address: original_entry_hash,
                         },
                         Some(new_entry),
@@ -441,32 +464,31 @@ mod tests {
                     .unwrap();
 
                 source_chain.flush(&dna_network).await.unwrap();
-                let (entry_create_header, entry_update_header) = env
+                let (entry_create_action, entry_update_action) = db
                     .conn()
                     .unwrap()
                     .with_commit_test(|writer| {
                         let store = Txn::from(writer);
-                        let ech = store.get_header(&original_header_address).unwrap().unwrap();
-                        let euh = store.get_header(&entry_update_hash).unwrap().unwrap();
+                        let ech = store.get_action(&original_action_address).unwrap().unwrap();
+                        let euh = store.get_action(&entry_update_hash).unwrap().unwrap();
                         (ech, euh)
                     })
                     .unwrap();
 
                 // Gather the expected op hashes, ops and basis
-                // We are only expecting Store Element and Register Replaced By ops and nothing else
-                let store_element_count = Arc::new(AtomicU32::new(0));
+                // We are only expecting Store Record and Register Replaced By ops and nothing else
+                let store_record_count = Arc::new(AtomicU32::new(0));
                 let register_replaced_by_count = Arc::new(AtomicU32::new(0));
-                let register_updated_element_count = Arc::new(AtomicU32::new(0));
+                let register_updated_record_count = Arc::new(AtomicU32::new(0));
                 let register_agent_activity_count = Arc::new(AtomicU32::new(0));
 
                 let expected = {
                     let mut map = HashMap::new();
                     // Op is expected to not contain the Entry even though the above contains the entry
-                    let (entry_create_header, sig) =
-                        entry_create_header.into_header_and_signature();
+                    let (entry_create_action, sig) = entry_create_action.into_inner();
                     let expected_op = DhtOp::RegisterAgentActivity(
                         sig.clone(),
-                        entry_create_header.clone().into_content(),
+                        entry_create_action.clone().into_content(),
                     );
                     let op_hash = expected_op.to_hash();
                     map.insert(
@@ -474,47 +496,46 @@ mod tests {
                         (expected_op, register_agent_activity_count.clone()),
                     );
 
-                    let expected_op = DhtOp::StoreElement(
+                    let expected_op = DhtOp::StoreRecord(
                         sig,
-                        entry_create_header.into_content().try_into().unwrap(),
+                        entry_create_action.into_content().try_into().unwrap(),
                         None,
                     );
                     let op_hash = expected_op.to_hash();
 
-                    map.insert(op_hash, (expected_op, store_element_count.clone()));
+                    map.insert(op_hash, (expected_op, store_record_count.clone()));
 
                     // Create RegisterUpdatedContent
                     // Op is expected to not contain the Entry
-                    let (entry_update_header, sig) =
-                        entry_update_header.into_header_and_signature();
-                    let entry_update_header: Update =
-                        entry_update_header.into_content().try_into().unwrap();
+                    let (entry_update_action, sig) = entry_update_action.into_inner();
+                    let entry_update_action: Update =
+                        entry_update_action.into_content().try_into().unwrap();
                     let expected_op =
-                        DhtOp::StoreElement(sig.clone(), entry_update_header.clone().into(), None);
+                        DhtOp::StoreRecord(sig.clone(), entry_update_action.clone().into(), None);
                     let op_hash = expected_op.to_hash();
 
-                    map.insert(op_hash, (expected_op, store_element_count.clone()));
+                    map.insert(op_hash, (expected_op, store_record_count.clone()));
 
                     let expected_op = DhtOp::RegisterUpdatedContent(
                         sig.clone(),
-                        entry_update_header.clone(),
+                        entry_update_action.clone(),
                         None,
                     );
                     let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
-                    let expected_op = DhtOp::RegisterUpdatedElement(
+                    let expected_op = DhtOp::RegisterUpdatedRecord(
                         sig.clone(),
-                        entry_update_header.clone(),
+                        entry_update_action.clone(),
                         None,
                     );
                     let op_hash = expected_op.to_hash();
 
                     map.insert(
                         op_hash,
-                        (expected_op, register_updated_element_count.clone()),
+                        (expected_op, register_updated_record_count.clone()),
                     );
-                    let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_header.into());
+                    let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_action.into());
                     let op_hash = expected_op.to_hash();
                     map.insert(
                         op_hash,
@@ -549,7 +570,8 @@ mod tests {
                                     tracing::debug!(?ops);
 
                                     // Check the ops are correct
-                                    for (op_hash, op) in ops {
+                                    for op in ops {
+                                        let op_hash = DhtOpHash::with_data_sync(&op);
                                         match expected.get(&op_hash) {
                                             Some((expected_op, count)) => {
                                                 assert_eq!(&op, expected_op);
@@ -584,13 +606,13 @@ mod tests {
                 {
                     let network = test_network.network();
                     for agent in agents {
-                        HolochainP2pRef::join(&network, dna.clone(), agent)
+                        HolochainP2pRef::join(&network, dna.clone(), agent, None)
                             .await
                             .unwrap()
                     }
                 }
 
-                call_workflow(env.clone().into(), dna_network, author).await;
+                call_workflow(db.clone().into(), dna_network, author).await;
 
                 // Wait for expected # of responses, or timeout
                 tokio::select! {
@@ -610,9 +632,9 @@ mod tests {
                 );
                 assert_eq!(
                     num_agents * 1,
-                    register_updated_element_count.load(Ordering::SeqCst)
+                    register_updated_record_count.load(Ordering::SeqCst)
                 );
-                assert_eq!(num_agents * 2, store_element_count.load(Ordering::SeqCst));
+                assert_eq!(num_agents * 2, store_record_count.load(Ordering::SeqCst));
                 assert_eq!(
                     num_agents * 2,
                     register_agent_activity_count.load(Ordering::SeqCst)

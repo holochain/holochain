@@ -24,7 +24,7 @@ mod tests;
 pub async fn validation_receipt_workflow(
     dna_hash: Arc<DnaHash>,
     vault: DbWrite<DbKindDht>,
-    network: &HolochainP2pDna,
+    network: HolochainP2pDna,
     keystore: MetaLairClient,
     conductor: ConductorHandle,
 ) -> WorkflowResult<WorkComplete> {
@@ -57,10 +57,10 @@ pub async fn validation_receipt_workflow(
             move |txn| {
                 let mut stmt = txn.prepare(
                     "
-            SELECT Header.author, DhtOp.hash, DhtOp.validation_status,
+            SELECT Action.author, DhtOp.hash, DhtOp.validation_status,
             DhtOp.when_integrated
             From DhtOp
-            JOIN Header ON DhtOp.header_hash = Header.hash
+            JOIN Action ON DhtOp.action_hash = Action.hash
             WHERE
             DhtOp.require_receipt = 1
             AND
@@ -117,7 +117,7 @@ pub async fn validation_receipt_workflow(
         // TODO: When networking has a send without response we can use that
         // instead of waiting for response.
         if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipt(
-            network,
+            &network,
             author,
             receipt.try_into()?,
         )
@@ -129,7 +129,7 @@ pub async fn validation_receipt_workflow(
         // Attempted to send the receipt so we now mark
         // it to not send in the future.
         vault
-            .async_commit(|txn| set_require_receipt(txn, op_hash, false))
+            .async_commit(move |txn| set_require_receipt(txn, &op_hash, false))
             .await?;
     }
 

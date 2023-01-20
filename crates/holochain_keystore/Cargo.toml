@@ -1,32 +1,45 @@
 [package]
 name = "holochain_keystore"
-version = "0.0.26"
+version = "0.1.0-beta-rc.2"
 description = "keystore for libsodium keypairs"
-license-file = "LICENSE_CAL-1.0"
+license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_keystore"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "nacl", "libsodium", "cryptography" ]
 categories = [ "cryptography" ]
-edition = "2018"
+edition = "2021"
+
+[features]
+default = [ "no-deps" ]
+
+db-encryption = [ "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl" ]
+no-deps = [ "lair_keystore/rusqlite-bundled" ]
 
 [dependencies]
 base64 = "0.13.0"
-ghost_actor = "=0.3.0-alpha.4"
-holo_hash = { version = "0.0.19", path = "../holo_hash", features = ["full"] }
+futures = "0.3.23"
+holo_hash = { version = "^0.1.0-beta-rc.1", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.51"
-holochain_zome_types = { path = "../holochain_zome_types", version = "0.0.24"}
-kitsune_p2p_types = { version = "0.0.17", path = "../kitsune_p2p/types" }
-lair_keystore_client_0_0 = { version = "=0.0.9", package = "lair_keystore_client" }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.1.0-beta-rc.2"}
+kitsune_p2p_types = { version = "^0.1.0-beta-rc.1", path = "../kitsune_p2p/types" }
+lair_keystore = { version = "0.2.3", default-features = false }
+must_future = "0.1.2"
 nanoid = "0.4.0"
-one_err = "0.0.5"
+one_err = "0.0.8"
+parking_lot = "0.11"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
-sodoken = "=0.0.1"
+sodoken = "=0.0.7"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full" ] }
 tracing = "0.1"
 
 # This is a redundant dependency.
 # It's included only to set the proper feature flag for database encryption.
-holochain_sqlite = { version = "0.0.26", path = "../holochain_sqlite" }
+holochain_sqlite = { version = "^0.1.0-beta-rc.2", path = "../holochain_sqlite" }
+
+[dev-dependencies]
+assert_cmd = "2.0.4"
+serde_yaml = "0.9.10"
+tempdir = "0.3.7"

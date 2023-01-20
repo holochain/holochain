@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::{loc_downscale, loc_upscale, ArcInterval, DhtLocation};
+use crate::{loc_downscale, loc_upscale, DhtArcRange, DhtLocation};
 
 /// A representation of DhtLocation in the u8 space. Useful for writing tests
 /// that test the full range of possible locations while still working with small numbers.
@@ -89,6 +89,11 @@ impl Loc8 {
         }
     }
 
+    pub fn to_unsigned(mut self) -> Self {
+        self.sign = false;
+        self
+    }
+
     pub fn set<L: Into<Loc8>, I: IntoIterator<Item = L>>(it: I) -> BTreeSet<Self> {
         it.into_iter().map(Into::into).collect()
     }
@@ -121,35 +126,39 @@ impl DhtLocation {
     /// suitable for use as a hash type.
     #[cfg(feature = "test_utils")]
     pub fn to_representative_test_bytes_36(&self) -> Vec<u8> {
-        self.as_u32()
+        let mut bytes: Vec<u8> = self
+            .as_u32()
             .to_le_bytes()
             .iter()
             .cycle()
             .take(36)
             .copied()
-            .collect()
+            .collect();
+        // to distinguish the 0 location from an empty hash
+        bytes[0] = 255;
+        bytes
     }
 }
 
-impl ArcInterval {
-    pub fn as_loc8(&self) -> ArcInterval<Loc8> {
+impl DhtArcRange {
+    pub fn as_loc8(&self) -> DhtArcRange<Loc8> {
         match self {
-            Self::Empty => ArcInterval::Empty,
-            Self::Full => ArcInterval::Full,
-            Self::Bounded(lo, hi) => ArcInterval::Bounded(lo.as_loc8(), hi.as_loc8()),
+            Self::Empty => DhtArcRange::Empty,
+            Self::Full => DhtArcRange::Full,
+            Self::Bounded(lo, hi) => DhtArcRange::Bounded(lo.as_loc8(), hi.as_loc8()),
         }
     }
 }
 
-impl<L> ArcInterval<L>
+impl<L> DhtArcRange<L>
 where
     Loc8: From<L>,
 {
-    pub fn canonical(self) -> ArcInterval {
+    pub fn canonical(self) -> DhtArcRange {
         match self {
-            ArcInterval::Empty => ArcInterval::Empty,
-            ArcInterval::Full => ArcInterval::Full,
-            ArcInterval::Bounded(lo, hi) => ArcInterval::new(
+            DhtArcRange::Empty => DhtArcRange::Empty,
+            DhtArcRange::Full => DhtArcRange::Full,
+            DhtArcRange::Bounded(lo, hi) => DhtArcRange::from_bounds(
                 DhtLocation::from(Loc8::from(lo)),
                 DhtLocation::from(Loc8::from(hi)),
             ),

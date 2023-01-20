@@ -1,8 +1,84 @@
+---
+default_semver_increment_mode: !pre_minor beta-rc
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.1.0-beta-rc.2
+
+## 0.1.0-beta-rc.1
+
+## 0.1.0-beta-rc.0
+
+## 0.0.56
+
+## 0.0.55
+
+## 0.0.54
+
+## 0.0.53
+
+## 0.0.52
+
+## 0.0.51
+
+## 0.0.50
+
+## 0.0.49
+
+## 0.0.48
+
+## 0.0.47
+
+## 0.0.46
+
+## 0.0.45
+
+## 0.0.44
+
+## 0.0.43
+
+## 0.0.42
+
+## 0.0.41
+
+## 0.0.40
+
+## 0.0.39
+
+## 0.0.38
+
+- `hdk_to_global_types` is removed.
+- `hdk_to_local_types` becomes `hdk_to_coordinates`.
+
+## 0.0.37
+
+## 0.0.36
+
+## 0.0.35
+
+## 0.0.34
+
+## 0.0.33
+
+## 0.0.32
+
+## 0.0.31
+
+## 0.0.30
+
+## 0.0.29
+
+## 0.0.28
+
+## 0.0.27
+
+## 0.0.26
+
+## 0.0.25
 
 ## 0.0.24
 

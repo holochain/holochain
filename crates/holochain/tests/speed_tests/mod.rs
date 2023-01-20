@@ -15,7 +15,7 @@
 //! hard to automate piping from tests stderr.
 //!
 
-#![allow(deprecated)]
+use std::sync::Arc;
 
 use ::fixt::prelude::*;
 use hdk::prelude::*;
@@ -23,17 +23,14 @@ use holochain::conductor::api::AdminRequest;
 use holochain::conductor::api::AdminResponse;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::RealAppInterfaceApi;
 use holochain::conductor::api::ZomeCall;
-use holochain::conductor::config::AdminInterfaceConfig;
-use holochain::conductor::config::ConductorConfig;
-use holochain::conductor::config::InterfaceDriver;
-use holochain::conductor::ConductorBuilder;
-use holochain::conductor::ConductorHandle;
+use holochain::test_utils::setup_app;
+use holochain_state::nonce::fresh_nonce;
+use holochain_wasm_test_utils::TestZomes;
+use tempfile::TempDir;
 
 use super::test_utils::*;
 use holochain::sweettest::*;
-use holochain_state::{prelude::test_environments, test_utils::TestEnvs};
 use holochain_test_wasm_common::AnchorInput;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -97,7 +94,7 @@ async fn speed_test_normal() {
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
     let envs = speed_test(None).await;
-    let path = envs.into_tempdir().into_path();
+    let path = envs.path();
     println!("Run the following to see info about the test that just ran,");
     println!("with the correct cell env dir appended to the path:");
     println!();
@@ -117,7 +114,7 @@ fn speed_test_all(n: usize) {
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) -> TestEnvs {
+async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -127,15 +124,18 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
     let dna_file = DnaFile::new(
         DnaDef {
             name: "need_for_speed_test".to_string(),
-            uid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-            properties: SerializedBytes::try_from(()).unwrap(),
-            origin_time: Timestamp::now(),
-            zomes: vec![TestWasm::Anchor.into()].into(),
+            modifiers: DnaModifiers {
+                network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                properties: SerializedBytes::try_from(()).unwrap(),
+                origin_time: Timestamp::HOLOCHAIN_EPOCH,
+                quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
+            },
+            integrity_zomes: vec![TestZomes::from(TestWasm::Anchor).integrity.into_inner()],
+            coordinator_zomes: vec![TestZomes::from(TestWasm::Anchor).coordinator.into_inner()],
         },
         vec![TestWasm::Anchor.into()],
     )
-    .await
-    .unwrap();
+    .await;
 
     // //////////
     // END DNA
@@ -169,12 +169,9 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
     // START CONDUCTOR
     // ///////////////
 
-    let mut dna_store = MockDnaStore::single_dna(dna_file, 2, 2);
-    dna_store.expect_get_entry_def().return_const(None);
-
-    let (test_env, _app_api, handle) = setup_app(
+    let (test_db, _app_api, handle) = setup_app(
+        vec![dna_file],
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-        dna_store,
     )
     .await;
 
@@ -195,46 +192,67 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
 
     // ALICE DOING A CALL
 
-    fn new_zome_call<P>(
+    async fn new_zome_call<P>(
         cell_id: CellId,
-        func: &str,
+        fn_name: FunctionName,
         payload: P,
-    ) -> Result<ZomeCall, SerializedBytesError>
+    ) -> Result<ZomeCallUnsigned, SerializedBytesError>
     where
         P: serde::Serialize + std::fmt::Debug,
     {
-        Ok(ZomeCall {
+        let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+        Ok(ZomeCallUnsigned {
             cell_id: cell_id.clone(),
             zome_name: TestWasm::Anchor.into(),
             cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-            fn_name: func.into(),
+            fn_name,
             payload: ExternIO::encode(payload)?,
             provenance: cell_id.agent_pubkey().clone(),
+            nonce,
+            expires_at,
         })
     }
 
-    let anchor_invocation = |anchor: &str, cell_id, i: usize| {
-        let anchor = AnchorInput(anchor.into(), i.to_string());
-        new_zome_call(cell_id, "anchor", anchor)
+    let anchor_invocation = |anchor: String, cell_id, i: usize| async move {
+        let anchor = AnchorInput(anchor.clone(), i.to_string());
+        new_zome_call(cell_id, "anchor".into(), anchor).await
     };
 
     async fn call(
         app_interface: &mut WebsocketSender,
         invocation: ZomeCall,
     ) -> WebsocketResult<AppResponse> {
-        let request = AppRequest::ZomeCall(Box::new(invocation));
+        let request = AppRequest::CallZome(Box::new(invocation));
         app_interface.request(request).await
     }
 
     let timer = std::time::Instant::now();
 
     for i in 0..num {
-        let invocation = anchor_invocation("alice", alice_cell_id.clone(), i).unwrap();
-        let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCall(_));
-        let invocation = anchor_invocation("bobbo", bob_cell_id.clone(), i).unwrap();
-        let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCall(_));
+        let invocation = anchor_invocation("alice".to_string(), alice_cell_id.clone(), i)
+            .await
+            .unwrap();
+        let response = call(
+            &mut app_interface,
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                .await
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_matches!(response, AppResponse::ZomeCalled(_));
+        let invocation = anchor_invocation("bobbo".to_string(), bob_cell_id.clone(), i)
+            .await
+            .unwrap();
+        let response = call(
+            &mut app_interface,
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                .await
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_matches!(response, AppResponse::ZomeCalled(_));
     }
 
     let mut alice_done = false;
@@ -246,13 +264,21 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
             bobbo_attempts += 1;
             let invocation = new_zome_call(
                 alice_cell_id.clone(),
-                "list_anchor_addresses",
+                "list_anchor_addresses".into(),
                 "bobbo".to_string(),
             )
+            .await
             .unwrap();
-            let response = call(&mut app_interface, invocation).await.unwrap();
+            let response = call(
+                &mut app_interface,
+                ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                    .await
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
             let hashes: EntryHashes = match response {
-                AppResponse::ZomeCall(r) => r.decode().unwrap(),
+                AppResponse::ZomeCalled(r) => r.decode().unwrap(),
                 _ => unreachable!(),
             };
             bobbo_done = hashes.0.len() == num;
@@ -262,13 +288,21 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
             alice_attempts += 1;
             let invocation = new_zome_call(
                 bob_cell_id.clone(),
-                "list_anchor_addresses",
+                "list_anchor_addresses".into(),
                 "alice".to_string(),
             )
+            .await
             .unwrap();
-            let response = call(&mut app_interface, invocation).await.unwrap();
+            let response = call(
+                &mut app_interface,
+                ZomeCall::try_from_unsigned_zome_call(handle.keystore(), invocation)
+                    .await
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
             let hashes: EntryHashes = match response {
-                AppResponse::ZomeCall(r) => r.decode().unwrap(),
+                AppResponse::ZomeCalled(r) => r.decode().unwrap(),
                 _ => unreachable!(),
             };
             alice_done = hashes.0.len() == num;
@@ -288,50 +322,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvs {
             break;
         }
     }
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
-    test_env
-}
 
-pub async fn setup_app(
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-    dna_store: MockDnaStore,
-) -> (TestEnvs, RealAppInterfaceApi, ConductorHandle) {
-    let envs = test_environments();
-
-    let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-        .config(ConductorConfig {
-            admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
-            }]),
-            ..Default::default()
-        })
-        .test(&envs, &[])
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .install_app("test app".to_string(), cell_data)
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .enable_app("test app".to_string())
-        .await
-        .unwrap();
-
-    let errors = conductor_handle
-        .clone()
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-
-    assert!(errors.is_empty());
-
-    let handle = conductor_handle.clone();
-
-    (envs, RealAppInterfaceApi::new(conductor_handle), handle)
+    handle.shutdown().await.unwrap().unwrap();
+    test_db
 }

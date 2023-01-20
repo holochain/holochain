@@ -1,0 +1,48 @@
+[package]
+name = "kitsune_p2p_dht"
+version = "0.1.0-beta-rc.1"
+description = "Kitsune P2p DHT definition"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/kitsune_p2p_dht"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+colored = { version = "1", optional = true }
+derivative = "2.2.0"
+derive_more = "0.99"
+futures = "0.3"
+gcollections = "1.5"
+kitsune_p2p_dht_arc = { version = "^0.1.0-beta-rc.1", path = "../dht_arc"}
+kitsune_p2p_timestamp = { version = "^0.1.0-beta-rc.1", path = "../timestamp", features = ["now"]}
+intervallum = "1.4"
+must_future = "0.1"
+num-traits = "0.2.14"
+once_cell = "1.8"
+rand = "0.8.4"
+serde = { version = "1.0", features = [ "derive" ] }
+statrs = "0.15"
+thiserror = "1.0"
+tracing = "0.1.29"
+
+[dev-dependencies]
+kitsune_p2p_dht = { path = ".", features = ["test_utils"]}
+kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}
+holochain_serialized_bytes = "0.0.51"
+maplit = "1"
+observability = "0.1"
+pretty_assertions = "0.7.2"
+proptest = "1"
+rand = "0.8"
+test-case = "1.2"
+
+[features]
+test_utils = [
+  "colored"
+]
+default = ["test_utils"]

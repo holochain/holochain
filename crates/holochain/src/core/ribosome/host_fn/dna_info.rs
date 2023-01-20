@@ -4,7 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::info::DnaInfo;
 use std::sync::Arc;
 
@@ -12,7 +12,7 @@ pub fn dna_info(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<DnaInfo, WasmError> {
+) -> Result<DnaInfo, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             bindings_deterministic: Permission::Allow,
@@ -20,22 +20,23 @@ pub fn dna_info(
         } => Ok(DnaInfo {
             name: ribosome.dna_def().name.clone(),
             hash: ribosome.dna_def().as_hash().clone(),
-            properties: ribosome.dna_def().properties.clone(),
+            properties: ribosome.dna_def().modifiers.properties.clone(),
             zome_names: ribosome
                 .dna_def()
-                .zomes
+                .integrity_zomes
                 .iter()
                 .map(|(zome_name, _zome_def)| zome_name.to_owned())
                 .collect(),
         }),
-        _ => Err(WasmError::Host(
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "dna_info".into(),
             )
             .to_string(),
-        )),
+        ))
+        .into()),
     }
 }
 
@@ -50,10 +51,12 @@ pub mod test {
     use holochain_zome_types::prelude::*;
 
     async fn test_conductor(properties: SerializedBytes) -> (SweetConductor, SweetZome) {
-        let (dna_file, _) =
-            SweetDnaFile::from_test_wasms(random_uid(), vec![TestWasm::ZomeInfo], properties)
-                .await
-                .unwrap();
+        let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
+            random_network_seed(),
+            vec![TestWasm::ZomeInfo],
+            properties,
+        )
+        .await;
 
         let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
         let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
@@ -63,7 +66,7 @@ pub mod test {
             .setup_app_for_agents(
                 "app-",
                 &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file.into()],
+                &[dna_file],
             )
             .await
             .unwrap();

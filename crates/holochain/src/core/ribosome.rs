@@ -1,18 +1,19 @@
 //! A Ribosome is a structure which knows how to execute hApp code.
 //!
-//! We have only one instance of this: [RealRibosome]. The abstract trait exists
+//! We have only one instance of this: [crate::core::ribosome::real_ribosome::RealRibosome]. The abstract trait exists
 //! so that we can write mocks against the `RibosomeT` interface, as well as
 //! opening the possiblity that we might support applications written in other
 //! languages and environments.
 
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
+#[allow(missing_docs)]
 pub mod error;
 pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
-use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
 use crate::conductor::interface::SignalBroadcaster;
@@ -24,9 +25,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -44,9 +42,12 @@ use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
+use holochain_state::nonce::*;
 use holochain_types::prelude::*;
+use holochain_types::zome_types::GlobalZomeTypes;
 use mockall::automock;
 use std::iter::Iterator;
+use std::sync::Arc;
 
 use self::guest_callback::{
     entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
@@ -96,14 +97,13 @@ impl CallContext {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum HostContext {
     EntryDefs(EntryDefsHostAccess),
     GenesisSelfCheck(GenesisSelfCheckHostAccess),
     Init(InitHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
-    ValidateCreateLink(ValidateLinkHostAccess),
     Validate(ValidateHostAccess),
     ValidationPackage(ValidationPackageHostAccess),
     ZomeCall(ZomeCallHostAccess),
@@ -115,7 +115,6 @@ impl From<&HostContext> for HostFnAccess {
             HostContext::ZomeCall(access) => access.into(),
             HostContext::GenesisSelfCheck(access) => access.into(),
             HostContext::Validate(access) => access.into(),
-            HostContext::ValidateCreateLink(access) => access.into(),
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),
             HostContext::MigrateAgent(access) => access.into(),
@@ -134,8 +133,7 @@ impl HostContext {
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
             Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
-            | Self::Validate(ValidateHostAccess { workspace, .. })
-            | Self::ValidateCreateLink(ValidateLinkHostAccess { workspace, .. }) => workspace,
+            | Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that uses the workspace without providing a workspace"
             ),
@@ -174,8 +172,7 @@ impl HostContext {
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
             | Self::ValidationPackage(ValidationPackageHostAccess { network, .. })
-            | Self::Validate(ValidateHostAccess { network, .. })
-            | Self::ValidateCreateLink(ValidateLinkHostAccess { network, .. }) => network,
+            | Self::Validate(ValidateHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
@@ -187,6 +184,7 @@ impl HostContext {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. })
             | Self::Init(InitHostAccess { signal_tx, .. })
+            | Self::PostCommit(PostCommitHostAccess { signal_tx, .. })
             => signal_tx,
             _ => panic!(
                 "Gave access to a host function that uses the signal broadcaster without providing one"
@@ -247,14 +245,29 @@ impl FnComponents {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(arbitrary::Arbitrary))]
 pub enum ZomesToInvoke {
+    /// All the integrity zomes.
+    AllIntegrity,
+    /// All integrity and coordinator zomes.
     All,
+    /// A single zome of unknown type.
     One(Zome),
+    /// A single integrity zome.
+    OneIntegrity(IntegrityZome),
+    /// A single coordinator zome.
+    OneCoordinator(CoordinatorZome),
 }
 
 impl ZomesToInvoke {
     pub fn one(zome: Zome) -> Self {
         Self::One(zome)
+    }
+    pub fn one_integrity(zome: IntegrityZome) -> Self {
+        Self::OneIntegrity(zome)
+    }
+    pub fn one_coordinator(zome: CoordinatorZome) -> Self {
+        Self::OneCoordinator(zome)
     }
 }
 
@@ -301,19 +314,34 @@ pub trait Invocation: Clone {
 }
 
 impl ZomeCallInvocation {
-    /// to decide if a zome call is authorized:
+    pub async fn verify_signature(&self) -> RibosomeResult<ZomeCallAuthorization> {
+        Ok(
+            if self
+                .provenance
+                .verify_signature_raw(
+                    &self.signature,
+                    ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?,
+                )
+                .await
+            {
+                ZomeCallAuthorization::Authorized
+            } else {
+                ZomeCallAuthorization::BadSignature
+            },
+        )
+    }
+
+    /// to decide if a zome call grant is authorized:
     /// - we need to find a live (committed and not deleted) cap grant that matches the secret
     /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
     /// - the live cap grant needs to include the invocation's provenance AND zome/function name
-    #[allow(clippy::extra_unused_lifetimes)]
-    pub async fn is_authorized<'a>(
+    pub async fn verify_grant(
         &self,
         host_access: &ZomeCallHostAccess,
-    ) -> RibosomeResult<bool> {
+    ) -> RibosomeResult<ZomeCallAuthorization> {
         let check_function = (self.zome.zome_name().clone(), self.fn_name.clone());
         let check_agent = self.provenance.clone();
         let check_secret = self.cap_secret;
-
         let maybe_grant: Option<CapGrant> = host_access
             .workspace
             .source_chain()
@@ -321,20 +349,64 @@ impl ZomeCallInvocation {
             .expect("Must have source chain to make zome calls")
             .valid_cap_grant(check_function, check_agent, check_secret)
             .await?;
+        Ok(if maybe_grant.is_some() {
+            ZomeCallAuthorization::Authorized
+        } else {
+            ZomeCallAuthorization::BadCapGrant
+        })
+    }
 
-        Ok(maybe_grant.is_some())
+    pub async fn verify_nonce(
+        &self,
+        host_access: &ZomeCallHostAccess,
+    ) -> RibosomeResult<ZomeCallAuthorization> {
+        Ok(
+            match host_access
+                .call_zome_handle
+                .witness_nonce_from_calling_agent(
+                    self.provenance.clone(),
+                    self.nonce,
+                    self.expires_at,
+                )
+                .await
+                .map_err(Box::new)?
+            {
+                WitnessNonceResult::Fresh => ZomeCallAuthorization::Authorized,
+                nonce_result => ZomeCallAuthorization::BadNonce(format!("{:?}", nonce_result)),
+            },
+        )
+    }
+
+    /// to verify if the zome call is authorized:
+    /// - the signature must be valid
+    /// - the nonce must not have already been seen
+    /// - the grant must be valid
+    /// the checks MUST be done in this order as witnessing the nonce is a write
+    /// and so we MUST NOT write nonces until after we verify the signature.
+    #[allow(clippy::extra_unused_lifetimes)]
+    pub async fn is_authorized<'a>(
+        &self,
+        host_access: &ZomeCallHostAccess,
+    ) -> RibosomeResult<ZomeCallAuthorization> {
+        Ok(match self.verify_signature().await? {
+            ZomeCallAuthorization::Authorized => match self.verify_nonce(host_access).await? {
+                ZomeCallAuthorization::Authorized => self.verify_grant(host_access).await?,
+                unauthorized => unauthorized,
+            },
+            unauthorized => unauthorized,
+        })
     }
 }
 
 mockall::mock! {
     Invocation {}
-    trait Invocation {
+    impl Invocation for Invocation {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
         fn host_input(self) -> Result<ExternIO, SerializedBytesError>;
         fn auth(&self) -> InvocationAuth;
     }
-    trait Clone {
+    impl Clone for Invocation {
         fn clone(&self) -> Self;
     }
 }
@@ -359,6 +431,14 @@ pub struct ZomeCallInvocation {
     /// The provenance of the call. Provenance means the 'source'
     /// so this expects the `AgentPubKey` of the agent calling the Zome function
     pub provenance: AgentPubKey,
+    /// The signature of the call from the provenance of the call.
+    /// Everything except the signature itself is signed.
+    pub signature: Signature,
+    /// The nonce of the call. Must be unique and monotonic.
+    /// If a higher nonce has been seen then older zome calls will be discarded.
+    pub nonce: Nonce256Bits,
+    /// This call MUST NOT be respected after this time, in the opinion of the callee.
+    pub expires_at: Timestamp,
 }
 
 impl Invocation for ZomeCallInvocation {
@@ -378,10 +458,9 @@ impl Invocation for ZomeCallInvocation {
 
 impl ZomeCallInvocation {
     pub async fn try_from_interface_call(
-        conductor_api: CellConductorApi,
+        conductor_api: CellConductorHandle,
         call: ZomeCall,
     ) -> RibosomeResult<Self> {
-        use crate::conductor::api::CellConductorApiT;
         let ZomeCall {
             cell_id,
             zome_name,
@@ -389,6 +468,9 @@ impl ZomeCallInvocation {
             cap_secret,
             payload,
             provenance,
+            signature,
+            nonce,
+            expires_at,
         } = call;
         let zome = conductor_api
             .get_zome(cell_id.dna_hash(), &zome_name)
@@ -400,6 +482,9 @@ impl ZomeCallInvocation {
             fn_name,
             payload,
             provenance,
+            signature,
+            nonce,
+            expires_at,
         })
     }
 }
@@ -413,6 +498,9 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cap_secret,
             payload,
             provenance,
+            signature,
+            nonce,
+            expires_at,
         } = inv;
         Self {
             cell_id,
@@ -421,6 +509,9 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cap_secret,
             payload,
             provenance,
+            signature,
+            nonce,
+            expires_at,
         }
     }
 }
@@ -432,6 +523,12 @@ pub struct ZomeCallHostAccess {
     pub network: HolochainP2pDna,
     pub signal_tx: SignalBroadcaster,
     pub call_zome_handle: CellConductorReadHandle,
+}
+
+impl std::fmt::Debug for ZomeCallHostAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ZomeCallHostAccess").finish()
+    }
 }
 
 impl From<ZomeCallHostAccess> for HostContext {
@@ -447,38 +544,48 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 }
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
-/// real concrete type is [RealRibosome]
+/// real concrete type is [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome)
 #[automock]
-pub trait RibosomeT: Sized + std::fmt::Debug {
+pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn dna_def(&self) -> &DnaDefHashed;
+
+    fn dna_hash(&self) -> &DnaHash;
+
+    fn dna_file(&self) -> &DnaFile;
 
     fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {
+            ZomesToInvoke::AllIntegrity => self
+                .dna_def()
+                .integrity_zomes
+                .iter()
+                .map(|(n, d)| (n.clone(), d.clone().erase_type()).into())
+                .collect(),
             ZomesToInvoke::All => self
                 .dna_def()
-                .zomes
-                .iter()
-                .cloned()
-                .map(Into::into)
+                .all_zomes()
+                .map(|(n, d)| (n.clone(), d.clone()).into())
                 .collect(),
             ZomesToInvoke::One(zome) => vec![zome],
+            ZomesToInvoke::OneIntegrity(zome) => vec![zome.erase_type()],
+            ZomesToInvoke::OneCoordinator(zome) => vec![zome.erase_type()],
         }
     }
 
-    fn zome_to_id(&self, zome: &Zome) -> RibosomeResult<ZomeId> {
-        let zome_name = zome.zome_name();
+    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeIndex> {
         match self
             .dna_def()
-            .zomes
-            .iter()
+            .all_zomes()
             .position(|(name, _)| name == zome_name)
         {
-            Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
+            Some(index) => Ok(holochain_zome_types::action::ZomeIndex::from(index as u8)),
             None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
         }
     }
+
+    fn get_integrity_zome(&self, zome_index: &ZomeIndex) -> Option<IntegrityZome>;
 
     fn call_iterator<I: Invocation + 'static>(
         &self,
@@ -493,6 +600,16 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError>;
+
+    /// Get a value from a const wasm function.
+    ///
+    /// This is really a stand in until Rust can properly support
+    /// const wasm values.
+    ///
+    /// This allows getting values from wasm without the need for any translation.
+    /// The same technique can be used with the wasmer cli to validate these
+    /// values without needing to make holochain a dependency.
+    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
@@ -544,20 +661,13 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<()>;
 
-    /// Helper function for running a validation callback. Just calls
-    /// [`run_callback`][] under the hood.
-    /// [`run_callback`]: #method.run_callback
+    /// Helper function for running a validation callback. Calls
+    /// private fn `do_callback!` under the hood.
     fn run_validate(
         &self,
         access: ValidateHostAccess,
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
-
-    fn run_validate_link<I: Invocation + 'static>(
-        &self,
-        access: ValidateLinkHostAccess,
-        invocation: ValidateLinkInvocation<I>,
-    ) -> RibosomeResult<ValidateLinkResult>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
@@ -566,24 +676,110 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallResponse>;
+
+    fn zome_types(&self) -> &Arc<GlobalZomeTypes>;
+}
+
+/// Placeholder for weighing. Currently produces zero weight.
+pub fn weigh_placeholder() -> EntryRateWeight {
+    EntryRateWeight::default()
 }
 
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
+    use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetAgents;
+    use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetZome;
     use crate::test_utils::host_fn_caller::HostFnCaller;
     use core::time::Duration;
+    use hdk::prelude::*;
     use holo_hash::AgentPubKey;
+    use holochain_keystore::AgentPubKeyExt;
+    use holochain_state::nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::zome_io::ZomeCallUnsigned;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn verify_zome_call_test() {
+        observability::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            alice_pubkey,
+            bob_pubkey,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::Foo).await;
+
+        let now = Timestamp::now();
+        let (nonce, expires_at) = fresh_nonce(now).unwrap();
+        let alice_unsigned_zome_call = ZomeCallUnsigned {
+            provenance: alice_pubkey.clone(),
+            cell_id: alice.cell_id().clone(),
+            zome_name: "foo".into(),
+            fn_name: "foo".into(),
+            cap_secret: None,
+            payload: ExternIO::encode(()).unwrap(),
+            nonce,
+            expires_at,
+        };
+        let alice_signed_zome_call = ZomeCall::try_from_unsigned_zome_call(
+            &conductor.keystore(),
+            alice_unsigned_zome_call.clone(),
+        )
+        .await
+        .unwrap();
+
+        // Bob observes or forges a valid zome call from alice.
+        // He removes Alice's signature but leaves her provenance and adds his own signature.
+        let mut bob_signed_zome_call = alice_signed_zome_call.clone();
+        bob_signed_zome_call.signature = bob_pubkey
+            .sign_raw(
+                &conductor.keystore(),
+                alice_unsigned_zome_call.data_to_sign().unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // The call should fail for bob.
+        let bob_call_result = conductor.raw_handle().call_zome(bob_signed_zome_call).await;
+
+        match bob_call_result {
+            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* (☞ ͡° ͜ʖ ͡°)☞ */
+            }
+            _ => panic!("{:?}", bob_call_result),
+        }
+
+        // The call should NOT fail for alice (e.g. bob's forgery should not consume alice's nonce).
+        let alice_call_result_0 = conductor
+            .raw_handle()
+            .call_zome(alice_signed_zome_call.clone())
+            .await;
+
+        match alice_call_result_0 {
+            Ok(Ok(ZomeCallResponse::Ok(_))) => { /* ಥ‿ಥ */ }
+            _ => panic!("{:?}", alice_call_result_0),
+        }
+
+        // The same call cannot be used a second time.
+        let alice_call_result_1 = conductor
+            .raw_handle()
+            .call_zome(alice_signed_zome_call)
+            .await;
+
+        match alice_call_result_1 {
+            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* ☜(ﾟヮﾟ☜) */ }
+            _ => panic!("{:?}", bob_call_result),
+        }
     }
 
     #[test]
@@ -600,15 +796,15 @@ pub mod wasm_test {
         pub bob_pubkey: AgentPubKey,
         pub alice: SweetZome,
         pub bob: SweetZome,
+        pub alice_cell: SweetCell,
+        pub bob_cell: SweetCell,
         pub alice_host_fn_caller: HostFnCaller,
         pub bob_host_fn_caller: HostFnCaller,
     }
 
     impl RibosomeTestFixture {
         pub async fn new(test_wasm: TestWasm) -> Self {
-            let (dna_file, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm])
-                .await
-                .unwrap();
+            let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
             let mut conductor = SweetConductor::from_standard_config().await;
             let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
@@ -617,23 +813,31 @@ pub mod wasm_test {
                 .setup_app_for_agents(
                     "app-",
                     &[alice_pubkey.clone(), bob_pubkey.clone()],
-                    &[dna_file.clone().into()],
+                    [&dna_file],
                 )
                 .await
                 .unwrap();
 
-            let ((alice,), (bob,)) = apps.into_tuples();
+            let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
 
-            let alice_host_fn_caller =
-                HostFnCaller::create_for_zome(alice.cell_id(), &conductor.handle(), &dna_file, 0)
-                    .await;
+            let alice_host_fn_caller = HostFnCaller::create_for_zome(
+                alice_cell.cell_id(),
+                &conductor.raw_handle(),
+                &dna_file,
+                0,
+            )
+            .await;
 
-            let bob_host_fn_caller =
-                HostFnCaller::create_for_zome(bob.cell_id(), &conductor.handle(), &dna_file, 0)
-                    .await;
+            let bob_host_fn_caller = HostFnCaller::create_for_zome(
+                bob_cell.cell_id(),
+                &conductor.raw_handle(),
+                &dna_file,
+                0,
+            )
+            .await;
 
-            let alice = alice.zome(test_wasm);
-            let bob = bob.zome(test_wasm);
+            let alice = alice_cell.zome(test_wasm);
+            let bob = bob_cell.zome(test_wasm);
 
             Self {
                 conductor,
@@ -641,6 +845,8 @@ pub mod wasm_test {
                 bob_pubkey,
                 alice,
                 bob,
+                alice_cell,
+                bob_cell,
                 alice_host_fn_caller,
                 bob_host_fn_caller,
             }

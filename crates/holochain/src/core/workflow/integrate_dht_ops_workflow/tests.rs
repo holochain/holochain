@@ -10,8 +10,8 @@ use ::fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
 use holochain_state::query::link::GetLinksQuery;
 use holochain_state::workspace::WorkspaceError;
+use holochain_zome_types::ActionHashed;
 use holochain_zome_types::Entry;
-use holochain_zome_types::HeaderHashed;
 use holochain_zome_types::ValidationStatus;
 use observability;
 
@@ -20,12 +20,11 @@ struct TestData {
     signature: Signature,
     original_entry: Entry,
     new_entry: Entry,
-    entry_update_header: Update,
+    entry_update_action: Update,
     entry_update_entry: Update,
-    original_header_hash: HeaderHash,
+    original_action_hash: ActionHash,
     original_entry_hash: EntryHash,
-    new_entry_hash: EntryHash,
-    original_header: NewEntryHeader,
+    original_action: NewEntryAction,
     entry_delete: Delete,
     link_add: CreateLink,
     link_remove: DeleteLink,
@@ -49,63 +48,62 @@ impl TestData {
         // New entry
         let new_entry_hash = EntryHashed::from_content_sync(new_entry.clone()).into_hash();
 
-        // Original entry and header for updates
-        let mut original_header = fixt!(NewEntryHeader, PublicCurve);
-        debug!(?original_header);
+        // Original entry and action for updates
+        let mut original_action = fixt!(NewEntryAction, PublicCurve);
+        debug!(?original_action);
 
-        match &mut original_header {
-            NewEntryHeader::Create(c) => c.entry_hash = original_entry_hash.clone(),
-            NewEntryHeader::Update(u) => u.entry_hash = original_entry_hash.clone(),
+        match &mut original_action {
+            NewEntryAction::Create(c) => c.entry_hash = original_entry_hash.clone(),
+            NewEntryAction::Update(u) => u.entry_hash = original_entry_hash.clone(),
         }
 
-        let original_header_hash =
-            HeaderHashed::from_content_sync(original_header.clone().into()).into_hash();
+        let original_action_hash =
+            ActionHashed::from_content_sync(original_action.clone().into()).into_hash();
 
-        // Header for the new entry
-        let mut new_entry_header = fixt!(NewEntryHeader, PublicCurve);
+        // Action for the new entry
+        let mut new_entry_action = fixt!(NewEntryAction, PublicCurve);
 
         // Update to new entry
-        match &mut new_entry_header {
-            NewEntryHeader::Create(c) => c.entry_hash = new_entry_hash.clone(),
-            NewEntryHeader::Update(u) => u.entry_hash = new_entry_hash.clone(),
+        match &mut new_entry_action {
+            NewEntryAction::Create(c) => c.entry_hash = new_entry_hash.clone(),
+            NewEntryAction::Update(u) => u.entry_hash = new_entry_hash.clone(),
         }
 
-        // Entry update for header
-        let mut entry_update_header = fixt!(Update, PublicCurve);
-        entry_update_header.entry_hash = new_entry_hash.clone();
-        entry_update_header.original_header_address = original_header_hash.clone();
+        // Entry update for action
+        let mut entry_update_action = fixt!(Update, PublicCurve);
+        entry_update_action.entry_hash = new_entry_hash.clone();
+        entry_update_action.original_action_address = original_action_hash.clone();
 
         // Entry update for entry
         let mut entry_update_entry = fixt!(Update, PublicCurve);
         entry_update_entry.entry_hash = new_entry_hash.clone();
         entry_update_entry.original_entry_address = original_entry_hash.clone();
-        entry_update_entry.original_header_address = original_header_hash.clone();
+        entry_update_entry.original_action_address = original_action_hash.clone();
 
         // Entry delete
         let mut entry_delete = fixt!(Delete);
-        entry_delete.deletes_address = original_header_hash.clone();
+        entry_delete.deletes_address = original_action_hash.clone();
 
         // Link add
         let mut link_add = fixt!(CreateLink);
-        link_add.base_address = original_entry_hash.clone();
-        link_add.target_address = new_entry_hash.clone();
-        link_add.zome_id = fixt!(ZomeId);
+        link_add.base_address = original_entry_hash.clone().into();
+        link_add.target_address = new_entry_hash.clone().into();
         link_add.tag = fixt!(LinkTag);
 
-        let link_add_hash = HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
+        let link_add_hash = ActionHashed::from_content_sync(link_add.clone().into()).into_hash();
 
         // Link remove
         let mut link_remove = fixt!(DeleteLink);
-        link_remove.base_address = original_entry_hash.clone();
+        link_remove.base_address = original_entry_hash.clone().into();
         link_remove.link_add_address = link_add_hash.clone();
 
-        // Any Header
-        let mut any_header = fixt!(Header, PublicCurve);
-        match &mut any_header {
-            Header::Create(ec) => {
+        // Any Action
+        let mut any_action = fixt!(Action, PublicCurve);
+        match &mut any_action {
+            Action::Create(ec) => {
                 ec.entry_hash = original_entry_hash.clone();
             }
-            Header::Update(eu) => {
+            Action::Update(eu) => {
                 eu.entry_hash = original_entry_hash.clone();
             }
             _ => {}
@@ -115,15 +113,14 @@ impl TestData {
             signature: fixt!(Signature),
             original_entry,
             new_entry,
-            entry_update_header,
+            entry_update_action,
             entry_update_entry,
-            original_header,
-            original_header_hash,
+            original_action,
+            original_action_hash,
             original_entry_hash,
             entry_delete,
             link_add,
             link_remove,
-            new_entry_hash,
         }
     }
 }
@@ -135,10 +132,9 @@ enum Db {
     IntQueue(DhtOp),
     IntQueueEmpty,
     MetaEmpty,
-    MetaActivity(Header),
-    MetaUpdate(AnyDhtHash, Header),
-    MetaDelete(HeaderHash, Header),
-    MetaLink(CreateLink, EntryHash),
+    MetaActivity(Action),
+    MetaUpdate(AnyDhtHash, Action),
+    MetaDelete(ActionHash, Action),
     MetaLinkEmpty(CreateLink),
 }
 
@@ -195,9 +191,9 @@ impl Db {
                             .unwrap();
                         assert!(found, "{}\n{:?}", here, op);
                     }
-                    Db::MetaActivity(header) => {
-                        let hash = HeaderHash::with_data_sync(&header);
-                        let basis: AnyDhtHash = header.author().clone().into();
+                    Db::MetaActivity(action) => {
+                        let hash = ActionHash::with_data_sync(&action);
+                        let basis: AnyDhtHash = action.author().clone().into();
                         let found: bool = txn
                             .query_row(
                                 "
@@ -205,7 +201,7 @@ impl Db {
                                     SELECT 1 FROM DhtOP
                                     WHERE when_integrated IS NOT NULL
                                     AND basis_hash = :basis
-                                    AND header_hash = :hash
+                                    AND action_hash = :hash
                                     AND validation_status = :status
                                     AND type = :activity
                                 )
@@ -219,10 +215,10 @@ impl Db {
                                 |row| row.get(0),
                             )
                             .unwrap();
-                        assert!(found, "{}\n{:?}", here, header);
+                        assert!(found, "{}\n{:?}", here, action);
                     }
-                    Db::MetaUpdate(base, header) => {
-                        let hash = HeaderHash::with_data_sync(&header);
+                    Db::MetaUpdate(base, action) => {
+                        let hash = ActionHash::with_data_sync(&action);
                         let found: bool = txn
                             .query_row(
                                 "
@@ -230,9 +226,9 @@ impl Db {
                                     SELECT 1 FROM DhtOP
                                     WHERE when_integrated IS NOT NULL
                                     AND basis_hash = :basis
-                                    AND header_hash = :hash
+                                    AND action_hash = :hash
                                     AND validation_status = :status
-                                    AND (type = :update_content OR type = :update_element)
+                                    AND (type = :update_content OR type = :update_record)
                                 )
                                 ",
                                 named_params! {
@@ -240,41 +236,41 @@ impl Db {
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
                                     ":update_content": DhtOpType::RegisterUpdatedContent,
-                                    ":update_element": DhtOpType::RegisterUpdatedElement,
+                                    ":update_record": DhtOpType::RegisterUpdatedRecord,
                                 },
                                 |row| row.get(0),
                             )
                             .unwrap();
-                        assert!(found, "{}\n{:?}", here, header);
+                        assert!(found, "{}\n{:?}", here, action);
                     }
-                    Db::MetaDelete(deleted_header_hash, header) => {
-                        let hash = HeaderHash::with_data_sync(&header);
+                    Db::MetaDelete(deleted_action_hash, action) => {
+                        let hash = ActionHash::with_data_sync(&action);
                         let found: bool = txn
                             .query_row(
                                 "
                                 SELECT EXISTS(
                                     SELECT 1 FROM DhtOP
-                                    JOIN Header on DhtOp.header_hash = Header.hash
+                                    JOIN Action on DhtOp.action_hash = Action.hash
                                     WHERE when_integrated IS NOT NULL
                                     AND validation_status = :status
                                     AND (
-                                        (DhtOp.type = :deleted_entry_header AND Header.deletes_header_hash = :deleted_header_hash)
+                                        (DhtOp.type = :deleted_entry_action AND Action.deletes_action_hash = :deleted_action_hash)
                                         OR
-                                        (DhtOp.type = :deleted_by AND header_hash = :hash)
+                                        (DhtOp.type = :deleted_by AND action_hash = :hash)
                                     )
                                 )
                                 ",
                                 named_params! {
-                                    ":deleted_header_hash": deleted_header_hash,
+                                    ":deleted_action_hash": deleted_action_hash,
                                     ":hash": hash,
                                     ":status": ValidationStatus::Valid,
                                     ":deleted_by": DhtOpType::RegisterDeletedBy,
-                                    ":deleted_entry_header": DhtOpType::RegisterDeletedEntryHeader,
+                                    ":deleted_entry_action": DhtOpType::RegisterDeletedEntryAction,
                                 },
                                 |row| row.get(0),
                             )
                             .unwrap();
-                        assert!(found, "{}\n{:?}", here, header);
+                        assert!(found, "{}\n{:?}", here, action);
                     }
                     Db::IntegratedEmpty => {
                         let not_empty: bool = txn
@@ -306,24 +302,10 @@ impl Db {
                             .unwrap();
                         assert!(!not_empty, "{}", here);
                     }
-                    Db::MetaLink(link_add, target_hash) => {
-                        let link_add_hash =
-                            HeaderHash::with_data_sync(&Header::from(link_add.clone()));
-                        let query = GetLinksQuery::new(
-                            link_add.base_address.clone(),
-                            link_add.zome_id,
-                            Some(link_add.tag.clone()),
-                        );
-                        let res = query.run(Txn::from(&txn)).unwrap();
-                        assert_eq!(res.len(), 1, "{}", here);
-                        assert_eq!(res[0].create_link_hash, link_add_hash, "{}", here);
-                        assert_eq!(res[0].target, target_hash, "{}", here);
-                        assert_eq!(res[0].tag, link_add.tag, "{}", here);
-                    }
                     Db::MetaLinkEmpty(link_add) => {
                         let query = GetLinksQuery::new(
                             link_add.base_address.clone(),
-                            link_add.zome_id,
+                            LinkTypeFilter::single_type(link_add.zome_index, link_add.link_type),
                             Some(link_add.tag.clone()),
                         );
                         let res = query.run(Txn::from(&txn)).unwrap();
@@ -345,23 +327,22 @@ impl Db {
                         Db::Integrated(op) => {
                             let op = DhtOpHashed::from_content_sync(op.clone());
                             let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, op).unwrap();
-                            mutations::set_when_integrated(txn, hash.clone(), Timestamp::now())
-                                .unwrap();
-                            mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
+                            mutations::insert_op(txn, &op).unwrap();
+                            mutations::set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
+                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                                 .unwrap();
                         }
                         Db::IntQueue(op) => {
                             let op = DhtOpHashed::from_content_sync(op.clone());
                             let hash = op.as_hash().clone();
-                            mutations::insert_op(txn, op).unwrap();
+                            mutations::insert_op(txn, &op).unwrap();
                             mutations::set_validation_stage(
                                 txn,
-                                hash.clone(),
+                                &hash,
                                 ValidationLimboStatus::AwaitingIntegration,
                             )
                             .unwrap();
-                            mutations::set_validation_status(txn, hash, ValidationStatus::Valid)
+                            mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                                 .unwrap();
                         }
                         _ => {
@@ -379,7 +360,7 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.clone(), qt, holochain_p2p_cell)
+    integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, holochain_p2p_cell)
         .await
         .unwrap();
 }
@@ -390,7 +371,7 @@ fn clear_dbs(env: DbWrite<DbKindDht>) {
         .unwrap()
         .with_commit_sync(|txn| {
             txn.execute("DELETE FROM DhtOP", []).unwrap();
-            txn.execute("DELETE FROM Header", []).unwrap();
+            txn.execute("DELETE FROM Action", []).unwrap();
             txn.execute("DELETE FROM Entry", []).unwrap();
             StateMutationResult::Ok(())
         })
@@ -403,49 +384,49 @@ fn clear_dbs(env: DbWrite<DbKindDht>) {
 // and the expected state of the database after the workflow is run
 
 fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    a.link_add.header_seq = 5;
+    a.link_add.action_seq = 5;
     let dep = DhtOp::RegisterAgentActivity(a.signature.clone(), a.link_add.clone().into());
-    let hash = HeaderHash::with_data_sync(&Header::CreateLink(a.link_add.clone()));
-    let mut new_header = a.link_add.clone();
-    new_header.prev_header = hash;
-    new_header.header_seq += 1;
-    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), new_header.clone().into());
+    let hash = ActionHash::with_data_sync(&Action::CreateLink(a.link_add.clone()));
+    let mut new_action = a.link_add.clone();
+    new_action.prev_action = hash;
+    new_action.action_seq += 1;
+    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), new_action.clone().into());
     let pre_state = vec![Db::Integrated(dep.clone()), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(dep.clone()),
         Db::MetaActivity(a.link_add.clone().into()),
         Db::Integrated(op.clone()),
-        Db::MetaActivity(new_header.clone().into()),
+        Db::MetaActivity(new_action.clone().into()),
     ];
     (pre_state, expect, "register agent activity")
 }
 
-fn register_updated_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreElement(
+fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
-        a.original_header.clone().into(),
+        a.original_action.clone().into(),
         Some(a.original_entry.clone().into()),
     );
-    let op = DhtOp::RegisterUpdatedElement(
+    let op = DhtOp::RegisterUpdatedRecord(
         a.signature.clone(),
-        a.entry_update_header.clone(),
+        a.entry_update_action.clone(),
         Some(a.new_entry.clone().into()),
     );
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaUpdate(
-            a.original_header_hash.clone().into(),
-            a.entry_update_header.clone().into(),
+            a.original_action_hash.clone().into(),
+            a.entry_update_action.clone().into(),
         ),
     ];
-    (pre_state, expect, "register updated element")
+    (pre_state, expect, "register updated record")
 }
 
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreEntry(
         a.signature.clone(),
-        a.original_header.clone(),
+        a.original_action.clone(),
         a.original_entry.clone().into(),
     );
     let op = DhtOp::RegisterUpdatedContent(
@@ -467,26 +448,26 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
 fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreEntry(
         a.signature.clone(),
-        a.original_header.clone(),
+        a.original_action.clone(),
         a.original_entry.clone().into(),
     );
-    let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
+    let op = DhtOp::RegisterDeletedEntryAction(a.signature.clone(), a.entry_delete.clone());
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
         Db::IntQueueEmpty,
         Db::Integrated(op.clone()),
         Db::MetaDelete(
-            a.original_header_hash.clone().into(),
+            a.original_action_hash.clone().into(),
             a.entry_delete.clone().into(),
         ),
     ];
     (pre_state, expect, "register deleted by")
 }
 
-fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreElement(
+fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
-        a.original_header.clone().into(),
+        a.original_action.clone().into(),
         Some(a.original_entry.clone().into()),
     );
     let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
@@ -494,32 +475,17 @@ fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaDelete(
-            a.original_header_hash.clone().into(),
+            a.original_action_hash.clone().into(),
             a.entry_delete.clone().into(),
         ),
     ];
-    (pre_state, expect, "register deleted header by")
-}
-
-fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = DhtOp::StoreEntry(
-        a.signature.clone(),
-        a.original_header.clone(),
-        a.original_entry.clone().into(),
-    );
-    let op = DhtOp::RegisterAddLink(a.signature.clone(), a.link_add.clone());
-    let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
-    let expect = vec![
-        Db::Integrated(op.clone()),
-        Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
-    ];
-    (pre_state, expect, "register link add")
+    (pre_state, expect, "register deleted action by")
 }
 
 fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreEntry(
         a.signature.clone(),
-        a.original_header.clone(),
+        a.original_action.clone(),
         a.original_entry.clone().into(),
     );
     let original_link_op = DhtOp::RegisterAddLink(a.signature.clone(), a.link_add.clone());
@@ -552,16 +518,15 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
     observability::test_run().ok();
-    let test_env = test_dht_env();
-    let env = test_env.env();
+    let test_db = test_dht_db();
+    let env = test_db.to_db();
 
     let tests = [
         register_agent_activity,
         register_replaced_by_for_entry,
-        register_updated_element,
+        register_updated_record,
         register_deleted_by,
-        register_deleted_header_by,
-        register_add_link,
+        register_deleted_action_by,
         register_delete_link,
         register_delete_link_missing_base,
     ];

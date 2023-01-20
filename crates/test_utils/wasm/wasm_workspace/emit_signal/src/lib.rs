@@ -18,8 +18,9 @@ fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
 
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
-    let mut functions: GrantedFunctions = BTreeSet::new();
-    functions.insert((zome_info()?.name, "recv_remote_signal".into()));
+    let mut fns = BTreeSet::new();
+    fns.insert((zome_info()?.name, "recv_remote_signal".into()));
+    let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted

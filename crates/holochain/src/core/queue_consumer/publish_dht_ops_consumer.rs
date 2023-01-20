@@ -2,60 +2,49 @@
 
 use super::*;
 
-use crate::conductor::manager::ManagedTaskResult;
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
-#[instrument(skip(env, conductor_handle, stop, network))]
+#[instrument(skip(env, conductor, network))]
 pub fn spawn_publish_dht_ops_consumer(
-    agent: AgentPubKey,
+    cell_id: CellId,
     env: DbWrite<DbKindAuthored>,
-    conductor_handle: ConductorHandle,
-    mut stop: sync::broadcast::Receiver<()>,
-    network: Box<dyn HolochainP2pDnaT + Send + Sync>,
-) -> (TriggerSender, JoinHandle<ManagedTaskResult>) {
+    conductor: ConductorHandle,
+    network: impl HolochainP2pDnaT + Send + Sync + Clone + 'static,
+) -> TriggerSender {
     // Create a trigger with an exponential back off starting at 1 minute
     // and maxing out at 5 minutes.
     // The back off is reset any time the trigger is called (when new data is committed)
-
-    let (tx, mut rx) =
+    let (tx, rx) =
         TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
-    let trigger_self = tx.clone();
-    let handle = tokio::spawn(async move {
-        let network = network;
-        loop {
-            // Wait for next job
-            if let Job::Shutdown = next_job_or_exit(&mut rx, &mut stop).await {
-                tracing::warn!(
-                    "Cell is shutting down: stopping publish_dht_ops_workflow queue consumer."
-                );
-                break;
-            }
-
-            #[cfg(any(test, feature = "test_utils"))]
-            {
-                if !conductor_handle.dev_settings().publish {
-                    continue;
+    let sender = tx.clone();
+    super::queue_consumer_cell_bound(
+        "publish_dht_ops_consumer",
+        cell_id.clone(),
+        conductor.task_manager(),
+        (tx.clone(), rx),
+        move || {
+            let tx = tx.clone();
+            let conductor = conductor.clone();
+            let env = env.clone();
+            let agent = cell_id.agent_pubkey().clone();
+            let network = network.clone();
+            let wf = publish_dht_ops_workflow(env, Arc::new(network), tx, agent);
+            async move {
+                if conductor
+                    .get_config()
+                    .network
+                    .as_ref()
+                    .map(|c| c.tuning_params.disable_publish)
+                    .unwrap_or(false)
+                {
+                    Ok(WorkComplete::Complete)
+                } else {
+                    wf.await
                 }
             }
-
-            // Run the workflow
-            match publish_dht_ops_workflow(
-                env.clone(),
-                network.as_ref(),
-                &trigger_self,
-                agent.clone(),
-            )
-            .await
-            {
-                Ok(WorkComplete::Incomplete) => trigger_self.trigger(),
-                Err(err) => handle_workflow_error(err)?,
-                _ => (),
-            };
-        }
-        Ok(())
-    });
-    (tx, handle)
+        },
+    );
+    sender
 }

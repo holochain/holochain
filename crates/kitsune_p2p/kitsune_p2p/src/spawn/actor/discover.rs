@@ -35,7 +35,7 @@ pub(crate) fn search_and_discover_peer_connect(
 
             // see if we already know how to reach the tgt agent
             if let Ok(Some(agent_info_signed)) = inner
-                .evt_sender
+                .host_api
                 .get_agent_info_signed(GetAgentInfoSignedEvt {
                     space: inner.space.clone(),
                     agent: to_agent.clone(),
@@ -64,7 +64,7 @@ pub(crate) fn search_and_discover_peer_connect(
                         let payload = wire::Wire::peer_get(inner.space.clone(), to_agent.clone());
                         match con_hnd.request(&payload, timeout).await {
                             Ok(wire::Wire::PeerGetResp(wire::PeerGetResp {
-                                agent_info_signed,
+                                agent_info_signed: Some(agent_info_signed),
                             })) => {
                                 if let Err(err) = inner
                                     .evt_sender
@@ -76,7 +76,7 @@ pub(crate) fn search_and_discover_peer_connect(
                                 {
                                     tracing::error!(
                                         ?err,
-                                        "search_and_discover error putting agent info"
+                                        "search_and_discover_peer_connect: error putting agent info"
                                     );
                                 }
 
@@ -84,13 +84,27 @@ pub(crate) fn search_and_discover_peer_connect(
                                 // return the try-to-connect future
                                 return peer_connect(inner, &agent_info_signed, timeout).await;
                             }
+                            Ok(wire::Wire::PeerGetResp(wire::PeerGetResp {
+                                agent_info_signed: None,
+                            })) => {
+                                // No agent found, move on to the next node.
+                                continue;
+                            }
                             peer_resp => {
-                                tracing::warn!(?peer_resp, "unexpected peer resp");
+                                // This node is sending us something unexpected, so let's warn about that.
+                                tracing::warn!(
+                                    ?peer_resp,
+                                    "search_and_discover_peer_connect: unexpected peer response"
+                                );
                             }
                         }
                     }
                 }
             }
+
+            tracing::info!(
+                "search_and_discover_peer_connect: no peers found, retrying after delay."
+            );
 
             backoff.wait().await;
         }
@@ -175,7 +189,7 @@ pub(crate) fn search_remotes_covering_basis(
             }
 
             // if we've exhausted our timeout, we should exit
-            timeout.ok()?;
+            timeout.ok("search_remotes_covering_basis")?;
 
             if near_nodes.is_empty() {
                 // maybe just wait and try again?
@@ -218,7 +232,10 @@ pub(crate) fn search_remotes_covering_basis(
                             break;
                         }
                         peer_resp => {
-                            tracing::warn!(?peer_resp, "unexpected peer resp");
+                            tracing::warn!(
+                                ?peer_resp,
+                                "search_remotes_covering_basis: unexpected peer response"
+                            );
                         }
                     }
                 }

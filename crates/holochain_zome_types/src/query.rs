@@ -3,14 +3,14 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use crate::header::EntryType;
-use crate::header::HeaderType;
+use crate::action::ActionType;
+use crate::action::EntryType;
 use crate::warrant::Warrant;
-use crate::Element;
-use crate::HeaderHashed;
+use crate::ActionHashed;
+use crate::Record;
+use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
-use holo_hash::HeaderHash;
 pub use holochain_serialized_bytes::prelude::*;
 
 /// Defines several ways that queries can be restricted to a range.
@@ -19,18 +19,18 @@ pub use holochain_serialized_bytes::prelude::*;
 /// The reason that this does NOT use native rust range traits is that the hash
 /// bounded queries MUST be inclusive otherwise the integrity and fork
 /// disambiguation logic is impossible. An exclusive range bound that does not
-/// include the final header tells us nothing about which fork to select
+/// include the final action tells us nothing about which fork to select
 /// between N forks of equal length that proceed it. With an inclusive hash
-/// bounded range the final header always points unambiguously at the "correct"
+/// bounded range the final action always points unambiguously at the "correct"
 /// fork that the range is over. Start hashes are not needed to provide this
 /// property so ranges can be hash terminated with a length of preceeding
-/// elements to return only. Technically the seq bounded ranges do not imply
+/// records to return only. Technically the seq bounded ranges do not imply
 /// any fork disambiguation and so could be a range but for simplicity we left
 /// the API symmetrical in boundedness across all enum variants.
 /// @TODO It may be possible to provide/implement RangeBounds in the case that
-/// a full sequence of elements/headers is provided but it would need to be
+/// a full sequence of records/actions is provided but it would need to be
 /// handled as inclusive first, to enforce the integrity of the query, then the
-/// exclusiveness achieved by simply removing the final element after the fact.
+/// exclusiveness achieved by simply removing the final record after the fact.
 #[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone, Debug)]
 pub enum ChainQueryFilterRange {
     /// Do NOT apply any range filtering for this query.
@@ -39,16 +39,16 @@ pub enum ChainQueryFilterRange {
     /// This is ambiguous over forking histories and so should NOT be used in
     /// validation logic.
     /// Inclusive start, inclusive end.
-    HeaderSeqRange(u32, u32),
-    /// A range over source chain header hashes.
+    ActionSeqRange(u32, u32),
+    /// A range over source chain action hashes.
     /// This CAN be used in validation logic as forks are disambiguated.
     /// Inclusive start and end (unlike std::ops::Range).
-    HeaderHashRange(HeaderHash, HeaderHash),
-    /// The terminating header hash and N preceeding elements.
-    /// N = 0 returns only the element with this `HeaderHash`.
+    ActionHashRange(ActionHash, ActionHash),
+    /// The terminating action hash and N preceeding records.
+    /// N = 0 returns only the record with this `ActionHash`.
     /// This CAN be used in validation logic as forks are not possible when
-    /// "looking up" towards genesis from some `HeaderHash`.
-    HeaderHashTerminated(HeaderHash, u32),
+    /// "looking up" towards genesis from some `ActionHash`.
+    ActionHashTerminated(ActionHash, u32),
 }
 
 impl Default for ChainQueryFilterRange {
@@ -57,13 +57,17 @@ impl Default for ChainQueryFilterRange {
     }
 }
 
-/// Query arguments
+/// Specifies arguments to a query of the source chain, including ordering and filtering.
+///
+/// This struct is used to construct an actual SQL query on the database, and also has methods
+/// to allow filtering in-memory.
 #[derive(
     serde::Serialize, serde::Deserialize, SerializedBytes, Default, PartialEq, Clone, Debug,
 )]
-#[non_exhaustive]
+// TODO: get feedback on whether it's OK to remove non_exhaustive
+// #[non_exhaustive]
 pub struct ChainQueryFilter {
-    /// Limit the results to a range of elements according to their headers.
+    /// Limit the results to a range of records according to their actions.
     pub sequence_range: ChainQueryFilterRange,
     /// Filter by EntryType
     // NB: if this filter is set, you can't verify the results, so don't
@@ -71,24 +75,27 @@ pub struct ChainQueryFilter {
     pub entry_type: Option<EntryType>,
     /// Filter by a list of `EntryHash`.
     pub entry_hashes: Option<HashSet<EntryHash>>,
-    /// Filter by HeaderType
+    /// Filter by ActionType
     // NB: if this filter is set, you can't verify the results, so don't
     //     use this in validation
-    pub header_type: Option<HeaderType>,
-    /// Include the entries in the elements
+    pub action_type: Option<ActionType>,
+    /// Include the entries in the records
     pub include_entries: bool,
+    /// The query should be ordered in descending order (default is ascending),
+    /// when run as a database query. There is no provisioning for in-memory ordering.
+    pub order_descending: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// An agents chain elements returned from a agent_activity_query
+/// An agents chain records returned from a agent_activity_query
 pub struct AgentActivity {
-    /// Valid headers on this chain.
-    pub valid_activity: Vec<(u32, HeaderHash)>,
-    /// Rejected headers on this chain.
-    pub rejected_activity: Vec<(u32, HeaderHash)>,
+    /// Valid actions on this chain.
+    pub valid_activity: Vec<(u32, ActionHash)>,
+    /// Rejected actions on this chain.
+    pub rejected_activity: Vec<(u32, ActionHash)>,
     /// The status of this chain.
     pub status: ChainStatus,
-    /// The highest chain header that has
+    /// The highest chain action that has
     /// been observed by this authority.
     pub highest_observed: Option<HighestObserved>,
     /// Warrants about this AgentActivity.
@@ -106,21 +113,21 @@ pub enum ActivityRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
-/// The highest header sequence observed by this authority.
-/// This also includes the headers at this sequence.
+/// The highest action sequence observed by this authority.
+/// This also includes the actions at this sequence.
 /// If there is more then one then there is a fork.
 ///
-/// This type is to prevent headers being hidden by
-/// withholding the previous header.
+/// This type is to prevent actions being hidden by
+/// withholding the previous action.
 ///
 /// The information is tracked at the edge of holochain before
 /// validation (but after drop checks).
 pub struct HighestObserved {
     /// The highest sequence number observed.
-    pub header_seq: u32,
-    /// Hashes of any headers claiming to be at this
-    /// header sequence.
-    pub hash: Vec<HeaderHash>,
+    pub action_seq: u32,
+    /// Hashes of any actions claiming to be at this
+    /// action sequence.
+    pub hash: Vec<ActionHash>,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -131,11 +138,11 @@ pub struct HighestObserved {
 pub enum ChainStatus {
     /// This authority has no information on the chain.
     Empty,
-    /// The chain is valid as at this header sequence and header hash.
+    /// The chain is valid as at this action sequence and action hash.
     Valid(ChainHead),
     /// Chain is forked.
     Forked(ChainFork),
-    /// Chain is invalid because of this header.
+    /// Chain is invalid because of this action.
     Invalid(ChainHead),
 }
 
@@ -146,25 +153,25 @@ impl Default for ChainStatus {
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-/// The header at the head of the complete chain.
+/// The action at the head of the complete chain.
 /// This is as far as this authority can see a
 /// chain with no gaps.
 pub struct ChainHead {
     /// Sequence number of this chain head.
-    pub header_seq: u32,
+    pub action_seq: u32,
     /// Hash of this chain head
-    pub hash: HeaderHash,
+    pub hash: ActionHash,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-/// The chain has been forked by these two headers
+/// The chain has been forked by these two actions
 pub struct ChainFork {
     /// The point where the chain has forked.
     pub fork_seq: u32,
-    /// The first header at this sequence position.
-    pub first_header: HeaderHash,
-    /// The second header at this sequence position.
-    pub second_header: HeaderHash,
+    /// The first action at this sequence position.
+    pub first_action: ActionHash,
+    /// The second action at this sequence position.
+    pub second_action: ActionHash,
 }
 
 impl ChainQueryFilter {
@@ -194,93 +201,105 @@ impl ChainQueryFilter {
         self
     }
 
-    /// Filter on header type.
-    pub fn header_type(mut self, header_type: HeaderType) -> Self {
-        self.header_type = Some(header_type);
+    /// Filter on action type.
+    pub fn action_type(mut self, action_type: ActionType) -> Self {
+        self.action_type = Some(action_type);
         self
     }
 
-    /// Include the entries in the ElementsVec that is returned.
+    /// Include the entries in the RecordsVec that is returned.
     pub fn include_entries(mut self, include_entries: bool) -> Self {
         self.include_entries = include_entries;
         self
     }
 
+    /// Set the order to ascending.
+    pub fn ascending(mut self) -> Self {
+        self.order_descending = false;
+        self
+    }
+
+    /// Set the order to ascending.
+    pub fn descending(mut self) -> Self {
+        self.order_descending = true;
+        self
+    }
+
     /// If the sequence range supports fork disambiguation, apply it to remove
-    /// headers that are not in the correct branch.
+    /// actions that are not in the correct branch.
     /// Numerical range bounds do NOT support fork disambiguation, and neither
     /// does unbounded, but everything hash bounded does.
-    pub fn disambiguate_forks(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
+    pub fn disambiguate_forks(&self, actions: Vec<ActionHashed>) -> Vec<ActionHashed> {
         match &self.sequence_range {
-            ChainQueryFilterRange::Unbounded => headers,
-            ChainQueryFilterRange::HeaderSeqRange(start, end) => headers
+            ChainQueryFilterRange::Unbounded => actions,
+            ChainQueryFilterRange::ActionSeqRange(start, end) => actions
                 .into_iter()
-                .filter(|header| *start <= header.header_seq() && header.header_seq() <= *end)
+                .filter(|action| *start <= action.action_seq() && action.action_seq() <= *end)
                 .collect(),
-            ChainQueryFilterRange::HeaderHashRange(start, end) => {
-                let mut header_hashmap = headers
+            ChainQueryFilterRange::ActionHashRange(start, end) => {
+                let mut action_hashmap = actions
                     .into_iter()
-                    .map(|header| (header.as_hash().clone(), header))
-                    .collect::<HashMap<HeaderHash, HeaderHashed>>();
-                let mut filtered_headers = Vec::new();
-                let mut maybe_next_header = header_hashmap.remove(end);
-                while let Some(next_header) = maybe_next_header {
-                    maybe_next_header = next_header
+                    .map(|action| (action.as_hash().clone(), action))
+                    .collect::<HashMap<ActionHash, ActionHashed>>();
+                let mut filtered_actions = Vec::new();
+                let mut maybe_next_action = action_hashmap.remove(end);
+                while let Some(next_action) = maybe_next_action {
+                    maybe_next_action = next_action
                         .as_content()
-                        .prev_header()
-                        .and_then(|prev_header| header_hashmap.remove(prev_header));
-                    let is_start = next_header.as_hash() == start;
-                    filtered_headers.push(next_header);
+                        .prev_action()
+                        .and_then(|prev_action| action_hashmap.remove(prev_action));
+                    let is_start = next_action.as_hash() == start;
+                    filtered_actions.push(next_action);
                     // This comes after the push to make the range inclusive.
                     if is_start {
                         break;
                     }
                 }
-                filtered_headers
+                filtered_actions
             }
-            ChainQueryFilterRange::HeaderHashTerminated(end, n) => {
-                let mut header_hashmap = headers
+            ChainQueryFilterRange::ActionHashTerminated(end, n) => {
+                let mut action_hashmap = actions
                     .iter()
-                    .map(|header| (header.as_hash().clone(), header))
-                    .collect::<HashMap<HeaderHash, &HeaderHashed>>();
-                let mut filtered_headers = Vec::new();
-                let mut maybe_next_header = header_hashmap.remove(end);
+                    .map(|action| (action.as_hash().clone(), action))
+                    .collect::<HashMap<ActionHash, &ActionHashed>>();
+                let mut filtered_actions = Vec::new();
+                let mut maybe_next_action = action_hashmap.remove(end);
                 let mut i = 0;
-                while let Some(next_header) = maybe_next_header {
-                    maybe_next_header = next_header
+                while let Some(next_action) = maybe_next_action {
+                    maybe_next_action = next_action
                         .as_content()
-                        .prev_header()
-                        .and_then(|prev_header| header_hashmap.remove(prev_header));
-                    filtered_headers.push(next_header.clone());
+                        .prev_action()
+                        .and_then(|prev_action| action_hashmap.remove(prev_action));
+                    filtered_actions.push(next_action.clone());
                     // This comes after the push to make the range inclusive.
                     if i == *n {
                         break;
                     }
                     i += 1;
                 }
-                filtered_headers
+                filtered_actions
             }
         }
     }
 
-    /// Filter a vector of hashed headers according to the query.
-    pub fn filter_headers(&self, headers: Vec<HeaderHashed>) -> Vec<HeaderHashed> {
-        self.disambiguate_forks(headers)
+    /// Filter a vector of hashed actions according to the query.
+    pub fn filter_actions(&self, actions: Vec<ActionHashed>) -> Vec<ActionHashed> {
+        self.disambiguate_forks(actions)
             .into_iter()
-            .filter(|header| {
-                self.header_type
+            .filter(|action| {
+                self.action_type
                     .as_ref()
-                    .map(|header_type| header.header_type() == *header_type)
+                    .map(|action_type| action.action_type() == *action_type)
                     .unwrap_or(true)
                     && self
                         .entry_type
                         .as_ref()
-                        .map(|entry_type| header.entry_type() == Some(entry_type))
+                        .map(|entry_type| action.entry_type() == Some(entry_type))
                         .unwrap_or(true)
                     && self
                         .entry_hashes
                         .as_ref()
-                        .map(|entry_hashes| match header.entry_hash() {
+                        .map(|entry_hashes| match action.entry_hash() {
                             Some(entry_hash) => entry_hashes.contains(entry_hash),
                             None => false,
                         })
@@ -289,21 +308,21 @@ impl ChainQueryFilter {
             .collect()
     }
 
-    /// Filter a vector of elements according to the query.
-    pub fn filter_elements(&self, elements: Vec<Element>) -> Vec<Element> {
-        let headers = self.filter_headers(
-            elements
+    /// Filter a vector of records according to the query.
+    pub fn filter_records(&self, records: Vec<Record>) -> Vec<Record> {
+        let actions = self.filter_actions(
+            records
                 .iter()
-                .map(|element| element.header_hashed().clone())
+                .map(|record| record.action_hashed().clone())
                 .collect(),
         );
-        let header_hashset = headers
+        let action_hashset = actions
             .iter()
-            .map(|header| header.as_hash().clone())
-            .collect::<HashSet<HeaderHash>>();
-        elements
+            .map(|action| action.as_hash().clone())
+            .collect::<HashSet<ActionHash>>();
+        records
             .into_iter()
-            .filter(|element| header_hashset.contains(element.header_address()))
+            .filter(|record| action_hashset.contains(record.action_address()))
             .collect()
     }
 }
@@ -312,72 +331,72 @@ impl ChainQueryFilter {
 #[cfg(feature = "fixturators")]
 mod tests {
     use super::ChainQueryFilter;
-    use crate::fixt::AppEntryTypeFixturator;
+    use crate::action::EntryType;
+    use crate::fixt::AppEntryDefFixturator;
     use crate::fixt::*;
-    use crate::header::EntryType;
+    use crate::ActionHashed;
     use crate::ChainQueryFilterRange;
-    use crate::HeaderHashed;
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
 
-    /// Create three Headers with various properties.
-    /// Also return the EntryTypes used to construct the first two headers.
-    fn fixtures() -> [HeaderHashed; 7] {
-        let entry_type_1 = EntryType::App(fixt!(AppEntryType));
+    /// Create three Actions with various properties.
+    /// Also return the EntryTypes used to construct the first two actions.
+    fn fixtures() -> [ActionHashed; 7] {
+        let entry_type_1 = EntryType::App(fixt!(AppEntryDef));
         let entry_type_2 = EntryType::AgentPubKey;
 
         let entry_hash_0 = fixt!(EntryHash);
 
         let mut h0 = fixt!(Create);
         h0.entry_type = entry_type_1.clone();
-        h0.header_seq = 0;
+        h0.action_seq = 0;
         h0.entry_hash = entry_hash_0.clone();
-        let hh0 = HeaderHashed::from_content_sync(h0.into());
+        let hh0 = ActionHashed::from_content_sync(h0.into());
 
         let mut h1 = fixt!(Update);
         h1.entry_type = entry_type_2.clone();
-        h1.header_seq = 1;
-        h1.prev_header = hh0.as_hash().clone();
-        let hh1 = HeaderHashed::from_content_sync(h1.into());
+        h1.action_seq = 1;
+        h1.prev_action = hh0.as_hash().clone();
+        let hh1 = ActionHashed::from_content_sync(h1.into());
 
         let mut h2 = fixt!(CreateLink);
-        h2.header_seq = 2;
-        h2.prev_header = hh1.as_hash().clone();
-        let hh2 = HeaderHashed::from_content_sync(h2.into());
+        h2.action_seq = 2;
+        h2.prev_action = hh1.as_hash().clone();
+        let hh2 = ActionHashed::from_content_sync(h2.into());
 
         let mut h3 = fixt!(Create);
         h3.entry_type = entry_type_2.clone();
-        h3.header_seq = 3;
-        h3.prev_header = hh2.as_hash().clone();
-        let hh3 = HeaderHashed::from_content_sync(h3.into());
+        h3.action_seq = 3;
+        h3.prev_action = hh2.as_hash().clone();
+        let hh3 = ActionHashed::from_content_sync(h3.into());
 
         // Cheeky forker!
         let mut h3a = fixt!(Create);
         h3a.entry_type = entry_type_1.clone();
-        h3a.header_seq = 3;
-        h3a.prev_header = hh2.as_hash().clone();
-        let hh3a = HeaderHashed::from_content_sync(h3a.into());
+        h3a.action_seq = 3;
+        h3a.prev_action = hh2.as_hash().clone();
+        let hh3a = ActionHashed::from_content_sync(h3a.into());
 
         let mut h4 = fixt!(Update);
         h4.entry_type = entry_type_1.clone();
         // same entry content as h0
         h4.entry_hash = entry_hash_0;
-        h4.header_seq = 4;
-        h4.prev_header = hh3.as_hash().clone();
-        let hh4 = HeaderHashed::from_content_sync(h4.into());
+        h4.action_seq = 4;
+        h4.prev_action = hh3.as_hash().clone();
+        let hh4 = ActionHashed::from_content_sync(h4.into());
 
         let mut h5 = fixt!(CreateLink);
-        h5.header_seq = 5;
-        h5.prev_header = hh4.as_hash().clone();
-        let hh5 = HeaderHashed::from_content_sync(h5.into());
+        h5.action_seq = 5;
+        h5.prev_action = hh4.as_hash().clone();
+        let hh5 = ActionHashed::from_content_sync(h5.into());
 
-        let headers = [hh0, hh1, hh2, hh3, hh3a, hh4, hh5];
-        headers
+        let actions = [hh0, hh1, hh2, hh3, hh3a, hh4, hh5];
+        actions
     }
 
-    fn map_query(query: &ChainQueryFilter, headers: &[HeaderHashed]) -> Vec<bool> {
-        let filtered = query.filter_headers(headers.to_vec());
-        headers
+    fn map_query(query: &ChainQueryFilter, actions: &[ActionHashed]) -> Vec<bool> {
+        let filtered = query.filter_actions(actions.to_vec());
+        actions
             .iter()
             .map(|h| filtered.contains(h))
             .collect::<Vec<_>>()
@@ -385,68 +404,68 @@ mod tests {
 
     #[test]
     fn filter_by_entry_type() {
-        let headers = fixtures();
+        let actions = fixtures();
 
         let query_1 =
-            ChainQueryFilter::new().entry_type(headers[0].entry_type().unwrap().to_owned());
+            ChainQueryFilter::new().entry_type(actions[0].entry_type().unwrap().to_owned());
         let query_2 =
-            ChainQueryFilter::new().entry_type(headers[1].entry_type().unwrap().to_owned());
+            ChainQueryFilter::new().entry_type(actions[1].entry_type().unwrap().to_owned());
 
         assert_eq!(
-            map_query(&query_1, &headers),
+            map_query(&query_1, &actions),
             [true, false, false, false, true, true, false].to_vec()
         );
         assert_eq!(
-            map_query(&query_2, &headers),
+            map_query(&query_2, &actions),
             [false, true, false, true, false, false, false].to_vec()
         );
     }
 
     #[test]
     fn filter_by_entry_hash() {
-        let headers = fixtures();
+        let actions = fixtures();
 
         let query = ChainQueryFilter::new().entry_hashes(
             vec![
-                headers[3].entry_hash().unwrap().clone(),
-                // headers[5] has same entry hash as headers[0]
-                headers[5].entry_hash().unwrap().clone(),
+                actions[3].entry_hash().unwrap().clone(),
+                // actions[5] has same entry hash as actions[0]
+                actions[5].entry_hash().unwrap().clone(),
             ]
             .into_iter()
             .collect(),
         );
 
         assert_eq!(
-            map_query(&query, &headers),
+            map_query(&query, &actions),
             vec![true, false, false, true, false, true, false]
         );
     }
 
     #[test]
-    fn filter_by_header_type() {
-        let headers = fixtures();
+    fn filter_by_action_type() {
+        let actions = fixtures();
 
-        let query_1 = ChainQueryFilter::new().header_type(headers[0].header_type());
-        let query_2 = ChainQueryFilter::new().header_type(headers[1].header_type());
-        let query_3 = ChainQueryFilter::new().header_type(headers[2].header_type());
+        let query_1 = ChainQueryFilter::new().action_type(actions[0].action_type());
+        let query_2 = ChainQueryFilter::new().action_type(actions[1].action_type());
+        let query_3 = ChainQueryFilter::new().action_type(actions[2].action_type());
 
         assert_eq!(
-            map_query(&query_1, &headers),
+            map_query(&query_1, &actions),
             [true, false, false, true, true, false, false].to_vec()
         );
         assert_eq!(
-            map_query(&query_2, &headers),
+            map_query(&query_2, &actions),
             [false, true, false, false, false, true, false].to_vec()
         );
         assert_eq!(
-            map_query(&query_3, &headers),
+            map_query(&query_3, &actions),
             [false, false, true, false, false, false, true].to_vec()
         );
     }
 
     #[test]
     fn filter_by_chain_sequence() {
-        let headers = fixtures();
+        let actions = fixtures();
 
         for (sequence_range, expected, name) in vec![
             (
@@ -455,58 +474,58 @@ mod tests {
                 "unbounded",
             ),
             (
-                ChainQueryFilterRange::HeaderSeqRange(0, 0),
+                ChainQueryFilterRange::ActionSeqRange(0, 0),
                 vec![true, false, false, false, false, false, false],
                 "first only",
             ),
             (
-                ChainQueryFilterRange::HeaderSeqRange(0, 1),
+                ChainQueryFilterRange::ActionSeqRange(0, 1),
                 vec![true, true, false, false, false, false, false],
                 "several from start",
             ),
             (
-                ChainQueryFilterRange::HeaderSeqRange(1, 2),
+                ChainQueryFilterRange::ActionSeqRange(1, 2),
                 vec![false, true, true, false, false, false, false],
                 "several not start",
             ),
             (
-                ChainQueryFilterRange::HeaderSeqRange(2, 999),
+                ChainQueryFilterRange::ActionSeqRange(2, 999),
                 vec![false, false, true, true, true, true, true],
                 "exceeds chain length, not start",
             ),
             (
-                ChainQueryFilterRange::HeaderHashRange(
-                    headers[2].as_hash().clone(),
-                    headers[6].as_hash().clone(),
+                ChainQueryFilterRange::ActionHashRange(
+                    actions[2].as_hash().clone(),
+                    actions[6].as_hash().clone(),
                 ),
                 vec![false, false, true, true, false, true, true],
                 "hash bounded not 3a",
             ),
             (
-                ChainQueryFilterRange::HeaderHashRange(
-                    headers[2].as_hash().clone(),
-                    headers[4].as_hash().clone(),
+                ChainQueryFilterRange::ActionHashRange(
+                    actions[2].as_hash().clone(),
+                    actions[4].as_hash().clone(),
                 ),
                 vec![false, false, true, false, true, false, false],
                 "hash bounded 3a",
             ),
             (
-                ChainQueryFilterRange::HeaderHashTerminated(headers[2].as_hash().clone(), 1),
+                ChainQueryFilterRange::ActionHashTerminated(actions[2].as_hash().clone(), 1),
                 vec![false, true, true, false, false, false, false],
                 "hash terminated not start",
             ),
             (
-                ChainQueryFilterRange::HeaderHashTerminated(headers[2].as_hash().clone(), 0),
+                ChainQueryFilterRange::ActionHashTerminated(actions[2].as_hash().clone(), 0),
                 vec![false, false, true, false, false, false, false],
                 "hash terminated not start 0 prior",
             ),
             (
-                ChainQueryFilterRange::HeaderHashTerminated(headers[5].as_hash().clone(), 7),
+                ChainQueryFilterRange::ActionHashTerminated(actions[5].as_hash().clone(), 7),
                 vec![true, true, true, true, false, true, false],
                 "hash terminated main chain before chain start",
             ),
             (
-                ChainQueryFilterRange::HeaderHashTerminated(headers[4].as_hash().clone(), 7),
+                ChainQueryFilterRange::ActionHashTerminated(actions[4].as_hash().clone(), 7),
                 vec![true, true, true, false, true, false, false],
                 "hash terminated 3a chain before chain start",
             ),
@@ -515,7 +534,7 @@ mod tests {
                 (
                     map_query(
                         &ChainQueryFilter::new().sequence_range(sequence_range),
-                        &headers,
+                        &actions,
                     ),
                     name
                 ),
@@ -526,15 +545,15 @@ mod tests {
 
     #[test]
     fn filter_by_multi() {
-        let headers = fixtures();
+        let actions = fixtures();
 
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .header_type(headers[0].header_type())
-                    .entry_type(headers[0].entry_type().unwrap().clone())
-                    .sequence_range(ChainQueryFilterRange::HeaderSeqRange(0, 0)),
-                &headers
+                    .action_type(actions[0].action_type())
+                    .entry_type(actions[0].entry_type().unwrap().clone())
+                    .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 0)),
+                &actions
             ),
             [true, false, false, false, false, false, false].to_vec()
         );
@@ -542,10 +561,10 @@ mod tests {
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .header_type(headers[1].header_type())
-                    .entry_type(headers[0].entry_type().unwrap().clone())
-                    .sequence_range(ChainQueryFilterRange::HeaderSeqRange(0, 999)),
-                &headers
+                    .action_type(actions[1].action_type())
+                    .entry_type(actions[0].entry_type().unwrap().clone())
+                    .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 999)),
+                &actions
             ),
             [false, false, false, false, false, true, false].to_vec()
         );
@@ -553,9 +572,9 @@ mod tests {
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .entry_type(headers[0].entry_type().unwrap().clone())
-                    .sequence_range(ChainQueryFilterRange::HeaderSeqRange(0, 999)),
-                &headers
+                    .entry_type(actions[0].entry_type().unwrap().clone())
+                    .sequence_range(ChainQueryFilterRange::ActionSeqRange(0, 999)),
+                &actions
             ),
             [true, false, false, false, true, true, false].to_vec()
         );

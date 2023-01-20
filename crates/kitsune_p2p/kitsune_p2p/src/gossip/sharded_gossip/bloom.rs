@@ -32,7 +32,7 @@ impl ShardedGossipLocal {
         for info in agents_within_arc {
             let signed_at_ms = info.signed_at_ms;
             // The key is the agent hash + the signed at.
-            let key = Arc::new(MetaOpKey::Agent(info.0.agent.clone(), signed_at_ms));
+            let key = MetaOpKey::Agent(info.0.agent.clone(), signed_at_ms);
             bloom.set(&key);
         }
         Ok(Some(bloom))
@@ -46,7 +46,7 @@ impl ShardedGossipLocal {
     /// No empty bloom filters.
     /// - Bloom has a 1% chance of false positive (which will lead to agents not being sent back).
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
-    pub(super) async fn generate_ops_blooms_for_time_window(
+    pub(super) async fn generate_op_blooms_for_time_window(
         &self,
         common_arc_set: &Arc<DhtArcSet>,
         search_time_window: TimeWindow,
@@ -113,7 +113,7 @@ impl ShardedGossipLocal {
 
                             while iter.peek().is_some() {
                                 for hash in iter.by_ref().take(100) {
-                                    bloom.set(&Arc::new(MetaOpKey::Op(hash)));
+                                    bloom.set(&MetaOpKey::Op(hash));
                                 }
                                 // Yield to the conductor every 100 hashes. Because tasks have
                                 // polling budgets this gives the runtime a chance to schedule other
@@ -164,7 +164,7 @@ impl ShardedGossipLocal {
     ///   above criteria and the number of local agents.
     /// - The worst case is maximum amount of ops that could be created for the time period.
     /// - The expected performance per op is average 10ms and worst 100 ms.
-    pub(super) async fn check_ops_bloom(
+    pub(super) async fn check_op_bloom(
         &self,
         common_arc_set: DhtArcSet,
         remote_bloom: &TimedBloomFilter,
@@ -199,7 +199,7 @@ impl ShardedGossipLocal {
 
                         while iter.peek().is_some() {
                             for hash in iter.by_ref().take(100) {
-                                if !remote_bloom.check(&Arc::new(MetaOpKey::Op(hash.clone()))) {
+                                if !remote_bloom.check(&MetaOpKey::Op(hash.clone())) {
                                     missing_hashes.push(hash);
                                 }
                             }

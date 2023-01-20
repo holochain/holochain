@@ -1,6 +1,7 @@
-use hdk::prelude::*;
+pub mod integrity;
 
-#[hdk_extern]
-pub fn validate_create_link(_: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult> {
-    Ok(ValidateLinkCallbackResult::Valid)
-}
+#[cfg(not(feature = "integrity"))]
+pub mod coordinator;
+
+#[cfg(not(feature = "integrity"))]
+pub use coordinator::*;

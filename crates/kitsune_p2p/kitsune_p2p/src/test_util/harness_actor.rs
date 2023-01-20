@@ -160,6 +160,9 @@ impl ghost_actor::GhostControlHandler for HarnessActor {
     ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, ()> {
         use ghost_actor::GhostControlSender;
         async move {
+            // The line below was added when migrating to rust edition 2021, per
+            // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+            let _ = &self;
             self.harness_chan.close();
             for (_, (p2p, ctrl)) in self.agents.iter() {
                 let _ = p2p.ghost_actor_shutdown().await;
@@ -186,7 +189,7 @@ impl HarnessInnerHandler for HarnessActor {
         let space_list = self.space_list.clone();
         Ok(async move {
             for space in space_list {
-                p2p.join(space.clone(), agent.clone()).await?;
+                p2p.join(space.clone(), agent.clone(), None).await?;
 
                 harness_chan.publish(HarnessEventType::Join {
                     agent: (&agent).into(),
@@ -208,7 +211,7 @@ impl HarnessControlApiHandler for HarnessActor {
         self.space_list.push(space.clone());
         let mut all = Vec::new();
         for (agent, (p2p, _)) in self.agents.iter() {
-            all.push(p2p.join(space.clone(), agent.clone()));
+            all.push(p2p.join(space.clone(), agent.clone(), None));
         }
         Ok(async move {
             futures::future::try_join_all(all).await?;

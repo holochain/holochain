@@ -18,12 +18,7 @@ observability::metrics!(
 #[tracing::instrument]
 pub fn print_all_metrics() {
     if observability::metrics::is_enabled() {
-        use kitsune_p2p_types::transport::KitsuneTransportMetrics;
         use std::fmt::Write;
-        let writes = KitsuneTransportMetrics::get(KitsuneTransportMetrics::Write);
-        let reads = KitsuneTransportMetrics::get(KitsuneTransportMetrics::Read);
-        let total_writes = writes as f64;
-        let total_reads = reads as f64;
         use KitsuneMetrics::*;
         let mut out = String::new();
         writeln!(
@@ -34,48 +29,27 @@ pub fn print_all_metrics() {
         for (metric, count) in KitsuneMetrics::iter() {
             match metric {
                 Call | Notify | Gossip | PeerGet | PeerQuery => {
-                    let percent = if total_writes > 0.0 {
-                        count as f64 / total_writes * 100.0
-                    } else {
-                        0.0
-                    };
                     writeln!(
                         out,
-                        "metric: {:?} {}Bytes {:.4}MB percent_of_writes: {:.2}%",
+                        "metric: {:?} {}Bytes {:.4}MB",
                         metric,
                         count,
                         count as f64 / 1_000_000.0,
-                        percent
                     )
                     .expect("Failed to print metrics");
                 }
                 Failure | CallResp | NotifyResp | PeerGetResp | PeerQueryResp => {
-                    let percent = if total_reads > 0.0 {
-                        count as f64 / total_reads * 100.0
-                    } else {
-                        0.0
-                    };
                     writeln!(
                         out,
-                        "metric: {:?} {}Bytes {:.4}MB percent_of_reads: {:.2}%",
+                        "metric: {:?} {}Bytes {:.4}MB",
                         metric,
                         count,
                         count as f64 / 1_000_000.0,
-                        percent
                     )
                     .expect("Failed to print metrics");
                 }
             }
         }
-        writeln!(
-            out,
-            "total writes: {}Bytes {:.4}MB total reads: {}Bytes {:.4}MB",
-            writes,
-            writes as f64 / 1_000_000.0,
-            reads,
-            reads as f64 / 1_000_000.0,
-        )
-        .expect("Failed to print metrics");
         tracing::trace!(metric = %out);
     }
 }

@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{functions::add_custom_functions, prelude::*};
 use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
@@ -103,9 +103,15 @@ impl Databases {
     }
 }
 
-pub(crate) fn new_connection_pool(path: &Path, synchronous_level: DbSyncLevel) -> ConnectionPool {
+pub(crate) fn new_connection_pool(
+    path: Option<&Path>,
+    synchronous_level: DbSyncLevel,
+) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
-    let manager = SqliteConnectionManager::file(path);
+    let manager = match path {
+        Some(path) => SqliteConnectionManager::file(path),
+        None => SqliteConnectionManager::memory(),
+    };
     let customizer = Box::new(ConnCustomizer { synchronous_level });
     // We need the same amount of connections as reader threads plus one for the writer thread.
     let max_cons = num_read_threads() + 1;
@@ -179,7 +185,7 @@ pub(crate) fn initialize_connection(
     conn: &mut Connection,
     synchronous_level: DbSyncLevel,
 ) -> rusqlite::Result<()> {
-    // tell SQLite to wait this long during write contention
+    // Tell SQLite to wait this long during write contention.
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
     #[cfg(feature = "db-encryption")]
@@ -200,16 +206,18 @@ pub(crate) fn initialize_connection(
 
     // this is recommended to always be off:
     // https://sqlite.org/pragma.html#pragma_trusted_schema
-    conn.pragma_update(None, "trusted_schema", &false)?;
+    conn.pragma_update(None, "trusted_schema", false)?;
 
     // enable foreign key support
-    conn.pragma_update(None, "foreign_keys", &"ON".to_string())?;
+    conn.pragma_update(None, "foreign_keys", "ON".to_string())?;
 
     match synchronous_level {
-        DbSyncLevel::Full => conn.pragma_update(None, "synchronous", &"2".to_string())?,
-        DbSyncLevel::Normal => conn.pragma_update(None, "synchronous", &"1".to_string())?,
-        DbSyncLevel::Off => conn.pragma_update(None, "synchronous", &"0".to_string())?,
+        DbSyncLevel::Full => conn.pragma_update(None, "synchronous", "2".to_string())?,
+        DbSyncLevel::Normal => conn.pragma_update(None, "synchronous", "1".to_string())?,
+        DbSyncLevel::Off => conn.pragma_update(None, "synchronous", "0".to_string())?,
     }
+
+    add_custom_functions(conn)?;
 
     Ok(())
 }
@@ -223,7 +231,7 @@ fn get_encryption_key_shim() -> [u8; 32] {
     ]
 }
 
-/// Singleton Connection.
+/// Singleton Connection
 #[derive(shrinkwraprs::Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct PConn {

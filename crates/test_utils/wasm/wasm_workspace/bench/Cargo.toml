@@ -1,17 +1,24 @@
 [package]
 name = "test_wasm_bench"
 version = "0.0.1"
-authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+authors = ["thedavidmeister", "thedavidmeister@gmail.com"]
+edition = "2021"
 
 [lib]
 name = "test_wasm_bench"
-crate-type = [ "cdylib", "rlib" ]
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "integrity_test_wasm_bench"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 
 [dependencies]
-hdk = { path = "../../../../hdk" }
+hdk = { path = "../../../../hdk", optional = true }
 serde = "1.0"
+hdi = { path = "../../../../hdi" }
 
 [features]
-default = []
-mock = ["hdk/mock"]
+default = ["hdk"]
+integrity = []

@@ -3,14 +3,14 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: Sign,
-) -> Result<Signature, WasmError> {
+) -> Result<Signature, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             keystore: Permission::Allow,
@@ -22,15 +22,17 @@ pub fn sign(
                 .sign(input.key, input.data.into_vec().into())
                 .await
         })
-        .map_err(|keystore_error| WasmError::Host(keystore_error.to_string())),
-        _ => Err(WasmError::Host(
+        .map_err(|keystore_error| -> RuntimeError {
+            wasm_error!(WasmErrorInner::Host(keystore_error.to_string())).into()
+        }),
+        _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
                 "sign".into(),
             )
             .to_string(),
-        )),
+        )).into()),
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::WasmError;
+use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -9,18 +9,18 @@ pub fn capability_grants(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     _input: (),
-) -> Result<(), WasmError> {
+) -> Result<(), RuntimeError> {
     unimplemented!();
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
 
     use matches::assert_matches;
 
@@ -28,9 +28,7 @@ pub mod wasm_test {
     async fn ribosome_capability_secret_test() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor,
-            alice,
-            ..
+            conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let _: CapSecret = conductor.call(&alice, "cap_secret", ()).await;
@@ -40,25 +38,27 @@ pub mod wasm_test {
     async fn ribosome_transferable_cap_grant() {
         observability::test_run().ok();
         let RibosomeTestFixture {
-            conductor,
-            alice,
-            ..
+            conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let secret: CapSecret = conductor.call(&alice, "cap_secret", ()).await;
-        let header: HeaderHash = conductor.call(&alice, "transferable_cap_grant", secret).await;
-        let maybe_element: Option<Element> = conductor.call(&alice, "get_entry", header).await;
-        let entry_secret: CapSecret = maybe_element.and_then(|element| {
-            let cap_grant_entry = element.entry().to_grant_option().unwrap();
-            match cap_grant_entry.access {
-                CapAccess::Transferable { secret, .. } => Some(secret),
-                _ => None,
-            }
-        }).unwrap();
+        let action: ActionHash = conductor
+            .call(&alice, "transferable_cap_grant", secret)
+            .await;
+        let maybe_record: Option<Record> = conductor.call(&alice, "get_entry", action).await;
+        let entry_secret: CapSecret = maybe_record
+            .and_then(|record| {
+                let cap_grant_entry = record.entry().to_grant_option().unwrap();
+                match cap_grant_entry.access {
+                    CapAccess::Transferable { secret, .. } => Some(secret),
+                    _ => None,
+                }
+            })
+            .unwrap();
         assert_eq!(entry_secret, secret);
     }
 
-    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
+    // MAYBE: [ B-03669 ] can move this to an integration test (may need to switch to using a RibosomeStore)
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_authorized_call() -> anyhow::Result<()> {
         observability::test_run().ok();
@@ -85,11 +85,11 @@ pub mod wasm_test {
             )
             .await;
 
-        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _));
+        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _, _));
 
         // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
 
-        let original_grant_hash: HeaderHash = conductor
+        let original_grant_hash: ActionHash = conductor
             .call(&bob, "transferable_cap_grant", original_secret)
             .await;
 
@@ -110,23 +110,23 @@ pub mod wasm_test {
 
         // BOB ROLLS THE GRANT SO ONLY THE NEW ONE WILL WORK FOR ALICE
 
-        let new_grant_header_hash: HeaderHash = conductor
+        let new_grant_action_hash: ActionHash = conductor
             .call(&bob, "roll_cap_grant", original_grant_hash)
             .await;
 
-        let output: Option<Element> = conductor
-            .call(&bob, "get_entry", new_grant_header_hash.clone())
+        let output: Option<Record> = conductor
+            .call(&bob, "get_entry", new_grant_action_hash.clone())
             .await;
 
         let new_secret: CapSecret = match output {
-            Some(element) => match element.entry().to_grant_option() {
+            Some(record) => match record.entry().to_grant_option() {
                 Some(zome_call_cap_grant) => match zome_call_cap_grant.access {
                     CapAccess::Transferable { secret, .. } => secret,
                     _ => unreachable!(),
                 },
                 _ => unreachable!(),
             },
-            _ => unreachable!("Couldn't get {:?}", new_grant_header_hash),
+            _ => unreachable!("Couldn't get {:?}", new_grant_action_hash),
         };
 
         let output: ZomeCallResponse = conductor
@@ -137,7 +137,7 @@ pub mod wasm_test {
             )
             .await;
 
-        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _));
+        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _, _));
 
         let output: ZomeCallResponse = conductor
             .call(
@@ -150,8 +150,8 @@ pub mod wasm_test {
 
         // BOB DELETES THE GRANT SO NO SECRETS WORK
 
-        let _: HeaderHash = conductor
-            .call(&bob, "delete_cap_grant", new_grant_header_hash)
+        let _: ActionHash = conductor
+            .call(&bob, "delete_cap_grant", new_grant_action_hash)
             .await;
 
         let output: ZomeCallResponse = conductor
@@ -162,7 +162,7 @@ pub mod wasm_test {
             )
             .await;
 
-        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _));
+        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _, _));
 
         let output: ZomeCallResponse = conductor
             .call(
@@ -173,7 +173,7 @@ pub mod wasm_test {
             .await;
 
         // the inner response should be unauthorized
-        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _));
+        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _, _));
 
         let mut conductor = conductor;
         conductor.shutdown().await;

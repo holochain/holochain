@@ -157,6 +157,16 @@ impl<T: HashType> HoloHash<T> {
         assert_length!(HOLO_HASH_FULL_LEN, &self.hash);
         self.hash
     }
+
+    /// Get the hex representation of the hash bytes
+    pub fn to_hex(&self) -> String {
+        use std::fmt::Write;
+        let mut s = String::with_capacity(self.hash.len());
+        for b in &self.hash {
+            write!(&mut s, "{:02x}", b).ok();
+        }
+        s
+    }
 }
 
 #[cfg(feature = "hashing")]
@@ -285,6 +295,10 @@ mod tests {
         assert_type(
             "DhtOpHash",
             DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
+        );
+        assert_type!(
+            "ExternalHash",
+            ExternalHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
     }
 

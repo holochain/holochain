@@ -1,12 +1,10 @@
 { nixpkgs ? null
 , rustVersion ? {
     track = "stable";
-    version = "1.58.1";
+    version = "1.66.0";
   }
 
-, holonixArgs ? {
-    inherit rustVersion;
-  }
+, holonixArgs ? { }
 }:
 
 # This is an example of what downstream consumers of holonix should do
@@ -20,7 +18,7 @@ let
 
   # START HOLONIX IMPORT BOILERPLATE
   holonixPath = config.holonix.pathFn { };
-  holonix = config.holonix.importFn holonixArgs;
+  holonix = config.holonix.importFn ({ inherit rustVersion; } // holonixArgs);
   # END HOLONIX IMPORT BOILERPLATE
 
   overlays = [
@@ -46,11 +44,37 @@ let
         fi
       '';
 
-      crate2nix = import sources.crate2nix.outPath { };
+      rustPlatform = self.makeRustPlatform {
+        rustc = holonix.pkgs.custom_rustc;
+        cargo = holonix.pkgs.custom_rustc;
+      };
+
+      inherit (self.rustPlatform.rust) rustc cargo;
+
+      cargo-nextest = self.rustPlatform.buildRustPackage {
+        name = "cargo-nextest";
+
+        src = sources.nextest.outPath;
+        cargoSha256 = "sha256-E25P/vasIBQp4m3zGii7ZotzJ7b2kT6ma9glvmQXcnM=";
+
+        cargoTestFlags = [
+          # TODO: investigate some more why these tests fail in nix
+          "--"
+          "--skip=tests_integration::test_relocated_run"
+          "--skip=tests_integration::test_run"
+          "--skip=tests_integration::test_run_after_build"
+        ];
+      };
     })
 
-  ];
+  ]
+  ++ [(
+    self: super: {
+      inherit crate2nix;
+    }
+  )];
 
+  crate2nix = (import (nixpkgs.path or holonix.pkgs.path) {}).crate2nix;
   nixpkgs' = import (nixpkgs.path or holonix.pkgs.path) { inherit overlays; };
   inherit (nixpkgs') callPackage;
 

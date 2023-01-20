@@ -8,11 +8,11 @@ use holochain_util::ffs;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     borrow::Cow,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
-pub type ResourceMap = HashMap<PathBuf, ResourceBytes>;
+pub type ResourceMap = BTreeMap<PathBuf, ResourceBytes>;
 
 /// A Manifest bundled together, optionally, with the Resources that it describes.
 /// This is meant to be serialized for standalone distribution, and deserialized
@@ -42,8 +42,8 @@ where
     /// absolute local paths. If this assertion fails,
     /// **resource resolution will panic!**
     //
-    // TODO: Represent this with types more solidly, perhaps breaking this
-    //       struct into two versions for each case.
+    // MAYBE: Represent this with types more solidly, perhaps breaking this
+    //        struct into two versions for each case.
     #[serde(skip)]
     root_dir: Option<PathBuf>,
 }
@@ -120,7 +120,7 @@ where
 
     /// Load a Bundle into memory from a file
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Ok(Self::decode(&ffs::read(path).await?)?)
+        Self::decode(&ffs::read(path).await?)
     }
 
     /// Write a Bundle to a file
@@ -202,6 +202,29 @@ where
     }
 }
 
+/// A manifest bundled together, optionally, with the Resources that it describes.
+/// The manifest may be of any format. This is useful for deserializing a bundle of
+/// an outdated format, so that it may be modified to fit the supported format.
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct RawBundle<M> {
+    /// The manifest describing the resources that compose this bundle.
+    #[serde(bound(deserialize = "M: DeserializeOwned"))]
+    pub manifest: M,
+
+    /// The full or partial resource data. Each entry must correspond to one
+    /// of the Bundled Locations specified by the Manifest. Bundled Locations
+    /// are always relative paths (relative to the root_dir).
+    pub resources: ResourceMap,
+}
+
+impl<M: serde::de::DeserializeOwned> RawBundle<M> {
+    /// Load a Bundle into memory from a file
+    pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
+        crate::decode(&ffs::read(path).await?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::error::MrBundleError;
@@ -236,10 +259,13 @@ mod tests {
             Location::Bundled("1.thing".into()),
             Location::Bundled("2.thing".into()),
         ]);
-        assert!(Bundle::new_unchecked(manifest.clone(), vec![("1.thing".into(), vec![1])]).is_ok());
+        assert!(
+            Bundle::new_unchecked(manifest.clone(), vec![("1.thing".into(), vec![1].into())])
+                .is_ok()
+        );
 
         matches::assert_matches!(
-            Bundle::new_unchecked(manifest, vec![("3.thing".into(), vec![3])]),
+            Bundle::new_unchecked(manifest, vec![("3.thing".into(), vec![3].into())]),
             Err(MrBundleError::BundleError(BundleError::BundledPathNotInManifest(path))) if path == PathBuf::from("3.thing")
         );
     }

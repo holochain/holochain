@@ -1,6 +1,8 @@
 //! Module for items related to aggregating validation_receipts
 
+use futures::Stream;
 use futures::StreamExt;
+use futures::TryStreamExt;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
@@ -69,24 +71,25 @@ impl ValidationReceipt {
                 async move { validator.sign(&keystore, this).await }
             })
             .collect::<Vec<_>>();
-        let signatures = futures::stream::iter(futures)
-            .buffer_unordered(10)
-            .collect::<Vec<_>>()
-            .await;
-        let signatures = if signatures.iter().any(Result::is_ok) {
-            signatures.into_iter().filter_map(Result::ok).collect()
-        } else {
-            return Err(signatures
-                .into_iter()
-                .filter_map(Result::err)
-                .next()
-                .expect("Must contain at least one error if there is no success"));
-        };
+        let stream = futures::stream::iter(futures);
+        let signatures = try_stream_of_results(stream).await?;
+        if signatures.is_empty() {
+            unreachable!("Signatures cannot be empty because the validators vec is not empty");
+        }
         Ok(Some(SignedValidationReceipt {
             receipt: self,
             validators_signatures: signatures,
         }))
     }
+}
+
+/// Try to collect a stream of futures that return results into a vec.
+async fn try_stream_of_results<T, U, E>(stream: U) -> Result<Vec<T>, E>
+where
+    U: Stream,
+    <U as Stream>::Item: futures::Future<Output = Result<T, E>>,
+{
+    stream.buffer_unordered(10).map(|r| r).try_collect().await
 }
 
 /// A full, signed validation receipt.
@@ -176,18 +179,18 @@ mod tests {
     async fn test_validation_receipts_db_populate_and_list() -> StateMutationResult<()> {
         observability::test_run().ok();
 
-        let test_env = crate::test_utils::test_authored_env();
-        let env = test_env.env();
+        let test_db = crate::test_utils::test_authored_db();
+        let env = test_db.to_db();
         let keystore = crate::test_utils::test_keystore();
 
         let op = DhtOpHashed::from_content_sync(DhtOp::RegisterAgentActivity(
             fixt!(Signature),
-            fixt!(Header),
+            fixt!(Action),
         ));
         let test_op_hash = op.as_hash().clone();
         env.conn()
             .unwrap()
-            .with_commit_sync(|txn| mutations::insert_op(txn, op))
+            .with_commit_sync(|txn| mutations::insert_op(txn, &op))
             .unwrap();
 
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
@@ -226,5 +229,31 @@ mod tests {
             assert_eq!(expects, list);
         });
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_try_stream_of_results() {
+        let iter: Vec<futures::future::Ready<Result<i32, String>>> = vec![];
+        let stream = futures::stream::iter(iter);
+        assert_eq!(Ok(vec![]), try_stream_of_results(stream).await);
+
+        let iter = vec![async move { Result::<_, String>::Ok(0) }];
+        let stream = futures::stream::iter(iter);
+        assert_eq!(Ok(vec![0]), try_stream_of_results(stream).await);
+
+        let iter = (0..10).map(|i| async move { Result::<_, String>::Ok(i) });
+        let stream = futures::stream::iter(iter);
+        assert_eq!(
+            Ok((0..10).collect::<Vec<_>>()),
+            try_stream_of_results(stream).await
+        );
+
+        let iter = vec![async move { Result::<i32, String>::Err("test".to_string()) }];
+        let stream = futures::stream::iter(iter);
+        assert_eq!(Err("test".to_string()), try_stream_of_results(stream).await);
+
+        let iter = (0..10).map(|_| async move { Result::<i32, String>::Err("test".to_string()) });
+        let stream = futures::stream::iter(iter);
+        assert_eq!(Err("test".to_string()), try_stream_of_results(stream).await);
     }
 }

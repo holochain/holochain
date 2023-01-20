@@ -18,7 +18,7 @@ impl EntryDefsInvocation {
     }
 }
 
-#[derive(Clone, Constructor)]
+#[derive(Clone, Constructor, Debug)]
 pub struct EntryDefsHostAccess;
 
 impl From<&HostContext> for EntryDefsHostAccess {
@@ -41,7 +41,7 @@ impl From<&EntryDefsHostAccess> for HostFnAccess {
 
 impl Invocation for EntryDefsInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::All
+        ZomesToInvoke::AllIntegrity
     }
     fn fn_components(&self) -> FnComponents {
         vec!["entry_defs".into()].into()
@@ -148,7 +148,7 @@ mod test {
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(ZomesToInvoke::All, entry_defs_invocation.zomes(),);
+        assert_eq!(ZomesToInvoke::AllIntegrity, entry_defs_invocation.zomes(),);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -231,21 +231,19 @@ mod slow_tests {
             result,
             EntryDefsResult::Defs({
                 let mut tree = BTreeMap::new();
-                let zome_name: ZomeName = "entry_defs".into();
+                let zome_name: ZomeName = "integrity_entry_defs".into();
                 let defs: EntryDefs = vec![
                     EntryDef {
                         id: "post".into(),
                         visibility: EntryVisibility::Public,
-                        crdt_type: CrdtType,
                         required_validations: 5.into(),
-                        required_validation_type: Default::default(),
+                        ..Default::default()
                     },
                     EntryDef {
                         id: "comment".into(),
                         visibility: EntryVisibility::Private,
-                        crdt_type: CrdtType,
                         required_validations: 5.into(),
-                        required_validation_type: Default::default(),
+                        ..Default::default()
                     },
                 ]
                 .into();

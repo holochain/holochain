@@ -7,48 +7,52 @@ use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::sweettest::*;
-use crate::test_utils::fake_valid_dna_file;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
-use holochain_conductor_api::InstalledAppInfoStatus;
-use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse, ZomeCall};
-use holochain_keystore::crude_mock_keystore::spawn_crude_mock_keystore;
-use holochain_keystore::crude_mock_keystore::spawn_real_or_mock_keystore;
-use holochain_state::prelude::*;
+use holochain_conductor_api::AppInfoStatus;
+use holochain_conductor_api::CellInfo;
+use holochain_keystore::crude_mock_keystore::*;
+use holochain_state::prelude::test_keystore;
+use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_websocket::WebsocketSender;
-use kitsune_p2p_types::dependencies::lair_keystore_api_0_0::LairError;
+use holochain_zome_types::op::Op;
 use maplit::hashset;
 use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
-    let envs = test_environments();
-    let dna_store = MockDnaStore::new();
-    let keystore = envs.keystore().clone();
+    let db_dir = test_db_dir();
+    let ribosome_store = RibosomeStore::new();
+    let keystore = test_keystore();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let conductor = Conductor::new(
-        envs.conductor(),
-        envs.wasm(),
-        dna_store,
-        keystore,
-        envs.path().to_path_buf().into(),
-        holochain_p2p,
-        DbSyncStrategy::default(),
-        post_commit_sender,
-    )
-    .await
+
+    let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
     .unwrap();
+    let conductor = Conductor::new(
+        Default::default(),
+        ribosome_store,
+        keystore,
+        holochain_p2p,
+        spaces,
+        post_commit_sender,
+        outcome_tx,
+    );
     let state = conductor.get_state().await.unwrap();
-    assert_eq!(state, ConductorState::default());
+    let mut expect_state = ConductorState::default();
+    expect_state.set_tag(state.tag().clone());
+    assert_eq!(state, expect_state);
 
     let cell_id = fake_cell_id(1);
-    let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
+    let installed_cell = InstalledCell::new(cell_id.clone(), "role_name".to_string());
     let app = InstalledAppCommon::new_legacy("fake app", vec![installed_cell]).unwrap();
 
     conductor
@@ -68,106 +72,31 @@ async fn can_update_state() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn can_add_clone_cell_to_app() {
-    let envs = test_environments();
-    let keystore = envs.keystore().clone();
-    let holochain_p2p = holochain_p2p::stub_network().await;
-
-    let agent = fixt!(AgentPubKey);
-    let dna = fake_valid_dna_file("");
-    let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
-
-    let dna_store = RealDnaStore::new();
-    let (post_commit_sender, _post_commit_receiver) =
-        tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let conductor = Conductor::new(
-        envs.conductor(),
-        envs.wasm(),
-        dna_store,
-        keystore,
-        envs.path().to_path_buf().into(),
-        holochain_p2p,
-        DbSyncStrategy::default(),
-        post_commit_sender,
-    )
-    .await
-    .unwrap();
-
-    let installed_cell = InstalledCell::new(cell_id.clone(), "role_id".to_string());
-    let role = AppRoleAssignment::new(cell_id.clone(), true, 1);
-    let app1 = InstalledAppCommon::new_legacy("no clone", vec![installed_cell.clone()]).unwrap();
-    let app2 = InstalledAppCommon::new("yes clone", agent, vec![("role_id".into(), role.clone())]);
-    assert_eq!(
-        app1.roles().keys().collect::<Vec<_>>(),
-        vec![&"role_id".to_string()]
-    );
-    assert_eq!(
-        app2.roles().keys().collect::<Vec<_>>(),
-        vec![&"role_id".to_string()]
-    );
-
-    conductor.register_phenotype(dna);
-    conductor
-        .update_state(move |mut state| {
-            state
-                .installed_apps_mut()
-                .insert(RunningApp::from(app1.clone()).into());
-            state
-                .installed_apps_mut()
-                .insert(RunningApp::from(app2.clone()).into());
-            Ok(state)
-        })
-        .await
-        .unwrap();
-
-    matches::assert_matches!(
-        conductor
-            .add_clone_cell_to_app("no clone".to_string(), "role_id".to_string(), ().into())
-            .await,
-        Err(ConductorError::AppError(AppError::CloneLimitExceeded(0, _)))
-    );
-
-    let cloned_cell_id = conductor
-        .add_clone_cell_to_app("yes clone".to_string(), "role_id".to_string(), ().into())
-        .await
-        .unwrap();
-
-    let state = conductor.get_state().await.unwrap();
-    assert_eq!(
-        state
-            .running_apps()
-            .find(|(id, _)| &id[..] == "yes clone")
-            .unwrap()
-            .1
-            .cloned_cells()
-            .cloned()
-            .collect::<Vec<CellId>>(),
-        vec![cloned_cell_id]
-    );
-}
-
 /// App can't be installed if another app is already installed under the
 /// same InstalledAppId
 #[tokio::test(flavor = "multi_thread")]
 async fn app_ids_are_unique() {
-    let environments = test_environments();
-    let dna_store = MockDnaStore::new();
+    let db_dir = test_db_dir();
+    let ribosome_store = RibosomeStore::new();
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-    let conductor = Conductor::new(
-        environments.conductor(),
-        environments.wasm(),
-        dna_store,
-        environments.keystore().clone(),
-        environments.path().to_path_buf().into(),
-        holochain_p2p,
-        DbSyncStrategy::default(),
-        post_commit_sender,
-    )
-    .await
+
+    let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
+    let spaces = Spaces::new(&ConductorConfig {
+        environment_path: db_dir.path().to_path_buf().into(),
+        ..Default::default()
+    })
     .unwrap();
+    let conductor = Conductor::new(
+        Default::default(),
+        ribosome_store,
+        test_keystore(),
+        holochain_p2p,
+        spaces,
+        post_commit_sender,
+        outcome_tx,
+    );
 
     let cell_id = fake_cell_id(1);
 
@@ -198,9 +127,9 @@ async fn app_ids_are_unique() {
     );
 }
 
-/// App can't be installed if it contains duplicate AppRoleIds
+/// App can't be installed if it contains duplicate RoleNames
 #[tokio::test(flavor = "multi_thread")]
-async fn app_role_ids_are_unique() {
+async fn role_names_are_unique() {
     let cells = vec![
         InstalledCell::new(fixt!(CellId), "1".into()),
         InstalledCell::new(fixt!(CellId), "1".into()),
@@ -209,139 +138,46 @@ async fn app_role_ids_are_unique() {
     let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
     matches::assert_matches!(
         result,
-        Err(AppError::DuplicateAppRoleIds(_, role_ids)) if role_ids == vec!["1".to_string()]
+        Err(AppError::DuplicateRoleNames(_, role_names)) if role_names == vec!["1".to_string()]
     );
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_set_fake_state() {
-    let envs = test_environments();
+    let db_dir = test_db_dir();
     let state = ConductorState::default();
     let conductor = ConductorBuilder::new()
         .fake_state(state.clone())
-        .test(&envs, &[])
+        .test(db_dir.path(), &[])
         .await
         .unwrap();
     assert_eq!(state, conductor.get_state_from_handle().await.unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn proxy_tls_with_test_keystore() {
+async fn test_list_running_apps_for_dependent_cell_id() {
     observability::test_run().ok();
 
-    let keystore1 = spawn_test_keystore().await.unwrap();
-    let keystore2 = spawn_test_keystore().await.unwrap();
-
-    if let Err(e) = proxy_tls_inner(keystore1.clone(), keystore2.clone()).await {
-        panic!("{:#?}", e);
-    }
-
-    let _ = keystore1.shutdown().await;
-    let _ = keystore2.shutdown().await;
-}
-
-async fn proxy_tls_inner(
-    keystore1: MetaLairClient,
-    keystore2: MetaLairClient,
-) -> anyhow::Result<()> {
-    use ghost_actor::GhostControlSender;
-    use kitsune_p2p::dependencies::*;
-    use kitsune_p2p_proxy::*;
-    use kitsune_p2p_types::transport::*;
-
-    let (cert_digest, cert, cert_priv_key) = keystore1.get_or_create_first_tls_cert().await?;
-
-    let tls_config1 = TlsConfig {
-        cert,
-        cert_priv_key,
-        cert_digest,
-    };
-
-    let (cert_digest, cert, cert_priv_key) = keystore2.get_or_create_first_tls_cert().await?;
-
-    let tls_config2 = TlsConfig {
-        cert,
-        cert_priv_key,
-        cert_digest,
-    };
-
-    let proxy_config =
-        ProxyConfig::local_proxy_server(tls_config1, AcceptProxyCallback::reject_all());
-    let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-    let (bind1, mut evt1) = spawn_kitsune_proxy_listener(
-        proxy_config,
-        kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
-        bind,
-        evt,
-    )
-    .await?;
-    tokio::task::spawn(async move {
-        while let Some(evt) = evt1.next().await {
-            match evt {
-                TransportEvent::IncomingChannel(_, mut write, read) => {
-                    println!("YOOTH");
-                    let data = read.read_to_end().await;
-                    let data = String::from_utf8_lossy(&data);
-                    let data = format!("echo: {}", data);
-                    write.write_and_close(data.into_bytes()).await?;
-                }
-            }
-        }
-        TransportResult::Ok(())
-    });
-    let url1 = bind1.bound_url().await?;
-    println!("{:?}", url1);
-
-    let proxy_config =
-        ProxyConfig::local_proxy_server(tls_config2, AcceptProxyCallback::reject_all());
-    let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-    let (bind2, _evt2) = spawn_kitsune_proxy_listener(
-        proxy_config,
-        kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams::default(),
-        bind,
-        evt,
-    )
-    .await?;
-    println!("{:?}", bind2.bound_url().await?);
-
-    let (_url, mut write, read) = bind2.create_channel(url1).await?;
-    write.write_and_close(b"test".to_vec()).await?;
-    let data = read.read_to_end().await;
-    let data = String::from_utf8_lossy(&data);
-    assert_eq!("echo: test", data);
-
-    let _ = bind1.ghost_actor_shutdown_immediate().await;
-    let _ = bind2.ghost_actor_shutdown_immediate().await;
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_list_running_apps_for_cell_id() {
-    observability::test_run().ok();
-
-    let mk_dna = |name| async move {
-        let zome = InlineZome::new_unique(Vec::new());
-        SweetDnaFile::unique_from_inline_zome(name, zome)
-            .await
-            .unwrap()
+    let mk_dna = |name: &'static str| async move {
+        let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
+        SweetDnaFile::unique_from_inline_zomes((name, zome)).await
     };
 
     // Create three unique DNAs
-    let (dna1, _) = mk_dna("zome1").await;
-    let (dna2, _) = mk_dna("zome2").await;
-    let (dna3, _) = mk_dna("zome3").await;
+    let (dna1, _, _) = mk_dna("zome1").await;
+    let (dna2, _, _) = mk_dna("zome2").await;
+    let (dna3, _, _) = mk_dna("zome3").await;
 
     // Install two apps on the Conductor:
     // Both share a CellId in common, and also include a distinct CellId each.
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
     let app1 = conductor
-        .setup_app_for_agent("app1", alice.clone(), &[dna1.clone(), dna2])
+        .setup_app_for_agent("app1", alice.clone(), [&dna1, &dna2])
         .await
         .unwrap();
     let app2 = conductor
-        .setup_app_for_agent("app2", alice.clone(), &[dna1, dna3])
+        .setup_app_for_agent("app2", alice.clone(), [&dna1, &dna3])
         .await
         .unwrap();
 
@@ -350,7 +186,7 @@ async fn test_list_running_apps_for_cell_id() {
 
     let list_apps = |conductor: ConductorHandle, cell: SweetCell| async move {
         conductor
-            .list_running_apps_for_required_cell_id(cell.cell_id())
+            .list_running_apps_for_dependent_cell_id(cell.cell_id())
             .await
             .unwrap()
     };
@@ -371,16 +207,18 @@ async fn test_list_running_apps_for_cell_id() {
     );
 }
 
-async fn mk_dna(name: &str, zome: InlineZome) -> DnaResult<(DnaFile, Zome)> {
-    SweetDnaFile::unique_from_inline_zome(name, zome).await
+async fn mk_dna(
+    zomes: impl Into<InlineZomeSet>,
+) -> (DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>) {
+    SweetDnaFile::unique_from_inline_zomes(zomes.into()).await
 }
 
 /// A function that sets up a SweetApp, used in several tests in this module
 async fn common_genesis_test_app(
     conductor: &mut SweetConductor,
-    custom_zome: InlineZome,
+    custom_zomes: impl Into<InlineZomeSet>,
 ) -> ConductorApiResult<SweetApp> {
-    let hardcoded_zome = InlineZome::new_unique(Vec::new());
+    let hardcoded_zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
 
     // Just a strong reminder that we need to be careful once we start using existing Cells:
     // When a Cell panics or fails validation in general, we want to disable all Apps touching that Cell.
@@ -396,8 +234,8 @@ async fn common_genesis_test_app(
     );
 
     // Create one DNA which always works, and another from a zome that gets passed in
-    let (dna_hardcoded, _) = mk_dna("hardcoded", hardcoded_zome).await?;
-    let (dna_custom, _) = mk_dna("custom", custom_zome).await?;
+    let (dna_hardcoded, _, _) = mk_dna(("hardcoded", hardcoded_zome)).await;
+    let (dna_custom, _, _) = mk_dna(custom_zomes).await;
 
     // Install both DNAs under the same app:
     conductor
@@ -408,9 +246,11 @@ async fn common_genesis_test_app(
 #[tokio::test(flavor = "multi_thread")]
 async fn test_uninstall_app() {
     observability::test_run().ok();
-    let zome = InlineZome::new_unique(Vec::new());
+    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let mut conductor = SweetConductor::from_standard_config().await;
-    common_genesis_test_app(&mut conductor, zome).await.unwrap();
+    common_genesis_test_app(&mut conductor, ("custom", zome))
+        .await
+        .unwrap();
 
     // - Ensure that the app is active
     assert_eq_retry_10s!(
@@ -422,7 +262,7 @@ async fn test_uninstall_app() {
     );
 
     conductor
-        .inner_handle()
+        .raw_handle()
         .uninstall_app(&"app".to_string())
         .await
         .unwrap();
@@ -440,17 +280,19 @@ async fn test_uninstall_app() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reconciliation_idempotency() {
     observability::test_run().ok();
-    let zome = InlineZome::new_unique(Vec::new());
+    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let mut conductor = SweetConductor::from_standard_config().await;
-    common_genesis_test_app(&mut conductor, zome).await.unwrap();
+    common_genesis_test_app(&mut conductor, ("custom", zome))
+        .await
+        .unwrap();
 
     conductor
-        .inner_handle()
+        .raw_handle()
         .reconcile_cell_status_with_app_status()
         .await
         .unwrap();
     conductor
-        .inner_handle()
+        .raw_handle()
         .reconcile_cell_status_with_app_status()
         .await
         .unwrap();
@@ -462,22 +304,18 @@ async fn test_reconciliation_idempotency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_signing_error_during_genesis() {
     observability::test_run().ok();
-    let bad_keystore = spawn_crude_mock_keystore(|| LairError::other("test error"))
-        .await
-        .unwrap();
+    let bad_keystore = spawn_crude_mock_keystore(|| "test error".into()).await;
 
-    let envs = test_envs_with_keystore(bad_keystore);
+    let db_dir = test_db_dir();
     let config = ConductorConfig::default();
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(&envs, &config, &[]).await,
-        envs,
+        SweetConductor::handle_from_existing(db_dir.path(), bad_keystore, &config, &[]).await,
+        db_dir.into(),
         config,
     )
     .await;
 
-    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign])
-        .await
-        .unwrap();
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
     let result = conductor
         .setup_app_for_agents(&"app", &[fixt!(AgentPubKey)], &[dna])
@@ -493,127 +331,161 @@ async fn test_signing_error_during_genesis() {
     };
 
     if let ConductorApiError::ConductorError(inner) = err {
-        assert_matches!(*inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+        assert_matches!(inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
     } else {
         panic!("this should have been an error too");
     }
 }
 
-async fn make_signing_call(client: &mut WebsocketSender, cell: &SweetCell) -> AppResponse {
-    client
-        .request(AppRequest::ZomeCall(Box::new(ZomeCall {
-            cell_id: cell.cell_id().clone(),
-            zome_name: "sign".into(),
-            fn_name: "sign_ephemeral".into(),
-            payload: ExternIO::encode(()).unwrap(),
-            cap_secret: None,
-            provenance: cell.agent_pubkey().clone(),
-        })))
-        .await
-        .unwrap()
+// async fn make_signing_call(
+//     conductor: &SweetConductor,
+//     client: &mut WebsocketSender,
+//     keystore_control: &MockLairControl,
+//     cell: &SweetCell,
+// ) -> AppResponse {
+//     let reinstate_mock = keystore_control.using_mock();
+//     if reinstate_mock {
+//         keystore_control.use_real();
+//     }
+//     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+//     let request = AppRequest::CallZome(Box::new(
+//         ZomeCall::try_from_unsigned_zome_call(
+//             conductor.raw_handle().keystore(),
+//             ZomeCallUnsigned {
+//                 cell_id: cell.cell_id().clone(),
+//                 zome_name: "sign".into(),
+//                 fn_name: "sign_ephemeral".into(),
+//                 payload: ExternIO::encode(()).unwrap(),
+//                 cap_secret: None,
+//                 provenance: cell.agent_pubkey().clone(),
+//                 nonce,
+//                 expires_at,
+//             },
+//         )
+//         .await
+//         .unwrap(),
+//     ));
+//     if reinstate_mock {
+//         keystore_control.use_mock();
+//     }
+//     client.request(request).await.unwrap()
+// }
+
+// A test which simulates Keystore errors with a test keystore which is designed
+// to fail.
+//
+// This test was written making the assumption that we could swap out the
+// MetaLairClient for each Cell at runtime, but given our current concurrency
+// model which puts each Cell in an Arc, this is not possible.
+// In order to implement this test, we should probably have the "crude mock
+// keystore" listen on a channel which toggles its behavior from always-correct
+// to always-failing. However, the problem that this test is testing for does
+// not seem to be an issue, therefore I'm not putting the effort into fixing it
+// right now.
+// @todo fix test by using new InstallApp call
+// #[tokio::test(flavor = "multi_thread")]
+// async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
+//     observability::test_run().ok();
+//     let (keystore, keystore_control) = spawn_real_or_mock_keystore(|_| Err("test error".into()))
+//         .await
+//         .unwrap();
+
+//     let db_dir = test_db_dir();
+//     let config = standard_config();
+//     let mut conductor = SweetConductor::new(
+//         SweetConductor::handle_from_existing(db_dir.path(), keystore.clone(), &config, &[]).await,
+//         db_dir.into(),
+//         config,
+//     )
+//     .await;
+
+//     let (agent1, agent2, agent3) = SweetAgents::three(keystore.clone()).await;
+
+//     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
+
+//     let app1 = conductor
+//         .setup_app_for_agent("app1", agent1.clone(), &[dna.clone()])
+//         .await
+//         .unwrap();
+
+//     let app2 = conductor
+//         .setup_app_for_agent("app2", agent2.clone(), &[dna.clone()])
+//         .await
+//         .unwrap();
+
+//     let (cell1,) = app1.into_tuple();
+//     let (cell2,) = app2.into_tuple();
+
+//     let app_port = conductor
+//         .raw_handle()
+//         .add_app_interface(either::Either::Left(0))
+//         .await
+//         .unwrap();
+//     let (mut app_client, _) = websocket_client_by_port(app_port).await.unwrap();
+//     let (mut admin_client, _) = conductor.admin_ws_client().await;
+
+//     // Now use the bad keystore to cause a signing error on the next zome call
+//     keystore_control.use_mock();
+
+//     let response: AdminResponse = admin_client
+//         .request(AdminRequest::InstallApp(Box::new(InstallAppPayload {
+//             installed_app_id: "app3".into(),
+//             agent_key: agent3.clone(),
+//             dnas: vec![InstallAppDnaPayload {
+//                 role_name: "whatever".into(),
+//                 hash: dna.dna_hash().clone(),
+//                 membrane_proof: None,
+//             }],
+//         })))
+//         .await
+//         .unwrap();
+
+// assert_matches!(response, AdminResponse::Error(_));
+// let response = make_signing_call(&conductor, &mut app_client, &keystore_control, &cell2).await;
+
+//     assert_matches!(response, AppResponse::Error(_));
+
+//     // Go back to the good keystore, see if we can proceed
+//     keystore_control.use_real();
+
+// let response = make_signing_call(&conductor, &mut app_client, &keystore_control, &cell2).await;
+// assert_matches!(response, AppResponse::ZomeCall(_));
+
+// let response = make_signing_call(&conductor, &mut app_client, &keystore_control, &cell1).await;
+// assert_matches!(response, AppResponse::ZomeCall(_));
+// }
+
+pub(crate) fn simple_create_entry_zome() -> InlineIntegrityZome {
+    let unit_entry_def = EntryDef::from_id("unit");
+    InlineIntegrityZome::new_unique(vec![unit_entry_def.clone()], 0)
+        .function("create", move |api, ()| {
+            let entry = Entry::app(().try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        .function("get", move |api, hash: ActionHash| {
+            let record = api
+                .get(vec![GetInput::new(hash.into(), Default::default())])?
+                .pop()
+                .unwrap();
+
+            Ok(record)
+        })
 }
 
-/// A test which simulates Keystore errors with a test keystore which is designed
-/// to fail.
-///
-/// This test was written making the assumption that we could swap out the
-/// MetaLairClient for each Cell at runtime, but given our current concurrency
-/// model which puts each Cell in an Arc, this is not possible.
-/// In order to implement this test, we should probably have the "crude mock
-/// keystore" listen on a channel which toggles its behavior from always-correct
-/// to always-failing. However, the problem that this test is testing for does
-/// not seem to be an issue, therefore I'm not putting the effort into fixing it
-/// right now.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
-    observability::test_run().ok();
-    let (keystore, keystore_control) = spawn_real_or_mock_keystore(|_| Err("test error".into()))
-        .await
-        .unwrap();
-
-    let envs = test_envs_with_keystore(keystore.clone());
-    let config = standard_config();
-    let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(&envs, &config, &[]).await,
-        envs,
-        config,
-    )
-    .await;
-
-    let (agent1, agent2, agent3) = SweetAgents::three(keystore.clone()).await;
-
-    let (dna, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign])
-        .await
-        .unwrap();
-
-    let app1 = conductor
-        .setup_app_for_agent("app1", agent1.clone(), &[dna.clone()])
-        .await
-        .unwrap();
-
-    let app2 = conductor
-        .setup_app_for_agent("app2", agent2.clone(), &[dna.clone()])
-        .await
-        .unwrap();
-
-    let (cell1,) = app1.into_tuple();
-    let (cell2,) = app2.into_tuple();
-
-    let app_port = conductor.inner_handle().add_app_interface(0).await.unwrap();
-    let (mut app_client, _) = websocket_client_by_port(app_port).await.unwrap();
-    let (mut admin_client, _) = conductor.admin_ws_client().await;
-
-    // Now use the bad keystore to cause a signing error on the next zome call
-    keystore_control.use_mock();
-
-    let response: AdminResponse = admin_client
-        .request(AdminRequest::InstallApp(Box::new(InstallAppPayload {
-            installed_app_id: "app3".into(),
-            agent_key: agent3.clone(),
-            dnas: vec![InstallAppDnaPayload {
-                role_id: "whatever".into(),
-                hash: dna.dna_hash().clone(),
-                membrane_proof: None,
-            }],
-        })))
-        .await
-        .unwrap();
-
-    assert_matches!(response, AdminResponse::Error(_));
-    let response = make_signing_call(&mut app_client, &cell2).await;
-
-    assert_matches!(response, AppResponse::Error(_));
-
-    // Go back to the good keystore, see if we can proceed
-    keystore_control.use_real();
-
-    let response = make_signing_call(&mut app_client, &cell2).await;
-    assert_matches!(response, AppResponse::ZomeCall(_));
-
-    let response = make_signing_call(&mut app_client, &cell1).await;
-    assert_matches!(response, AppResponse::ZomeCall(_));
-}
-
-pub(crate) fn simple_create_entry_zome() -> InlineZome {
-    let unit_entry_def = EntryDef::default_with_id("unit");
-    InlineZome::new_unique(vec![unit_entry_def.clone()]).callback("create", move |api, ()| {
-        let entry_def_id: EntryDefId = unit_entry_def.id.clone();
-        let entry = Entry::app(().try_into().unwrap()).unwrap();
-        let hash = api.create(CreateInput::new(
-            entry_def_id,
-            entry,
-            ChainTopOrdering::default(),
-        ))?;
-        Ok(hash)
-    })
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_reenable_app() {
+async fn test_enable_disable_enable_app() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let app = common_genesis_test_app(&mut conductor, zome).await.unwrap();
+    let app = common_genesis_test_app(&mut conductor, ("zome", zome))
+        .await
+        .unwrap();
 
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
@@ -628,8 +500,15 @@ async fn test_reenable_app() {
         .unwrap();
     assert_eq!(inactive_apps.len(), 0);
     assert_eq!(active_apps.len(), 1);
-    assert_eq!(active_apps[0].cell_data.len(), 2);
-    assert_matches!(active_apps[0].status, InstalledAppInfoStatus::Running);
+    assert_eq!(active_apps[0].cell_info.len(), 2);
+    assert_matches!(active_apps[0].status, AppInfoStatus::Running);
+
+    let (_, cell) = app.into_tuple();
+
+    let hash: ActionHash = conductor
+        .call_fallible(&cell.zome("zome"), "create", ())
+        .await
+        .unwrap();
 
     conductor
         .disable_app("app".to_string(), DisabledAppReason::User)
@@ -646,28 +525,27 @@ async fn test_reenable_app() {
         .unwrap();
     assert_eq!(active_apps.len(), 0);
     assert_eq!(inactive_apps.len(), 1);
-    assert_eq!(inactive_apps[0].cell_data.len(), 2);
+    assert_eq!(inactive_apps[0].cell_info.len(), 2);
     assert_matches!(
         inactive_apps[0].status,
-        InstalledAppInfoStatus::Disabled {
+        AppInfoStatus::Disabled {
             reason: DisabledAppReason::User
         }
     );
 
-    conductor.enable_app("app".to_string()).await.unwrap();
-    conductor
-        .inner_handle()
-        .reconcile_cell_status_with_app_status()
+    // - We can't make a zome call while disabled
+    assert!(conductor
+        .call_fallible::<_, Option<Record>, _>(&cell.zome("zome"), "get", hash.clone())
         .await
-        .unwrap();
+        .is_err());
 
-    let (_, cell) = app.into_tuple();
+    conductor.enable_app("app".to_string()).await.unwrap();
 
     // - We can still make a zome call after reactivation
-    let _: HeaderHash = conductor
-        .call_fallible(&cell.zome("custom"), "create", ())
+    assert!(conductor
+        .call_fallible::<_, Option<Record>, _>(&cell.zome("zome"), "get", hash.clone())
         .await
-        .unwrap();
+        .is_ok());
 
     // - Ensure that the app is active
 
@@ -685,9 +563,112 @@ async fn test_reenable_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_enable_disable_enable_clone_cell() {
+    observability::test_run().ok();
+    let zome = simple_create_entry_zome();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = common_genesis_test_app(&mut conductor, ("zome", zome))
+        .await
+        .unwrap();
+    let app_id = app.installed_app_id().clone();
+
+    let (clone, role_name) = {
+        let (_, cell) = app.into_tuple();
+        let role_name = cell.cell_id().dna_hash().to_string();
+
+        let clone = conductor
+            .create_clone_cell(CreateCloneCellPayload {
+                app_id: app_id.clone(),
+                role_name: role_name.clone(),
+                modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
+                membrane_proof: None,
+                name: None,
+            })
+            .await
+            .unwrap();
+
+        (clone, role_name)
+    };
+    let zome = SweetZome::new(clone.cell_id.clone(), "zome".into());
+    let hash: ActionHash = conductor.call(&zome, "create", ()).await;
+
+    let clone_cell_id = CloneCellId::CloneId(clone.clone_id);
+    conductor
+        .disable_clone_cell(&DisableCloneCellPayload {
+            app_id: app_id.clone(),
+            clone_cell_id: clone_cell_id.clone(),
+        })
+        .await
+        .unwrap();
+
+    // - should not be able to call a zome fn on a disabled clone cell
+    let result: Result<Option<Record>, _> =
+        conductor.call_fallible(&zome, "get", hash.clone()).await;
+
+    assert!(matches!(
+        result,
+        Err(ConductorApiError::ConductorError(
+            ConductorError::CellMissing(_)
+        ))
+    ));
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    {
+        // - cell should still be disabled after restart
+        let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+        let cell = unwrap_cell_info_clone(app_info.cell_info.get(&role_name).unwrap()[1].clone());
+        assert!(!cell.enabled);
+    }
+    {
+        // - should *still* not be able to call a zome fn on a disabled clone cell after restart
+        let result: Result<Option<Record>, _> =
+            conductor.call_fallible(&zome, "get", hash.clone()).await;
+        assert!(matches!(
+            result,
+            Err(ConductorApiError::ConductorError(
+                ConductorError::CellMissing(_)
+            ))
+        ));
+    }
+
+    conductor
+        .raw_handle()
+        .enable_clone_cell(&EnableCloneCellPayload {
+            app_id: app_id.clone(),
+            clone_cell_id,
+        })
+        .await
+        .unwrap();
+
+    {
+        // - cell should still be enabled now
+        let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+        let cell = unwrap_cell_info_clone(app_info.cell_info.get(&role_name).unwrap()[1].clone());
+        assert!(cell.enabled);
+    }
+    {
+        // - can call clone again
+        let _: Option<Record> = conductor
+            .call_fallible(&zome, "get", hash)
+            .await
+            .expect("can call zome fn now");
+    }
+}
+
+fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_conductor_api::ClonedCell {
+    match cell_info {
+        CellInfo::Cloned(cell) => cell,
+        _ => panic!("wrong cell type: {:?}", cell_info),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_installation_fails_if_genesis_self_check_is_invalid() {
     observability::test_run().ok();
-    let bad_zome = InlineZome::new_unique(Vec::new()).callback(
+    let bad_zome = InlineZomeSet::new_unique_single("integrity", "custom", Vec::new(), 0).function(
+        "integrity",
         "genesis_self_check",
         |_api, _data: GenesisSelfCheckData| {
             Ok(GenesisSelfCheckResult::Invalid(
@@ -704,7 +685,7 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
     };
 
     if let ConductorApiError::ConductorError(inner) = err {
-        assert_matches!(*inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
+        assert_matches!(inner, ConductorError::GenesisFailed { errors } if errors.len() == 1);
     } else {
         panic!("this should have been an error too");
     }
@@ -713,23 +694,29 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     observability::test_run().ok();
-    let unit_entry_def = EntryDef::default_with_id("unit");
-    let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
-        .callback("validate_create_entry", |_api, _data: ValidateData| {
-            Ok(ValidateResult::Invalid(
-                "intentional invalid result for testing".into(),
-            ))
-        })
-        .callback("create", move |api, ()| {
-            let entry_def_id: EntryDefId = unit_entry_def.id.clone();
-            let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                entry_def_id,
-                entry,
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        });
+    let unit_entry_def = EntryDef::from_id("unit");
+    let bad_zome =
+        InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
+            .function("integrity", "validate", |_api, op: Op| match op {
+                Op::StoreEntry(StoreEntry { action, .. })
+                    if action.hashed.content.app_entry_def().is_some() =>
+                {
+                    Ok(ValidateResult::Invalid(
+                        "intentional invalid result for testing".into(),
+                    ))
+                }
+                _ => Ok(ValidateResult::Valid),
+            })
+            .function("custom", "create", move |api, ()| {
+                let entry = Entry::app(().try_into().unwrap()).unwrap();
+                let hash = api.create(CreateInput::new(
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                    EntryVisibility::Public,
+                    entry,
+                    ChainTopOrdering::default(),
+                ))?;
+                Ok(hash)
+            });
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = common_genesis_test_app(&mut conductor, bad_zome)
@@ -738,7 +725,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 
     let (_, cell_bad) = app.into_tuple();
 
-    let result: ConductorApiResult<HeaderHash> = conductor
+    let result: ConductorApiResult<ActionHash> = conductor
         .call_fallible(&cell_bad.zome("custom"), "create", ())
         .await;
 
@@ -760,31 +747,39 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 //   Otherwise, we have to devise a way to discover whether a panic happened
 //   during genesis or not.
 // NOTE: we need a test with a failure during a validation callback that happens
-//       *inline*. It's not enough to have a failing validate_create_entry for
+//       *inline*. It's not enough to have a failing validate for
 //       instance, because that failure will be returned by the zome call.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "need to figure out how to write this test, i.e. to make genesis panic"]
 async fn test_apps_disable_on_panic_after_genesis() {
     observability::test_run().ok();
-    let unit_entry_def = EntryDef::default_with_id("unit");
-    let bad_zome = InlineZome::new_unique(vec![unit_entry_def.clone()])
-        // We need a different validation callback that doesn't happen inline
-        // so we can cause failure in it. But it must also be after genesis.
-        .callback("validate_create_entry", |_api, _data: ValidateData| {
-            // Trigger a deserialization error
-            let _: Entry = SerializedBytes::try_from(())?.try_into()?;
-            Ok(ValidateResult::Valid)
-        })
-        .callback("create", move |api, ()| {
-            let entry_def_id: EntryDefId = unit_entry_def.id.clone();
-            let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create(CreateInput::new(
-                entry_def_id,
-                entry,
-                ChainTopOrdering::default(),
-            ))?;
-            Ok(hash)
-        });
+    let unit_entry_def = EntryDef::from_id("unit");
+    let bad_zome =
+        InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
+            // We need a different validation callback that doesn't happen inline
+            // so we can cause failure in it. But it must also be after genesis.
+            .function("integrity", "validate", |_api, op: Op| {
+                match op {
+                    Op::StoreEntry(StoreEntry { action, .. })
+                        if action.hashed.content.app_entry_def().is_some() =>
+                    {
+                        // Trigger a deserialization error
+                        let _: Entry = SerializedBytes::try_from(())?.try_into()?;
+                        Ok(ValidateResult::Valid)
+                    }
+                    _ => Ok(ValidateResult::Valid),
+                }
+            })
+            .function("custom", "create", move |api, ()| {
+                let entry = Entry::app(().try_into().unwrap()).unwrap();
+                let hash = api.create(CreateInput::new(
+                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                    EntryVisibility::Public,
+                    entry,
+                    ChainTopOrdering::default(),
+                ))?;
+                Ok(hash)
+            });
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = common_genesis_test_app(&mut conductor, bad_zome)
@@ -793,7 +788,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
 
     let (_, cell_bad) = app.into_tuple();
 
-    let _: ConductorApiResult<HeaderHash> = conductor
+    let _: ConductorApiResult<ActionHash> = conductor
         .call_fallible(&cell_bad.zome("custom"), "create", ())
         .await;
 
@@ -811,7 +806,9 @@ async fn test_app_status_states() {
     observability::test_run().ok();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
-    common_genesis_test_app(&mut conductor, zome).await.unwrap();
+    common_genesis_test_app(&mut conductor, ("zome", zome))
+        .await
+        .unwrap();
 
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
@@ -824,12 +821,12 @@ async fn test_app_status_states() {
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
 
     // PAUSED  --start->  RUNNING
 
     conductor.start_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Running);
 
     // RUNNING  --disable->  DISABLED
 
@@ -837,12 +834,12 @@ async fn test_app_status_states() {
         .disable_app("app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --start->  DISABLED
 
     conductor.start_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --pause->  DISABLED
 
@@ -850,12 +847,12 @@ async fn test_app_status_states() {
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Disabled { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --enable->  ENABLED
 
     conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Running);
 
     // RUNNING  --pause->  PAUSED
 
@@ -863,12 +860,12 @@ async fn test_app_status_states() {
         .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
         .await
         .unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Paused { .. });
+    assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
 
     // PAUSED  --enable->  RUNNING
 
     conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, InstalledAppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Running);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -883,11 +880,11 @@ async fn test_cell_and_app_status_reconciliation() {
     use AppStatusFx::*;
     use AppStatusKind::*;
     use CellStatus::*;
-    let mk_zome = || InlineZome::new_unique(Vec::new());
+    let mk_zome = || ("zome", InlineIntegrityZome::new_unique(Vec::new(), 0));
     let dnas = [
-        mk_dna("zome", mk_zome()).await.unwrap().0,
-        mk_dna("zome", mk_zome()).await.unwrap().0,
-        mk_dna("zome", mk_zome()).await.unwrap().0,
+        mk_dna(mk_zome()).await.0,
+        mk_dna(mk_zome()).await.0,
+        mk_dna(mk_zome()).await.0,
     ];
     let app_id = "app".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -955,8 +952,8 @@ async fn test_cell_and_app_status_reconciliation() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_app_status_filters() {
     observability::test_run().ok();
-    let zome = InlineZome::new_unique(Vec::new());
-    let dnas = [mk_dna("dna", zome).await.unwrap().0];
+    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
+    let dnas = [mk_dna(("dna", zome)).await.0];
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
@@ -1028,17 +1025,17 @@ async fn test_init_concurrency() {
     let num_inits_clone = num_inits.clone();
     let num_calls_clone = num_calls.clone();
 
-    let zome = InlineZome::new_unique(vec![])
-        .callback("init", move |_, ()| {
+    let zome = InlineZomeSet::new_unique_single("integrity", "zome", vec![], 0)
+        .function("zome", "init", move |_, ()| {
             num_inits.clone().fetch_add(1, Ordering::SeqCst);
             Ok(InitCallbackResult::Pass)
         })
-        .callback("zomefunc", move |_, ()| {
+        .function("zome", "zomefunc", move |_, ()| {
             std::thread::sleep(std::time::Duration::from_millis(5));
             num_calls.clone().fetch_add(1, Ordering::SeqCst);
             Ok(())
         });
-    let dnas = [mk_dna("zome", zome).await.unwrap().0];
+    let dnas = [mk_dna(zome).await.0];
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("app", &dnas).await.unwrap();
     let (cell,) = app.into_tuple();
@@ -1051,7 +1048,6 @@ async fn test_init_concurrency() {
         let zome = cell.zome("zome");
         let num_iters = num_iters.clone();
         tokio::spawn(async move {
-            println!("i: {:?}", _i);
             num_iters.fetch_add(1, Ordering::SeqCst);
             let _: () = conductor.call(&zome, "zomefunc", ()).await;
         })

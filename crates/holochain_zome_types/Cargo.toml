@@ -1,41 +1,42 @@
 [package]
 name = "holochain_zome_types"
-version = "0.0.24"
+version = "0.1.0-beta-rc.2"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_zome_types"
 readme = "README.md"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = "0.4.6"
-kitsune_p2p_timestamp = { version = "0.0.5", path = "../kitsune_p2p/timestamp" }
-holo_hash = { version = "0.0.19", path = "../holo_hash" }
+kitsune_p2p_timestamp = { version = "^0.1.0-beta-rc.1", path = "../kitsune_p2p/timestamp" }
+holo_hash = { version = "^0.1.0-beta-rc.1", path = "../holo_hash", features = ["encoding"] }
+holochain_integrity_types = { version = "^0.1.0-beta-rc.2", path = "../holochain_integrity_types", features = ["tracing"] }
 holochain_serialized_bytes = "=0.0.51"
 paste = "=1.0.5"
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = "1.0", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
-serde_yaml = { version = "0.8", optional = true }
+serde_yaml = { version = "0.9", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.77"
+holochain_wasmer_common = "=0.0.82"
 
 # fixturator dependencies
-fixt = { version = "0.0.8", path = "../fixt", optional = true }
+fixt = { version = "^0.1.0-beta-rc.1", path = "../fixt", optional = true }
 strum = { version = "0.18.0", optional = true }
-rand = {version = "0.7", optional = true}
+rand = { version = "0.8.5", optional = true }
 
 # sqlite dependencies
-rusqlite = { version = "0.26", optional = true }
+rusqlite = { version = "0.28", optional = true }
 num_enum = { version = "0.5", optional = true }
 
 # full-dna-def dependencies
 derive_builder = { version = "0.9", optional = true }
+kitsune_p2p_dht = { version = "^0.1.0-beta-rc.1", path = "../kitsune_p2p/dht", optional = true }
 nanoid = { version = "0.3", optional = true }
 shrinkwraprs = { version = "0.3", optional = true }
 
@@ -58,11 +59,11 @@ default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
 
 # Extra impls for DnaDef, including InlineZome, which are not used in Wasm
 # but used in Holochain
-full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
+full-dna-def = ["derive_builder", "kitsune_p2p_dht", "nanoid", "shrinkwraprs"]
 
 full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full", "properties"]
 
-fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", ]
+fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", "holochain_integrity_types/test_utils", "full-dna-def"]
 
 properties = ["serde_yaml"]
 
@@ -77,5 +78,6 @@ test_utils = [
   "holo_hash/hashing",
   "holo_hash/test_utils",
   "holochain_serialized_bytes/arbitrary",
-  "full-dna-def"
+  "full-dna-def",
+  "holochain_integrity_types/test_utils",
 ]

@@ -1,19 +1,25 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 // TODO [ B-03669 ] move to own crate
 
-use super::{SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorHandle};
-use crate::conductor::{
-    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult,
-    handle::ConductorHandle, CellError, Conductor, ConductorBuilder,
+use super::{
+    SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig, SweetConductorHandle,
 };
+use crate::conductor::state::AppInterfaceId;
+use crate::conductor::ConductorHandle;
+use crate::conductor::{
+    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, space::Spaces,
+    CellError, Conductor, ConductorBuilder,
+};
+use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
-use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_keystore::MetaLairClient;
-use holochain_state::test_utils::{test_environments, TestEnvs};
+use holochain_state::prelude::test_db_dir;
+use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_websocket::*;
-use kitsune_p2p::KitsuneP2pConfig;
+use rand::Rng;
+use std::path::Path;
 use std::sync::Arc;
 
 /// A stream of signals.
@@ -28,7 +34,9 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 #[derive(derive_more::From)]
 pub struct SweetConductor {
     handle: Option<SweetConductorHandle>,
-    envs: TestEnvs,
+    db_dir: TestDir,
+    keystore: MetaLairClient,
+    pub(crate) spaces: Spaces,
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
@@ -36,44 +44,69 @@ pub struct SweetConductor {
 
 /// Standard config for SweetConductors
 pub fn standard_config() -> ConductorConfig {
-    let mut network = KitsuneP2pConfig::default();
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    let admin_interface = AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket { port: 0 },
-    };
-    ConductorConfig {
-        network: Some(network),
-        admin_interfaces: Some(vec![admin_interface]),
-        ..Default::default()
+    SweetConductorConfig::standard().into()
+}
+
+/// A DnaFile with a role name assigned
+pub struct DnaWithRole {
+    role: RoleName,
+    dna: DnaFile,
+}
+
+impl From<DnaFile> for DnaWithRole {
+    fn from(dna: DnaFile) -> Self {
+        Self {
+            // Assign a dummy unique throwaway role
+            role: format!("{}", dna.dna_hash()),
+            dna,
+        }
+    }
+}
+
+impl From<(RoleName, DnaFile)> for DnaWithRole {
+    fn from((role, dna): (RoleName, DnaFile)) -> Self {
+        Self { role, dna }
     }
 }
 
 impl SweetConductor {
     /// Create a SweetConductor from an already-built ConductorHandle and environments
-    /// DnaStore
+    /// RibosomeStore
     /// The conductor will be supplied with a single test AppInterface named
     /// "sweet-interface" so that signals may be emitted
     pub async fn new(
         handle: ConductorHandle,
-        envs: TestEnvs,
+        env_dir: TestDir,
         config: ConductorConfig,
     ) -> SweetConductor {
         // Automatically add a test app interface
         handle
-            .add_test_app_interface(Default::default())
+            .add_test_app_interface(AppInterfaceId::default())
             .await
             .expect("Couldn't set up test app interface");
 
         // Get a stream of all signals since conductor startup
-        let signal_stream = handle.signal_broadcaster().await.subscribe_merged();
+        let signal_stream = handle.signal_broadcaster().subscribe_merged();
+
+        // XXX: this is a bit wonky.
+        // We create a Spaces instance here purely because it's easier to initialize
+        // the per-space databases this way. However, we actually use the TestEnvs
+        // to actually access those databases.
+        // As a TODO, we can remove the need for TestEnvs in sweettest or have
+        // some other better integration between the two.
+        let spaces = Spaces::new(&ConductorConfig {
+            environment_path: env_dir.to_path_buf().into(),
+            ..Default::default()
+        })
+        .unwrap();
+
+        let keystore = handle.keystore().clone();
 
         Self {
             handle: Some(SweetConductorHandle(handle)),
-            envs,
+            db_dir: env_dir,
+            keystore,
+            spaces,
             config,
             dnas: Vec::new(),
             signal_stream: Some(Box::new(signal_stream)),
@@ -81,31 +114,33 @@ impl SweetConductor {
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config(config: ConductorConfig) -> SweetConductor {
-        let envs = test_environments();
-        let handle = Self::handle_from_existing(&envs, &config, &[]).await;
-        Self::new(handle, envs, config).await
+    pub async fn from_config<C: Into<ConductorConfig>>(config: C) -> SweetConductor {
+        let config = config.into();
+        let dir = TestDir::new(test_db_dir());
+        let handle = Self::handle_from_existing(&dir, test_keystore(), &config, &[]).await;
+        Self::new(handle, dir, config).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
-    pub async fn from_builder<DS: DnaStore + 'static>(
-        builder: ConductorBuilder<DS>,
-    ) -> SweetConductor {
-        let envs = test_environments();
+    pub async fn from_builder(builder: ConductorBuilder) -> SweetConductor {
+        let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
-        let handle = builder.test(&envs, &[]).await.unwrap();
-        Self::new(handle, envs, config).await
+        let handle = builder.test(&db_dir, &[]).await.unwrap();
+        Self::new(handle, db_dir, config).await
     }
 
     /// Create a handle from an existing environment and config
     pub async fn handle_from_existing(
-        envs: &TestEnvs,
+        db_dir: &Path,
+        keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
     ) -> ConductorHandle {
         Conductor::builder()
             .config(config.clone())
-            .test(envs, extra_dnas)
+            .with_keystore(keystore)
+            .no_print_setup()
+            .test(db_dir, extra_dnas)
             .await
             .unwrap()
     }
@@ -115,14 +150,20 @@ impl SweetConductor {
         Self::from_config(standard_config()).await
     }
 
-    /// Access the TestEnvs for this conductor
-    pub fn envs(&self) -> &TestEnvs {
-        &self.envs
+    /// Access the database path for this conductor
+    pub fn db_path(&self) -> &Path {
+        &self.db_dir
+    }
+
+    /// Make the temp db dir persistent
+    pub fn persist(&mut self) -> &Path {
+        self.db_dir.persist();
+        &self.db_dir
     }
 
     /// Access the MetaLairClient for this conductor
     pub fn keystore(&self) -> MetaLairClient {
-        self.envs.keystore().clone()
+        self.keystore.clone()
     }
 
     /// Convenience function that uses the internal handle to enable an app
@@ -130,7 +171,7 @@ impl SweetConductor {
         &self,
         id: InstalledAppId,
     ) -> ConductorResult<(InstalledApp, Vec<(CellId, CellError)>)> {
-        self.handle().0.enable_app(id).await
+        self.raw_handle().enable_app(id).await
     }
 
     /// Convenience function that uses the internal handle to disable an app
@@ -139,12 +180,12 @@ impl SweetConductor {
         id: InstalledAppId,
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp> {
-        self.handle().0.disable_app(id, reason).await
+        self.raw_handle().disable_app(id, reason).await
     }
 
     /// Convenience function that uses the internal handle to start an app
     pub async fn start_app(&self, id: InstalledAppId) -> ConductorResult<InstalledApp> {
-        self.handle().0.start_app(id).await
+        self.raw_handle().start_app(id).await
     }
 
     /// Convenience function that uses the internal handle to pause an app
@@ -153,7 +194,7 @@ impl SweetConductor {
         id: InstalledAppId,
         reason: PausedAppReason,
     ) -> ConductorResult<InstalledApp> {
-        self.handle().0.pause_app(id, reason).await
+        self.raw_handle().pause_app(id, reason).await
     }
 
     /// Install the dna first.
@@ -174,25 +215,22 @@ impl SweetConductor {
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
-        dna_files: &[&DnaFile],
+        roles: &[DnaWithRole],
     ) -> ConductorApiResult<()> {
         let installed_app_id = installed_app_id.to_string();
 
-        let installed_cells = dna_files
+        let installed_cells = roles
             .iter()
-            .map(|&dna| {
-                let cell_handle = format!("{}", dna.dna_hash());
-                let cell_id = CellId::new(dna.dna_hash().clone(), agent.clone());
-                (InstalledCell::new(cell_id, cell_handle), None)
+            .map(|r| {
+                let cell_id = CellId::new(r.dna.dna_hash().clone(), agent.clone());
+                (InstalledCell::new(cell_id, r.role.clone()), None)
             })
             .collect();
-        self.handle()
-            .0
-            .clone()
+        self.raw_handle()
             .install_app(installed_app_id.clone(), installed_cells)
             .await?;
 
-        self.handle().0.clone().enable_app(installed_app_id).await?;
+        self.raw_handle().enable_app(installed_app_id).await?;
         Ok(())
     }
 
@@ -209,98 +247,108 @@ impl SweetConductor {
     ) -> ConductorApiResult<SweetApp> {
         let mut sweet_cells = Vec::new();
         for dna_hash in dna_hashes {
-            let cell_authored_env = self.handle().0.get_authored_env(&dna_hash)?;
-            let cell_dht_env = self.handle().0.get_dht_env(&dna_hash)?;
-            let cell_id = CellId::new(dna_hash, agent.clone());
-            let cell = SweetCell {
-                cell_id,
-                cell_authored_env,
-                cell_dht_env,
-            };
-            sweet_cells.push(cell);
+            // Initialize per-space databases
+            let _space = self.spaces.get_or_create_space(&dna_hash)?;
+
+            // Create and add the SweetCell
+            sweet_cells.push(self.get_sweet_cell(CellId::new(dna_hash, agent.clone()))?);
         }
 
         Ok(SweetApp::new(installed_app_id.into(), sweet_cells))
     }
 
+    /// Construct a SweetCell for a cell which has already been created
+    pub fn get_sweet_cell(&self, cell_id: CellId) -> ConductorApiResult<SweetCell> {
+        let (dna_hash, agent) = cell_id.into_dna_and_agent();
+        let cell_authored_db = self.raw_handle().get_authored_db(&dna_hash)?;
+        let cell_dht_db = self.raw_handle().get_dht_db(&dna_hash)?;
+        let cell_id = CellId::new(dna_hash, agent);
+        Ok(SweetCell {
+            cell_id,
+            cell_authored_db,
+            cell_dht_db,
+        })
+    }
+
     /// Opinionated app setup.
     /// Creates an app for the given agent, using the given DnaFiles, with no extra configuration.
-    pub async fn setup_app_for_agent<'a, D>(
+    pub async fn setup_app_for_agent<'a, R, D>(
         &mut self,
         installed_app_id: &str,
         agent: AgentPubKey,
-        dna_files: D,
+        roles: D,
     ) -> ConductorApiResult<SweetApp>
     where
-        D: IntoIterator<Item = &'a DnaFile>,
+        R: Into<DnaWithRole> + Clone + 'a,
+        D: IntoIterator<Item = &'a R>,
     {
-        let dna_files: Vec<_> = dna_files.into_iter().collect();
-        self.setup_app_1_register_dna(dna_files.as_slice()).await?;
-        self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), dna_files.as_slice())
+        let roles: Vec<DnaWithRole> = roles.into_iter().cloned().map(Into::into).collect();
+        let dnas = roles.iter().map(|r| &r.dna).collect::<Vec<_>>();
+        self.setup_app_1_register_dna(&dnas).await?;
+        self.setup_app_2_install_and_enable(installed_app_id, agent.clone(), roles.as_slice())
             .await?;
 
-        self.handle()
-            .0
-            .clone()
+        self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
 
-        let dna_files = dna_files.iter().map(|d| d.dna_hash().clone());
-        self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_files)
+        let dna_hashes = roles.iter().map(|r| r.dna.dna_hash().clone());
+        self.setup_app_3_create_sweet_app(installed_app_id, agent, dna_hashes)
             .await
     }
 
     /// Opinionated app setup.
     /// Creates an app using the given DnaFiles, with no extra configuration.
     /// An AgentPubKey will be generated, and is accessible via the returned SweetApp.
-    pub async fn setup_app<'a, D>(
+    pub async fn setup_app<'a, R, D>(
         &mut self,
         installed_app_id: &str,
-        dna_files: D,
+        dnas: D,
     ) -> ConductorApiResult<SweetApp>
     where
-        D: IntoIterator<Item = &'a DnaFile>,
+        R: Into<DnaWithRole> + Clone + 'a,
+        D: IntoIterator<Item = &'a R> + Clone,
     {
         let agent = SweetAgents::one(self.keystore()).await;
-        self.setup_app_for_agent(installed_app_id, agent, dna_files)
+        self.setup_app_for_agent(installed_app_id, agent, dnas.clone())
             .await
     }
 
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
-    /// All InstalledAppIds and AppRoleIds are auto-generated. In tests driven directly
+    /// All InstalledAppIds and RoleNames are auto-generated. In tests driven directly
     /// by Rust, you typically won't care what these values are set to, but in case you
     /// do, they are set as so:
     /// - InstalledAppId: {app_id_prefix}-{agent_pub_key}
-    /// - AppRoleId: {dna_hash}
+    /// - RoleName: {dna_hash}
     ///
     /// Returns a batch of SweetApps, sorted in the same order as Agents passed in.
-    pub async fn setup_app_for_agents<'a, A, D>(
+    pub async fn setup_app_for_agents<'a, A, R, D>(
         &mut self,
         app_id_prefix: &str,
         agents: A,
-        dna_files: D,
+        roles: D,
     ) -> ConductorApiResult<SweetAppBatch>
     where
         A: IntoIterator<Item = &'a AgentPubKey>,
-        D: IntoIterator<Item = &'a DnaFile>,
+        R: Into<DnaWithRole> + Clone + 'a,
+        D: IntoIterator<Item = &'a R>,
     {
         let agents: Vec<_> = agents.into_iter().collect();
-        let dna_files: Vec<_> = dna_files.into_iter().collect();
-        self.setup_app_1_register_dna(dna_files.as_slice()).await?;
+        let roles: Vec<DnaWithRole> = roles.into_iter().cloned().map(Into::into).collect();
+        let dnas: Vec<&DnaFile> = roles.iter().map(|r| &r.dna).collect();
+        self.setup_app_1_register_dna(dnas.as_slice()).await?;
         for &agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             self.setup_app_2_install_and_enable(
                 &installed_app_id,
                 agent.to_owned(),
-                dna_files.as_slice(),
+                roles.as_slice(),
             )
             .await?;
         }
 
-        self.handle()
-            .0
-            .clone()
+        self.raw_handle()
             .reconcile_cell_status_with_app_status()
             .await?;
 
@@ -311,7 +359,7 @@ impl SweetConductor {
                 self.setup_app_3_create_sweet_app(
                     &installed_app_id,
                     agent.clone(),
-                    dna_files.iter().map(|d| d.dna_hash().clone()),
+                    roles.iter().map(|r| r.dna.dna_hash().clone()),
                 )
                 .await?,
             );
@@ -320,12 +368,24 @@ impl SweetConductor {
         Ok(SweetAppBatch(apps))
     }
 
+    /// Call into the underlying create_clone_cell function, and register the
+    /// created dna with SweetConductor so it will be reloaded on restart.
+    pub async fn create_clone_cell(
+        &mut self,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorApiResult<holochain_conductor_api::ClonedCell> {
+        let clone = self.raw_handle().create_clone_cell(payload).await?;
+        let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
+        self.dnas.push(dna_file);
+        Ok(clone)
+    }
+
     /// Get a stream of all Signals emitted on the "sweet-interface" AppInterface.
     ///
     /// This is designed to crash if called more than once, because as currently
     /// implemented, creating multiple signal streams would simply cause multiple
     /// consumers of the same underlying streams, not a fresh subscription
-    pub fn signals(&mut self) -> impl tokio_stream::Stream<Item = Signal> {
+    pub fn signals(&mut self) -> SignalStream {
         self.signal_stream
             .take()
             .expect("Can't take the SweetConductor signal stream twice")
@@ -348,7 +408,7 @@ impl SweetConductor {
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
         if let Some(handle) = self.handle.take() {
-            handle.shutdown_and_wait().await;
+            handle.shutdown().await.unwrap().unwrap();
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }
@@ -358,7 +418,13 @@ impl SweetConductor {
     pub async fn startup(&mut self) {
         if self.handle.is_none() {
             self.handle = Some(SweetConductorHandle(
-                Self::handle_from_existing(&self.envs, &self.config, self.dnas.as_slice()).await,
+                Self::handle_from_existing(
+                    &self.db_dir,
+                    self.keystore.clone(),
+                    &self.config,
+                    self.dnas.as_slice(),
+                )
+                .await,
             ));
         } else {
             panic!("Attempted to start conductor which was already started");
@@ -371,7 +437,8 @@ impl SweetConductor {
     }
 
     // NB: keep this private to prevent leaking out owned references
-    fn handle(&self) -> SweetConductorHandle {
+    #[allow(dead_code)]
+    fn sweet_handle(&self) -> SweetConductorHandle {
         self.handle
             .as_ref()
             .map(|h| h.clone_privately())
@@ -381,7 +448,7 @@ impl SweetConductor {
     /// Get the ConductorHandle within this Conductor.
     /// Be careful when using this, because this leaks out handles, which may
     /// make it harder to shut down the conductor during tests.
-    pub fn inner_handle(&self) -> ConductorHandle {
+    pub fn raw_handle(&self) -> ConductorHandle {
         self.handle
             .as_ref()
             .map(|h| h.0.clone())
@@ -395,19 +462,49 @@ impl SweetConductor {
         if let Some(handle) = self.handle.as_ref() {
             let iter = handle.list_cell_ids(None).into_iter().map(|id| async {
                 let id = id;
-                let env = self.get_authored_env(id.dna_hash()).unwrap();
+                let db = self.get_authored_db(id.dna_hash()).unwrap();
                 let trigger = self.get_cell_triggers(&id).unwrap();
-                (env, trigger)
+                (db, trigger)
             });
             futures::stream::iter(iter)
                 .then(|f| f)
-                .for_each(|(env, mut triggers)| async move {
-                    crate::test_utils::force_publish_dht_ops(&env, &mut triggers.publish_dht_ops)
+                .for_each(|(db, mut triggers)| async move {
+                    // The line below was added when migrating to rust edition 2021, per
+                    // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
+                    let _ = &triggers;
+                    crate::test_utils::force_publish_dht_ops(&db, &mut triggers.publish_dht_ops)
                         .await
                         .unwrap();
                 })
                 .await;
         }
+    }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn exchange_peer_info(conductors: impl IntoIterator<Item = &Self>) {
+        let mut all = Vec::new();
+        for c in conductors.into_iter() {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+                all.push(env.clone());
+            }
+        }
+        crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+    }
+
+    /// Let each conductor know about each others' agents so they can do networking
+    pub async fn exchange_peer_info_sampled(
+        conductors: impl IntoIterator<Item = &Self>,
+        rng: &mut StdRng,
+        s: usize,
+    ) {
+        let mut all = Vec::new();
+        for c in conductors.into_iter() {
+            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
+                all.push(env.clone());
+            }
+        }
+        let connectivity = covering(rng, all.len(), s);
+        crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
     }
 }
 
@@ -415,25 +512,17 @@ impl SweetConductor {
 pub async fn websocket_client_by_port(
     port: u16,
 ) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
-    Ok(holochain_websocket::connect(
+    holochain_websocket::connect(
         url2::url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
-    .await?)
+    .await
 }
 
 impl Drop for SweetConductor {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            tokio::task::spawn(async move {
-                // Shutdown the conductor
-                if let Some(shutdown) = handle.take_shutdown_handle() {
-                    handle.shutdown();
-                    if let Err(e) = shutdown.await {
-                        tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
-                    }
-                }
-            });
+            tokio::task::spawn(handle.shutdown());
         }
     }
 }
@@ -462,4 +551,44 @@ impl std::borrow::Borrow<SweetConductorHandle> for SweetConductor {
             .as_ref()
             .expect("Tried to use a conductor that is offline")
     }
+}
+
+impl std::fmt::Debug for SweetConductor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SweetConductor")
+            .field("db_dir", &self.db_dir)
+            .field("config", &self.config)
+            .field("dnas", &self.dnas)
+            .finish()
+    }
+}
+
+fn covering(rng: &mut StdRng, n: usize, s: usize) -> Vec<HashSet<usize>> {
+    let nodes: Vec<_> = (0..n)
+        .map(|i| {
+            let peers: HashSet<_> = std::iter::repeat_with(|| rng.gen_range(0..n))
+                .filter(|j| i != *j)
+                .take(s)
+                .collect();
+            peers
+        })
+        .collect();
+    let mut visited = HashSet::<usize>::new();
+    let mut queue = vec![0];
+    while let Some(next) = queue.pop() {
+        let unvisited: Vec<_> = nodes[next]
+            .iter()
+            .filter(|p| !visited.contains(p))
+            .copied()
+            .collect();
+        queue.extend(unvisited.iter());
+        visited.extend(unvisited.iter());
+        if visited.len() == n {
+            break;
+        }
+    }
+    if visited.len() < n {
+        panic!("Covering could not be created. Try a higher s value.");
+    }
+    nodes
 }

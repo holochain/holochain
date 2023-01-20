@@ -24,10 +24,6 @@ pub enum KitsuneP2pError {
     #[error("Decoding Error: {0}")]
     DecodingError(Box<str>),
 
-    /// TransportError
-    #[error(transparent)]
-    TransportError(#[from] kitsune_p2p_types::transport::TransportError),
-
     /// std::io::Error
     #[error(transparent)]
     StdIoError(#[from] std::io::Error),
@@ -101,6 +97,7 @@ pub(crate) mod gossip;
 pub mod wire;
 
 pub use gossip::GossipModuleType;
+pub use kitsune_p2p_types::dht;
 pub use kitsune_p2p_types::dht_arc;
 
 #[allow(missing_docs)]

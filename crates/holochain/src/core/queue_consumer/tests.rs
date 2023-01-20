@@ -18,7 +18,7 @@ async fn test_trigger() {
 
     let (tx, mut rx) = TriggerSender::new();
     let jh = tokio::spawn(async move { rx.listen().await.unwrap() });
-    tx.trigger();
+    tx.trigger(&"");
 
     // This should be joined because the trigger was called.
     let r = jh.await;
@@ -33,8 +33,8 @@ async fn test_trigger() {
     });
     // Calling trigger twice before a listen should only
     // cause one listen to progress.
-    tx.trigger();
-    tx.trigger();
+    tx.trigger(&"");
+    tx.trigger(&"");
 
     // This should timeout because the second listen should not pass.
     let r = tokio::time::timeout(Duration::from_millis(100), jh).await;
@@ -130,7 +130,7 @@ async fn test_reset_on_trigger() {
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
 
-    tx.trigger();
+    tx.trigger(&"");
 
     // There should be one trigger immediately.
     let timer = tokio::time::Instant::now();
@@ -176,6 +176,7 @@ async fn test_pause_resume() {
 }
 
 #[tokio::test]
+#[ignore = "flaky due to dependence on timing"]
 async fn test_concurrency() {
     // - Trigger overrides already waiting listen.
     let (tx, mut rx) =
@@ -184,7 +185,7 @@ async fn test_concurrency() {
     let jh = tokio::spawn(async move { rx.listen().await.unwrap() });
     // - Make sure listen has been called already.
     tokio::time::sleep(Duration::from_millis(10)).await;
-    tx.trigger();
+    tx.trigger(&"");
     jh.await.unwrap();
     assert!(timer.elapsed() < Duration::from_millis(20));
 
@@ -220,27 +221,28 @@ async fn publish_loop() {
         .prefix("holochain-test-environments")
         .tempdir()
         .unwrap();
-    let env = DbWrite::test(&tmpdir, kind).expect("Couldn't create test database");
-    let header = Header::arbitrary(&mut u).unwrap();
-    let author = header.author().clone();
+    let db = DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database");
+    let action = Action::arbitrary(&mut u).unwrap();
+    let author = action.author().clone();
     let signature = Signature::arbitrary(&mut u).unwrap();
-    let op = DhtOp::RegisterAgentActivity(signature, header);
+    let op = DhtOp::RegisterAgentActivity(signature, action);
     let op = DhtOpHashed::from_content_sync(op);
     let op_hash = op.to_hash();
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations::insert_op(txn, op).unwrap();
+            mutations::insert_op(txn, &op).unwrap();
         })
         .unwrap();
     let mut dna_network = MockHolochainP2pDnaT::new();
     let (tx, mut op_published) = tokio::sync::mpsc::channel(100);
     dna_network
         .expect_publish()
-        .returning(move |_, _, _, _, _| {
+        .returning(move |_, _, _, _, _, _, _| {
             tx.try_send(()).unwrap();
             Ok(())
         });
+    let dna_network = Arc::new(dna_network);
 
     let (ts, mut trigger_recv) =
         TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
@@ -252,7 +254,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -266,7 +268,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -277,12 +279,12 @@ async fn publish_loop() {
     );
 
     // - Triggering publish causes it to run again.
-    ts.trigger();
+    ts.trigger(&"");
 
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -299,10 +301,10 @@ async fn publish_loop() {
         .and_then(|epoch| epoch.checked_sub(MIN_PUBLISH_INTERVAL))
         .unwrap();
 
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations::set_last_publish_time(txn, op_hash.clone(), five_mins_ago).unwrap();
+            mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
         })
         .unwrap();
 
@@ -313,7 +315,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -321,7 +323,7 @@ async fn publish_loop() {
     op_published.recv().await.unwrap();
 
     // - Set receipts complete.
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_test(|txn| {
             mutations::set_receipts_complete(txn, &op_hash, true).unwrap();
@@ -335,7 +337,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -355,20 +357,20 @@ async fn publish_loop() {
 
     // - Set the ops last publish time to five mins ago.
     // - Set receipts not complete.
-    env.conn()
+    db.conn()
         .unwrap()
         .with_commit_test(|txn| {
-            mutations::set_last_publish_time(txn, op_hash.clone(), five_mins_ago).unwrap();
+            mutations::set_last_publish_time(txn, &op_hash, five_mins_ago).unwrap();
             mutations::set_receipts_complete(txn, &op_hash, false).unwrap();
         })
         .unwrap();
 
     // - Publish runs due to a trigger.
-    ts.trigger();
+    ts.trigger(&"");
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -382,7 +384,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(env.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
     // - The op is not published because of the time interval.

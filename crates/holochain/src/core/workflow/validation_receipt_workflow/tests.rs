@@ -17,9 +17,8 @@ async fn test_validation_receipt() {
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
 
-    let (dna_file, _) = SweetDnaFile::unique_from_inline_zome("zome1", simple_create_read_zome())
-        .await
-        .unwrap();
+    let (dna_file, _, _) =
+        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
@@ -27,16 +26,18 @@ async fn test_validation_receipt() {
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = conductors[0].call(&alice.zome("zome1"), "create", ()).await;
+    let hash: ActionHash = conductors[0]
+        .call(&alice.zome("simple"), "create", ())
+        .await;
 
-    consistency_10s(&[&alice, &bobbo, &carol]).await;
+    consistency_10s([&alice, &bobbo, &carol]).await;
 
     // Get op hashes
-    let vault = alice.dht_env().clone().into();
-    let element = fresh_store_test(&vault, |store| {
-        store.get_element(&hash.clone().into()).unwrap().unwrap()
+    let vault = alice.dht_db().clone().into();
+    let record = fresh_store_test(&vault, |store| {
+        store.get_record(&hash.clone().into()).unwrap().unwrap()
     });
-    let ops = produce_ops_from_element(&element)
+    let ops = produce_ops_from_record(&record)
         .unwrap()
         .into_iter()
         .map(|op| DhtOpHash::with_data_sync(&op))

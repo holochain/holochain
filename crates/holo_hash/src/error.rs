@@ -3,7 +3,7 @@
 use crate::HOLO_HASH_PREFIX_LEN;
 
 /// HoloHash Error Type.
-#[derive(thiserror::Error, Debug, Clone, PartialEq)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum HoloHashError {
     /// holo hashes begin with a lower case u (base64url_no_pad)
     #[error("Holo Hash missing 'u' prefix")]
@@ -24,6 +24,10 @@ pub enum HoloHashError {
     /// checksum validation failed
     #[error("Holo Hash checksum validation failed")]
     BadChecksum,
+
+    /// this hash size is too large for blake2b
+    #[error("Bad Blake2B hash size.")]
+    BadHashSize,
 }
 
 /// HoloHash Result type

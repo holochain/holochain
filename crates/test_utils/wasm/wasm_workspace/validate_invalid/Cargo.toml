@@ -2,15 +2,21 @@
 name = "test_wasm_validate_invalid"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "test_wasm_validate_invalid"
 crate-type = [ "cdylib", "rlib" ]
 
+[[example]]
+name = "integrity_test_wasm_validate_invalid"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 serde = "1.0"
 hdk = { path = "../../../../hdk" }
+hdi = { path = "../../../../hdi" }
 
 [features]
 default = []

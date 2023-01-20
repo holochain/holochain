@@ -2,7 +2,7 @@
 , callPackage
 , lib
 , writeShellScriptBin
-
+, crate2nix
 , holonix
 , holonixPath
 , hcToplevelDir
@@ -23,41 +23,29 @@ rec {
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
     # run all the non-slow cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo test ''${CARGO_TEST_ARGS:-} --workspace --exclude holochain --exclude release-automation --lib --tests --profile fast-test -- --nocapture
+    cargo test ''${CARGO_TEST_ARGS:-} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --profile fast-test ''${1-} -- --nocapture
   '';
 
-  hcSlowTests = writeShellScriptBin "hc-test-slow" ''
+  hcStandardTestsNextest = writeShellScriptBin "hc-test-standard-nextest" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
-    # alas, we cannot specify --features in the virtual workspace
-    # run the specific slow tests in the holochain crate
-    cargo test ''${CARGO_TEST_ARGS:-} --manifest-path=crates/holochain/Cargo.toml --features slow_tests,test_utils,build_wasms,db-encryption --profile fast-test -- --nocapture
+    # run all the cargo tests
+    cargo build --features 'build' -p holochain_wasm_test_utils
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run --test-threads=2} --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test ''${1-}
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=''${NUM_JOBS:-8}
-    export CARGO_BUILD_JOBS=''${CARGO_BUILD_JOBS:-8}
-
     # run all the wasm tests (within wasm) with the conductor mocked
     cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
-  hcReleaseAutomationTest = writeShellScriptBin "hc-release-automation-test" ''
+  hcReleaseAutomationTest = writeShellScriptBin "hc-test-release-automation" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
@@ -87,31 +75,28 @@ rec {
         ${releaseAutomation} \
             --workspace-path=''${TEST_WORKSPACE:?} \
             --log-level=${logLevel} \
+            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
           release \
             --no-verify-pre \
             --force-branch-creation \
             --disallowed-version-reqs=">=0.1" \
             --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-            --additional-manifests=''${TEST_WORKSPACE}/crates/release-automation/Cargo.toml \
             --steps=CreateReleaseBranch,BumpReleaseVersions
       '';
     in
-    writeShellScriptBin "hc-release-automation-test-repo" ''
+    writeShellScriptBin "hc-test-release-automation-repo" ''
       set -euxo pipefail
 
       export TEST_WORKSPACE=$(mktemp -d)
-      trap "rm -rf ''${TEST_WORKSPACE:?}" EXIT
+      if [[ "''${KEEP_TEST_WORKSPACE:-false}" != "true" ]]; then
+        trap "rm -rf ''${TEST_WORKSPACE:?}" EXIT
+      fi
 
       # check the state of the repository
       (
         ${prepareWorkspaceCmd}
         ${crateCmd "debug"}
         ${releaseCmd "debug"}
-      ) || (
-        ${prepareWorkspaceCmd}
-        ${crateCmd "trace"}
-        ${releaseCmd "trace"}
       )
     '';
 
@@ -143,16 +128,12 @@ rec {
     hc-test
   '';
 
-  hcReleaseTest = writeShellScriptBin "hc-release-test" ''
+  hcReleaseTest = writeShellScriptBin "hc-test-release" ''
     set -euxo pipefail
     export RUST_BACKTRACE=1
 
-    # limit parallel jobs to reduce memory consumption
-    export NUM_JOBS=8
-    export CARGO_BUILD_JOBS=8
-
-    ${hcReleaseAutomationTest}/bin/hc-release-automation-test
-    ${hcReleaseAutomationTestRepo}/bin/hc-release-automation-test-repo
+    ${hcReleaseAutomationTest}/bin/hc-test-release-automation
+    ${hcReleaseAutomationTestRepo}/bin/hc-test-release-automation-repo
   '';
 
   hcSpeedTest = writeShellScriptBin "hc-speed-test" ''
@@ -166,7 +147,7 @@ rec {
 
     for i in {0..100}
     do
-      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms -- --nocapture
+      cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests,glacial_tests,build_wasms -- --nocapture
     done
     for i in {0..100}
     do
@@ -273,6 +254,15 @@ rec {
 
   hcRegenReadmes = writeShellScriptBin "hc-regen-readmes" ''
     cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
+  '';
+
+  hcRegenNixExpressions = writeShellScriptBin "hc-regen-nix-expressions" ''
+    set -xe
+    pushd ${hcToplevelDir}
+    ${crate2nix}/bin/crate2nix generate \
+        -f crates/release-automation/Cargo.toml \
+        -o crates/release-automation/Cargo.nix
+    git commit crates/release-automation/Cargo.nix -m "chore: hc-regen-nix-expressions"
   '';
 } // (if stdenv.isLinux then {
   hcCoverageTest = writeShellScriptBin "hc-coverage-test" ''

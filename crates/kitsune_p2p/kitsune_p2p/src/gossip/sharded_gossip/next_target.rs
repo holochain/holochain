@@ -41,7 +41,7 @@ impl ShardedGossipLocal {
                         .expect("Your system clock is set before UNIX epoch")
             })
             .filter(|a| remote_agents_within_arc_set.contains(&a.agent))
-            .filter(|a| !a.storage_arc.interval().is_empty())
+            .filter(|a| !a.storage_arc.is_empty())
         {
             // Get an address if there is one.
             let info = info
@@ -84,7 +84,7 @@ impl ShardedGossipLocal {
             }
         }
 
-        let remote_nodes = remote_nodes.into_iter().map(|(_, v)| v).collect();
+        let remote_nodes = remote_nodes.into_values().collect();
         let tuning_params = self.tuning_params.clone();
         // We could clone the metrics store out of the lock here but I don't think
         // the next_remote_node will be that slow so we can just choose the next node inline.
@@ -131,6 +131,8 @@ fn next_remote_node(
         }
     });
 
+    let forced_initiate = metrics.read().forced_initiate();
+
     remote_nodes
         .into_iter()
         // Don't initiate with nodes we are currently gossiping with.
@@ -139,7 +141,7 @@ fn next_remote_node(
             match metrics.read().last_outcome(&n.agent_info_list) {
                 Some(RoundOutcome::Success(when)) => {
                     // If we should force initiate then we don't need to wait for the delay.
-                    metrics.read().forced_initiate()
+                    forced_initiate
                         || when.elapsed().as_millis() as u32
                             >= tuning_params.gossip_peer_on_success_next_gossip_delay_ms
                 }
@@ -167,7 +169,7 @@ mod tests {
             .take(39)
             .map(char::from)
             .collect();
-        let port = rng.gen_range(5000, 6000);
+        let port = rng.gen_range(5000..6000);
 
         url2::url2!(
             "kitsune-proxy://{}mqcw/kitsune-quic/h/localhost/p/{}/-",
@@ -261,13 +263,21 @@ mod tests {
         let last = remote_nodes.pop().unwrap();
 
         // - Record a successful initiate round for the last node at the earliest time.
-        metrics.write().record_initiate(&last.agent_info_list);
-        metrics.write().record_success(&last.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&last.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&last.agent_info_list, GossipModuleType::ShardedRecent);
 
         // - Record successful initiate rounds for the rest of the nodes at later times.
         for node in remote_nodes.iter() {
-            metrics.write().record_initiate(&node.agent_info_list);
-            metrics.write().record_success(&node.agent_info_list);
+            metrics
+                .write()
+                .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+            metrics
+                .write()
+                .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
         }
 
         // - Push the last node back into the remote nodes.
@@ -296,8 +306,12 @@ mod tests {
 
         // - Record successful initiate rounds for the rest of the nodes.
         for node in remote_nodes.iter() {
-            metrics.write().record_initiate(&node.agent_info_list);
-            metrics.write().record_success(&node.agent_info_list);
+            metrics
+                .write()
+                .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+            metrics
+                .write()
+                .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
         }
 
         // - Push the last node back into the remote nodes.
@@ -324,8 +338,12 @@ mod tests {
 
         // - Record successful initiate rounds for the rest of the nodes.
         for node in remote_nodes.iter() {
-            metrics.write().record_initiate(&node.agent_info_list);
-            metrics.write().record_success(&node.agent_info_list);
+            metrics
+                .write()
+                .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+            metrics
+                .write()
+                .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
         }
 
         // - Push the last two nodes back into the remote nodes.
@@ -364,7 +382,9 @@ mod tests {
         // - Record remote rounds for the rest of the nodes
         // but don't record any successes.
         for node in remote_nodes.iter() {
-            metrics.write().record_remote_round(&node.agent_info_list);
+            metrics
+                .write()
+                .record_accept(&node.agent_info_list, GossipModuleType::ShardedRecent);
         }
 
         let r = next_remote_node(remote_nodes.clone(), &metrics, tuning_params_no_delay());
@@ -373,8 +393,12 @@ mod tests {
         assert!(r.is_none());
 
         // - Record the last node as a successful round and push it into the list.
-        metrics.write().record_initiate(&last.agent_info_list);
-        metrics.write().record_success(&last.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&last.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&last.agent_info_list, GossipModuleType::ShardedRecent);
         remote_nodes.push(last);
 
         let r = next_remote_node(remote_nodes.clone(), &metrics, tuning_params_no_delay());
@@ -394,8 +418,12 @@ mod tests {
 
         // - Record successful initiate rounds for the all of the nodes.
         for node in remote_nodes.iter() {
-            metrics.write().record_initiate(&node.agent_info_list);
-            metrics.write().record_success(&node.agent_info_list);
+            metrics
+                .write()
+                .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+            metrics
+                .write()
+                .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
         }
 
         let r = next_remote_node(
@@ -433,8 +461,12 @@ mod tests {
 
         // - Record error outcomes for every node.
         for node in remote_nodes.iter() {
-            metrics.write().record_initiate(&node.agent_info_list);
-            metrics.write().record_error(&node.agent_info_list);
+            metrics
+                .write()
+                .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+            metrics
+                .write()
+                .record_error(&node.agent_info_list, GossipModuleType::ShardedRecent);
         }
 
         let r = next_remote_node(
@@ -487,13 +519,21 @@ mod tests {
         let last = remote_nodes.pop().unwrap();
 
         // - Record a successful initiate round for the last node before the other nodes.
-        metrics.write().record_initiate(&last.agent_info_list);
-        metrics.write().record_success(&last.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&last.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&last.agent_info_list, GossipModuleType::ShardedRecent);
 
         // - Record successful initiate rounds for the rest of the nodes.
         for node in remote_nodes.iter() {
-            metrics.write().record_initiate(&node.agent_info_list);
-            metrics.write().record_success(&node.agent_info_list);
+            metrics
+                .write()
+                .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+            metrics
+                .write()
+                .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
         }
 
         // - Push the last node back on the list.
@@ -525,8 +565,12 @@ mod tests {
 
         // - Record this successful initiate round.
         let last = remote_nodes.last().unwrap();
-        metrics.write().record_initiate(&last.agent_info_list);
-        metrics.write().record_success(&last.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&last.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&last.agent_info_list, GossipModuleType::ShardedRecent);
 
         let r = next_remote_node(
             remote_nodes.clone(),
@@ -540,8 +584,12 @@ mod tests {
 
         // - Record this successful initiate round.
         let first = remote_nodes.first().unwrap();
-        metrics.write().record_initiate(&first.agent_info_list);
-        metrics.write().record_success(&first.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&first.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&first.agent_info_list, GossipModuleType::ShardedRecent);
 
         let r = next_remote_node(
             remote_nodes.clone(),
@@ -586,8 +634,12 @@ mod tests {
 
         // - Record the successful initiate round for this node.
         let node = expected_node(1).unwrap();
-        metrics.write().record_initiate(&node.agent_info_list);
-        metrics.write().record_success(&node.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
 
         let r = next_remote_node(
             remote_nodes.clone(),
@@ -601,8 +653,12 @@ mod tests {
 
         // - Record the successful initiate round for this node.
         let node = expected_node(2).unwrap();
-        metrics.write().record_initiate(&node.agent_info_list);
-        metrics.write().record_success(&node.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
 
         let r = next_remote_node(
             remote_nodes.clone(),
@@ -629,8 +685,12 @@ mod tests {
 
         // - Record the successful initiate round for this node.
         let node = expected_node(3).unwrap();
-        metrics.write().record_initiate(&node.agent_info_list);
-        metrics.write().record_success(&node.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
 
         // - Forth force initiate overlaps with third so it resets.
         metrics.write().record_force_initiate();
@@ -647,8 +707,12 @@ mod tests {
 
         // - Record the successful initiate round for this node.
         let node = expected_node(4).unwrap();
-        metrics.write().record_initiate(&node.agent_info_list);
-        metrics.write().record_success(&node.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
 
         let r = next_remote_node(
             remote_nodes.clone(),
@@ -662,8 +726,12 @@ mod tests {
 
         // - Record the successful initiate round for this node.
         let node = expected_node(5).unwrap();
-        metrics.write().record_initiate(&node.agent_info_list);
-        metrics.write().record_success(&node.agent_info_list);
+        metrics
+            .write()
+            .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
+        metrics
+            .write()
+            .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
 
         let r = next_remote_node(
             remote_nodes.clone(),

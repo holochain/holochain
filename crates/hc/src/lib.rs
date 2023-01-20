@@ -66,7 +66,7 @@
 //!  hc r -n 5 ./elemental-chat.dna gen -a "my-app" network quic
 //! ```
 //! #### Call
-//! Allows calling the [`AdminRequest`] api.
+//! Allows calling the [`AdminRequest`](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api/enum.AdminRequest.html) api.
 //! If the conductors are not already running they
 //! will be run to make the call.
 //!
@@ -108,19 +108,54 @@
 //! ```
 //! and the examples.
 
+use std::process::Command;
+
 // Useful to have this public when using this as a library.
 pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
-use structopt::StructOpt;
+use structopt::{lazy_static::lazy_static, StructOpt};
 
-/// Holochain CLI
-///
-/// Work with DNA, hApp and web-hApp bundle files, set up sandbox environments for testing
-/// and development purposes, make direct admin calls to running conductors,
-/// and more.
+mod external_subcommands;
+
+lazy_static! {
+    static ref HELP: &'static str = {
+        let extensions = external_subcommands::list_external_subcommands()
+            .into_iter()
+            .map(|s| format!("    hc {}\t  Run \"hc {} help\" to see its help", s, s))
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        let extensions_str = match extensions.len() {
+            0 => String::from(""),
+            _ => format!(
+                r#"
+EXTENSIONS:
+{extensions}"#
+            ),
+        };
+
+        let s = format!(
+            r#"Holochain CLI
+
+Work with DNA, hApp and web-hApp bundle files, set up sandbox environments for testing and development purposes, make direct admin calls to running conductors, and more.
+{extensions_str}"#
+        );
+        Box::leak(s.into_boxed_str())
+    };
+}
+
+fn builtin_commands() -> Vec<String> {
+    ["hc-web-app", "hc-dna", "hc-app", "hc-sandbox"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
+#[structopt(long_about = *HELP)]
 pub enum Opt {
     /// Work with DNA bundles
     Dna(hc_bundle::HcDnaBundle),
@@ -130,6 +165,9 @@ pub enum Opt {
     WebApp(hc_bundle::HcWebAppBundle),
     /// Work with sandboxed environments for testing and development
     Sandbox(hc_sandbox::HcSandbox),
+    /// Allow redirect of external subcommands (like hc-scaffold and hc-launch)
+    #[structopt(external_subcommand)]
+    External(Vec<String>),
 }
 
 impl Opt {
@@ -140,6 +178,13 @@ impl Opt {
             Self::App(cmd) => cmd.run().await?,
             Self::WebApp(cmd) => cmd.run().await?,
             Self::Sandbox(cmd) => cmd.run().await?,
+            Self::External(args) => {
+                let command_suffix = args.first().expect("Missing subcommand name");
+                Command::new(format!("hc-{}", command_suffix))
+                    .args(&args[1..])
+                    .status()
+                    .expect("Failed to run external subcommand");
+            }
         }
         Ok(())
     }
