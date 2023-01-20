@@ -1,0 +1,14 @@
+{
+    "holochain-nixpkgs": {
+        "branch": "develop",
+        "description": null,
+        "homepage": null,
+        "owner": "holochain",
+        "repo": "holochain-nixpkgs",
+        "rev": "ac371c1756628983311361517eac5c56cd0043a0",
+        "sha256": "08z9m2ab6p4pzg2mylkvaxmz40vkpz7l0b4dqv8ydiw0ybf093w9",
+        "type": "tarball",
+        "url": "https://github.com/holochain/holochain-nixpkgs/archive/ac371c1756628983311361517eac5c56cd0043a0.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}
