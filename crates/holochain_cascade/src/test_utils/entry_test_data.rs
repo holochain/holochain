@@ -180,6 +180,7 @@ impl EntryTestData {
         };
 
         let link = Link {
+            author: create_link.author,
             target: create_link.target_address.clone(),
             timestamp: create_link.timestamp,
             zome_index: create_link.zome_index,

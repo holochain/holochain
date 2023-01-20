@@ -106,6 +106,7 @@ fixturator!(
 );
 
 pub struct KnownCreateLink {
+    pub author: AgentPubKey,
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
@@ -122,6 +123,7 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
     type Item = CreateLink;
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(CreateLink);
+        f.author = self.0.curve.author.clone();
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
