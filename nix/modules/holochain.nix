@@ -15,6 +15,13 @@
       pname = "holochain";
       src = flake.config.srcCleaned;
 
+      version = let
+        holochainCargoToml = builtins.fromTOML (
+          builtins.readFile (self + /crates/holochain/Cargo.toml)
+        );
+      in
+        holochainCargoToml.package.version;
+
       CARGO_PROFILE = "";
 
       OPENSSL_NO_VENDOR = "1";
