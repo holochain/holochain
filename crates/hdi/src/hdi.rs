@@ -127,20 +127,20 @@ impl HostHdi {
 #[cfg(all(not(feature = "mock"), target_arch = "wasm32"))]
 impl HdiT for HostHdi {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
-        host_call::<VerifySignature, bool>(__verify_signature, verify_signature)
+        host_call::<VerifySignature, bool>(__hc__verify_signature_1, verify_signature)
     }
     fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput> {
-        host_call::<HashInput, HashOutput>(__hash, hash_input)
+        host_call::<HashInput, HashOutput>(__hc__hash_1, hash_input)
     }
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
-        host_call::<MustGetEntryInput, EntryHashed>(__must_get_entry, must_get_entry_input)
+        host_call::<MustGetEntryInput, EntryHashed>(__hc__must_get_entry_1, must_get_entry_input)
     }
     fn must_get_action(
         &self,
         must_get_action_input: MustGetActionInput,
     ) -> ExternResult<SignedActionHashed> {
         host_call::<MustGetActionInput, SignedActionHashed>(
-            __must_get_action,
+            __hc__must_get_action_1,
             must_get_action_input,
         )
     }
@@ -149,7 +149,7 @@ impl HdiT for HostHdi {
         must_get_valid_record_input: MustGetValidRecordInput,
     ) -> ExternResult<Record> {
         host_call::<MustGetValidRecordInput, Record>(
-            __must_get_valid_record,
+            __hc__must_get_valid_record_1,
             must_get_valid_record_input,
         )
     }
@@ -158,19 +158,19 @@ impl HdiT for HostHdi {
         must_get_agent_activity_input: MustGetAgentActivityInput,
     ) -> ExternResult<Vec<RegisterAgentActivity>> {
         host_call::<MustGetAgentActivityInput, Vec<RegisterAgentActivity>>(
-            __must_get_agent_activity,
+            __hc__must_get_agent_activity_1,
             must_get_agent_activity_input,
         )
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
-        host_call::<(), DnaInfo>(__dna_info, ())
+        host_call::<(), DnaInfo>(__hc__dna_info_1, ())
     }
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
-        host_call::<(), ZomeInfo>(__zome_info, ())
+        host_call::<(), ZomeInfo>(__hc__zome_info_1, ())
     }
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
         if cfg!(feature = "trace") {
-            host_call::<TraceMsg, ()>(__trace, trace_msg)
+            host_call::<TraceMsg, ()>(__hc__trace_1, trace_msg)
         } else {
             Err(wasm_error!(WasmErrorInner::Guest(
                 "`trace()` can only be used when the \"trace\" cargo feature is set (it is off by default).".to_string(),
@@ -182,7 +182,7 @@ impl HdiT for HostHdi {
         x_salsa20_poly1305_decrypt: XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
         host_call::<XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(
-            __x_salsa20_poly1305_decrypt,
+            __hc__x_salsa20_poly1305_decrypt_1,
             x_salsa20_poly1305_decrypt,
         )
     }
@@ -191,7 +191,7 @@ impl HdiT for HostHdi {
         x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
         host_call::<X25519XSalsa20Poly1305Decrypt, Option<XSalsa20Poly1305Data>>(
-            __x_25519_x_salsa20_poly1305_decrypt,
+            __hc__x_25519_x_salsa20_poly1305_decrypt_1,
             x_25519_x_salsa20_poly1305_decrypt,
         )
     }
