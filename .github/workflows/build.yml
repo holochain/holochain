@@ -10,10 +10,6 @@ jobs:
       matrix:
         nixCommand:
           - "nix build .#holochain --no-link"
-          # TODO:
-          #   This currently doesn't make a lot of sense, because holonix
-          #     will reference another version of holochain
-          - "nix run .#holonix-integration-test"
         platform:
           - arch: macos-x86_64
             runs-on: [macos-latest]
