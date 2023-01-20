@@ -45,7 +45,7 @@ impl Location {
 }
 
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
-    Ok(ffs::read(path).await?)
+    Ok(ffs::read(path).await?.into())
 }
 
 pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
@@ -54,7 +54,8 @@ pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
         .bytes()
         .await?
         .into_iter()
-        .collect())
+        .collect::<Vec<_>>()
+        .into())
 }
 
 #[cfg(test)]

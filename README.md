@@ -104,7 +104,7 @@ As well as creating the config file, this process also instantiates the database
 
 ## License
 
-Copyright (C) 2019-2022, Holochain Foundation
+Copyright (C) 2019 - 2023, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0). This program is distributed in the hope that it will be useful,

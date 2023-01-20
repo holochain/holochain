@@ -89,11 +89,20 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
-const WASM_METERING_LIMIT: u64 = 10_000_000_000;
+#[cfg(not(test))]
+/// one hundred giga ops
+const WASM_METERING_LIMIT: u64 = 100_000_000_000;
+
+#[cfg(test)]
+
+/// ten mega ops.
+/// We don't want tests to run forever, and it can take several minutes for 100 giga ops to run.
+const WASM_METERING_LIMIT: u64 = 10_000_000;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
+
 pub struct RealRibosome {
     // NOTE - Currently taking a full DnaFile here.
     //      - It would be an optimization to pre-ensure the WASM bytecode
@@ -489,8 +498,8 @@ impl RealRibosome {
     }
 
     pub fn cranelift() -> Cranelift {
-        let cost_function = |_operator: &WasmOperator| -> u64 { 0 };
-        // @todo 10 giga-ops is totally arbitrary cutoff so we probably
+        let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
+        // @todo 100 giga-ops is totally arbitrary cutoff so we probably
         // want to make the limit configurable somehow.
         let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
         let mut cranelift = Cranelift::default();
@@ -514,86 +523,94 @@ impl RealRibosome {
         };
 
         host_fn_builder
-            .with_host_function(&mut ns, "__trace", trace)
-            .with_host_function(&mut ns, "__hash", hash)
-            .with_host_function(&mut ns, "__version", version)
-            .with_host_function(&mut ns, "__verify_signature", verify_signature)
-            .with_host_function(&mut ns, "__sign", sign)
-            .with_host_function(&mut ns, "__sign_ephemeral", sign_ephemeral)
+            .with_host_function(&mut ns, "__hc__trace_1", trace)
+            .with_host_function(&mut ns, "__hc__hash_1", hash)
+            .with_host_function(&mut ns, "__hc__version_1", version)
+            .with_host_function(&mut ns, "__hc__verify_signature_1", verify_signature)
+            .with_host_function(&mut ns, "__hc__sign_1", sign)
+            .with_host_function(&mut ns, "__hc__sign_ephemeral_1", sign_ephemeral)
             .with_host_function(
                 &mut ns,
-                "__x_salsa20_poly1305_shared_secret_create_random",
+                "__hc__x_salsa20_poly1305_shared_secret_create_random_1",
                 x_salsa20_poly1305_shared_secret_create_random,
             )
             .with_host_function(
                 &mut ns,
-                "__x_salsa20_poly1305_shared_secret_export",
+                "__hc__x_salsa20_poly1305_shared_secret_export_1",
                 x_salsa20_poly1305_shared_secret_export,
             )
             .with_host_function(
                 &mut ns,
-                "__x_salsa20_poly1305_shared_secret_ingest",
+                "__hc__x_salsa20_poly1305_shared_secret_ingest_1",
                 x_salsa20_poly1305_shared_secret_ingest,
             )
             .with_host_function(
                 &mut ns,
-                "__x_salsa20_poly1305_encrypt",
+                "__hc__x_salsa20_poly1305_encrypt_1",
                 x_salsa20_poly1305_encrypt,
             )
             .with_host_function(
                 &mut ns,
-                "__x_salsa20_poly1305_decrypt",
+                "__hc__x_salsa20_poly1305_decrypt_1",
                 x_salsa20_poly1305_decrypt,
             )
-            .with_host_function(&mut ns, "__create_x25519_keypair", create_x25519_keypair)
             .with_host_function(
                 &mut ns,
-                "__x_25519_x_salsa20_poly1305_encrypt",
+                "__hc__create_x25519_keypair_1",
+                create_x25519_keypair,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
                 x_25519_x_salsa20_poly1305_encrypt,
             )
             .with_host_function(
                 &mut ns,
-                "__x_25519_x_salsa20_poly1305_decrypt",
+                "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
                 x_25519_x_salsa20_poly1305_decrypt,
             )
-            .with_host_function(&mut ns, "__zome_info", zome_info)
-            .with_host_function(&mut ns, "__dna_info", dna_info)
-            .with_host_function(&mut ns, "__call_info", call_info)
-            .with_host_function(&mut ns, "__random_bytes", random_bytes)
-            .with_host_function(&mut ns, "__sys_time", sys_time)
-            .with_host_function(&mut ns, "__sleep", sleep)
-            .with_host_function(&mut ns, "__agent_info", agent_info)
-            .with_host_function(&mut ns, "__capability_claims", capability_claims)
-            .with_host_function(&mut ns, "__capability_grants", capability_grants)
-            .with_host_function(&mut ns, "__capability_info", capability_info)
-            .with_host_function(&mut ns, "__get", get)
-            .with_host_function(&mut ns, "__get_details", get_details)
-            .with_host_function(&mut ns, "__get_links", get_links)
-            .with_host_function(&mut ns, "__get_link_details", get_link_details)
-            .with_host_function(&mut ns, "__get_agent_activity", get_agent_activity)
-            .with_host_function(&mut ns, "__must_get_entry", must_get_entry)
-            .with_host_function(&mut ns, "__must_get_action", must_get_action)
-            .with_host_function(&mut ns, "__must_get_valid_record", must_get_valid_record)
+            .with_host_function(&mut ns, "__hc__zome_info_1", zome_info)
+            .with_host_function(&mut ns, "__hc__dna_info_1", dna_info)
+            .with_host_function(&mut ns, "__hc__call_info_1", call_info)
+            .with_host_function(&mut ns, "__hc__random_bytes_1", random_bytes)
+            .with_host_function(&mut ns, "__hc__sys_time_1", sys_time)
+            .with_host_function(&mut ns, "__hc__sleep_1", sleep)
+            .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
+            .with_host_function(&mut ns, "__hc__capability_claims_1", capability_claims)
+            .with_host_function(&mut ns, "__hc__capability_grants_1", capability_grants)
+            .with_host_function(&mut ns, "__hc__capability_info_1", capability_info)
+            .with_host_function(&mut ns, "__hc__get_1", get)
+            .with_host_function(&mut ns, "__hc__get_details_1", get_details)
+            .with_host_function(&mut ns, "__hc__get_links_1", get_links)
+            .with_host_function(&mut ns, "__hc__get_link_details_1", get_link_details)
+            .with_host_function(&mut ns, "__hc__get_agent_activity_1", get_agent_activity)
+            .with_host_function(&mut ns, "__hc__must_get_entry_1", must_get_entry)
+            .with_host_function(&mut ns, "__hc__must_get_action_1", must_get_action)
             .with_host_function(
                 &mut ns,
-                "__must_get_agent_activity",
+                "__hc__must_get_valid_record_1",
+                must_get_valid_record,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__must_get_agent_activity_1",
                 must_get_agent_activity,
             )
             .with_host_function(
                 &mut ns,
-                "__accept_countersigning_preflight_request",
+                "__hc__accept_countersigning_preflight_request_1",
                 accept_countersigning_preflight_request,
             )
-            .with_host_function(&mut ns, "__query", query)
-            .with_host_function(&mut ns, "__remote_signal", remote_signal)
-            .with_host_function(&mut ns, "__call", call)
-            .with_host_function(&mut ns, "__create", create)
-            .with_host_function(&mut ns, "__emit_signal", emit_signal)
-            .with_host_function(&mut ns, "__create_link", create_link)
-            .with_host_function(&mut ns, "__delete_link", delete_link)
-            .with_host_function(&mut ns, "__update", update)
-            .with_host_function(&mut ns, "__delete", delete)
-            .with_host_function(&mut ns, "__schedule", schedule);
+            .with_host_function(&mut ns, "__hc__query_1", query)
+            .with_host_function(&mut ns, "__hc__remote_signal_1", remote_signal)
+            .with_host_function(&mut ns, "__hc__call_1", call)
+            .with_host_function(&mut ns, "__hc__create_1", create)
+            .with_host_function(&mut ns, "__hc__emit_signal_1", emit_signal)
+            .with_host_function(&mut ns, "__hc__create_link_1", create_link)
+            .with_host_function(&mut ns, "__hc__delete_link_1", delete_link)
+            .with_host_function(&mut ns, "__hc__update_1", update)
+            .with_host_function(&mut ns, "__hc__delete_1", delete)
+            .with_host_function(&mut ns, "__hc__schedule_1", schedule);
 
         imports.register("env", ns);
 
@@ -814,7 +831,7 @@ impl RibosomeT for RealRibosome {
                         .map_or(Ok(None), |func| Ok(Some(func.call()?)))
                         .map_err(|e: RuntimeError| {
                             RibosomeError::WasmRuntimeError(
-                                wasm_error!(WasmErrorInner::Host(format!("{}", e))).into(),
+                                wasm_error!(WasmErrorInner::Host(format!("Failed during call to wasm function. Zome Name: {}, Fn Name: {}, Error: {}", zome.zome_name(), name, e))).into(),
                             )
                         })?;
 
@@ -1028,7 +1045,68 @@ pub mod wasm_test {
         }
     }
 
-    #[ignore = "turn this back on when we set the cost_function to return non-0"]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn wasm_tooling_test() {
+        observability::test_run().ok();
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crud]).await;
+        let ribosome = super::RealRibosome::new(dna_file).unwrap();
+        let module = ribosome
+            .module(&TestWasm::Crud.coordinator_zome_name())
+            .unwrap();
+        assert_eq!(
+            vec![
+                "__hc__get_agent_activity_1",
+                "__hc__query_1",
+                "__hc__sign_1",
+                "__hc__sign_ephemeral_1",
+                "__hc__create_1",
+                "__hc__update_1",
+                "__hc__delete_1",
+                "__hc__get_1",
+                "__hc__get_details_1",
+                "__hc__accept_countersigning_preflight_request_1",
+                "__hc__agent_info_1",
+                "__hc__call_info_1",
+                "__hc__create_link_1",
+                "__hc__delete_link_1",
+                "__hc__get_links_1",
+                "__hc__get_link_details_1",
+                "__hc__call_1",
+                "__hc__emit_signal_1",
+                "__hc__remote_signal_1",
+                "__hc__random_bytes_1",
+                "__hc__sys_time_1",
+                "__hc__schedule_1",
+                "__hc__sleep_1",
+                "__hc__x_salsa20_poly1305_shared_secret_create_random_1",
+                "__hc__x_salsa20_poly1305_shared_secret_export_1",
+                "__hc__x_salsa20_poly1305_shared_secret_ingest_1",
+                "__hc__x_salsa20_poly1305_encrypt_1",
+                "__hc__create_x25519_keypair_1",
+                "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
+                "__hc__verify_signature_1",
+                "__hc__hash_1",
+                "__hc__must_get_entry_1",
+                "__hc__must_get_action_1",
+                "__hc__must_get_valid_record_1",
+                "__hc__must_get_agent_activity_1",
+                "__hc__dna_info_1",
+                "__hc__zome_info_1",
+                "__hc__trace_1",
+                "__hc__x_salsa20_poly1305_decrypt_1",
+                "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>(),
+            module
+                .imports()
+                .map(|import| import.name().to_string())
+                .collect::<Vec<String>>()
+        );
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn the_incredible_halt_test() {
         observability::test_run().ok();
@@ -1036,10 +1114,10 @@ pub mod wasm_test {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
 
-        // This will run infinitely unless our metering kicks in and traps it.
+        // This will run infinitely until our metering kicks in and traps it.
         // Also we stop it running after 10 seconds.
         let result: Result<Result<(), _>, _> = tokio::time::timeout(
-            std::time::Duration::from_millis(10000),
+            std::time::Duration::from_secs(60),
             conductor.call_fallible(&alice, "smash", ()),
         )
         .await;
@@ -1048,7 +1126,7 @@ pub mod wasm_test {
         // The same thing will happen when we commit an entry due to a loop in
         // the validation logic.
         let create_result: Result<Result<(), _>, _> = tokio::time::timeout(
-            std::time::Duration::from_millis(10000),
+            std::time::Duration::from_secs(60),
             conductor.call_fallible(&alice, "create_a_thing", ()),
         )
         .await;
