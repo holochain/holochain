@@ -202,6 +202,7 @@ workflows:
          - merge-release-test
          # - merge-release-test-mac
          - standard-test-nextest
+         - standard-test-nextest-tx5
          - rustdoc-build-test
          - hc-static-checks
          - wasm-test
@@ -210,6 +211,7 @@ workflows:
          - ci-jobs-succeed:
               requires:
                  - standard-test-nextest
+                 - standard-test-nextest-tx5
                  - rustdoc-build-test
                  - hc-static-checks
                  - wasm-test
