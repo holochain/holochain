@@ -25,7 +25,7 @@ impl AppBundle {
         root_dir: PathBuf,
     ) -> AppBundleResult<Self> {
         let resources = join_all(resources.into_iter().map(|(path, dna_bundle)| async move {
-            dna_bundle.encode().map(|bytes| (path, bytes))
+            dna_bundle.encode().map(|bytes| (path, bytes.into()))
         }))
         .await
         .into_iter()

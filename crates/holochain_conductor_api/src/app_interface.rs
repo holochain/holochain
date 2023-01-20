@@ -1,4 +1,4 @@
-use crate::{signal_subscription::SignalSubscription, ExternalApiWireError};
+use crate::ExternalApiWireError;
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
@@ -70,19 +70,12 @@ pub enum AppRequest {
 
     /// Info about networking processes
     NetworkInfo(Box<NetworkInfoRequestPayload>),
-
-    /// Is currently unimplemented and will return
-    /// an [`AppResponse::Unimplemented`].
-    SignalSubscription(SignalSubscription),
 }
 
 /// Represents the possible responses to an [`AppRequest`].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppResponse {
-    /// This request is unimplemented
-    Unimplemented(AppRequest),
-
     /// Can occur in response to any [`AppRequest`].
     ///
     /// There has been an error during the handling of the request.
@@ -103,9 +96,8 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
-    /// The response contains an [`InstalledCell`] with the created clone
-    /// cell's [`CloneId`] and [`CellId`].
-    CloneCellCreated(InstalledCell),
+    /// The response contains the created clone [`ClonedCell`].
+    CloneCellCreated(ClonedCell),
 
     /// The successful response to an [`AppRequest::DisableCloneCell`].
     ///
@@ -114,8 +106,9 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::EnableCloneCell`].
     ///
-    /// A previously disabled clone cell has been enabled.
-    CloneCellEnabled(InstalledCell),
+    /// A previously disabled clone cell has been enabled. The [`ClonedCell`]
+    /// is returned.
+    CloneCellEnabled(ClonedCell),
 
     /// NetworkInfo is returned
     NetworkInfo(Vec<NetworkInfo>),
@@ -207,45 +200,42 @@ impl ZomeCall {
     }
 }
 
+///
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CellInfo {
-    // cells provisioned at app installation as defined in the bundle
-    Provisioned(Cell),
+    /// Cells provisioned at app installation as defined in the bundle.
+    Provisioned(ProvisionedCell),
 
-    // cells created by cloning
-    Cloned(Cell),
+    // Cells created at runtime by cloning provisioned cells.
+    Cloned(ClonedCell),
 
-    // potential cells with deferred installation as defined in the bundle
-    // unimplemented
+    /// Potential cells with deferred installation as defined in the bundle.
+    /// Not yet implemented.
     Stem(StemCell),
 }
 
 impl CellInfo {
-    fn new_provisioned(
-        cell_id: CellId,
-        dna_modifiers: DnaModifiers,
-        name: String,
-        enabled: bool,
-    ) -> Self {
-        Self::Provisioned(Cell {
+    pub fn new_provisioned(cell_id: CellId, dna_modifiers: DnaModifiers, name: String) -> Self {
+        Self::Provisioned(ProvisionedCell {
             cell_id,
-            clone_id: None,
             dna_modifiers,
             name,
-            enabled,
         })
     }
 
-    fn new_cloned(
+    pub fn new_cloned(
         cell_id: CellId,
         clone_id: CloneId,
+        original_dna_hash: DnaHash,
         dna_modifiers: DnaModifiers,
         name: String,
         enabled: bool,
     ) -> Self {
-        Self::Cloned(Cell {
+        Self::Cloned(ClonedCell {
             cell_id,
-            clone_id: Some(clone_id),
+            clone_id,
+            original_dna_hash,
             dna_modifiers,
             name,
             enabled,
@@ -253,17 +243,29 @@ impl CellInfo {
     }
 }
 
+/// Cell whose instantiation has been deferred.
+/// Not yet implemented.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StemCell {
-    pub dna: DnaHash,
-    pub name: Option<String>,
+    pub original_dna_hash: DnaHash,
     pub dna_modifiers: DnaModifiers,
+    pub name: Option<String>,
 }
 
+/// Provisioned cell, a cell instantiated from a DNA on app installation.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Cell {
+pub struct ProvisionedCell {
     pub cell_id: CellId,
-    pub clone_id: Option<CloneId>,
+    pub dna_modifiers: DnaModifiers,
+    pub name: String,
+}
+
+/// Cloned cell that was created from a provisioned cell at runtime.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ClonedCell {
+    pub cell_id: CellId,
+    pub clone_id: CloneId,
+    pub original_dna_hash: DnaHash,
     pub dna_modifiers: DnaModifiers,
     pub name: String,
     pub enabled: bool,
@@ -280,6 +282,8 @@ pub struct AppInfo {
     pub cell_info: HashMap<RoleName, Vec<CellInfo>>,
     /// The app's current status, in an API-friendly format
     pub status: AppInfoStatus,
+    /// The app's agent pub key.
+    pub agent_pub_key: AgentPubKey,
 }
 
 impl AppInfo {
@@ -289,6 +293,7 @@ impl AppInfo {
     ) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
+        let agent_pub_key = app.agent_key().to_owned();
 
         let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
         app.roles().iter().for_each(|(role_name, role_assignment)| {
@@ -303,7 +308,6 @@ impl AppInfo {
                         provisioned_cell.clone(),
                         dna_def.modifiers.to_owned(),
                         dna_def.name.to_owned(),
-                        status == AppInfoStatus::Running,
                     );
                     cell_info_for_role.push(cell_info);
                 } else {
@@ -322,6 +326,7 @@ impl AppInfo {
                         let cell_info = CellInfo::new_cloned(
                             cell_id.to_owned(),
                             clone_id.to_owned(),
+                            dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
                             dna_def.name.to_owned(),
                             true,
@@ -340,6 +345,7 @@ impl AppInfo {
                         let cell_info = CellInfo::new_cloned(
                             cell_id.to_owned(),
                             clone_id.to_owned(),
+                            dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
                             dna_def.name.to_owned(),
                             false,
@@ -358,6 +364,7 @@ impl AppInfo {
             installed_app_id,
             cell_info,
             status,
+            agent_pub_key,
         }
     }
 }

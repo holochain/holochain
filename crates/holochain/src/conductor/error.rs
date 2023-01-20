@@ -31,6 +31,9 @@ pub enum ConductorError {
     #[error("Cell is already active.")]
     CellAlreadyActive,
 
+    #[error("Cell already exists. CellId: {0:?}")]
+    CellAlreadyExists(CellId),
+
     #[error("Cell is not initialized.")]
     CellNotInitialized,
 
