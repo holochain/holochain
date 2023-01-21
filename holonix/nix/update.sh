@@ -8,7 +8,7 @@
 set -e
 niv update ${@}
 
-if git diff --exit-code --quiet nix/sources.*; then
+if git diff --exit-code --quiet ../nix/sources.*; then
     echo no changes, exiting..
     exit 0
 fi
