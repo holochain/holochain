@@ -6,6 +6,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230120.225800
+
+## [holochain\_cli-0.1.0-beta-rc.4](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.4)
+
+## [holochain-0.1.0-beta-rc.4](crates/holochain/CHANGELOG.md#0.1.0-beta-rc.4)
+
+- Fix: Disabled clone cells are no longer started when conductor restarts. [\#1775](https://github.com/holochain/holochain/pull/1775)
+
+## [holochain\_websocket-0.1.0-beta-rc.1](crates/holochain_websocket/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_test\_wasm\_common-0.1.0-beta-rc.3](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_conductor\_api-0.1.0-beta-rc.4](crates/holochain_conductor_api/CHANGELOG.md#0.1.0-beta-rc.4)
+
+- **BREAKING CHANGE**: `CreateCloneCell` returns `ClonedCell` instead of `InstalledCell`.
+- **BREAKING CHANGE**: `EnableCloneCell` returns `ClonedCell` instead of `InstalledCell`.
+- **BREAKING CHANGE**: Remove unused call `AdminRequest::StartApp`.
+- **BREAKING CHANGE**: `Cell` is split up into `ProvisionedCell` and `ClonedCell`.
+- **BREAKING CHANGE**: `CellInfo` variants are renamed to snake case during serde.
+- Return additional field `agent_pub_key` in `AppInfo`.
+
+## [holochain\_wasm\_test\_utils-0.1.0-beta-rc.3](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_cascade-0.1.0-beta-rc.3](crates/holochain_cascade/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_state-0.1.0-beta-rc.3](crates/holochain_state/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_p2p-0.1.0-beta-rc.3](crates/holochain_p2p/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_types-0.1.0-beta-rc.3](crates/holochain_types/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_keystore-0.1.0-beta-rc.3](crates/holochain_keystore/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_sqlite-0.1.0-beta-rc.3](crates/holochain_sqlite/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [kitsune\_p2p-0.1.0-beta-rc.2](crates/kitsune_p2p/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [kitsune\_p2p\_proxy-0.1.0-beta-rc.2](crates/kitsune_p2p_proxy/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [kitsune\_p2p\_transport\_quic-0.1.0-beta-rc.2](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [kitsune\_p2p\_fetch-0.1.0-beta-rc.1](crates/kitsune_p2p_fetch/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [kitsune\_p2p\_types-0.1.0-beta-rc.2](crates/kitsune_p2p_types/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [mr\_bundle-0.1.0-beta-rc.2](crates/mr_bundle/CHANGELOG.md#0.1.0-beta-rc.2)
+
+- **BREAKING CHANGE:** The `resources` field of bundles was not properly set up for efficient serialization. Bundles built before this change must now be rebuilt. [\#1723](https://github.com/holochain/holochain/pull/1723)
+  - Where the actual bytes of the resource were previously specified by a simple sequence of numbers, now a byte array is expected. For instance, in JavaScript, this is the difference between an Array and a Buffer.
+
+## [hdk-0.1.0-beta-rc.3](crates/hdk/CHANGELOG.md#0.1.0-beta-rc.3)
+
+- Fix typos and links in docs and add links to wasm examples.
+
+## [holochain\_zome\_types-0.1.0-beta-rc.3](crates/holochain_zome_types/CHANGELOG.md#0.1.0-beta-rc.3)
+
+- Added the `author` field to the `Link` struct for easy access after a `get_links` call.
+
+## [hdi-0.2.0-beta-rc.3](crates/hdi/CHANGELOG.md#0.2.0-beta-rc.3)
+
+## [hdk\_derive-0.1.0-beta-rc.3](crates/hdk_derive/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_integrity\_types-0.1.0-beta-rc.3](crates/holochain_integrity_types/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holo\_hash-0.1.0-beta-rc.2](crates/holo_hash/CHANGELOG.md#0.1.0-beta-rc.2)
+
 # 20230117.165308
 
 ## [holochain\_cli-0.1.0-beta-rc.3](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.3)
