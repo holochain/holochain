@@ -1,6 +1,6 @@
 #! /usr/bin/env nix-shell
 #! nix-shell --pure --keep NIX_PATH
-#! nix-shell -p cacert nixUnstable
+#! nix-shell -p cacert nix
 #! nix-shell -p niv -p yq -i bash
 
 set -e
