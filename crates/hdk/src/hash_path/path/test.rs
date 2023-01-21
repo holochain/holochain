@@ -55,6 +55,7 @@ fn root_ensures() {
         }]))
         .returning(|_| {
             Ok(vec![vec![Link {
+                author: ::fixt::fixt!(AgentPubKey),
                 target: Path::from("foo").path_entry_hash().unwrap().into(),
                 timestamp: Timestamp::now(),
                 zome_index: 0.into(),
@@ -214,6 +215,7 @@ fn paths_exists() {
         }]))
         .returning(|_| {
             Ok(vec![vec![Link {
+                author: ::fixt::fixt!(AgentPubKey),
                 target: Path::from("foo.bar").path_entry_hash().unwrap().into(),
                 timestamp: Timestamp::now(),
                 zome_index: 0.into(),
@@ -231,6 +233,7 @@ fn paths_exists() {
         }]))
         .returning(|_| {
             Ok(vec![vec![Link {
+                author: ::fixt::fixt!(AgentPubKey),
                 target: Path::from("foo.bar.baz").path_entry_hash().unwrap().into(),
                 timestamp: Timestamp::now(),
                 zome_index: 0.into(),
@@ -263,6 +266,7 @@ fn children() {
 
     // Create some links to return.
     let foo = Link {
+        author: ::fixt::fixt!(AgentPubKey),
         target: Path::from("foo").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
         zome_index: 0.into(),
@@ -271,6 +275,7 @@ fn children() {
         create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar = Link {
+        author: ::fixt::fixt!(AgentPubKey),
         target: Path::from("foo.bar").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
         zome_index: 0.into(),
@@ -279,6 +284,7 @@ fn children() {
         create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar2 = Link {
+        author: ::fixt::fixt!(AgentPubKey),
         target: Path::from("foo.bar2").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
         zome_index: 0.into(),
@@ -287,6 +293,7 @@ fn children() {
         create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar_baz = Link {
+        author: ::fixt::fixt!(AgentPubKey),
         target: Path::from("foo.bar.baz").path_entry_hash().unwrap().into(),
         timestamp: Timestamp::now(),
         zome_index: 0.into(),
@@ -295,6 +302,7 @@ fn children() {
         create_link_hash: ActionHash::from_raw_36(vec![0; 36]),
     };
     let foo_bar2_baz2 = Link {
+        author: ::fixt::fixt!(AgentPubKey),
         target: Path::from("foo.bar2.baz2")
             .path_entry_hash()
             .unwrap()

@@ -144,7 +144,13 @@ fn combine_integrity_zomes() {
 
 #[test]
 fn link_types_create_link() {
-    set_zome_types_and_compare(&[], &[(3, 3)], CreateLink(ZomeIndex(3), LinkType(0)));
+    // let author = ::fixt::fixt!(AgentPubKey);
+    set_zome_types_and_compare(
+        /*author.clone(),*/
+        &[],
+        &[(3, 3)],
+        CreateLink(ZomeIndex(3), LinkType(0)),
+    );
     create_link(
         base(),
         base(),
@@ -170,7 +176,9 @@ fn link_types_create_link() {
 #[test]
 fn link_zomes_create_link() {
     use integrity_zomes::*;
+    // let author = ::fixt::fixt!(AgentPubKey);
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(32, 3), (15, 3)],
         CreateLink(ZomeIndex(32), LinkType(2)),
@@ -178,6 +186,7 @@ fn link_zomes_create_link() {
     create_link(base(), base(), LinkZomes::A(integrity_a::LinkTypes::C), ()).unwrap();
 
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(32, 3), (15, 6)],
         CreateLink(ZomeIndex(15), LinkType(2)),
@@ -216,12 +225,19 @@ fn link_zomes_create_link() {
 fn link_types_get_links() {
     use integrity_zomes::integrity_a::LinkTypes;
 
+    // let author = ::fixt::fixt!(AgentPubKey);
     // Include just `A`
-    set_zome_types_and_compare(&[], &[(1, 3)], GetLinks(make_filter(&[(1, 0..=0)])));
+    set_zome_types_and_compare(
+        /*author.clone(),*/
+        &[],
+        &[(1, 3)],
+        GetLinks(make_filter(&[(1, 0..=0)])),
+    );
     get_links(base(), LinkTypes::A, None).unwrap();
 
     // Include all links from within this zome.
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(1, 3)],
         GetLinks(LinkTypeFilter::single_dep(1.into())),
@@ -229,11 +245,17 @@ fn link_types_get_links() {
     get_links(base(), .., None).unwrap();
 
     // Include types in this vec.
-    set_zome_types_and_compare(&[], &[(1, 3)], GetLinks(make_filter(&[(1, 0..=1)])));
+    set_zome_types_and_compare(
+        /*author.clone(),*/
+        &[],
+        &[(1, 3)],
+        GetLinks(make_filter(&[(1, 0..=1)])),
+    );
     get_links(base(), vec![LinkTypes::A, LinkTypes::B], None).unwrap();
 
     // Include types in this array.
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(1, 3)],
         GetLinks(LinkTypeFilter::Types(vec![(
@@ -245,6 +267,7 @@ fn link_types_get_links() {
 
     // Include types in this ref to array.
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(1, 3)],
         GetLinks(LinkTypeFilter::Types(vec![(
@@ -257,6 +280,7 @@ fn link_types_get_links() {
     // Include types in this slice.
     let t = [LinkTypes::A, LinkTypes::C];
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(1, 3)],
         GetLinks(LinkTypeFilter::Types(vec![(
@@ -271,8 +295,11 @@ fn link_types_get_links() {
 fn link_zomes_get_links() {
     use integrity_zomes::*;
 
+    // let author = ::fixt::fixt!(AgentPubKey);
+
     // Include just `A(B)`
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(3, 3), (1, 3)],
         GetLinks(LinkTypeFilter::Types(vec![(3.into(), vec![1.into()])])),
@@ -281,6 +308,7 @@ fn link_zomes_get_links() {
 
     // Include just `B(B)`
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(3, 3), (1, 3)],
         GetLinks(LinkTypeFilter::Types(vec![(1.into(), vec![1.into()])])),
@@ -289,6 +317,7 @@ fn link_zomes_get_links() {
 
     // Include all links from within this zome.
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(3, 3), (1, 3)],
         GetLinks(LinkTypeFilter::Dependencies(vec![3.into(), 1.into()])),
@@ -297,6 +326,7 @@ fn link_zomes_get_links() {
 
     // Include types in this vec.
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(3, 3), (1, 3)],
         GetLinks(LinkTypeFilter::Types(vec![
@@ -318,6 +348,7 @@ fn link_zomes_get_links() {
 
     // Include types in this array.
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(3, 3), (1, 3)],
         GetLinks(LinkTypeFilter::Types(vec![
@@ -337,6 +368,7 @@ fn link_zomes_get_links() {
 
     // Include types in this ref to array.
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(3, 3), (1, 3)],
         GetLinks(LinkTypeFilter::Types(vec![
@@ -360,6 +392,7 @@ fn link_zomes_get_links() {
         LinkZomes::A(integrity_a::LinkTypes::C),
     ];
     set_zome_types_and_compare(
+        /*author.clone(),*/
         &[],
         &[(3, 3), (1, 3)],
         GetLinks(LinkTypeFilter::Types(vec![(
@@ -442,7 +475,12 @@ fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
     set_zome_types_and_compare(entries, links, Compare::Nothing)
 }
 
-fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare: Compare) {
+fn set_zome_types_and_compare(
+    // _author: AgentPubKey,
+    entries: &[(u8, u8)],
+    links: &[(u8, u8)],
+    compare: Compare,
+) {
     let mut mock_hdk = MockHdkT::new();
     let entries = entries.to_vec();
     let links = links.to_vec();
@@ -488,6 +526,7 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
     if !matches!(compare, Compare::GetLinks(_)) {
         mock_hdk.expect_get_links().returning(|_| {
             Ok(vec![vec![Link {
+                author: ::fixt::fixt!(AgentPubKey),
                 target: base(),
                 timestamp: Timestamp(0),
                 zome_index: 0.into(),
@@ -508,6 +547,7 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
                 })
                 .returning(|_| {
                     Ok(vec![vec![Link {
+                        author: ::fixt::fixt!(AgentPubKey),
                         target: base(),
                         timestamp: Timestamp(0),
                         zome_index: 0.into(),
