@@ -50,6 +50,7 @@ runs:
       run: |
         cd ./holonix
         ./nix/update.sh ${{ inputs.update_source }}
+        cd -
       env:
         GITHUB_TOKEN: ${{ inputs.HRA_GITHUB_TOKEN }}
     - name: create pull request
