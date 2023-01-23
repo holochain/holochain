@@ -15,7 +15,7 @@ fi
 
 nix/regen_versions.sh
 
-cat << EOF | git commit VERSIONS.md nix/sources.* -F -
+cat << EOF | git commit VERSIONS.md $(realpath nix/sources.*) -F -
 update nix sources
 
 see VERSIONS.md for the exact changes
