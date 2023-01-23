@@ -17,7 +17,7 @@ let
   sources = import ./nix/sources.nix;
 
   # START HOLONIX IMPORT BOILERPLATE
-  holonixPath = config.holonix.pathFn { };
+  holonixPath = ./holonix;
   holonix = config.holonix.importFn ({ inherit rustVersion; } // holonixArgs);
   # END HOLONIX IMPORT BOILERPLATE
 
