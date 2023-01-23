@@ -343,9 +343,7 @@ impl RealRibosome {
             .is_none()
         {
             holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
-                .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
-                    Self::cranelift,
-                )))
+                .set(RwLock::new(SerializedModuleCache::default()))
                 // An error here means the cell is full when we tried to set it, so
                 // some other thread must have done something in between the get
                 // above and the set here. In this case we don't care as we don't
@@ -485,16 +483,6 @@ impl RealRibosome {
         }
         // Fallback to creating the instance.
         Ok((instance, context_key))
-    }
-
-    pub fn cranelift() -> Cranelift {
-        let cost_function = |_operator: &wasmparser::Operator| -> u64 { 0 };
-        // @todo 10 giga-ops is totally arbitrary cutoff so we probably
-        // want to make the limit configurable somehow.
-        let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
-        let mut cranelift = Cranelift::default();
-        cranelift.canonicalize_nans(true).push_middleware(metering);
-        cranelift
     }
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
