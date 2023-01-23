@@ -4,6 +4,7 @@
 #! nix-shell -p niv -p yq -i bash
 
 set -e
+set -x
 
 export NIX_CONFIG="extra-experimental-features = nix-command";
 
