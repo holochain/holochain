@@ -3,7 +3,6 @@ use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
-/// <Vec<(ZomeName, $callback_result)>> for ValidationResult
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
@@ -22,7 +21,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-/// <Vec<(ZomeName, $callback_result)>> for ValidationResult
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
