@@ -5,7 +5,7 @@
 #! nix-shell --keep GITHUB_TOKEN
 #! nix-shell -i bash
 
-set -e
+set -ex
 niv update ${@}
 
 if git diff --exit-code --quiet ../nix/sources.*; then
