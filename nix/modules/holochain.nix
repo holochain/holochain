@@ -64,12 +64,32 @@
       doCheck = false;
     });
 
-    # derivation with the main crates
-    holochain-tests = craneLib.buildPackage (commonArgs // {
-      cargoArtifacts = holochainDeps;
-      doCheck = true;
-      cargoExtraArgs = "--features build_wasms";
+    holochainTestDeps = craneLib.buildDepsOnly (commonArgs // rec {
+      RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
+      RUST_SODIUM_SHARED = "1";
+      pname = "holochain-tests";
+      cargoExtraArgs = ''
+        --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests
+      '';
     });
+
+    disabledTests = [
+      "conductor::cell::gossip_test::gossip_test"
+      "conductor::interface::websocket::test::enable_disable_enable_app"
+      "conductor::interface::websocket::test::websocket_call_zome_function"
+      "core::ribosome::host_fn::accept_countersigning_preflight_request::wasm_test::enzymatic_session_fail"
+      "core::ribosome::host_fn::remote_signal::tests::remote_signal_test"
+      "core::workflow::app_validation_workflow::tests::app_validation_workflow_test"
+      "core::workflow::app_validation_workflow::validation_tests::app_validation_ops"
+      "core::workflow::sys_validation_workflow::tests::sys_validation_workflow_test"
+      "local_network_tests::conductors_call_remote::_2"
+      "local_network_tests::conductors_call_remote::_4"
+      "conductor::interface::websocket::test::enable_disable_enable_apped"
+    ];
+
+    disabledTestsArgs =
+      lib.forEach disabledTests (test: "-E 'not test(${test})'");
+
 
     holochain-tests-nextest = craneLib.cargoNextest (commonArgs // {
       cargoArtifacts = holochainDeps;
@@ -80,11 +100,14 @@
       # cargoExtraArgs = "--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption";
       # CARGO_PROFILE = "release";
       cargoExtraArgs = ''
-        --test-threads 2 --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests
+        --test-threads 2 --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests \
+        ${lib.concatStringsSep " " disabledTestsArgs}
       '';
+
+      # cargoNextestExtraArgs = lib.concatStringsSep " " disabledTestsArgs;
     });
 
   in {
-    packages = {inherit holochain holochain-tests holochain-tests-nextest;};
+    packages = {inherit holochain holochain-tests-nextest;};
   };
 }

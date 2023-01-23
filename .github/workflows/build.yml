@@ -1,6 +1,7 @@
 name: build holochain
 on:
   workflow_dispatch:
+  pull_request:
 
 jobs:
   holochain-binaries:
@@ -10,11 +11,11 @@ jobs:
         nixCommand:
           - "nix build .#holochain --no-link"
         platform:
-          - arch: macos-x86_64
-            runs-on: [macos-latest]
-          - arch: macos-arm64
+          - system: x86_64-darwin
             runs-on: [self-hosted, macOS, ARM64]
-          - arch: linux-x86_64
+          - system: aarch64-darwin
+            runs-on: [self-hosted, macOS, ARM64]
+          - system: x86_64-linux
             runs-on: [ubuntu-latest]
         cachixName:
           - holochain-ci
@@ -41,4 +42,4 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: "Test comand ${{ matrix.nixCommand }}"
-        run: "${{ matrix.nixCommand }} -L --show-trace"
+        run: "${{ matrix.nixCommand }} -L --show-trace --system ${{ matrix.platform.system }}"
