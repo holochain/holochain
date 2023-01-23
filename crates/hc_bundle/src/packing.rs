@@ -70,16 +70,17 @@ fn bundle_path_to_dir(path: &Path, extension: &'static str) -> HcBundleResult<Pa
         .join(stem))
 }
 
-/// Pack a directory containing a DNA manifest into a DnaBundle, returning
+/// Pack a directory containing a yaml Manifest (Dna, Happ, WebHapp) into a Bundle, returning
 /// the path to which the bundle file was written
 pub async fn pack<M: Manifest>(
     dir_path: &std::path::Path,
     target_path: Option<PathBuf>,
     name: String,
+    serialize_wasm: bool,
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
     let manifest_path = dir_path.join(&M::path());
-    let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path).await?;
+    let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path, serialize_wasm).await?;
     let target_path = match target_path {
         Some(target_path) => {
             if target_path.is_dir() {
@@ -145,7 +146,7 @@ integrity:
         std::fs::write(tmpdir.path().join("zome-3.wasm"), &[7, 8, 9]).unwrap();
 
         let (bundle_path, bundle) =
-            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string())
+            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string(), true)
                 .await
                 .unwrap();
         // Ensure the bundle path was generated as expected
@@ -182,6 +183,7 @@ integrity:
             &dir,
             Some(dir.parent().unwrap().to_path_buf()),
             "test_dna".to_string(),
+            true,
         )
         .await
         .unwrap();
@@ -200,7 +202,7 @@ integrity:
         assert_eq!(dir.read_dir().unwrap().collect::<Vec<_>>().len(), 3);
 
         // Ensure that we get the same bundle after the roundtrip
-        let (_, bundle2) = pack(&dir, None, "test_dna".to_string()).await.unwrap();
+        let (_, bundle2) = pack(&dir, None, "test_dna".to_string(), true).await.unwrap();
         assert_eq!(bundle, bundle2);
     }
 }

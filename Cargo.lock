@@ -3722,6 +3722,7 @@ dependencies = [
  "flate2",
  "futures",
  "holochain_util",
+ "holochain_wasmer_host",
  "maplit",
  "matches",
  "reqwest",
@@ -3733,6 +3734,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "wasmer-middlewares",
 ]
 
 [[package]]

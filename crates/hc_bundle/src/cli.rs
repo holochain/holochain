@@ -233,7 +233,7 @@ impl HcDnaBundle {
             Self::Pack { path, output } => {
                 let name = get_dna_name(&path).await?;
                 let (bundle_path, _) =
-                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name).await?;
+                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name, true).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -286,7 +286,7 @@ impl HcAppBundle {
                 }
 
                 let (bundle_path, _) =
-                    crate::packing::pack::<AppManifest>(&path, output, name).await?;
+                    crate::packing::pack::<AppManifest>(&path, output, name, false).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -334,7 +334,7 @@ impl HcWebAppBundle {
                 }
 
                 let (bundle_path, _) =
-                    crate::packing::pack::<WebAppManifest>(&path, output, name).await?;
+                    crate::packing::pack::<WebAppManifest>(&path, output, name, false).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {

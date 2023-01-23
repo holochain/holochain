@@ -68,7 +68,6 @@ use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_create_rand
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_salsa20_poly1305_shared_secret_export;
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
-use crate::core::ribosome::real_ribosome::wasmparser::Operator as WasmOperator;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
@@ -489,7 +488,7 @@ impl RealRibosome {
     }
 
     pub fn cranelift() -> Cranelift {
-        let cost_function = |_operator: &WasmOperator| -> u64 { 0 };
+        let cost_function = |_operator: &wasmparser::Operator| -> u64 { 0 };
         // @todo 10 giga-ops is totally arbitrary cutoff so we probably
         // want to make the limit configurable somehow.
         let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));

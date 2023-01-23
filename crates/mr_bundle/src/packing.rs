@@ -6,7 +6,21 @@ use crate::{
     Manifest, RawBundle,
 };
 use holochain_util::ffs;
-use std::path::Path;
+use holochain_wasmer_host::prelude::*;
+use std::{path::Path, sync::Arc};
+use wasmer_middlewares::Metering;
+
+const WASM_METERING_LIMIT: u64 = 100_000_000_000;
+
+pub fn cranelift() -> Cranelift {
+    let cost_function = |_operator: &wasmparser::Operator| -> u64 { 1 };
+    // @todo 100 giga-ops is totally arbitrary cutoff so we probably
+    // want to make the limit configurable somehow.
+    let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
+    let mut cranelift = Cranelift::default();
+    cranelift.canonicalize_nans(true).push_middleware(metering);
+    cranelift
+}
 
 impl<M: Manifest> Bundle<M> {
     /// Create a directory which contains the manifest as a YAML file,
@@ -29,7 +43,7 @@ impl<M: Manifest> Bundle<M> {
     /// Reconstruct a `Bundle<M>` from a previously unpacked directory.
     /// The manifest file itself must be specified, since it may have an arbitrary
     /// path relative to the unpacked directory root.
-    pub async fn pack_yaml(manifest_path: &Path) -> MrBundleResult<Self> {
+    pub async fn pack_yaml(manifest_path: &Path, serialize_wasm: bool) -> MrBundleResult<Self> {
         let manifest_path = ffs::canonicalize(manifest_path).await?;
         let manifest_yaml = ffs::read_to_string(&manifest_path).await.map_err(|err| {
             PackingError::BadManifestPath(manifest_path.clone(), err.into_inner())
@@ -40,9 +54,21 @@ impl<M: Manifest> Bundle<M> {
         let resources = futures::future::join_all(manifest.bundled_paths().into_iter().map(
             |relative_path| async {
                 let resource_path = ffs::canonicalize(base_path.join(&relative_path)).await?;
-                ffs::read(&resource_path)
-                    .await
-                    .map(|resource| (relative_path, resource))
+                ffs::read(&resource_path).await.map(|mut resource| {
+                    if serialize_wasm
+                        && relative_path.extension() == Some(std::ffi::OsStr::new("wasm"))
+                    {
+                        println!("Found wasm and was instructed to serialize it to wasmer format, doing so now...");
+                        let compiler_config = cranelift();
+                        let store = Store::new(&Universal::new(compiler_config).engine());
+                        let module = Module::from_binary(&store, resource.as_slice())
+                            .unwrap();
+                        let serialized_module = module
+                            .serialize().unwrap();
+                        resource = serialized_module
+                    }
+                    (relative_path, resource)
+                })
             },
         ))
         .await
