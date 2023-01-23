@@ -4,15 +4,10 @@
     sourcesJSON =
       builtins.fromJSON (builtins.readFile (self + /nix/sources.json));
 
-    holonix = builtins.fetchTarball {
-      inherit (sourcesJSON.holonix) url sha256;
-    };
-
-    holonixSourcesJSON =
-      builtins.fromJSON (builtins.readFile ("${holonix}/nix/sources.json"));
+    holonix = self + /holonix;
 
     holochain-nixpkgs = builtins.fetchTarball {
-      inherit (holonixSourcesJSON.holochain-nixpkgs) url sha256;
+      inherit (sourcesJSON.holochain-nixpkgs) url sha256;
     };
 
     holochainNixpkgsSourcesJSON =

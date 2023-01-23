@@ -1,7 +1,6 @@
 use fallible_iterator::FallibleIterator;
 use hdk::prelude::EntryType;
 use hdk::prelude::Record;
-use hdk::prelude::ValidationPackage;
 use holo_hash::ActionHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::HolochainP2pDnaT;
@@ -316,102 +315,6 @@ async fn get_agent_activity_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn get_custom_package_test() {
-    observability::test_run().ok();
-
-    let zomes = vec![TestWasm::ValidationPackageSuccess];
-    let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
-    let handle = conductor_test.raw_handle();
-    let alice_call_data = conductor_test.alice_call_data();
-    let bob_call_data = conductor_test.bob_call_data().unwrap();
-    let alice_cell_id = &alice_call_data.cell_id;
-
-    let invocation = new_zome_call(
-        &alice_cell_id,
-        "commit_artist",
-        (),
-        TestWasm::ValidationPackageSuccess,
-    )
-    .unwrap();
-    let result = handle.call_zome(invocation).await;
-
-    assert_matches!(result, Err(_));
-
-    let invocation = new_zome_call(
-        &alice_cell_id,
-        "commit_songs",
-        (),
-        TestWasm::ValidationPackageSuccess,
-    )
-    .unwrap();
-    let result = handle.call_zome(invocation).await.unwrap().unwrap();
-
-    assert_matches!(result, ZomeCallResponse::Ok(_));
-
-    let invocation = new_zome_call(
-        &alice_cell_id,
-        "commit_artist",
-        (),
-        TestWasm::ValidationPackageSuccess,
-    )
-    .unwrap();
-    let result = handle.call_zome(invocation).await.unwrap().unwrap();
-
-    assert_matches!(result, ZomeCallResponse::Ok(_));
-
-    // 15 for genesis plus 1 init
-    // 1 artist is 3 ops.
-    // and 30 songs at 6 ops each.
-    let expected_count = 16 + 30 * 3 + 3;
-
-    // Wait for bob to integrate and then check they have the package cached
-    wait_for_integration(
-        &bob_call_data.db,
-        expected_count,
-        NUM_ATTEMPTS,
-        DELAY_PER_ATTEMPT.clone(),
-    )
-    .await;
-
-    let alice_source_chain = SourceChain::public_only(alice_call_data.db.clone().into()).unwrap();
-    let shh = alice_source_chain
-        .iter_back()
-        .find(|shh| {
-            Ok(shh
-                .action()
-                .entry_type()
-                .map(|entry_type| {
-                    if let EntryType::App(app_entry_def) = entry_type {
-                        app_entry_def.entry_index().index() == 1
-                    } else {
-                        false
-                    }
-                })
-                .unwrap_or(false))
-        })
-        .unwrap()
-        .unwrap();
-
-    {
-        let db: DbRead = bob_call_data.db.clone().into();
-        let record_integrated = RecordBuf::vault(db.clone(), false).unwrap();
-        let meta_integrated = MetadataBuf::vault(db.clone()).unwrap();
-        let mut record_cache = RecordBuf::cache(db.clone()).unwrap();
-        let mut meta_cache = MetadataBuf::cache(db.clone()).unwrap();
-        let cascade = Cascade::empty()
-            .with_cache(DbPairMut::new(&mut record_cache, &mut meta_cache))
-            .with_integrated(DbPair::new(&record_integrated, &meta_integrated));
-
-        let result = cascade
-            .get_validation_package_local(shh.action_address())
-            .unwrap();
-        assert_matches!(result, Some(_));
-    }
-
-    conductor_test.shutdown_conductor().await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_host_fn_test() {
     observability::test_run().ok();
 
@@ -515,24 +418,4 @@ async fn commit_some_data(
         action_hash = Some(result);
     }
     action_hash.unwrap()
-}
-
-// Cascade helper function for easily getting the validation package
-async fn check_cascade(
-    action_hashed: &ActionHashed,
-    call_data: &CellHostFnCaller,
-) -> Option<ValidationPackage> {
-    let mut record_cache = RecordBuf::cache(call_data.db.clone().into()).unwrap();
-    let mut meta_cache = MetadataBuf::cache(call_data.db.clone().into()).unwrap();
-    let cache_data = DbPairMut::new(&mut record_cache, &mut meta_cache);
-    let mut cascade = Cascade::empty()
-        .with_cache(cache_data)
-        .with_network(call_data.network.clone());
-
-    // Cascade
-    let validation_package = cascade
-        .get_validation_package(call_data.cell_id.agent_pubkey().clone(), action_hashed)
-        .await
-        .unwrap();
-    validation_package
 }
