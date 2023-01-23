@@ -400,10 +400,8 @@ impl From<StoppedApp> for InstalledApp {
 pub struct InstalledAppCommon {
     /// The unique identifier for an installed app in this conductor
     installed_app_id: InstalledAppId,
-    /// The agent key used to install this app. Currently this is meaningless,
-    /// but I'm leaving it here as a placeholder in case we ever want it to
-    /// have formal significance.
-    _agent_key: AgentPubKey,
+    /// The agent key used to install this app.
+    agent_key: AgentPubKey,
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
     role_assignments: HashMap<RoleName, AppRoleAssignment>,
 }
@@ -412,7 +410,7 @@ impl InstalledAppCommon {
     /// Constructor
     pub fn new<S: ToString, I: IntoIterator<Item = (RoleName, AppRoleAssignment)>>(
         installed_app_id: S,
-        _agent_key: AgentPubKey,
+        agent_key: AgentPubKey,
         role_assignments: I,
     ) -> AppResult<Self> {
         let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
@@ -425,7 +423,7 @@ impl InstalledAppCommon {
         }
         Ok(InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
-            _agent_key,
+            agent_key,
             role_assignments,
         })
     }
@@ -681,8 +679,8 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn _agent_key(&self) -> &AgentPubKey {
-        &self._agent_key
+    pub fn agent_key(&self) -> &AgentPubKey {
+        &self.agent_key
     }
 
     /// Constructor for apps not using a manifest.
@@ -742,7 +740,7 @@ impl InstalledAppCommon {
             .collect();
         Ok(Self {
             installed_app_id,
-            _agent_key,
+            agent_key: _agent_key,
             role_assignments: roles,
         })
     }

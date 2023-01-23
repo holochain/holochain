@@ -282,6 +282,8 @@ pub struct AppInfo {
     pub cell_info: HashMap<RoleName, Vec<CellInfo>>,
     /// The app's current status, in an API-friendly format
     pub status: AppInfoStatus,
+    /// The app's agent pub key.
+    pub agent_pub_key: AgentPubKey,
 }
 
 impl AppInfo {
@@ -291,6 +293,7 @@ impl AppInfo {
     ) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
+        let agent_pub_key = app.agent_key().to_owned();
 
         let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
         app.roles().iter().for_each(|(role_name, role_assignment)| {
@@ -361,6 +364,7 @@ impl AppInfo {
             installed_app_id,
             cell_info,
             status,
+            agent_pub_key,
         }
     }
 }

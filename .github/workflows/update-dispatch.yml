@@ -1,0 +1,65 @@
+name: "update holochain-nixpkgs for holonix"
+on:
+  # push:
+  #   branches: [pr-periodic-updates]
+  schedule:
+    - cron: "0 7 * * *" # run daily
+    - cron: "0 10,13,16 * * 3" # run several more times on wednesday to make up for a delayed release
+  workflow_dispatch:
+    inputs:
+      only-base-ref:
+        description: |
+          when this is set to 'true', the branches main and develop
+          will not be automatically included in the update
+        required: true
+        default: "false"
+        type: string
+
+concurrency:
+  group: ${{ github.ref_name }}
+
+jobs:
+  call-update:
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - name: develop
+            skip: false
+          - name: ${{ github.ref_name }}
+            skip: true
+        update_source:
+          - holochain-nixpkgs
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Evaluate skip
+        id: skip
+        if: ${{
+          !(
+          (github.event.inputs.only-base-ref == 'true' && !endsWith(github.ref_name, matrix.branch.name))
+          || (github.event.inputs.only-base-ref != 'true' && endsWith(github.ref_name, matrix.branch.name) && matrix.branch.skip == true)
+          )
+          }}
+        run: echo
+      - name: Checkout repository
+        if: ${{ steps.skip.outcome != 'skipped' }}
+        uses: actions/checkout@v2.4.0
+      - name: Call the update action
+        if: ${{ steps.skip.outcome != 'skipped' }}
+        uses: ./.github/actions/update
+        with:
+          branch: ${{ matrix.branch.name }}
+          update_source: ${{ matrix.update_source }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+          CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_SIGNING_KEY }}
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+  all-jobs-succeed:
+    runs-on: "ubuntu-latest"
+    needs: [call-update]
+    if: always()
+    steps:
+      - name: Check status
+        env:
+          RESULTS: "${{ toJSON(needs.*.result) }}"
+        run: "[[ $(jq -n 'env.RESULTS | fromjson | unique == [\"success\"]') == \"true\" ]]\n"

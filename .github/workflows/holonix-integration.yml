@@ -1,0 +1,51 @@
+name: "holonix integration test"
+
+on:
+  workflow_dispatch:
+  pull_request: {}
+
+concurrency:
+  group: ${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - arch: macos-aarch64
+            runs-on: [macOS, self-hosted, arm64]
+          - arch: macos-x86_64
+            runs-on: macos-latest
+          - arch: linux-x86_64
+            runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform.runs-on }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2.4.0
+      - name: Install nix
+        uses: cachix/install-nix-action@v18
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.12.0/install
+      - name: Setup cachix
+        uses: cachix/cachix-action@v12
+        with:
+          name: holochain-ci
+          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: holonix-integration-test
+        if: ${{ matrix.platform.runs-on != 'macos-latest' }}
+        run: nix run ./holonix#holonix-integration-test
+
+  ci-jobs-succeed:
+    needs: [tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check status
+        env:
+          RESULTS: "${{ toJSON(needs.*.result) }}"
+        run: "[[ $(jq -n 'env.RESULTS | fromjson | unique == [\"success\"]') == \"true\" ]]\n"

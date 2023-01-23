@@ -259,10 +259,13 @@ mod tests {
             Location::Bundled("1.thing".into()),
             Location::Bundled("2.thing".into()),
         ]);
-        assert!(Bundle::new_unchecked(manifest.clone(), vec![("1.thing".into(), vec![1])]).is_ok());
+        assert!(
+            Bundle::new_unchecked(manifest.clone(), vec![("1.thing".into(), vec![1].into())])
+                .is_ok()
+        );
 
         matches::assert_matches!(
-            Bundle::new_unchecked(manifest, vec![("3.thing".into(), vec![3])]),
+            Bundle::new_unchecked(manifest, vec![("3.thing".into(), vec![3].into())]),
             Err(MrBundleError::BundleError(BundleError::BundledPathNotInManifest(path))) if path == PathBuf::from("3.thing")
         );
     }

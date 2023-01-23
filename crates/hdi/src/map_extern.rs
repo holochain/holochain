@@ -40,7 +40,7 @@ macro_rules! map_extern_preamble {
     }
 }
 
-pub fn encode_to_guestptrlen<T: std::fmt::Debug + Serialize>(v: T) -> GuestPtrLen {
+pub fn encode_to_guestptrlen<T: std::fmt::Debug + Serialize>(v: T) -> DoubleUSize {
     match ExternIO::encode(v) {
         Ok(v) => return_ptr::<ExternIO>(v),
         Err(serialized_bytes_error) => return_err_ptr(wasm_error!(WasmErrorInner::Serialize(
@@ -79,7 +79,7 @@ macro_rules! map_extern {
                 use super::*;
 
                 #[no_mangle]
-                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
+                pub extern "C" fn $name(guest_ptr: usize, len: usize) -> $crate::prelude::DoubleUSize {
                     $crate::map_extern_preamble!(guest_ptr, len, inner, $input, $output);
                     match super::$f(inner) {
                         Ok(v) => $crate::map_extern::encode_to_guestptrlen(v),
@@ -100,7 +100,7 @@ macro_rules! map_extern_infallible {
                 use super::*;
 
                 #[no_mangle]
-                pub extern "C" fn $name(guest_ptr: $crate::prelude::GuestPtr, len: $crate::prelude::Len) -> $crate::prelude::GuestPtrLen {
+                pub extern "C" fn $name(guest_ptr: usize, len: usize) -> $crate::prelude::DoubleUSize {
                     $crate::map_extern_preamble!(guest_ptr, len, inner, $input, $output);
                     $crate::map_extern::encode_to_guestptrlen(super::$f(inner))
                 }
