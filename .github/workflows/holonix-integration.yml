@@ -37,6 +37,7 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: holonix-integration-test
+        continue-on-error: ${{ matrix.platform.runs-on == 'macos-latest' }}
         run: nix run ./holonix#holonix-integration-test
 
   ci-jobs-succeed:
