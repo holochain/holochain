@@ -23,7 +23,7 @@ impl ShardedGossipLocal {
         let mut u = arbitrary::Unstructured::new(&NOISE);
         let space = KitsuneSpace::arbitrary(&mut u).unwrap();
         let space = Arc::new(space);
-        let fetch_queue = FetchPool::new_bitwise_or();
+        let fetch_pool = FetchPool::new_bitwise_or();
 
         Self {
             gossip_type,
@@ -33,7 +33,7 @@ impl ShardedGossipLocal {
             host_api: host,
             inner: Share::new(inner),
             closing: std::sync::atomic::AtomicBool::new(false),
-            fetch_queue,
+            fetch_pool,
         }
     }
 }

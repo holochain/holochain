@@ -400,7 +400,7 @@ impl From<AppInfoStatus> for AppStatus {
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct NetworkInfo {
-    pub fetch_queue_info: FetchPoolInfoStateful,
+    pub fetch_pool_info: FetchPoolInfoStateful,
 }
 
 #[test]

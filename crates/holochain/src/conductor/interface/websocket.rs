@@ -480,7 +480,7 @@ pub mod test {
                     assert_eq!(
                         info,
                         vec![NetworkInfo {
-                            fetch_queue_info: FetchPoolInfoStateful::default()
+                            fetch_pool_info: FetchPoolInfoStateful::default()
                         }]
                     )
                 }

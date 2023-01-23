@@ -99,9 +99,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             r = ui_task => { r.unwrap().unwrap() }
         }
     } else {
-        // tokio::select! {
-        //     r = tasks => { r.into_iter().collect::<Result<Vec<_>, _>>().unwrap();  }
-        // }
+        tokio::select! {
+            r = tasks => { r.into_iter().collect::<Result<Vec<_>, _>>().unwrap();  }
+        }
     }
 
     Ok(())

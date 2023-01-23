@@ -109,7 +109,7 @@ pub(crate) async fn spawn_space(
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
-    fetch_queue: FetchPool,
+    fetch_pool: FetchPool,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     ghost_actor::GhostSender<SpaceInternal>,
@@ -138,7 +138,7 @@ pub(crate) async fn spawn_space(
         config,
         bandwidth_throttles,
         parallel_notify_permit,
-        fetch_queue,
+        fetch_pool,
     )));
 
     Ok((sender, i_s, evt_recv))
@@ -474,7 +474,7 @@ impl SpaceInternalHandler for Space {
                     continue;
                 } else {
                     // Add this hash to our fetch queue.
-                    ro_inner.fetch_queue.push(FetchPoolPush {
+                    ro_inner.fetch_pool.push(FetchPoolPush {
                         key: FetchKey::Op(op_hash.data()),
                         space: space.clone(),
                         source: FetchSource::Agent(source.clone()),
@@ -1219,7 +1219,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<KitsuneDiagnostics> {
         let diagnostics = KitsuneDiagnostics {
             metrics: self.ro_inner.metrics.clone(),
-            fetch_queue: FetchPoolReader::new(self.ro_inner.fetch_queue.clone()),
+            fetch_pool: FetchPoolReader::new(self.ro_inner.fetch_pool.clone()),
         };
         Ok(async move { Ok(diagnostics) }.boxed().into())
     }
@@ -1248,7 +1248,7 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) metric_exchange: MetricExchangeSync,
     pub(crate) publish_pending_delegates: parking_lot::Mutex<HashMap<KOpHash, PendingDelegate>>,
     #[allow(dead_code)]
-    pub(crate) fetch_queue: FetchPool,
+    pub(crate) fetch_pool: FetchPool,
 }
 
 impl SpaceReadOnlyInner {
@@ -1326,7 +1326,7 @@ impl Space {
         config: Arc<KitsuneP2pConfig>,
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
-        fetch_queue: FetchPool,
+        fetch_pool: FetchPool,
     ) -> Self {
         let metrics = MetricsSync::default();
 
@@ -1395,7 +1395,7 @@ impl Space {
                         evt_sender.clone(),
                         host_api.clone(),
                         metrics.clone(),
-                        fetch_queue.clone(),
+                        fetch_pool.clone(),
                     ),
                 )
             })
@@ -1495,7 +1495,7 @@ impl Space {
             metrics,
             metric_exchange,
             publish_pending_delegates: parking_lot::Mutex::new(HashMap::new()),
-            fetch_queue,
+            fetch_pool,
         });
 
         Self {

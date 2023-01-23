@@ -7,21 +7,22 @@ use crate::FetchPool;
 /// Read-only access to the queue
 #[derive(Clone)]
 pub struct FetchPoolReader {
-    queue: FetchPool,
+    pool: FetchPool,
     max_info: Arc<ShareOpen<FetchPoolInfo>>,
 }
 
 impl FetchPoolReader {
     /// Constructor
-    pub fn new(queue: FetchPool) -> Self {
+    pub fn new(pool: FetchPool) -> Self {
         Self {
-            queue,
+            pool,
             max_info: Arc::new(ShareOpen::new(Default::default())),
         }
     }
+
     /// Get info about the queue, filtered by space
     pub fn info(&self, spaces: HashSet<KSpace>) -> FetchPoolInfoStateful {
-        let (count, bytes) = self.queue.state.share_ref(|s| {
+        let (count, bytes) = self.pool.state.share_ref(|s| {
             s.queue
                 .values()
                 .filter(|v| spaces.contains(&v.space))
@@ -54,7 +55,7 @@ impl FetchPoolReader {
 impl std::fmt::Debug for FetchPoolReader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FetchPoolReader")
-            .field("queue", &self.queue)
+            .field("queue", &self.pool)
             .field("max_info", &self.max_info.share_ref(|i| i.clone()))
             .finish()
     }
@@ -104,7 +105,7 @@ mod tests {
 
             let queue = queue.into_iter().collect();
             FetchPoolReader {
-                queue: FetchPool {
+                pool: FetchPool {
                     config: Arc::new(cfg),
                     state: ShareOpen::new(State { queue }),
                 },

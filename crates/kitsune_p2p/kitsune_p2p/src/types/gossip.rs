@@ -79,7 +79,7 @@ pub trait AsGossipModuleFactory: 'static + Send + Sync {
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
-        fetch_queue: FetchPool,
+        fetch_pool: FetchPool,
     ) -> GossipModule;
 }
 
@@ -95,7 +95,7 @@ impl GossipModuleFactory {
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
-        fetch_queue: FetchPool,
+        fetch_pool: FetchPool,
     ) -> GossipModule {
         self.0.spawn_gossip_task(
             tuning_params,
@@ -104,7 +104,7 @@ impl GossipModuleFactory {
             evt_sender,
             host,
             metrics,
-            fetch_queue,
+            fetch_pool,
         )
     }
 }

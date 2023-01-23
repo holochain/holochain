@@ -307,7 +307,7 @@ impl ShardedGossipLocal {
                 source: source.clone(),
                 size,
             };
-            self.fetch_queue.push(request);
+            self.fetch_pool.push(request);
         }
         Ok(())
     }

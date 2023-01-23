@@ -17,7 +17,7 @@ impl GossipDashboard {
                 .iter()
                 .map(|n| {
                     (
-                        n.diagnostics.fetch_queue.info(
+                        n.diagnostics.fetch_pool.info(
                             [n.zome.cell_id().dna_hash().to_kitsune()]
                                 .into_iter()
                                 .collect(),
