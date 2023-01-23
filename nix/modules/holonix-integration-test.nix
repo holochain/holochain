@@ -3,7 +3,7 @@
     pkgs = config.pkgs;
   in {
     apps.holonix-integration-test.type = "app";
-    apps.holonix-integration-test.program = toString (
+    apps.holonix-integration-test.program = builtins.toString (
       config.writers.writePureShellScript
       [
         pkgs.bats
