@@ -1,4 +1,4 @@
-use kitsune_p2p_fetch::FetchQueueConfig;
+use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
@@ -8,7 +8,7 @@ use super::*;
 /// Allows only specifying the methods you care about, and letting all the rest
 /// throw errors if called
 #[allow(missing_docs)]
-pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
+pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
     /// Name to be printed out on unimplemented error
     const NAME: &'static str;
 

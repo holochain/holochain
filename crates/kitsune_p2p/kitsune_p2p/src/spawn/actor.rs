@@ -114,7 +114,7 @@ pub(crate) struct KitsuneP2pActor {
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
-    fetch_queue: FetchQueue,
+    fetch_pool: FetchPool,
 }
 
 impl KitsuneP2pActor {
@@ -284,16 +284,16 @@ impl KitsuneP2pActor {
         ));
 
         // TODO - use a real config
-        let fetch_queue = FetchQueue::new_bitwise_or();
+        let fetch_pool = FetchPool::new_bitwise_or();
 
         // Start a loop to handle our fetch queue fetch items.
         {
-            let fetch_queue = fetch_queue.clone();
+            let fetch_pool = fetch_pool.clone();
             let i_s = internal_sender.clone();
             let host = host.clone();
             tokio::task::spawn(async move {
                 loop {
-                    let list = fetch_queue.get_items_to_fetch();
+                    let list = fetch_pool.get_items_to_fetch();
 
                     for (key, space, source, context) in list {
                         if let FetchKey::Op(op_hash) = &key {
@@ -302,7 +302,7 @@ impl KitsuneP2pActor {
                                 .await
                             {
                                 if res.len() == 1 && res.remove(0) {
-                                    fetch_queue.remove(&key);
+                                    fetch_pool.remove(&key);
                                     continue;
                                 }
                             }
@@ -323,10 +323,10 @@ impl KitsuneP2pActor {
             let evt_sender = evt_sender.clone();
             let host = host.clone();
             let tuning_params = config.tuning_params.clone();
-            let fetch_queue = fetch_queue.clone();
+            let fetch_pool = fetch_pool.clone();
             async move {
                 let fetch_response_queue = &fetch_response_queue;
-                let fetch_queue = &fetch_queue;
+                let fetch_pool = &fetch_pool;
                 ep.for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
                     let evt_sender = evt_sender.clone();
                     let host = host.clone();
@@ -644,9 +644,8 @@ impl KitsuneP2pActor {
                                                     } else {
                                                         FetchKey::Op(op_hash.clone())
                                                     };
-                                                let fetch_context = fetch_queue
-                                                    .remove(&key)
-                                                    .and_then(|i| i.context);
+                                                let fetch_context =
+                                                    fetch_pool.remove(&key).and_then(|i| i.context);
 
                                                 // forward the received op
                                                 let _ = evt_sender
@@ -692,7 +691,7 @@ impl KitsuneP2pActor {
             config: Arc::new(config),
             bandwidth_throttles,
             parallel_notify_permit,
-            fetch_queue,
+            fetch_pool,
         })
     }
 }
@@ -1014,7 +1013,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let config = Arc::clone(&self.config);
         let bandwidth_throttles = self.bandwidth_throttles.clone();
         let parallel_notify_permit = self.parallel_notify_permit.clone();
-        let fetch_queue = self.fetch_queue.clone();
+        let fetch_pool = self.fetch_pool.clone();
 
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
@@ -1026,7 +1025,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                     config,
                     bandwidth_throttles,
                     parallel_notify_permit,
-                    fetch_queue,
+                    fetch_pool,
                 )
                 .await
                 .expect("cannot fail to create space");

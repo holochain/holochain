@@ -2,15 +2,15 @@ use std::collections::HashSet;
 
 use kitsune_p2p_types::KSpace;
 
-use crate::FetchQueue;
+use crate::FetchPool;
 
 /// Read-only access to the queue
 #[derive(Clone, derive_more::From)]
-pub struct FetchQueueReader(FetchQueue);
+pub struct FetchPoolReader(FetchPool);
 
-impl FetchQueueReader {
+impl FetchPoolReader {
     /// Get info about the queue, filtered by space
-    pub fn info(&self, spaces: HashSet<KSpace>) -> FetchQueueInfo {
+    pub fn info(&self, spaces: HashSet<KSpace>) -> FetchPoolInfo {
         let (count, bytes) = self.0.state.share_ref(|s| {
             s.queue
                 .values()
@@ -18,7 +18,7 @@ impl FetchQueueReader {
                 .filter_map(|v| v.size.map(|s| s.get()))
                 .fold((0, 0), |(c, s), t| (c + 1, s + t))
         });
-        FetchQueueInfo {
+        FetchPoolInfo {
             op_bytes_to_fetch: bytes,
             num_ops_to_fetch: count,
         }
@@ -27,7 +27,7 @@ impl FetchQueueReader {
 
 /// Info about the fetch queue
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct FetchQueueInfo {
+pub struct FetchPoolInfo {
     /// Total number of bytes expected to be received through fetches
     pub op_bytes_to_fetch: usize,
 
@@ -41,7 +41,7 @@ mod tests {
 
     use kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
 
-    use crate::{queue::tests::*, State};
+    use crate::{pool::tests::*, State};
 
     use super::*;
 
@@ -59,7 +59,7 @@ mod tests {
             queue[1].1.size = Some(1000.into());
 
             let queue = queue.into_iter().collect();
-            FetchQueueReader(FetchQueue {
+            FetchPoolReader(FetchPool {
                 config: Arc::new(cfg),
                 state: ShareOpen::new(State { queue }),
             })

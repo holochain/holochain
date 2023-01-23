@@ -20,7 +20,7 @@ impl KitsuneHostDefaultError for HostStubErr {
     const NAME: &'static str = "HostStub";
 }
 
-impl FetchQueueConfig for HostStubErr {
+impl FetchPoolConfig for HostStubErr {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }
@@ -125,7 +125,7 @@ impl KitsuneHost for HostStub {
     }
 }
 
-impl FetchQueueConfig for HostStub {
+impl FetchPoolConfig for HostStub {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }
