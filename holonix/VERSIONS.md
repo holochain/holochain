@@ -3,7 +3,10 @@
 ## Common binaries
 The following binaries are the same version regardless of the _holochainVersionId_ argument.
 
-
+- rustc: rustc 1.64.0 (a55dd71d5 2022-09-19)
+- cargo fmt: rustfmt 1.5.1-stable (a55dd71 2022-09-19)
+- cargo clippy: clippy 0.1.64 (a55dd71 2022-09-19)
+- perf-5.15.89: mirror://kernel/linux/kernel/v5.x/linux-5.15.89.tar.xz
 
 ## Available _holochainVersionId_ options
 Each of the following headings represent one pre-built _holochainVersionId_ and their corresponding holochain version information.
