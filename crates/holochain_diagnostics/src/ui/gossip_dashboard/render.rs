@@ -1,5 +1,5 @@
 use super::*;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfoStateful;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfoStateful;
 
 impl GossipDashboard {
     pub fn render<K: Backend>(&self, f: &mut Frame<K>, state: &impl ClientState) {

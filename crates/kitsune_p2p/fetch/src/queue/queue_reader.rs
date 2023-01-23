@@ -2,25 +2,25 @@ use std::{collections::HashSet, sync::Arc};
 
 use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KSpace};
 
-use crate::FetchQueue;
+use crate::FetchPool;
 
 /// Read-only access to the queue
 #[derive(Clone)]
-pub struct FetchQueueReader {
-    queue: FetchQueue,
-    max_info: Arc<ShareOpen<FetchQueueInfo>>,
+pub struct FetchPoolReader {
+    queue: FetchPool,
+    max_info: Arc<ShareOpen<FetchPoolInfo>>,
 }
 
-impl FetchQueueReader {
+impl FetchPoolReader {
     /// Constructor
-    pub fn new(queue: FetchQueue) -> Self {
+    pub fn new(queue: FetchPool) -> Self {
         Self {
             queue,
             max_info: Arc::new(ShareOpen::new(Default::default())),
         }
     }
     /// Get info about the queue, filtered by space
-    pub fn info(&self, spaces: HashSet<KSpace>) -> FetchQueueInfoStateful {
+    pub fn info(&self, spaces: HashSet<KSpace>) -> FetchPoolInfoStateful {
         let (count, bytes) = self.queue.state.share_ref(|s| {
             s.queue
                 .values()
@@ -43,17 +43,17 @@ impl FetchQueueReader {
             i.clone()
         });
 
-        let current = FetchQueueInfo {
+        let current = FetchPoolInfo {
             op_bytes_to_fetch: bytes,
             num_ops_to_fetch: count,
         };
-        FetchQueueInfoStateful { current, max }
+        FetchPoolInfoStateful { current, max }
     }
 }
 
-impl std::fmt::Debug for FetchQueueReader {
+impl std::fmt::Debug for FetchPoolReader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FetchQueueReader")
+        f.debug_struct("FetchPoolReader")
             .field("queue", &self.queue)
             .field("max_info", &self.max_info.share_ref(|i| i.clone()))
             .finish()
@@ -62,7 +62,7 @@ impl std::fmt::Debug for FetchQueueReader {
 
 /// Info about the fetch queue
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct FetchQueueInfo {
+pub struct FetchPoolInfo {
     /// Total number of bytes expected to be received through fetches
     pub op_bytes_to_fetch: usize,
 
@@ -70,13 +70,13 @@ pub struct FetchQueueInfo {
     pub num_ops_to_fetch: usize,
 }
 
-/// The instantaneous and accumulated max FetchQueueInfo
+/// The instantaneous and accumulated max FetchPoolInfo
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct FetchQueueInfoStateful {
+pub struct FetchPoolInfoStateful {
     /// The instantaneous info
-    pub current: FetchQueueInfo,
+    pub current: FetchPoolInfo,
     /// The max info since the last time it went to zero
-    pub max: FetchQueueInfo,
+    pub max: FetchPoolInfo,
 }
 
 #[cfg(test)]
@@ -103,8 +103,8 @@ mod tests {
             queue[1].1.size = Some(1000.into());
 
             let queue = queue.into_iter().collect();
-            FetchQueueReader {
-                queue: FetchQueue {
+            FetchPoolReader {
+                queue: FetchPool {
                     config: Arc::new(cfg),
                     state: ShareOpen::new(State { queue }),
                 },

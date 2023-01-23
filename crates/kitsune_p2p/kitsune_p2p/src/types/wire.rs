@@ -120,9 +120,9 @@ kitsune_p2p_types::write_codec_enum! {
             agent.1: Arc<KitsuneAgent>,
         },
 
-        /// Response to a peer get
+        /// Response to a peer get. If the agent isn't known, None will be returned.
         PeerGetResp(0x51) {
-            agent_info_signed.0: AgentInfoSigned,
+            agent_info_signed.0: Option<AgentInfoSigned>,
         },
 
         /// Query a remote node for peers holding
@@ -132,7 +132,7 @@ kitsune_p2p_types::write_codec_enum! {
             basis_loc.1: DhtLocation,
         },
 
-        /// Response to a peer query
+        /// Response to a peer query. May be empty if no matching agents are known.
         PeerQueryResp(0x53) {
             peer_list.0: Vec<AgentInfoSigned>,
         },

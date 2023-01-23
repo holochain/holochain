@@ -111,6 +111,7 @@ impl LinkTestData {
         );
 
         let link = Link {
+            author: create_link.author,
             target: target_hash.clone().into(),
             timestamp: create_link.timestamp,
             tag: create_link.tag.clone(),
@@ -120,6 +121,7 @@ impl LinkTestData {
         };
 
         let later_link = Link {
+            author: later_create_link.author,
             target: target_hash.clone().into(),
             timestamp: later_create_link.timestamp,
             tag: later_create_link.tag.clone(),

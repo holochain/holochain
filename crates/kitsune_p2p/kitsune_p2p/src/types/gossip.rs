@@ -1,7 +1,7 @@
 use crate::metrics::*;
 use crate::types::*;
 use crate::HostApi;
-use kitsune_p2p_fetch::FetchQueue;
+use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
@@ -79,7 +79,7 @@ pub trait AsGossipModuleFactory: 'static + Send + Sync {
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
-        fetch_queue: FetchQueue,
+        fetch_queue: FetchPool,
     ) -> GossipModule;
 }
 
@@ -95,7 +95,7 @@ impl GossipModuleFactory {
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
-        fetch_queue: FetchQueue,
+        fetch_queue: FetchPool,
     ) -> GossipModule {
         self.0.spawn_gossip_task(
             tuning_params,

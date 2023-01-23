@@ -1,5 +1,5 @@
 use holochain::prelude::metrics::PeerAgentHistory;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfoStateful;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfoStateful;
 
 use super::*;
 
@@ -33,7 +33,7 @@ pub fn ui_throughput_summary(sums: Vec<u32>) -> List<'static> {
     )
 }
 
-pub fn ui_gossip_progress_gauge(info: FetchQueueInfoStateful) -> Gauge<'static> {
+pub fn ui_gossip_progress_gauge(info: FetchPoolInfoStateful) -> Gauge<'static> {
     let d = info.max.op_bytes_to_fetch;
     let n = d.saturating_sub(info.current.op_bytes_to_fetch);
 

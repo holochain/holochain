@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_types"
-version = "0.1.0-beta-rc.1"
+version = "0.1.0-beta-rc.2"
 description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -31,7 +31,7 @@ serde = { version = "1", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
 serde_json = { version = "1", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
-sysinfo = "0.15.9"
+sysinfo = "0.27"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full" ] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }

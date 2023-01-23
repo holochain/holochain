@@ -453,7 +453,7 @@ impl Metrics {
             };
             record_item(&mut history.initiates, round);
             if history.current_round {
-                tracing::warn!("Recorded initiate with current round already set");
+                tracing::info!("Recorded initiate with current round already set");
             }
             history.current_round = true;
         }
@@ -476,7 +476,7 @@ impl Metrics {
             };
             record_item(&mut history.accepts, round);
             if history.current_round {
-                tracing::warn!("Recorded accept with current round already set");
+                tracing::info!("Recorded accept with current round already set");
             }
             history.current_round = true;
         }

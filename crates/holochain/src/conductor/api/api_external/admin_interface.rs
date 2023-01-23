@@ -218,15 +218,6 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AppDisabled)
             }
-            StartApp { installed_app_id } => {
-                // TODO: check to see if app was actually started
-                let app = self
-                    .conductor_handle
-                    .clone()
-                    .start_app(installed_app_id)
-                    .await?;
-                Ok(AdminResponse::AppStarted(app.status().is_running()))
-            }
             AttachAppInterface { port } => {
                 let port = port.unwrap_or(0);
                 let port = self

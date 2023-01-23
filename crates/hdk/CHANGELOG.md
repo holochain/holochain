@@ -6,6 +6,11 @@ default_semver_increment_mode: !pre_minor beta-rc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+- Add note in HDK documentation about links not deduplicating. ([#1791](https://github.com/holochain/holochain/pull/1791))
+
+## 0.1.0-beta-rc.3
+
 - Fix typos and links in docs and add links to wasm examples.
 
 ## 0.1.0-beta-rc.2
