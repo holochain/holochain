@@ -212,6 +212,31 @@ impl State {
     pub fn remove(&mut self, key: &FetchKey) -> Option<FetchPoolItem> {
         self.queue.remove(key)
     }
+
+    /// Get a string summary of the queue's contents
+    pub fn summary(&self) -> String {
+        let table = self
+            .queue
+            .iter()
+            .map(|(k, v)| {
+                let key = match k {
+                    FetchKey::Op(hash) => {
+                        let h = hash.to_string();
+                        format!("{}..{}", &h[0..4], &h[h.len() - 4..])
+                    }
+                    FetchKey::Region(_) => "[region]".to_string(),
+                };
+                format!("{:10}  {}", key, v.sources.0.len())
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("{}\n{} items total", table, self.queue.len())
+    }
+
+    /// The heading to go along with the summary
+    pub fn summary_heading() -> String {
+        format!("{:10}  {}", "key", "s")
+    }
 }
 
 /// A mutable iterator over the FetchPool State
