@@ -68,23 +68,24 @@
       RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
       RUST_SODIUM_SHARED = "1";
       pname = "holochain-tests";
-      cargoExtraArgs = ''
-        --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests
-      '';
+      CARGO_PROFILE = "fast-test";
+      # cargoExtraArgs = ''
+      #   --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests
+      # '';
     });
 
     disabledTests = [
-      "conductor::cell::gossip_test::gossip_test"
-      "conductor::interface::websocket::test::enable_disable_enable_app"
-      "conductor::interface::websocket::test::websocket_call_zome_function"
-      "core::ribosome::host_fn::accept_countersigning_preflight_request::wasm_test::enzymatic_session_fail"
-      "core::ribosome::host_fn::remote_signal::tests::remote_signal_test"
-      "core::workflow::app_validation_workflow::tests::app_validation_workflow_test"
-      "core::workflow::app_validation_workflow::validation_tests::app_validation_ops"
-      "core::workflow::sys_validation_workflow::tests::sys_validation_workflow_test"
-      "local_network_tests::conductors_call_remote::_2"
-      "local_network_tests::conductors_call_remote::_4"
-      "conductor::interface::websocket::test::enable_disable_enable_apped"
+      # "conductor::cell::gossip_test::gossip_test"
+      # "conductor::interface::websocket::test::enable_disable_enable_app"
+      # "conductor::interface::websocket::test::websocket_call_zome_function"
+      # "core::ribosome::host_fn::accept_countersigning_preflight_request::wasm_test::enzymatic_session_fail"
+      # "core::ribosome::host_fn::remote_signal::tests::remote_signal_test"
+      # "core::workflow::app_validation_workflow::tests::app_validation_workflow_test"
+      # "core::workflow::app_validation_workflow::validation_tests::app_validation_ops"
+      # "core::workflow::sys_validation_workflow::tests::sys_validation_workflow_test"
+      # "local_network_tests::conductors_call_remote::_2"
+      # "local_network_tests::conductors_call_remote::_4"
+      # "conductor::interface::websocket::test::enable_disable_enable_apped"
     ];
 
     disabledTestsArgs =
@@ -92,17 +93,21 @@
 
 
     holochain-tests-nextest = craneLib.cargoNextest (commonArgs // {
-      cargoArtifacts = holochainDeps;
+      __noChroot = true;
+      cargoArtifacts = holochainTestDeps;
       preCheck = ''
-        rm /build/source/target/debug/.fingerprint/holochain_wasm_test_utils-*/invoked.timestamp
-        rm /build/source/target/debug/.fingerprint/holochain_test_wasm_common-*/invoked.timestamp
+        pwd
+        # rm /build/source/target/debug/.fingerprint/holochain_wasm_test_utils-*/invoked.timestamp
+        # rm /build/source/target/debug/.fingerprint/holochain_test_wasm_common-*/invoked.timestamp
       '';
       # cargoExtraArgs = "--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption";
       # CARGO_PROFILE = "release";
       cargoExtraArgs = ''
-        --test-threads 2 --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests \
+        --test-threads 2 --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test \
         ${lib.concatStringsSep " " disabledTestsArgs}
       '';
+
+      dontPatchELF = true;
 
       # cargoNextestExtraArgs = lib.concatStringsSep " " disabledTestsArgs;
     });
