@@ -1,11 +1,9 @@
-{ nixpkgs ? null
-, rustVersion ? {
-    track = "stable";
-    version = "1.66.0";
-  }
+{ nixpkgs ? null, rustVersion ? {
+  track = "stable";
+  version = "1.66.0";
+}
 
-, holonixArgs ? { }
-}:
+, holonixArgs ? { } }:
 
 # This is an example of what downstream consumers of holonix should do
 # This is also used to dogfood as many commands as possible for holonix
@@ -67,25 +65,15 @@ let
       };
     })
 
-  ]
-  ++ [(
-    self: super: {
-      inherit crate2nix;
-    }
-  )];
+  ] ++ [ (self: super: { inherit crate2nix; }) ];
 
-  crate2nix = (import (nixpkgs.path or holonix.pkgs.path) {}).crate2nix;
+  crate2nix = (import (nixpkgs.path or holonix.pkgs.path) { }).crate2nix;
   nixpkgs' = import (nixpkgs.path or holonix.pkgs.path) { inherit overlays; };
   inherit (nixpkgs') callPackage;
 
   pkgs = callPackage ./nix/pkgs/default.nix { };
-in
-{
-  inherit
-    nixpkgs'
-    holonix
-    pkgs
-    ;
+in {
+  inherit nixpkgs' holonix pkgs;
 
   # TODO: refactor when we start releasing again
   # releaseHooks = callPackages ./nix/release {
@@ -95,10 +83,5 @@ in
   #     ;
   # };
 
-  shells = callPackage ./nix/shells.nix {
-    inherit
-      holonix
-      pkgs
-      ;
-  };
+  shells = callPackage ./nix/shells.nix { inherit holonix pkgs; };
 }
