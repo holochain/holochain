@@ -1,0 +1,15 @@
+[package]
+name = "holochain"
+version = "0.0.29-alpha2"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+
+[dependencies]
+holochain_core_types = { path = "../core_types" }
+holochain_conductor_api = { path = "../conductor_api" }
+lib3h_sodium = "=0.0.10"
+holochain_common = { path = "../common" }
+structopt = "=0.2.15"
+tiny_http = "=0.6.2"
+ws = "=0.8.0"
+[target.'cfg(unix)'.dependencies]
+signal-hook = "=0.1.10"

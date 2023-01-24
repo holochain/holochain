@@ -3,7 +3,6 @@ use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
 use super::guest_callback::validate::ValidateHostAccess;
-use super::guest_callback::validation_package::ValidationPackageHostAccess;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::host_fn::HostFnApi;
 use super::HostContext;
@@ -22,8 +21,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
@@ -626,7 +623,7 @@ impl RealRibosome {
 }
 
 /// General purpose macro which relies heavily on various impls of the form:
-/// From<Vec<(ZomeName, $callback_result)>> for ValidationPackageResult
+/// From<Vec<(ZomeName, $callback_result)>> for ValidationResult
 macro_rules! do_callback {
     ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
@@ -932,19 +929,6 @@ impl RibosomeT for RealRibosome {
         invocation: MigrateAgentInvocation,
     ) -> RibosomeResult<MigrateAgentResult> {
         do_callback!(self, host_access, invocation, MigrateAgentCallbackResult)
-    }
-
-    fn run_validation_package(
-        &self,
-        host_access: ValidationPackageHostAccess,
-        invocation: ValidationPackageInvocation,
-    ) -> RibosomeResult<ValidationPackageResult> {
-        do_callback!(
-            self,
-            host_access,
-            invocation,
-            ValidationPackageCallbackResult
-        )
     }
 
     fn zome_types(&self) -> &Arc<GlobalZomeTypes> {

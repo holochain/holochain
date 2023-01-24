@@ -133,8 +133,11 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
 ///   - `[ 1, 2, 3 ]` returns `[ a ]`
 ///   - `[ 5 ]` returns `[ ]` (does _not_ return c because the filter is by "prefix", not "contains")
 ///
-/// This is mostly identical to `get_link_details` but returns only creates that have not been
-/// deleted c.f. get_link_details that returns all the creates and all the deletes together.
+/// This is mostly identical to [ `get_link_details` ] but returns only creates that have not been
+/// deleted, whereas `get_link_details` returns all the creates and all the deletes together.
+/// Also note that, unlike when [ `get` ] is used to retrieve an entry, links that
+/// only differ by author and creation time are not deduplicated; hence, you may receive multiple
+/// links with the same base, tag, and target.
 ///
 /// See [ `get_link_details` ].
 pub fn get_links(

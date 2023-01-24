@@ -1,0 +1,80 @@
+name: "update"
+
+inputs:
+  branch:
+    description: ""
+    required: true
+  update_source:
+    description: "passed to ./nix/update.sh"
+    required: true
+  GITHUB_TOKEN:
+    description: ""
+    required: true
+  HRA_GITHUB_TOKEN:
+    description: ""
+    required: true
+  CACHIX_SIGNING_KEY:
+    description: ""
+    required: true
+  CACHIX_AUTH_TOKEN:
+    description: ""
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2.4.0
+      with:
+        ref: ${{ inputs.branch }}
+    - name: Install nix
+      uses: cachix/install-nix-action@v18
+      with:
+        install_url: https://releases.nixos.org/nix/nix-2.12.0/install
+    - name: Setup cachix
+      uses: cachix/cachix-action@v12
+      with:
+        name: holochain-ci
+        signingKey: "${{ inputs.CACHIX_SIGNING_KEY }}"
+        authToken: "${{ inputs.CACHIX_AUTH_TOKEN }}"
+    - name: set up git config
+      shell: bash
+      run: |
+        git config --global user.email "hrabot@holochain.org"
+        git config --global user.name "Holochain Release Automation"
+    - name: Set NIX_PATH
+      shell: bash
+      run: "echo NIX_PATH=nixpkgs=$(nix eval --impure --raw --expr '(import (import ./nix/sources.nix {}).holochain-nixpkgs {}).pkgs.path') >> $GITHUB_ENV"
+    - name: update holochain-nixpkgs
+      shell: bash
+      run: |
+        cd ./holonix
+        ./nix/update.sh ${{ inputs.update_source }}
+        cd -
+      env:
+        GITHUB_TOKEN: ${{ inputs.HRA_GITHUB_TOKEN }}
+    - name: create pull request
+      uses: peter-evans/create-pull-request@v3
+      id: cpr1
+      with:
+        token: ${{ inputs.HRA_GITHUB_TOKEN }}
+        title: update ${{ inputs.update_source }} on ${{ inputs.branch }}
+        branch: auto-update/${{ inputs.branch }}/${{ inputs.update_source }}
+        labels: |
+          release
+        draft: false
+        delete-branch: true
+        reviewers: steveej
+    - name: Enable Pull Request Automerge
+      if: steps.cpr1.outputs.pull-request-operation == 'created' || steps.cpr1.outputs.pull-request-operation == 'updated'
+      uses: peter-evans/enable-pull-request-automerge@v1
+      with:
+        token: ${{ inputs.HRA_GITHUB_TOKEN}}
+        pull-request-number: ${{ steps.cpr1.outputs.pull-request-number }}
+        merge-method: squash
+    - name: Auto approve Pull Request
+      if: steps.cpr1.outputs.pull-request-operation == 'created' || steps.cpr1.outputs.pull-request-operation == 'updated'
+      uses: juliangruber/approve-pull-request-action@v1
+      with:
+        github-token: ${{ inputs.GITHUB_TOKEN }}
+        number: ${{ steps.cpr1.outputs.pull-request-number }}
