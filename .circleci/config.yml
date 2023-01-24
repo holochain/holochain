@@ -94,9 +94,7 @@ jobs:
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
-         NUM_JOBS: 1
          GOMAXPROCS: 1
-         CARGO_NEXTEST_ARGS: "run --test-threads=2 --build-jobs=1"
       steps:
          - checkout
          - run: git config --global --unset url.ssh://git@github.com.insteadof
@@ -122,9 +120,7 @@ jobs:
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
-         NUM_JOBS: 1
          GOMAXPROCS: 1
-         CARGO_NEXTEST_ARGS: "run --test-threads=2 --build-jobs=1"
       steps:
          - checkout
          - run: git config --global --unset url.ssh://git@github.com.insteadof

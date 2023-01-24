@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Adds feature flipper `tx5` which enables experimental integration with holochains WebRTC networking backend. This is not enabled by default.
+- Adds feature flipper `tx5` which enables experimental integration with holochains WebRTC networking backend. This is not enabled by default. [\#1741](https://github.com/holochain/holochain/pull/1741)
 
 ## 0.1.0-beta-rc.2
 

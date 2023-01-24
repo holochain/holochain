@@ -7031,9 +7031,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ec3f91a213b496a2835d8c93d248dfeb3c891a54a72b001976d3c1f2be04b52"
+checksum = "a80ab97492505545ecfdd2f1c3996cbf22a815d76eb898bb39bf7dbbef5b5e4c"
 dependencies = [
  "futures",
  "once_cell",
@@ -7063,9 +7063,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a5e0639301bbc48039f4ffcc2abf09e5bea48abb78a577c6f1d519a8bbe30c6"
+checksum = "ec23921731761c1fd6290071e7252439db641608b9ced5e6ef1de17721847856"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -7076,9 +7076,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.1-alpha.4"
+version = "0.0.1-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90715363fedbb2046377aac06ddf410b40d3df47d3d9626f59ad890609368a5f"
+checksum = "5ba8e0d086d4f34ff00d4170bba9ba4dbd12465b4c39ceaf541626454385d16b"
 dependencies = [
  "Inflector",
  "libc",
