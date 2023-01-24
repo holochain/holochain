@@ -32,5 +32,5 @@ Each of the following headings represent one pre-built _holochainVersionId_ and 
 - holochain-0.1.0-beta-rc.4: https://github.com/holochain/holochain/tree/holochain-0.1.0-beta-rc.4
 - kitsune-p2p-tx2-proxy-0.1.0-beta-rc.2: https://github.com/holochain/holochain/tree/holochain-0.1.0-beta-rc.4
 - lair-keystore-0.2.3: https://github.com/holochain/lair/tree/lair_keystore_api-v0.2.3
-- launcher-0.0.5: https://github.com/holochain/launcher/tree/holochain_cli_launch-0.0.5
+- launcher-0.0.6: https://github.com/holochain/launcher/tree/holochain_cli_launch-0.0.7
 - scaffolding-0.0.6: https://github.com/holochain/scaffolding/tree/holochain_scaffolding_cli-v0.0.6

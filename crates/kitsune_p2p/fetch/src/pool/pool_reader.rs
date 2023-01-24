@@ -86,7 +86,7 @@ mod tests {
 
     use kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
 
-    use crate::{queue::tests::*, State};
+    use crate::{pool::tests::*, State};
 
     use super::*;
 
