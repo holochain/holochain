@@ -94,6 +94,8 @@ jobs:
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
+         NUM_JOBS: 2
+         GOMAXPROCS: 2
       steps:
          - checkout
          - run: git config --global --unset url.ssh://git@github.com.insteadof
@@ -119,6 +121,8 @@ jobs:
       environment:
          CACHIX_NAME: holochain-ci
          NIXPKGS_ALLOW_UNFREE: 1
+         NUM_JOBS: 2
+         GOMAXPROCS: 2
       steps:
          - checkout
          - run: git config --global --unset url.ssh://git@github.com.insteadof
