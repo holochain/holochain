@@ -2551,7 +2551,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.82"
-source = "git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization-dylib#c709d9b317c02f07da980af39ccb48074b9e803e"
+source = "git+https://github.com/Sprillow/holochain-wasmer.git?rev=9332ca94ec114bab455dba39f5908059caa2cdc0#9332ca94ec114bab455dba39f5908059caa2cdc0"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -2577,11 +2577,11 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.82"
-source = "git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization-dylib#c709d9b317c02f07da980af39ccb48074b9e803e"
+source = "git+https://github.com/Sprillow/holochain-wasmer.git?rev=9332ca94ec114bab455dba39f5908059caa2cdc0#9332ca94ec114bab455dba39f5908059caa2cdc0"
 dependencies = [
  "bimap",
  "holochain_serialized_bytes",
- "holochain_wasmer_common 0.0.82 (git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization-dylib)",
+ "holochain_wasmer_common 0.0.82 (git+https://github.com/Sprillow/holochain-wasmer.git?rev=9332ca94ec114bab455dba39f5908059caa2cdc0)",
  "once_cell",
  "parking_lot 0.12.1",
  "rand 0.8.5",
