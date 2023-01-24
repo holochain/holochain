@@ -232,10 +232,12 @@ impl State {
 
                 let size = v.size.unwrap_or_default().get();
                 format!(
-                    "{:10}  {:^6} {:^6?} {:>6}",
+                    "{:10}  {:^6} {:^6} {:>6}",
                     key,
                     v.sources.0.len(),
-                    v.last_fetch.map(|t| t.elapsed()).unwrap_or(Duration::ZERO),
+                    v.last_fetch
+                        .map(|t| format!("{:?}", t.elapsed()))
+                        .unwrap_or("-".to_string()),
                     size.human_count_bytes(),
                 )
             })

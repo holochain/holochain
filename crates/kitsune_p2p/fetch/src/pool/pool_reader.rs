@@ -50,6 +50,11 @@ impl FetchPoolReader {
         };
         FetchPoolInfoStateful { current, max }
     }
+
+    /// Get a concise textual summary of the contents of the FetchPool
+    pub fn summary(&self) -> String {
+        self.pool.state.share_ref(|s| s.summary())
+    }
 }
 
 impl std::fmt::Debug for FetchPoolReader {
@@ -58,11 +63,6 @@ impl std::fmt::Debug for FetchPoolReader {
             .field("queue", &self.pool)
             .field("max_info", &self.max_info.share_ref(|i| i.clone()))
             .finish()
-    }
-
-    /// Get a concise textual summary of the contents of the FetchPool
-    pub fn summary(&self) -> String {
-        self.0.state.share_ref(|s| s.summary())
     }
 }
 
