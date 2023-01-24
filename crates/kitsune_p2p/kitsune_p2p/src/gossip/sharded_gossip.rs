@@ -11,7 +11,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
-use kitsune_p2p_fetch::{FetchQueue, FetchQueueReader, FetchSource, OpHashSized};
+use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -174,7 +174,7 @@ impl ShardedGossip {
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
-        fetch_queue: FetchQueue,
+        fetch_pool: FetchPool,
         #[cfg(feature = "test")] enable_history: bool,
     ) -> Arc<Self> {
         #[cfg(feature = "test")]
@@ -198,7 +198,7 @@ impl ShardedGossip {
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
-                fetch_queue,
+                fetch_pool,
             },
             bandwidth,
         });
@@ -431,7 +431,7 @@ pub struct ShardedGossipLocal {
     host_api: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
-    fetch_queue: FetchQueue,
+    fetch_pool: FetchPool,
 }
 
 /// Incoming gossip.
@@ -1347,7 +1347,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
-        fetch_queue: FetchQueue,
+        fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1358,7 +1358,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
-            fetch_queue,
+            fetch_pool,
         ))
     }
 }
@@ -1382,7 +1382,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
-        fetch_queue: FetchQueue,
+        fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1393,7 +1393,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             GossipType::Historical,
             self.bandwidth.clone(),
             metrics,
-            fetch_queue,
+            fetch_pool,
         ))
     }
 }
@@ -1446,6 +1446,6 @@ impl TryFrom<u8> for MissingOpsStatus {
 pub struct KitsuneDiagnostics {
     /// Access to metrics info
     pub metrics: MetricsSync,
-    /// Access to FetchQueue,
-    pub fetch_queue: FetchQueueReader,
+    /// Access to FetchPool,
+    pub fetch_pool: FetchPoolReader,
 }

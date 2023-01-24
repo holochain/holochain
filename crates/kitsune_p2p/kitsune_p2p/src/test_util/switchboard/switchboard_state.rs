@@ -141,7 +141,7 @@ impl Switchboard {
             self.gossip_type,
             bandwidth,
             Default::default(),
-            kitsune_p2p_fetch::FetchQueue::new_bitwise_or(),
+            kitsune_p2p_fetch::FetchPool::new_bitwise_or(),
         );
         let gossip_module = GossipModule(gossip.clone());
 

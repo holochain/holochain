@@ -3,7 +3,7 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchQueueInfo;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfo;
 use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
@@ -400,7 +400,7 @@ impl From<AppInfoStatus> for AppStatus {
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct NetworkInfo {
-    pub fetch_queue_info: FetchQueueInfo,
+    pub fetch_pool_info: FetchPoolInfo,
 }
 
 #[test]
