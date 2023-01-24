@@ -49,10 +49,11 @@ exclude = ["crates/release-automation"]
 
 [profile.fast-test]
 inherits = "dev"
+debug = 1
 
 [profile.fast-test.package."*"]
 opt-level = 3
-debug = true
+debug = 1
 debug-assertions = false
 overflow-checks = false
 incremental = false
