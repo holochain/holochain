@@ -805,8 +805,8 @@ mod network_impls {
         ) -> ConductorResult<Vec<NetworkInfo>> {
             futures::future::join_all(dnas.iter().map(|dna| async move {
                 let d = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
-                let fetch_queue_info = d.fetch_queue.info([dna.to_kitsune()].into_iter().collect());
-                ConductorResult::Ok(NetworkInfo { fetch_queue_info })
+                let fetch_pool_info = d.fetch_pool.info([dna.to_kitsune()].into_iter().collect());
+                ConductorResult::Ok(NetworkInfo { fetch_pool_info })
             }))
             .await
             .into_iter()

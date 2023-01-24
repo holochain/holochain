@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use crate::{event::*, KitsuneHost};
 use futures::FutureExt;
-use kitsune_p2p_fetch::{FetchQueueConfig, OpHashSized};
+use kitsune_p2p_fetch::{FetchPoolConfig, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::combinators::second;
@@ -47,7 +47,7 @@ impl SwitchboardEventHandler {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEventHandler {}
 impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
 
-impl FetchQueueConfig for SwitchboardEventHandler {
+impl FetchPoolConfig for SwitchboardEventHandler {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }

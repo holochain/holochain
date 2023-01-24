@@ -1,7 +1,7 @@
-//! The Fetch Queue: a structure to store ops-to-be-fetched.
+//! The Fetch Pool: a structure to store ops-to-be-fetched.
 //!
 //! When we encounter an op hash that we have no record of, we store it as an item
-//! at the end of the FetchQueue. The items of the queue contain not only the op hash,
+//! at the end of the FetchPool. The items of the queue contain not only the op hash,
 //! but also the source(s) to fetch it from, and other data including the last time
 //! a fetch was attempted.
 //!
@@ -16,20 +16,20 @@ use tokio::time::{Duration, Instant};
 use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KAgent, KSpace /*, Tx2Cert*/};
 use linked_hash_map::{Entry, LinkedHashMap};
 
-use crate::{FetchContext, FetchKey, FetchQueuePush, RoughInt};
+use crate::{FetchContext, FetchKey, FetchPoolPush, RoughInt};
 
-mod queue_reader;
-pub use queue_reader::*;
+mod pool_reader;
+pub use pool_reader::*;
 
 /// Max number of queue items to check on each `next()` poll
 const NUM_ITEMS_PER_POLL: usize = 100;
 
-/// A FetchQueue tracks a set of [`FetchKey`]s (op hashes or regions) to be fetched,
+/// A FetchPool tracks a set of [`FetchKey`]s (op hashes or regions) to be fetched,
 /// each of which can have multiple sources associated with it.
 ///
 /// When adding the same key twice, the sources are merged by appending the newest
 /// source to the front of the list of sources, and the contexts are merged by the
-/// method defined in [`FetchQueueConfig`].
+/// method defined in [`FetchPoolConfig`].
 ///
 /// The queue items can be accessed only through its Iterator implementation.
 /// Each item contains a FetchKey and one Source agent from which to fetch it.
@@ -37,23 +37,23 @@ const NUM_ITEMS_PER_POLL: usize = 100;
 /// It is important to use the iterator lazily, and only take what is needed.
 /// Accessing any item through iteration implies that a fetch was attempted.
 #[derive(Clone)]
-pub struct FetchQueue {
+pub struct FetchPool {
     config: FetchConfig,
     state: ShareOpen<State>,
 }
 
-impl std::fmt::Debug for FetchQueue {
+impl std::fmt::Debug for FetchPool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.state
-            .share_ref(|state| f.debug_struct("FetchQueue").field("state", state).finish())
+            .share_ref(|state| f.debug_struct("FetchPool").field("state", state).finish())
     }
 }
 
 /// Alias
-pub type FetchConfig = Arc<dyn FetchQueueConfig>;
+pub type FetchConfig = Arc<dyn FetchPoolConfig>;
 
 /// Host-defined details about how the fetch queue should function
-pub trait FetchQueueConfig: 'static + Send + Sync {
+pub trait FetchPoolConfig: 'static + Send + Sync {
     /// How long between successive item fetches, regardless of source?
     /// This gives a source a fair chance to respond before proceeding with a
     /// different source.
@@ -79,11 +79,11 @@ pub trait FetchQueueConfig: 'static + Send + Sync {
     fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32;
 }
 
-/// The actual inner state of the FetchQueue, from which items can be obtained
+/// The actual inner state of the FetchPool, from which items can be obtained
 #[derive(Debug)]
 pub struct State {
     /// Items ready to be fetched
-    queue: LinkedHashMap<FetchKey, FetchQueueItem>,
+    queue: LinkedHashMap<FetchKey, FetchPoolItem>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -95,10 +95,10 @@ impl Default for State {
     }
 }
 
-/// A mutable iterator over the FetchQueue State
+/// A mutable iterator over the FetchPool State
 pub struct StateIter<'a> {
     state: &'a mut State,
-    config: &'a dyn FetchQueueConfig,
+    config: &'a dyn FetchPoolConfig,
 }
 
 /// Fetch item within the fetch queue state.
@@ -107,7 +107,7 @@ struct Sources(Vec<SourceRecord>);
 
 /// An item in the queue, corresponding to a single op or region to fetch
 #[derive(Debug, PartialEq, Eq)]
-pub struct FetchQueueItem {
+pub struct FetchPoolItem {
     /// Known sources from whom we can fetch this item.
     /// Sources will always be tried in order.
     sources: Sources,
@@ -136,15 +136,15 @@ pub enum FetchSource {
 
 // TODO: move this to host, but for now, for convenience, we just use this one config
 // for every queue
-struct FetchQueueConfigBitwiseOr;
+struct FetchPoolConfigBitwiseOr;
 
-impl FetchQueueConfig for FetchQueueConfigBitwiseOr {
+impl FetchPoolConfig for FetchPoolConfigBitwiseOr {
     fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
         a | b
     }
 }
 
-impl FetchQueue {
+impl FetchPool {
     /// Constructor
     pub fn new(config: FetchConfig) -> Self {
         Self {
@@ -156,7 +156,7 @@ impl FetchQueue {
     /// Constructor, using only the "hardcoded" config (TODO: remove)
     pub fn new_bitwise_or() -> Self {
         Self {
-            config: Arc::new(FetchQueueConfigBitwiseOr),
+            config: Arc::new(FetchPoolConfigBitwiseOr),
             state: ShareOpen::new(State::default()),
         }
     }
@@ -165,10 +165,10 @@ impl FetchQueue {
     /// If the FetchKey does not already exist, add it to the end of the queue.
     /// If the FetchKey exists, add the new source and merge the context in, without
     /// changing the position in the queue.
-    pub fn push(&self, args: FetchQueuePush) {
+    pub fn push(&self, args: FetchPoolPush) {
         self.state.share_mut(|s| {
             tracing::debug!(
-                "FetchQueue (size = {}) item added: {:?}",
+                "FetchPool (size = {}) item added: {:?}",
                 s.queue.len() + 1,
                 args
             );
@@ -177,11 +177,11 @@ impl FetchQueue {
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    pub fn remove(&self, key: &FetchKey) -> Option<FetchQueueItem> {
+    pub fn remove(&self, key: &FetchKey) -> Option<FetchPoolItem> {
         self.state.share_mut(|s| {
             let removed = s.remove(key);
             tracing::debug!(
-                "FetchQueue (size = {}) item removed: key={:?} val={:?}",
+                "FetchPool (size = {}) item removed: key={:?} val={:?}",
                 s.queue.len(),
                 key,
                 removed
@@ -209,8 +209,8 @@ impl State {
     /// If the FetchKey does not already exist, add it to the end of the queue.
     /// If the FetchKey exists, add the new source and merge the context in, without
     /// changing the position in the queue.
-    pub fn push(&mut self, config: &dyn FetchQueueConfig, args: FetchQueuePush) {
-        let FetchQueuePush {
+    pub fn push(&mut self, config: &dyn FetchPoolConfig, args: FetchPoolPush) {
+        let FetchPoolPush {
             key,
             author,
             context,
@@ -226,7 +226,7 @@ impl State {
                 } else {
                     Sources(vec![SourceRecord::new(source)])
                 };
-                let item = FetchQueueItem {
+                let item = FetchPoolItem {
                     sources,
                     space,
                     size,
@@ -250,7 +250,7 @@ impl State {
     /// to the end of the queue.
     ///
     /// Only items whose `last_fetch` is more than `interval` ago will be returned.
-    pub fn iter_mut<'a>(&'a mut self, config: &'a dyn FetchQueueConfig) -> StateIter {
+    pub fn iter_mut<'a>(&'a mut self, config: &'a dyn FetchPoolConfig) -> StateIter {
         StateIter {
             state: self,
             config,
@@ -258,7 +258,7 @@ impl State {
     }
 
     /// When an item has been successfully fetched, we can remove it from the queue.
-    pub fn remove(&mut self, key: &FetchKey) -> Option<FetchQueueItem> {
+    pub fn remove(&mut self, key: &FetchKey) -> Option<FetchPoolItem> {
         self.queue.remove(key)
     }
 }
@@ -342,7 +342,7 @@ mod tests {
 
     pub(super) struct Config(pub u32, pub u32);
 
-    impl FetchQueueConfig for Config {
+    impl FetchPoolConfig for Config {
         fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
             (a + b).min(1)
         }
@@ -360,8 +360,8 @@ mod tests {
         FetchKey::Op(Arc::new(KitsuneOpHash::new(vec![n; 36])))
     }
 
-    pub(super) fn req(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchQueuePush {
-        FetchQueuePush {
+    pub(super) fn req(n: u8, context: Option<FetchContext>, source: FetchSource) -> FetchPoolPush {
+        FetchPoolPush {
             key: key_op(n),
             author: None,
             context,
@@ -372,11 +372,11 @@ mod tests {
     }
 
     pub(super) fn item(
-        _cfg: &dyn FetchQueueConfig,
+        _cfg: &dyn FetchPoolConfig,
         sources: Vec<FetchSource>,
         context: Option<FetchContext>,
-    ) -> FetchQueueItem {
-        FetchQueueItem {
+    ) -> FetchPoolItem {
+        FetchPoolItem {
             sources: Sources(sources.into_iter().map(|s| SourceRecord::new(s)).collect()),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,
