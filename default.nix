@@ -84,4 +84,6 @@ in {
   # };
 
   shells = callPackage ./nix/shells.nix { inherit holonix pkgs; };
+
+  holonixVanilla = import ./holonix holonixArgs;
 }
