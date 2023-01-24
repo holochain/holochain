@@ -18,8 +18,9 @@ else
   holochain-nixpkgs.pkgs.rust.mkRust ({
     track = "stable";
     version = "latest";
-  } // (if rustVersion != null then rustVersion else { }))) }:
-  
+  } // (if rustVersion != null then rustVersion else { }))), inNixShell ? false
+}:
+
 let
   holochainVersionFinal = if holochainVersionId == "custom" then
     if holochainVersion == null then
