@@ -36,7 +36,7 @@ of the data. In practice, this means three things:
 - entry type definitions
 - link type definitions
 - a validation callback that constrains the kinds of data that can validly be called entries
-and links of those types (see also [`validate`](prelude::validate)).
+and links of those types (see also [`holochain_integrity_types::Op`]).
 
 **The coordination zomes comprise the application's controller layer** — the code that actually
 writes and retrieves data, handles countersigning sessions and sends and receives messages
@@ -57,9 +57,12 @@ zomes, i. e. a shared data model.
 ## Data validation
 
 The second fundamental part of integrity zomes is data validation. For every [operation](holochain_integrity_types::Op)
-that can be performed on the data, a validation rule can be specified. Both data types and data
-values can be validated. All of these validation rules are written in a central callback
-which is called by the Holochain engine for each operation.
+that is produced by an [action](holochain_integrity_types::Action), a
+validation rule can be specified. Both data types and data values can be
+validated.
+
+All of these validation rules are declared in the `validate` callback. It
+is executed for a new action by each validation authority.
 
 There's a helper type called [`OpType`](holochain_integrity_types::OpType) available for easy
 access to all link and entry variants when validating an operation. In many cases, this type can
@@ -96,7 +99,7 @@ Many more validation examples can be browsed in that very workspace.
 ## License
  [![License: CAL 1.0](https://img.shields.io/badge/License-CAL-1.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
 
-Copyright (C) 2019 - 2022, Holochain Foundation
+Copyright (C) 2019 - 2023, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,

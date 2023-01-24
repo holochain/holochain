@@ -1,5 +1,5 @@
 [![Project](https://img.shields.io/badge/Project-Holochain-blue.svg?style=flat-square)](http://holochain.org/)
-[![Forum](https://img.shields.io/badge/Forum-forum%2eholochain%2enet-blue.svg?style=flat-square)](https://forum.holochain.org)
+[![Discord](https://img.shields.io/badge/Discord-blue.svg?style=flat-square)](https://discord.gg/k55DS5dmPH)
 [![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
 ![Test](https://github.com/holochain/holochain-client-js/actions/workflows/test.yml/badge.svg?branch=main)
 [![Twitter Follow](https://img.shields.io/twitter/follow/holochain.svg?style=social&label=Follow)](https://twitter.com/holochain)
@@ -56,7 +56,7 @@ Furthermore there's a tutorial on how to [build a hApp](https://github.com/holoc
 
 Holochain is an open source project. We welcome all sorts of participation and are actively working on increasing surface area to accept it. Please see our [contributing guidelines](/CONTRIBUTING.md) for our general practices and protocols on participating in the community, as well as specific expectations around things like code formatting, testing practices, continuous integration, etc.
 
-> Connect with us on [Discord](https://discord.gg/MwPvM4Vffg) and [our forum](https://forum.holochain.org).
+> Connect with us on [Discord](https://discord.gg/MwPvM4Vffg)
 
 #### Development environment setup
 
@@ -104,7 +104,7 @@ As well as creating the config file, this process also instantiates the database
 
 ## License
 
-Copyright (C) 2019-2022, Holochain Foundation
+Copyright (C) 2019 - 2023, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0). This program is distributed in the hope that it will be useful,

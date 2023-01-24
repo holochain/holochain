@@ -263,7 +263,7 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           cat <<EOF >> "${HOLOCHAIN_RELEASE_SH}"
-          export TAG=$(git tag --list | grep holochain- | tail -n1)
+          export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
           export VERSION=\${TAG/holochain-/}
           export VERSION_COMPAT="v\${VERSION//./_}"
           export RELEASE_BRANCH=$(git branch --show-current)

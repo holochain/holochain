@@ -141,11 +141,20 @@ Holochain will merge multiple callback results for the same callback in a contex
 
 The callbacks are:
 
-- `fn entry_defs(_: ()) -> ExternResult<EntryDefs>`:
+- `fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult>`:
+  - Typically implemented automatically by macros in the HDK so does NOT
+    require writing the extern for it manually.
   - `EntryDefs` is a vector defining all entries used by this app.
   - All zomes in a DNA define all their entries at the same time for the host.
   - All entry defs are combined into a single ordered list per zome and exposed to tooling such as DNA generation.
   - Entry defs are referenced by `u8` numerical position externally and in DHT actions, and by id/name e.g. "post" in sparse callbacks.
+- `fn genesis_self_check(_: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult>`:
+  - Allows each agent to validate itself before attempting to join the
+    network.
+  - Receives `GenesisSelfCheckData` that includes DNA information, the agent
+    key for the candidate source chain and the membrane proof.
+  - Runs _before the agent exists on the network_ so has no ability to use
+    the network and generally only has access to deterministic HDK functions.
 - `fn init(_: ()) -> ExternResult<InitCallbackResult>`:
   - Allows the guest to pass/fail/retry initialization with [`InitCallbackResult`](holochain_zome_types::init::InitCallbackResult).
   - Lazy execution - only runs when any zome of the DNA is first called.
@@ -163,12 +172,6 @@ The callbacks are:
   - Executes after the WASM call that originated the commits so not bound by the original atomic transaction.
   - Input is all the action hashes that were committed.
   - The zome that originated the commits is called.
-- `fn validate_create_link(create_link_data: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
-  - Allows the guest to pass/fail/retry link creation validation.
-  - Only the zome that created the link is called.
-- `fn validate_delete_link(delete_link_data: ValidateDeleteLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
-  - Allows the guest to pass/fail/retry link deletion validation.
-  - Only the zome that deleted the link is called.
 - `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>`:
   - Allows the guest to pass/fail/retry any operation.
   - Only the originating zome is called.

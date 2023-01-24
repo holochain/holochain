@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.1.0-beta-rc.3
+
+- Added the `author` field to the `Link` struct for easy access after a `get_links` call.
+
+## 0.1.0-beta-rc.2
+
 ## 0.1.0-beta-rc.1
 
 ## 0.1.0-beta-rc.0

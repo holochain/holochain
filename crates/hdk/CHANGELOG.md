@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add note in HDK documentation about links not deduplicating. ([#1791](https://github.com/holochain/holochain/pull/1791))
+
+## 0.1.0-beta-rc.3
+
+- Fix typos and links in docs and add links to wasm examples.
+
+## 0.1.0-beta-rc.2
+
 ## 0.1.0-beta-rc.1
 
 ## 0.1.0-beta-rc.0

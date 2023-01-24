@@ -7,12 +7,12 @@
 use kitsune_p2p_types::{dht::region::RegionCoords, KAgent, KOpHash, KSpace};
 
 mod error;
-mod queue;
+mod pool;
 mod respond;
 mod rough_sized;
 
 pub use error::*;
-pub use queue::*;
+pub use pool::*;
 pub use respond::*;
 pub use rough_sized::*;
 
@@ -31,7 +31,7 @@ pub enum FetchKey {
 
 /// A fetch "unit" that can be de-duplicated.
 #[derive(Debug, Clone, PartialEq)]
-pub struct FetchQueuePush {
+pub struct FetchPoolPush {
     /// Description of what to fetch.
     pub key: FetchKey,
 

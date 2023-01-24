@@ -1,6 +1,6 @@
 [package]
 name = "mr_bundle"
-version = "0.1.0-beta-rc.0"
+version = "0.1.0-beta-rc.2"
 authors = ["Michael Dougherty <maackle.d@gmail.com>"]
 edition = "2021"
 description = "Implements the un-/packing of bundles that either embed or reference a set of resources"
