@@ -214,7 +214,10 @@ impl State {
     }
 
     /// Get a string summary of the queue's contents
+    #[cfg(feature = "test_utils")]
     pub fn summary(&self) -> String {
+        use human_repr::HumanCount;
+
         let table = self
             .queue
             .iter()
@@ -226,7 +229,15 @@ impl State {
                     }
                     FetchKey::Region(_) => "[region]".to_string(),
                 };
-                format!("{:10}  {}", key, v.sources.0.len())
+
+                let size = v.size.unwrap_or_default().get();
+                format!(
+                    "{:10}  {:^6} {:^6?} {:>6}",
+                    key,
+                    v.sources.0.len(),
+                    v.last_fetch.map(|t| t.elapsed()).unwrap_or(Duration::ZERO),
+                    size.human_count_bytes(),
+                )
             })
             .collect::<Vec<_>>()
             .join("\n");
@@ -234,8 +245,9 @@ impl State {
     }
 
     /// The heading to go along with the summary
+    #[cfg(feature = "test_utils")]
     pub fn summary_heading() -> String {
-        format!("{:10}  {}", "key", "s")
+        format!("{:10}  {:>6} {:>6} {}", "key", "#src", "last", "size")
     }
 }
 

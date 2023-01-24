@@ -59,6 +59,11 @@ impl std::fmt::Debug for FetchPoolReader {
             .field("max_info", &self.max_info.share_ref(|i| i.clone()))
             .finish()
     }
+
+    /// Get a concise textual summary of the contents of the FetchPool
+    pub fn summary(&self) -> String {
+        self.0.state.share_ref(|s| s.summary())
+    }
 }
 
 /// Info about the fetch queue
@@ -112,6 +117,8 @@ mod tests {
                 max_info: Arc::new(ShareOpen::new(Default::default())),
             }
         };
+        println!("{}", State::summary_heading());
+        println!("{}", q.summary());
         let info = q.info([space(0)].into_iter().collect());
         // The item without a size is not returned.
         assert_eq!(info.current.num_ops_to_fetch, 2);
