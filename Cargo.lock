@@ -2055,7 +2055,7 @@ dependencies = [
  "holochain_types",
  "holochain_util",
  "holochain_wasm_test_utils",
- "holochain_wasmer_host 0.0.82 (git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization)",
+ "holochain_wasmer_host",
  "holochain_websocket",
  "holochain_zome_types",
  "hostname",
@@ -2551,7 +2551,7 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_common"
 version = "0.0.82"
-source = "git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization#df221db7ea253238dc8ba0691496efd7b7297950"
+source = "git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization-dylib#c709d9b317c02f07da980af39ccb48074b9e803e"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -2577,28 +2577,11 @@ dependencies = [
 [[package]]
 name = "holochain_wasmer_host"
 version = "0.0.82"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc0227cea8181e9c4f6496981bfe426ad5fcb692f9e3f59f22df4f6d2c40bffa"
+source = "git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization-dylib#c709d9b317c02f07da980af39ccb48074b9e803e"
 dependencies = [
  "bimap",
  "holochain_serialized_bytes",
- "holochain_wasmer_common 0.0.82 (registry+https://github.com/rust-lang/crates.io-index)",
- "once_cell",
- "parking_lot 0.12.1",
- "rand 0.8.5",
- "serde",
- "tracing",
- "wasmer",
-]
-
-[[package]]
-name = "holochain_wasmer_host"
-version = "0.0.82"
-source = "git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization#df221db7ea253238dc8ba0691496efd7b7297950"
-dependencies = [
- "bimap",
- "holochain_serialized_bytes",
- "holochain_wasmer_common 0.0.82 (git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization)",
+ "holochain_wasmer_common 0.0.82 (git+https://github.com/Sprillow/holochain-wasmer.git?branch=preserialization-dylib)",
  "once_cell",
  "parking_lot 0.12.1",
  "rand 0.8.5",
@@ -3751,7 +3734,7 @@ dependencies = [
  "flate2",
  "futures",
  "holochain_util",
- "holochain_wasmer_host 0.0.82 (registry+https://github.com/rust-lang/crates.io-index)",
+ "holochain_wasmer_host",
  "maplit",
  "matches",
  "reqwest",

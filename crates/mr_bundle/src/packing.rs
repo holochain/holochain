@@ -7,7 +7,7 @@ use crate::{
 };
 use holochain_util::ffs;
 use holochain_wasmer_host::prelude::*;
-use std::{path::Path, sync::Arc};
+use std::{path::Path, str::FromStr, sync::Arc};
 use wasmer_middlewares::Metering;
 
 const WASM_METERING_LIMIT: u64 = 100_000_000_000;
@@ -60,7 +60,15 @@ impl<M: Manifest> Bundle<M> {
                     {
                         println!("Found wasm and was instructed to serialize it to wasmer format, doing so now...");
                         let compiler_config = cranelift();
-                        let store = Store::new(&Universal::new(compiler_config).engine());
+                        // use what I see in
+                        // platform ios headless example
+                        // https://github.com/wasmerio/wasmer/blob/447c2e3a152438db67be9ef649327fabcad6f5b8/examples/platform_ios_headless.rs#L38-L53
+                        let triple = Triple::from_str("aarch64-apple-ios").unwrap();
+                        let mut cpu_feature = CpuFeature::set();
+                        cpu_feature.insert(CpuFeature::from_str("sse2").unwrap());
+                        let target = Target::new(triple, cpu_feature);
+                        let engine = Dylib::new(compiler_config).target(target).engine();
+                        let store = Store::new(&engine);
                         let module = Module::from_binary(&store, resource.as_slice())
                             .unwrap();
                         let serialized_module = module
