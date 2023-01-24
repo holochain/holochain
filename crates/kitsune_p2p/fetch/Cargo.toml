@@ -25,6 +25,8 @@ tokio = { version = "1.11", features = [ "full" ] }
 tracing = "0.1.29"
 linked-hash-map = "0.5.6"
 
+human-repr = { version = "1", optional = true}
+
 [dev-dependencies]
 kitsune_p2p_fetch = { path = ".", features = ["test_utils"]}
 holochain_serialized_bytes = "0.0.51"
@@ -34,5 +36,5 @@ test-case = "1.2"
 tokio = { version = "1.11", features = [ "full", "test-util" ] }
 
 [features]
-test_utils = []
+test_utils = ["human-repr"]
 default = ["test_utils"]

@@ -2593,7 +2593,7 @@ dependencies = [
  "observability",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -2815,6 +2815,12 @@ dependencies = [
  "toml",
  "uuid 0.8.2",
 ]
+
+[[package]]
+name = "human-repr"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0fb489e3108b684bba475a4cb9804260365870e2f60058265e3d0a3b309bdb1"
 
 [[package]]
 name = "hyper"
@@ -3237,6 +3243,7 @@ dependencies = [
  "derive_more",
  "futures",
  "holochain_serialized_bytes",
+ "human-repr",
  "kitsune_p2p_fetch",
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
