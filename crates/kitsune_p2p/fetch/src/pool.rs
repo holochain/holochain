@@ -42,108 +42,6 @@ pub struct FetchPool {
     state: ShareOpen<State>,
 }
 
-impl std::fmt::Debug for FetchPool {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.state
-            .share_ref(|state| f.debug_struct("FetchPool").field("state", state).finish())
-    }
-}
-
-/// Alias
-pub type FetchConfig = Arc<dyn FetchPoolConfig>;
-
-/// Host-defined details about how the fetch queue should function
-pub trait FetchPoolConfig: 'static + Send + Sync {
-    /// How long between successive item fetches, regardless of source?
-    /// This gives a source a fair chance to respond before proceeding with a
-    /// different source.
-    ///
-    /// The most conservative setting for this is `2 * tuning_params.implicit_timeout`,
-    /// since that is the maximum amount of time a successful response can take.
-    /// Lower values will give up early and may result in duplicate data sent if the
-    /// response takes a long time to come back.
-    fn item_retry_delay(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(90)
-    }
-
-    /// How long between successive fetches from a particular source, for a particular item?
-    /// This protects us from wasting resources on a source which may be offline.
-    /// This will eventually be replaced with an exponential backoff which will be
-    /// tracked for this source across all items.
-    fn source_retry_delay(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(5 * 60)
-    }
-
-    /// When a fetch key is added twice, this determines how the two different contexts
-    /// get reconciled.
-    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32;
-}
-
-/// The actual inner state of the FetchPool, from which items can be obtained
-#[derive(Debug)]
-pub struct State {
-    /// Items ready to be fetched
-    queue: LinkedHashMap<FetchKey, FetchPoolItem>,
-}
-
-#[allow(clippy::derivable_impls)]
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            queue: Default::default(),
-        }
-    }
-}
-
-/// A mutable iterator over the FetchPool State
-pub struct StateIter<'a> {
-    state: &'a mut State,
-    config: &'a dyn FetchPoolConfig,
-}
-
-/// Fetch item within the fetch queue state.
-#[derive(Debug, PartialEq, Eq)]
-struct Sources(Vec<SourceRecord>);
-
-/// An item in the queue, corresponding to a single op or region to fetch
-#[derive(Debug, PartialEq, Eq)]
-pub struct FetchPoolItem {
-    /// Known sources from whom we can fetch this item.
-    /// Sources will always be tried in order.
-    sources: Sources,
-    /// The space to retrieve this op from
-    space: KSpace,
-    /// Approximate size of the item. If set, the item will be counted towards overall progress.
-    size: Option<RoughInt>,
-    /// Opaque user data specified by the host
-    pub context: Option<FetchContext>,
-    /// The last time we tried fetching this item from any source
-    last_fetch: Option<Instant>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct SourceRecord {
-    source: FetchSource,
-    last_request: Option<Instant>,
-}
-
-/// A source to fetch from: either a node, or an agent on a node
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum FetchSource {
-    /// An agent on a node
-    Agent(KAgent),
-}
-
-// TODO: move this to host, but for now, for convenience, we just use this one config
-// for every queue
-struct FetchPoolConfigBitwiseOr;
-
-impl FetchPoolConfig for FetchPoolConfigBitwiseOr {
-    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
-        a | b
-    }
-}
-
 impl FetchPool {
     /// Constructor
     pub fn new(config: FetchConfig) -> Self {
@@ -201,6 +99,59 @@ impl FetchPool {
 
             out
         })
+    }
+}
+
+impl std::fmt::Debug for FetchPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.state
+            .share_ref(|state| f.debug_struct("FetchPool").field("state", state).finish())
+    }
+}
+
+/// Alias
+pub type FetchConfig = Arc<dyn FetchPoolConfig>;
+
+/// Host-defined details about how the fetch queue should function
+pub trait FetchPoolConfig: 'static + Send + Sync {
+    /// How long between successive item fetches, regardless of source?
+    /// This gives a source a fair chance to respond before proceeding with a
+    /// different source.
+    ///
+    /// The most conservative setting for this is `2 * tuning_params.implicit_timeout`,
+    /// since that is the maximum amount of time a successful response can take.
+    /// Lower values will give up early and may result in duplicate data sent if the
+    /// response takes a long time to come back.
+    fn item_retry_delay(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(90)
+    }
+
+    /// How long between successive fetches from a particular source, for a particular item?
+    /// This protects us from wasting resources on a source which may be offline.
+    /// This will eventually be replaced with an exponential backoff which will be
+    /// tracked for this source across all items.
+    fn source_retry_delay(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(5 * 60)
+    }
+
+    /// When a fetch key is added twice, this determines how the two different contexts
+    /// get reconciled.
+    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32;
+}
+
+/// The actual inner state of the FetchPool, from which items can be obtained
+#[derive(Debug)]
+pub struct State {
+    /// Items ready to be fetched
+    queue: LinkedHashMap<FetchKey, FetchPoolItem>,
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            queue: Default::default(),
+        }
     }
 }
 
@@ -263,6 +214,12 @@ impl State {
     }
 }
 
+/// A mutable iterator over the FetchPool State
+pub struct StateIter<'a> {
+    state: &'a mut State,
+    config: &'a dyn FetchPoolConfig,
+}
+
 impl<'a> Iterator for StateIter<'a> {
     type Item = (FetchKey, KSpace, FetchSource, Option<FetchContext>);
 
@@ -292,6 +249,28 @@ impl<'a> Iterator for StateIter<'a> {
     }
 }
 
+/// An item in the queue, corresponding to a single op or region to fetch
+#[derive(Debug, PartialEq, Eq)]
+pub struct FetchPoolItem {
+    /// Known sources from whom we can fetch this item.
+    /// Sources will always be tried in order.
+    sources: Sources,
+    /// The space to retrieve this op from
+    space: KSpace,
+    /// Approximate size of the item. If set, the item will be counted towards overall progress.
+    size: Option<RoughInt>,
+    /// Opaque user data specified by the host
+    pub context: Option<FetchContext>,
+    /// The last time we tried fetching this item from any source
+    last_fetch: Option<Instant>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SourceRecord {
+    source: FetchSource,
+    last_request: Option<Instant>,
+}
+
 impl SourceRecord {
     fn new(source: FetchSource) -> Self {
         Self {
@@ -307,6 +286,10 @@ impl SourceRecord {
         }
     }
 }
+
+/// Fetch item within the fetch queue state.
+#[derive(Debug, PartialEq, Eq)]
+struct Sources(Vec<SourceRecord>);
 
 impl Sources {
     fn next(&mut self, interval: Duration) -> Option<FetchSource> {
@@ -327,6 +310,23 @@ impl Sources {
         } else {
             None
         }
+    }
+}
+
+/// A source to fetch from: either a node, or an agent on a node
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum FetchSource {
+    /// An agent on a node
+    Agent(KAgent),
+}
+
+// TODO: move this to host, but for now, for convenience, we just use this one config
+// for every queue
+struct FetchPoolConfigBitwiseOr;
+
+impl FetchPoolConfig for FetchPoolConfigBitwiseOr {
+    fn merge_fetch_contexts(&self, a: u32, b: u32) -> u32 {
+        a | b
     }
 }
 
