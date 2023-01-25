@@ -391,10 +391,7 @@ impl RealRibosome {
         // watch out for cache misses in the tests that make things slooow if you change this!
         // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
         let mut key = [0; 32];
-        let wasm_zome_hash = self
-            .dna_file
-            .dna()
-            .get_wasm_zome_hash(zome_name)?;
+        let wasm_zome_hash = self.dna_file.dna().get_wasm_zome_hash(zome_name)?;
         let bytes = wasm_zome_hash.get_raw_32();
         key.copy_from_slice(bytes);
         Ok(key)
@@ -434,10 +431,22 @@ impl RealRibosome {
 
     pub fn build_instance(
         &self,
-        zome_name: &ZomeName,
+        zome: &Zome<ZomeDef>,
         context_key: u64,
     ) -> RibosomeResult<Arc<Mutex<Instance>>> {
-        let module = self.runtime_compiled_module(zome_name)?;
+        let module = match &zome.def {
+            ZomeDef::Wasm(_wasm_zome) => self.runtime_compiled_module(zome.zome_name())?,
+            ZomeDef::WasmDylib(wasm_zome_dylib) => {
+                self.precompiled_module(&wasm_zome_dylib.path)?
+            }
+            _ => {
+                // TODO-connor replace error
+                return RibosomeResult::Err(RibosomeError::ZomeFnNotExists(
+                    ZomeName::new("m"),
+                    FunctionName("m".to_string()),
+                ));
+            }
+        };
         let imports: ImportObject = Self::imports(self, context_key, module.store());
         let instance = Arc::new(Mutex::new(Instance::new(&module, &imports).map_err(
             |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
@@ -497,7 +506,7 @@ impl RealRibosome {
         }
         // We didn't get an instance hit so create a new key.
         let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let instance = self.build_instance(call_context.zome.zome_name(), context_key)?;
+        let instance = self.build_instance(&call_context.zome, context_key)?;
 
         // Update the context.
         {
