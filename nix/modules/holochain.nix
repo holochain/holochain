@@ -93,7 +93,8 @@
 
 
     holochain-tests-nextest = craneLib.cargoNextest (commonArgs // {
-      __noChroot = true;
+      # __noChroot = true;
+      __impure = true;
       cargoArtifacts = holochainTestDeps;
       preCheck = ''
         pwd
@@ -109,6 +110,7 @@
 
       dontPatchELF = true;
       dontFixup = true;
+      installPhase = "mkdir $out";
 
       # cargoNextestExtraArgs = lib.concatStringsSep " " disabledTestsArgs;
     });
