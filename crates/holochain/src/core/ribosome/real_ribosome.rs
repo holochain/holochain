@@ -351,13 +351,17 @@ impl RealRibosome {
 
     pub fn precompiled_module(&self, dylib_path: &PathBuf) -> RibosomeResult<Arc<Module>> {
         let store = ios_dylib_store();
+        println!("dylib path {:?}", dylib_path);
         match unsafe { Module::deserialize_from_file(&store, dylib_path) } {
             Ok(module) => Ok(Arc::new(module)),
             // TODO-connor fix to real error
-            Err(e) => Err(RibosomeError::ZomeFnNotExists(
-                ZomeName::from("m"),
-                FunctionName::from("m"),
-            )),
+            Err(e) => {
+                println!("error during deserialize_from_file {:?}", e);
+                Err(RibosomeError::ZomeFnNotExists(
+                    ZomeName::from("this is not the real error"),
+                    FunctionName::from("this is not the real error"),
+                ))
+            }
         }
     }
 
