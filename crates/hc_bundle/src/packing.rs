@@ -93,8 +93,7 @@ pub fn preserialized_module(wasm: &[u8]) -> Module {
     // platform ios headless example
     // https://github.com/wasmerio/wasmer/blob/447c2e3a152438db67be9ef649327fabcad6f5b8/examples/platform_ios_headless.rs#L38-L53
     let triple = Triple::from_str("aarch64-apple-ios").unwrap();
-    let mut cpu_feature = CpuFeature::set();
-    cpu_feature.insert(CpuFeature::from_str("sse2").unwrap());
+    let cpu_feature = CpuFeature::set();
     let target = Target::new(triple, cpu_feature);
     let engine = Dylib::new(compiler_config).target(target).engine();
     let store = Store::new(&engine);

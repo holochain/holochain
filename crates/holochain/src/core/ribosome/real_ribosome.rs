@@ -236,8 +236,7 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
 
 pub fn ios_dylib_store() -> Store {
     let triple = Triple::from_str("aarch64-apple-ios").unwrap();
-    let mut cpu_feature = CpuFeature::set();
-    cpu_feature.insert(CpuFeature::from_str("sse2").unwrap());
+    let cpu_feature = CpuFeature::set();
     let target = Target::new(triple, cpu_feature);
     let engine = Dylib::headless().target(target).engine();
     let store = Store::new(&engine);
