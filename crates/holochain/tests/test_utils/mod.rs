@@ -127,8 +127,7 @@ pub async fn call_zome_fn<S>(
 ) where
     S: Serialize + std::fmt::Debug,
 {
-  let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(Timestamp::now()).unwrap();
-    rand::Rng::fill(&mut rand::thread_rng(), &mut nonce);
+    let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(Timestamp::now()).unwrap();
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
     let zome_call_unsigned = ZomeCallUnsigned {
         cap_secret: Some(cap_secret),
@@ -138,7 +137,7 @@ pub async fn call_zome_fn<S>(
         provenance: signing_key,
         payload: ExternIO::encode(input).unwrap(),
         nonce: Nonce256Bits::from(nonce),
-        expires_at: Timestamp((Timestamp::now().as_millis() + 6000) * 1000),
+        expires_at,
     };
     let signature = signing_keypair.sign(&zome_call_unsigned.data_to_sign().unwrap());
     let call = ZomeCall {
