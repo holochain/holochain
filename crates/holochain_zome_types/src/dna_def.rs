@@ -310,8 +310,8 @@ impl DnaDef {
             .map(|(_, def)| def)
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
             .and_then(|def| match def {
-                ZomeDef::Wasm(wasm_zome) => Ok(wasm_zome.wasm_hash),
-                ZomeDef::WasmDylib(wasm_zome_dylib) => Ok(wasm_zome_dylib.wasm_hash),
+                ZomeDef::Wasm(wasm_zome) => Ok(wasm_zome.wasm_hash.clone()),
+                ZomeDef::WasmDylib(wasm_zome_dylib) => Ok(wasm_zome_dylib.wasm_hash.clone()),
                 _ => Err(ZomeError::NonWasmZome(zome_name.clone())),
             })
     }
