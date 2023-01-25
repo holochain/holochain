@@ -1,6 +1,7 @@
 name: build holochain
 on:
   workflow_dispatch:
+  pull_request:
 
 jobs:
   holochain-binaries:
@@ -9,11 +10,12 @@ jobs:
       matrix:
         nixCommand:
           - "nix build .#holochain --no-link"
+          - "nix build .#holochain-tests-nextest --no-link"
         platform:
           - system: x86_64-darwin
-            runs-on: [self-hosted, macOS, ARM64]
+            runs-on: multi-arch
           - system: aarch64-darwin
-            runs-on: [self-hosted, macOS, ARM64]
+            runs-on: multi-arch
           - system: x86_64-linux
             runs-on: [ubuntu-latest]
         cachixName:
@@ -33,7 +35,7 @@ jobs:
         with:
           install_url: https://releases.nixos.org/nix/nix-2.12.0/install
           extra_nix_config: |
-            experimental-features = flakes nix-command
+            experimental-features = flakes nix-command ci-derivations impure-derivations
       - name: Setup cachix
         uses: cachix/cachix-action@v12
         with:
