@@ -21,13 +21,12 @@ jobs:
 
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
-      - name: "Displays Xcode current version"
-        run: |
-          sudo xcode-select -p || :
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           lfs: false
 
       - name: "Test comand ${{ matrix.nixCommand }}"
-        run: "${{ matrix.nixCommand }} -L --show-trace --system ${{ matrix.platform.system }}"
+        run: |
+          echo $PATH
+          "${{ matrix.nixCommand }} -L --show-trace --system ${{ matrix.platform.system }}"
