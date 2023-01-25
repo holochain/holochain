@@ -25,7 +25,7 @@ pub enum DnaManifest {
 )]
 #[serde(try_from = "DnaManifest")]
 /// A dna manifest that has been successfully validated.
-pub struct ValidatedDnaManifest(pub(super) DnaManifest);
+pub struct ValidatedDnaManifest(pub DnaManifest);
 
 impl mr_bundle::Manifest for ValidatedDnaManifest {
     fn locations(&self) -> Vec<mr_bundle::Location> {
