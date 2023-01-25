@@ -7,6 +7,7 @@ use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::sweettest::*;
+use crate::test_utils::inline_zomes::simple_crud_zome;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
@@ -246,28 +247,69 @@ async fn common_genesis_test_app(
 #[tokio::test(flavor = "multi_thread")]
 async fn test_uninstall_app() {
     observability::test_run().ok();
-    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
+    let (dna, _, _) = mk_dna(simple_crud_zome()).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    common_genesis_test_app(&mut conductor, ("custom", zome))
-        .await
-        .unwrap();
 
-    // - Ensure that the app is active
+    let app1 = conductor.setup_app(&"app1", [&dna]).await.unwrap();
+    let app2 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
+
+    let hash1: ActionHash = conductor
+        .call(
+            &app1.cells()[0].zome("coordinator"),
+            "create_string",
+            "1".to_string(),
+        )
+        .await;
+
+    let hash2: ActionHash = conductor
+        .call(
+            &app2.cells()[0].zome("coordinator"),
+            "create_string",
+            "1".to_string(),
+        )
+        .await;
+
+    assert!(conductor
+        .call::<_, Option<Record>, _>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone(),)
+        .await
+        .is_some());
+    assert!(conductor
+        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone(),)
+        .await
+        .is_some());
+
+    // - Ensure that the apps are active
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
             (state.running_apps().count(), state.stopped_apps().count())
         },
-        (1, 0)
+        (2, 0)
     );
 
     conductor
         .raw_handle()
-        .uninstall_app(&"app".to_string())
+        .uninstall_app(&"app1".to_string())
         .await
         .unwrap();
 
-    // - Ensure that the app is removed
+    // - Ensure that the remaining app can still access both hashes
+    assert!(conductor
+        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone(),)
+        .await
+        .is_some());
+    assert!(conductor
+        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash2.clone(),)
+        .await
+        .is_some());
+
+    conductor
+        .raw_handle()
+        .uninstall_app(&"app2".to_string())
+        .await
+        .unwrap();
+
+    // - Ensure that the apps are removed
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
@@ -275,6 +317,18 @@ async fn test_uninstall_app() {
         },
         (0, 0)
     );
+
+    // - A new app can't read any of the data from the previous two, because once the last instance
+    //   of the cells was destroyed, all data was destroyed as well.
+    let app3 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
+    assert!(conductor
+        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone(),)
+        .await
+        .is_none());
+    assert!(conductor
+        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash2.clone(),)
+        .await
+        .is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]

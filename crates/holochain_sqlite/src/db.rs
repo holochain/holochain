@@ -330,14 +330,30 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Self::new(None, kind, DbSyncLevel::default())
     }
 
-    /// Remove the db and directory
-    #[deprecated = "is this used?"]
-    pub async fn remove(self) -> DatabaseResult<()> {
-        if let Some(parent) = self.0.path.parent() {
-            std::fs::remove_dir_all(parent)?;
-        }
-        Ok(())
-    }
+    // /// Delete the db files
+    // pub async fn delete(&self) -> DatabaseResult<()> {
+    //     let mut path = self.0.path.clone();
+    //     assert_eq!(
+    //         path.extension(),
+    //         Some(std::ffi::OsString::from("sqlite3".to_string()).as_os_str())
+    //     );
+    //     let name = path
+    //         .file_name()
+    //         .expect("DB must have a filename")
+    //         .to_owned();
+    //     let mut name_shm = name.clone();
+    //     let mut name_wal = name.clone();
+    //     name_shm.push("-shm".to_string());
+    //     name_wal.push("-wal".to_string());
+
+    //     std::fs::remove_file(&path)?;
+    //     path.set_file_name(name_shm);
+    //     std::fs::remove_file(&path)?;
+    //     path.set_file_name(name_wal);
+    //     std::fs::remove_file(&path)?;
+
+    //     Ok(())
+    // }
 
     pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
     where

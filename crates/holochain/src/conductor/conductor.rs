@@ -2156,29 +2156,63 @@ impl Conductor {
     /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
         let state = self.get_state().await?;
-        let keepers: HashSet<CellId> = state
+
+        let keepers: HashSet<&CellId> = state
             .enabled_apps()
-            .flat_map(|(_, app)| app.all_cells().cloned().collect::<HashSet<_>>())
+            .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
+            .collect();
+
+        let all: HashSet<&CellId> = state
+            .installed_apps()
+            .iter()
+            .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 
         // Clean up all cells that will be dropped (leave network, etc.)
-        let to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
-            let to_remove = cells
+        // let (to_cleanup, to_delete): (Vec<_>, Vec<_>) = self.running_cells.share_mut(|cells| {
+        let cells_to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
+            let to_remove: Vec<_> = cells
                 .keys()
                 .filter(|id| !keepers.contains(id))
                 .cloned()
-                .collect::<Vec<_>>();
+                .collect();
 
+            // remove all but the keepers
             to_remove
                 .iter()
                 .filter_map(|cell_id| cells.remove(cell_id))
+                .map(|item| item.cell)
                 .collect()
         });
-        for cell in to_cleanup {
-            cell.cell.cleanup().await?;
+
+        // Stop all long-running tasks for cells about to be dropped
+        for cell in cells_to_cleanup.iter() {
+            cell.cleanup().await?;
         }
 
-        // drop all but the keepers
+        // Find any DNAs from cleaned up cells which don't have representation in any cells
+        // in any app. In other words, find the DNAs which are *only* represented in uninstalled apps.
+        let all_dnas: HashSet<_> = all.into_iter().map(|cell_id| cell_id.dna_hash()).collect();
+        let dnas_to_cleanup = cells_to_cleanup
+            .iter()
+            .map(|cell| cell.id().dna_hash())
+            .filter(|dna| !all_dnas.contains(dna));
+
+        // Cells which belong to no app (its app has been uninstalled) will be cleaned up
+        // and all authored data removed from the database
+        for dna_hash in dnas_to_cleanup {
+            self.spaces
+                .authored_db(dna_hash)
+                .unwrap()
+                .async_commit(|txn| DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?))
+                .await?;
+            self.spaces
+                .dht_db(dna_hash)
+                .unwrap()
+                .async_commit(|txn| DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?))
+                .await?;
+        }
+
         Ok(())
     }
 
