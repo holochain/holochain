@@ -394,8 +394,7 @@ impl RealRibosome {
         let bytes = self
             .dna_file
             .dna()
-            .get_wasm_zome(zome_name)?
-            .wasm_hash
+            .get_wasm_zome_hash(zome_name)?
             .get_raw_32();
         key.copy_from_slice(bytes);
         Ok(key)
@@ -421,9 +420,8 @@ impl RealRibosome {
             &self
                 .dna_file
                 .dna()
-                .get_wasm_zome(zome_name)
-                .map_err(DnaError::from)?
-                .wasm_hash,
+                .get_wasm_zome_hash(zome_name)
+                .map_err(DnaError::from)?,
             self.dna_file.dna_hash(),
             context_key,
         );
@@ -458,9 +456,8 @@ impl RealRibosome {
             &self
                 .dna_file
                 .dna()
-                .get_wasm_zome(call_context.zome.zome_name())
-                .map_err(DnaError::from)?
-                .wasm_hash,
+                .get_wasm_zome_hash(call_context.zome.zome_name())
+                .map_err(DnaError::from)?,
             self.dna_file.dna_hash(),
             0,
         );
@@ -469,9 +466,8 @@ impl RealRibosome {
             &self
                 .dna_file
                 .dna()
-                .get_wasm_zome(call_context.zome.zome_name())
-                .map_err(DnaError::from)?
-                .wasm_hash,
+                .get_wasm_zome_hash(call_context.zome.zome_name())
+                .map_err(DnaError::from)?,
             self.dna_file.dna_hash(),
             CONTEXT_KEY.load(std::sync::atomic::Ordering::Relaxed),
         );

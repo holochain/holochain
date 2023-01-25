@@ -303,6 +303,19 @@ impl DnaDef {
             })
     }
 
+    /// Return the Wasm Hash for Zome, error if not a Wasm type Zome
+    pub fn get_wasm_zome_hash(&self, zome_name: &ZomeName) -> Result<WasmHash, ZomeError> {
+        self.all_zomes()
+            .find(|(name, _)| *name == zome_name)
+            .map(|(_, def)| def)
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+            .and_then(|def| match def {
+                ZomeDef::Wasm(wasm_zome) => Ok(wasm_zome.wasm_hash),
+                ZomeDef::WasmDylib(wasm_zome_dylib) => Ok(wasm_zome_dylib.wasm_hash),
+                _ => Err(ZomeError::NonWasmZome(zome_name.clone())),
+            })
+    }
+
     /// Set the DNA's name.
     pub fn set_name(&self, name: String) -> Self {
         let mut clone = self.clone();
