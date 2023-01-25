@@ -18,8 +18,7 @@ jobs:
             runs-on: multi-arch
           - system: x86_64-linux
             runs-on: [ubuntu-latest]
-        cachixName:
-          - holochain-ci
+
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
       - name: "Displays Xcode current version"
@@ -29,18 +28,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           lfs: false
-
-      - name: Install nix
-        uses: cachix/install-nix-action@v18
-        with:
-          install_url: https://releases.nixos.org/nix/nix-2.12.0/install
-          extra_nix_config: |
-            experimental-features = flakes nix-command ci-derivations impure-derivations
-      - name: Setup cachix
-        uses: cachix/cachix-action@v12
-        with:
-          name: "${{ matrix.cachixName }}"
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: "Test comand ${{ matrix.nixCommand }}"
         run: "${{ matrix.nixCommand }} -L --show-trace --system ${{ matrix.platform.system }}"
