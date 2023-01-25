@@ -40,6 +40,7 @@ impl From<WasmMapSerialized> for WasmMap {
     }
 }
 
+/// Store the paths to dylib precompiled wasmer modules
 pub type DylibZomeMap = BTreeMap<holo_hash::WasmHash, PathBuf>;
 
 /// Represents a full DNA, including DnaDef and WebAssembly bytecode.
@@ -84,7 +85,7 @@ impl DnaFile {
             code.insert(wasm_hash, wasm);
         }
 
-        // TODO: add dylibs!
+        // TODO-connor: add dylibs!
 
         let dna = DnaDefHashed::from_content_sync(dna);
         Self {

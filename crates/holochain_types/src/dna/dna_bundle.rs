@@ -62,7 +62,6 @@ impl DnaBundle {
         &self,
     ) -> DnaResult<(IntegrityZomes, CoordinatorZomes, WasmMap, DylibZomeMap)> {
         // TODO-connor
-
         let mut resources = self.resolve_all_cloned().await?;
         let data = match &self.manifest().0 {
             DnaManifest::V1(manifest) => {

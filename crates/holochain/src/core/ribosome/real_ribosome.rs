@@ -353,7 +353,7 @@ impl RealRibosome {
         let store = ios_dylib_store();
         match unsafe { Module::deserialize_from_file(&store, dylib_path) } {
             Ok(module) => Ok(Arc::new(module)),
-            // TODO-connor
+            // TODO-connor fix to real error
             Err(e) => Err(RibosomeError::ZomeFnNotExists(
                 ZomeName::from("m"),
                 FunctionName::from("m"),
@@ -618,7 +618,6 @@ impl RealRibosome {
             .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
     }
 
-    // TODO-connor
     pub fn do_wasm_call_for_module<I: Invocation>(
         &self,
         call_context: CallContext,
