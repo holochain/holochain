@@ -103,11 +103,12 @@
       # cargoExtraArgs = "--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption";
       # CARGO_PROFILE = "release";
       cargoExtraArgs = ''
-        --test-threads 2 --workspace --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests --cargo-profile fast-test \
+        ${import ../../.config/nextest-args.nix} \
         ${lib.concatStringsSep " " disabledTestsArgs}
       '';
 
       dontPatchELF = true;
+      dontFixup = true;
 
       # cargoNextestExtraArgs = lib.concatStringsSep " " disabledTestsArgs;
     });

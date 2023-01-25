@@ -20,11 +20,11 @@
     };
   };
 
-  outputs = inputs@{ flake-parts, ... }:
+  outputs = inputs@{ self, flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = ["aarch64-darwin" "x86_64-linux" "x86_64-darwin"];
       # auto import all nix code from `./modules`
-      imports = map (m: "${./nix/modules}/${m}")
+      imports = map (m: "${./.}/nix/modules/${m}")
         (builtins.attrNames (builtins.readDir ./nix/modules));
       perSystem = { config, self', inputs', ... }: {
         # Per-system attributes can be defined here. The self' and inputs'
