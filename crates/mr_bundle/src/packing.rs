@@ -6,7 +6,7 @@ use crate::{
     Manifest, RawBundle,
 };
 use holochain_util::ffs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 impl<M: Manifest> Bundle<M> {
     /// Create a directory which contains the manifest as a YAML file,
@@ -34,21 +34,9 @@ impl<M: Manifest> Bundle<M> {
         let manifest_yaml = ffs::read_to_string(&manifest_path).await.map_err(|err| {
             PackingError::BadManifestPath(manifest_path.clone(), err.into_inner())
         })?;
-        let manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(UnpackingError::from)?;
         let manifest_relative_path = M::path();
         let base_path = prune_path(manifest_path.clone(), &manifest_relative_path)?;
-        let resources = futures::future::join_all(manifest.bundled_paths().into_iter().map(
-            |relative_path| async {
-                let resource_path = ffs::canonicalize(base_path.join(&relative_path)).await?;
-                ffs::read(&resource_path)
-                    .await
-                    .map(|resource| (relative_path, resource))
-            },
-        ))
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
-        Bundle::new(manifest, resources, base_path)
+        pack_yaml::<M>(manifest_yaml, base_path).await
     }
 }
 
@@ -73,6 +61,29 @@ impl<M: serde::Serialize> RawBundle<M> {
         .await
         .map_err(Into::into)
     }
+}
+
+/// Reconstruct a `Bundle<M>` from a previously unpacked directory.
+/// The manifest file itself must be specified, since it may have an arbitrary
+/// path relative to the unpacked directory root.
+pub async fn pack_yaml<M: Manifest>(
+    manifest_yaml: String,
+    base_path: PathBuf,
+) -> MrBundleResult<Bundle<M>> {
+    let manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(UnpackingError::from)?;
+
+    let resources = futures::future::join_all(manifest.bundled_paths().into_iter().map(
+        |relative_path| async {
+            let resource_path = ffs::canonicalize(base_path.join(&relative_path)).await?;
+            ffs::read(&resource_path)
+                .await
+                .map(|resource| (relative_path, resource))
+        },
+    ))
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
+    Bundle::new(manifest, resources, base_path)
 }
 
 async fn unpack_yaml<M: serde::Serialize>(
