@@ -391,11 +391,11 @@ impl RealRibosome {
         // watch out for cache misses in the tests that make things slooow if you change this!
         // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
         let mut key = [0; 32];
-        let bytes = self
+        let wasm_zome_hash = self
             .dna_file
             .dna()
-            .get_wasm_zome_hash(zome_name)?
-            .get_raw_32();
+            .get_wasm_zome_hash(zome_name)?;
+        let bytes = wasm_zome_hash.get_raw_32();
         key.copy_from_slice(bytes);
         Ok(key)
     }
