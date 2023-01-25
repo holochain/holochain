@@ -44,4 +44,4 @@ jobs:
       - name: "Test comand ${{ matrix.nixCommand }}"
         run: |
           echo $PATH
-          "${{ matrix.nixCommand }} -L --show-trace --system ${{ matrix.platform.system }}"
+          "${{ matrix.nixCommand }} -L --show-trace
