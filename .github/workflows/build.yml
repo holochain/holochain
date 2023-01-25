@@ -26,8 +26,22 @@ jobs:
         with:
           lfs: false
 
+      - name: Install nix
+        uses: cachix/install-nix-action@v18
+        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.12.0/install
+          extra_nix_config: |
+            experimental-features = flakes nix-command
+
+      - name: Setup cachix
+        uses: cachix/cachix-action@v12
+        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
+        with:
+          name: "${{ matrix.cachixName }}"
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
       - name: "Test comand ${{ matrix.nixCommand }}"
         run: |
           echo $PATH
-          nix build .#holochain --no-link -L --show-trace
           "${{ matrix.nixCommand }} -L --show-trace --system ${{ matrix.platform.system }}"
