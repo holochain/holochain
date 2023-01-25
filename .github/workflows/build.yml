@@ -32,7 +32,7 @@ jobs:
         with:
           install_url: https://releases.nixos.org/nix/nix-2.12.0/install
           extra_nix_config: |
-            experimental-features = flakes nix-command
+            experimental-features = flakes nix-command ca-derivations impure-derivations
 
       - name: Setup cachix
         uses: cachix/cachix-action@v12
