@@ -175,7 +175,7 @@ async fn unpack_roundtrip() {
     assert!(unpacked_dir.join("another/nested/bundled.thing").is_file());
     assert!(!unpacked_dir.join("deeply/nested/local.thing").exists());
 
-    let reconstructed = Bundle::<TestManifest>::pack_yaml(&unpacked_dir.join("test-manifest.yaml"), false)
+    let reconstructed = Bundle::<TestManifest>::pack_yaml(&unpacked_dir.join("test-manifest.yaml"))
         .await
         .unwrap();
 

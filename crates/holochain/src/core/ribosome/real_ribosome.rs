@@ -85,6 +85,8 @@ use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
@@ -232,6 +234,16 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
     u64::from_le_bytes(bits)
 }
 
+pub fn ios_dylib_store() -> Store {
+    let triple = Triple::from_str("aarch64-apple-ios").unwrap();
+    let mut cpu_feature = CpuFeature::set();
+    cpu_feature.insert(CpuFeature::from_str("sse2").unwrap());
+    let target = Target::new(triple, cpu_feature);
+    let engine = Dylib::headless().target(target).engine();
+    let store = Store::new(&engine);
+    store
+}
+
 impl RealRibosome {
     /// Create a new instance
     pub fn new(dna_file: DnaFile) -> RibosomeResult<Self> {
@@ -337,7 +349,19 @@ impl RealRibosome {
         }
     }
 
-    pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
+    pub fn precompiled_module(&self, dylib_path: &PathBuf) -> RibosomeResult<Arc<Module>> {
+        let store = ios_dylib_store();
+        match unsafe { Module::deserialize_from_file(&store, dylib_path) } {
+            Ok(module) => Ok(Arc::new(module)),
+            // TODO-connor
+            Err(e) => Err(RibosomeError::ZomeFnNotExists(
+                ZomeName::from("m"),
+                FunctionName::from("m"),
+            )),
+        }
+    }
+
+    pub fn runtime_compiled_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         if holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
             .get()
             .is_none()
@@ -411,7 +435,7 @@ impl RealRibosome {
         zome_name: &ZomeName,
         context_key: u64,
     ) -> RibosomeResult<Arc<Mutex<Instance>>> {
-        let module = self.module(zome_name)?;
+        let module = self.runtime_compiled_module(zome_name)?;
         let imports: ImportObject = Self::imports(self, context_key, module.store());
         let instance = Arc::new(Mutex::new(Instance::new(&module, &imports).map_err(
             |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
@@ -593,6 +617,102 @@ impl RealRibosome {
             .get(zome_name)
             .ok_or_else(|| ZomeTypesError::MissingDependenciesForZome(zome_name.clone()))?)
     }
+
+    // TODO-connor
+    pub fn do_wasm_call_for_module<I: Invocation>(
+        &self,
+        call_context: CallContext,
+        invocation: &I,
+        zome: &Zome,
+        to_call: &FunctionName,
+        module: Arc<Module>,
+    ) -> Result<Option<ExternIO>, RibosomeError> {
+        if module.info().exports.contains_key(to_call.as_ref()) {
+            // there is a callback to_call and it is implemented in the wasm
+            // it is important to fully instantiate this (e.g. don't try to use the module above)
+            // because it builds guards against memory leaks and handles imports correctly
+            let (instance, context_key) = self.instance(call_context)?;
+
+            let result: Result<ExternIO, RuntimeError> = holochain_wasmer_host::guest::call(
+                instance.clone(),
+                to_call.as_ref(),
+                // be aware of this clone!
+                // the whole invocation is cloned!
+                // @todo - is this a problem for large payloads like entries?
+                invocation.to_owned().host_input()?,
+            );
+
+            // a bit of typefu to avoid cloning the result.
+            let (can_cache, result) = match result {
+                Err(runtime_error) => match runtime_error.downcast::<WasmError>() {
+                    Ok(wasm_error) => (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into())),
+                    Err(result) => (false, Err(result)),
+                },
+                result => (true, result),
+            };
+
+            // Cache this instance.
+            if can_cache {
+                self.cache_instance(context_key, instance, zome.zome_name())?;
+            }
+
+            Ok(Some(result?))
+        } else {
+            // the func doesn't exist
+            // the callback is not implemented
+            Ok(None)
+        }
+    }
+
+    pub fn get_const_fn_for_wasm(
+        &self,
+        call_context: CallContext,
+        name: &str,
+        module: Arc<Module>,
+    ) -> Result<Option<i32>, RibosomeError> {
+        // Check if the wasm has a function that matches this type.
+        if module.exports().functions().any(|f| {
+            f.name() == name && f.ty().params().is_empty() && f.ty().results() == [Type::I32]
+        }) {
+            let (instance, context_key) = self.instance(call_context)?;
+
+            // Call the function as a native function.
+            let result = instance
+                .lock()
+                .exports
+                .get_native_function::<(), i32>(name)
+                .ok()
+                .map_or(Ok(None), |func| Ok(Some(func.call()?)))
+                .map_err(|e: RuntimeError| {
+                    RibosomeError::WasmRuntimeError(
+                        wasm_error!(WasmErrorInner::Host(format!("{}", e))).into(),
+                    )
+                })?;
+
+            // Remove the blank context.
+            CONTEXT_MAP.lock().remove(&context_key);
+
+            Ok(result)
+        } else {
+            // the func doesn't exist
+            // the callback is not implemented
+            Ok(None)
+        }
+    }
+
+    pub fn get_extern_fns_for_wasm(&self, module: Arc<Module>) -> Vec<FunctionName> {
+        let mut extern_fns: Vec<FunctionName> = module
+            .info()
+            .exports
+            .iter()
+            .filter(|(name, _)| {
+                name.as_str() != "__num_entry_types" && name.as_str() != "__num_link_types"
+            })
+            .map(|(name, _index)| FunctionName::new(name))
+            .collect();
+        extern_fns.sort();
+        extern_fns
+    }
 }
 
 /// General purpose macro which relies heavily on various impls of the form:
@@ -680,20 +800,12 @@ impl RibosomeT for RealRibosome {
             extern_fns: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(_) => {
-                        let module = self.module(zome.zome_name())?;
-
-                        let mut extern_fns: Vec<FunctionName> = module
-                            .info()
-                            .exports
-                            .iter()
-                            .filter(|(name, _)| {
-                                name.as_str() != "__num_entry_types"
-                                    && name.as_str() != "__num_link_types"
-                            })
-                            .map(|(name, _index)| FunctionName::new(name))
-                            .collect();
-                        extern_fns.sort();
-                        extern_fns
+                        let module = self.runtime_compiled_module(zome.zome_name())?;
+                        self.get_extern_fns_for_wasm(module)
+                    }
+                    ZomeDef::WasmDylib(zome_wasm_dylib) => {
+                        let module = self.precompiled_module(&zome_wasm_dylib.path)?;
+                        self.get_extern_fns_for_wasm(module)
                     }
                     ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),
                 }
@@ -720,45 +832,12 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let module = self.module(zome.zome_name())?;
-
-                if module.info().exports.contains_key(to_call.as_ref()) {
-                    // there is a callback to_call and it is implemented in the wasm
-                    // it is important to fully instantiate this (e.g. don't try to use the module above)
-                    // because it builds guards against memory leaks and handles imports correctly
-                    let (instance, context_key) = self.instance(call_context)?;
-
-                    let result: Result<ExternIO, RuntimeError> = holochain_wasmer_host::guest::call(
-                        instance.clone(),
-                        to_call.as_ref(),
-                        // be aware of this clone!
-                        // the whole invocation is cloned!
-                        // @todo - is this a problem for large payloads like entries?
-                        invocation.to_owned().host_input()?,
-                    );
-
-                    // a bit of typefu to avoid cloning the result.
-                    let (can_cache, result) = match result {
-                        Err(runtime_error) => match runtime_error.downcast::<WasmError>() {
-                            Ok(wasm_error) => {
-                                (!wasm_error.error.maybe_corrupt(), Err(wasm_error.into()))
-                            }
-                            Err(result) => (false, Err(result)),
-                        },
-                        result => (true, result),
-                    };
-
-                    // Cache this instance.
-                    if can_cache {
-                        self.cache_instance(context_key, instance, zome.zome_name())?;
-                    }
-
-                    Ok(Some(result?))
-                } else {
-                    // the func doesn't exist
-                    // the callback is not implemented
-                    Ok(None)
-                }
+                let module = self.runtime_compiled_module(zome.zome_name())?;
+                self.do_wasm_call_for_module::<I>(call_context, invocation, zome, to_call, module)
+            }
+            ZomeDef::WasmDylib(zome_wasm_dylib) => {
+                let module = self.precompiled_module(&zome_wasm_dylib.path)?;
+                self.do_wasm_call_for_module::<I>(call_context, invocation, zome, to_call, module)
             }
             ZomeDef::Inline {
                 inline_zome: zome, ..
@@ -782,38 +861,12 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(_) => {
-                let module = self.module(zome.zome_name())?;
-
-                // Check if the wasm has a function that matches this type.
-                if module.exports().functions().any(|f| {
-                    f.name() == name
-                        && f.ty().params().is_empty()
-                        && f.ty().results() == [Type::I32]
-                }) {
-                    let (instance, context_key) = self.instance(call_context)?;
-
-                    // Call the function as a native function.
-                    let result = instance
-                        .lock()
-                        .exports
-                        .get_native_function::<(), i32>(name)
-                        .ok()
-                        .map_or(Ok(None), |func| Ok(Some(func.call()?)))
-                        .map_err(|e: RuntimeError| {
-                            RibosomeError::WasmRuntimeError(
-                                wasm_error!(WasmErrorInner::Host(format!("{}", e))).into(),
-                            )
-                        })?;
-
-                    // Remove the blank context.
-                    CONTEXT_MAP.lock().remove(&context_key);
-
-                    Ok(result)
-                } else {
-                    // the func doesn't exist
-                    // the callback is not implemented
-                    Ok(None)
-                }
+                let module = self.runtime_compiled_module(zome.zome_name())?;
+                self.get_const_fn_for_wasm(call_context, name, module)
+            }
+            ZomeDef::WasmDylib(zome_wasm_dylib) => {
+                let module = self.precompiled_module(&zome_wasm_dylib.path)?;
+                self.get_const_fn_for_wasm(call_context, name, module)
             }
             ZomeDef::Inline {
                 inline_zome: zome, ..

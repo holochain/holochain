@@ -20,6 +20,7 @@ use error::ZomeResult;
 use crate::InlineIntegrityZome;
 #[cfg(feature = "full-dna-def")]
 use error::ZomeError;
+use std::path::PathBuf;
 #[cfg(feature = "full-dna-def")]
 use std::sync::Arc;
 
@@ -132,6 +133,19 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
     }
 }
 
+/// A zome defined by a preserialized
+/// wasmer module, as a "dynamic library" (dylib)
+/// Useful for iOS
+#[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct WasmZomeDylib {
+    /// The WasmHash representing the WASM byte code for this zome.
+    pub wasm_hash: holo_hash::WasmHash,
+    /// The path to the dylib
+    pub path: PathBuf,
+    /// The zome dependencies
+    pub dependencies: Vec<ZomeName>,
+}
+
 /// Just the definition of a Zome, without the name included. This exists
 /// mainly for use in HashMaps where ZomeDefs are keyed by ZomeName.
 ///
@@ -149,6 +163,11 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 pub enum ZomeDef {
     /// A zome defined by Wasm bytecode
     Wasm(WasmZome),
+
+    /// A zome defined by a preserialized
+    /// wasmer module, as a "dynamic library" (dylib)
+    /// Useful for iOS
+    WasmDylib(WasmZomeDylib),
 
     /// A zome defined by Rust closures. Cannot be deserialized.
     #[serde(skip_deserializing)]
@@ -172,6 +191,8 @@ pub struct CoordinatorZomeDef(ZomeDef);
 enum ZomeDefSerialized {
     Wasm(WasmZome),
 
+    WasmDylib(WasmZomeDylib),
+
     #[cfg(feature = "full-dna-def")]
     InlineUid(String),
 }
@@ -180,6 +201,8 @@ impl From<ZomeDef> for ZomeDefSerialized {
     fn from(d: ZomeDef) -> Self {
         match d {
             ZomeDef::Wasm(zome) => Self::Wasm(zome),
+
+            ZomeDef::WasmDylib(zome) => Self::WasmDylib(zome),
 
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { inline_zome, .. } => Self::InlineUid(inline_zome.0.uuid()),
@@ -203,6 +226,11 @@ impl CoordinatorZomeDef {
     pub fn set_dependency(&mut self, zome_name: impl Into<ZomeName>) {
         match &mut self.0 {
             ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies.push(zome_name.into()),
+
+            ZomeDef::WasmDylib(WasmZomeDylib { dependencies, .. }) => {
+                dependencies.push(zome_name.into())
+            }
+
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { dependencies, .. } => dependencies.push(zome_name.into()),
         }
@@ -258,6 +286,9 @@ impl ZomeDef {
     pub fn wasm_hash(&self, _zome_name: &ZomeName) -> ZomeResult<holo_hash::WasmHash> {
         match self {
             ZomeDef::Wasm(WasmZome { wasm_hash, .. }) => Ok(wasm_hash.clone()),
+
+            ZomeDef::WasmDylib(WasmZomeDylib { wasm_hash, .. }) => Ok(wasm_hash.clone()),
+
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { .. } => Err(ZomeError::NonWasmZome(_zome_name.clone())),
         }
@@ -267,6 +298,9 @@ impl ZomeDef {
     pub fn dependencies(&self) -> &[ZomeName] {
         match self {
             ZomeDef::Wasm(WasmZome { dependencies, .. }) => &dependencies[..],
+
+            ZomeDef::WasmDylib(WasmZomeDylib { dependencies, .. }) => &dependencies[..],
+
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { dependencies, .. } => &dependencies[..],
         }

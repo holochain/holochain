@@ -4,10 +4,26 @@
 
 use crate::error::{HcBundleError, HcBundleResult};
 use holochain_util::ffs;
+use holochain_wasmer_host::prelude::*;
 use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
+use wasmer_middlewares::Metering;
+
+const WASM_METERING_LIMIT: u64 = 100_000_000_000;
+
+pub fn cranelift() -> Cranelift {
+    let cost_function = |_operator: &wasmparser::Operator| -> u64 { 1 };
+    // @todo 100 giga-ops is totally arbitrary cutoff so we probably
+    // want to make the limit configurable somehow.
+    let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
+    let mut cranelift = Cranelift::default();
+    cranelift.canonicalize_nans(true).push_middleware(metering);
+    cranelift
+}
 
 /// Unpack a DNA bundle into a working directory, returning the directory path used.
 pub async fn unpack<M: Manifest>(
@@ -70,6 +86,22 @@ fn bundle_path_to_dir(path: &Path, extension: &'static str) -> HcBundleResult<Pa
         .join(stem))
 }
 
+pub fn preserialized_module(wasm: &[u8]) -> Module {
+    println!("Found wasm and was instructed to serialize it to wasmer format, doing so now...");
+    let compiler_config = cranelift();
+    // use what I see in
+    // platform ios headless example
+    // https://github.com/wasmerio/wasmer/blob/447c2e3a152438db67be9ef649327fabcad6f5b8/examples/platform_ios_headless.rs#L38-L53
+    let triple = Triple::from_str("aarch64-apple-ios").unwrap();
+    let mut cpu_feature = CpuFeature::set();
+    cpu_feature.insert(CpuFeature::from_str("sse2").unwrap());
+    let target = Target::new(triple, cpu_feature);
+    let engine = Dylib::new(compiler_config).target(target).engine();
+    let store = Store::new(&engine);
+    let module = Module::from_binary(&store, wasm).unwrap();
+    module
+}
+
 /// Pack a directory containing a yaml Manifest (Dna, Happ, WebHapp) into a Bundle, returning
 /// the path to which the bundle file was written
 pub async fn pack<M: Manifest>(
@@ -80,7 +112,7 @@ pub async fn pack<M: Manifest>(
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
     let manifest_path = dir_path.join(&M::path());
-    let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path, serialize_wasm).await?;
+    let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path).await?;
     let target_path = match target_path {
         Some(target_path) => {
             if target_path.is_dir() {
@@ -92,6 +124,45 @@ pub async fn pack<M: Manifest>(
         None => dir_to_bundle_path(&dir_path, name, M::bundle_extension())?,
     };
     bundle.write_to_file(&target_path).await?;
+    if serialize_wasm {
+        let target_path_folder = target_path
+            .parent()
+            .expect("target_path should have a parent folder");
+        let _write_serialized_result =
+            futures::future::join_all(bundle.bundled_resources().into_iter().map(
+                |(relative_path, bytes)| async move {
+                    // only pre-serialize wasm resources
+                    if relative_path.extension() == Some(std::ffi::OsStr::new("wasm")) {
+                        let ios_folder_path = target_path_folder.join("ios");
+                        let mut resource_path_adjoined = ios_folder_path.join(
+                            &relative_path
+                                .file_name()
+                                .expect("wasm resource should have a filename"),
+                        );
+                        // see this code for rationale
+                        // https://github.com/wasmerio/wasmer/blob/447c2e3a152438db67be9ef649327fabcad6f5b8/lib/engine-dylib/src/artifact.rs#L722-L756
+                        resource_path_adjoined.set_extension("dylib");
+                        ffs::create_dir_all(ios_folder_path).await?;
+                        ffs::write(&resource_path_adjoined, vec![].as_slice()).await?;
+                        let resource_path = ffs::canonicalize(resource_path_adjoined).await?;
+                        let module = preserialized_module(bytes.as_slice());
+                        match module.serialize_to_file(resource_path.clone()) {
+                            Ok(()) => {
+                                println!("wrote ios dylib to {:?}", resource_path);
+                                Ok(())
+                            }
+                            Err(e) => Err(HcBundleError::SerializedModuleError(e)),
+                        }
+                    } else {
+                        Ok(())
+                    }
+                },
+            ))
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+    }
+
     Ok((target_path, bundle))
 }
 
@@ -202,7 +273,9 @@ integrity:
         assert_eq!(dir.read_dir().unwrap().collect::<Vec<_>>().len(), 3);
 
         // Ensure that we get the same bundle after the roundtrip
-        let (_, bundle2) = pack(&dir, None, "test_dna".to_string(), true).await.unwrap();
+        let (_, bundle2) = pack(&dir, None, "test_dna".to_string(), true)
+            .await
+            .unwrap();
         assert_eq!(bundle, bundle2);
     }
 }

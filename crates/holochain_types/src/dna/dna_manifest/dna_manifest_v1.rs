@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::prelude::*;
 use holo_hash::*;
 use holochain_zome_types::ZomeName;
@@ -148,6 +150,10 @@ pub struct ZomeManifest {
     /// The location of the wasm for this zome
     #[serde(flatten)]
     pub location: ZomeLocation,
+
+    /// The location of the wasm dylib for this zome
+    /// Useful for iOS.
+    pub dylib: Option<PathBuf>,
 
     /// The integrity zomes this zome depends on.
     /// The order of these must match the order the types

@@ -19,6 +19,9 @@ name = "hc-dna"
 path = "src/bin/hc-dna.rs"
 
 [dependencies]
+futures = "0.3"
+holochain_wasmer_host = { git = "https://github.com/Sprillow/holochain-wasmer.git", rev = "1323eca56d836d6b0bd9dcff46869638e8c846da" } # "=0.0.82"
+wasmer-middlewares = "2"
 anyhow = "1.0"
 holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "^0.1.0-beta-rc.0"}
 holochain_serialized_bytes = "=0.0.51"

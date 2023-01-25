@@ -37,10 +37,10 @@ impl DnaBundle {
     /// Convert to a DnaFile, and return what the hash of the Dna *would* have
     /// been without the provided modifier overrides
     pub async fn into_dna_file(self, modifiers: DnaModifiersOpt) -> DnaResult<(DnaFile, DnaHash)> {
-        let (integrity, coordinator, wasms) = self.inner_maps().await?;
+        let (integrity, coordinator, wasms, dylibs) = self.inner_maps().await?;
         let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, modifiers)?;
 
-        Ok((DnaFile::from_parts(dna_def, wasms), original_hash))
+        Ok((DnaFile::from_parts(dna_def, wasms, dylibs), original_hash))
     }
 
     /// Construct from raw bytes
@@ -58,7 +58,11 @@ impl DnaBundle {
             .map_err(Into::into)
     }
 
-    async fn inner_maps(&self) -> DnaResult<(IntegrityZomes, CoordinatorZomes, WasmMap)> {
+    async fn inner_maps(
+        &self,
+    ) -> DnaResult<(IntegrityZomes, CoordinatorZomes, WasmMap, DylibZomeMap)> {
+        // TODO-connor
+
         let mut resources = self.resolve_all_cloned().await?;
         let data = match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
@@ -104,7 +108,15 @@ impl DnaBundle {
 
         let wasms = WasmMap::from(code);
 
-        Ok((integrity_zomes, coordinator_zomes, wasms))
+        // let dylibs: BTreeMap<_, _> = data
+        //     .into_iter()
+        //     .flatten()
+        //     .map(|(_, hash, wasm, _)| (hash, wasm))
+        //     .collect();
+        let dylibs = BTreeMap::new();
+        let dylib_zomes = DylibZomeMap::from(dylibs.clone());
+
+        Ok((integrity_zomes, coordinator_zomes, wasms, dylib_zomes))
     }
 
     /// Convert to a DnaDef
@@ -169,6 +181,7 @@ impl DnaBundle {
                         name,
                         hash: Some(hash),
                         location: Location::Bundled(PathBuf::from(filename)),
+                        dylib: None,
                         dependencies: Some(dependencies),
                     }
                 })
@@ -192,6 +205,7 @@ impl DnaBundle {
                         name,
                         hash: Some(hash),
                         location: Location::Bundled(PathBuf::from(filename)),
+                        dylib: None,
                         dependencies: Some(dependencies),
                     }
                 })
@@ -216,6 +230,7 @@ impl DnaBundle {
     }
 }
 
+// TODO-connor
 pub(super) async fn hash_bytes(
     zomes: impl Iterator<Item = ZomeManifest>,
     resources: &mut HashMap<Location, ResourceBytes>,
@@ -273,6 +288,7 @@ mod tests {
                         name: "zome1".into(),
                         hash: None,
                         location: mr_bundle::Location::Bundled(path1.clone()),
+                        dylib: None,
                         dependencies: Default::default(),
                     },
                     ZomeManifest {
@@ -280,6 +296,7 @@ mod tests {
                         // Intentional wrong hash
                         hash: Some(hash1.clone().into()),
                         location: mr_bundle::Location::Bundled(path2.clone()),
+                        dylib: None,
                         dependencies: Default::default(),
                     },
                 ],

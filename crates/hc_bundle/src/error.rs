@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_util::ffs;
+use holochain_wasmer_host::prelude::SerializeError;
 
 /// HcBundleError type.
 #[derive(Debug, thiserror::Error)]
@@ -35,6 +36,9 @@ pub enum HcBundleError {
 
     #[error("This file should have a '.{0}' extension: {1}")]
     FileExtensionMissing(&'static str, PathBuf),
+
+    #[error(transparent)]
+    SerializedModuleError(#[from] SerializeError),
 }
 
 /// HcBundle Result type.
