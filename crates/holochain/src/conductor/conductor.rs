@@ -2169,6 +2169,7 @@ impl Conductor {
             .collect();
 
         // Clean up all cells that will be dropped (leave network, etc.)
+        // let (to_cleanup, to_delete): (Vec<_>, Vec<_>) = self.running_cells.share_mut(|cells| {
         let cells_to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
             let to_remove: Vec<_> = cells
                 .keys()

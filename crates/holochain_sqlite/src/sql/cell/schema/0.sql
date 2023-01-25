@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS ValidationReceipt (
     hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
     op_hash         BLOB           NOT NULL,
     blob            BLOB           NOT NULL,
-    FOREIGN KEY(op_hash) REFERENCES DhtOp(hash)
+    FOREIGN KEY(op_hash) REFERENCES DhtOp(hash) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS ChainLock (
