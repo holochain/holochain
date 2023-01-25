@@ -61,9 +61,6 @@ pub struct DnaFile {
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
     pub(super) code: WasmMap,
-
-    /// Paths to any dylib zomes
-    pub(super) dylibs: DylibZomeMap,
 }
 
 impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
@@ -79,19 +76,15 @@ impl DnaFile {
     /// Construct a new DnaFile instance.
     pub async fn new(dna: DnaDef, wasm: impl IntoIterator<Item = wasm::DnaWasm>) -> Self {
         let mut code = BTreeMap::new();
-        let mut dylibs = BTreeMap::new();
         for wasm in wasm {
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
 
-        // TODO-connor: add dylibs!
-
         let dna = DnaDefHashed::from_content_sync(dna);
         Self {
             dna,
             code: code.into(),
-            dylibs,
         }
     }
 
@@ -165,8 +158,8 @@ impl DnaFile {
 
     /// Construct a DnaFile from its constituent parts
     #[cfg(feature = "fixturators")]
-    pub fn from_parts(dna: DnaDefHashed, code: WasmMap, dylibs: DylibZomeMap) -> Self {
-        Self { dna, code, dylibs }
+    pub fn from_parts(dna: DnaDefHashed, code: WasmMap) -> Self {
+        Self { dna, code }
     }
 
     /// The DnaDef along with its hash
