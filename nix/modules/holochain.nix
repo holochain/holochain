@@ -93,8 +93,7 @@
 
 
     holochain-tests-nextest = craneLib.cargoNextest (commonArgs // {
-      # __noChroot = true;
-      __impure = true;
+      __impure = pkgs.stdenv.isLinux;
       cargoArtifacts = holochainTestDeps;
       preCheck = ''
         pwd
