@@ -71,7 +71,6 @@ rec {
   release = coreDev.overrideAttrs (attrs: {
     nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
       niv
-      cargo-readme
       (import ../crates/release-automation/default.nix { })
     ]);
   });

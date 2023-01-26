@@ -1,9 +1,10 @@
 #!/bin/bash
+cargo install cargo-rdme
 
 crates_to_document=("hdi" "hdk" "holochain_keystore" "holochain_state")
 
 for crate in "${crates_to_document[@]}"; do
-    echo 'generating README for crate' "$crate";
+    echo 'generating README for crate' "$crate"
     cargo rdme -w $crate --intralinks-strip-links --force
 done
 
