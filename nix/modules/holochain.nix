@@ -35,10 +35,12 @@
           sqlcipher
         ])
         ++ (lib.optionals pkgs.stdenv.isDarwin
-          (lib.attrValues
-          (lib.filterAttrs (n: _: ! lib.elem n [
-            "QuickTime"
-          ]) pkgs.darwin.apple_sdk_11_0.frameworks))
+          (with pkgs.darwin.apple_sdk_11_0.frameworks; [
+            AppKit
+            CoreFoundation
+            CoreServices
+            Security
+          ])
         );
 
       nativeBuildInputs =
