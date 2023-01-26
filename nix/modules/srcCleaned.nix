@@ -5,6 +5,7 @@
     # Works like include, but the reverse.
     exclude = [
       (inputs.nix-filter.lib.matchExt "nix")
+      (inputs.nix-filter.lib.matchExt "yml")
     ];
   };
 }
