@@ -1,11 +1,8 @@
 # Definitions can be imported from a separate file like this one
 
 { self, inputs, lib, ... }@flake: {
-  perSystem = { config, self', inputs', system, ... }:
+  perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-
-      pkgs = config.pkgs;
-
       rustToolchain = config.rust.rustHolochain;
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 

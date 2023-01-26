@@ -1,8 +1,8 @@
 { self, lib, inputs, ... }@flake: {
-  perSystem = { config, self', inputs', system, ... }: {
+  perSystem = { config, self', inputs', system, pkgs, ... }: {
     options.rust = lib.mkOption { type = lib.types.raw; };
     config.rust = let
-      rustPkgs = import config.pkgs.path {
+      rustPkgs = import pkgs.path {
         inherit system;
         overlays = [
           inputs.rust-overlay.overlays.default
