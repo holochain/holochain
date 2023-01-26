@@ -2162,14 +2162,13 @@ impl Conductor {
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 
-        let all: HashSet<&CellId> = state
+        let all_cells: HashSet<&CellId> = state
             .installed_apps()
             .iter()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 
         // Clean up all cells that will be dropped (leave network, etc.)
-        // let (to_cleanup, to_delete): (Vec<_>, Vec<_>) = self.running_cells.share_mut(|cells| {
         let cells_to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
             let to_remove: Vec<_> = cells
                 .keys()
@@ -2192,7 +2191,10 @@ impl Conductor {
 
         // Find any DNAs from cleaned up cells which don't have representation in any cells
         // in any app. In other words, find the DNAs which are *only* represented in uninstalled apps.
-        let all_dnas: HashSet<_> = all.into_iter().map(|cell_id| cell_id.dna_hash()).collect();
+        let all_dnas: HashSet<_> = all_cells
+            .into_iter()
+            .map(|cell_id| cell_id.dna_hash())
+            .collect();
         let dnas_to_cleanup = cells_to_cleanup
             .iter()
             .map(|cell| cell.id().dna_hash())

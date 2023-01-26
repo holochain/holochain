@@ -251,7 +251,6 @@ async fn test_uninstall_app() {
     let mut conductor = SweetConductor::from_standard_config().await;
 
     let app1 = conductor.setup_app(&"app1", [&dna]).await.unwrap();
-    let app2 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
 
     let hash1: ActionHash = conductor
         .call(
@@ -260,6 +259,8 @@ async fn test_uninstall_app() {
             "1".to_string(),
         )
         .await;
+
+    let app2 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
 
     let hash2: ActionHash = conductor
         .call(
@@ -287,6 +288,7 @@ async fn test_uninstall_app() {
         (2, 0)
     );
 
+    // - Uninstall the first app
     conductor
         .raw_handle()
         .uninstall_app(&"app1".to_string())
@@ -303,6 +305,7 @@ async fn test_uninstall_app() {
         .await
         .is_some());
 
+    // - Uninstall the remaining app
     conductor
         .raw_handle()
         .uninstall_app(&"app2".to_string())
