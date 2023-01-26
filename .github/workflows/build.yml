@@ -36,7 +36,7 @@ jobs:
 
       - name: Setup cachix
         uses: cachix/cachix-action@v12
-        # if: ${{ matrix.platform.runs-on != 'multi-arch' }}
+        continue-on-error: ${{ matrix.platform.runs-on == 'multi-arch' }}
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
