@@ -1,7 +1,6 @@
 {
-  perSystem = { config, lib,... }: let
-    pkgs = config.pkgs;
-  in {
+  perSystem = { config, lib, pkgs, ... }:
+  {
     options.writers = {
       writePureShellScript = lib.mkOption {
         type = lib.types.functionTo lib.types.anything;
