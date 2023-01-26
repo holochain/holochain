@@ -4,7 +4,7 @@ on:
   pull_request:
 
 jobs:
-  holochain-binaries:
+  build-holochain:
     strategy:
       fail-fast: false
       matrix:
@@ -17,7 +17,7 @@ jobs:
           - system: aarch64-darwin
             runs-on: multi-arch
           - system: x86_64-linux
-            runs-on: [ubuntu-latest]
+            runs-on: ubuntu-latest
 
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
