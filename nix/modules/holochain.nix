@@ -69,9 +69,22 @@
       RUST_SODIUM_SHARED = "1";
       pname = "holochain-tests";
       CARGO_PROFILE = "fast-test";
-      # cargoExtraArgs = ''
-      #   --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests
-      # '';
+      cargoExtraArgs = ''--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests'';
+    });
+
+    holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // rec {
+      RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
+      RUST_SODIUM_SHARED = "1";
+      pname = "holochain-nextest";
+      CARGO_PROFILE = "fast-test";
+      cargoExtraArgs = ''--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests'';
+      nativeBuildInputs = [
+        pkgs.cargo-nextest
+      ];
+      buildPhase = ''
+        cargo nextest list ${import ../../.config/nextest-args.nix}
+      '';
+      dontCheck = true;
     });
 
     disabledTests = [
@@ -91,10 +104,23 @@
     disabledTestsArgs =
       lib.forEach disabledTests (test: "-E 'not test(${test})'");
 
-
-    holochain-tests-nextest = craneLib.cargoNextest (commonArgs // {
-      __noChroot = true;
+    holochain-tests = craneLib.cargoTest (commonArgs // {
+      pname = "holochain";
+      __impure = pkgs.stdenv.isLinux;
       cargoArtifacts = holochainTestDeps;
+      CARGO_PROFILE = "fast-test";
+      cargoExtraArgs = ''--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests'';
+
+      dontPatchELF = true;
+      dontFixup = true;
+      installPhase = "mkdir $out";
+    });
+
+
+    holochain-tests-nextest' = craneLib.cargoNextest (commonArgs // {
+      pname = "holochain-nextest";
+      __impure = pkgs.stdenv.isLinux;
+      cargoArtifacts = holochainNextestDeps;
       preCheck = ''
         pwd
         # rm /build/source/target/debug/.fingerprint/holochain_wasm_test_utils-*/invoked.timestamp
@@ -107,13 +133,21 @@
         ${lib.concatStringsSep " " disabledTestsArgs}
       '';
 
+      DYLD_PRINT_LIBRARIES=1;
+
       dontPatchELF = true;
       dontFixup = true;
+      installPhase = "mkdir $out";
 
       # cargoNextestExtraArgs = lib.concatStringsSep " " disabledTestsArgs;
     });
 
+    holochain-tests-nextest = holochain-tests-nextest'.overrideAttrs (old: {
+      buildInputs = old.buildInputs
+      ++ (lib.filter (b: lib.hasPrefix "rust-default-" b.name) old.nativeBuildInputs);
+    });
+
   in {
-    packages = {inherit holochain holochain-tests-nextest;};
+    packages = {inherit holochain holochain-tests holochain-tests-nextest;};
   };
 }
