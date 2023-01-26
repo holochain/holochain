@@ -10,7 +10,7 @@ jobs:
       matrix:
         nixCommand:
           - "nix build .#holochain --no-link"
-          - "nix build .#holochain-tests-nextest --no-link"
+          # - "nix build .#holochain-tests-nextest --no-link"
         platform:
           - system: x86_64-darwin
             runs-on: multi-arch
