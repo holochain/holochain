@@ -24,24 +24,14 @@
     };
   };
 
-  outputs = inputs@{ self, flake-parts, ... }:
+  # refer to flake-parts docs https://flake.parts/
+  outputs = inputs@{ self, nixpkgs, flake-parts, ... }:
+    # all possible arguments for a module: https://flake.parts/module-arguments.html#top-level-module-arguments
     flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = ["aarch64-darwin" "x86_64-linux" "x86_64-darwin"];
+      systems = [ "aarch64-darwin" "x86_64-linux" "x86_64-darwin" ];
       # auto import all nix code from `./modules`, treat each one as
       # a flake and merge them
       imports = map (m: "${./.}/nix/modules/${m}")
         (builtins.attrNames (builtins.readDir ./nix/modules));
-      perSystem = { config, self', inputs', ... }: {
-        # Per-system attributes can be defined here. The self' and inputs'
-        # module parameters provide easy access to attributes of the same
-        # system.
-
-      };
-      flake = {
-        # The usual flake attributes can be defined here, including system-
-        # agnostic ones like nixosModule and system-enumerating ones, although
-        # those are more easily expressed in perSystem.
-
-      };
     };
 }
