@@ -29,6 +29,7 @@
     # all possible arguments for a module: https://flake.parts/module-arguments.html#top-level-module-arguments
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "aarch64-darwin" "x86_64-linux" "x86_64-darwin" ];
+
       # auto import all nix code from `./modules`, treat each one as
       # a flake and merge them
       imports = map (m: "${./.}/nix/modules/${m}")
