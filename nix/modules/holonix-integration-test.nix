@@ -1,38 +1,27 @@
 { self, lib, ... }: {
-  perSystem = { config, ... }: let
-    pkgs = config.pkgs;
-  in {
-    apps.holonix-integration-test.type = "app";
-    apps.holonix-integration-test.program = builtins.toString (
-      config.writers.writePureShellScript
-      [
-        pkgs.bats
-        pkgs.coreutils
-        pkgs.nix
-      ]
-      ''
-        # cp -r ${self} $TMPDIR/holonix
-        # cd $TMPDIR/holonix
+  perSystem = { self', config, pkgs, ... }:
 
-        cd ${self}/holonix
-        nix-shell --run "bash -c '
-          bats ./test/clippy.bats
-          # TODO: revisit when decided on a new gihtub-release binary
-          # bats ./test/github-release.bats
+    let
+      bats = "${pkgs.bats}/bin/bats";
+      testScript = pkgs.writeShellScript ""
+        ''
+          set -Eeuo pipefail
+          cd ${self}/holonix
 
-          bats ./test/nix-shell.bats
-          ${if pkgs.stdenv.isLinux then "bats ./test/perf.bats" else ""}
-          bats ./test/rust-manifest-list-unpinned.bats
-          bats ./test/rust.bats
-          bats ./test/flamegraph.bats
-          bats ./test/holochain-binaries.bats
+          ${bats} ./test/holochain-binaries.bats
+          ${bats} ./test/launcher.bats
+          ${bats} ./test/scaffolding.bats
+          ${bats} ./test/rust.bats
+        '';
 
-          # TODO:
-          #   Decide what to do with these tests.
-          bats ./test/launcher.bats
-          bats ./test/scaffolding.bats
-        '"
-      ''
-    );
-  };
+    in
+    {
+      packages.holonix-tests-integration =
+        self'.devShells.holonix.overrideAttrs (old: {
+          buildPhase = ''
+            ${testScript}
+            touch $out
+          '';
+        });
+      };
 }
