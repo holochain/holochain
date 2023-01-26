@@ -1,7 +1,6 @@
 { self, lib, ... }: {
-  perSystem = { config, ... }: let
-    pkgs = config.pkgs;
-  in {
+  perSystem = { config, pkgs, ... }:
+  {
     apps.holonix-integration-test.type = "app";
     apps.holonix-integration-test.program = builtins.toString (
       config.writers.writePureShellScript
