@@ -67,9 +67,7 @@
       RUST_SODIUM_SHARED = "1";
       pname = "holochain-tests";
       CARGO_PROFILE = "fast-test";
-      # cargoExtraArgs = ''
-      #   --features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests
-      # '';
+      cargoExtraArgs = ''--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests'';
     });
 
     disabledTests = [
@@ -90,7 +88,7 @@
       lib.forEach disabledTests (test: "-E 'not test(${test})'");
 
 
-    holochain-tests-nextest = craneLib.cargoNextest (commonArgs // {
+    holochain-tests-nextest' = craneLib.cargoNextest (commonArgs // {
       __impure = pkgs.stdenv.isLinux;
       cargoArtifacts = holochainTestDeps;
       preCheck = ''
@@ -110,6 +108,10 @@
       installPhase = "mkdir $out";
 
       # cargoNextestExtraArgs = lib.concatStringsSep " " disabledTestsArgs;
+    });
+
+    holochain-tests-nextest = holochain-tests-nextest'.overrideAttrs (old: {
+      buildInputs = old.buildInputs ++ old.nativeBuildInputs;
     });
 
   in {
