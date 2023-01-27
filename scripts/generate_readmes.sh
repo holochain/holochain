@@ -1,6 +1,4 @@
 #!/bin/bash
-cargo install cargo-rdme
-
 crates_to_document=("hdi" "hdk" "holochain_keystore" "holochain_state")
 
 for crate in "${crates_to_document[@]}"; do
@@ -13,5 +11,7 @@ git diff --exit-code --quiet
 readmes_updated=$?
 if [[ "$readmes_updated" == 1 ]]; then
     echo 'READMEs have been updated, committing changes'
+    git config --local user.name release-ci
+    git config --local user.email ci@holo.host
     git commit -am "docs(crate-level): generate readmes from doc comments"
 fi
