@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.1.0-beta-rc.3"
+version = "0.1.0"
 description = "Holochain common types"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -21,20 +21,20 @@ cfg-if = "0.1"
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 derive_more = "0.99.3"
 either = "1.5"
-fixt = { path = "../fixt", version = "^0.1.0-beta-rc.1"}
+fixt = { path = "../fixt", version = "^0.1.0"}
 flate2 = "1.0.14"
 futures = "0.3"
 one_err = "0.0.8"
-holo_hash = { version = "^0.1.0-beta-rc.2", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "^0.1.0-beta-rc.3", path = "../holochain_keystore" }
+holo_hash = { version = "^0.1.0", path = "../holo_hash", features = ["encoding"] }
+holochain_keystore = { version = "^0.1.0", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.1.0-beta-rc.3"}
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.1.0-beta-rc.3", features = ["full"] }
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.1.0"}
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.1.0", features = ["full"] }
 itertools = { version = "0.10" }
-kitsune_p2p_dht = { version = "^0.1.0-beta-rc.1", path = "../kitsune_p2p/dht" }
+kitsune_p2p_dht = { version = "^0.1.0", path = "../kitsune_p2p/dht" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
-mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.1.0-beta-rc.2"}
+mr_bundle = { path = "../mr_bundle", features = ["packing"], version = "^0.1.0"}
 must_future = "0.1.1"
 nanoid = "0.3"
 observability = "0.1.3"
@@ -53,7 +53,7 @@ strum_macros = "0.18.0"
 tempfile = "3"
 thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "rt" ] }
-holochain_util = { version = "^0.1.0-beta-rc.0", path = "../holochain_util", features = ["backtrace"] }
+holochain_util = { version = "^0.1.0", path = "../holochain_util", features = ["backtrace"] }
 tracing = "0.1.26"
 derive_builder = "0.9.0"
 
