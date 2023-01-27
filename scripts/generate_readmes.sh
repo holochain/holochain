@@ -14,4 +14,6 @@ if [[ "$readmes_updated" == 1 ]]; then
     git config --local user.name release-ci
     git config --local user.email ci@holo.host
     git commit -am "docs(crate-level): generate readmes from doc comments"
+    git config --local --unset user.name
+    git config --local --unset user.email
 fi
