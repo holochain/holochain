@@ -6,7 +6,7 @@ use holochain_wasmer_host::prelude::*;
 pub fn unblock_agent(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
-    input: BlockAgentInput,
+    _input: holochain_zome_types::block::UnblockAgentInput,
 ) -> Result<(), RuntimeError> {
     unreachable!();
 }
