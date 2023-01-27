@@ -1,9 +1,17 @@
 {
-  description = "The new, performant, and simplified version of Holochain on Rust (sometimes called Holochain RSM for Refactored State Model) ";
+  description =
+    "The new, performant, and simplified version of Holochain on Rust (sometimes called Holochain RSM for Refactored State Model) ";
 
   inputs = {
     # nix packages pointing to the github repo
     nixpkgs.url = "nixpkgs/nixos-unstable";
+
+    # lib to build nix packages from rust crates
+    crate2nix = {
+      url = "github:kolloch/crate2nix";
+      flake = false;
+    };
+
     # lib to build nix packages from rust crates
     crane = {
       url = "github:ipetkov/crane";
@@ -75,8 +83,7 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "aarch64-darwin" "x86_64-linux" "x86_64-darwin" ];
 
-      # auto import all nix code from `./modules`, treat each one as
-      # a flake and merge them
+      # auto import all nix code from `./modules`, treat each one as a flake and merge them
       imports = map (m: "${./.}/nix/modules/${m}")
         (builtins.attrNames (builtins.readDir ./nix/modules));
     };

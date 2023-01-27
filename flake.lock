@@ -23,6 +23,22 @@
         "type": "github"
       }
     },
+    "crate2nix": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1674839639,
+        "narHash": "sha256-YxLU6sD9GeztGM4NPoL8+K9NnNSfhUxj1WowwHQtgTE=",
+        "owner": "kolloch",
+        "repo": "crate2nix",
+        "rev": "fd2b9cf70ef55529b6793036b648ce2d9e2e7ba1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kolloch",
+        "repo": "crate2nix",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -282,6 +298,7 @@
     "root": {
       "inputs": {
         "crane": "crane",
+        "crate2nix": "crate2nix",
         "flake-compat": "flake-compat_2",
         "flake-parts": "flake-parts",
         "holochain": "holochain",
