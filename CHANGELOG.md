@@ -6,10 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
-- Added dev shells to Nix flake:
-  1. `default` for happ developers; usage `nix develop github:holochain/holochain` from any folder
-  2. `coreDev` for holochain developers; usage `nix develop .#coreDev` from within repo's root folder
-
 # 20230126.223635
 
 - First beta release
