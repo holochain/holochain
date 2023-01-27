@@ -31,6 +31,7 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = flakes nix-command
+
       - name: Setup cachix
         uses: cachix/cachix-action@v12
         if: ${{ matrix.platform.runs-on != 'multi-arch' }}

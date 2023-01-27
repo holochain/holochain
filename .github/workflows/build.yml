@@ -1,22 +1,46 @@
 name: build holochain
 on:
   workflow_dispatch:
+  pull_request:
+
+concurrency:
+  group: ${{ github.action }}-${{ github.ref_name }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-holochain:
     strategy:
       fail-fast: false
       matrix:
-        nixCommand:
-          - "nix build .#holochain --no-link"
-          # - "nix build .#holochain-tests-nextest --no-link"
+        cmd:
+          - "nix build .#holochain"
+          - "nix build .#holochain-tests-nextest"
+          - "nix build .#holochain-tests-wasm"
         platform:
           - system: x86_64-darwin
             runs-on: multi-arch
           - system: aarch64-darwin
             runs-on: multi-arch
           - system: x86_64-linux
-            runs-on: ubuntu-latest
+            runs-on: multi-arch
+
+        include:
+          - cmd: "nix run .#release-automation-tests"
+            platform:
+              system: x86_64-linux
+              runs-on: ubuntu-latest
+          - cmd: "nix run .#release-automation-tests-repo"
+            platform:
+              system: x86_64-linux
+              runs-on: ubuntu-latest
+          - cmd: "nix run .#release-automation-tests-repo"
+            platform:
+              system: x86_64-linux
+              runs-on: ubuntu-latest
+          - cmd: "nix build .#holochain-tests-clippy .#holochain-tests-fmt"
+            platform:
+              system: x86_64-linux
+              runs-on: ubuntu-latest
 
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
@@ -41,4 +65,4 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: "Test comand ${{ matrix.nixCommand }}"
-        run: ${{ matrix.nixCommand }} -L --show-trace --system ${{ matrix.platform.system }} --extra-experimental-features "ca-derivations impure-derivations"
+        run: ${{ matrix.cmd }} --no-link -L --show-trace --system ${{ matrix.platform.system }} --extra-experimental-features "ca-derivations impure-derivations"

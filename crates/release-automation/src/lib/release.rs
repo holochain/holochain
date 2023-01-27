@@ -778,6 +778,8 @@ pub fn do_publish_to_crates_io<'a>(
                     "--locked",
                     "--verbose",
                     "--no-verify",
+                    "--registry",
+                    "crates-io",
                     &format!("--manifest-path={}", manifest_path.to_string_lossy()),
                 ],
                 if dry_run { vec!["--dry-run"] } else { vec![] },

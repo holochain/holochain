@@ -17,7 +17,7 @@ fn release_createreleasebranch() {
     let workspace_mocker = example_workspace_1().unwrap();
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
     workspace.git_checkout_new_branch("develop").unwrap();
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = assert_cmd::Command::new("release-automation");
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "release",
@@ -48,7 +48,7 @@ fn release_createreleasebranch_fails_on_dirty_repo() {
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
     workspace.git_checkout_new_branch("develop").unwrap();
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = assert_cmd::Command::new("release-automation");
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=debug",
@@ -119,7 +119,7 @@ fn bump_versions_on_selection() {
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
     workspace.git_checkout_new_branch("develop").unwrap();
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = assert_cmd::Command::new("release-automation");
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -334,7 +334,7 @@ fn changelog_aggregation() {
 
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = assert_cmd::Command::new("release-automation");
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -364,7 +364,7 @@ fn release_publish() {
     workspace.git_checkout_new_branch("develop").unwrap();
 
     // simulate a release
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = assert_cmd::Command::new("release-automation");
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -378,7 +378,7 @@ fn release_publish() {
     println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1,);
 
     // publish
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = assert_cmd::Command::new("release-automation");
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -405,7 +405,7 @@ fn post_release_version_bumps() {
     workspace.git_checkout_new_branch("develop").unwrap();
 
     // simulate a release
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = assert_cmd::Command::new("release-automation");
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -422,7 +422,7 @@ fn post_release_version_bumps() {
     let output = assert_cmd_success!(cmd);
     println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1,);
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = assert_cmd::Command::new("release-automation");
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -743,7 +743,7 @@ fn multiple_subsequent_releases() {
 
             workspace.git_checkout_branch("develop", true).unwrap();
 
-            let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+            let mut cmd = assert_cmd::Command::new("release-automation");
             let cmd = cmd.args(&[
                 &format!("--workspace-path={}", workspace.root().display()),
                 "--log-level=trace",
@@ -862,7 +862,7 @@ fn apply_dev_versions_works() {
 
     assert_eq!(get_crate_a_version(), "0.0.1");
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = assert_cmd::Command::new("release-automation");
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace_mocker.root().display()),
         "--log-level=debug",
@@ -907,7 +907,7 @@ fn release_dry_run_fails_on_unallowed_conditions() {
 
         workspace.git_add_all_and_commit("msg", None).unwrap();
 
-        let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+        let mut cmd = assert_cmd::Command::new("release-automation");
         let cmd = cmd.args(&[
             &format!("--workspace-path={}", workspace.root().display()),
             &format!("--match-filter={}", member),
