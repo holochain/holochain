@@ -12,12 +12,12 @@
     # filter out all .nix files to not affect the input hash
     # when these are changes
     nix-filter.url = "github:numtide/nix-filter";
-    # provide downward compatibility for non-flake users
+    # provide downward compatibility for nix-shell/derivation users
     flake-compat = {
       url = "github:edolstra/flake-compat";
       flake = false;
     };
-    # input for rust, rustup and cargo
+    # rustup, rust and cargo
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -25,8 +25,8 @@
   };
 
   # refer to flake-parts docs https://flake.parts/
-  outputs = inputs@{ self, nixpkgs, flake-parts, ... }:
-    # all possible arguments for a module: https://flake.parts/module-arguments.html#top-level-module-arguments
+  outputs = inputs @ { self, nixpkgs, flake-parts, ... }:
+    # all possible parameters for a module: https://flake.parts/module-arguments.html#top-level-module-arguments
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "aarch64-darwin" "x86_64-linux" "x86_64-darwin" ];
 

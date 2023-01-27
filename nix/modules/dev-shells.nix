@@ -1,8 +1,13 @@
 { self, lib, ... } @ flake: {
-  # all possible arguments for perSystem: https://flake.parts/module-arguments.html#persystem-module-parameters
+  # all possible parameters for perSystem: https://flake.parts/module-arguments.html#persystem-module-parameters
   perSystem = { config, self', inputs', pkgs, ... }: {
     devShells.default = pkgs.mkShell {
-      packages = [ self'.packages.holochain ];
+      packages = [ config.rust.rustHolochain self'.packages.holochain ];
     };
+
+    devShells.coreDev =
+      pkgs.mkShell {
+        packages = [ config.rust.rustHolochain ];
+      };
   };
 }
