@@ -1,10 +1,13 @@
 # Definitions can be imported from a separate file like this one
 
-{ self, inputs, lib, ... } @ flake: {
+{ self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
 
-      rustToolchain = config.rust.rustHolochain;
+      rustToolchain = config.rust.mkRust {
+        track = "stable";
+        version = "latest";
+      };
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
@@ -16,34 +19,22 @@
 
         cargoExtraArgs = "--bin lair-keystore";
 
-        buildInputs =
-          (with pkgs; [
-            openssl
-          ])
+        buildInputs = (with pkgs; [ openssl ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
             (with pkgs.darwin.apple_sdk_11_0.frameworks; [
               AppKit
               CoreFoundation
               CoreServices
               Security
-            ])
-          );
+            ]));
 
-        nativeBuildInputs =
-          (with pkgs; [
-            perl
-            pkg-config
-          ])
-          ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs; [
-            xcbuild
-            libiconv
-          ]);
+        nativeBuildInputs = (with pkgs; [ perl pkg-config ])
+          ++ lib.optionals pkgs.stdenv.isDarwin
+          (with pkgs; [ xcbuild libiconv ]);
       };
 
       # derivation building all dependencies
-      deps = craneLib.buildDepsOnly (commonArgs // {
-
-      });
+      deps = craneLib.buildDepsOnly (commonArgs // { });
 
       # derivation with the main crates
       package = craneLib.buildPackage (commonArgs // {
@@ -51,10 +42,5 @@
         doCheck = false;
       });
 
-    in
-    {
-      packages = {
-        lair = package;
-      };
-    };
+    in { packages = { lair = package; }; };
 }

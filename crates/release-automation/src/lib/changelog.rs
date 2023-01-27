@@ -1543,7 +1543,7 @@ mod tests {
                 .write_all(format!("\n{}\n", FRONTMATTER_VALUE).as_bytes())
                 .unwrap();
 
-            let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+            let mut cmd = assert_cmd::Command::new("release-automation");
             let cmd = cmd.args(&[
                 &format!("--workspace-path={}", workspace.root().display()),
                 "--log-level=trace",

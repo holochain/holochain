@@ -69,7 +69,7 @@ on:
   pull_request: {}
 
 concurrency:
-  group: ${{ github.ref_name }}-${{ github.event_name }}
+  group: ${{ github.action }}-${{ github.ref_name }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event.inputs.force_cancel_in_progress == 'true' || github.event_name == 'pull_request' }}
 
 jobs:
@@ -245,7 +245,7 @@ jobs:
                 --pure \
                 --keep CARGO_NEXTEST_ARGS \
                 --keep CARGO_TEST_ARGS \
-                --fallback --argstr flavor "coreDev" --run '
+                --fallback --argstr devShellId "coreDev" --run '
                   set -e
                   hc-test-standard-nextest
                   hc-static-checks
@@ -265,7 +265,7 @@ jobs:
           #       --pure \
           #       --keep CARGO_NEXTEST_ARGS \
           #       --keep CARGO_TEST_ARGS \
-          #       --fallback --argstr flavor "coreDev" --run hc-test-standard-nextest
+          #       --fallback --argstr devShellId "coreDev" --run hc-test-standard-nextest
 
           # - name: cargo-test-static
           #   largeCacheStorage:
@@ -278,7 +278,7 @@ jobs:
           #     nix-shell \
           #       --pure \
           #       --keep CARGO_TEST_ARGS \
-          #       --fallback --argstr flavor "coreDev" --run hc-static-checks
+          #       --fallback --argstr devShellId "coreDev" --run hc-static-checks
 
           # - name: cargo-test-wasm
           #   largeCacheStorage:
@@ -291,7 +291,7 @@ jobs:
           #     nix-shell \
           #       --pure \
           #       --keep CARGO_TEST_ARGS \
-          #       --fallback --argstr flavor "coreDev" --run hc-test-wasm
+          #       --fallback --argstr devShellId "coreDev" --run hc-test-wasm
 
           - name: nix-test
             largeCacheStorage:
@@ -644,7 +644,7 @@ jobs:
           nix-shell \
             --pure \
             --keep CARGO_REGISTRY_TOKEN \
-            --argstr flavor release  --run '
+            --argstr devShellId release  --run '
               release-automation \
                 --workspace-path=$PWD \
                 --log-level=trace \

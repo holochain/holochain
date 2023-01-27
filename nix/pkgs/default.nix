@@ -47,7 +47,7 @@ let
       )
   '';
 
-  mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''
+  mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings [ "_" ] [ "-" ] crate) ''
     exec ${hcRunCrate}/bin/hc-run-crate ${crate} $@
   '';
 
@@ -56,10 +56,11 @@ let
   '';
 
   ci = callPackage ./ci.nix { };
-  core = callPackage ./core.nix {
-    inherit hcToplevelDir;
-    releaseAutomation = "${hcReleaseAutomation}/bin/hc-ra";
-  } // {
+  core = callPackage ./core.nix
+    {
+      inherit hcToplevelDir;
+      releaseAutomation = "${hcReleaseAutomation}/bin/hc-ra";
+    } // {
     inherit hcReleaseAutomation;
   };
   happ = {
@@ -75,6 +76,9 @@ let
       ;
   };
 
-in builtins.mapAttrs (k: v:
-  builtins.removeAttrs v [ "override" "overrideDerivation" ]
-) all
+in
+builtins.mapAttrs
+  (k: v:
+    builtins.removeAttrs v [ "override" "overrideDerivation" ]
+  )
+  all

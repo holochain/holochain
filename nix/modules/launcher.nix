@@ -1,10 +1,13 @@
 # Definitions can be imported from a separate file like this one
 
-{ self, inputs, lib, ... } @ flake: {
+{ self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
 
-      rustToolchain = config.rust.rustHolochain;
+      rustToolchain = config.rust.mkRust {
+        track = "stable";
+        version = "latest";
+      };
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
@@ -45,9 +48,7 @@
       };
 
       # derivation building all dependencies
-      deps = craneLib.buildDepsOnly (commonArgs // {
-
-      });
+      deps = craneLib.buildDepsOnly (commonArgs // { });
 
       # derivation with the main crates
       package = craneLib.buildPackage (commonArgs // {

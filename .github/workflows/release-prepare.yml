@@ -90,8 +90,8 @@ jobs:
             nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV:?} \
               --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
               --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
-      - name: Set NIX_PATH (FIXME)
-        run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
+      # - name: Set NIX_PATH (FIXME)
+      #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
       - name: Restore the holochain release repository
         uses: steveeJ-forks/actions-cache/restore@retry
@@ -193,7 +193,7 @@ jobs:
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
-          nix-shell --argstr flavor release --pure --run '
+          nix-shell --argstr devShellId release --pure --run '
             set -e
 
             release-automation \
@@ -207,7 +207,7 @@ jobs:
         run: |
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
-          nix-shell --pure --argstr flavor release --run "cargo install cargo-rdme --force && ./scripts/generate_readmes.sh"
+          nix-shell --pure --argstr devShellId release --run "cargo install cargo-rdme --force && ./scripts/generate_readmes.sh"
 
       - name: Bump the crate versions for the release
         id: bump-versions
@@ -217,7 +217,8 @@ jobs:
           source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
-          nix-shell --argstr flavor release --pure --run '
+          nix-shell --argstr devShellId release --pure --run '
+
             set -e
             cargo sweep -s
 
@@ -240,7 +241,7 @@ jobs:
                 --no-verify-pre \
                 --force-tag-creation \
                 --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-                --disallowed-version-reqs=">=0.2" \
+                --disallowed-version-reqs=">=0.3" \
                 --steps=BumpReleaseVersions
 
             cargo sweep -f

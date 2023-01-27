@@ -1,13 +1,5 @@
-{ stdenv
-, callPackage
-, lib
-, writeShellScriptBin
-, crate2nix
-, holonix
-, holonixPath
-, hcToplevelDir
-, releaseAutomation
-}:
+{ stdenv, callPackage, lib, writeShellScriptBin, crate2nix, holonix, holonixPath
+, hcToplevelDir, releaseAutomation }:
 
 rec {
   hcTest = writeShellScriptBin "hc-test" ''
@@ -34,7 +26,9 @@ rec {
 
     # run all the cargo tests
     cargo build --features 'build' -p holochain_wasm_test_utils
-    cargo nextest ''${CARGO_NEXTEST_ARGS:-run} ${import ../../.config/nextest-args.nix} ''${HC_EXTRA_NEXTEST_ARGS:-} ''${1-}
+    cargo nextest ''${CARGO_NEXTEST_ARGS:-run} ${
+      import ../../.config/nextest-args.nix
+    } ''${1-}
   '';
 
   hcWasmTests = writeShellScriptBin "hc-test-wasm" ''
@@ -45,81 +39,18 @@ rec {
     cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
-  hcReleaseAutomationTest = writeShellScriptBin "hc-test-release-automation" ''
+  hcStaticChecks = let
+    pathPrefix = lib.makeBinPath (builtins.attrValues {
+      inherit (holonix.pkgs) hnRustClippy hnRustFmtCheck hnRustFmtFmt;
+    });
+  in writeShellScriptBin "hc-static-checks" ''
+    export PATH=${pathPrefix}:$PATH
+
     set -euxo pipefail
     export RUST_BACKTRACE=1
-
-    # make sure the binary is built
-    cargo build --locked --manifest-path=crates/release-automation/Cargo.toml
-    # run the release-automation tests
-    cargo test ''${CARGO_TEST_ARGS:-} --locked --manifest-path=crates/release-automation/Cargo.toml ''${@}
+    hn-rust-fmt-check
+    hn-rust-clippy
   '';
-
-  hcReleaseAutomationTestRepo =
-    let
-      prepareWorkspaceCmd = ''
-        rm -rf ''${TEST_WORKSPACE:?}
-        git clone $PWD ''${TEST_WORKSPACE:?}
-      '';
-
-      crateCmd = logLevel: ''
-        ${releaseAutomation} \
-            --workspace-path=''${TEST_WORKSPACE:?} \
-            --log-level=${logLevel} \
-          crate \
-            apply-dev-versions \
-            --commit \
-            --no-verify
-      '';
-      releaseCmd = logLevel: ''
-        ${releaseAutomation} \
-            --workspace-path=''${TEST_WORKSPACE:?} \
-            --log-level=${logLevel} \
-            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-          release \
-            --no-verify-pre \
-            --force-branch-creation \
-            --disallowed-version-reqs=">=0.1" \
-            --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-            --steps=CreateReleaseBranch,BumpReleaseVersions
-      '';
-    in
-    writeShellScriptBin "hc-test-release-automation-repo" ''
-      set -euxo pipefail
-
-      export TEST_WORKSPACE=$(mktemp -d)
-      if [[ "''${KEEP_TEST_WORKSPACE:-false}" != "true" ]]; then
-        trap "rm -rf ''${TEST_WORKSPACE:?}" EXIT
-      fi
-
-      # check the state of the repository
-      (
-        ${prepareWorkspaceCmd}
-        ${crateCmd "debug"}
-        ${releaseCmd "debug"}
-      )
-    '';
-
-  hcStaticChecks =
-    let
-      pathPrefix = lib.makeBinPath
-        (builtins.attrValues {
-          inherit (holonix.pkgs)
-            hnRustClippy
-            hnRustFmtCheck
-            hnRustFmtFmt
-            ;
-        })
-      ;
-    in
-    writeShellScriptBin "hc-static-checks" ''
-      export PATH=${pathPrefix}:$PATH
-
-      set -euxo pipefail
-      export RUST_BACKTRACE=1
-      hn-rust-fmt-check
-      hn-rust-clippy
-    '';
 
   hcMergeTest = writeShellScriptBin "hc-merge-test" ''
     set -euxo pipefail
@@ -251,19 +182,6 @@ rec {
     bench $compare
     add_comment_to_commit $compare $commit
   '';
-
-  hcRegenReadmes = writeShellScriptBin "hc-regen-readmes" ''
-    cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
-  '';
-
-  hcRegenNixExpressions = writeShellScriptBin "hc-regen-nix-expressions" ''
-    set -xe
-    pushd ${hcToplevelDir}
-    ${crate2nix}/bin/crate2nix generate \
-        -f crates/release-automation/Cargo.toml \
-        -o crates/release-automation/Cargo.nix
-    git commit crates/release-automation/Cargo.nix -m "chore: hc-regen-nix-expressions"
-  '';
 } // (if stdenv.isLinux then {
   hcCoverageTest = writeShellScriptBin "hc-coverage-test" ''
     set -euxo pipefail
@@ -274,7 +192,7 @@ rec {
     # actually kcov does not work with workspace target either
     # we need to use targets in each crate - but that is slow
     # use symlinks so we don't have to recompile deps over and over
-    for i in ''$(find crates -maxdepth 1 -mindepth 1 -type d | sort); do
+    for i in $(find crates -maxdepth 1 -mindepth 1 -type d | sort); do
       # skip some crates that aren't ready yet
       case "$i" in
         "crates/dpki" | "crates/keystore" )
@@ -311,4 +229,5 @@ rec {
     # so we'll just open the coverage report in a browser
     xdg-open target/coverage/index.html
   '';
-} else { })
+} else
+  { })
