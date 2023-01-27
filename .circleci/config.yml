@@ -86,7 +86,7 @@ jobs:
 
    standard-test-nextest:
       docker:
-         - image: holochain/holochain:circle.build.develop
+         - image: nixos/nix:2.13.2
            auth:
               username: $DOCKER_USER
               password: $DOCKER_PASS
@@ -98,16 +98,15 @@ jobs:
          - checkout
          - run: git config --global --unset url.ssh://git@github.com.insteadof
          - run:
-              name: Set up Nix cache
-              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
-         - run:
               name: Run the standard tests (nextest)
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr flavor "coreDev" --run hc-test-standard-nextest
-         - run:
-              name: push to cachix
-              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciCachixPush)/bin/hc-ci-cachix-push.sh || true
-              when: always
+              command: |
+                 set -x
+                 nix run --extra-experimental-features "flakes nix-command" nixpkgs#cachix \
+                  watch-exec holochain-ci \
+                     nix build -vL \
+                        --extra-experimental-features "ca-derivations impure-derivations nix-command" \
+                        .#holochain-tests-nextest
 
    wasm-test:
       docker:
