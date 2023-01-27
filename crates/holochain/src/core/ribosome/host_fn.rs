@@ -198,7 +198,7 @@ host_fn_api_impls! {
     fn sys_time (()) -> zt::timestamp::Timestamp;
 
     // Unblock some previously blocked agent.
-    fn unblock_agent (zt::block::UnblockAgentInput) -> ();
+    fn unblock_agent (zt::block::BlockAgentInput) -> ();
 
     // Same as  but also takes the ActionHash of the updated record.
     fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;

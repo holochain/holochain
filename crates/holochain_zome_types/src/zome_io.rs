@@ -145,7 +145,7 @@ wasm_io_types! {
     fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
 
     // Unblock some previously blocked agent.
-    fn unblock_agent(zt::block::UnblockAgentInput) -> ();
+    fn unblock_agent(zt::block::BlockAgentInput) -> ();
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;
 
