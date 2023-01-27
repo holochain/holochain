@@ -16,9 +16,9 @@ jobs:
       matrix:
         platform:
           - arch: macos-aarch64
-            runs-on: [macOS, self-hosted, arm64]
+            runs-on: multi-arch
           - arch: macos-x86_64
-            runs-on: macos-latest
+            runs-on: multi-arch
           - arch: linux-x86_64
             runs-on: ubuntu-latest
     runs-on: ${{ matrix.platform.runs-on }}
