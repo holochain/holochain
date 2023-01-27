@@ -3,14 +3,10 @@
 -- block spans
 CREATE TABLE IF NOT EXISTS block_span (
 
-  ipv4 BLOB NULL,
-  node BLOB NULL,
-  dna BLOB NULL,
-  agent BLOB NULL,
+  target BLOB NULL,
+  reason BLOB NULL,
 
   start_ms INTEGER NULL,
   end_ms INTEGER NULL,
-
-  mut BOOLEAN NOT NULL,
 
 );
