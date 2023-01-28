@@ -49,7 +49,17 @@ async fn get_config(
 async fn read_config(config_path: &std::path::Path) -> LairResult<LairServerConfig> {
     let bytes = tokio::fs::read(config_path).await?;
 
-    let config = LairServerConfigInner::from_bytes(&bytes)?;
+    // normal
+    // let config = LairServerConfigInner::from_bytes(&bytes)?;
+
+    // TODO: remove this again, it's not for permanent use
+    // it addresses the apple container id changing between development
+    // installs of the iOS app
+    let mut config = LairServerConfigInner::from_bytes(&bytes)?;
+    let parent = config_path.parent().unwrap();
+    config.connection_url.set_path(parent.join("socket").to_str().unwrap());
+    config.pid_file = parent.join("pid_file");
+    config.store_file = parent.join("store_file");
 
     Ok(Arc::new(config))
 }
