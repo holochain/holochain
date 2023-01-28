@@ -45,7 +45,7 @@ pub use bandwidth::BandwidthThrottles;
 /// on every iteration. We should add a longer interval for refreshing this
 /// list (perhaps once per second), and use a cached value for other iterations,
 /// so as not to do hundreds of DB queries per second.
-const GOSSIP_LOOP_INTERVAL: Duration = Duration::from_millis(10);
+const GOSSIP_LOOP_INTERVAL: Duration = Duration::from_millis(10000);
 
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
