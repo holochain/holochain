@@ -570,10 +570,9 @@ mod dna_impls {
             &self,
             ribosome: RealRibosome,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-            let is_full_wasm_dna = ribosome
-                .dna_def()
-                .all_zomes()
-                .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
+            let is_full_wasm_dna = ribosome.dna_def().all_zomes().all(|(_, zome_def)| {
+                matches!(zome_def, ZomeDef::Wasm(_)) || matches!(zome_def, ZomeDef::WasmDylib(_))
+            });
 
             // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
             if is_full_wasm_dna {
