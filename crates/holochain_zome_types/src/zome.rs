@@ -146,6 +146,7 @@ pub struct WasmZomeDylib {
     pub dependencies: Vec<ZomeName>,
 }
 
+/// TODO: change this comment
 /// Just the definition of a Zome, without the name included. This exists
 /// mainly for use in HashMaps where ZomeDefs are keyed by ZomeName.
 ///
@@ -159,7 +160,7 @@ pub struct WasmZomeDylib {
 /// In particular, a real-world DnaFile should only ever contain Wasm zomes!
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 // This can be untagged, since the only valid serialization target is WasmZome
-#[serde(untagged, into = "ZomeDefSerialized")]
+#[serde(tag = "type", into = "ZomeDefSerialized")]
 pub enum ZomeDef {
     /// A zome defined by Wasm bytecode
     Wasm(WasmZome),
@@ -187,7 +188,7 @@ pub struct CoordinatorZomeDef(ZomeDef);
 /// The serialized form of a ZomeDef, which is identical for Wasm zomes, but
 /// unwraps InlineZomes to just a bare network seed.
 #[derive(Serialize)]
-#[serde(untagged)]
+#[serde(tag = "type")]
 enum ZomeDefSerialized {
     Wasm(WasmZome),
 
