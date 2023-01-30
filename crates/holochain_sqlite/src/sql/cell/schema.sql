@@ -105,10 +105,12 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     -- Used to withhold ops from publishing for things
     -- like countersigning.
     withhold_publish    INTEGER     NULL, -- BOOLEAN
+
     -- The op has received enough validation receipts.
     -- This is required as a field because different ops have different EntryTypes,
     -- which have different numbers of required validation receipts.
     receipts_complete   INTEGER     NULL,     -- BOOLEAN
+    
     last_publish_time   INTEGER     NULL,   -- UNIX TIMESTAMP SECONDS
 
     -- 0: Awaiting System Validation Dependencies.
@@ -122,13 +124,6 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     validation_stage            INTEGER     NULL,
     num_validation_attempts     INTEGER     NULL,
     last_validation_attempt     INTEGER     NULL,
-
-    -- NB: I removed this because when_integrated covers it
-    -- TODO: @freesig: Might be hard to index on various timestamps?
-    -- is_integrated    INTEGER        NOT NULL,      -- BOOLEAN
-
-    -- NB: I removed this because it's accessible via Action.entry_hash
-    -- entry_hash       BLOB           NULL,
 
     -- The integration dependency if there is one.
     dependency          BLOB           NULL,
