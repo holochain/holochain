@@ -247,21 +247,6 @@ mod startup_shutdown_impls {
     /// Methods used by the [ConductorHandle]
     //-----------------------------------------------------------------------------
     impl Conductor {
-        pub(crate) async fn witness_nonce_from_calling_agent(
-            &self,
-            agent: AgentPubKey,
-            nonce: Nonce256Bits,
-            expires: Timestamp,
-        ) -> ConductorResult<WitnessNonceResult> {
-            Ok(witness_nonce(
-                &self.spaces.conductor_db,
-                agent,
-                nonce,
-                Timestamp::now(),
-                expires,
-            )
-            .await?)
-        }
 
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
@@ -747,6 +732,7 @@ mod dna_impls {
 mod network_impls {
     use holochain_conductor_api::NetworkInfo;
     use holochain_p2p::HolochainP2pSender;
+    use holochain_types::block::Block;
 
     use super::*;
 
@@ -775,6 +761,32 @@ mod network_impls {
                     Ok(out)
                 }
             }
+        }
+
+        pub(crate) async fn witness_nonce_from_calling_agent(
+            &self,
+            agent: AgentPubKey,
+            nonce: Nonce256Bits,
+            expires: Timestamp,
+        ) -> ConductorResult<WitnessNonceResult> {
+            Ok(witness_nonce(
+                &self.spaces.conductor_db,
+                agent,
+                nonce,
+                Timestamp::now(),
+                expires,
+            )
+            .await?)
+        }
+
+        /// Block some target.
+        pub async fn block(&self, _block: Block) -> ConductorResult<()> {
+            unimplemented!();
+        }
+
+        /// Unblock some target.
+        pub async fn unblock(&self, _block: Block) -> ConductorResult<()> {
+            unimplemented!();
         }
 
         pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
