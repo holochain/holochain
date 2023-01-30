@@ -87,7 +87,7 @@ fn check_migrations() {
                     if out.status.success() && out.stdout.is_empty() && out.stderr.is_empty() {
                         // no change. good.
                     } else {
-                        panic!("Diff found in schema file.\n\n{}\nSchema files cannot be modified. Set up a new database migration in 'crates/holochain_sqlite/src/schema.rs'\n\n", String::from_utf8_lossy(&out.stdout))
+                        panic!("Diff found in schema file:\n\n{}\nSchema and migration files cannot be modified. Instead, set up a new database migration in 'crates/holochain_sqlite/src/schema.rs'\n\n", String::from_utf8_lossy(&out.stdout))
                     }
                 }
                 Err(err) => panic!("Error while checking schema: {:?}, path = {:?}", err, path),

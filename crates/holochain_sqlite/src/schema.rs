@@ -1,3 +1,18 @@
+//! Schema and migration definitions
+//!
+//! To create a new migration, add a new [`Migration`] object to the `migrations`
+//! vec for a particular schema, and bump the `current_index` by 1.
+//! The `Migration` must specify the actual forward migration script, as well as
+//! an updated schema defining the result of running the migration.
+//!
+//! Currently, the updated schema only serves as a point of reference for examining
+//! the current schema. In the future, we should find a way to compare the actual
+//! schema resulting from migrations with the schema provided, to make sure they match.
+//!
+//! Note that there is code in `build.rs` which fails the build if any schema or migration
+//! file has a change according to `git diff`. This will hopefully help prevent accidental
+//! modification of schemas, which should never be committed.
+
 use once_cell::sync::Lazy;
 use rusqlite::Connection;
 
@@ -14,40 +29,24 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
     ],
 });
 
-pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = M::initial(include_str!("sql/conductor/schema/0.sql"));
-
-    Schema {
-        current_index: 0,
-        migrations: vec![migration_0],
-    }
+pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| Schema {
+    current_index: 0,
+    migrations: vec![M::initial(include_str!("sql/conductor/schema/0.sql"))],
 });
 
-pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = M::initial(include_str!("sql/wasm/schema/0.sql"));
-
-    Schema {
-        current_index: 0,
-        migrations: vec![migration_0],
-    }
+pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| Schema {
+    current_index: 0,
+    migrations: vec![M::initial(include_str!("sql/wasm/schema/0.sql"))],
 });
 
-pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = M::initial(include_str!("sql/p2p_agent_store/schema/0.sql"));
-
-    Schema {
-        current_index: 0,
-        migrations: vec![migration_0],
-    }
+pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| Schema {
+    current_index: 0,
+    migrations: vec![M::initial(include_str!("sql/p2p_agent_store/schema/0.sql"))],
 });
 
-pub static SCHEMA_P2P_METRICS: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = M::initial(include_str!("sql/p2p_metrics/schema/0.sql"));
-
-    Schema {
-        current_index: 0,
-        migrations: vec![migration_0],
-    }
+pub static SCHEMA_P2P_METRICS: Lazy<Schema> = Lazy::new(|| Schema {
+    current_index: 0,
+    migrations: vec![M::initial(include_str!("sql/p2p_metrics/schema/0.sql"))],
 });
 
 pub struct Schema {
