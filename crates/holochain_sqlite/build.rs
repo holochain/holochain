@@ -1,5 +1,8 @@
+use std::path::PathBuf;
+
 const SQL_DIR: &str = "./src/sql";
 const FIX_SQL_FMT: Option<&str> = option_env!("FIX_SQL_FMT");
+
 fn fix_sql_fmt() -> bool {
     if let Some(fsf) = FIX_SQL_FMT {
         !fsf.is_empty()
@@ -68,9 +71,37 @@ fn check_fmt(path: &std::path::Path) {
     }
 }
 
+fn check_migrations() {
+    use std::process::Command;
+    let root = PathBuf::from(SQL_DIR);
+    for dir in [
+        root.join("cell"),
+        root.join("conductor"),
+        root.join("p2p_agent_store"),
+        root.join("p2p_metrics"),
+        root.join("wasm"),
+    ] {
+        let path = dir.join("schema.sql");
+        let mut cmd = Command::new("git");
+        cmd.arg("diff");
+        cmd.arg(path.clone());
+        match cmd.output() {
+            Ok(out) => {
+                if out.status.success() && out.stdout.is_empty() && out.stderr.is_empty() {
+                    // no change, good
+                } else {
+                    panic!("Diff found in schema file.\n\n{}\nSchema files cannot be modified. Set up a new database migration in 'crates/holochain_sqlite/src/schema.rs'\n\n", String::from_utf8_lossy(&out.stdout))
+                }
+            }
+            Err(err) => panic!("Error while checking schema: {:?}, path = {:?}", err, path),
+        }
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-env-changed=FIX_SQL_FMT");
     for sql in find_sql(std::path::Path::new(SQL_DIR)) {
         check_fmt(&sql);
     }
+    check_migrations();
 }
