@@ -2,19 +2,20 @@ use once_cell::sync::Lazy;
 use rusqlite::Connection;
 
 use crate::db::DbKind;
-use crate::sql::*;
 
-pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(include_str!("sql/cell/schema/0.sql"));
-
-    Schema {
-        current_index: 0,
-        migrations: vec![migration_0],
-    }
+pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
+    current_index: 1,
+    migrations: vec![
+        M::initial(include_str!("sql/cell/schema/0.sql")),
+        M {
+            forward: include_str!("sql/cell/schema/1-up.sql").into(),
+            schema: include_str!("sql/cell/schema/1.sql").into(),
+        },
+    ],
 });
 
 pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(include_str!("sql/conductor/schema/0.sql"));
+    let migration_0 = M::initial(include_str!("sql/conductor/schema/0.sql"));
 
     Schema {
         current_index: 0,
@@ -23,7 +24,7 @@ pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(include_str!("sql/wasm/schema/0.sql"));
+    let migration_0 = M::initial(include_str!("sql/wasm/schema/0.sql"));
 
     Schema {
         current_index: 0,
@@ -32,7 +33,7 @@ pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(include_str!("sql/p2p_agent_store/schema/0.sql"));
+    let migration_0 = M::initial(include_str!("sql/p2p_agent_store/schema/0.sql"));
 
     Schema {
         current_index: 0,
@@ -41,7 +42,7 @@ pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_P2P_METRICS: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(include_str!("sql/p2p_metrics/schema/0.sql"));
+    let migration_0 = M::initial(include_str!("sql/p2p_metrics/schema/0.sql"));
 
     Schema {
         current_index: 0,
@@ -81,7 +82,7 @@ impl Schema {
                 std::cmp::Ordering::Less => {
                     // run forward migrations
                     for v in current_index..self.current_index + 1 {
-                        self.migrations[v].run(conn)?;
+                        self.migrations[v].run_forward(conn)?;
                         // set the DB user_version so that next time we don't run
                         // the same migration
                         conn.pragma_update(None, "user_version", v + 1)?;
@@ -111,16 +112,14 @@ impl Schema {
 
 pub struct Migration {
     schema: Sql,
-    _forward: Sql,
-    _backward: Option<Sql>,
+    forward: Sql,
 }
 
 impl Migration {
     pub fn initial(schema: &str) -> Self {
         Self {
             schema: schema.into(),
-            _forward: "".into(),
-            _backward: None,
+            forward: "".into(),
         }
     }
 
@@ -129,9 +128,11 @@ impl Migration {
         Ok(())
     }
 
-    pub fn run(&self, _conn: &mut Connection) -> rusqlite::Result<()> {
-        unimplemented!("actual migrations not yet implemented")
+    pub fn run_forward(&self, conn: &mut Connection) -> rusqlite::Result<()> {
+        conn.execute_batch(&self.forward)?;
+        Ok(())
     }
 }
+type M = Migration;
 
 type Sql = String;
