@@ -1,4 +1,4 @@
-name: "holonix integration test"
+name: "holonix test"
 
 on:
   workflow_dispatch:
