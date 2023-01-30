@@ -52,9 +52,13 @@ name = "api_thru"
 harness = false
 
 [features]
+default = [ "tx2" ]
+
 test_utils = [
   "arbitrary",
   "kitsune_p2p_dht_arc/test_utils",
   "ghost_actor/test_utils",
   "mockall",
 ]
+
+tx2 = []
