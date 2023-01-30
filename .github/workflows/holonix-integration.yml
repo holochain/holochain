@@ -39,7 +39,9 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: build holonix-integration-test
-        run: nix build -L .#holonix-integration-test --system ${{matrix.platform.arch}}
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: cachix watch-exec -c1 -j2 holochain-ci -- nix build -L .#holonix-integration-test --system ${{matrix.platform.arch}}
   tests:
     needs: [build]
     timeout-minutes: 100
@@ -72,7 +74,9 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: run holonix-integration-test
-        run: nix run -L .#holonix-integration-test --system ${{matrix.platform.arch}}
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: cachix watch-exec -c1 -j2 holochain-ci -- nix run -L .#holonix-integration-test --system ${{matrix.platform.arch}}
 
   ci-jobs-succeed:
     needs: [tests]

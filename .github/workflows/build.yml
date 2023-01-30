@@ -50,10 +50,12 @@ jobs:
 
       - name: Setup cachix
         uses: cachix/cachix-action@v12
-        continue-on-error: ${{ matrix.platform.runs-on == 'multi-arch' }}
+        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: "Test comand ${{ matrix.nixCommand }}"
-        run: ${{ matrix.cmd }} -L --show-trace --system ${{ matrix.platform.system }} --extra-experimental-features "ca-derivations impure-derivations"
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: cachix watch-exec -c1 -j2 holochain-ci -- ${{ matrix.cmd }} -L --show-trace --system ${{ matrix.platform.system }} --extra-experimental-features "ca-derivations impure-derivations"
