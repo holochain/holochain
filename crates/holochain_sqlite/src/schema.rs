@@ -5,7 +5,7 @@ use crate::db::DbKind;
 use crate::sql::*;
 
 pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(sql_cell::SCHEMA);
+    let migration_0 = Migration::initial(include_str!("sql/cell/schema/0.sql"));
 
     Schema {
         current_index: 0,
@@ -14,7 +14,7 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(sql_conductor::SCHEMA);
+    let migration_0 = Migration::initial(include_str!("sql/conductor/schema/0.sql"));
 
     Schema {
         current_index: 0,
@@ -23,7 +23,7 @@ pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(sql_wasm::SCHEMA);
+    let migration_0 = Migration::initial(include_str!("sql/wasm/schema/0.sql"));
 
     Schema {
         current_index: 0,
@@ -32,7 +32,7 @@ pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(sql_p2p_agent_store::SCHEMA);
+    let migration_0 = Migration::initial(include_str!("sql/p2p_agent_store/schema/0.sql"));
 
     Schema {
         current_index: 0,
@@ -41,7 +41,7 @@ pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| {
 });
 
 pub static SCHEMA_P2P_METRICS: Lazy<Schema> = Lazy::new(|| {
-    let migration_0 = Migration::initial(sql_p2p_metrics::SCHEMA);
+    let migration_0 = Migration::initial(include_str!("sql/p2p_metrics/schema/0.sql"));
 
     Schema {
         current_index: 0,
