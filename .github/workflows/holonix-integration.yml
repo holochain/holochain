@@ -9,24 +9,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  tests:
+  build:
     timeout-minutes: 100
     strategy:
       fail-fast: false
       matrix:
         platform:
-          # - arch: macos-aarch64
-          #   runs-on: multi-arch
-          # - arch: macos-x86_64
-          #   runs-on: multi-arch
-          - arch: linux-x86_64
-            runs-on: ubuntu-latest
+          - arch: aarch64-darwin
+            runs-on: multi-arch
+          - arch: x86_64-darwin
+            runs-on: multi-arch
+          - arch: x86_64-linux
+            runs-on: multi-arch
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Install nix
         uses: cachix/install-nix-action@v18
+        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
           install_url: https://releases.nixos.org/nix/nix-2.12.0/install
       - name: Setup cachix
@@ -37,9 +38,41 @@ jobs:
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: holonix-integration-test
-        if: ${{ matrix.platform.runs-on != 'macos-latest' }}
-        run: nix run ./holonix#holonix-integration-test
+      - name: build holonix-integration-test
+        run: nix build -L .#holonix-integration-test --system ${{matrix.platform.arch}}
+  tests:
+    needs: [build]
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # TODO: we can't run this on the multi-arch builder as it can't execute foreign shell commands
+          # - arch: aarch64-darwin
+          #   runs-on: multi-arch
+          - arch: x86_64-darwin
+            runs-on: macos-latest
+          - arch: x86_64-linux
+            runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform.runs-on }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install nix
+        uses: cachix/install-nix-action@v18
+        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.12.0/install
+      - name: Setup cachix
+        uses: cachix/cachix-action@v12
+        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
+        with:
+          name: holochain-ci
+          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: run holonix-integration-test
+        run: nix run -L .#holonix-integration-test --system ${{matrix.platform.arch}}
 
   ci-jobs-succeed:
     needs: [tests]
