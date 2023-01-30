@@ -1,7 +1,16 @@
 use std::path::PathBuf;
 
+/// The location of all our sql scrips
 const SQL_DIR: &str = "./src/sql";
+
+/// An env var that will trigger a SQL format.
 const FIX_SQL_FMT: Option<&str> = option_env!("FIX_SQL_FMT");
+
+/// This is the first commit to introduce the migrations system. We check for diffs
+/// against this to ensure that no migration or schema file has ever been modified.
+/// If you change the migration directory structure, you'll have to change this ref
+/// so that everything will be registered as unchanged again.
+const GIT_INITIAL_MIGRATION_REF: &str = "8eba364d89f0b9c9a3892246f85b2c773eb8eb8e";
 
 fn fix_sql_fmt() -> bool {
     if let Some(fsf) = FIX_SQL_FMT {
@@ -82,7 +91,14 @@ fn check_migrations() {
     ] {
         for path in find_sql(&dir) {
             let mut cmd = Command::new("git");
-            match cmd.arg("diff").arg(path.clone()).output() {
+            match cmd
+                .arg("diff")
+                // Filter out files which were merely added
+                .arg("--diff-filter=a")
+                .arg(GIT_INITIAL_MIGRATION_REF)
+                .arg(path.clone())
+                .output()
+            {
                 Ok(out) => {
                     if out.status.success() && out.stdout.is_empty() && out.stderr.is_empty() {
                         // no change. good.
