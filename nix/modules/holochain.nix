@@ -26,12 +26,13 @@
 
         buildInputs = (with pkgs; [ openssl opensslStatic sqlcipher ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
-          (with pkgs.darwin.apple_sdk_11_0.frameworks; [
-            AppKit
-            CoreFoundation
-            CoreServices
-            Security
-          ]));
+            (with pkgs.darwin.apple_sdk_11_0.frameworks; [
+              AppKit
+              CoreFoundation
+              CoreServices
+              Security
+              IOKit
+            ]));
 
         nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config ])
           ++ lib.optionals pkgs.stdenv.isDarwin
@@ -165,8 +166,7 @@
         dontFixup = true;
       });
 
-    in
-    {
+    in {
       packages = {
         inherit holochain holochain-tests holochain-tests-nextest;
 
