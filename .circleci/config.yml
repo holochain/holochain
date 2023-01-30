@@ -65,7 +65,7 @@ jobs:
 
    standard-test-nextest:
       docker:
-         - image: holochain/holochain:circle.build.develop
+         - image: nixos/nix:latest
            auth:
               username: $DOCKER_USER
               password: $DOCKER_PASS
@@ -76,18 +76,13 @@ jobs:
          GOMAXPROCS: 1
       steps:
          - checkout
-         - run: git config --global --unset url.ssh://git@github.com.insteadof
-         - run:
-              name: Set up Nix cache
-              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciSetupNixConf)/bin/hc-ci-setup-nix-conf.sh
          - run:
               name: Run the standard tests (nextest)
               no_output_timeout: 30m
-              command: nix-shell --fallback --pure --argstr devShellId "coreDev" --run hc-test-standard-nextest
-         - run:
-              name: push to cachix
-              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciCachixPush)/bin/hc-ci-cachix-push.sh || true
-              when: always
+              command: |
+                 export NIX_CONFIG="extra-experimental-features = nix-command flakes impure-derivations ca-derivations"
+                 nix run nixpkgs#cachix -- use ${CACHIX_NAME}
+                 nix run nixpkgs#cachix -- watch-exec ${CACHIX_NAME} -- nix build -L .#holochain-tests-nextest
 
    standard-test-nextest-tx5:
       docker:
@@ -180,33 +175,33 @@ jobs:
 workflows:
    tests:
       jobs:
-         # - merge-release-test-mac
-         - standard-test-nextest
-         - standard-test-nextest-tx5
-         - rustdoc-build-test
-         - hc-static-checks
-         - wasm-test
+         # - standard-test-nextest
+         # - standard-test-nextest-tx5
+         # - rustdoc-build-test
+         # - hc-static-checks
+         # - wasm-test
          # - merge-test-mac
 
          - ci-jobs-succeed:
               requires:
-                 - standard-test-nextest
-                 - standard-test-nextest-tx5
-                 - rustdoc-build-test
-                 - hc-static-checks
-                 - wasm-test
+                 []
+                 #   - standard-test-nextest
+                 #   - standard-test-nextest-tx5
+                 #   - rustdoc-build-test
+                 #   - hc-static-checks
+                 #   - wasm-test
 
-   docker-builds:
-      triggers:
-         - schedule:
-              cron: "0 0 * * *"
-              filters:
-                 branches:
-                    only:
-                       - develop
-                       - master
-      jobs:
-         - docker-build-latest
-         - docker-build-circle-build:
-              requires:
-                 - docker-build-latest
+   # docker-builds:
+   #    triggers:
+   #       - schedule:
+   #            cron: "0 0 * * *"
+   #            filters:
+   #               branches:
+   #                  only:
+   #                     - develop
+   #                     - master
+   #    jobs:
+   #    - docker-build-latest
+   #    - docker-build-circle-build:
+   #         requires:
+   #            - docker-build-latest

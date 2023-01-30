@@ -69,7 +69,7 @@ on:
   pull_request: {}
 
 concurrency:
-  group: ${{ github.action }}-${{ github.ref_name }}-${{ github.event_name }}
+  group: release-${{ github.ref_name }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event.inputs.force_cancel_in_progress == 'true' || github.event_name == 'pull_request' }}
 
 jobs:

@@ -6,7 +6,7 @@
 
       rustToolchain = config.rust.mkRust {
         track = "stable";
-        version = "latest";
+        version = "1.66.1";
       };
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
@@ -23,21 +23,26 @@
           (with pkgs; [
             openssl
             glib
-            webkitgtk.dev
-            gdk-pixbuf
-            gtk3
           ])
+          ++ (lib.optionals pkgs.stdenv.isLinux
+            (with pkgs; [
+              webkitgtk.dev
+              gdk-pixbuf
+              gtk3
+            ]))
           ++ (lib.optionals pkgs.stdenv.isDarwin
             (with pkgs.darwin.apple_sdk_11_0.frameworks; [
               AppKit
               CoreFoundation
               CoreServices
               Security
+              WebKit
             ])
           );
 
         nativeBuildInputs =
-          (with pkgs; [
+          (with pkgs;
+          [
             perl
             pkg-config
           ])
@@ -45,6 +50,8 @@
             xcbuild
             libiconv
           ]);
+
+        doCheck = false;
       };
 
       # derivation building all dependencies
@@ -53,7 +60,6 @@
       # derivation with the main crates
       package = craneLib.buildPackage (commonArgs // {
         cargoArtifacts = deps;
-        doCheck = false;
       });
 
     in

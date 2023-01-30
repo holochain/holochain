@@ -20,7 +20,7 @@
       coreDev = pkgs.mkShell {
         inputsFrom = [ self'.devShells.rustDev ];
 
-        packages = with pkgs; [ ];
+        packages = with pkgs; [ cargo-nextest ];
       };
 
       rustDev = pkgs.mkShell {
