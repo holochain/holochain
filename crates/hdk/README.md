@@ -72,7 +72,7 @@ module and `entry_defs` callback
 - Ed25519 signing and verification of data: `ed25519` module
 - Exposing information about the current execution context such as zome name: `info` module
 - Other utility functions provided by the host such as generating randomness and timestamps that are impossible in WASM: utility module
-- Exposing functions to external processes and callbacks to the host: `hdk_extern!` and `map_extern!` macros
+- Exposing functions to external processes and callbacks to the host: [`hdk_extern!`](macro@crate::prelude::hdk_extern) and [`map_extern!`](macro@crate::prelude::map_extern) macros
 - Integration with the Rust [tracing](https://docs.rs/tracing/0.1.23/tracing/) crate
 - Exposing a `prelude` of common types and functions for convenience
 
@@ -103,7 +103,7 @@ And every host function defined by Holochain has a convenience wrapper in HDK th
 
 ### Extern callbacks
 
-To extend a Rust function so that it can be called by the host, add the `hdk_extern!` attribute.
+To extend a Rust function so that it can be called by the host, add the [`hdk_extern!`](macro@crate::prelude::hdk_extern) attribute.
 
 - The function must take _one_ argument that implements `serde::Serialize + std::fmt::Debug`
 - The function must return an `ExternResult` where the success value implements `serde::Serialize + std::fmt::Debug`
@@ -187,7 +187,7 @@ HDK is designed in layers so that there is some kind of 80/20 rule.
 The code is not strictly organised this way but you'll get a feel for it as you write your own hApps.
 
 Roughly speaking, 80% of your apps can be production ready using just 20% of the HDK features and code.
-These are the 'high level' functions such as [`crate::entry::create_entry`] and macros like `hdk_extern!`.
+These are the 'high level' functions such as [`crate::entry::create_entry`] and macros like [`hdk_extern!`](macro@crate::prelude::hdk_extern).
 Every Holochain function is available with a typed and documented wrapper and there is a set of macros for exposing functions and defining entries.
 
 The 20% of the time that you need to go deeper there is another layer followng its own 80/20 rule.
@@ -241,7 +241,7 @@ You do _not_ need to pin _all_ your Rust dependencies, just those that take part
 
 ## HDK is integrated with rust tracing for better debugging 🐛
 
-Every extern defined with the `hdk_extern!` attribute registers a [tracing subscriber](https://crates.io/crates/tracing-subscriber) that works in WASM.
+Every extern defined with the [`hdk_extern!`](macro@crate::prelude::hdk_extern) attribute registers a [tracing subscriber](https://crates.io/crates/tracing-subscriber) that works in WASM.
 
 All the basic tracing macros `trace!`, `debug!`, `warn!`, `error!` are implemented.
 
