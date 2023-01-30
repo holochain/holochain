@@ -39,40 +39,23 @@
 
     # holochain_scaffolding_cli
     scaffolding = {
-      url = "github:holochain/scaffolding";
+      url = "github:holochain/scaffolding/holochain_scaffolding_cli-v0.1.4";
       flake = false;
     };
 
-    # launcher
     launcher = {
-      url = "github:holochain/launcher";
+      url = "github:holochain/launcher/holochain_cli_launch-0.0.9";
       flake = false;
     };
 
     # holochain
     holochain = {
-      # url = "github:holochain/holochain/develop";
-      url = "https://example.com";
+      url = "github:holochain/holochain/holochain-0.1.0";
       flake = false;
     };
-    holochain_v0_1_0-beta-rc_0 = {
-      url = "github:holochain/holochain/holochain-0.1.0-beta-rc.0";
-      flake = false;
-    };
-    holochain_v0_1_0-beta-rc_1 = {
-      url = "github:holochain/holochain/holochain-0.1.0-beta-rc.1";
-      flake = false;
-    };
-    holochain_v0_1_0-beta-rc_2 = {
-      url = "github:holochain/holochain/holochain-0.1.0-beta-rc.2";
-      flake = false;
-    };
-    holochain_v0_1_0-beta-rc_3 = {
-      url = "github:holochain/holochain/holochain-0.1.0-beta-rc.3";
-      flake = false;
-    };
-    holochain_v0_1_0-beta-rc_4 = {
-      url = "github:holochain/holochain/holochain-0.1.0-beta-rc.4";
+
+    cargo-chef = {
+      url = "github:LukeMathWalker/cargo-chef/main";
       flake = false;
     };
   };
