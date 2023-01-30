@@ -60,18 +60,24 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
       - name: Install nix
         uses: cachix/install-nix-action@v18
         if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
-          install_url: https://releases.nixos.org/nix/nix-2.12.0/install
+          extra_nix_config: |
+            experimental-features = flakes nix-command
       - name: Setup cachix
         uses: cachix/cachix-action@v12
         if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
           name: holochain-ci
-          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - name: Restart nix-daemon
+        if: ${{ matrix.platform.runs-on == 'ubuntu-latest' }}
+        run: |
+          sudo bash -c 'echo extra-experimental-features = ca-derivations impure-derivations >> /etc/nix/nix.conf'
+          sudo systemctl stop nix-daemon
 
       - name: run holonix-integration-test
         env:

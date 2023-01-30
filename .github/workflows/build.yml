@@ -44,18 +44,21 @@ jobs:
         uses: cachix/install-nix-action@v18
         if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
-          install_url: https://releases.nixos.org/nix/nix-2.12.0/install
           extra_nix_config: |
             experimental-features = flakes nix-command
-
       - name: Setup cachix
         uses: cachix/cachix-action@v12
         if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - name: Restart nix-daemon
+        if: ${{ matrix.platform.runs-on == 'ubuntu-latest' }}
+        run: |
+          sudo bash -c 'echo extra-experimental-features = ca-derivations impure-derivations >> /etc/nix/nix.conf'
+          sudo systemctl stop nix-daemon
 
       - name: "Test comand ${{ matrix.nixCommand }}"
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: cachix watch-exec -c1 -j2 holochain-ci -- ${{ matrix.cmd }} -L --show-trace --system ${{ matrix.platform.system }} --extra-experimental-features "ca-derivations impure-derivations"
+        run: cachix watch-exec -c1 -j2 holochain-ci -- ${{ matrix.cmd }} -L --show-trace --system ${{ matrix.platform.system }}
