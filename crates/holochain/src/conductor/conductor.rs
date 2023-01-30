@@ -780,13 +780,13 @@ mod network_impls {
         }
 
         /// Block some target.
-        pub async fn block(&self, _block: Block) -> ConductorResult<()> {
-            unimplemented!();
+        pub async fn block(&self, block: Block) -> ConductorResult<()> {
+            Ok(holochain_state::block::block(&self.spaces.conductor_db, block).await?)
         }
 
         /// Unblock some target.
-        pub async fn unblock(&self, _block: Block) -> ConductorResult<()> {
-            unimplemented!();
+        pub async fn unblock(&self, block: Block) -> ConductorResult<()> {
+            Ok(holochain_state::block::unblock(&self.spaces.conductor_db, block).await?)
         }
 
         pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {

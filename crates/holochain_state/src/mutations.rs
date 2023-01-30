@@ -22,6 +22,7 @@ use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::zome_io::Nonce256Bits;
 use holochain_zome_types::*;
 use std::str::FromStr;
+use holochain_types::block::Block;
 
 pub use error::*;
 
@@ -272,6 +273,14 @@ pub fn insert_nonce(
         "expires": expires,
     })?;
     Ok(())
+}
+
+pub fn insert_block(_txn: &Transaction<'_>, _block: Block) -> DatabaseResult<()> {
+    unimplemented!();
+}
+
+pub fn insert_unblock(_txn: &Transaction<'_>, _block: Block) -> DatabaseResult<()> {
+    unimplemented!();
 }
 
 /// Set the validation status of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
