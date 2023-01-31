@@ -6,6 +6,9 @@ const SQL_DIR: &str = "./src/sql";
 /// An env var that will trigger a SQL format.
 const FIX_SQL_FMT: Option<&str> = option_env!("FIX_SQL_FMT");
 
+/// Git ref against which to check for schema changes
+const GIT_BASE_REF: &str = "origin/develop";
+
 fn fix_sql_fmt() -> bool {
     if let Some(fsf) = FIX_SQL_FMT {
         !fsf.is_empty()
@@ -91,6 +94,7 @@ fn check_migrations() {
                 .arg("diff")
                 // Filter out files which were merely added
                 .arg("--diff-filter=a")
+                .arg(GIT_BASE_REF)
                 .arg(path.clone())
                 .output()
             {
