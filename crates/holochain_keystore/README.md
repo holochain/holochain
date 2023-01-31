@@ -1,5 +1,7 @@
 # holochain_keystore
 
+<!-- cargo-rdme start -->
+
 A Keystore is a secure repository of private keys. MetaLairClient is a
 reference to a Keystore. MetaLairClient allows async generation of keypairs,
 and usage of those keypairs, reference by the public AgentPubKey.
@@ -28,5 +30,7 @@ async fn main() {
     }).await.unwrap();
 }
 ```
+
+<!-- cargo-rdme end -->
 
 License: CAL-1.0
