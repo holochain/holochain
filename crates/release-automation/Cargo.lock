@@ -218,12 +218,13 @@ checksum = "6c58ec36aac5066d5ca17df51b3e70279f5670a72102f5752cb7e7c856adfc70"
 
 [[package]]
 name = "cargo"
-version = "0.67.0"
+version = "0.67.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42890ec1f3578e60096342fb58b9949f925445841dbfc8a36230131815ae984e"
+checksum = "61d6715d02fc838c73eb8e116a8935677bfc4353a2983e0140b4ef018919ec40"
 dependencies = [
  "anyhow",
  "atty",
+ "base64",
  "bytesize",
  "cargo-platform",
  "cargo-util 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -235,10 +236,11 @@ dependencies = [
  "filetime",
  "flate2",
  "fwdansi",
- "git2",
+ "git2 0.16.1",
  "git2-curl",
  "glob",
  "hex 0.4.3",
+ "hmac",
  "home",
  "humantime",
  "ignore",
@@ -263,6 +265,7 @@ dependencies = [
  "serde-value",
  "serde_ignored",
  "serde_json",
+ "sha1",
  "shell-escape",
  "strip-ansi-escapes",
  "tar",
@@ -312,7 +315,7 @@ dependencies = [
  "crates-io 0.34.0 (git+https://github.com/rust-lang/cargo?branch=rust-1.66.0)",
  "filetime",
  "flate2",
- "git2",
+ "git2 0.15.0",
  "glob",
  "itertools",
  "lazy_static",
@@ -557,7 +560,7 @@ version = "0.18.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "599f67b56f40863598cb30450427049935d05de2e36c61d33c050f04d7ec8cf2"
 dependencies = [
- "git2",
+ "git2 0.15.0",
  "hex 0.4.3",
  "home",
  "memchr",
@@ -874,6 +877,7 @@ checksum = "8168378f4e5023e7218c89c891c0fd8ecdb5e5e4f18cb78f38cf245dd021e76f"
 dependencies = [
  "block-buffer",
  "crypto-common",
+ "subtle",
 ]
 
 [[package]]
@@ -1208,13 +1212,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "git2-curl"
-version = "0.16.0"
+name = "git2"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed817a00721e2f8037ba722e60358d4956dae9cca10315fc982f967907d3b0cd"
+checksum = "ccf7f68c2995f392c49fffb4f95ae2c873297830eb25c6bc4c114ce8f4562acc"
+dependencies = [
+ "bitflags",
+ "libc",
+ "libgit2-sys",
+ "log",
+ "openssl-probe",
+ "openssl-sys",
+ "url",
+]
+
+[[package]]
+name = "git2-curl"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7577f4e6341ba7c90d883511130a45b956c274ba5f4d205d9f9da990f654cd33"
 dependencies = [
  "curl",
- "git2",
+ "git2 0.16.1",
  "log",
  "url",
 ]
@@ -1284,6 +1303,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "hmac"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
+dependencies = [
+ "digest",
 ]
 
 [[package]]
@@ -1487,9 +1515,9 @@ checksum = "201de327520df007757c1f0adce6e827fe8562fbc28bfd9c15571c66ca1f5f79"
 
 [[package]]
 name = "libgit2-sys"
-version = "0.14.0+1.5.0"
+version = "0.14.2+1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47a00859c70c8a4f7218e6d1cc32875c4b55f6799445b842b0d8ed5e4c3d959b"
+checksum = "7f3d95f6b51075fe9810a7ae22c7095f12b98005ab364d8544797a825ce946a4"
 dependencies = [
  "cc",
  "libc",
@@ -2080,7 +2108,7 @@ dependencies = [
  "enumflags2",
  "env_logger 0.8.4",
  "fancy-regex",
- "git2",
+ "git2 0.15.0",
  "indoc",
  "itertools",
  "linked-hash-map",
@@ -2478,6 +2506,12 @@ dependencies = [
  "quote 1.0.23",
  "syn 1.0.107",
 ]
+
+[[package]]
+name = "subtle"
+version = "2.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "syn"
