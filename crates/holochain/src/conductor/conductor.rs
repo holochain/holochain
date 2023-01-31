@@ -247,7 +247,6 @@ mod startup_shutdown_impls {
     /// Methods used by the [ConductorHandle]
     //-----------------------------------------------------------------------------
     impl Conductor {
-
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
             config: ConductorConfig,

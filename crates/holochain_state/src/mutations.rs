@@ -11,6 +11,9 @@ use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_types::block::Block;
+use holochain_types::block::BlockTargetId;
+use holochain_types::block::BlockTargetReason;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
@@ -22,7 +25,6 @@ use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::zome_io::Nonce256Bits;
 use holochain_zome_types::*;
 use std::str::FromStr;
-use holochain_types::block::Block;
 
 pub use error::*;
 
@@ -275,8 +277,14 @@ pub fn insert_nonce(
     Ok(())
 }
 
-pub fn insert_block(_txn: &Transaction<'_>, _block: Block) -> DatabaseResult<()> {
-    unimplemented!();
+pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
+    sql_insert!(txn, BlockSpan, {
+        "target_id": BlockTargetId::from(block.target.clone()),
+        "target_reason": BlockTargetReason::from(block.target.clone()),
+        "start_ms": block.start,
+        "end_ms": block.end,
+    })?;
+    Ok(())
 }
 
 pub fn insert_unblock(_txn: &Transaction<'_>, _block: Block) -> DatabaseResult<()> {
