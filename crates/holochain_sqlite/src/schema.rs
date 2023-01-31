@@ -78,7 +78,7 @@ impl Schema {
                 tracing::info!(
                     "database forward migrated: {} from {} to {}",
                     db_kind,
-                    migrations_applied - 1,
+                    migrations_applied,
                     num_migrations - 1,
                 );
             }
