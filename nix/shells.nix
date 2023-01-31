@@ -58,6 +58,7 @@ rec {
       gh
       nixpkgs-fmt
       cargo-sweep
+      go
     ])
     ++ (lib.optionals stdenv.isDarwin
       (with holonix.pkgs.darwin; [

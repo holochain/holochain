@@ -68,7 +68,7 @@ impl ShardedGossipLocal {
                 inner.initiate_tgt = Some(tgt);
                 Ok(())
             })?;
-            Some((cert, HowToConnect::Url(url), gossip))
+            Some((cert, HowToConnect::Url(url.to_string()), gossip))
         } else {
             None
         };
@@ -80,7 +80,7 @@ impl ShardedGossipLocal {
     /// - Only send the agent bloom if this is a recent gossip type.
     pub(super) async fn incoming_initiate(
         &self,
-        peer_cert: Tx2Cert,
+        peer_cert: Arc<[u8; 32]>,
         remote_arc_set: Vec<DhtArcRange>,
         remote_id: u32,
         remote_agent_list: Vec<AgentInfoSigned>,

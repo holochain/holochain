@@ -9,10 +9,7 @@ use std::future::Future;
 /// - Err - we were not able to establish a connection within the timeout
 pub(crate) enum PeerDiscoverResult {
     OkShortcut,
-    OkRemote {
-        url: url2::Url2,
-        con_hnd: Tx2ConHnd<wire::Wire>,
-    },
+    OkRemote { url: String, con_hnd: MetaNetCon },
     Err(KitsuneP2pError),
 }
 
@@ -133,11 +130,14 @@ pub(crate) fn peer_connect(
         }
 
         // attempt an outgoing connection
-        let con_hnd = inner.ep_hnd.get_connection(url.clone(), timeout).await?;
+        let con_hnd = inner
+            .ep_hnd
+            .get_connection(url.to_string(), timeout)
+            .await?;
 
         // return the result
         Ok(PeerDiscoverResult::OkRemote {
-            url: url.into(),
+            url: url.to_string(),
             con_hnd,
         })
     }
