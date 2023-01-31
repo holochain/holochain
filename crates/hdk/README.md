@@ -1,5 +1,7 @@
 # hdk
 
+<!-- cargo-rdme start -->
+
 The Holochain Development Kit (HDK) provides high and low level functions for writing Holochain applications.
 
 Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes".
@@ -8,7 +10,7 @@ In short, that structure is __hApp -> DNA -> zome -> function__.
 
 hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
 data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
-[Holochain Deterministic Integrity (HDI)](hdi) for more information.
+Holochain Deterministic Integrity (HDI) for more information.
 
 Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
 Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
@@ -44,7 +46,7 @@ function that checks the integrity of any operations that manipulate data of tho
 The wasm workspace contains examples of integrity zomes like this:
 <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
 
-Refer to the [HDI crate](hdi) for more information on the integrity layer.
+Refer to the HDI crate for more information on the integrity layer.
 
 ## Coordinator zomes 🐜
 
@@ -59,19 +61,20 @@ An example coordinator zome can be found in the wasm workspace of the Holochain 
 HDK implements several key features:
 
 - Base HDKT trait for standardisation, mocking, unit testing support: [`hdk`] module
-- Capabilities and function level access control: [`capability`] module
-- [Holochain Deterministic Integrity (HDI)](hdi)
-- Application data and entry definitions for the source chain and DHT: [`entry`] module and [`entry_defs`] callback
-- Referencing/linking entries on the DHT together into a graph structure: [`link`] module
-- Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
+- Capabilities and function level access control: `capability` module
+- Holochain Deterministic Integrity (HDI)
+- Application data and entry definitions for the source chain and DHT: `entry`
+module and `entry_defs` callback
+- Referencing/linking entries on the DHT together into a graph structure: `link` module
+- Defining tree-like structures out of links and entries for discoverability and scalability: `hash_path` module
 - Create, read, update, delete (CRUD) operations on the above
-- Libsodium compatible symmetric/secret (secretbox) and asymmetric/keypair (box) encryption: [`x_salsa20_poly1305`] module
-- Ed25519 signing and verification of data: [`ed25519`] module
-- Exposing information about the current execution context such as zome name: [`info`] module
+- Libsodium compatible symmetric/secret (secretbox) and asymmetric/keypair (box) encryption: `x_salsa20_poly1305` module
+- Ed25519 signing and verification of data: `ed25519` module
+- Exposing information about the current execution context such as zome name: `info` module
 - Other utility functions provided by the host such as generating randomness and timestamps that are impossible in WASM: utility module
-- Exposing functions to external processes and callbacks to the host: [`hdk_extern!`] and [`map_extern!`] macros
+- Exposing functions to external processes and callbacks to the host: [`hdk_extern!`](macro@crate::prelude::hdk_extern) and [`map_extern!`](macro@crate::prelude::map_extern) macros
 - Integration with the Rust [tracing](https://docs.rs/tracing/0.1.23/tracing/) crate
-- Exposing a [`prelude`] of common types and functions for convenience
+- Exposing a `prelude` of common types and functions for convenience
 
 Generally these features are structured logically into modules but there are some affordances to the layering of abstractions.
 
@@ -100,14 +103,14 @@ And every host function defined by Holochain has a convenience wrapper in HDK th
 
 ### Extern callbacks
 
-To extend a Rust function so that it can be called by the host, add the [`hdk_extern!`] attribute.
+To extend a Rust function so that it can be called by the host, add the [`hdk_extern!`](macro@crate::prelude::hdk_extern) attribute.
 
 - The function must take _one_ argument that implements `serde::Serialize + std::fmt::Debug`
 - The function must return an `ExternResult` where the success value implements `serde::Serialize + std::fmt::Debug`
 - The function must have a unique name across all externs as they share a global namespace in WASM
 - Everything inside the function is Rust-as-usual including `?` to interact with `ExternResult` that fails as `WasmError`
-- Use the [`wasm_error!`](holochain_wasmer_guest::wasm_error) macro along with the
-[`WasmErrorInner::Guest`](holochain_wasmer_guest::WasmErrorInner::Guest) variant for failure conditions that the host or
+- Use the `wasm_error!` macro along with the
+`WasmErrorInner::Guest` variant for failure conditions that the host or
 external processes need to be aware of
 - Externed functions can be called as normal by other functions inside the same WASM
 
@@ -156,12 +159,12 @@ The callbacks are:
   - Runs _before the agent exists on the network_ so has no ability to use
     the network and generally only has access to deterministic HDK functions.
 - `fn init(_: ()) -> ExternResult<InitCallbackResult>`:
-  - Allows the guest to pass/fail/retry initialization with [`InitCallbackResult`](holochain_zome_types::init::InitCallbackResult).
+  - Allows the guest to pass/fail/retry initialization with `InitCallbackResult`.
   - Lazy execution - only runs when any zome of the DNA is first called.
   - All zomes in a DNA init at the same time.
   - Any zome failure fails initialization for the DNA, any zome retry (missing dependencies) causes the DNA to retry.
   - Failure overrides retry.
-  - See [`create_cap_grant`](crate::capability::create_cap_grant) for an explanation of how to set up capabilities in `init`.
+  - See `create_cap_grant` for an explanation of how to set up capabilities in `init`.
 - `fn migrate_agent_{{ open|close }} -> ExternResult<MigrateAgentCallbackResult>`:
   - Allows the guest to pass/fail a migration attempt to/from another DNA.
   - Open runs when an agent is starting a new source chain from an old one.
@@ -176,7 +179,7 @@ The callbacks are:
   - Allows the guest to pass/fail/retry any operation.
   - Only the originating zome is called.
   - Failure overrides retry.
-  - See [`validate`](hdi::prelude::validate) for more details.
+  - See `validate` for more details.
 
 ## HDK has layers 🧅
 
@@ -184,7 +187,7 @@ HDK is designed in layers so that there is some kind of 80/20 rule.
 The code is not strictly organised this way but you'll get a feel for it as you write your own hApps.
 
 Roughly speaking, 80% of your apps can be production ready using just 20% of the HDK features and code.
-These are the 'high level' functions such as [`crate::entry::create_entry`] and macros like [`hdk_extern!`].
+These are the 'high level' functions such as [`crate::entry::create_entry`] and macros like [`hdk_extern!`](macro@crate::prelude::hdk_extern).
 Every Holochain function is available with a typed and documented wrapper and there is a set of macros for exposing functions and defining entries.
 
 The 20% of the time that you need to go deeper there is another layer followng its own 80/20 rule.
@@ -238,7 +241,7 @@ You do _not_ need to pin _all_ your Rust dependencies, just those that take part
 
 ## HDK is integrated with rust tracing for better debugging 🐛
 
-Every extern defined with the [`hdk_extern!`] attribute registers a [tracing subscriber](https://crates.io/crates/tracing-subscriber) that works in WASM.
+Every extern defined with the [`hdk_extern!`](macro@crate::prelude::hdk_extern) attribute registers a [tracing subscriber](https://crates.io/crates/tracing-subscriber) that works in WASM.
 
 All the basic tracing macros `trace!`, `debug!`, `warn!`, `error!` are implemented.
 
@@ -259,9 +262,10 @@ When the host encounters a failure `Result`, it will __serialize the error and p
 The __guest must handle this error__ and either return it back to the host which _then_ rolls back writes (see above), or implement some kind of graceful failure or retry logic.
 
 The `Result` from the host in the case of host calls indicates whether the execution _completed_ successfully and is _in addition to_ other Result-like enums.
-For example, a remote call can be `Ok` from the host's perspective but contain an [ `crate::prelude::ZomeCallResponse::Unauthorized` ] "failure" enum variant from the remote agent.
+For example, a remote call can be `Ok` from the host's perspective but contain an
+`ZomeCallResponse::Unauthorized` "failure" enum variant from the remote agent.
 Both need to be handled in context.
 
-[`hdk_extern!`]: hdk_derive::hdk_extern
+<!-- cargo-rdme end -->
 
 License: CAL-1.0
