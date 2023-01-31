@@ -2203,16 +2203,35 @@ impl Conductor {
         // Cells which belong to no app (its app has been uninstalled) will be cleaned up
         // and all authored data removed from the database
         for dna_hash in dnas_to_cleanup {
-            self.spaces
-                .authored_db(dna_hash)
-                .unwrap()
-                .async_commit(|txn| DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?))
-                .await?;
-            self.spaces
-                .dht_db(dna_hash)
-                .unwrap()
-                .async_commit(|txn| DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?))
-                .await?;
+            futures::future::join_all(
+                [
+                    self.spaces
+                        .authored_db(dna_hash)
+                        .unwrap()
+                        .async_commit(|txn| {
+                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
+                        })
+                        .boxed(),
+                    self.spaces
+                        .dht_db(dna_hash)
+                        .unwrap()
+                        .async_commit(|txn| {
+                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
+                        })
+                        .boxed(),
+                    self.spaces
+                        .cache(dna_hash)
+                        .unwrap()
+                        .async_commit(|txn| {
+                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
+                        })
+                        .boxed(),
+                ]
+                .into_iter(),
+            )
+            .await
+            .into_iter()
+            .collect::<Result<Vec<usize>, _>>()?;
         }
 
         Ok(())
