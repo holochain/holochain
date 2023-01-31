@@ -19,7 +19,6 @@ use rusqlite::Connection;
 use crate::db::DbKind;
 
 pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
-    current_index: 1,
     migrations: vec![
         M::initial(include_str!("sql/cell/schema/0.sql")),
         M {
@@ -30,27 +29,22 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
 });
 
 pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| Schema {
-    current_index: 0,
     migrations: vec![M::initial(include_str!("sql/conductor/schema/0.sql"))],
 });
 
 pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| Schema {
-    current_index: 0,
     migrations: vec![M::initial(include_str!("sql/wasm/schema/0.sql"))],
 });
 
 pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| Schema {
-    current_index: 0,
     migrations: vec![M::initial(include_str!("sql/p2p_agent_store/schema/0.sql"))],
 });
 
 pub static SCHEMA_P2P_METRICS: Lazy<Schema> = Lazy::new(|| Schema {
-    current_index: 0,
     migrations: vec![M::initial(include_str!("sql/p2p_metrics/schema/0.sql"))],
 });
 
 pub struct Schema {
-    current_index: usize,
     migrations: Vec<Migration>,
 }
 
@@ -70,38 +64,32 @@ impl Schema {
             .map(ToString::to_string)
             .unwrap_or_else(|| "<no name>".to_string());
 
-        if user_version == 0 {
-            // database just needs to be created / initialized
-            self.migrations[self.current_index].initialize(conn)?;
-            tracing::info!("database initialized: {}", db_kind);
-            return Ok(());
-        } else {
-            let current_index = user_version as usize - 1;
-            match current_index.cmp(&self.current_index) {
-                std::cmp::Ordering::Less => {
-                    // run forward migrations
-                    for v in current_index..self.current_index + 1 {
-                        self.migrations[v].run_forward(conn)?;
-                        // set the DB user_version so that next time we don't run
-                        // the same migration
-                        conn.pragma_update(None, "user_version", v + 1)?;
-                    }
-                    tracing::info!(
-                        "database forward migrated: {} from {} to {}",
-                        db_kind,
-                        current_index,
-                        self.current_index
-                    );
+        let migrations_applied = user_version as usize;
+        let num_migrations = self.migrations.len();
+        match migrations_applied.cmp(&(num_migrations)) {
+            std::cmp::Ordering::Less => {
+                // run forward migrations
+                for v in migrations_applied..num_migrations {
+                    self.migrations[v].run_forward(conn)?;
+                    // set the DB user_version so that next time we don't run
+                    // the same migration
+                    conn.pragma_update(None, "user_version", v + 1)?;
                 }
-                std::cmp::Ordering::Equal => {
-                    tracing::debug!(
-                        "database needed no migration or initialization, good to go: {}",
-                        db_kind
-                    );
-                }
-                std::cmp::Ordering::Greater => {
-                    unimplemented!("backward migrations unimplemented");
-                }
+                tracing::info!(
+                    "database forward migrated: {} from {} to {}",
+                    db_kind,
+                    migrations_applied - 1,
+                    num_migrations - 1,
+                );
+            }
+            std::cmp::Ordering::Equal => {
+                tracing::debug!(
+                    "database needed no migration or initialization, good to go: {}",
+                    db_kind
+                );
+            }
+            std::cmp::Ordering::Greater => {
+                unimplemented!("backward migrations unimplemented");
             }
         }
 
@@ -109,16 +97,18 @@ impl Schema {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Migration {
     schema: Sql,
     forward: Sql,
 }
 
 impl Migration {
+    /// The initial migration's forward migration is the entire schema
     pub fn initial(schema: &str) -> Self {
         Self {
             schema: schema.into(),
-            forward: "".into(),
+            forward: schema.into(),
         }
     }
 
@@ -135,3 +125,76 @@ impl Migration {
 type M = Migration;
 
 type Sql = String;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_migrations_initial() {
+        let schema = Schema {
+            migrations: vec![
+                M::initial("CREATE TABLE Numbers (num INTEGER);"),
+                M {
+                    forward: "CREATE TABLE Names (name TEXT);".into(),
+                    schema: "n/a".into(),
+                },
+            ],
+        };
+
+        let mut conn = Connection::open_in_memory().unwrap();
+
+        // The Names table doesn't exist yet, since the current_index is set to 0.
+        schema.initialize(&mut conn, None).unwrap();
+        assert_eq!(
+            conn.execute("INSERT INTO Numbers (num) VALUES (1)", ())
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            conn.execute("INSERT INTO Names (name) VALUES ('Mike')", ())
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_migrations_sequential() {
+        let mut schema = Schema {
+            migrations: vec![M::initial("CREATE TABLE Numbers (num INTEGER);")],
+        };
+
+        let mut conn = Connection::open_in_memory().unwrap();
+
+        // The Names table doesn't exist yet, since the current_index is set to 0.
+        schema.initialize(&mut conn, None).unwrap();
+        assert_eq!(
+            conn.execute("INSERT INTO Numbers (num) VALUES (1)", ())
+                .unwrap(),
+            1
+        );
+        assert!(conn
+            .execute("INSERT INTO Names (name) VALUES ('Mike')", ())
+            .is_err());
+
+        // This initialization will run only the second migration and create the Names table.
+        schema.migrations = vec![
+            M::initial("This bad SQL won't run, phew!"),
+            M {
+                forward: "CREATE TABLE Names (name TEXT);".into(),
+                schema: "n/a".into(),
+            },
+        ];
+        schema.initialize(&mut conn, None).unwrap();
+        assert_eq!(
+            conn.execute("INSERT INTO Numbers (num) VALUES (1)", ())
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            conn.execute("INSERT INTO Names (name) VALUES ('Mike')", ())
+                .unwrap(),
+            1
+        );
+    }
+}
