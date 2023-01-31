@@ -14,7 +14,7 @@
 //! modification of schemas, which should never be committed.
 
 use once_cell::sync::Lazy;
-use rusqlite::Connection;
+use rusqlite::{Connection, Transaction};
 
 use crate::db::DbKind;
 
@@ -23,7 +23,7 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
         M::initial(include_str!("sql/cell/schema/0.sql")),
         M {
             forward: include_str!("sql/cell/schema/1-up.sql").into(),
-            schema: include_str!("sql/cell/schema/1.sql").into(),
+            _schema: include_str!("sql/cell/schema/1.sql").into(),
         },
     ],
 });
@@ -68,13 +68,15 @@ impl Schema {
         let num_migrations = self.migrations.len();
         match migrations_applied.cmp(&(num_migrations)) {
             std::cmp::Ordering::Less => {
+                let mut txn = conn.transaction()?;
                 // run forward migrations
                 for v in migrations_applied..num_migrations {
-                    self.migrations[v].run_forward(conn)?;
+                    self.migrations[v].run_forward(&mut txn)?;
                     // set the DB user_version so that next time we don't run
                     // the same migration
-                    conn.pragma_update(None, "user_version", v + 1)?;
+                    txn.pragma_update(None, "user_version", v + 1)?;
                 }
+                txn.commit()?;
                 tracing::info!(
                     "database forward migrated: {} from {} to {}",
                     db_kind,
@@ -99,7 +101,7 @@ impl Schema {
 
 #[derive(Clone, Debug)]
 pub struct Migration {
-    schema: Sql,
+    _schema: Sql,
     forward: Sql,
 }
 
@@ -107,18 +109,13 @@ impl Migration {
     /// The initial migration's forward migration is the entire schema
     pub fn initial(schema: &str) -> Self {
         Self {
-            schema: schema.into(),
+            _schema: schema.into(),
             forward: schema.into(),
         }
     }
 
-    pub fn initialize(&self, conn: &mut Connection) -> rusqlite::Result<()> {
-        conn.execute_batch(&self.schema)?;
-        Ok(())
-    }
-
-    pub fn run_forward(&self, conn: &mut Connection) -> rusqlite::Result<()> {
-        conn.execute_batch(&self.forward)?;
+    pub fn run_forward(&self, txn: &mut Transaction) -> rusqlite::Result<()> {
+        txn.execute_batch(&self.forward)?;
         Ok(())
     }
 }
@@ -137,7 +134,7 @@ mod tests {
                 M::initial("CREATE TABLE Numbers (num INTEGER);"),
                 M {
                     forward: "CREATE TABLE Names (name TEXT);".into(),
-                    schema: "n/a".into(),
+                    _schema: "n/a".into(),
                 },
             ],
         };
@@ -182,7 +179,7 @@ mod tests {
             M::initial("This bad SQL won't run, phew!"),
             M {
                 forward: "CREATE TABLE Names (name TEXT);".into(),
-                schema: "n/a".into(),
+                _schema: "n/a".into(),
             },
         ];
         schema.initialize(&mut conn, None).unwrap();
