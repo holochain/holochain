@@ -16,7 +16,9 @@ fn fix_sql_fmt() -> bool {
 
 fn find_sql(path: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();
-    for e in std::fs::read_dir(path).expect(&format!("Path doesn't exist: {:?}", path)) {
+    for e in std::fs::read_dir(path)
+        .unwrap_or_else(|e| panic!("Path doesn't exist: {:?}. Error: {}", path, e))
+    {
         let e = e.unwrap();
         let path = e.path();
         let t = e.file_type().unwrap();
