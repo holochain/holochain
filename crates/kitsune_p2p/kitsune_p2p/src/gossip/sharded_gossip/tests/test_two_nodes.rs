@@ -42,7 +42,7 @@ async fn sharded_sanity_test() {
 
     // - Send initiate to alice.
     let alice_outgoing = alice
-        .process_incoming(bob_cert.clone(), bob_outgoing)
+        .process_incoming(bob_cert.clone().into(), bob_outgoing)
         .await
         .unwrap();
 
@@ -83,7 +83,7 @@ async fn sharded_sanity_test() {
     // - Send the above to alice.
     for incoming in bob_outgoing {
         let outgoing = alice
-            .process_incoming(bob_cert.clone(), incoming)
+            .process_incoming(bob_cert.clone().into(), incoming)
             .await
             .unwrap();
         alice_outgoing.extend(outgoing);
@@ -139,7 +139,7 @@ async fn partial_missing_doesnt_finish() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
@@ -168,7 +168,10 @@ async fn partial_missing_doesnt_finish() {
         finished: MissingOpsStatus::ChunkComplete as u8,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 0);
 
     bob.inner
@@ -192,7 +195,7 @@ async fn missing_ops_finishes() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
@@ -221,7 +224,10 @@ async fn missing_ops_finishes() {
         finished: MissingOpsStatus::AllComplete as u8,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 0);
 
     bob.inner
@@ -246,7 +252,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
@@ -275,7 +281,10 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
         finished: MissingOpsStatus::AllComplete as u8,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 0);
 
     bob.inner
@@ -300,7 +309,7 @@ async fn bloom_response_finishes() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 0,
@@ -329,7 +338,10 @@ async fn bloom_response_finishes() {
         finished: true,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 1);
 
     bob.inner
@@ -354,7 +366,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone() => RoundState {
+                cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
@@ -383,7 +395,10 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
         finished: true,
     });
 
-    let outgoing = bob.process_incoming(cert.clone(), incoming).await.unwrap();
+    let outgoing = bob
+        .process_incoming(cert.clone().into(), incoming)
+        .await
+        .unwrap();
     assert_eq!(outgoing.len(), 1);
 
     bob.inner
@@ -411,7 +426,7 @@ async fn no_data_still_finishes() {
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[0].0.clone()),
             round_map: maplit::hashmap! {
-                bob_cert.clone() => RoundState {
+                bob_cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 0,
@@ -439,7 +454,7 @@ async fn no_data_still_finishes() {
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[1].0.clone()),
             round_map: maplit::hashmap! {
-                alice_cert.clone() => RoundState {
+                alice_cert.clone().into() => RoundState {
                     remote_agent_list: vec![],
                     common_arc_set: Arc::new(DhtArcSet::Full),
                     num_expected_op_blooms: 1,
@@ -469,7 +484,7 @@ async fn no_data_still_finishes() {
     });
 
     let outgoing = alice
-        .process_incoming(bob_cert.clone(), incoming)
+        .process_incoming(bob_cert.clone().into(), incoming)
         .await
         .unwrap();
 
@@ -478,7 +493,10 @@ async fn no_data_still_finishes() {
 
     // - Send this to bob.
     let outgoing = bob
-        .process_incoming(alice_cert.clone(), outgoing.into_iter().next().unwrap())
+        .process_incoming(
+            alice_cert.clone().into(),
+            outgoing.into_iter().next().unwrap(),
+        )
         .await
         .unwrap();
 
@@ -668,13 +686,16 @@ async fn initiate_times_out() {
 
     // Process the initiate with Bob.
     let bob_outgoing = bob
-        .process_incoming(alice_cert.clone(), alice_initiate)
+        .process_incoming(alice_cert.clone().into(), alice_initiate)
         .await
         .unwrap();
 
     // Process the Bob's accept with Alice.
     for bo in bob_outgoing {
-        alice.process_incoming(tgt2_cert.clone(), bo).await.unwrap();
+        alice
+            .process_incoming(tgt2_cert.clone().into(), bo)
+            .await
+            .unwrap();
     }
 
     // Check the round is now active.

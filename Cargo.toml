@@ -49,16 +49,19 @@ exclude = ["crates/release-automation"]
 
 [profile.fast-test]
 inherits = "dev"
+debug = 1
 
 [profile.fast-test.package."*"]
 opt-level = 3
-debug = true
+debug = 1
 debug-assertions = false
 overflow-checks = false
 incremental = false
 codegen-units = 16
 
 [patch.crates-io]
+# tx5 = { path = "../tx5/crates/tx5" }
+# tx5-signal = { path = "../tx5/crates/tx5-signal" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
