@@ -5,10 +5,13 @@ CREATE TABLE ValidationReceipt (
   op_hash BLOB NOT NULL,
   blob BLOB NOT NULL,
   FOREIGN KEY(op_hash) REFERENCES DhtOp(hash) ON DELETE CASCADE
-) AS (
-  SELECT
-    *
-  FROM
-    ValidationReceipt_1Up
 );
+INSERT INTO
+  ValidationReceipt (hash, op_hash, blob)
+SELECT
+  hash,
+  op_hash,
+  blob
+FROM
+  ValidationReceipt_1Up;
 DROP TABLE ValidationReceipt_1Up;
