@@ -49,6 +49,14 @@
 
       # derivation with the main crates
       holochain = craneLib.buildPackage (commonArgs // {
+        cargoExtraArgs = '' \
+          --bin hc-sandbox \
+          --bin hc-app \
+          --bin hc-dna \
+          --bin hc \
+          --bin hc-web-app \
+          --bin holochain \
+        '';
         cargoArtifacts = holochainDeps;
         doCheck = false;
       });

@@ -41,6 +41,8 @@
             xcbuild
             libiconv
           ]);
+
+        doCheck = false;
       };
 
       # derivation building all dependencies
@@ -49,7 +51,6 @@
       # derivation with the main crates
       package = craneLib.buildPackage (commonArgs // {
         cargoArtifacts = deps;
-        doCheck = false;
       });
 
     in
