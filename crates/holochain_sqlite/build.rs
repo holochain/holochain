@@ -78,9 +78,20 @@ fn check_fmt(path: &std::path::Path) {
     }
 }
 
+/// Ensure that schema migration files have no changes since `GIT_BASE_REF` (origin/develop).
+/// Pure additions are excluded, which allows new files to be created, but once they are merged
+/// as a PR, then no changes can be made.
+/// This is a loose check and obviously can be easily circumvented, but it hopefully helps remind us
+/// that we must never change migration files.
 fn check_migrations() {
     use std::process::Command;
     let root = PathBuf::from(SQL_DIR);
+
+    // If git is unavailable, skip this check
+    if Command::new("git").arg("status").output().is_err() {
+        return;
+    }
+
     for dir in [
         root.join("cell/schema"),
         root.join("conductor/schema"),
