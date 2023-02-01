@@ -48,7 +48,7 @@ jobs:
             experimental-features = flakes nix-command
       - name: Setup cachix
         uses: cachix/cachix-action@v12
-        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
+        continue-on-error: ${{ matrix.platform.runs-on == 'multi-arch' }}
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
@@ -59,6 +59,4 @@ jobs:
           sudo systemctl stop nix-daemon
 
       - name: "Test comand ${{ matrix.nixCommand }}"
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: cachix watch-exec -c1 -j2 holochain-ci -- ${{ matrix.cmd }} -L --show-trace --system ${{ matrix.platform.system }}
+        run: ${{ matrix.cmd }} -L --show-trace --system ${{ matrix.platform.system }}
