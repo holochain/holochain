@@ -19,8 +19,8 @@ jobs:
             runs-on: multi-arch
           - system: aarch64-darwin
             runs-on: multi-arch
-          - system: x86_64-linux
-            runs-on: multi-arch
+          # - system: x86_64-linux
+          #   runs-on: multi-arch
 
         include:
           - cmd: "nix run .#release-automation-tests .#release-automation-tests-repo"

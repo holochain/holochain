@@ -77,16 +77,10 @@ jobs:
       steps:
          - checkout
          - run:
-              name: Set up Nix cache
-              command: $(nix-build . --fallback --no-link -A passthru.internal.flake.packages.x86_64-linux.scripts-ci-cachix-helper) setup
-         - run:
               name: Run the standard tests (nextest)
               no_output_timeout: 30m
-              command: nix build -L .#holochain-tests-nextest
-         - run:
-              name: push to cachix
-              command: $(nix-build . --fallback --no-link -A pkgs.ci.ciCachixPush)/bin/hc-ci-cachix-push.sh || true
-              when: always
+              command: |
+                 cachix watch-exec ${CACHIX_NAME} nix build -L --extra-experimental-features "nix-command flakes impure-derivations ca-derivations" .#holochain-tests-nextest
 
    standard-test-nextest-tx5:
       docker:
@@ -179,7 +173,7 @@ jobs:
 workflows:
    tests:
       jobs:
-         # - standard-test-nextest
+         - standard-test-nextest
          - standard-test-nextest-tx5
          # - rustdoc-build-test
          # - hc-static-checks
