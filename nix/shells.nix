@@ -58,6 +58,7 @@ rec {
       gh
       nixpkgs-fmt
       cargo-sweep
+      go
     ])
     ++ (lib.optionals stdenv.isDarwin
       (with holonix.pkgs.darwin; [
@@ -71,7 +72,6 @@ rec {
   release = coreDev.overrideAttrs (attrs: {
     nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
       niv
-      cargo-readme
       (import ../crates/release-automation/default.nix { })
     ]);
   });

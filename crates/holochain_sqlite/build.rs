@@ -1,5 +1,14 @@
+use std::path::PathBuf;
+
+/// The location of all our sql scrips
 const SQL_DIR: &str = "./src/sql";
+
+/// An env var that will trigger a SQL format.
 const FIX_SQL_FMT: Option<&str> = option_env!("FIX_SQL_FMT");
+
+/// Git ref against which to check for schema changes
+const GIT_BASE_REF: &str = "origin/develop";
+
 fn fix_sql_fmt() -> bool {
     if let Some(fsf) = FIX_SQL_FMT {
         !fsf.is_empty()
@@ -10,7 +19,9 @@ fn fix_sql_fmt() -> bool {
 
 fn find_sql(path: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();
-    for e in std::fs::read_dir(path).unwrap() {
+    for e in std::fs::read_dir(path)
+        .unwrap_or_else(|e| panic!("Path doesn't exist: {:?}. Error: {}", path, e))
+    {
         let e = e.unwrap();
         let path = e.path();
         let t = e.file_type().unwrap();
@@ -24,7 +35,6 @@ fn find_sql(path: &std::path::Path) -> Vec<std::path::PathBuf> {
         if path.extension() != Some(std::ffi::OsStr::new("sql")) {
             continue;
         }
-        println!("cargo:rerun-if-changed={}", path.to_string_lossy());
         out.push(path);
     }
     out
@@ -68,9 +78,45 @@ fn check_fmt(path: &std::path::Path) {
     }
 }
 
+fn check_migrations() {
+    use std::process::Command;
+    let root = PathBuf::from(SQL_DIR);
+    for dir in [
+        root.join("cell/schema"),
+        root.join("conductor/schema"),
+        root.join("p2p_agent_store/schema"),
+        root.join("p2p_metrics/schema"),
+        root.join("wasm/schema"),
+    ] {
+        for path in find_sql(&dir) {
+            let mut cmd = Command::new("git");
+            match cmd
+                .arg("diff")
+                // Filter out files which were merely added
+                .arg("--diff-filter=a")
+                .arg(GIT_BASE_REF)
+                .arg(path.clone())
+                .output()
+            {
+                Ok(out) => {
+                    if out.status.success() && out.stdout.is_empty() && out.stderr.is_empty() {
+                        // no change. good.
+                    } else {
+                        panic!("Diff found in schema file:\n\n{}\nSchema and migration files cannot be modified. Instead, set up a new database migration in 'crates/holochain_sqlite/src/schema.rs'\n\n", String::from_utf8_lossy(&out.stdout))
+                    }
+                }
+                Err(err) => panic!("Error while checking schema: {:?}, path = {:?}", err, path),
+            }
+        }
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-env-changed=FIX_SQL_FMT");
-    for sql in find_sql(std::path::Path::new(SQL_DIR)) {
+    let all_sql = find_sql(std::path::Path::new(SQL_DIR));
+    for sql in all_sql {
+        println!("cargo:rerun-if-changed={}", sql.to_string_lossy());
         check_fmt(&sql);
     }
+    check_migrations();
 }

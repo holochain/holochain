@@ -16,7 +16,7 @@
         pname = "holochain";
         src = flake.config.srcCleaned;
 
-        version = builtins.toString self.lastModified;
+        version = "workspace";
 
         CARGO_PROFILE = "";
 
@@ -104,35 +104,33 @@
         installPhase = "mkdir $out";
       });
 
-      holochain-tests-nextest' = craneLib.cargoNextest (commonArgs // {
-        pname = "holochain-nextest";
+      holochain-tests-nextest = craneLib.cargoNextest (commonArgs // {
+        pname = "holochain";
         __impure = pkgs.stdenv.isLinux;
         cargoArtifacts = holochainNextestDeps;
+
+        # This was needed if __impure is not set. But since the tests were slow,
+        #   we disabled the sandbox anyways. This might be needed in the future.
+        # preCheck = ''
+        #   rm /build/source/target/debug/.fingerprint/holochain_wasm_test_utils-*/invoked.timestamp
+        #   rm /build/source/target/debug/.fingerprint/holochain_test_wasm_common-*/invoked.timestamp
+        # '';
+
         preCheck = ''
-          pwd
-          # rm /build/source/target/debug/.fingerprint/holochain_wasm_test_utils-*/invoked.timestamp
-          # rm /build/source/target/debug/.fingerprint/holochain_test_wasm_common-*/invoked.timestamp
+          export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
         '';
-        # cargoExtraArgs = "--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption";
-        # CARGO_PROFILE = "release";
+
         cargoExtraArgs = ''
           ${import ../../.config/nextest-args.nix} \
           ${lib.concatStringsSep " " disabledTestsArgs}
         '';
 
-        DYLD_PRINT_LIBRARIES = 1;
-
         dontPatchELF = true;
         dontFixup = true;
-        installPhase = "mkdir $out";
+        dontInstall = true;
 
+        # TODO: fix upstream bug that seems to ignore `cargoNextestExtraArgs`
         # cargoNextestExtraArgs = lib.concatStringsSep " " disabledTestsArgs;
-      });
-
-      holochain-tests-nextest = holochain-tests-nextest'.overrideAttrs (old: {
-        buildInputs = old.buildInputs
-          ++ (lib.filter (b: lib.hasPrefix "rust-default-" b.name)
-            old.nativeBuildInputs);
       });
 
       holochain-tests-fmt = craneLib.cargoFmt (commonArgs // {
