@@ -15,10 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - arch: macos-aarch64
-            runs-on: multi-arch
-          - arch: macos-x86_64
-            runs-on: multi-arch
+          # - arch: macos-aarch64
+          #   runs-on: multi-arch
+          # - arch: macos-x86_64
+          #   runs-on: multi-arch
           - arch: linux-x86_64
             runs-on: ubuntu-latest
     runs-on: ${{ matrix.platform.runs-on }}
