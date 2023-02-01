@@ -2200,8 +2200,7 @@ impl Conductor {
             .map(|cell| cell.id().dna_hash())
             .filter(|dna| !all_dnas.contains(dna));
 
-        // Cells which belong to no app (its app has been uninstalled) will be cleaned up
-        // and all authored data removed from the database
+        // For any unrepresented DNAs, clean up those DNA-specific databases
         for dna_hash in dnas_to_cleanup {
             futures::future::join_all(
                 [
@@ -2226,6 +2225,7 @@ impl Conductor {
                             DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
                         })
                         .boxed(),
+                    // TODO: also delete stale Wasms
                 ]
                 .into_iter(),
             )
