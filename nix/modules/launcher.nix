@@ -23,21 +23,26 @@
           (with pkgs; [
             openssl
             glib
-            webkitgtk.dev
-            gdk-pixbuf
-            gtk3
           ])
+          ++ (lib.optionals pkgs.stdenv.isLinux
+            (with pkgs; [
+              webkitgtk.dev
+              gdk-pixbuf
+              gtk3
+            ]))
           ++ (lib.optionals pkgs.stdenv.isDarwin
             (with pkgs.darwin.apple_sdk_11_0.frameworks; [
               AppKit
               CoreFoundation
               CoreServices
               Security
+              WebKit
             ])
           );
 
         nativeBuildInputs =
-          (with pkgs; [
+          (with pkgs;
+          [
             perl
             pkg-config
           ])
