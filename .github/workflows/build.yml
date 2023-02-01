@@ -13,8 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         cmd:
-          - "nix build .#holochain-tests-nextest --no-link"
-          - "nix build .#holochain-tests-wasm --no-link"
+          - "nix build .#holochain-tests-wasm .#holochain-tests-nextest --no-link"
         platform:
           - system: x86_64-darwin
             runs-on: multi-arch
