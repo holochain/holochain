@@ -88,7 +88,7 @@ fn check_migrations() {
     let root = PathBuf::from(SQL_DIR);
 
     // If git is unavailable, skip this check
-    if Command::new("git status").output().is_err() {
+    if Command::new("git").arg("status").output().is_err() {
         return;
     }
 
