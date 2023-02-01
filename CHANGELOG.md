@@ -6,6 +6,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230201.215611
+
+## [holochain\_cli-0.1.1](crates/holochain_cli/CHANGELOG.md#0.1.1)
+
+## [holochain\_cli\_sandbox-0.1.1](crates/holochain_cli_sandbox/CHANGELOG.md#0.1.1)
+
+## [holochain\_cli\_bundle-0.1.1](crates/holochain_cli_bundle/CHANGELOG.md#0.1.1)
+
+## [holochain-0.1.1](crates/holochain/CHANGELOG.md#0.1.1)
+
+- When uninstalling an app, local data is now cleaned up where appropriate. [\#1805](https://github.com/holochain/holochain/pull/1805)
+  - Detail: any time an app is uninstalled, if the removal of that app’s cells would cause there to be no cell installed which uses a given DNA, the databases for that DNA space are deleted. So, if you have an app installed twice under two different agents and uninstall one of them, no data will be removed, but if you uninstall both, then all local data will be cleaned up. If any of your data was gossiped to other peers though, it will live on in the DHT, and even be gossiped back to you if you reinstall that same app with a new agent.
+
+## [holochain\_test\_wasm\_common-0.1.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.1)
+
+## [holochain\_conductor\_api-0.1.1](crates/holochain_conductor_api/CHANGELOG.md#0.1.1)
+
+## [holochain\_wasm\_test\_utils-0.1.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.1)
+
+## [holochain\_cascade-0.1.1](crates/holochain_cascade/CHANGELOG.md#0.1.1)
+
+## [holochain\_state-0.1.1](crates/holochain_state/CHANGELOG.md#0.1.1)
+
+## [holochain\_p2p-0.1.1](crates/holochain_p2p/CHANGELOG.md#0.1.1)
+
+## [holochain\_types-0.1.1](crates/holochain_types/CHANGELOG.md#0.1.1)
+
+## [holochain\_keystore-0.1.1](crates/holochain_keystore/CHANGELOG.md#0.1.1)
+
+## [holochain\_sqlite-0.1.1](crates/holochain_sqlite/CHANGELOG.md#0.1.1)
+
+## [kitsune\_p2p-0.1.1](crates/kitsune_p2p/CHANGELOG.md#0.1.1)
+
+- Adds feature flipper `tx5` which enables experimental integration with holochains WebRTC networking backend. This is not enabled by default. [\#1741](https://github.com/holochain/holochain/pull/1741)
+
+## [kitsune\_p2p\_proxy-0.1.1](crates/kitsune_p2p_proxy/CHANGELOG.md#0.1.1)
+
+## [kitsune\_p2p\_transport\_quic-0.1.1](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.1.1)
+
+## [kitsune\_p2p\_fetch-0.1.1](crates/kitsune_p2p_fetch/CHANGELOG.md#0.1.1)
+
+## [kitsune\_p2p\_types-0.1.1](crates/kitsune_p2p_types/CHANGELOG.md#0.1.1)
+
+## [hdk-0.1.1](crates/hdk/CHANGELOG.md#0.1.1)
+
+## [holochain\_zome\_types-0.1.1](crates/holochain_zome_types/CHANGELOG.md#0.1.1)
+
+## [hdi-0.2.1](crates/hdi/CHANGELOG.md#0.2.1)
+
+## [hdk\_derive-0.1.1](crates/hdk_derive/CHANGELOG.md#0.1.1)
+
+## [holochain\_integrity\_types-0.1.1](crates/holochain_integrity_types/CHANGELOG.md#0.1.1)
+
+## [holo\_hash-0.1.1](crates/holo_hash/CHANGELOG.md#0.1.1)
+
+## [fixt-0.1.1](crates/fixt/CHANGELOG.md#0.1.1)
+
 # 20230126.223635
 
 - First beta release
