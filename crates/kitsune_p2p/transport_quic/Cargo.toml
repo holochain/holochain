@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_transport_quic"
-version = "0.1.1-dev.0"
+version = "0.1.1"
 description = "QUIC transport module for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,7 +14,7 @@ edition = "2021"
 blake2b_simd = "1.0.0"
 futures = "0.3.21"
 if-addrs = "0.7.0"
-kitsune_p2p_types = { version = "^0.1.1-dev.0", path = "../types" }
+kitsune_p2p_types = { version = "^0.1.1", path = "../types" }
 nanoid = "0.4.0"
 once_cell = "1.9.0"
 quinn = "0.8.1"
