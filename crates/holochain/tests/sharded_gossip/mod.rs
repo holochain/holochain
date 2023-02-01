@@ -31,11 +31,15 @@ fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) ->
     tuning.disable_historical_gossip = !historical;
     tuning.danger_gossip_recent_threshold_secs =
         recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
+
     tuning.gossip_inbound_target_mbps = 10000.0;
     tuning.gossip_outbound_target_mbps = 10000.0;
     tuning.gossip_historic_outbound_target_mbps = 10000.0;
     tuning.gossip_historic_inbound_target_mbps = 10000.0;
-    // tuning.gossip_max_batch_size = 32_000_000;
+
+    // This allows attempting to contact an offline node to timeout quickly,
+    // so we can fallback to the next one
+    tuning.default_rpc_single_timeout_ms = 3_000;
 
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
