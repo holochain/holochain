@@ -214,6 +214,22 @@ pub mod tuning_params_struct {
         /// [Default: 200 ms]
         tx2_initial_connect_retry_delay_ms: usize = 200,
 
+        /// Tx5 max pending send byte count limit.
+        /// [Default: 16 MiB]
+        tx5_max_send_bytes: u32 = 16 * 1024 * 1024,
+
+        /// Tx5 max pending recv byte count limit.
+        /// [Default: 16 MiB]
+        tx5_max_recv_bytes: u32 = 16 * 1024 * 1024,
+
+        /// Tx5 max concurrent connection limit.
+        /// [Default: 40]
+        tx5_max_conn_count: u32 = 40,
+
+        /// Tx5 max init (connect) time for a connection in seconds.
+        /// [Default: 20]
+        tx5_max_conn_init_s: u32 = 20,
+
         /// if you would like to be able to use an external tool
         /// to debug the QUIC messages sent and received by kitsune
         /// you'll need the decryption keys.
@@ -254,6 +270,11 @@ pub mod tuning_params_struct {
         /// Get the gossip recent threshold param as a proper Duration
         pub fn danger_gossip_recent_threshold(&self) -> std::time::Duration {
             std::time::Duration::from_secs(self.danger_gossip_recent_threshold_secs)
+        }
+
+        /// Get the tx5_max_conn_init_s param as a Duration.
+        pub fn tx5_max_conn_init(&self) -> std::time::Duration {
+            std::time::Duration::from_secs(self.tx5_max_conn_init_s as u64)
         }
 
         /// returns true if we should initialize a tls keylog
