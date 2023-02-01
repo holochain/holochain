@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.1.0"
+version = "0.1.1-dev.0"
 description = "p2p / dht communication framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -19,12 +19,12 @@ futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
 governor = "0.3.2"
 itertools = "0.10"
-kitsune_p2p_fetch = { version = "^0.1.0", path = "../fetch" }
+kitsune_p2p_fetch = { version = "^0.1.1-dev.0", path = "../fetch" }
 kitsune_p2p_mdns = { version = "^0.1.0", path = "../mdns" }
-kitsune_p2p_proxy = { version = "^0.1.0", path = "../proxy" }
+kitsune_p2p_proxy = { version = "^0.1.1-dev.0", path = "../proxy" }
 kitsune_p2p_timestamp = { version = "^0.1.0", path = "../timestamp", features = ["now"] }
-kitsune_p2p_transport_quic = { version = "^0.1.0", path = "../transport_quic", optional = true }
-kitsune_p2p_types = { version = "^0.1.0", path = "../types", default-features = false }
+kitsune_p2p_transport_quic = { version = "^0.1.1-dev.0", path = "../transport_quic", optional = true }
+kitsune_p2p_types = { version = "^0.1.1-dev.0", path = "../types", default-features = false }
 must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
@@ -43,7 +43,7 @@ tracing = "0.1"
 tokio-stream = "0.1"
 tx5 = { version = "0.0.1-alpha.3", optional = true }
 url2 = "0.0.6"
-fixt = { path = "../../fixt", version = "^0.1.0"}
+fixt = { path = "../../fixt", version = "^0.1.1-dev.0"}
 
 # arbitrary could be made optional
 arbitrary = { version = "1.0", features = ["derive"] }
