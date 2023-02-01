@@ -102,9 +102,9 @@ async fn async_main() {
 
     // wait for a unix signal or ctrl-c instruction to
     // shutdown holochain
-    tokio::signal::ctrl_c().await.unwrap_or_else(|e| {
-        tracing::error!("Could not handle termination signal: {:?}", e)
-    });
+    tokio::signal::ctrl_c()
+        .await
+        .unwrap_or_else(|e| { tracing::error!("Could not handle termination signal: {:?}", e)});
     tracing::info!("Gracefully shutting down conductor...");
     let shutdown_result = conductor.shutdown().await;
     handle_shutdown(shutdown_result);
