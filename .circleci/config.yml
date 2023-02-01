@@ -80,7 +80,8 @@ jobs:
               name: Run the standard tests (nextest)
               no_output_timeout: 30m
               command: |
-                 cachix watch-exec ${CACHIX_NAME} nix build -L --extra-experimental-features "nix-command flakes impure-derivations ca-derivations" .#holochain-tests-nextest
+                 export NIX_CONFIG="extra-experimental-features = nix-command flakes impure-derivations ca-derivations"
+                 nix run nixpkgs#cachix -- watch-exec ${CACHIX_NAME} nix build -L -- .#holochain-tests-nextest
 
    standard-test-nextest-tx5:
       docker:
