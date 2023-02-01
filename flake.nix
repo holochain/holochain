@@ -75,6 +75,11 @@
       url = "github:holochain/holochain/holochain-0.1.0-beta-rc.4";
       flake = false;
     };
+
+    cargo-chef = {
+      url = "github:LukeMathWalker/cargo-chef/main";
+      flake = false;
+    };
   };
 
   # refer to flake-parts docs https://flake.parts/
