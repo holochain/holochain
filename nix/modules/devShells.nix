@@ -7,7 +7,7 @@
       holonix = pkgs.mkShell {
         inputsFrom = [ self'.devShells.rustDev ];
 
-        packages = with self'.packages; [ holochain lair launcher scaffolding ];
+        packages = with self'.packages; [ holochain launcher scaffolding ];
       };
 
       release = pkgs.mkShell {
