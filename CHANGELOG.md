@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230202.193047
+
+## [holochain\_cli-0.1.2](crates/holochain_cli/CHANGELOG.md#0.1.2)
+
+## [holochain\_cli\_sandbox-0.1.2](crates/holochain_cli_sandbox/CHANGELOG.md#0.1.2)
+
+## [holochain\_cli\_bundle-0.1.2](crates/holochain_cli_bundle/CHANGELOG.md#0.1.2)
+
+## [holochain-0.1.2](crates/holochain/CHANGELOG.md#0.1.2)
+
+## [holochain\_conductor\_api-0.1.2](crates/holochain_conductor_api/CHANGELOG.md#0.1.2)
+
+## [holochain\_wasm\_test\_utils-0.1.2](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.2)
+
+## [holochain\_cascade-0.1.2](crates/holochain_cascade/CHANGELOG.md#0.1.2)
+
+## [holochain\_state-0.1.2](crates/holochain_state/CHANGELOG.md#0.1.2)
+
+## [holochain\_p2p-0.1.2](crates/holochain_p2p/CHANGELOG.md#0.1.2)
+
+## [holochain\_types-0.1.2](crates/holochain_types/CHANGELOG.md#0.1.2)
+
+## [holochain\_keystore-0.1.2](crates/holochain_keystore/CHANGELOG.md#0.1.2)
+
+## [holochain\_sqlite-0.1.2](crates/holochain_sqlite/CHANGELOG.md#0.1.2)
+
 # 20230201.224917
 
 ## [holochain\_cli-0.1.1](crates/holochain_cli/CHANGELOG.md#0.1.1)
