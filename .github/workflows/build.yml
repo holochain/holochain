@@ -20,8 +20,8 @@ jobs:
             runs-on: multi-arch
           - system: aarch64-darwin
             runs-on: multi-arch
-          # - system: x86_64-linux
-          #   runs-on: multi-arch
+          - system: x86_64-linux
+            runs-on: multi-arch
 
         include:
           - cmd:
@@ -29,7 +29,7 @@ jobs:
               verb: run
             platform:
               system: x86_64-linux
-              runs-on: ubuntu-latest
+              runs-on: multi-arch
           - cmd:
               pkgs: [holochain-tests-clippy, holochain-tests-fmt]
               verb: build
