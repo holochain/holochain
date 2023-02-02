@@ -17,7 +17,7 @@
         RUST_SODIUM_SHARED = "1";
 
         pname = "holochain";
-        src = flake.config.srcCleaned;
+        src = flake.config.srcCleanedRepo;
 
         version = "workspace";
 
@@ -43,12 +43,14 @@
       };
 
       # derivation building all dependencies
-      holochainDeps = craneLib.buildDepsOnly (commonArgs // rec {
+      holochainDepsRepo = craneLib.buildDepsOnly (commonArgs // rec {
+        src = flake.config.srcCleanedRepo;
         doCheck = false;
       });
 
       # derivation with the main crates
-      holochain = craneLib.buildPackage (commonArgs // {
+      holochainRepo = craneLib.buildPackage (commonArgs // {
+        src = flake.config.srcCleanedRepo;
         cargoExtraArgs = '' \
           --bin hc-sandbox \
           --bin hc-app \
@@ -57,7 +59,21 @@
           --bin hc-web-app \
           --bin holochain \
         '';
-        cargoArtifacts = holochainDeps;
+        cargoArtifacts = holochainDepsRepo;
+        doCheck = false;
+      });
+
+      # derivation with the main crates
+      holochain = craneLib.buildPackage (commonArgs // {
+        src = flake.config.srcCleanedHolochain;
+        cargoExtraArgs = '' \
+          --bin hc-sandbox \
+          --bin hc-app \
+          --bin hc-dna \
+          --bin hc \
+          --bin hc-web-app \
+          --bin holochain \
+        '';
         doCheck = false;
       });
 
@@ -119,7 +135,7 @@
       });
 
       holochain-tests-clippy = craneLib.cargoClippy (commonArgs // {
-        cargoArtifacts = holochainDeps;
+        cargoArtifacts = holochainDepsRepo;
         doCheck = false;
 
         cargoClippyExtraArgs = ''
@@ -134,7 +150,7 @@
       });
 
       holochain-tests-wasm = craneLib.cargoTest (commonArgs // {
-        cargoArtifacts = holochainDeps;
+        cargoArtifacts = holochainDepsRepo;
         cargoExtraArgs =
           "--lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features";
 
@@ -145,7 +161,7 @@
     in
     {
       packages = {
-        inherit holochain holochain-tests-nextest;
+        inherit holochainRepo holochain holochain-tests-nextest;
 
         inherit holochain-tests-wasm holochain-tests-fmt holochain-tests-clippy;
       };

@@ -6,15 +6,15 @@ let
 
 in
 {
-  options.srcCleaned = lib.mkOption { type = lib.types.raw; };
-  config.srcCleaned = inputs.nix-filter.lib {
+  options.srcCleanedRepo = lib.mkOption { type = lib.types.raw; };
+  config.srcCleanedRepo = inputs.nix-filter.lib {
     include = includeCommon;
     root = self;
   };
 
-  options.srcCleanedTests = lib.mkOption { type = lib.types.raw; };
-  config.srcCleanedTests = inputs.nix-filter.lib {
-    root = self;
-    include = includeCommon ++ [ ".config" ];
+  options.srcCleanedHolochain = lib.mkOption { type = lib.types.raw; };
+  config.srcCleanedHolochain = inputs.nix-filter.lib {
+    include = includeCommon;
+    root = inputs.holochain;
   };
 }
