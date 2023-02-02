@@ -11,6 +11,7 @@ use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::sql::sql_conductor;
 use holochain_types::block::Block;
 use holochain_types::block::BlockTargetId;
 use holochain_types::block::BlockTargetReason;
@@ -277,18 +278,90 @@ pub fn insert_nonce(
     Ok(())
 }
 
-pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
-    sql_insert!(txn, BlockSpan, {
-        "target_id": BlockTargetId::from(block.target.clone()),
-        "target_reason": BlockTargetReason::from(block.target.clone()),
-        "start_ms": block.start,
-        "end_ms": block.end,
-    })?;
+fn pluck_overlapping_block_bounds(
+    txn: &Transaction<'_>,
+    block: Block,
+) -> DatabaseResult<(Option<i64>, Option<i64>)> {
+    // Find existing min/max blocks that overlap the new block.
+    let target_id = BlockTargetId::from(block.target.clone());
+    let target_reason = BlockTargetReason::from(block.target.clone());
+    let params = named_params! {
+        ":target_id": target_id.clone(),
+        ":target_reason": target_reason.clone(),
+        ":start_ms": block.start,
+        ":end_ms": block.end,
+    };
+    let maybe_min_maybe_max: (Option<i64>, Option<i64>) = txn.query_row(
+        sql_conductor::OVERLAPPING_BLOCK_SPAN_BOUNDS,
+        params,
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+
+    // Flush all overlapping blocks.
+    txn.execute(sql_conductor::OVERLAPPING_BLOCK_SPAN_DELETE, params)?;
+    Ok(maybe_min_maybe_max)
+}
+
+fn insert_block_inner(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
+    if block.start < block.end {
+        sql_insert!(txn, BlockSpan, {
+            "target_id": BlockTargetId::from(block.target.clone()),
+            "target_reason": BlockTargetReason::from(block.target),
+            "start_ms": block.start,
+            "end_ms": block.end,
+        })?;
+    }
     Ok(())
 }
 
-pub fn insert_unblock(_txn: &Transaction<'_>, _block: Block) -> DatabaseResult<()> {
-    unimplemented!();
+pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
+    let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, block.clone())?;
+
+    // Build one new block from the extremums.
+    insert_block_inner(
+        txn,
+        Block {
+            target: block.target,
+            start: match maybe_min_maybe_max.0 {
+                Some(min) => std::cmp::min(Timestamp(min), block.start),
+                None => block.start,
+            },
+            end: match maybe_min_maybe_max.1 {
+                Some(max) => std::cmp::max(Timestamp(max), block.end),
+                None => block.end,
+            },
+        },
+    )
+}
+
+pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<()> {
+    let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, unblock.clone())?;
+
+    // Reinstate anything outside the unblock bounds.
+    if let (Some(min), _) = maybe_min_maybe_max {
+        let unblock0 = unblock.clone();
+        insert_block_inner(
+            txn,
+            Block {
+                target: unblock0.target,
+                start: Timestamp(min),
+                end: unblock0.start,
+            },
+        )?;
+    }
+
+    if let (_, Some(max)) = maybe_min_maybe_max {
+        insert_block_inner(
+            txn,
+            Block {
+                target: unblock.target,
+                start: unblock.end,
+                end: Timestamp(max),
+            },
+        )?;
+    }
+
+    Ok(())
 }
 
 /// Set the validation status of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.

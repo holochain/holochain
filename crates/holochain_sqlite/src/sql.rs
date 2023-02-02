@@ -59,6 +59,10 @@ pub mod sql_conductor {
     pub(crate) const SCHEMA: &str = include_str!("sql/conductor/schema.sql");
     pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/nonce_already_seen.sql");
     pub const DELETE_EXPIRED_NONCE: &str = include_str!("sql/conductor/delete_expired_nonce.sql");
+    pub const OVERLAPPING_BLOCK_SPAN_BOUNDS: &str =
+        include_str!("sql/conductor/overlapping_block_span_bounds.sql");
+    pub const OVERLAPPING_BLOCK_SPAN_DELETE: &str =
+        include_str!("sql/conductor/overlapping_block_span_delete.sql");
 }
 
 pub(crate) mod sql_p2p_agent_store {

@@ -9,6 +9,6 @@ pub struct BlockAgentInput {
     // But unblock must be an exact match.
     #[serde(with = "serde_bytes")]
     pub reason: Vec<u8>,
-    pub start: Option<Timestamp>,
-    pub end: Option<Timestamp>,
+    pub start: Timestamp,
+    pub end: Timestamp,
 }

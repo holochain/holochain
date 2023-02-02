@@ -49,7 +49,7 @@ pub enum BlockTarget {
     IP(IpV4, IPBlockReason),
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, Clone)]
 pub enum BlockTargetId {
     Cell(CellId),
     Node(NodeId),
@@ -76,7 +76,7 @@ impl ToSql for BlockTargetId {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, Clone)]
 pub enum BlockTargetReason {
     Cell(CellBlockReason),
     Node(NodeBlockReason),
