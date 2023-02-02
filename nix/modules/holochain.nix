@@ -64,8 +64,6 @@
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // rec {
         pname = "holochain-nextest";
         CARGO_PROFILE = "fast-test";
-        cargoExtraArgs =
-          "--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests";
         nativeBuildInputs = [ pkgs.cargo-nextest ];
         buildPhase = ''
           cargo nextest run --no-run \
@@ -75,42 +73,47 @@
         dontCheck = true;
       });
 
-      # e.g.
-      # "conductor::cell::gossip_test::gossip_test"
-      disabledTests = [
-        "core::ribosome::host_fn::remote_signal::tests::remote_signal_test"
-      ];
+      holochain-tests-nextest =
+        let
+          # e.g.
+          # "conductor::cell::gossip_test::gossip_test"
+          disabledTests = [
+            "core::ribosome::host_fn::remote_signal::tests::remote_signal_test"
+            "new_lair::test_new_lair_conductor_integration"
+            "conductor::cell::gossip_test::gossip_test"
+          ] ++ (lib.optionals (pkgs.system == "x86_64-darwin") [
+          ]);
 
-      disabledTestsArgs =
-        lib.forEach disabledTests (test: "-E 'not test(${test})'");
+          # the space after the not is crucial or else nextest won't parse the expression
+          disabledTestsArg = '' \
+            -E 'not test(/${lib.concatStringsSep "|" disabledTests}/)'
+          '';
+        in
+        craneLib.cargoNextest (commonArgs // {
+          __impure = pkgs.stdenv.isLinux;
+          cargoArtifacts = holochainNextestDeps;
 
-      holochain-tests-nextest = craneLib.cargoNextest (commonArgs // {
-        pname = "holochain";
-        __impure = pkgs.stdenv.isLinux;
-        cargoArtifacts = holochainNextestDeps;
+          preCheck = ''
+            export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
+          '';
 
+          cargoExtraArgs = ''
+            --profile ci \
+            --config-file ${../../.config/nextest.toml} \
+            ${import ../../.config/test-args.nix} \
+            ${import ../../.config/nextest-args.nix} \
+            ${disabledTestsArg} \
+          '';
 
-        nativeBuildInputs = commonArgs.nativeBuildInputs ++ (with pkgs; [
-          gitFull
-        ]);
+          dontPatchELF = true;
+          dontFixup = true;
 
-        preCheck = ''
-          export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
-        '';
-
-        cargoExtraArgs = ''
-          --config-file ${../../.config/nextest.toml} \
-          ${import ../../.config/test-args.nix} \
-          ${import ../../.config/nextest-args.nix} \
-          ${lib.concatStringsSep " " disabledTestsArgs}
-        '';
-
-        dontPatchELF = true;
-        dontFixup = true;
-        dontInstall = true;
-
-        installPhase = "cp -v target/.rustc_info.json $out";
-      });
+          installPhase = ''
+            mkdir -p $out
+            cp -vL target/.rustc_info.json $out/
+            find target -name "junit.xml" -exec cp -vLb {} $out/ \;
+          '';
+        });
 
       holochain-tests-fmt = craneLib.cargoFmt (commonArgs // {
         cargoArtifacts = null;
@@ -133,6 +136,11 @@
 
         dontPatchELF = true;
         dontFixup = true;
+
+        installPhase = ''
+          mkdir -p $out
+          cp -vL target/.rustc_info.json  $out/
+        '';
       });
 
       holochain-tests-wasm = craneLib.cargoTest (commonArgs // {
@@ -142,6 +150,11 @@
 
         dontPatchELF = true;
         dontFixup = true;
+
+        installPhase = ''
+          mkdir -p $out
+          cp -vL target/.rustc_info.json  $out/
+        '';
       });
 
     in

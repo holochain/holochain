@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         cmd:
-          - "nix build .#holochain-tests-wasm .#holochain-tests-nextest"
+          - "nix build .#packages.${system}.holochain-tests-wasm .#packages.${system}.holochain-tests-nextest"
         platform:
           - system: x86_64-darwin
             runs-on: multi-arch
@@ -27,7 +27,7 @@ jobs:
             platform:
               system: x86_64-linux
               runs-on: ubuntu-latest
-          - cmd: "nix build .#holochain-tests-clippy .#holochain-tests-fmt"
+          - cmd: "nix build .#packages.${system}.holochain-tests-clippy .#packages.${system}.holochain-tests-fmt"
             platform:
               system: x86_64-linux
               runs-on: ubuntu-latest
@@ -47,6 +47,7 @@ jobs:
             experimental-features = flakes nix-command
       - name: Setup cachix
         uses: cachix/cachix-action@v12
+        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         continue-on-error: ${{ matrix.platform.runs-on == 'multi-arch' }}
         with:
           name: holochain-ci
@@ -58,4 +59,6 @@ jobs:
           sudo systemctl stop nix-daemon
 
       - name: "Test comand ${{ matrix.nixCommand }}"
-        run: ${{ matrix.cmd }} -L --show-trace --system ${{ matrix.platform.system }}
+        env:
+          system: ${{ matrix.platform.system }}
+        run: ${{ matrix.cmd }} -L --show-trace
