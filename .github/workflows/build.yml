@@ -13,7 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         cmd:
-          - "nix build .#packages.${system}.holochain-tests-wasm .#packages.${system}.holochain-tests-nextest"
+          - pkgs: [holochain-tests-wasm, holochain-tests-nextest]
+            verb: build
         platform:
           - system: x86_64-darwin
             runs-on: multi-arch
@@ -23,11 +24,15 @@ jobs:
           #   runs-on: multi-arch
 
         include:
-          - cmd: "nix run .#release-automation-tests .#release-automation-tests-repo"
+          - cmd:
+              pkgs: [release-automation-tests, release-automation-tests-repo]
+              verb: run
             platform:
               system: x86_64-linux
               runs-on: ubuntu-latest
-          - cmd: "nix build .#packages.${system}.holochain-tests-clippy .#packages.${system}.holochain-tests-fmt"
+          - cmd:
+              pkgs: [holochain-tests-clippy, holochain-tests-fmt]
+              verb: build
             platform:
               system: x86_64-linux
               runs-on: ubuntu-latest
@@ -61,4 +66,4 @@ jobs:
       - name: "Test comand ${{ matrix.nixCommand }}"
         env:
           system: ${{ matrix.platform.system }}
-        run: ${{ matrix.cmd }} -L --show-trace
+        run: nix ${{ matrix.cmd.verb }} -L --show-trace .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
