@@ -240,7 +240,7 @@ jobs:
                 --no-verify-pre \
                 --force-tag-creation \
                 --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-                --disallowed-version-reqs=">=0.2" \
+                --disallowed-version-reqs=">=0.3" \
                 --steps=BumpReleaseVersions
 
             cargo sweep -f
