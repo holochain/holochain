@@ -11,3 +11,13 @@ CREATE TABLE IF NOT EXISTS Nonce (
     nonce BLOB NOT NULL,
     expires INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS BlockSpan (
+    id INTEGER PRIMARY KEY,
+
+    target_id BLOB NOT NULL,
+    target_reason BLOB NOT NULL,
+
+    start_ms INTEGER NOT NULL,
+    end_ms INTEGER NOT NULL
+);

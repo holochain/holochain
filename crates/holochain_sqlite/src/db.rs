@@ -446,10 +446,6 @@ pub struct DbKindCache(pub Arc<DnaHash>);
 pub struct DbKindConductor;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
-/// Specifies the environment used to witness nonces.
-pub struct DbKindNonce;
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used to save wasm
 pub struct DbKindWasm;
 

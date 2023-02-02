@@ -110,7 +110,7 @@ pub struct Block {
     /// Target of the block.
     pub target: BlockTarget,
     /// Start time of the block. None = forever in the past.
-    pub start: Option<Timestamp>,
+    pub start: Timestamp,
     /// End time of the block. None = forever in the future.
-    pub end: Option<Timestamp>,
+    pub end: Timestamp,
 }
