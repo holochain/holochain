@@ -127,10 +127,6 @@ pub mod tuning_params_struct {
         /// [Default: 5 minutes]
         gossip_agent_info_update_interval_ms: u32 = 1000 * 60 * 5,
 
-        /// How frequently we should locally sync when there is
-        /// no new data. Agents arc can change so this shouldn't
-        /// be too long. [Default: 1 minutes]
-        gossip_local_sync_delay_ms: u32 = 1000 * 60,
 
         /// The target redundancy is the number of peers we expect to hold any
         /// given Op.
