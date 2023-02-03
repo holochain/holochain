@@ -668,7 +668,7 @@ pub fn do_publish_to_crates_io<'a>(
     allowed_missing_dependencies: &HashSet<String>,
     cargo_target_dir: &Option<PathBuf>,
 ) -> Fallible<()> {
-    ensure_release_order_consistency(&crates)?;
+    ensure_release_order_consistency(&crates).context("release ordering is broken")?;
 
     let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
 

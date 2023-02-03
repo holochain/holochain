@@ -17,4 +17,13 @@ in
     include = includeCommon;
     root = inputs.holochain;
   };
+
+  options.srcCleanedReleaseAutomationRepo = lib.mkOption { type = lib.types.raw; };
+  config.srcCleanedReleaseAutomationRepo = inputs.nix-filter.lib {
+    include = includeCommon ++ [
+      "src"
+      "examples"
+    ];
+    root = "${self}/crates/release-automation";
+  };
 }

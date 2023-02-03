@@ -28,11 +28,11 @@
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
-
         pname = "release-automation";
-        src = ../../crates/release-automation;
+        version = "workspace";
+        src = flake.config.srcCleanedReleaseAutomationRepo;
 
-        CARGO_PROFILE = "release";
+        cargoExtraArgs = "--all-targets";
 
         buildInputs = (with pkgs; [ openssl ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
@@ -43,13 +43,16 @@
             Security
           ]));
 
-        nativeBuildInputs = (with pkgs; [ perl pkg-config ])
-          ++ lib.optionals pkgs.stdenv.isDarwin
+        nativeBuildInputs = (with pkgs;
+          [ perl pkg-config ])
+        ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
       };
 
       # derivation building all dependencies
-      deps = craneLib.buildDepsOnly (commonArgs // { });
+      deps = craneLib.buildDepsOnly (commonArgs // {
+        doCheck = false;
+      });
 
       # derivation with the main crates
       package = craneLib.buildPackage (commonArgs // {
@@ -57,25 +60,41 @@
         doCheck = false;
       });
 
-      testDeps = craneLib.buildDepsOnly (commonArgs // rec {
-        RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
-        RUST_SODIUM_SHARED = "1";
-        cargoExtraArgs = "--tests";
-      });
+      tests = craneLib.cargoNextest (commonArgs // {
+        pname = "${commonArgs.pname}-tests";
+        __noChroot = pkgs.stdenv.isLinux;
 
-      # TODO: this currently fails becasue of the test environment that nix provides, despite __impure
-      tests = craneLib.cargoTest (commonArgs // {
-        __impure = pkgs.stdenv.isLinux;
-
-        cargoArtifacts = testDeps;
+        cargoArtifacts = deps;
 
         buildInputs = commonArgs.buildInputs ++ [ pkgs.cacert ];
-        nativeBuildInputs = commonArgs.nativeBuildInputs
-          ++ [ package pkgs.gitFull ];
+        nativeBuildInputs = commonArgs.nativeBuildInputs ++
+          [
+            pkgs.gitFull
+            (config.writers.writePureShellScriptBin
+              "release-automation"
+              ([ pkgs.gitFull rustToolchain ] ++ commonArgs.nativeBuildInputs ++ commonArgs.buildInputs)
+              "exec ${package}/bin/release-automation $@")
+          ];
+
+        cargoNextestExtraArgs =
+          let
+            nextestToml = builtins.toFile "nextest.toml" ''
+              [profile.default]
+              retries = 1
+              status-level = "skip"
+              final-status-level = "flaky"
+            '';
+          in
+          '' \
+            --config-file=${nextestToml} \
+          '';
 
         dontPatchELF = true;
         dontFixup = true;
-        installPhase = "mkdir $out";
+        installPhase = ''
+          mkdir -p $out
+          cp -vL target/.rustc_info.json $out/
+        '';
       });
 
       packagePath = lib.makeBinPath [ package ];
@@ -85,61 +104,73 @@
       packages = {
         release-automation = package;
 
-        release-automation-tests-drv = tests;
-
-        release-automation-tests =
-          pkgs.writeShellScriptBin "release-automation-tests" ''
-            set -euxo pipefail
-            export RUST_BACKTRACE=1
-
-            export PATH=${lib.makeBinPath (with pkgs; [ package nix gitFull ])}:$PATH
-
-            nix-shell --argstr devShellId release --run '
-              # make sure the binary is built
-              cargo build --locked --manifest-path=crates/release-automation/Cargo.toml
-              # run the release-automation tests
-              cargo test ''${CARGO_TEST_ARGS:-} --locked --manifest-path=crates/release-automation/Cargo.toml ''${@}
-            '
-          '';
+        release-automation-tests = tests;
 
         # check the state of the repository
-        release-automation-tests-repo = pkgs.writeShellScriptBin "release-automation-tests-repo" ''
-          set -euxo pipefail
+        # TODO: to get the actual .git repo we could be something like this:
+        # using a dummy input like this:
+        # ```nix
+        #     repo-git.url = "file+file:/dev/null";
+        #     repo-git.flake = false;
+        # ```
+        # and then when i run the test derivations that rely on that input, i can temporarily lock that input to a local path like this:
+        # ```
+        # tmpgit=$(mktemp -d)
+        # git clone --bare --single-branch . $tmpgit
+        # nix flake lock --update-input repo-git --override-input repo-git "path:$tmpdir"
+        # rm -rf $tmpgit
+        # ```
+        release-automation-tests-repo = pkgs.runCommand
+          "release-automation-tests-repo"
+          {
+            __impure = pkgs.stdenv.isLinux;
+            nativeBuildInputs = self'.packages.holochainRepo.nativeBuildInputs ++ [
+              package
 
-          export PATH=${lib.makeBinPath (with pkgs; [ package nix gitFull ])}:$PATH
+              pkgs.coreutils
+              pkgs.gitFull
+            ];
+            buildInputs = self'.packages.holochainRepo.buildInputs ++ [
+              pkgs.cacert
+            ];
+          } ''
+          set -euo pipefail
 
-          export TEST_WORKSPACE=$(mktemp -d)
-          if [[ "''${KEEP_TEST_WORKSPACE:-false}" != "true" ]]; then
-            trap "rm -rf ''${TEST_WORKSPACE:?}" EXIT
-          fi
+          export HOME="$(mktemp -d)"
+          export TEST_WORKSPACE="''${HOME:?}/src"
 
-          nix-shell --argstr devShellId coreDev --run '
-            set -euxo pipefail
-            rm -rf ''${TEST_WORKSPACE:?}
-            git clone $PWD ''${TEST_WORKSPACE:?}
-            cd ''${TEST_WORKSPACE:?}
-            git fetch origin
-            git switch -c release-automation-tests-repo
+          cp -r --no-preserve=mode,ownership ${flake.config.srcCleanedRepo} ''${TEST_WORKSPACE:?}
+          cp --no-preserve=mode,ownership ${../../CHANGELOG.md} ''${TEST_WORKSPACE:?}/CHANGELOG.md
+          cd ''${TEST_WORKSPACE:?}
 
-            release-automation \
-                --workspace-path=''${TEST_WORKSPACE:?} \
-                --log-level=debug \
-              crate \
-                apply-dev-versions \
-                --commit \
-                --no-verify
+          git init
+          git switch -c main
+          git add .
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
+          git commit -am "main"
 
-            release-automation \
-                --workspace-path=''${TEST_WORKSPACE:?} \
-                --log-level=debug \
-                --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-              release \
-                --no-verify-pre \
-                --force-branch-creation \
-                --disallowed-version-reqs=">=0.3" \
-                --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-                --steps=CreateReleaseBranch,BumpReleaseVersions
-          '
+          release-automation \
+              --workspace-path=''${TEST_WORKSPACE:?} \
+              --log-level=debug \
+            crate \
+              apply-dev-versions \
+              --commit \
+              --no-verify
+
+          release-automation \
+              --workspace-path=''${TEST_WORKSPACE:?} \
+              --log-level=debug \
+              --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+            release \
+              --no-verify-pre \
+              --force-branch-creation \
+              --disallowed-version-reqs=">=0.3" \
+              --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
+              --steps=CreateReleaseBranch,BumpReleaseVersions
+
+          rm -rf target
+          mv ''${TEST_WORKSPACE:?} $out
         '';
       };
     };
