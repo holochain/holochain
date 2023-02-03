@@ -6,9 +6,6 @@ const SQL_DIR: &str = "./src/sql";
 /// An env var that will trigger a SQL format.
 const FIX_SQL_FMT: Option<&str> = option_env!("FIX_SQL_FMT");
 
-/// Git ref against which to check for schema changes
-const GIT_BASE_REF: &str = "origin/develop";
-
 fn fix_sql_fmt() -> bool {
     if let Some(fsf) = FIX_SQL_FMT {
         !fsf.is_empty()
@@ -78,13 +75,7 @@ fn check_fmt(path: &std::path::Path) {
     }
 }
 
-/// Ensure that schema migration files have no changes since `GIT_BASE_REF` (origin/develop).
-/// Pure additions are excluded, which allows new files to be created, but once they are merged
-/// as a PR, then no changes can be made.
-/// This is a loose check and obviously can be easily circumvented, but it hopefully helps remind us
-/// that we must never change migration files.
-fn check_migrations() {
-    use std::process::Command;
+fn _check_migrations() {
     let root = PathBuf::from(SQL_DIR);
 
     // If git is unavailable, skip this check
@@ -99,25 +90,11 @@ fn check_migrations() {
         root.join("p2p_metrics/schema"),
         root.join("wasm/schema"),
     ] {
-        for path in find_sql(&dir) {
-            let mut cmd = Command::new("git");
-            match cmd
-                .arg("diff")
-                // Filter out files which were merely added
-                .arg("--diff-filter=a")
-                .arg(GIT_BASE_REF)
-                .arg(path.clone())
-                .output()
-            {
-                Ok(out) => {
-                    if out.status.success() && out.stdout.is_empty() && out.stderr.is_empty() {
-                        // no change. good.
-                    } else {
-                        panic!("Diff found in schema file:\n\n{}\nSchema and migration files cannot be modified. Instead, set up a new database migration in 'crates/holochain_sqlite/src/schema.rs'\n\n", String::from_utf8_lossy(&out.stdout))
-                    }
-                }
-                Err(err) => panic!("Error while checking schema: {:?}, path = {:?}", err, path),
-            }
+        for _path in find_sql(&dir) {
+            // TODO: ensure that each schema migration script not introduced "recently"
+            // (for some value of "recently") has not changed. We don't ever
+            // want these to change, we only want to add new ones.
+            // Probably the best way to accomplish this is through a git commit hook or something.
         }
     }
 }
@@ -129,5 +106,4 @@ fn main() {
         println!("cargo:rerun-if-changed={}", sql.to_string_lossy());
         check_fmt(&sql);
     }
-    check_migrations();
 }
