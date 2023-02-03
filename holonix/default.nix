@@ -11,7 +11,7 @@ config ? import ./config.nix
 , include ? { test = false; }, isIncludedFn ? (name: include."${name}" or true)
 
 # either one listed in VERSIONS.md or "custom". when "custom" is set, `holochainVersion` needs to be specified
-, holochainVersionId ? "main", holochainVersion ? null, rustVersion ? { }
+, holochainVersionId ? "v0_1_0", holochainVersion ? null, rustVersion ? { }
 , rustc ? (if rustVersion == { } then
   holochain-nixpkgs.pkgs.rust.packages.stable.rust.rustc
 else
@@ -28,16 +28,6 @@ let
         When 'holochainVersionId' is set to "custom" a value to 'holochainVersion' must be provided.''
     else
       holochainVersion
-  else if holochainVersionId == "main" then
-  # make "main" the equivalent of the highest known version
-  # we introduce this behavior because we currently don't have hc-{scaffold,launch} for branch names
-  # makes use of the natural sorting of attribute sets
-
-    let
-      values = builtins.attrValues
-        holochain-nixpkgs.packages.holochain.holochainVersions;
-      lastIndex = (builtins.length values) - 1;
-    in builtins.elemAt values lastIndex
   else
     (let
       value' = builtins.getAttr holochainVersionId
