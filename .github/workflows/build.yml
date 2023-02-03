@@ -26,7 +26,7 @@ jobs:
         include:
           - cmd:
               pkgs: [release-automation-tests, release-automation-tests-repo]
-              verb: run
+              verb: build
             platform:
               system: x86_64-linux
               runs-on: multi-arch
