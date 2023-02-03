@@ -52,7 +52,6 @@ jobs:
             experimental-features = flakes nix-command
       - name: Setup cachix
         uses: cachix/cachix-action@v12
-        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         continue-on-error: ${{ matrix.platform.runs-on == 'multi-arch' }}
         with:
           name: holochain-ci
@@ -66,4 +65,14 @@ jobs:
       - name: "Test comand ${{ matrix.nixCommand }}"
         env:
           system: ${{ matrix.platform.system }}
-        run: nix ${{ matrix.cmd.verb }} -L --show-trace .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
+        run: |
+          set -xe
+
+          # first build all derivations. this could be enough for test derivations.
+          nix build -L --show-trace .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
+
+          # if there's something to run we generate separate commands
+          if [[ ${{ matrix.cmd.verb }} == "run" ]]; then
+            export basecmd="nix run -L --show-trace .#packages.${system}."
+            ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
+          fi
