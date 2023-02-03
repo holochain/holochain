@@ -92,7 +92,7 @@ fn check_migrations() {
         Ok(output) => !output.status.success(),
         Err(_) => true,
     } {
-        eprintln!("git or .git not available, cannot check schema migration files.");
+        println!("cargo:warning=git or .git not available, cannot check schema migration files.");
         return;
     }
 
