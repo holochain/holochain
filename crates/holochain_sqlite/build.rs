@@ -77,6 +77,12 @@ fn check_fmt(path: &std::path::Path) {
 
 fn _check_migrations() {
     let root = PathBuf::from(SQL_DIR);
+
+    // If git is unavailable, skip this check
+    if Command::new("git").arg("status").output().is_err() {
+        return;
+    }
+
     for dir in [
         root.join("cell/schema"),
         root.join("conductor/schema"),
