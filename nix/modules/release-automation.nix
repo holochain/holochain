@@ -123,7 +123,7 @@
         release-automation-tests-repo = pkgs.runCommand
           "release-automation-tests-repo"
           {
-            __impure = pkgs.stdenv.isLinux;
+            __noChroot = pkgs.stdenv.isLinux;
             nativeBuildInputs = self'.packages.holochainRepo.nativeBuildInputs ++ [
               package
 
