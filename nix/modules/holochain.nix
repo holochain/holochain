@@ -90,7 +90,7 @@
           '';
         in
         craneLib.cargoNextest (commonArgs // {
-          __impure = pkgs.stdenv.isLinux;
+          __noChroot = pkgs.stdenv.isLinux;
           cargoArtifacts = holochainNextestDeps;
 
           preCheck = ''
