@@ -11,7 +11,7 @@ config ? import ./config.nix
 , include ? { test = false; }, isIncludedFn ? (name: include."${name}" or true)
 
 # either one listed in VERSIONS.md or "custom". when "custom" is set, `holochainVersion` needs to be specified
-, holochainVersionId ? "v0_1_0", holochainVersion ? null, rustVersion ? { }
+, holochainVersionId ? "v0_1_3", holochainVersion ? null, rustVersion ? { }
 , rustc ? (if rustVersion == { } then
   holochain-nixpkgs.pkgs.rust.packages.stable.rust.rustc
 else
