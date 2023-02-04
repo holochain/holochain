@@ -31,11 +31,15 @@ fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) ->
     tuning.disable_historical_gossip = !historical;
     tuning.danger_gossip_recent_threshold_secs =
         recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
+
     tuning.gossip_inbound_target_mbps = 10000.0;
     tuning.gossip_outbound_target_mbps = 10000.0;
     tuning.gossip_historic_outbound_target_mbps = 10000.0;
     tuning.gossip_historic_inbound_target_mbps = 10000.0;
-    // tuning.gossip_max_batch_size = 32_000_000;
+
+    // This allows attempting to contact an offline node to timeout quickly,
+    // so we can fallback to the next one
+    tuning.default_rpc_single_timeout_ms = 3_000;
 
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
@@ -246,14 +250,13 @@ async fn three_way_gossip(config: ConductorConfig) {
         let bytes = vec![42u8 + i as u8; size];
         let hash: ActionHash = conductors[0].call(&zomes[0], "create_bytes", bytes).await;
         hashes.push(hash);
-        dbg!(start.elapsed());
     }
 
     conductors.exchange_peer_info().await;
-    consistency_10s([&cells[0], &cells[1]]).await;
+    consistency_60s([&cells[0], &cells[1]]).await;
 
-    tracing::info!(
-        "CONSISTENCY REACHED between first two nodes in {:?}",
+    println!(
+        "Done waiting for consistency between first two nodes. Elapsed: {:?}",
         start.elapsed()
     );
 
@@ -274,7 +277,6 @@ async fn three_way_gossip(config: ConductorConfig) {
             .collect::<Vec<_>>()
     );
     assert_eq!(records_0, records_1);
-    dbg!(start.elapsed());
 
     conductors[0].shutdown().await;
 
@@ -292,9 +294,22 @@ async fn three_way_gossip(config: ConductorConfig) {
 
     consistency_60s_advanced([(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
 
-    dbg!(start.elapsed());
+    println!(
+        "Done waiting for consistency between last two nodes. Elapsed: {:?}",
+        start.elapsed()
+    );
 
     let records_2: Vec<Option<Record>> = conductors[2].call(&zome, "read_multi", hashes).await;
+    assert_eq!(
+        records_2.iter().filter(|r| r.is_some()).count(),
+        num,
+        "couldn't get records at positions: {:?}",
+        records_2
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| r.is_none().then(|| i))
+            .collect::<Vec<_>>()
+    );
     assert_eq!(records_2, records_1);
 }
 

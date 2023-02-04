@@ -13,21 +13,26 @@ jobs:
       fail-fast: false
       matrix:
         cmd:
-          - "nix build .#holochain-tests-wasm .#holochain-tests-nextest --no-link"
+          - pkgs: [holochain-tests-wasm, holochain-tests-nextest]
+            verb: build
         platform:
           - system: x86_64-darwin
             runs-on: multi-arch
           - system: aarch64-darwin
             runs-on: multi-arch
-          # - system: x86_64-linux
-          #   runs-on: multi-arch
+          - system: x86_64-linux
+            runs-on: multi-arch
 
         include:
-          - cmd: "nix run .#release-automation-tests .#release-automation-tests-repo"
+          - cmd:
+              pkgs: [release-automation-tests, release-automation-tests-repo]
+              verb: build
             platform:
               system: x86_64-linux
-              runs-on: ubuntu-latest
-          - cmd: "nix build .#holochain-tests-clippy .#holochain-tests-fmt --no-link"
+              runs-on: multi-arch
+          - cmd:
+              pkgs: [holochain-tests-clippy, holochain-tests-fmt]
+              verb: build
             platform:
               system: x86_64-linux
               runs-on: ubuntu-latest
@@ -58,4 +63,16 @@ jobs:
           sudo systemctl stop nix-daemon
 
       - name: "Test comand ${{ matrix.nixCommand }}"
-        run: ${{ matrix.cmd }} -L --show-trace --system ${{ matrix.platform.system }}
+        env:
+          system: ${{ matrix.platform.system }}
+        run: |
+          set -xe
+
+          # first build all derivations. this could be enough for test derivations.
+          nix build -L --show-trace .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
+
+          # if there's something to run we generate separate commands
+          if [[ ${{ matrix.cmd.verb }} == "run" ]]; then
+            export basecmd="nix run -L --show-trace .#packages.${system}."
+            ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
+          fi

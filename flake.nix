@@ -39,13 +39,18 @@
 
     # holochain_scaffolding_cli
     scaffolding = {
-      url = "github:holochain/scaffolding";
+      url = "github:holochain/scaffolding/holochain_scaffolding_cli-v0.1.4";
       flake = false;
     };
 
-    # launcher
     launcher = {
-      url = "github:holochain/launcher";
+      url = "github:holochain/launcher/holochain_cli_launch-0.0.9";
+      flake = false;
+    };
+
+    # holochain
+    holochain = {
+      url = "github:holochain/holochain/holochain-0.1.0";
       flake = false;
     };
 
@@ -59,7 +64,7 @@
   outputs = inputs @ { self, nixpkgs, flake-parts, ... }:
     # all possible parameters for a module: https://flake.parts/module-arguments.html#top-level-module-arguments
     flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = [ "aarch64-darwin" "x86_64-linux" "x86_64-darwin" ];
+      systems = [ "aarch64-darwin" "x86_64-linux" "x86_64-darwin" "aarch64-linux" ];
 
       # auto import all nix code from `./modules`, treat each one as a flake and merge them
       imports = map (m: "${./.}/nix/modules/${m}")
