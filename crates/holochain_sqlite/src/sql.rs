@@ -63,6 +63,7 @@ pub mod sql_conductor {
         include_str!("sql/conductor/overlapping_block_span_bounds.sql");
     pub const OVERLAPPING_BLOCK_SPAN_DELETE: &str =
         include_str!("sql/conductor/overlapping_block_span_delete.sql");
+    pub const IS_BLOCKED: &str = include_str!("sql/conductor/is_blocked.sql");
 }
 
 pub(crate) mod sql_p2p_agent_store {

@@ -39,7 +39,7 @@ type IpV4 = [u8; 4];
 
 /// Target of a block.
 /// Each target type has an ID and associated reason.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum BlockTarget {
     /// Some cell did bad at the happ level.
     Cell(CellId, CellBlockReason),
@@ -105,7 +105,7 @@ impl From<BlockTarget> for BlockTargetReason {
 
 /// Represents a block.
 /// Also can represent an unblock.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Block {
     /// Target of the block.
     pub target: BlockTarget,

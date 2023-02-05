@@ -303,7 +303,8 @@ fn pluck_overlapping_block_bounds(
 }
 
 fn insert_block_inner(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
-    if block.start < block.end {
+    dbg!(&block);
+    if block.start <= block.end {
         sql_insert!(txn, BlockSpan, {
             "target_id": BlockTargetId::from(block.target.clone()),
             "target_reason": BlockTargetReason::from(block.target),
@@ -336,6 +337,7 @@ pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
 
 pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<()> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, unblock.clone())?;
+    dbg!(&maybe_min_maybe_max);
 
     // Reinstate anything outside the unblock bounds.
     if let (Some(min), _) = maybe_min_maybe_max {
@@ -345,7 +347,9 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
             Block {
                 target: unblock0.target,
                 start: Timestamp(min),
-                end: unblock0.start,
+                // Unblocks are inclusive so we reinstate the preblock up to but
+                // not including the unblock start.
+                end: (unblock0.start - core::time::Duration::from_micros(1))?,
             },
         )?;
     }
@@ -355,7 +359,9 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
             txn,
             Block {
                 target: unblock.target,
-                start: unblock.end,
+                // Unblocks are inclusive so we reinstate the postblock after but
+                // not including the unblock end.
+                start: (unblock.end + core::time::Duration::from_micros(1))?,
                 end: Timestamp(max),
             },
         )?;

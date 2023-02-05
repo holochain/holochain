@@ -1,5 +1,5 @@
--- simple select the matching agent
-SELECT COUNT(1)  > 0
+-- count rows with a block for any reason against the target
+SELECT COUNT(1) > 0
 FROM BlockSpan
 WHERE
   target_id = :target_id
