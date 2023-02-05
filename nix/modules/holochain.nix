@@ -73,7 +73,7 @@
         dontCheck = true;
       });
 
-      holochain-tests-nextest =
+      holochainTestsNextestArgs =
         let
           # e.g.
           # "conductor::cell::gossip_test::gossip_test"
@@ -82,14 +82,17 @@
             "new_lair::test_new_lair_conductor_integration"
             "conductor::cell::gossip_test::gossip_test"
           ] ++ (lib.optionals (pkgs.system == "x86_64-darwin") [
+            "test_reconnect"
+          ]) ++ (lib.optionals (pkgs.system == "aarch64-darwin") [
+            "test_reconnect"
           ]);
 
           # the space after the not is crucial or else nextest won't parse the expression
           disabledTestsArg = '' \
-            -E 'not test(/${lib.concatStringsSep "|" disabledTests}/)'
+            -E 'not test(/${lib.concatStringsSep "|" disabledTests}/)' \
           '';
         in
-        craneLib.cargoNextest (commonArgs // {
+        (commonArgs // {
           __noChroot = pkgs.stdenv.isLinux;
           cargoArtifacts = holochainNextestDeps;
 
@@ -113,6 +116,19 @@
             cp -vL target/.rustc_info.json $out/
             find target -name "junit.xml" -exec cp -vLb {} $out/ \;
           '';
+        });
+
+      holochain-tests-nextest = craneLib.cargoNextest holochainTestsNextestArgs;
+      holochain-tests-nextest-tx5 = craneLib.cargoNextest
+        (holochainTestsNextestArgs // {
+          pname = "holochain-nextest-tx5";
+          cargoExtraArgs = holochainTestsNextestArgs.cargoExtraArgs + '' \
+            --features tx5 \
+          '';
+
+          nativeBuildInputs = holochainTestsNextestArgs.nativeBuildInputs ++ [
+            pkgs.go
+          ];
         });
 
       holochain-tests-fmt = craneLib.cargoFmt (commonArgs // {
@@ -157,10 +173,14 @@
         '';
       });
 
+      holochain-tests-doc = craneLib.cargoDoc (commonArgs // {
+        cargoArtifacts = holochainDepsRepo;
+      });
+
     in
     {
       packages = {
-        inherit holochainRepo holochain holochain-tests-nextest;
+        inherit holochainRepo holochain holochain-tests-nextest holochain-tests-nextest-tx5 holochain-tests-doc;
 
         inherit holochain-tests-wasm holochain-tests-fmt holochain-tests-clippy;
       };
