@@ -342,29 +342,44 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
     // Reinstate anything outside the unblock bounds.
     if let (Some(min), _) = maybe_min_maybe_max {
         let unblock0 = unblock.clone();
-        insert_block_inner(
-            txn,
-            Block {
-                target: unblock0.target,
-                start: Timestamp(min),
-                // Unblocks are inclusive so we reinstate the preblock up to but
-                // not including the unblock start.
-                end: (unblock0.start - core::time::Duration::from_micros(1))?,
-            },
-        )?;
+        // Unblocks are inclusive so we reinstate the preblock up to but not
+        // including the unblock start.
+        match unblock0.start - core::time::Duration::from_micros(1) {
+            Ok(preblock_end) => insert_block_inner(
+                txn,
+                Block {
+                    target: unblock0.target,
+                    start: Timestamp(min),
+                    end: preblock_end,
+                },
+            )?,
+            // It's an underflow not overflow but whatever, do nothing as the
+            // preblock is unrepresentable.
+            Err(TimestampError::Overflow) => { },
+            // Probably not possible but if it is, handle gracefully.
+            Err(e) => return Err(e.into()),
+        }
+        ;
     }
 
     if let (_, Some(max)) = maybe_min_maybe_max {
-        insert_block_inner(
-            txn,
-            Block {
-                target: unblock.target,
-                // Unblocks are inclusive so we reinstate the postblock after but
-                // not including the unblock end.
-                start: (unblock.end + core::time::Duration::from_micros(1))?,
-                end: Timestamp(max),
-            },
-        )?;
+        // Unblocks are inclusive so we reinstate the postblock after but not
+        // including the unblock end.
+        match unblock.end + core::time::Duration::from_micros(1) {
+            Ok(postblock_start) => insert_block_inner(
+                txn,
+                Block {
+                    target: unblock.target,
+                    start: postblock_start,
+                    end: Timestamp(max),
+                },
+            )?,
+            // Do nothing if building the postblock is a timestamp overflow.
+            // This means the postblock is unrepresentable.
+            Err(TimestampError::Overflow) => { },
+            // Probably not possible but if it is, handle gracefully.
+            Err(e) => return Err(e.into()),
+        }
     }
 
     Ok(())
