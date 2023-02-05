@@ -17,6 +17,23 @@
         "type": "github"
       }
     },
+    "cargo-rdme": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1675118998,
+        "narHash": "sha256-lrYWqu3h88fr8gG3Yo5GbFGYaq5/1Os7UtM+Af0Bg4k=",
+        "owner": "orium",
+        "repo": "cargo-rdme",
+        "rev": "f9dbb6bccc078f4869f45ae270a2890ac9a75877",
+        "type": "github"
+      },
+      "original": {
+        "owner": "orium",
+        "ref": "v1.1.0",
+        "repo": "cargo-rdme",
+        "type": "github"
+      }
+    },
     "crane": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -236,6 +253,7 @@
     "root": {
       "inputs": {
         "cargo-chef": "cargo-chef",
+        "cargo-rdme": "cargo-rdme",
         "crane": "crane",
         "crate2nix": "crate2nix",
         "flake-compat": "flake-compat_2",
