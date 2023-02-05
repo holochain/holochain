@@ -13,7 +13,10 @@ jobs:
       fail-fast: false
       matrix:
         cmd:
-          - pkgs: [holochain-tests-wasm, holochain-tests-nextest]
+          - pkgs:
+              - holochain-tests-wasm
+              - holochain-tests-nextest
+              - holochain-tests-nextest-tx5
             verb: build
         platform:
           - system: x86_64-darwin
@@ -25,13 +28,18 @@ jobs:
 
         include:
           - cmd:
-              pkgs: [release-automation-tests, release-automation-tests-repo]
+              pkgs:
+                - release-automation-tests
+                - release-automation-tests-repo
               verb: build
             platform:
               system: x86_64-linux
               runs-on: multi-arch
           - cmd:
-              pkgs: [holochain-tests-clippy, holochain-tests-fmt]
+              pkgs:
+                - holochain-tests-clippy
+                - holochain-tests-fmt
+                - holochain-tests-doc
               verb: build
             platform:
               system: x86_64-linux
