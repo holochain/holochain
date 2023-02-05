@@ -1,7 +1,7 @@
 //! Kitsune Config Tuning Params
 
 /// How long kitsune should wait before timing out when joining the network.
-pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// Fifteen minutes
 pub const RECENT_THRESHOLD_DEFAULT: std::time::Duration = std::time::Duration::from_secs(60 * 15);

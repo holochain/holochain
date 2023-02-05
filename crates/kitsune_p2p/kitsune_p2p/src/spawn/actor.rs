@@ -1023,6 +1023,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
+                tracing::debug!("got to p1");
                 let (send, send_inner, evt_recv) = spawn_space(
                     space2,
                     ep_hnd,
@@ -1033,17 +1034,30 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                     fetch_queue,
                 )
                 .await
+                .map_err(|e| {
+                    tracing::error!("HASANFAOSJIF {:?}", e);
+                    e
+                })
                 .expect("cannot fail to create space");
+                tracing::debug!("got to p2");
                 internal_sender
                     .register_space_event_handler(evt_recv)
                     .await
+                    .map_err(|e| {
+                        tracing::error!("JKAIUSYDJKHI {:?}", e);
+                        e
+                    })
                     .expect("FAIL");
+                tracing::debug!("got to p3");
                 (send, send_inner)
             })),
         };
         let space_sender = space_sender.get();
+        tracing::debug!("got to p4");
         Ok(async move {
+            tracing::debug!("got to p5");
             let (space_sender, _) = space_sender.await;
+            tracing::debug!("got to p6");
             space_sender.join(space, agent, initial_arc).await
         }
         .boxed()

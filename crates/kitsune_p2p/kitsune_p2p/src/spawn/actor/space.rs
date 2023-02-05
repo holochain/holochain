@@ -759,6 +759,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
         initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
+        tracing::debug!("got to i1");
         if let Some(initial_arc) = initial_arc {
             self.agent_arcs.insert(agent.clone(), initial_arc);
         }
@@ -815,7 +816,13 @@ impl KitsuneP2pHandler for Space {
             }
         }
 
-        Ok(async move { fut.await }.boxed().into())
+        Ok(async move {
+            let resp = fut.await;
+            tracing::debug!("got to i2");
+            resp
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_leave(
