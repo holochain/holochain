@@ -13,7 +13,7 @@
       release = pkgs.mkShell {
         inputsFrom = [ self'.devShells.rustDev ];
 
-        packages = (with self'.packages; [ release-automation ])
+        packages = (with self'.packages; [ release-automation cargo-rdme ])
           ++ (with pkgs; [ cargo-readme cargo-sweep gh gitFull ]);
       };
 

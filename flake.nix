@@ -58,6 +58,11 @@
       url = "github:LukeMathWalker/cargo-chef/main";
       flake = false;
     };
+
+    cargo-rdme = {
+      url = "github:orium/cargo-rdme/v1.1.0";
+      flake = false;
+    };
   };
 
   # refer to flake-parts docs https://flake.parts/
