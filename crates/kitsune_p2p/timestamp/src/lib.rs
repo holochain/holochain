@@ -160,12 +160,6 @@ impl Timestamp {
     pub fn saturating_from_dur(duration: &core::time::Duration) -> Self {
         Timestamp(std::cmp::min(duration.as_micros(), i64::MAX as u128) as i64)
     }
-
-    /// Convert this timestamp to fit into a SQLite integer which is an i64.
-    /// The value will be clamped to the valid range supported by SQLite
-    pub fn into_sql_lossy(self) -> Self {
-        Self(i64::clamp(self.0, -62167219200 * MM, 106751991167 * MM))
-    }
 }
 
 impl TryFrom<core::time::Duration> for Timestamp {
@@ -185,7 +179,7 @@ impl TryFrom<core::time::Duration> for Timestamp {
 impl rusqlite::ToSql for Timestamp {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
-            self.into_sql_lossy().0.into(),
+            self.0.into(),
         ))
     }
 }
@@ -228,7 +222,7 @@ mod tests {
     #[test]
     fn micros_roundtrip() {
         for t in [Timestamp(1234567890), Timestamp(987654321)] {
-            let micros = t.clone().into_sql_lossy().as_micros();
+            let micros = t.clone().as_micros();
             let r = Timestamp::from_micros(micros);
             assert_eq!(t.0, r.0);
             assert_eq!(t, r);
