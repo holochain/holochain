@@ -50,7 +50,8 @@
 
     # holochain
     holochain = {
-      url = "github:holochain/holochain/holochain-0.1.0";
+      url = "github:holochain/holochain/holochain-0.1.3";
+      # handling as flake leads to duplicate inputs
       flake = false;
     };
 
