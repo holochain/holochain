@@ -5,4 +5,5 @@ let
   script = pkgs.writeShellScriptBin name ''
     cargo install cargo-edit
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

@@ -5,7 +5,8 @@ let
   ld-flags =
     "-F${frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation ";
 
-in lib.attrsets.optionalAttrs stdenv.isDarwin {
+in
+lib.attrsets.optionalAttrs stdenv.isDarwin {
   buildInputs =
     [ frameworks.Security frameworks.CoreFoundation frameworks.CoreServices ];
 

@@ -17,4 +17,5 @@ let
     echo "flushing binary artifacts from dist"
     rm -rf ./dist;
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

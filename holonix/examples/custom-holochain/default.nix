@@ -6,7 +6,8 @@ let
     holochainVersion = import ./holochain_version.nix;
   };
   nixpkgs = holonix.pkgs;
-in nixpkgs.mkShell {
+in
+nixpkgs.mkShell {
   inputsFrom = [ holonix.main ];
   packages = [
     # additional packages go here

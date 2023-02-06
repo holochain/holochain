@@ -1,5 +1,11 @@
-{ config, isIncludedFn, holochainVersionFinal, stdenv, writeShellScriptBin, bats
-, nix }:
+{ config
+, isIncludedFn
+, holochainVersionFinal
+, stdenv
+, writeShellScriptBin
+, bats
+, nix
+}:
 let
   # self tests for holonix
   # mostly smoke tests on various platforms
@@ -30,7 +36,8 @@ let
       ""}
   '';
 
-in {
+in
+{
   buildInputs = [
     script
     # test system for bash

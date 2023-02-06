@@ -13,7 +13,8 @@ let
       upstream = "origin";
     };
   };
-in {
+in
+{
   buildInputs = [ ]
 
     ++ (pkgs.callPackage ./branch { config = release-config; }).buildInputs

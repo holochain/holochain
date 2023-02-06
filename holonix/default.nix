@@ -3,81 +3,97 @@
 # This means that downstream consumers should pkgs.callPackage this file
 # See example.default.nix for an example of how to consume this file downstream
 {
-# allow consumers to pass in their own config
-# fallback to empty sets
-config ? import ./config.nix
+  # allow consumers to pass in their own config
+  # fallback to empty sets
+  config ? import ./config.nix
 , holochain-nixpkgs ? config.holochain-nixpkgs.importFn { }
 , includeHolochainBinaries ? include.holochainBinaries or true
-, include ? { test = false; }, isIncludedFn ? (name: include."${name}" or true)
+, include ? { test = false; }
+, isIncludedFn ? (name: include."${name}" or true)
 
-# either one listed in VERSIONS.md or "custom". when "custom" is set, `holochainVersion` needs to be specified
-, holochainVersionId ? "v0_1_3", holochainVersion ? null, rustVersion ? { }
+  # either one listed in VERSIONS.md or "custom". when "custom" is set, `holochainVersion` needs to be specified
+, holochainVersionId ? "v0_1_3"
+, holochainVersion ? null
+, rustVersion ? { }
 , rustc ? (if rustVersion == { } then
-  holochain-nixpkgs.pkgs.rust.packages.stable.rust.rustc
-else
-  holochain-nixpkgs.pkgs.rust.mkRust ({
-    track = "stable";
-    version = "latest";
-  } // (if rustVersion != null then rustVersion else { }))), inNixShell ? false
+    holochain-nixpkgs.pkgs.rust.packages.stable.rust.rustc
+  else
+    holochain-nixpkgs.pkgs.rust.mkRust ({
+      track = "stable";
+      version = "latest";
+    } // (if rustVersion != null then rustVersion else { })))
+, inNixShell ? false
 }:
 
 let
-  holochainVersionFinal = if holochainVersionId == "custom" then
-    if holochainVersion == null then
-      throw ''
-        When 'holochainVersionId' is set to "custom" a value to 'holochainVersion' must be provided.''
+  holochainVersionFinal =
+    if holochainVersionId == "custom" then
+      if holochainVersion == null then
+        throw ''
+          When 'holochainVersionId' is set to "custom" a value to 'holochainVersion' must be provided.''
+      else
+        holochainVersion
     else
-      holochainVersion
-  else
-    (let
-      value' = builtins.getAttr holochainVersionId
-        holochain-nixpkgs.packages.holochain.holochainVersions;
-      value = (value' // {
-        scaffolding = if isIncludedFn "scaffolding" == true then
-          (value'.scaffolding or null)
-        else
-          null;
-        launcher = if isIncludedFn "launcher" == true then
-          (value'.launcher or null)
-        else
-          null;
-      });
+      (
+        let
+          value' = builtins.getAttr holochainVersionId
+            holochain-nixpkgs.packages.holochain.holochainVersions;
+          value = (value' // {
+            scaffolding =
+              if isIncludedFn "scaffolding" == true then
+                (value'.scaffolding or null)
+              else
+                null;
+            launcher =
+              if isIncludedFn "launcher" == true then
+                (value'.launcher or null)
+              else
+                null;
+          });
 
-    in if holochainVersion != null then
-      builtins.trace ''
-        WARNING: ignoring the value of `holochainVersion` because `holochainVersionId` is not set to "custom"''
-      value
-    else
-      value);
+        in
+        if holochainVersion != null then
+          builtins.trace ''
+            WARNING: ignoring the value of `holochainVersion` because `holochainVersionId` is not set to "custom"''
+            value
+        else
+          value
+      );
 
   sources = import nix/sources.nix { };
 
-in assert (holochainVersionId == "custom") -> (let
-  deprecatedAttributes = builtins.filter
-    (elem: builtins.elem elem [ "cargoSha256" "bins" "lairKeystoreHashes" ])
-    (builtins.attrNames holochainVersionFinal);
+in
+assert (holochainVersionId == "custom") -> (
+  let
+    deprecatedAttributes = builtins.filter
+      (elem: builtins.elem elem [ "cargoSha256" "bins" "lairKeystoreHashes" ])
+      (builtins.attrNames holochainVersionFinal);
 
-in if [ ] != deprecatedAttributes then
-  (let holonixPath = builtins.toString ./.;
+  in
+  if [ ] != deprecatedAttributes then
+    (
+      let holonixPath = builtins.toString ./.;
 
-  in throw ''
-    The following attributes found in the 'holochainVersion' set are no longer supported:
-    ${builtins.concatStringsSep ", " deprecatedAttributes}
+      in throw ''
+        The following attributes found in the 'holochainVersion' set are no longer supported:
+        ${builtins.concatStringsSep ", " deprecatedAttributes}
 
-    The structure of 'holochainVersion' changed in a breaking way,
-    and more supported values were added to 'holochainVersionId'.
+        The structure of 'holochainVersion' changed in a breaking way,
+        and more supported values were added to 'holochainVersionId'.
 
-    Please see if a matching 'holochainVersionId' for your desired version already exists:
-    - ${holonixPath}/VERSIONS.md
+        Please see if a matching 'holochainVersionId' for your desired version already exists:
+        - ${holonixPath}/VERSIONS.md
 
-    If not please take a look at the updated readme and example files for custom holochain versions:
-    - ${holonixPath}/examples/custom-holochain
+        If not please take a look at the updated readme and example files for custom holochain versions:
+        - ${holonixPath}/examples/custom-holochain
 
-    If you're in a hurry you can rollback to holonix revision
-    d326ee858e051a2525a1ddb0452cab3085c4aa98 or before.
-  '')
-else
-  true);
+        If you're in a hurry you can rollback to holonix revision
+        d326ee858e051a2525a1ddb0452cab3085c4aa98 or before.
+      ''
+    )
+  else
+    true
+);
 
 let
   pkgs = import holochain-nixpkgs.pkgs.path {
@@ -85,8 +101,10 @@ let
       (self: super: {
         custom_rustc = rustc;
 
-        holonix = ((import <nixpkgs> { }).callPackage or self.callPackage)
-          ./pkgs/holonix.nix { inherit holochainVersionId holochainVersion; };
+        holonix =
+          ((import <nixpkgs> { }).callPackage or self.callPackage)
+            ./pkgs/holonix.nix
+            { inherit holochainVersionId holochainVersion; };
         holonixIntrospect = self.callPackage ./pkgs/holonix-introspect.nix {
           inherit (self) holochainBinaries;
         };
@@ -104,7 +122,7 @@ let
         inherit holochainVersionId holochainVersionFinal;
         holochainBinaries =
           holochain-nixpkgs.packages.holochain.mkHolochainAllBinariesWithDeps
-          holochainVersionFinal;
+            holochainVersionFinal;
       })
     ];
   };
@@ -153,7 +171,8 @@ let
   derivation-safe-holonix-shell =
     (removeAttrs holonix-shell [ "override" "overrideDerivation" ]);
 
-in {
+in
+{
   inherit holochain-nixpkgs pkgs
 
     # expose other things

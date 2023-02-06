@@ -1,7 +1,8 @@
 { flavor ? null
 , flavour ? null
 , rustVersion ? null
-, ... } @ args:
+, ...
+} @ args:
 
 let
   flavor' =
@@ -11,12 +12,13 @@ let
   default = import (builtins.toString ./default.nix) (
     if rustVersion != null then {
       inherit rustVersion;
-    } else {}
-   // (builtins.removeAttrs args [
-    "flavor"
-    "flavour"
-    "inNixShell"
-  ]));
+    } else { }
+      // (builtins.removeAttrs args [
+      "flavor"
+      "flavour"
+      "inNixShell"
+    ])
+  );
 in
 
 builtins.getAttr flavor' default.shells
