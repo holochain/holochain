@@ -80,6 +80,19 @@ mod test {
                     (8, false),
                 ],
             ),
+            // block earlier then later with gap
+            (
+                vec![(0, 1, true), (3, 4, true)],
+                vec![
+                    (-1, false),
+                    (0, true),
+                    (1, true),
+                    (2, false),
+                    (3, true),
+                    (4, true),
+                    (5, false),
+                ],
+            ),
             // block later then earlier with gap
             (
                 vec![(3, 4, true), (0, 1, true)],
