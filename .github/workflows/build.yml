@@ -3,26 +3,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  holochain-binaries:
+  build-holochain:
     strategy:
       fail-fast: false
       matrix:
         nixCommand:
           - "nix build .#holochain --no-link"
+          # - "nix build .#holochain-tests-nextest --no-link"
         platform:
-          - arch: macos-x86_64
-            runs-on: [macos-latest]
-          - arch: macos-arm64
-            runs-on: [self-hosted, macOS, ARM64]
-          - arch: linux-x86_64
-            runs-on: [ubuntu-latest]
-        cachixName:
-          - holochain-ci
+          - system: x86_64-darwin
+            runs-on: multi-arch
+          - system: aarch64-darwin
+            runs-on: multi-arch
+          - system: x86_64-linux
+            runs-on: ubuntu-latest
+
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
-      - name: "Displays Xcode current version"
-        run: |
-          sudo xcode-select -p || :
       - name: Checkout code
         uses: actions/checkout@v3
         with:
@@ -30,15 +27,18 @@ jobs:
 
       - name: Install nix
         uses: cachix/install-nix-action@v18
+        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
           install_url: https://releases.nixos.org/nix/nix-2.12.0/install
           extra_nix_config: |
             experimental-features = flakes nix-command
+
       - name: Setup cachix
         uses: cachix/cachix-action@v12
+        continue-on-error: ${{ matrix.platform.runs-on == 'multi-arch' }}
         with:
-          name: "${{ matrix.cachixName }}"
+          name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: "Test comand ${{ matrix.nixCommand }}"
-        run: "${{ matrix.nixCommand }} -L --show-trace"
+        run: ${{ matrix.nixCommand }} -L --show-trace --system ${{ matrix.platform.system }} --extra-experimental-features "ca-derivations impure-derivations"

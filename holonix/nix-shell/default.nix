@@ -1,6 +1,14 @@
-{ stdenv, mkShell, bashInteractive, coreutils, flamegraph, nix
+{ stdenv
+, mkShell
+, bashInteractive
+, coreutils
+, flamegraph
+, nix
 
-, holochain-nixpkgs, holonixComponents, holonixVersions }:
+, holochain-nixpkgs
+, holonixComponents
+, holonixVersions
+}:
 
 let
   base = {
@@ -47,7 +55,8 @@ let
     ];
   };
 
-in (mkShell {
+in
+(mkShell {
   name = "holonix-shell";
 
   inputsFrom = holonixComponents ++
@@ -57,5 +66,5 @@ in (mkShell {
 }).overrideAttrs (attrs: {
   nativeBuildInputs =
     builtins.filter (el: (builtins.match ".*(rust|cargo).*" el.name) == null)
-    attrs.nativeBuildInputs;
+      attrs.nativeBuildInputs;
 })

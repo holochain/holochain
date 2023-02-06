@@ -6,4 +6,5 @@ let
     hn-node-flush
     hn-rust-flush
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

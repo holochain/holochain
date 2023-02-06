@@ -22,4 +22,5 @@ let
     done
     git checkout -f
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

@@ -33,4 +33,5 @@ let
      --owner '${config.release.github.owner}' \
      --repo '${config.release.github.repo}'
   '';
-in { buildInputs = [ script notes-script ]; }
+in
+{ buildInputs = [ script notes-script ]; }

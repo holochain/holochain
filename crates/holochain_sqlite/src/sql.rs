@@ -1,5 +1,4 @@
 pub mod sql_cell {
-    pub(crate) const SCHEMA: &str = include_str!("sql/cell/schema.sql");
     pub const UPDATE_INTEGRATE_DEP_ACTIVITY: &str =
         include_str!("sql/cell/update_dep_activity.sql");
     pub const ACTIVITY_INTEGRATED_UPPER_BOUND: &str =
@@ -56,7 +55,6 @@ pub mod sql_cell {
 }
 
 pub mod sql_conductor {
-    pub(crate) const SCHEMA: &str = include_str!("sql/conductor/schema.sql");
     pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/nonce_already_seen.sql");
     pub const DELETE_EXPIRED_NONCE: &str = include_str!("sql/conductor/delete_expired_nonce.sql");
     pub const FROM_BLOCK_SPAN_WHERE_OVERLAPPING: &str =
@@ -65,7 +63,6 @@ pub mod sql_conductor {
 }
 
 pub(crate) mod sql_p2p_agent_store {
-    pub(crate) const SCHEMA: &str = include_str!("sql/p2p_agent_store/schema.sql");
     pub(crate) const INSERT: &str = include_str!("sql/p2p_agent_store/insert.sql");
     pub(crate) const SELECT_ALL: &str = include_str!("sql/p2p_agent_store/select_all.sql");
     pub(crate) const SELECT: &str = include_str!("sql/p2p_agent_store/select.sql");
@@ -79,11 +76,8 @@ pub(crate) mod sql_p2p_agent_store {
 }
 
 pub(crate) mod sql_p2p_metrics {
-    pub(crate) const SCHEMA: &str = include_str!("sql/p2p_metrics/schema.sql");
     pub(crate) const INSERT: &str = include_str!("sql/p2p_metrics/insert.sql");
     pub(crate) const PRUNE: &str = include_str!("sql/p2p_metrics/prune.sql");
 }
 
-pub(crate) mod sql_wasm {
-    pub(crate) const SCHEMA: &str = include_str!("sql/wasm/schema.sql");
-}
+pub(crate) mod sql_wasm {}

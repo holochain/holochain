@@ -6,4 +6,5 @@ let
     echo "flushing node artifacts"
     find . -wholename "**/node_modules" | xargs -I {} rm -rf  {};
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

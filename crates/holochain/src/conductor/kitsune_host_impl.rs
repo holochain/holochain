@@ -23,7 +23,9 @@ use kitsune_p2p::{
     agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
     event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
-use kitsune_p2p_types::{config::KitsuneP2pTuningParams, KOpData, KOpHash};
+use kitsune_p2p_types::{
+    config::KitsuneP2pTuningParams, dependencies::lair_keystore_api, KOpData, KOpHash,
+};
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
@@ -32,6 +34,8 @@ pub struct KitsuneHostImpl {
     ribosome_store: RwShare<RibosomeStore>,
     tuning_params: KitsuneP2pTuningParams,
     strat: ArqStrat,
+    lair_tag: Option<Arc<str>>,
+    lair_client: Option<lair_keystore_api::LairClient>,
 }
 
 impl KitsuneHostImpl {
@@ -41,12 +45,16 @@ impl KitsuneHostImpl {
         ribosome_store: RwShare<RibosomeStore>,
         tuning_params: KitsuneP2pTuningParams,
         strat: ArqStrat,
+        lair_tag: Option<Arc<str>>,
+        lair_client: Option<lair_keystore_api::LairClient>,
     ) -> Arc<Self> {
         Arc::new(Self {
             spaces,
             ribosome_store,
             tuning_params,
             strat,
+            lair_tag,
+            lair_client,
         })
     }
 }
@@ -244,5 +252,13 @@ impl KitsuneHost for KitsuneHostImpl {
         }
         .boxed()
         .into()
+    }
+
+    fn lair_tag(&self) -> Option<Arc<str>> {
+        self.lair_tag.clone()
+    }
+
+    fn lair_client(&self) -> Option<lair_keystore_api::LairClient> {
+        self.lair_client.clone()
     }
 }

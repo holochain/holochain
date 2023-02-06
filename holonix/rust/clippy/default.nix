@@ -8,4 +8,5 @@ let
     -A clippy::pedantic -A clippy::restriction \
     -D clippy::complexity -D clippy::perf -D clippy::correctness
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

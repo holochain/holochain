@@ -15,4 +15,5 @@ let
 
     hn-rust-manifest-list-unpinned
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

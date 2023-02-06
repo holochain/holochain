@@ -330,15 +330,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Self::new(None, kind, DbSyncLevel::default())
     }
 
-    /// Remove the db and directory
-    #[deprecated = "is this used?"]
-    pub async fn remove(self) -> DatabaseResult<()> {
-        if let Some(parent) = self.0.path.parent() {
-            std::fs::remove_dir_all(parent)?;
-        }
-        Ok(())
-    }
-
     pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
