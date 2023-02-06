@@ -288,12 +288,12 @@ fn pluck_overlapping_block_bounds(
     let params = named_params! {
         ":target_id": target_id.clone(),
         ":target_reason": target_reason.clone(),
-        ":start_ms": block.start(),
-        ":end_ms": block.end(),
+        ":start_us": block.start(),
+        ":end_us": block.end(),
     };
     let maybe_min_maybe_max: (Option<i64>, Option<i64>) = txn.query_row(
         &format!(
-            "SELECT min(start_ms), max(end_ms) {}",
+            "SELECT min(start_us), max(end_us) {}",
             sql_conductor::FROM_BLOCK_SPAN_WHERE_OVERLAPPING
         ),
         params,
@@ -315,8 +315,8 @@ fn insert_block_inner(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()>
     sql_insert!(txn, BlockSpan, {
         "target_id": BlockTargetId::from(block.target().clone()),
         "target_reason": BlockTargetReason::from(block.target().clone()),
-        "start_ms": block.start(),
-        "end_ms": block.end(),
+        "start_us": block.start(),
+        "end_us": block.end(),
     })?;
     Ok(())
 }

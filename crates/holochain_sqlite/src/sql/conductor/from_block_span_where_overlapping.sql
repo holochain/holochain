@@ -19,6 +19,6 @@ WHERE
   target_id = :target_id
   AND target_reason = :target_reason
   AND NOT(
-    :end_ms < start_ms
-    OR end_ms < :start_ms
+    :end_us < start_us
+    OR end_us < :start_us
   )

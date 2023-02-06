@@ -5,5 +5,5 @@ FROM
   BlockSpan
 WHERE
   target_id = :target_id
-  AND start_ms <= :time_ms
-  AND :time_ms <= end_ms
+  AND start_us <= :time_us
+  AND :time_us <= end_us
