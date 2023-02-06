@@ -5,10 +5,10 @@ use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::prelude::DbWrite;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
-use holochain_types::block::Block;
-use holochain_types::block::BlockTargetId;
 use holochain_types::prelude::DbKindConductor;
 use holochain_types::prelude::Timestamp;
+use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTargetId;
 
 pub async fn block(db: &DbWrite<DbKindConductor>, block: Block) -> DatabaseResult<()> {
     db.async_commit(move |txn| mutations::insert_block(txn, block))
@@ -48,11 +48,11 @@ pub async fn is_blocked(
 mod test {
     use crate::test_utils::test_conductor_db;
     use hdk::prelude::Timestamp;
-    use holochain_types::block::Block;
-    use holochain_types::block::BlockTarget;
-    use holochain_types::block::BlockTargetId;
-    use holochain_types::block::CellBlockReason;
     use holochain_types::prelude::CellIdFixturator;
+    use holochain_zome_types::block::Block;
+    use holochain_zome_types::block::BlockTarget;
+    use holochain_zome_types::block::BlockTargetId;
+    use holochain_zome_types::block::CellBlockReason;
     use holochain_zome_types::TimestampFixturator;
 
     // More complex setups.
@@ -113,11 +113,8 @@ mod test {
             let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
             for (start, end, op) in &setup {
-                let block = Block {
-                    target: target.clone(),
-                    start: Timestamp(*start),
-                    end: Timestamp(*end),
-                };
+                let block =
+                    Block::try_new(target.clone(), Timestamp(*start), Timestamp(*end)).unwrap();
                 if *op {
                     super::block(&db, block).await.unwrap()
                 } else {
@@ -156,11 +153,7 @@ mod test {
 
         super::block(
             &db,
-            Block {
-                target: target0.clone(),
-                start: Timestamp::MIN,
-                end: Timestamp::MAX,
-            },
+            Block::try_new(target0.clone(), Timestamp::MIN, Timestamp::MAX).unwrap(),
         )
         .await
         .unwrap();
@@ -171,11 +164,7 @@ mod test {
 
         super::block(
             &db,
-            Block {
-                target: target1.clone(),
-                start: Timestamp::MIN,
-                end: Timestamp::MAX,
-            },
+            Block::try_new(target1.clone(), Timestamp::MIN, Timestamp::MAX).unwrap(),
         )
         .await
         .unwrap();
@@ -187,11 +176,7 @@ mod test {
         // Unblock the app block.
         super::unblock(
             &db,
-            Block {
-                target: target1.clone(),
-                start: Timestamp::MIN,
-                end: Timestamp::MAX,
-            },
+            Block::try_new(target1.clone(), Timestamp::MIN, Timestamp::MAX).unwrap(),
         )
         .await
         .unwrap();
@@ -233,22 +218,20 @@ mod test {
 
             super::block(
                 &db,
-                Block {
-                    target: target.clone(),
-                    start: Timestamp(block_start),
-                    end: Timestamp(block_end),
-                },
+                Block::try_new(target.clone(), Timestamp(block_start), Timestamp(block_end))
+                    .unwrap(),
             )
             .await
             .unwrap();
 
             super::unblock(
                 &db,
-                Block {
-                    target: target.clone(),
-                    start: Timestamp(unblock_start),
-                    end: Timestamp(unblock_end),
-                },
+                Block::try_new(
+                    target.clone(),
+                    Timestamp(unblock_start),
+                    Timestamp(unblock_end),
+                )
+                .unwrap(),
             )
             .await
             .unwrap();
@@ -312,22 +295,20 @@ mod test {
 
             super::block(
                 &db,
-                Block {
-                    target: target.clone(),
-                    start: Timestamp(block_start),
-                    end: Timestamp(block_end),
-                },
+                Block::try_new(target.clone(), Timestamp(block_start), Timestamp(block_end))
+                    .unwrap(),
             )
             .await
             .unwrap();
 
             super::unblock(
                 &db,
-                Block {
-                    target: target.clone(),
-                    start: Timestamp(unblock_start),
-                    end: Timestamp(unblock_end),
-                },
+                Block::try_new(
+                    target.clone(),
+                    Timestamp(unblock_start),
+                    Timestamp(unblock_end),
+                )
+                .unwrap(),
             )
             .await
             .unwrap();
@@ -390,11 +371,7 @@ mod test {
 
             super::block(
                 &db,
-                Block {
-                    target: target.clone(),
-                    start: Timestamp(start),
-                    end: Timestamp(end),
-                },
+                Block::try_new(target.clone(), Timestamp(start), Timestamp(end)).unwrap(),
             )
             .await
             .unwrap();
@@ -446,11 +423,7 @@ mod test {
 
             super::block(
                 &db,
-                Block {
-                    target: target1.clone(),
-                    start: Timestamp(start),
-                    end: Timestamp(end),
-                },
+                Block::try_new(target1.clone(), Timestamp(start), Timestamp(end)).unwrap(),
             )
             .await
             .unwrap();

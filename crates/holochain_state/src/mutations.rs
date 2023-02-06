@@ -12,9 +12,6 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
-use holochain_types::block::Block;
-use holochain_types::block::BlockTargetId;
-use holochain_types::block::BlockTargetReason;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
@@ -22,6 +19,9 @@ use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
 use holochain_types::sql::AsSql;
+use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTargetId;
+use holochain_zome_types::block::BlockTargetReason;
 use holochain_zome_types::entry::EntryHashed;
 use holochain_zome_types::zome_io::Nonce256Bits;
 use holochain_zome_types::*;
@@ -347,13 +347,18 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
     // Reinstate anything outside the unblock bounds.
     if let (Some(min), _) = maybe_min_maybe_max {
         let unblock0 = unblock.clone();
+        let preblock_start = Timestamp(min);
         // Unblocks are inclusive so we reinstate the preblock up to but not
         // including the unblock start.
         match unblock0.start() - core::time::Duration::from_micros(1) {
-            Ok(preblock_end) => insert_block_inner(
-                txn,
-                Block::try_new(unblock0.target().clone(), Timestamp(min), preblock_end)?,
-            )?,
+            Ok(preblock_end) => {
+                if preblock_start <= preblock_end {
+                    insert_block_inner(
+                        txn,
+                        Block::try_new(unblock0.target().clone(), preblock_start, preblock_end)?,
+                    )?
+                }
+            }
             // It's an underflow not overflow but whatever, do nothing as the
             // preblock is unrepresentable.
             Err(TimestampError::Overflow) => {}
@@ -363,13 +368,18 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
     }
 
     if let (_, Some(max)) = maybe_min_maybe_max {
+        let postblock_end = Timestamp(max);
         // Unblocks are inclusive so we reinstate the postblock after but not
         // including the unblock end.
         match unblock.end() + core::time::Duration::from_micros(1) {
-            Ok(postblock_start) => insert_block_inner(
-                txn,
-                Block::try_new(unblock.target().clone(), postblock_start, Timestamp(max))?,
-            )?,
+            Ok(postblock_start) => {
+                if postblock_start <= postblock_end {
+                    insert_block_inner(
+                        txn,
+                        Block::try_new(unblock.target().clone(), postblock_start, postblock_end)?,
+                    )?
+                }
+            }
             // Do nothing if building the postblock is a timestamp overflow.
             // This means the postblock is unrepresentable.
             Err(TimestampError::Overflow) => {}

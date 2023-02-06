@@ -2,7 +2,9 @@ use crate::CellId;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holochain_integrity_types::Timestamp;
+#[cfg(feature = "rusqlite")]
 use rusqlite::types::ToSqlOutput;
+#[cfg(feature = "rusqlite")]
 use rusqlite::ToSql;
 use thiserror::Error;
 
@@ -80,6 +82,7 @@ impl From<BlockTarget> for BlockTargetId {
     }
 }
 
+#[cfg(feature = "rusqlite")]
 impl ToSql for BlockTargetId {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
@@ -97,6 +100,7 @@ pub enum BlockTargetReason {
     IP(IPBlockReason),
 }
 
+#[cfg(feature = "rusqlite")]
 impl ToSql for BlockTargetReason {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
@@ -167,5 +171,30 @@ impl Block {
 
     pub fn end(&self) -> Timestamp {
         self.end
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::BlockTarget;
+    use super::CellBlockReason;
+    use crate::CellIdFixturator;
+    use holochain_integrity_types::Timestamp;
+
+    #[test]
+    fn block_test_new() {
+        let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+
+        // valids.
+        for (start, end) in vec![(0, 0), (-1, 0), (0, 1), (i64::MIN, i64::MAX)] {
+            super::Block::try_new(target.clone(), Timestamp(start), Timestamp(end)).unwrap();
+        }
+
+        // invalids.
+        for (start, end) in vec![(0, -1), (1, 0), (i64::MAX, i64::MIN)] {
+            assert!(
+                super::Block::try_new(target.clone(), Timestamp(start), Timestamp(end)).is_err()
+            );
+        }
     }
 }

@@ -17,8 +17,6 @@ pub mod action;
 pub mod activity;
 pub mod app;
 pub mod autonomic;
-#[allow(missing_docs)]
-pub mod block;
 pub mod chain;
 pub mod chc;
 pub mod combinators;

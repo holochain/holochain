@@ -731,7 +731,7 @@ mod dna_impls {
 mod network_impls {
     use holochain_conductor_api::NetworkInfo;
     use holochain_p2p::HolochainP2pSender;
-    use holochain_types::block::Block;
+    use holochain_zome_types::block::Block;
 
     use super::*;
 
