@@ -36,7 +36,7 @@
             mkdir .writable_home
             export HOME=$PWD/.writeable_home
 
-            nix develop ${self'.devShells.holonixRepo}
+            nix develop ${self'.devShells.holonix}
               --override-inputs holochain ${self} \
               --extra-experimental-features "flakes nix-command" \
               --command ${testScript}

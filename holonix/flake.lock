@@ -1,0 +1,79 @@
+{
+  "nodes": {
+    "holochain": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1675681355,
+        "narHash": "sha256-szuNTgKjtXxH32jlrAGozmqkeuf5ix7P4/LafFMH6QM=",
+        "owner": "holochain",
+        "repo": "holochain",
+        "rev": "99b6993ffbc224a68f089f7f10a77539c63af8ba",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "repo": "holochain",
+        "type": "github"
+      }
+    },
+    "lair": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1675710493,
+        "narHash": "sha256-py/M9biK+14XXxdRnVmBDk44VhbNvbTEJBwca+HHtj0=",
+        "owner": "holochain",
+        "repo": "lair",
+        "rev": "6c71614cad5664917d1271bf9ac0b5b84db25520",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "repo": "lair",
+        "type": "github"
+      }
+    },
+    "launcher": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1675698172,
+        "narHash": "sha256-5Qs9ZU1+QwXUkOFWPuanjbQQy3vHTBUWFvvjjeSxZwA=",
+        "owner": "holochain",
+        "repo": "launcher",
+        "rev": "6395b87cd2c9cb201021555e3c46698aba569281",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "repo": "launcher",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "holochain": "holochain",
+        "lair": "lair",
+        "launcher": "launcher",
+        "scaffolding": "scaffolding"
+      }
+    },
+    "scaffolding": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1675700335,
+        "narHash": "sha256-CVK1NNYGrmrPqyocS3fw68ehD2xg9pZ7EtOLHhQIi+A=",
+        "owner": "holochain",
+        "repo": "scaffolding",
+        "rev": "4bc832aa7fbaab71583b03815b87a8ac77f7bde3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "ref": "pr_holonix_on_flakes_compat",
+        "repo": "scaffolding",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

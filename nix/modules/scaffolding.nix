@@ -13,7 +13,7 @@
       commonArgs = {
 
         pname = "scaffolding";
-        src = inputs.scaffolding;
+        src = inputs.holonix.inputs.scaffolding;
 
         CARGO_PROFILE = "release";
 
