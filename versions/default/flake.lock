@@ -1,0 +1,78 @@
+{
+  "nodes": {
+    "holochain": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1675681355,
+        "narHash": "sha256-szuNTgKjtXxH32jlrAGozmqkeuf5ix7P4/LafFMH6QM=",
+        "owner": "holochain",
+        "repo": "holochain",
+        "rev": "99b6993ffbc224a68f089f7f10a77539c63af8ba",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "repo": "holochain",
+        "type": "github"
+      }
+    },
+    "lair": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1675714999,
+        "narHash": "sha256-pPa2VA2nY52HHo8TFv81HjOuaS/jeEUgxRDPG4FWf6w=",
+        "owner": "holochain",
+        "repo": "lair",
+        "rev": "a4fa49a2b8dcebe5e784ed44d2c22d6044a8abdc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "repo": "lair",
+        "type": "github"
+      }
+    },
+    "launcher": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1675698172,
+        "narHash": "sha256-5Qs9ZU1+QwXUkOFWPuanjbQQy3vHTBUWFvvjjeSxZwA=",
+        "owner": "holochain",
+        "repo": "launcher",
+        "rev": "6395b87cd2c9cb201021555e3c46698aba569281",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "repo": "launcher",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "holochain": "holochain",
+        "lair": "lair",
+        "launcher": "launcher",
+        "scaffolding": "scaffolding"
+      }
+    },
+    "scaffolding": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1675708027,
+        "narHash": "sha256-CVK1NNYGrmrPqyocS3fw68ehD2xg9pZ7EtOLHhQIi+A=",
+        "owner": "holochain",
+        "repo": "scaffolding",
+        "rev": "8273d604e3e09a3a8f65c902d84d86fefd72cdce",
+        "type": "github"
+      },
+      "original": {
+        "owner": "holochain",
+        "repo": "scaffolding",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

@@ -17,6 +17,7 @@ jobs:
               - holochain-tests-wasm
               - holochain-tests-nextest
               - holochain-tests-nextest-tx5
+              - holonix-tests-integration
             verb: build
         platform:
           - system: x86_64-darwin
@@ -77,7 +78,9 @@ jobs:
           set -xe
 
           # first build all derivations. this could be enough for test derivations.
-          nix build -L --show-trace .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
+          nix build -L --show-trace \
+            --override-input versions/holochain . \
+            .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
 
           # if there's something to run we generate separate commands
           if [[ ${{ matrix.cmd.verb }} == "run" ]]; then

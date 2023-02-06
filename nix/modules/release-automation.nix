@@ -125,13 +125,13 @@
           "release-automation-tests-repo"
           {
             __noChroot = pkgs.stdenv.isLinux;
-            nativeBuildInputs = self'.packages.holochainRepo.nativeBuildInputs ++ [
+            nativeBuildInputs = self'.packages.holochain.nativeBuildInputs ++ [
               package
 
               pkgs.coreutils
               pkgs.gitFull
             ];
-            buildInputs = self'.packages.holochainRepo.buildInputs ++ [
+            buildInputs = self'.packages.holochain.buildInputs ++ [
               pkgs.cacert
             ];
           } ''

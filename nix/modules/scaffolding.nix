@@ -13,7 +13,7 @@
       commonArgs = {
 
         pname = "scaffolding";
-        src = inputs.scaffolding;
+        src = inputs.versions.inputs.scaffolding;
 
         CARGO_PROFILE = "release";
 

@@ -13,7 +13,7 @@
       commonArgs = {
 
         pname = "launcher";
-        src = inputs.launcher;
+        src = inputs.versions.inputs.launcher;
 
         CARGO_PROFILE = "release";
 

@@ -31,28 +31,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # lair
-    lair = {
-      url = "github:holochain/lair";
-      flake = false;
+    versions = {
+      url = "github:holochain/holochain/pr_holonix_on_flakes?dir=versions/default";
     };
 
-    # holochain_scaffolding_cli
-    scaffolding = {
-      url = "github:holochain/scaffolding/holochain_scaffolding_cli-v0.1.4";
-      flake = false;
-    };
-
-    launcher = {
-      url = "github:holochain/launcher/holochain_cli_launch-0.0.9";
-      flake = false;
-    };
-
-    # holochain
-    holochain = {
-      url = "github:holochain/holochain/holochain-0.1.0";
-      flake = false;
-    };
+    holochain.follows = "versions/holochain";
+    lair.follows = "versions/lair";
+    launcher.follows = "versions/launcher";
+    scaffolding.follows = "versions/scaffolding";
 
     cargo-chef = {
       url = "github:LukeMathWalker/cargo-chef/main";

@@ -15,8 +15,3 @@ teardown() {
   echo $result
   [[ "$result" == "holochain_cli_launch"* ]]
 }
-
-# @test "hApp launch hc-launch" {
-#   # TODO
-#   :
-# }
