@@ -283,13 +283,13 @@ fn pluck_overlapping_block_bounds(
     block: Block,
 ) -> DatabaseResult<(Option<i64>, Option<i64>)> {
     // Find existing min/max blocks that overlap the new block.
-    let target_id = BlockTargetId::from(block.target.clone());
-    let target_reason = BlockTargetReason::from(block.target.clone());
+    let target_id = BlockTargetId::from(block.target().clone());
+    let target_reason = BlockTargetReason::from(block.target().clone());
     let params = named_params! {
         ":target_id": target_id.clone(),
         ":target_reason": target_reason.clone(),
-        ":start_ms": block.start,
-        ":end_ms": block.end,
+        ":start_ms": block.start(),
+        ":end_ms": block.end(),
     };
     let maybe_min_maybe_max: (Option<i64>, Option<i64>) = txn.query_row(
         &format!(
@@ -312,14 +312,12 @@ fn pluck_overlapping_block_bounds(
 }
 
 fn insert_block_inner(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
-    if block.start <= block.end {
-        sql_insert!(txn, BlockSpan, {
-            "target_id": BlockTargetId::from(block.target.clone()),
-            "target_reason": BlockTargetReason::from(block.target),
-            "start_ms": block.start,
-            "end_ms": block.end,
-        })?;
-    }
+    sql_insert!(txn, BlockSpan, {
+        "target_id": BlockTargetId::from(block.target().clone()),
+        "target_reason": BlockTargetReason::from(block.target().clone()),
+        "start_ms": block.start(),
+        "end_ms": block.end(),
+    })?;
     Ok(())
 }
 
@@ -329,17 +327,17 @@ pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
     // Build one new block from the extremums.
     insert_block_inner(
         txn,
-        Block {
-            target: block.target,
-            start: match maybe_min_maybe_max.0 {
-                Some(min) => std::cmp::min(Timestamp(min), block.start),
-                None => block.start,
+        Block::try_new(
+            block.target().clone(),
+            match maybe_min_maybe_max.0 {
+                Some(min) => std::cmp::min(Timestamp(min), block.start()),
+                None => block.start(),
             },
-            end: match maybe_min_maybe_max.1 {
-                Some(max) => std::cmp::max(Timestamp(max), block.end),
-                None => block.end,
+            match maybe_min_maybe_max.1 {
+                Some(max) => std::cmp::max(Timestamp(max), block.end()),
+                None => block.end(),
             },
-        },
+        )?,
     )
 }
 
@@ -351,14 +349,10 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
         let unblock0 = unblock.clone();
         // Unblocks are inclusive so we reinstate the preblock up to but not
         // including the unblock start.
-        match unblock0.start - core::time::Duration::from_micros(1) {
+        match unblock0.start() - core::time::Duration::from_micros(1) {
             Ok(preblock_end) => insert_block_inner(
                 txn,
-                Block {
-                    target: unblock0.target,
-                    start: Timestamp(min),
-                    end: preblock_end,
-                },
+                Block::try_new(unblock0.target().clone(), Timestamp(min), preblock_end)?,
             )?,
             // It's an underflow not overflow but whatever, do nothing as the
             // preblock is unrepresentable.
@@ -371,14 +365,10 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
     if let (_, Some(max)) = maybe_min_maybe_max {
         // Unblocks are inclusive so we reinstate the postblock after but not
         // including the unblock end.
-        match unblock.end + core::time::Duration::from_micros(1) {
+        match unblock.end() + core::time::Duration::from_micros(1) {
             Ok(postblock_start) => insert_block_inner(
                 txn,
-                Block {
-                    target: unblock.target,
-                    start: postblock_start,
-                    end: Timestamp(max),
-                },
+                Block::try_new(unblock.target().clone(), postblock_start, Timestamp(max))?,
             )?,
             // Do nothing if building the postblock is a timestamp overflow.
             // This means the postblock is unrepresentable.

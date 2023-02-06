@@ -105,12 +105,46 @@ impl From<BlockTarget> for BlockTargetReason {
 
 /// Represents a block.
 /// Also can represent an unblock.
+/// NOT serializable and NOT pub fields by design. `try_new` MUST be the only
+/// entrypoint to build a `Block` as this enforces that the start/end times are
+/// valid according to invariants the SQL queries rely on to avoid corrupting the
+/// database.
 #[derive(Clone, Debug)]
 pub struct Block {
     /// Target of the block.
-    pub target: BlockTarget,
+    target: BlockTarget,
     /// Start time of the block. None = forever in the past.
-    pub start: Timestamp,
+    start: Timestamp,
     /// End time of the block. None = forever in the future.
-    pub end: Timestamp,
+    end: Timestamp,
+}
+
+pub enum BlockError {
+    InvalidTimes(Timestamp, Timestamp),
+}
+
+impl Block {
+    pub fn try_new(
+        target: BlockTarget,
+        start: Timestamp,
+        end: Timestamp,
+    ) -> Result<Self, BlockError> {
+        if start > end {
+            Err(BlockError::InvalidTimes(start, end))
+        } else {
+            Ok(Self { target, start, end })
+        }
+    }
+
+    pub fn target(&self) -> &BlockTarget {
+        &self.target
+    }
+
+    pub fn start(&self) -> Timestamp {
+        self.start
+    }
+
+    pub fn end(&self) -> Timestamp {
+        self.end
+    }
 }
