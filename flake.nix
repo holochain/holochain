@@ -31,28 +31,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # lair
-    lair = {
-      url = "github:holochain/lair";
-      flake = false;
-    };
-
-    # holochain_scaffolding_cli
-    scaffolding = {
-      url = "github:holochain/scaffolding/holochain_scaffolding_cli-v0.1.4";
-      flake = false;
-    };
-
-    launcher = {
-      url = "github:holochain/launcher/holochain_cli_launch-0.0.9";
-      flake = false;
-    };
-
-    # holochain
-    holochain = {
-      url = "github:holochain/holochain/holochain-0.1.3";
-      # handling as flake leads to duplicate inputs
-      flake = false;
+    holonix = {
+      url = "path:./holonix";
     };
 
     cargo-chef = {

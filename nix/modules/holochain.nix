@@ -17,7 +17,7 @@
         RUST_SODIUM_SHARED = "1";
 
         pname = "holochain";
-        src = flake.config.srcCleanedRepo;
+        src = flake.config.srcCleanedHolochain;
 
         version = "workspace";
 
@@ -43,20 +43,14 @@
       };
 
       # derivation building all dependencies
-      holochainDepsRepo = craneLib.buildDepsOnly (commonArgs // rec {
-        src = flake.config.srcCleanedRepo;
-        doCheck = false;
-      });
-
-      # derivation with the main crates
-      holochainRepo = craneLib.buildPackage (commonArgs // {
-        src = flake.config.srcCleanedRepo;
-        cargoArtifacts = holochainDepsRepo;
+      holochainDeps = craneLib.buildDepsOnly (commonArgs // rec {
+        src = flake.config.srcCleanedHolochain;
         doCheck = false;
       });
 
       # derivation with the main crates
       holochain = craneLib.buildPackage (commonArgs // {
+        cargoArtifacts = holochainDeps;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
       });
@@ -124,7 +118,7 @@
       });
 
       holochain-tests-clippy = craneLib.cargoClippy (commonArgs // {
-        cargoArtifacts = holochainDepsRepo;
+        cargoArtifacts = holochainDeps;
         doCheck = false;
 
         cargoClippyExtraArgs = ''
@@ -144,7 +138,7 @@
       });
 
       holochain-tests-wasm = craneLib.cargoTest (commonArgs // {
-        cargoArtifacts = holochainDepsRepo;
+        cargoArtifacts = holochainDeps;
         cargoExtraArgs =
           "--lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features";
 
@@ -157,10 +151,14 @@
         '';
       });
 
+      holochain-tests-doc = craneLib.cargoDoc (commonArgs // {
+        cargoArtifacts = holochainDeps;
+      });
+
     in
     {
       packages = {
-        inherit holochainRepo holochain holochain-tests-nextest;
+        inherit holochain holochain-tests-nextest holochain-tests-nextest-tx5 holochain-tests-doc;
 
         inherit holochain-tests-wasm holochain-tests-fmt holochain-tests-clippy;
       };

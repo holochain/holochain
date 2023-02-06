@@ -15,7 +15,7 @@ in
   options.srcCleanedHolochain = lib.mkOption { type = lib.types.raw; };
   config.srcCleanedHolochain = inputs.nix-filter.lib {
     include = includeCommon;
-    root = inputs.holochain;
+    root = inputs.holonix.inputs.holochain;
   };
 
   options.srcCleanedReleaseAutomationRepo = lib.mkOption { type = lib.types.raw; };

@@ -13,7 +13,7 @@
       commonArgs = {
 
         pname = "lair";
-        src = inputs.lair;
+        src = inputs.holonix.inputs.lair;
 
         CARGO_PROFILE = "release";
 

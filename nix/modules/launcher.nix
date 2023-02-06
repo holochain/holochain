@@ -13,7 +13,7 @@
       commonArgs = {
 
         pname = "launcher";
-        src = inputs.launcher;
+        src = inputs.holonix.inputs.launcher;
 
         CARGO_PROFILE = "release";
 

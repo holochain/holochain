@@ -13,7 +13,11 @@ jobs:
       fail-fast: false
       matrix:
         cmd:
-          - pkgs: [holochain-tests-wasm, holochain-tests-nextest]
+          - pkgs:
+              - holochain-tests-wasm
+              - holochain-tests-nextest
+              - holochain-tests-nextest-tx5
+              - holonix-tests-integration
             verb: build
         platform:
           - system: x86_64-darwin
