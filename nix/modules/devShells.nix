@@ -1,14 +1,26 @@
 { self, lib, ... }: {
   perSystem = { config, self', inputs', pkgs, ... }: {
     devShells = {
-
       default = self'.devShells.holonix;
 
       holonix = pkgs.mkShell {
+        inputsFrom = [ self'.devShells.holonixBase ];
+
+        packages = with self'.packages; [ holochainRepo lair launcher scaffolding ];
+      };
+
+      holonixBase = pkgs.mkShell {
         inputsFrom = [ self'.devShells.rustDev ];
 
-        packages = with self'.packages; [ holochain lair launcher scaffolding ];
+        packages = with self'.packages; [ lair launcher scaffolding ];
       };
+
+      holonixRepo = pkgs.mkShell {
+        inputsFrom = [ self'.devShells.holonixBase ];
+
+        packages = with self'.packages; [ holochainRepo lair launcher scaffolding ];
+      };
+
 
       release = pkgs.mkShell {
         inputsFrom = [ self'.devShells.rustDev ];
