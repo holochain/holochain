@@ -23,4 +23,5 @@ let
      sed -i 's/^'"''${dep}"' = { version = "=[0-9]\+.[0-9]\+.[0-9]\+\(-alpha[0-9]\+\)\?"/'"''${dep}"' = { version = "=${config.release.version.current}"/g' {}
     done
   '';
-in { buildInputs = [ bump-version bump-deps ]; }
+in
+{ buildInputs = [ bump-version bump-deps ]; }

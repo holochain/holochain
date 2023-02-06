@@ -31,4 +31,5 @@ let
       exit 1;
     fi
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

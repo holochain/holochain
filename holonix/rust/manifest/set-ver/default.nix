@@ -7,4 +7,5 @@ let
     hn-flush
     find . -name "Cargo.toml" | xargs -I {} cargo upgrade "$1" --all --manifest-path {}
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

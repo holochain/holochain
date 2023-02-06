@@ -1,7 +1,19 @@
-{ config, stdenv, mkShell, rust, rustc ? rust.packages.stable.rust.rustc
+{ config
+, stdenv
+, mkShell
+, rust
+, rustc ? rust.packages.stable.rust.rustc
 
-, callPackage, kcov, binutils, gcc, gnumake, openssl, pkgconfig, cargo-make
-, curl }:
+, callPackage
+, kcov
+, binutils
+, gcc
+, gnumake
+, openssl
+, pkgconfig
+, cargo-make
+, curl
+}:
 let rustConfig = import ./config.nix;
 
 in mkShell {

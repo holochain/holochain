@@ -6,4 +6,5 @@ let
     echo "checking rust formatting"
     cargo fmt -- --check
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

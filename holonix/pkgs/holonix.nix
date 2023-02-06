@@ -20,7 +20,8 @@ let
         --realise "''${ref}"
   '';
 
-in pkgs.writeShellScriptBin "holonix" ''
+in
+pkgs.writeShellScriptBin "holonix" ''
   export GC_ROOT_DIR="''${HOME:-/tmp}/.holonix"
   export SHELL_DRV="''${GC_ROOT_DIR}/shellDrv"
   export LOG="''${GC_ROOT_DIR}/log"

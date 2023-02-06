@@ -47,4 +47,5 @@ let
     printf '%s\n\n%s\n' "$prepend" "$current" > ${changelog-path}
     echo '${template}' > '${unreleased-path}'
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }

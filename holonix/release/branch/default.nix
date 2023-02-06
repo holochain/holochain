@@ -28,4 +28,5 @@ let
     fi;
     echo
   '';
-in { buildInputs = [ script ]; }
+in
+{ buildInputs = [ script ]; }
