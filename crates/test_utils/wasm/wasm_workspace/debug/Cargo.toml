@@ -17,6 +17,7 @@ crate-type = ["cdylib", "rlib"]
 serde = "1.0"
 tracing = "0.1"
 tracing-core = "0.1"
+hdi = { path = "../../../../hdi", features = ["trace"] }
 hdk = { path = "../../../../hdk" }
 
 [features]

@@ -1,4 +1,5 @@
 use crate::conductor::ConductorHandle;
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
@@ -6,12 +7,14 @@ use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::new_invocation;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
+use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
+use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
@@ -60,6 +63,96 @@ async fn app_validation_workflow_test() {
         expected_count,
     )
     .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_private_entries_are_never_passed_to_validation() {
+    observability::test_run().ok();
+
+    #[hdk_entry_helper]
+    pub struct Post(String);
+
+    // #[hdk_entry_defs(skip_hdk_extern = true)]
+    // #[unit_enum(UnitEntryTypes)]
+    #[derive(Serialize, Deserialize)]
+    #[serde(tag = "type")]
+    #[hdk_entry_defs(skip_hdk_extern = true)]
+    #[unit_enum(UnitEntryTypes)]
+    pub enum EntryTypes {
+        #[entry_def(visibility = "private")]
+        Post(Post),
+        // Pub(Post),
+    }
+
+    let validation_successes = std::sync::Arc::new(std::sync::atomic::AtomicU8::new(0));
+    let validation_successes_2 = validation_successes.clone();
+
+    let zomeset = InlineZomeSet::new_unique(
+        [("integrity", vec![EntryDef::from_id("unit")], 0)],
+        ["coordinator"],
+    )
+    .function("integrity", "validate", move |_h, op: Op| {
+        op.to_type::<EntryTypes, ()>().expect("op.to_type failed");
+        validation_successes_2.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(ValidateResult::Valid)
+    })
+    .function("coordinator", "create", |h, ()| {
+        let claim = CapClaimEntry {
+            tag: "tag".into(),
+            grantor: ::fixt::fixt!(AgentPubKey),
+            secret: CapSecret::from([1; 64]),
+        };
+        let input = EntryTypes::Post(Post("whatever".into()));
+        // let ScopedEntryDefIndex {
+        //     zome_index,
+        //     zome_type: entry_def_index,
+        // } = (&input).try_into().unwrap();
+        let location = EntryDefLocation::app(0, 0);
+        let visibility = EntryVisibility::from(&input);
+        assert_eq!(visibility, EntryVisibility::Private);
+        let entry = input.try_into().unwrap();
+        h.create(CreateInput::new(
+            location.clone(),
+            visibility,
+            entry,
+            ChainTopOrdering::default(),
+        ))?;
+        h.create(CreateInput::new(
+            location,
+            visibility,
+            Entry::CapClaim(claim),
+            ChainTopOrdering::default(),
+        ))?;
+
+        Ok(())
+
+        // Ok(h.create_entry()?)
+        // Ok(h.create(CreateInput::new(
+        //     InlineZomeSet::get_entry_location(&h, EntryDefIndex(0)),
+        //     EntryVisibility::Private,
+        //     Entry::app_fancy(Post("whatever".into())).unwrap(),
+        //     ChainTopOrdering::default(),
+        // ))?)
+    });
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomeset).await;
+
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let apps = conductors
+        .setup_app(&"test_app", &[dna_file.clone()])
+        .await
+        .unwrap();
+    let ((alice,), (_bob,)) = apps.into_tuples();
+
+    conductors.exchange_peer_info().await;
+
+    let _hash: ActionHash = conductors[0]
+        .call(&alice.zome("coordinator"), "create", ())
+        .await;
+
+    assert_eq!(
+        validation_successes.load(std::sync::atomic::Ordering::Relaxed),
+        3
+    );
 }
 
 const SELECT: &'static str = "SELECT count(hash) FROM DhtOp WHERE";

@@ -586,7 +586,7 @@ where
     WasmError: From<<ET as EntryTypesHelper>::Error>,
 {
     match entry {
-        RecordEntryRef::Present(entry) => match entry_type {
+        RecordEntryRef::Present(entry) => match dbg!(entry_type) {
             EntryType::App(AppEntryDef {
                 zome_index,
                 entry_index: entry_def_index,
@@ -616,10 +616,18 @@ where
                 }
                 Ok(InScopeEntry::Agent(entry_hash.clone().into()))
             }
-            _ => Err(wasm_error!(WasmErrorInner::Guest(
-                "Entry type is a capability and should be private but there is an entry present"
+            EntryType::App(AppEntryDef {
+                visibility: EntryVisibility::Private,
+                ..
+            })
+            | EntryType::CapGrant
+            | EntryType::CapClaim => {
+                dbg!("the spot");
+                Err(wasm_error!(WasmErrorInner::Guest(
+                "EntryType is CapGrant or CapClaim, but there is an entry present where there shouldn't be."
                     .to_string()
-            ))),
+            )))
+            }
         },
         RecordEntryRef::Hidden => match entry_type {
             EntryType::App(AppEntryDef {
