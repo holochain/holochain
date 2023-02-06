@@ -286,8 +286,8 @@ fn pluck_overlapping_block_bounds(
     let target_id = BlockTargetId::from(block.target().clone());
     let target_reason = BlockTargetReason::from(block.target().clone());
     let params = named_params! {
-        ":target_id": target_id.clone(),
-        ":target_reason": target_reason.clone(),
+        ":target_id": target_id,
+        ":target_reason": target_reason,
         ":start_us": block.start(),
         ":end_us": block.end(),
     };

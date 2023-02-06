@@ -40,7 +40,7 @@ pub async fn is_blocked(
     target_id: BlockTargetId,
     timestamp: Timestamp,
 ) -> StateQueryResult<bool> {
-    db.async_reader(move |txn| Ok(query_is_blocked(&txn, target_id, timestamp)?))
+    db.async_reader(move |txn| query_is_blocked(&txn, target_id, timestamp))
         .await
 }
 
