@@ -31,6 +31,7 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
 pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| Schema {
     migrations: vec![
         M::initial(include_str!("sql/conductor/schema/0.sql")),
+        // Everything in schema 0 has IF NOT EXISTS on it so we can rerun it.
         M {
             forward: "".into(),
             _schema: include_str!("sql/conductor/schema/0.sql").into(),
