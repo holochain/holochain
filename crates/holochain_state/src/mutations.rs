@@ -292,18 +292,26 @@ fn pluck_overlapping_block_bounds(
         ":end_ms": block.end,
     };
     let maybe_min_maybe_max: (Option<i64>, Option<i64>) = txn.query_row(
-        sql_conductor::OVERLAPPING_BLOCK_SPAN_BOUNDS,
+        &format!(
+            "SELECT min(start_ms), max(end_ms) {}",
+            sql_conductor::FROM_BLOCK_SPAN_WHERE_OVERLAPPING
+        ),
         params,
         |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
 
     // Flush all overlapping blocks.
-    txn.execute(sql_conductor::OVERLAPPING_BLOCK_SPAN_DELETE, params)?;
+    txn.execute(
+        &format!(
+            "DELETE {}",
+            sql_conductor::FROM_BLOCK_SPAN_WHERE_OVERLAPPING
+        ),
+        params,
+    )?;
     Ok(maybe_min_maybe_max)
 }
 
 fn insert_block_inner(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
-    dbg!(&block);
     if block.start <= block.end {
         sql_insert!(txn, BlockSpan, {
             "target_id": BlockTargetId::from(block.target.clone()),
@@ -337,7 +345,6 @@ pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
 
 pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<()> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, unblock.clone())?;
-    dbg!(&maybe_min_maybe_max);
 
     // Reinstate anything outside the unblock bounds.
     if let (Some(min), _) = maybe_min_maybe_max {
@@ -355,11 +362,10 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
             )?,
             // It's an underflow not overflow but whatever, do nothing as the
             // preblock is unrepresentable.
-            Err(TimestampError::Overflow) => { },
+            Err(TimestampError::Overflow) => {}
             // Probably not possible but if it is, handle gracefully.
             Err(e) => return Err(e.into()),
-        }
-        ;
+        };
     }
 
     if let (_, Some(max)) = maybe_min_maybe_max {
@@ -376,7 +382,7 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
             )?,
             // Do nothing if building the postblock is a timestamp overflow.
             // This means the postblock is unrepresentable.
-            Err(TimestampError::Overflow) => { },
+            Err(TimestampError::Overflow) => {}
             // Probably not possible but if it is, handle gracefully.
             Err(e) => return Err(e.into()),
         }

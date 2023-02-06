@@ -59,10 +59,8 @@ pub mod sql_conductor {
     pub(crate) const SCHEMA: &str = include_str!("sql/conductor/schema.sql");
     pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/nonce_already_seen.sql");
     pub const DELETE_EXPIRED_NONCE: &str = include_str!("sql/conductor/delete_expired_nonce.sql");
-    pub const OVERLAPPING_BLOCK_SPAN_BOUNDS: &str =
-        include_str!("sql/conductor/overlapping_block_span_bounds.sql");
-    pub const OVERLAPPING_BLOCK_SPAN_DELETE: &str =
-        include_str!("sql/conductor/overlapping_block_span_delete.sql");
+    pub const FROM_BLOCK_SPAN_WHERE_OVERLAPPING: &str =
+        include_str!("sql/conductor/from_block_span_where_overlapping.sql");
     pub const IS_BLOCKED: &str = include_str!("sql/conductor/is_blocked.sql");
 }
 
