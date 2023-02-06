@@ -106,6 +106,24 @@ mod test {
                     (5, false),
                 ],
             ),
+            // Redundant blocks and singular unblock
+            (
+                vec![
+                    (0, 5, true),
+                    (1, 5, true),
+                    (0, 4, true),
+                    (3, 3, true),
+                    (2, 3, false),
+                ],
+                vec![
+                    (0, true),
+                    (1, true),
+                    (2, false),
+                    (3, false),
+                    (4, true),
+                    (5, true),
+                ],
+            ),
         ] {
             let db = test_conductor_db();
 
