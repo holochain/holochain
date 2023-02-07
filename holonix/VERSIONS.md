@@ -6,7 +6,7 @@ The following binaries are the same version regardless of the _holochainVersionI
 - rustc: rustc 1.66.1 (90743e729 2023-01-10)
 - cargo fmt: rustfmt 1.5.1-stable (90743e7 2023-01-10)
 - cargo clippy: clippy 0.1.66 (90743e7 2023-01-10)
-- perf-5.15.91: mirror://kernel/linux/kernel/v5.x/linux-5.15.91.tar.xz
+- perf-5.15.92: mirror://kernel/linux/kernel/v5.x/linux-5.15.92.tar.xz
 
 ## Available _holochainVersionId_ options
 Each of the following headings represent one pre-built _holochainVersionId_ and their corresponding holochain version information.
