@@ -66,7 +66,7 @@ jobs:
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-          pushFilter: "^tmp-.*-[0-9]"
+          pushFilter: "tmp-.*-"
       - name: Restart nix-daemon
         if: ${{ matrix.platform.runs-on == 'ubuntu-latest' }}
         run: |
