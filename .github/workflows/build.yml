@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build-holochain:
+  "test":
     strategy:
       fail-fast: false
       matrix:
@@ -18,35 +18,36 @@ jobs:
               - holochain-tests-nextest
               - holochain-tests-nextest-tx5
               - holonix-tests-integration
-            verb: build
+            # verb: build
         platform:
           - system: x86_64-darwin
-            runs-on: multi-arch
+            # runs-on: multi-arch
           - system: aarch64-darwin
-            runs-on: multi-arch
+            # runs-on: multi-arch
           - system: x86_64-linux
-            runs-on: multi-arch
+            # runs-on: multi-arch
 
         include:
           - cmd:
               pkgs:
                 - release-automation-tests
                 - release-automation-tests-repo
-              verb: build
+              # verb: build
             platform:
               system: x86_64-linux
-              runs-on: multi-arch
+              # runs-on: multi-arch
           - cmd:
               pkgs:
                 - holochain-tests-clippy
                 - holochain-tests-fmt
                 - holochain-tests-doc
-              verb: build
+              # verb: build
             platform:
               system: x86_64-linux
-              runs-on: ubuntu-latest
+              # runs-on: ubuntu-latest
 
-    runs-on: ${{ matrix.platform.runs-on }}
+    # runs-on: ${{ matrix.platform.runs-on }}
+    runs-on: [self-hosted, multi-arch]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -65,11 +66,17 @@ jobs:
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+          pushFilter: "^tmp-.*-[0-9]"
       - name: Restart nix-daemon
         if: ${{ matrix.platform.runs-on == 'ubuntu-latest' }}
         run: |
           sudo bash -c 'echo extra-experimental-features = ca-derivations impure-derivations >> /etc/nix/nix.conf'
           sudo systemctl stop nix-daemon
+
+      - name: Print matrix
+        env:
+          MATRIX: ${{ toJSON(matrix) }}
+        run: echo ${MATRIX}
 
       - name: "Test comand ${{ matrix.nixCommand }}"
         env:
@@ -83,7 +90,7 @@ jobs:
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
 
           # if there's something to run we generate separate commands
-          if [[ ${{ matrix.cmd.verb }} == "run" ]]; then
-            export basecmd="nix run -L --show-trace .#packages.${system}."
-            ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
-          fi
+          # if [[ ${{ matrix.cmd.verb }} == "run" ]]; then
+          #   export basecmd="nix run -L --show-trace .#packages.${system}."
+          #   ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
+          # fi
