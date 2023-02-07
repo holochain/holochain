@@ -37,6 +37,7 @@
               CoreServices
               Security
               WebKit
+              Carbon
             ])
           );
 
