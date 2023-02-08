@@ -1,6 +1,6 @@
 {
   description =
-    "The new, performant, and simplified version of Holochain on Rust (sometimes called Holochain RSM for Refactored State Model) ";
+    "Holochain is an open-source framework to develop peer-to-peer applications with high levels of security, reliability, and performance.";
 
   inputs = {
     # nix packages pointing to the github repo
