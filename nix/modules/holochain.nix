@@ -55,11 +55,13 @@
       });
 
       # derivation with the main crates
-      holochain = craneLib.buildPackage (commonArgs // {
+      holochain = (craneLib.buildPackage (commonArgs // {
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
-      });
+      })) // {
+        src.rev = inputs.holochain.rev;
+      };
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // rec {
         pname = "holochain-nextest";

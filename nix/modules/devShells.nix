@@ -1,53 +1,69 @@
 { self, lib, ... }: {
-  perSystem = { config, self', inputs', pkgs, ... }: {
-    devShells = {
-      default = self'.devShells.holonix;
-
-      holonix = pkgs.mkShell {
-        inputsFrom = [ self'.devShells.rustDev ];
-
-        packages = with self'.packages; [ holochain lair-keystore hc-launch hc-scaffold ];
+  perSystem = { config, self', inputs', pkgs, ... }:
+    let
+      holonixPackages = with self'.packages; [ holochain lair-keystore hc-launch hc-scaffold ];
+      versionsFileText = builtins.concatStringsSep "\n"
+        (
+          builtins.map
+            (package: ''
+              ${package.pname}: ${package.src.rev or "na"}'')
+            holonixPackages
+        );
+      versionsFile = pkgs.writeText "hn-introspect" versionsFileText;
+      hn-introspect =
+        pkgs.writeShellScriptBin "hn-introspect" "${pkgs.coreutils}/bin/cat ${versionsFile}";
+    in
+    {
+      packages = {
+        inherit hn-introspect;
       };
 
-      release = pkgs.mkShell {
-        inputsFrom = [ self'.devShells.rustDev ];
+      devShells = {
+        default = self'.devShells.holonix;
+        holonix = pkgs.mkShell {
+          inputsFrom = [ self'.devShells.rustDev ];
+          packages = holonixPackages ++ [ hn-introspect ];
+        };
 
-        packages = (with self'.packages;
-          [ release-automation cargo-rdme ])
-        ++ (with pkgs; [ cargo-readme cargo-sweep gh gitFull cacert ]);
-      };
+        release = pkgs.mkShell {
+          inputsFrom = [ self'.devShells.rustDev ];
 
-      coreDev = pkgs.mkShell {
-        inputsFrom = [ self'.devShells.rustDev ];
+          packages = (with self'.packages;
+            [ release-automation cargo-rdme ])
+          ++ (with pkgs; [ cargo-readme cargo-sweep gh gitFull cacert ]);
+        };
 
-        packages = with pkgs; [ cargo-nextest ];
+        coreDev = pkgs.mkShell {
+          inputsFrom = [ self'.devShells.rustDev ];
 
-        shellHook = ''
-          export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
-          mkdir -p $HC_TEST_WASM_DIR
-
-          export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
-          mkdir -p $HC_WASM_CACHE_PATH
-        '';
-      };
-
-      rustDev = pkgs.mkShell
-        {
-          inputsFrom = [
-            self'.packages.holochain
-          ];
+          packages = with pkgs; [ cargo-nextest ];
 
           shellHook = ''
-            export CARGO_HOME="$PWD/.cargo"
-            export CARGO_INSTALL_ROOT="$PWD/.cargo"
-            export CARGO_TARGET_DIR="$PWD/target"
-            export CARGO_CACHE_RUSTC_INFO=1
-            export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
-            export NIX_PATH="nixpkgs=${pkgs.path}"
-          '' + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
-            export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
-          '');
+            export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
+            mkdir -p $HC_TEST_WASM_DIR
+
+            export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
+            mkdir -p $HC_WASM_CACHE_PATH
+          '';
         };
+
+        rustDev = pkgs.mkShell
+          {
+            inputsFrom = [
+              self'.packages.holochain
+            ];
+
+            shellHook = ''
+              export CARGO_HOME="$PWD/.cargo"
+              export CARGO_INSTALL_ROOT="$PWD/.cargo"
+              export CARGO_TARGET_DIR="$PWD/target"
+              export CARGO_CACHE_RUSTC_INFO=1
+              export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
+              export NIX_PATH="nixpkgs=${pkgs.path}"
+            '' + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
+              export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
+            '');
+          };
+      };
     };
-  };
 }
