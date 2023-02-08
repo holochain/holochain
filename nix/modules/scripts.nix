@@ -32,7 +32,6 @@
         '';
 
       scripts-repo-flake-update = pkgs.writeShellScriptBin "scripts-repo-flake-update" ''
-        #! /usr/bin/env nix-shell
         set -xeuo pipefail
         trap "cd $PWD" EXIT
 
