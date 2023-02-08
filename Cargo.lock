@@ -7032,9 +7032,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.1-alpha.3"
+version = "0.0.1-alpha.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a80ab97492505545ecfdd2f1c3996cbf22a815d76eb898bb39bf7dbbef5b5e4c"
+checksum = "7d4f2f63e0150607e2660faa9e7efb35cc64bffe4a8a048a65d49f73a5caf846"
 dependencies = [
  "futures",
  "once_cell",
@@ -7052,9 +7052,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-core"
-version = "0.0.1-alpha.1"
+version = "0.0.1-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9aeb460272a40a32f4253782b4da938166aa8fabedd5bb3a757c22215bc68a07"
+checksum = "8590a82f158651ddc89669e1bd01314c58827e8b7aa6a992580b5d2de630c3cf"
 dependencies = [
  "base64 0.13.1",
  "serde",
@@ -7064,9 +7064,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.1-alpha.3"
+version = "0.0.1-alpha.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec23921731761c1fd6290071e7252439db641608b9ced5e6ef1de17721847856"
+checksum = "4ce036496f0e92e2a77cfd7bfc4ebff280f1cc45a6b16a438630955510c90176"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -7077,16 +7077,18 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.1-alpha.5"
+version = "0.0.1-alpha.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ba8e0d086d4f34ff00d4170bba9ba4dbd12465b4c39ceaf541626454385d16b"
+checksum = "f93319a2801a89d9f7be3780a7585ec7e22ef33e434b267081bf0549fd4422c8"
 dependencies = [
  "Inflector",
+ "base64 0.13.1",
+ "dirs 4.0.0",
  "libc",
  "libloading",
  "once_cell",
  "ouroboros",
- "tempfile",
+ "sha2 0.10.6",
  "tracing",
  "tx5-core",
  "zip",
@@ -7094,9 +7096,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.1-alpha.1"
+version = "0.0.1-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37cf6d24449a2a7b76bbee610aaf020a61d268a40f5de5f51fc6459e2fb4a72c"
+checksum = "206ade2798fbd3e5a90ebb02460e0a088a2d0669329abe2916777ad5d14f6a84"
 dependencies = [
  "futures",
  "lair_keystore_api",

@@ -482,6 +482,8 @@ impl MetaNet {
             .with_max_conn_count(tuning_params.tx5_max_conn_count)
             .with_max_conn_init(tuning_params.tx5_max_conn_init());
 
+        tracing::info!(/*?tx5_config,*/ "meta net startup tx5");
+
         if let Some(lair_client) = host.lair_client() {
             tx5_config.set_lair_client(lair_client);
         }
@@ -493,6 +495,7 @@ impl MetaNet {
         let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
 
         let cli_url = ep_hnd.listen(tx5::Tx5Url::new(&signal_url)?).await?;
+        tracing::info!(%cli_url, "tx5 listening at url");
 
         let res_store = Arc::new(Mutex::new(HashMap::new()));
 
