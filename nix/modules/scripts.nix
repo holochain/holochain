@@ -40,7 +40,6 @@
         cd ../../
 
         nix flake lock --update-input versions --override-input versions "path:./versions/0_1"
-        # nix flake lock --update-input versions
       '';
     };
   };
