@@ -7,6 +7,9 @@ inputs:
   update_source:
     description: "passed to ./nix/update.sh"
     required: true
+  update_cmd:
+    description: "verbatim command to run"
+    required: true
   GITHUB_TOKEN:
     description: ""
     required: true
@@ -42,15 +45,10 @@ runs:
       run: |
         git config --global user.email "hrabot@holochain.org"
         git config --global user.name "Holochain Release Automation"
-    - name: Set NIX_PATH
-      shell: bash
-      run: "echo NIX_PATH=nixpkgs=$(nix eval --impure --raw --expr '(import (import ./nix/sources.nix {}).holochain-nixpkgs {}).pkgs.path') >> $GITHUB_ENV"
-    - name: update holochain-nixpkgs
+    - name: update source ${{ inputs.update_source }}
       shell: bash
       run: |
-        cd ./holonix
-        ./nix/update.sh ${{ inputs.update_source }}
-        cd -
+        ${{ inputs.update_cmd }}
       env:
         GITHUB_TOKEN: ${{ inputs.HRA_GITHUB_TOKEN }}
     - name: create pull request
@@ -58,10 +56,11 @@ runs:
       id: cpr1
       with:
         token: ${{ inputs.HRA_GITHUB_TOKEN }}
-        title: update ${{ inputs.update_source }} on ${{ inputs.branch }}
+        title: "update source '${{ inputs.update_source }}' on branch '${{ inputs.branch }}'"
         branch: auto-update/${{ inputs.branch }}/${{ inputs.update_source }}
         labels: |
           release
+          autorebase:opt-in
         draft: false
         delete-branch: true
         reviewers: steveej
