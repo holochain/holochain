@@ -1,13 +1,10 @@
-{ callPackage
-, writeShellScriptBin
-
-, hcToplevelDir
-, nixEnvPrefixEval
-
-, jq
-}:
-
-let
+{
+  callPackage,
+  writeShellScriptBin,
+  hcToplevelDir,
+  nixEnvPrefixEval,
+  jq,
+}: let
   hcRunCrate = writeShellScriptBin "hc-run-crate" ''
     set -x
     ${nixEnvPrefixEval}
@@ -47,22 +44,25 @@ let
       )
   '';
 
-  mkHolochainBinaryScript = crate: writeShellScriptBin (builtins.replaceStrings [ "_" ] [ "-" ] crate) ''
-    exec ${hcRunCrate}/bin/hc-run-crate ${crate} $@
-  '';
+  mkHolochainBinaryScript = crate:
+    writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''
+      exec ${hcRunCrate}/bin/hc-run-crate ${crate} $@
+    '';
 
   hcReleaseAutomation = writeShellScriptBin "hc-ra" ''
     exec ${hcRunCrate}/bin/hc-run-crate "release-automation" $@
   '';
 
-  ci = callPackage ./ci.nix { };
-  core = callPackage ./core.nix
+  ci = callPackage ./ci.nix {};
+  core =
+    callPackage ./core.nix
     {
       inherit hcToplevelDir;
       releaseAutomation = "${hcReleaseAutomation}/bin/hc-ra";
-    } // {
-    inherit hcReleaseAutomation;
-  };
+    }
+    // {
+      inherit hcReleaseAutomation;
+    };
   happ = {
     holochain = mkHolochainBinaryScript "holochain";
     hc = mkHolochainBinaryScript "hc";
@@ -75,10 +75,10 @@ let
       happ
       ;
   };
-
 in
-builtins.mapAttrs
-  (k: v:
-    builtins.removeAttrs v [ "override" "overrideDerivation" ]
+  builtins.mapAttrs
+  (
+    k: v:
+      builtins.removeAttrs v ["override" "overrideDerivation"]
   )
   all

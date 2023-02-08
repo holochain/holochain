@@ -1,2 +1,1 @@
-{ devShellId ? "coreDev", ... }@args:
-(import ./default.nix ({ inherit devShellId; } // args))
+{devShellId ? "coreDev", ...} @ args: (import ./default.nix ({inherit devShellId;} // args))
