@@ -16,6 +16,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CellError {
+    #[error("Cell {1} is not authorized to interact with cell {0}")]
+    AuthError(CellId, CellId),
     #[error("error dealing with workspace state: {0}")]
     DatabaseError(#[from] DatabaseError),
     #[error(transparent)]

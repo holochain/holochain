@@ -44,6 +44,7 @@ use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
+use holochain_zome_types::block::BlockTargetId;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
 use std::hash::Hash;
@@ -367,6 +368,32 @@ impl Cell {
         }
     }
 
+    async fn is_authorized(&self, other: CellId) -> CellResult<bool> {
+        Ok(if other == self.id {
+            true
+        } else {
+            holochain_state::block::is_blocked(
+                &self.space.conductor_db,
+                BlockTargetId::Cell(other),
+                Timestamp::now(),
+            )
+            .await?
+        })
+    }
+
+    async fn authorize_holochain_p2p_event(
+        &self,
+        evt: &holochain_p2p::event::HolochainP2pEvent,
+    ) -> CellResult<()> {
+        // Authorize the incoming message before doing anything else.
+        let from_cell = CellId::new(evt.dna_hash().clone(), evt.from_agent().clone());
+        if !self.is_authorized(from_cell.clone()).await? {
+            Err(CellError::AuthError(self.id.clone(), from_cell))
+        } else {
+            Ok(())
+        }
+    }
+
     #[instrument(skip(self, evt))]
     /// Entry point for incoming messages from the network that need to be handled
     pub async fn handle_holochain_p2p_event(
@@ -374,6 +401,9 @@ impl Cell {
         evt: holochain_p2p::event::HolochainP2pEvent,
     ) -> CellResult<()> {
         use holochain_p2p::event::HolochainP2pEvent::*;
+
+        self.authorize_holochain_p2p_event(&evt).await?;
+
         match evt {
             PutAgentInfoSigned { .. }
             | QueryAgentInfoSigned { .. }

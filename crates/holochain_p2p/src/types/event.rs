@@ -313,6 +313,61 @@ impl HolochainP2pEvent {
         })
     }
 
+    /// The from_agent associated with this network p2p event.
+    pub fn from_agent(&self) -> &AgentPubKey {
+        match self {
+            HolochainP2pEvent::FetchOpData { .. } => {
+                unimplemented!("There is no provenance for FetchOpData")
+            }
+            HolochainP2pEvent::QueryOpHashes { .. } => {
+                unimplemented!("There is no provenance for QueryOpHashes")
+            }
+            HolochainP2pEvent::Publish { .. } => {
+                unimplemented!("There is no provenance for Publish")
+            }
+            HolochainP2pEvent::CallRemote { from_agent, .. } => from_agent,
+            HolochainP2pEvent::QueryPeerDensity { .. } => {
+                unimplemented!("There is no provenance for QueryPeerDensity")
+            }
+            HolochainP2pEvent::QueryAgentInfoSignedNearBasis { .. } => {
+                unimplemented!("There is no provenance for QueryAgentInfoSignedNearBasis")
+            }
+            HolochainP2pEvent::PutAgentInfoSigned { .. } => {
+                unimplemented!("There is no provenance for PutAgentInfoSigned")
+            }
+            HolochainP2pEvent::QueryAgentInfoSigned { .. } => {
+                unimplemented!("There is no provenance for QueryAgentInfoSigned")
+            }
+            HolochainP2pEvent::QueryGossipAgents { .. } => {
+                unimplemented!("There is no provenance for QueryGossipAgents")
+            }
+            HolochainP2pEvent::Get { .. } => {
+                unimplemented!("There is no provenance for Get")
+            }
+            HolochainP2pEvent::GetMeta { .. } => {
+                unimplemented!("There is no provenance for GetMeta")
+            }
+            HolochainP2pEvent::GetLinks { .. } => {
+                unimplemented!("There is no provenance for GetLinks")
+            }
+            HolochainP2pEvent::GetAgentActivity { .. } => {
+                unimplemented!("There is no provenance for GetAgentActivity")
+            }
+            HolochainP2pEvent::MustGetAgentActivity { .. } => {
+                unimplemented!("There is no provenance for MustGetAgentActivity")
+            }
+            HolochainP2pEvent::ValidationReceiptReceived { .. } => {
+                unimplemented!("There is no provenance for ValidationReceiptReceived")
+            }
+            HolochainP2pEvent::SignNetworkData { .. } => {
+                unimplemented!("There is no provenance for SignNetworkData")
+            }
+            HolochainP2pEvent::CountersigningSessionNegotiation { .. } => {
+                unimplemented!("There is no provenance for CountersigningSessionNegotiation")
+            }
+        }
+    }
+
     /// The agent_pub_key associated with this network p2p event.
     pub fn target_agents(&self) -> &AgentPubKey {
         match_p2p_evt!(self => |to_agent| { to_agent }, {
