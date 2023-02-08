@@ -10,10 +10,11 @@
       };
 
       release = pkgs.mkShell {
-        inputsFrom = [ self'.devShells.coreDev ];
+        inputsFrom = [ self'.devShells.rustDev ];
 
-        packages = (with self'.packages; [ release-automation cargo-rdme ])
-          ++ (with pkgs; [ cargo-readme cargo-sweep gh gitFull ]);
+        packages = (with self'.packages;
+          [ release-automation cargo-rdme ])
+        ++ (with pkgs; [ cargo-readme cargo-sweep gh gitFull cacert ]);
       };
 
       coreDev = pkgs.mkShell {
@@ -32,7 +33,10 @@
 
       rustDev = pkgs.mkShell
         {
-          inherit (self'.packages.holochain) nativeBuildInputs;
+          inputsFrom = [
+            self'.packages.holochain
+          ];
+
           shellHook = ''
             export CARGO_HOME="$PWD/.cargo"
             export CARGO_INSTALL_ROOT="$PWD/.cargo"
