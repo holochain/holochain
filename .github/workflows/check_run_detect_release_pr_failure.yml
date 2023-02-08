@@ -1,7 +1,8 @@
 name: detect critical check failures
 
 on:
-  status: {}
+  workflow_dispatch:
+  # status: {}
 
 jobs:
   investigate_event:
