@@ -65,7 +65,7 @@
       imports = map (m: "${./.}/nix/modules/${m}")
         (builtins.attrNames (builtins.readDir ./nix/modules));
 
-      perSystem = {pkgs, ...}: {
+      perSystem = { pkgs, ... }: {
         legacyPackages = pkgs;
       };
     };

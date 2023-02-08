@@ -1,10 +1,11 @@
-{
-  callPackage,
-  writeShellScriptBin,
-  hcToplevelDir,
-  nixEnvPrefixEval,
-  jq,
-}: let
+{ callPackage
+, writeShellScriptBin
+, hcToplevelDir
+, nixEnvPrefixEval
+, jq
+,
+}:
+let
   hcRunCrate = writeShellScriptBin "hc-run-crate" ''
     set -x
     ${nixEnvPrefixEval}
@@ -45,7 +46,7 @@
   '';
 
   mkHolochainBinaryScript = crate:
-    writeShellScriptBin (builtins.replaceStrings ["_"] ["-"] crate) ''
+    writeShellScriptBin (builtins.replaceStrings [ "_" ] [ "-" ] crate) ''
       exec ${hcRunCrate}/bin/hc-run-crate ${crate} $@
     '';
 
@@ -53,13 +54,13 @@
     exec ${hcRunCrate}/bin/hc-run-crate "release-automation" $@
   '';
 
-  ci = callPackage ./ci.nix {};
+  ci = callPackage ./ci.nix { };
   core =
     callPackage ./core.nix
-    {
-      inherit hcToplevelDir;
-      releaseAutomation = "${hcReleaseAutomation}/bin/hc-ra";
-    }
+      {
+        inherit hcToplevelDir;
+        releaseAutomation = "${hcReleaseAutomation}/bin/hc-ra";
+      }
     // {
       inherit hcReleaseAutomation;
     };
@@ -76,9 +77,9 @@
       ;
   };
 in
-  builtins.mapAttrs
+builtins.mapAttrs
   (
     k: v:
-      builtins.removeAttrs v ["override" "overrideDerivation"]
+    builtins.removeAttrs v [ "override" "overrideDerivation" ]
   )
   all

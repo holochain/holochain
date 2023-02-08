@@ -1,5 +1,13 @@
-{ stdenv, callPackage, lib, writeShellScriptBin, crate2nix, holonix, holonixPath
-, hcToplevelDir, releaseAutomation }:
+{ stdenv
+, callPackage
+, lib
+, writeShellScriptBin
+, crate2nix
+, holonix
+, holonixPath
+, hcToplevelDir
+, releaseAutomation
+}:
 
 rec {
   hcTest = writeShellScriptBin "hc-test" ''
@@ -39,18 +47,20 @@ rec {
     cargo test ''${CARGO_TEST_ARGS:-} --lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features -- --nocapture
   '';
 
-  hcStaticChecks = let
-    pathPrefix = lib.makeBinPath (builtins.attrValues {
-      inherit (holonix.pkgs) hnRustClippy hnRustFmtCheck hnRustFmtFmt;
-    });
-  in writeShellScriptBin "hc-static-checks" ''
-    export PATH=${pathPrefix}:$PATH
+  hcStaticChecks =
+    let
+      pathPrefix = lib.makeBinPath (builtins.attrValues {
+        inherit (holonix.pkgs) hnRustClippy hnRustFmtCheck hnRustFmtFmt;
+      });
+    in
+    writeShellScriptBin "hc-static-checks" ''
+      export PATH=${pathPrefix}:$PATH
 
-    set -euxo pipefail
-    export RUST_BACKTRACE=1
-    hn-rust-fmt-check
-    hn-rust-clippy
-  '';
+      set -euxo pipefail
+      export RUST_BACKTRACE=1
+      hn-rust-fmt-check
+      hn-rust-clippy
+    '';
 
   hcMergeTest = writeShellScriptBin "hc-merge-test" ''
     set -euxo pipefail

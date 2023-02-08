@@ -8,4 +8,5 @@ let
     name = "release-automation";
     src = ./.;
   };
-in callPackage "${generated}/default.nix" { }
+in
+callPackage "${generated}/default.nix" { }

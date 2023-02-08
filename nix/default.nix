@@ -30,13 +30,13 @@ in
     devShellsSystem = flake.devShells.${builtins.currentSystem};
   in
   devShellsSystem."${devShellId}".overrideAttrs (attrs:
-    attrs // {
-      passthru = (attrs.passthru or { }) // {
-        internal = {
-          inherit flake;
-          inherit devShellsSystem;
-        };
+  attrs // {
+    passthru = (attrs.passthru or { }) // {
+      internal = {
+        inherit flake;
+        inherit devShellsSystem;
       };
-    })
+    };
+  })
 
 ) filteredArgs
