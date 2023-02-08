@@ -64,5 +64,9 @@
       # auto import all nix code from `./modules`, treat each one as a flake and merge them
       imports = map (m: "${./.}/nix/modules/${m}")
         (builtins.attrNames (builtins.readDir ./nix/modules));
+
+      perSystem = {pkgs, ...}: {
+        legacyPackages = pkgs;
+      };
     };
 }

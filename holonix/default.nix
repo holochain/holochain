@@ -1,4 +1,4 @@
-{...} @ args: let
+{system ? builtins.currentSystem, ...} @ args: let
   deprecatedArgs = [
     "config"
     "holochain-nixpkgs"
@@ -35,8 +35,8 @@
     builtins.removeAttrs args
     (unsupportedArgs' ++ deprecatedArgs' ++ ignoredArgs);
 
-  flake = import ../nix/compat.nix;
-  devShellsSystem = flake.devShells.${builtins.currentSystem};
+  flake-compat = import ../nix/compat.nix;
+  devShellsSystem = flake-compat.devShells.${system};
 
   fn = {devShellId ? "holonix"}:
     devShellsSystem.${devShellId}.overrideAttrs (attrs:
@@ -45,9 +45,11 @@
         passthru =
           (attrs.passthru or {})
           // {
+            pkgs = flake-compat.legacyPackages.${system};
+            main = devShellsSystem.${devShellId};
+
             internal = {
-              inherit flake;
-              inherit devShellsSystem;
+              inherit flake-compat;
             };
           };
       });
