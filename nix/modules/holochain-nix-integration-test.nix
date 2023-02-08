@@ -1,7 +1,6 @@
 { self, lib, ... }: {
-  perSystem = { config, ... }:
-    let pkgs = config.pkgs;
-    in {
+  perSystem = { config, pkgs, ... }:
+    {
       apps.holochain-nix-integration-test.type = "app";
       apps.holochain-nix-integration-test.program = builtins.toString
         (pkgs.writeShellScript "script.sh" ''

@@ -1,20 +1,23 @@
 # Definitions can be imported from a separate file like this one
 
 { self, inputs, lib, ... }@flake: {
-  perSystem = { config, self', inputs', system, ... }:
+  perSystem = { config, self', inputs', system, pkgs, ... }:
     let
+      rustToolchain = config.rust.mkRust {
+        track = "stable";
+        version = "1.66.1";
+      };
 
-      pkgs = config.pkgs;
-
-      rustToolchain = config.rust.rustHolochain;
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       opensslStatic = pkgs.pkgsStatic.openssl;
 
       commonArgs = {
+        RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
+        RUST_SODIUM_SHARED = "1";
 
         pname = "holochain";
-        src = flake.config.srcCleaned;
+        src = flake.config.srcCleanedHolochain;
 
         version = "workspace";
 
@@ -31,6 +34,7 @@
             CoreFoundation
             CoreServices
             Security
+            IOKit
           ]));
 
         nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config ])
@@ -40,100 +44,95 @@
 
       # derivation building all dependencies
       holochainDeps = craneLib.buildDepsOnly (commonArgs // rec {
-        RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
-        RUST_SODIUM_SHARED = "1";
+        src = flake.config.srcCleanedHolochain;
+        doCheck = false;
+      });
+
+      holochainDepsRelease = craneLib.buildDepsOnly (commonArgs // rec {
+        CARGO_PROFILE = "release";
+        src = flake.config.srcCleanedHolochain;
         doCheck = false;
       });
 
       # derivation with the main crates
       holochain = craneLib.buildPackage (commonArgs // {
-        cargoArtifacts = holochainDeps;
+        cargoArtifacts = holochainDepsRelease;
+        src = flake.config.srcCleanedHolochain;
         doCheck = false;
       });
 
-      holochainTestDeps = craneLib.buildDepsOnly (commonArgs // rec {
-        RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
-        RUST_SODIUM_SHARED = "1";
-        pname = "holochain-tests";
-        CARGO_PROFILE = "fast-test";
-        cargoExtraArgs =
-          "--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests";
-      });
-
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // rec {
-        RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
-        RUST_SODIUM_SHARED = "1";
         pname = "holochain-nextest";
         CARGO_PROFILE = "fast-test";
-        cargoExtraArgs =
-          "--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests";
         nativeBuildInputs = [ pkgs.cargo-nextest ];
         buildPhase = ''
-          cargo nextest list ${import ../../.config/nextest-args.nix}
+          cargo nextest run --no-run \
+          ${import ../../.config/test-args.nix} \
+          ${import ../../.config/nextest-args.nix} \
         '';
         dontCheck = true;
       });
 
-      disabledTests = [
-        # "conductor::cell::gossip_test::gossip_test"
-        # "conductor::interface::websocket::test::enable_disable_enable_app"
-        # "conductor::interface::websocket::test::websocket_call_zome_function"
-        # "core::ribosome::host_fn::accept_countersigning_preflight_request::wasm_test::enzymatic_session_fail"
-        # "core::ribosome::host_fn::remote_signal::tests::remote_signal_test"
-        # "core::workflow::app_validation_workflow::tests::app_validation_workflow_test"
-        # "core::workflow::app_validation_workflow::validation_tests::app_validation_ops"
-        # "core::workflow::sys_validation_workflow::tests::sys_validation_workflow_test"
-        # "local_network_tests::conductors_call_remote::_2"
-        # "local_network_tests::conductors_call_remote::_4"
-        # "conductor::interface::websocket::test::enable_disable_enable_apped"
-      ];
+      holochainTestsNextestArgs =
+        let
+          # e.g.
+          # "conductor::cell::gossip_test::gossip_test"
+          disabledTests = [
+            "core::ribosome::host_fn::remote_signal::tests::remote_signal_test"
+            "new_lair::test_new_lair_conductor_integration"
+            "conductor::cell::gossip_test::gossip_test"
+          ] ++ (lib.optionals (pkgs.system == "x86_64-darwin") [
+            "test_reconnect"
+          ]) ++ (lib.optionals (pkgs.system == "aarch64-darwin") [
+            "test_reconnect"
+          ]);
 
-      disabledTestsArgs =
-        lib.forEach disabledTests (test: "-E 'not test(${test})'");
+          # the space after the not is crucial or else nextest won't parse the expression
+          disabledTestsArg = '' \
+            -E 'not test(/${lib.concatStringsSep "|" disabledTests}/)' \
+          '';
+        in
+        (commonArgs // {
+          __noChroot = pkgs.stdenv.isLinux;
+          cargoArtifacts = holochainNextestDeps;
 
-      holochain-tests = craneLib.cargoTest (commonArgs // {
-        pname = "holochain";
-        __impure = pkgs.stdenv.isLinux;
-        cargoArtifacts = holochainTestDeps;
-        CARGO_PROFILE = "fast-test";
-        cargoExtraArgs =
-          "--features slow_tests,glacial_tests,test_utils,build_wasms,db-encryption --lib --tests";
+          preCheck = ''
+            export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
+          '';
 
-        dontPatchELF = true;
-        dontFixup = true;
-        installPhase = "mkdir $out";
-      });
+          cargoExtraArgs = ''
+            --profile ci \
+            --config-file ${../../.config/nextest.toml} \
+            ${import ../../.config/test-args.nix} \
+            ${import ../../.config/nextest-args.nix} \
+            ${disabledTestsArg} \
+          '';
 
-      holochain-tests-nextest = craneLib.cargoNextest (commonArgs // {
-        pname = "holochain";
-        __impure = pkgs.stdenv.isLinux;
-        cargoArtifacts = holochainNextestDeps;
+          dontPatchELF = true;
+          dontFixup = true;
 
-        # This was needed if __impure is not set. But since the tests were slow,
-        #   we disabled the sandbox anyways. This might be needed in the future.
-        # preCheck = ''
-        #   rm /build/source/target/debug/.fingerprint/holochain_wasm_test_utils-*/invoked.timestamp
-        #   rm /build/source/target/debug/.fingerprint/holochain_test_wasm_common-*/invoked.timestamp
-        # '';
+          installPhase = ''
+            mkdir -p $out
+            cp -vL target/.rustc_info.json $out/
+            find target -name "junit.xml" -exec cp -vLb {} $out/ \;
+          '';
+        });
 
-        preCheck = ''
-          export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
-        '';
+      holochain-tests-nextest = craneLib.cargoNextest holochainTestsNextestArgs;
+      holochain-tests-nextest-tx5 = craneLib.cargoNextest
+        (holochainTestsNextestArgs // {
+          pname = "holochain-nextest-tx5";
+          cargoExtraArgs = holochainTestsNextestArgs.cargoExtraArgs + '' \
+            --features tx5 \
+          '';
 
-        cargoExtraArgs = ''
-          ${import ../../.config/nextest-args.nix} \
-          ${lib.concatStringsSep " " disabledTestsArgs}
-        '';
-
-        dontPatchELF = true;
-        dontFixup = true;
-        dontInstall = true;
-
-        # TODO: fix upstream bug that seems to ignore `cargoNextestExtraArgs`
-        # cargoNextestExtraArgs = lib.concatStringsSep " " disabledTestsArgs;
-      });
+          nativeBuildInputs = holochainTestsNextestArgs.nativeBuildInputs ++ [
+            pkgs.go
+          ];
+        });
 
       holochain-tests-fmt = craneLib.cargoFmt (commonArgs // {
+        src = flake.config.srcCleanedHolochain;
         cargoArtifacts = null;
         doCheck = false;
 
@@ -142,6 +141,8 @@
       });
 
       holochain-tests-clippy = craneLib.cargoClippy (commonArgs // {
+        pname = "holochain-tests-clippy";
+        src = flake.config.srcCleanedHolochain;
         cargoArtifacts = holochainDeps;
         doCheck = false;
 
@@ -154,21 +155,37 @@
 
         dontPatchELF = true;
         dontFixup = true;
+
+        installPhase = ''
+          mkdir -p $out
+          cp -vL target/.rustc_info.json  $out/
+        '';
       });
 
       holochain-tests-wasm = craneLib.cargoTest (commonArgs // {
+        pname = "holochain-tests-wasm";
         cargoArtifacts = holochainDeps;
         cargoExtraArgs =
           "--lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features";
 
         dontPatchELF = true;
         dontFixup = true;
+
+        installPhase = ''
+          mkdir -p $out
+          cp -vL target/.rustc_info.json  $out/
+        '';
+      });
+
+      holochain-tests-doc = craneLib.cargoDoc (commonArgs // {
+        pname = "holochain-tests-docs";
+        cargoArtifacts = holochainDeps;
       });
 
     in
     {
       packages = {
-        inherit holochain holochain-tests holochain-tests-nextest;
+        inherit holochain holochain-tests-nextest holochain-tests-nextest-tx5 holochain-tests-doc;
 
         inherit holochain-tests-wasm holochain-tests-fmt holochain-tests-clippy;
       };
