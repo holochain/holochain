@@ -50,8 +50,9 @@ pub enum IPBlockReason {
 
 // @todo this is probably wrong.
 type NodeId = [u8; 32];
-// @todo this is probably wrong.
-type IpV4 = [u8; 4];
+
+/// The type to use for identifying blocking ipv4 addresses.
+type IpV4 = std::net::Ipv4Addr;
 
 /// Target of a block.
 /// Each target type has an ID and associated reason.
