@@ -33,9 +33,10 @@ pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| Schema {
         M::initial(include_str!("sql/conductor/schema/0.sql")),
         // Everything in schema 0 has IF NOT EXISTS on it so we can rerun it.
         M {
-            forward: "".into(),
-            _schema: include_str!("sql/conductor/schema/0.sql").into(),
-        }],
+            forward: include_str!("sql/conductor/schema/0.sql").into(),
+            _schema: "".into(),
+        },
+    ],
 });
 
 pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| Schema {
