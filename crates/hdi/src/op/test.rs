@@ -96,14 +96,14 @@ fn test_activity_entry(
     EntryType::App(public_app_entry_def(0, 2)), RecordEntry::Present(e(C{}))
     => matches Ok(InScopeEntry::App(EntryTypes::C(C{}))) ; "c")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::Hidden
-    => matches Ok(InScopeEntry::PrivateApp(UnitEntryTypes::A)) ; "private a")]
+    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::Present(e(A))
+    => matches Ok(InScopeEntry::PrivateApp(EntryTypes::A(A))) ; "private a")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 1)), RecordEntry::Hidden
-    => matches Ok(InScopeEntry::PrivateApp(UnitEntryTypes::B)) ; "private b")]
+    EntryType::App(private_app_entry_def(0, 1)), RecordEntry::Present(e(B))
+    => matches Ok(InScopeEntry::PrivateApp(EntryTypes::B(B))) ; "private b")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 2)), RecordEntry::Hidden
-    => matches Ok(InScopeEntry::PrivateApp(UnitEntryTypes::C)) ; "private c")]
+    EntryType::App(private_app_entry_def(0, 2)), RecordEntry::Present(e(C))
+    => matches Ok(InScopeEntry::PrivateApp(EntryTypes::C(C))) ; "private c")]
 #[test_case(
     EntryType::AgentPubKey, RecordEntry::Present(Entry::Agent(eh(0).into()))
     => matches Ok(InScopeEntry::Agent(_)) ; "agent")]

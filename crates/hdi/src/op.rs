@@ -38,7 +38,7 @@ where
 {
     Agent(AgentPubKey),
     App(ET),
-    PrivateApp(<ET as UnitEnum>::Unit),
+    PrivateApp(ET),
     CapClaim,
     CapGrant,
 }
@@ -159,7 +159,7 @@ impl OpHelper for Op {
                             InScopeEntry::PrivateApp(entry_type) => OpRecord::UpdatePrivateEntry {
                                 original_action_hash: original_action_hash.clone(),
                                 original_entry_hash: original_entry_hash.clone(),
-                                app_entry_type: entry_type,
+                                app_entry_type: entry_type.to_unit(),
                                 action: action.clone(),
                             },
                             InScopeEntry::Agent(new_key) => OpRecord::UpdateAgent {
@@ -289,8 +289,8 @@ impl OpHelper for Op {
                             InScopeEntry::PrivateApp(original_entry_type) => {
                                 Some(OpUpdate::PrivateEntry {
                                     original_action_hash: original_action_hash.clone(),
-                                    app_entry_type: new_entry_type,
-                                    original_app_entry_type: original_entry_type,
+                                    app_entry_type: new_entry_type.to_unit(),
+                                    original_app_entry_type: original_entry_type.to_unit(),
                                     action: update.hashed.content.clone(),
                                 })
                             }
@@ -527,7 +527,7 @@ impl OpHelper for Op {
                     },
                     InScopeEntry::PrivateApp(original_entry_type) => OpDelete::PrivateEntry {
                         original_action: original_action.clone(),
-                        original_app_entry_type: original_entry_type,
+                        original_app_entry_type: original_entry_type.to_unit(),
                         action: delete.hashed.content.clone(),
                     },
                     InScopeEntry::CapClaim => OpDelete::CapClaim {
@@ -590,12 +590,13 @@ where
             EntryType::App(AppEntryDef {
                 zome_index,
                 entry_index: entry_def_index,
-                visibility: EntryVisibility::Public,
+                visibility,
                 ..
             }) => {
                 if !matches!(entry, Entry::App(_)) {
                     return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Entry type is App but Entry is not App".to_string()
+                        "Entry type is App but Entry is something other than an App entry"
+                            .to_string()
                     )));
                 }
                 let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
@@ -603,9 +604,14 @@ where
                     *entry_def_index,
                     entry,
                 )?;
-                match entry_type {
-                    Some(entry_type) => Ok(InScopeEntry::App(entry_type)),
-                    None => Err(deny_other_zome()),
+                match (entry_type, visibility) {
+                    (Some(entry_type), EntryVisibility::Public) => {
+                        Ok(InScopeEntry::App(entry_type))
+                    }
+                    (Some(entry_type), EntryVisibility::Private) => {
+                        Ok(InScopeEntry::PrivateApp(entry_type))
+                    }
+                    (None, _) => Err(deny_other_zome()),
                 }
             }
             EntryType::AgentPubKey => {
@@ -616,51 +622,18 @@ where
                 }
                 Ok(InScopeEntry::Agent(entry_hash.clone().into()))
             }
-            EntryType::App(AppEntryDef {
-                visibility: EntryVisibility::Private,
-                ..
-            })
-            | EntryType::CapGrant
-            | EntryType::CapClaim => {
-                dbg!("the spot");
-                Err(wasm_error!(WasmErrorInner::Guest(
-                "EntryType is CapGrant or CapClaim, but there is an entry present where there shouldn't be."
-                    .to_string()
-            )))
-            }
-        },
-        RecordEntryRef::Hidden => match entry_type {
-            EntryType::App(AppEntryDef {
-                zome_index,
-                entry_index: entry_def_index,
-                visibility: EntryVisibility::Private,
-            }) => match get_unit_entry_type::<ET>(*zome_index, *entry_def_index)? {
-                Some(unit) => Ok(InScopeEntry::PrivateApp(unit)),
-                None => Err(deny_other_zome()),
-            },
-            EntryType::App(AppEntryDef {
-                visibility: EntryVisibility::Public,
-                ..
-            }) => Err(wasm_error!(WasmErrorInner::Guest(
-                "Entry type is public but entry is hidden".to_string()
-            ))),
             EntryType::CapClaim => Ok(InScopeEntry::CapClaim),
             EntryType::CapGrant => Ok(InScopeEntry::CapGrant),
-            EntryType::AgentPubKey => Err(wasm_error!(WasmErrorInner::Guest(
-                "Entry type AgentPubKey is missing entry.".to_string()
-            ))),
         },
-        RecordEntryRef::NotApplicable => Err(wasm_error!(WasmErrorInner::Guest(
+        RecordEntryRef::Hidden => Err(wasm_error!(WasmErrorInner::Host(
+            "Has Entry type but entry is marked hidden".to_string()
+        ))),
+        RecordEntryRef::NotApplicable => Err(wasm_error!(WasmErrorInner::Host(
             "Has Entry type but entry is marked not applicable".to_string()
         ))),
-        RecordEntryRef::NotStored => match entry_type {
-            EntryType::CapClaim | EntryType::CapGrant => Err(wasm_error!(WasmErrorInner::Guest(
-                "Capability tokens are never publicly stored.".to_string()
-            ))),
-            _ => Err(wasm_error!(WasmErrorInner::Host(
-                "Has Entry type but the entry is not currently stored.".to_string()
-            ))),
-        },
+        RecordEntryRef::NotStored => Err(wasm_error!(WasmErrorInner::Host(
+            "Has Entry type but the entry is not currently stored.".to_string()
+        ))),
     }
 }
 
@@ -783,7 +756,7 @@ where
                 action: action.clone(),
             }),
             InScopeEntry::PrivateApp(entry_type) => Ok(OpRecord::CreatePrivateEntry {
-                app_entry_type: entry_type,
+                app_entry_type: entry_type.to_unit(),
                 action: action.clone(),
             }),
             InScopeEntry::CapClaim => Ok(OpRecord::CreateCapClaim {
