@@ -6,12 +6,11 @@
         (
           builtins.map
             (package: ''
-              ${package.pname}: ${package.src.rev or "na"}'')
+              echo ${package.pname} \($(${package}/bin/${package.pname} -V)\): ${package.src.rev or "na"}'')
             holonixPackages
         );
-      versionsFile = pkgs.writeText "hn-introspect" versionsFileText;
       hn-introspect =
-        pkgs.writeShellScriptBin "hn-introspect" "${pkgs.coreutils}/bin/cat ${versionsFile}";
+        pkgs.writeShellScriptBin "hn-introspect" versionsFileText;
     in
     {
       packages = {
