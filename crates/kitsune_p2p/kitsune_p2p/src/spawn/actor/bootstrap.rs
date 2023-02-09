@@ -45,6 +45,7 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
     kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input)?;
     match url {
         Some(url) => {
+            tracing::warn!("BOOTSTRAP_POST: {}", url.as_str());
             let res = CLIENT
                 .post(url.as_str())
                 .body(body_data)
@@ -53,10 +54,12 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
                 .send()
                 .await?;
             if res.status().is_success() {
+                tracing::warn!("BOOTSTRAP_POST SUCCESS");
                 Ok(Some(kitsune_p2p_types::codec::rmp_decode(
                     &mut res.bytes().await?.as_ref(),
                 )?))
             } else {
+                tracing::warn!("BOOTSTRAP_POST ERR");
                 Err(crate::KitsuneP2pError::Bootstrap(
                     res.text().await?.into_boxed_str(),
                 ))

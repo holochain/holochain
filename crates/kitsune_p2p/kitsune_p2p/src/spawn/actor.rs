@@ -121,6 +121,8 @@ impl KitsuneP2pActor {
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         host: HostApi,
     ) -> KitsuneP2pResult<Self> {
+        tracing::warn!("NEW KITSUNE");
+
         crate::types::metrics::init();
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {

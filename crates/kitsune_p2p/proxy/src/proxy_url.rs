@@ -132,6 +132,18 @@ impl ProxyUrl {
 
     /// Extract the cert digest from the url
     pub fn digest(&self) -> CertDigest {
+        if self.full.scheme() == "wss" {
+            // override for tx5
+            if let Some(mut i) = self.full.path_segments() {
+                if let Some(_u) = i.next() {
+                    if let Some(u) = i.next() {
+                        let digest =
+                            base64::decode_config(u, base64::URL_SAFE_NO_PAD).unwrap();
+                        return CertDigest::from_slice(&digest);
+                    }
+                }
+            }
+        }
         let digest =
             base64::decode_config(self.full.host_str().unwrap(), base64::URL_SAFE_NO_PAD).unwrap();
         CertDigest::from_slice(&digest)

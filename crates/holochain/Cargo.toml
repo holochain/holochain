@@ -84,8 +84,11 @@ wasmer-middlewares = "2"
 hdk = { version = "^0.1.0", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
 holochain_test_wasm_common = { version = "^0.1.0", path = "../test_utils/wasm_common", optional = true  }
+kitsune_p2p_bootstrap = { path = "../kitsune_p2p/bootstrap", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
 itertools = { version = "0.10", optional = false }
+tx5-go-pion-turn = { version = "0.0.1-alpha.2", optional = true }
+tx5-signal-srv = { version = "0.0.1-alpha.2", optional = true }
 
 # chc deps
 bytes = { version = "1", optional = true }
@@ -104,7 +107,6 @@ contrafact = "0.1.0-dev.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
 ed25519-dalek = "1"
 isotest = "0"
-kitsune_p2p_bootstrap = { path = "../kitsune_p2p/bootstrap" }
 maplit = "1"
 pretty_assertions = "0.6.1"
 rand_dalek = {package = "rand", version = "0.7"}
@@ -116,6 +118,7 @@ test-case = "1.2.1"
 hdk = { version = "^0.1.0", path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
 holochain_test_wasm_common = { version = "^0.1.0", path = "../test_utils/wasm_common", optional = false  }
+kitsune_p2p_bootstrap = { path = "../kitsune_p2p/bootstrap", optional = false }
 unwrap_to = { version = "0.1.0", optional = false }
 arbitrary = { version = "1.0", features = ["derive"] }
 
@@ -147,7 +150,7 @@ path = "src/bin/holochain/main.rs"
 default = ["slow_tests", "glacial_tests", "test_utils", "no-deps", "tx2"]
 
 tx2 = [ "kitsune_p2p/tx2" ]
-tx5 = [ "kitsune_p2p/tx5" ]
+tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
 
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
@@ -160,6 +163,7 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "kitsune_p2p_types/test_utils",
   "kitsune_p2p/test_utils",
+  "kitsune_p2p_bootstrap",
   "holochain_p2p/mock_network",
   "matches",
   "holochain_test_wasm_common",

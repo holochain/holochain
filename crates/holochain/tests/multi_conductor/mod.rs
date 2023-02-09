@@ -1,5 +1,6 @@
 use hdk::prelude::*;
 use holochain::conductor::config::ConductorConfig;
+use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::{SweetConductor, SweetZome};
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
 use holochain::test_utils::wait_for_integration_1m;
@@ -76,7 +77,10 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
-    let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
+    let config = SweetConductorConfig::standard()
+        .webrtc_networking("wss://holotest.net".into());
+
+    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
