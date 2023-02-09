@@ -22,7 +22,7 @@ pub enum EntryTypes {
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.to_type::<_, ()>()? {
-        OpType::StoreEntry(e) => match e {
+        FlatOp::StoreEntry(e) => match e {
             OpEntry::CreateEntry {
                 app_entry: EntryTypes::AgentsChain(AgentsChain(author, filter)),
                 ..

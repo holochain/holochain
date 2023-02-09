@@ -4,10 +4,10 @@ use crate::prelude::*;
 #[cfg(test)]
 mod test;
 
-/// This trait provides a conversion to a convenience type [`OpType`]
+/// This trait provides a conversion to a convenience type [`FlatOp`]
 /// for use in the validation call back.
 ///
-/// Not all data is available in the [`OpType`]. This is why the [`Op`]
+/// Not all data is available in the [`FlatOp`]. This is why the [`Op`]
 /// is not taken by value and can still be used after this conversion.
 ///
 /// There is data that is common to all ops and can be accessed via helpers on
@@ -18,15 +18,28 @@ mod test;
 /// - Get the [`Op::prev_action()`] of the op.
 /// - Get the [`Op::action_type()`] of the op.
 pub trait OpHelper {
-    /// Converts an [`Op`] to an [`OpType`] without consuming it.
+    /// Converts an [`Op`] to a [`FlatOp`] without consuming it.
     /// This will clone the required internal data.
-    fn to_type<ET, LT>(&self) -> Result<OpType<ET, LT>, WasmError>
+    fn flattened<ET, LT>(&self) -> Result<FlatOp<ET, LT>, WasmError>
     where
         ET: EntryTypesHelper + UnitEnum,
         <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
         LT: LinkTypesHelper,
         WasmError: From<<ET as EntryTypesHelper>::Error>,
         WasmError: From<<LT as LinkTypesHelper>::Error>;
+
+    /// Alias for `flattened`, for backward compatibility
+    #[deprecated = "`to_type` has been renamed to `flattened`, please use that name instead"]
+    fn to_type<ET, LT>(&self) -> Result<FlatOp<ET, LT>, WasmError>
+    where
+        ET: EntryTypesHelper + UnitEnum,
+        <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
+        LT: LinkTypesHelper,
+        WasmError: From<<ET as EntryTypesHelper>::Error>,
+        WasmError: From<<LT as LinkTypesHelper>::Error>,
+    {
+        self.flattened()
+    }
 }
 
 #[derive(Debug)]
@@ -63,7 +76,7 @@ enum ActivityEntry<Unit> {
 }
 
 impl OpHelper for Op {
-    fn to_type<ET, LT>(&self) -> Result<OpType<ET, LT>, WasmError>
+    fn flattened<ET, LT>(&self) -> Result<FlatOp<ET, LT>, WasmError>
     where
         ET: EntryTypesHelper + UnitEnum,
         <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
@@ -193,7 +206,7 @@ impl OpHelper for Op {
                         }
                     }
                 };
-                Ok(OpType::StoreRecord(r))
+                Ok(FlatOp::StoreRecord(r))
             }
             Op::StoreEntry(StoreEntry { action, entry }) => {
                 let r = match &action.hashed.content {
@@ -234,7 +247,7 @@ impl OpHelper for Op {
                         }
                     }
                 };
-                Ok(OpType::StoreEntry(r))
+                Ok(FlatOp::StoreEntry(r))
             }
             Op::RegisterUpdate(RegisterUpdate {
                 update,
@@ -307,7 +320,7 @@ impl OpHelper for Op {
                     }),
                 };
                 match r {
-                    Some(r) => Ok(OpType::RegisterUpdate(r)),
+                    Some(r) => Ok(FlatOp::RegisterUpdate(r)),
                     None => unreachable!("As entry types are already checked to match"),
                 }
             }
@@ -457,7 +470,7 @@ impl OpHelper for Op {
                         }
                     }
                 };
-                Ok(OpType::RegisterAgentActivity(r))
+                Ok(FlatOp::RegisterAgentActivity(r))
             }
             Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
                 let CreateLink {
@@ -469,7 +482,7 @@ impl OpHelper for Op {
                     ..
                 } = &create_link.hashed.content;
                 let link_type = in_scope_link_type(*zome_index, *link_type)?;
-                Ok(OpType::RegisterCreateLink {
+                Ok(FlatOp::RegisterCreateLink {
                     base_address: base_address.clone(),
                     target_address: target_address.clone(),
                     tag: tag.clone(),
@@ -490,7 +503,7 @@ impl OpHelper for Op {
                     ..
                 } = create_link;
                 let link_type = in_scope_link_type(*zome_index, *link_type)?;
-                Ok(OpType::RegisterDeleteLink {
+                Ok(FlatOp::RegisterDeleteLink {
                     original_action: create_link.clone(),
                     base_address: base_address.clone(),
                     target_address: target_address.clone(),
@@ -539,7 +552,7 @@ impl OpHelper for Op {
                         action: delete.hashed.content.clone(),
                     },
                 };
-                Ok(OpType::RegisterDelete(r))
+                Ok(FlatOp::RegisterDelete(r))
             }
         }
     }

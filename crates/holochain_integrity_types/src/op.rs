@@ -410,7 +410,7 @@ impl EntryCreationAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// A convenience type for validation [`Op`]s.
-pub enum OpType<ET, LT>
+pub enum FlatOp<ET, LT>
 where
     ET: UnitEnum,
 {
@@ -498,6 +498,10 @@ where
     /// [`EntryHash`] of the deleted entry.
     RegisterDelete(OpDelete<ET>),
 }
+
+#[deprecated = "use the name FlatOp instead"]
+/// Alias for `FlatOp` for backward compatibility
+pub type OpType<ET, LT> = FlatOp<ET, LT>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Data specific to the [`Op::StoreRecord`] operation.
