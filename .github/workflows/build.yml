@@ -91,6 +91,8 @@ jobs:
           # first build all derivations. this could be enough for test derivations.
           nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
+            --eval-store auto \
+            --store $(cat /etc/nix/machines | grep ${system} | shuf -n1 | cut -d " " -f1) \
             --override-input versions ./versions/0_1 \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
 
