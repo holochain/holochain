@@ -18,6 +18,7 @@ pub mod countersigning;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
+pub mod flat_op;
 pub mod genesis;
 #[allow(missing_docs)]
 pub mod hash;

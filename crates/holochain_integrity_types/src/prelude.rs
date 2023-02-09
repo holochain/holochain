@@ -7,6 +7,7 @@ pub use crate::chain::*;
 pub use crate::countersigning::*;
 pub use crate::entry::*;
 pub use crate::entry_def::*;
+pub use crate::flat_op::*;
 pub use crate::genesis::*;
 pub use crate::hash::*;
 pub use crate::info::*;
