@@ -53,6 +53,17 @@
       # derivation with the main crates
       package = craneLib.buildPackage (commonArgs // {
         cargoArtifacts = deps;
+
+        nativeBuildInputs = commonArgs.nativeBuildInputs ++ [
+          pkgs.makeBinaryWrapper
+        ];
+
+        preFixup = ''
+          wrapProgram $out/bin/hc-launch \
+            --set WEBKIT_DISABLE_COMPOSITING_MODE 1 \
+            --set GIO_MODULE_DIR ${pkgs.glib-networking}/lib/gio/modules \
+            --prefix GIO_EXTRA_MODULES : ${pkgs.glib-networking}/lib/gio/modules
+        '';
       });
 
     in
