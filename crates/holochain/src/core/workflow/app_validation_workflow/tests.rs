@@ -67,7 +67,7 @@ async fn app_validation_workflow_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_private_entries_are_never_passed_to_validation() {
+async fn test_private_entries_are_passed_to_validation_only_when_authored_with_full_entry() {
     observability::test_run().ok();
 
     set_zome_types(&[(0, 3)], &[]);

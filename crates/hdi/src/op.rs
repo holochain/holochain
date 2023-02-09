@@ -39,8 +39,8 @@ where
     Agent(AgentPubKey),
     App(ET),
     PrivateApp(ET),
-    CapClaim,
-    CapGrant,
+    CapClaim(CapClaimEntry),
+    CapGrant(CapGrantEntry),
 }
 
 /// [`RecordEntry`]s that takes a reference.
@@ -168,12 +168,12 @@ impl OpHelper for Op {
                                 new_key,
                                 action: action.clone(),
                             },
-                            InScopeEntry::CapClaim => OpRecord::UpdateCapClaim {
+                            InScopeEntry::CapClaim(_) => OpRecord::UpdateCapClaim {
                                 original_action_hash: original_action_hash.clone(),
                                 original_entry_hash: original_entry_hash.clone(),
                                 action: action.clone(),
                             },
-                            InScopeEntry::CapGrant => OpRecord::UpdateCapGrant {
+                            InScopeEntry::CapGrant(_) => OpRecord::UpdateCapGrant {
                                 original_action_hash: original_action_hash.clone(),
                                 original_entry_hash: original_entry_hash.clone(),
                                 action: action.clone(),
@@ -219,18 +219,26 @@ impl OpHelper for Op {
                                 app_entry: entry_type,
                                 action: action.clone(),
                             },
+                            InScopeEntry::PrivateApp(entry_type) => OpEntry::UpdateEntry {
+                                original_action_hash: original_action_hash.clone(),
+                                original_entry_hash: original_entry_hash.clone(),
+                                app_entry: entry_type,
+                                action: action.clone(),
+                            },
                             InScopeEntry::Agent(agent_key) => OpEntry::UpdateAgent {
                                 original_key: original_entry_hash.clone().into(),
                                 original_action_hash: original_action_hash.clone(),
                                 new_key: agent_key,
                                 action: action.clone(),
                             },
-                            _ => {
-                                return Err(wasm_error!(WasmErrorInner::Guest(
-                                    "StoreEntry should not exist for private entries Id"
-                                        .to_string()
-                                )))
-                            }
+                            InScopeEntry::CapGrant(entry) => OpEntry::UpdateCapGrant {
+                                entry,
+                                action: action.clone(),
+                            },
+                            InScopeEntry::CapClaim(entry) => OpEntry::UpdateCapClaim {
+                                entry,
+                                action: action.clone(),
+                            },
                         }
                     }
                 };
@@ -297,11 +305,11 @@ impl OpHelper for Op {
                             _ => None,
                         }
                     }
-                    InScopeEntry::CapClaim => Some(OpUpdate::CapClaim {
+                    InScopeEntry::CapClaim(_) => Some(OpUpdate::CapClaim {
                         original_action_hash: original_action_hash.clone(),
                         action: update.hashed.content.clone(),
                     }),
-                    InScopeEntry::CapGrant => Some(OpUpdate::CapGrant {
+                    InScopeEntry::CapGrant(_) => Some(OpUpdate::CapGrant {
                         original_action_hash: original_action_hash.clone(),
                         action: update.hashed.content.clone(),
                     }),
@@ -530,11 +538,11 @@ impl OpHelper for Op {
                         original_app_entry_type: original_entry_type.to_unit(),
                         action: delete.hashed.content.clone(),
                     },
-                    InScopeEntry::CapClaim => OpDelete::CapClaim {
+                    InScopeEntry::CapClaim(_) => OpDelete::CapClaim {
                         original_action: original_action.clone(),
                         action: delete.hashed.content.clone(),
                     },
-                    InScopeEntry::CapGrant => OpDelete::CapGrant {
+                    InScopeEntry::CapGrant(_) => OpDelete::CapGrant {
                         original_action: original_action.clone(),
                         action: delete.hashed.content.clone(),
                     },
@@ -586,23 +594,20 @@ where
     WasmError: From<<ET as EntryTypesHelper>::Error>,
 {
     match entry {
-        RecordEntryRef::Present(entry) => match dbg!(entry_type) {
-            EntryType::App(AppEntryDef {
-                zome_index,
-                entry_index: entry_def_index,
-                visibility,
-                ..
-            }) => {
-                if !matches!(entry, Entry::App(_)) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Entry type is App but Entry is something other than an App entry"
-                            .to_string()
-                    )));
-                }
+        RecordEntryRef::Present(entry) => match (entry, entry_type) {
+            (
+                entry @ Entry::App(_),
+                EntryType::App(AppEntryDef {
+                    zome_index,
+                    entry_index: entry_def_index,
+                    visibility,
+                    ..
+                }),
+            ) => {
                 let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
                     *zome_index,
                     *entry_def_index,
-                    entry,
+                    &entry,
                 )?;
                 match (entry_type, visibility) {
                     (Some(entry_type), EntryVisibility::Public) => {
@@ -614,16 +619,20 @@ where
                     (None, _) => Err(deny_other_zome()),
                 }
             }
-            EntryType::AgentPubKey => {
-                if !matches!(entry, Entry::Agent(_)) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Entry type is AgentPubKey but Entry is not AgentPubKey".to_string()
-                    )));
-                }
+            (Entry::Agent(_), EntryType::AgentPubKey) => {
                 Ok(InScopeEntry::Agent(entry_hash.clone().into()))
             }
-            EntryType::CapClaim => Ok(InScopeEntry::CapClaim),
-            EntryType::CapGrant => Ok(InScopeEntry::CapGrant),
+            (Entry::CapClaim(entry), EntryType::CapClaim) => {
+                Ok(InScopeEntry::CapClaim(entry.clone()))
+            }
+            (Entry::CapGrant(entry), EntryType::CapGrant) => {
+                Ok(InScopeEntry::CapGrant(entry.clone()))
+            }
+            (entry, entry_type) => {
+                return Err(wasm_error!(WasmErrorInner::Host(format!(
+                    "invalid pairing of Entry and EntryType: {entry:?} and {entry_type:?}"
+                ))))
+            }
         },
         RecordEntryRef::Hidden => Err(wasm_error!(WasmErrorInner::Host(
             "Has Entry type but entry is marked hidden".to_string()
@@ -759,10 +768,10 @@ where
                 app_entry_type: entry_type.to_unit(),
                 action: action.clone(),
             }),
-            InScopeEntry::CapClaim => Ok(OpRecord::CreateCapClaim {
+            InScopeEntry::CapClaim(_) => Ok(OpRecord::CreateCapClaim {
                 action: action.clone(),
             }),
-            InScopeEntry::CapGrant => Ok(OpRecord::CreateCapGrant {
+            InScopeEntry::CapGrant(_) => Ok(OpRecord::CreateCapGrant {
                 action: action.clone(),
             }),
         }

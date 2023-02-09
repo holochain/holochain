@@ -109,10 +109,10 @@ fn test_activity_entry(
     => matches Ok(InScopeEntry::Agent(_)) ; "agent")]
 #[test_case(
     EntryType::CapClaim, RecordEntry::Hidden
-    => matches Ok(InScopeEntry::CapClaim) ; "cap claim")]
+    => matches Ok(InScopeEntry::CapClaim(_)) ; "cap claim")]
 #[test_case(
     EntryType::CapGrant, RecordEntry::Hidden
-    => matches Ok(InScopeEntry::CapGrant) ; "cap grant")]
+    => matches Ok(InScopeEntry::CapGrant(_)) ; "cap grant")]
 #[test_case(
     EntryType::App(public_app_entry_def(0, 0)), RecordEntry::Present(e(D::default()))
     => matches Err(WasmErrorInner::Serialize(_)) ; "deserialization failure")]

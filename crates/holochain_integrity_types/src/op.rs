@@ -1,9 +1,9 @@
 //! # Dht Operations
 
 use crate::{
-    Action, ActionRef, ActionType, AgentValidationPkg, AppEntryDef, CloseChain, Create, CreateLink,
-    Delete, DeleteLink, Dna, Entry, EntryType, InitZomesComplete, LinkTag, MembraneProof,
-    OpenChain, Record, SignedActionHashed, SignedHashed, UnitEnum, Update,
+    Action, ActionRef, ActionType, AgentValidationPkg, AppEntryDef, CapClaimEntry, CapGrantEntry,
+    CloseChain, Create, CreateLink, Delete, DeleteLink, Dna, Entry, EntryType, InitZomesComplete,
+    LinkTag, MembraneProof, OpenChain, Record, SignedActionHashed, SignedHashed, UnitEnum, Update,
 };
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
@@ -914,6 +914,34 @@ where
         /// The hash of the original keys [`Action`].
         original_action_hash: ActionHash,
         /// The [`Update`] action that updates this entry
+        action: Update,
+    },
+    /// This operation stores the [`Entry`] for a created CapGrant.
+    CreateCapGrant {
+        /// The cap grant entry.
+        entry: CapGrantEntry,
+        /// The [`Create`] action that creates this CapGrant
+        action: Create,
+    },
+    /// This operation stores the [`Entry`] for an updated CapGrant.
+    UpdateCapGrant {
+        /// The cap grant entry.
+        entry: CapGrantEntry,
+        /// The [`Update`] action that updates this CapGrant
+        action: Update,
+    },
+    /// This operation stores the [`Entry`] for a created CapClaim.
+    CreateCapClaim {
+        /// The cap claim entry.
+        entry: CapClaimEntry,
+        /// The [`Create`] action that creates this CapClaim
+        action: Create,
+    },
+    /// This operation stores the [`Entry`] for an updated CapClaim.
+    UpdateCapClaim {
+        /// The cap claim entry.
+        entry: CapClaimEntry,
+        /// The [`Update`] action that updates this CapClaim
         action: Update,
     },
 }

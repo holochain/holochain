@@ -613,6 +613,14 @@ impl EntryType {
             EntryType::CapGrant => &EntryVisibility::Private,
         }
     }
+
+    /// Is this entry type related to cap grants or claims?
+    pub fn is_capability(&self) -> bool {
+        match self {
+            EntryType::CapClaim | EntryType::CapGrant => true,
+            _ => false,
+        }
+    }
 }
 
 impl std::fmt::Display for EntryType {

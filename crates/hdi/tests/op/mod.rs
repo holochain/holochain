@@ -344,6 +344,18 @@ fn op_to_type(op: OpType<EntryTypes, LinkTypes>) {
             let u = EntryCreationAction::Update(action);
             store_entry_entry(u, entry)
         }
+        OpType::StoreEntry(OpEntry::CreateCapGrant { entry, action }) => {
+            store_entry_entry(EntryCreationAction::Create(action), Entry::CapGrant(entry))
+        }
+        OpType::StoreEntry(OpEntry::CreateCapClaim { entry, action }) => {
+            store_entry_entry(EntryCreationAction::Create(action), Entry::CapClaim(entry))
+        }
+        OpType::StoreEntry(OpEntry::UpdateCapGrant { entry, action }) => {
+            store_entry_entry(EntryCreationAction::Update(action), Entry::CapGrant(entry))
+        }
+        OpType::StoreEntry(OpEntry::UpdateCapClaim { entry, action }) => {
+            store_entry_entry(EntryCreationAction::Update(action), Entry::CapClaim(entry))
+        }
         OpType::RegisterCreateLink { action, .. } => Op::RegisterCreateLink(RegisterCreateLink {
             create_link: SignedHashed {
                 hashed: HoloHashed::from_content_sync(action),
