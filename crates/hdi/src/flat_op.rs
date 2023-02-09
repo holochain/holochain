@@ -1,11 +1,11 @@
 //! An alternative to [`Op`] using a flatter structure, and user-defined deserialized
 //! entry included where appropriate
 
-use crate::{
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
+use holochain_integrity_types::{
     AgentValidationPkg, CloseChain, Create, CreateLink, Delete, DeleteLink, Dna,
     EntryCreationAction, InitZomesComplete, LinkTag, MembraneProof, OpenChain, UnitEnum, Update,
 };
-use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, DnaHash, EntryHash};
 
 mod flat_op_activity;
 mod flat_op_entry;

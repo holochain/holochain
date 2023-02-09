@@ -285,5 +285,8 @@ pub mod chain;
 #[deny(missing_docs)]
 pub mod op;
 
+#[deny(missing_docs)]
+pub mod flat_op;
+
 #[cfg(any(feature = "test_utils", test))]
 pub mod test_utils;
