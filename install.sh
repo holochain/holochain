@@ -17,19 +17,11 @@ cat <<EOF
 
 # Prepare the environment, setup the binary cache and make sure it's loaded
 export NIX_CONFIG="extra-experimental-features = nix-command flakes"
-sudo --preserve-env=PATH nix run nixpkgs/nixos-22.11#cachix -- use holochain-ci -m root-nixconf
+sudo --preserve-env=PATH $(which nix) run nixpkgs/nixos-22.11#cachix -- use holochain-ci -m root-nixconf && sudo pkill nix-daemon
 EOF
-
-if systemctl status nix-daemon >/dev/null; then
-cat <<EOF
-
-# Ensure the nix-daemon is restarted after the cachix configuration
-sudo systemctl stop nix-daemon
-EOF
-fi
 
 cat <<EOF
 
-# This will scaffold the example into the 'forum' directory
+# This will scaffold the example project into the 'forum' directory
 nix run github:holochain/holochain#hc-scaffold -- example forum
 EOF
