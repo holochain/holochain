@@ -56,6 +56,7 @@
 
       # derivation with the main crates
       holochain = (craneLib.buildPackage (commonArgs // {
+        CARGO_PROFILE = "release";
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
