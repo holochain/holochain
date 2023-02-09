@@ -23,6 +23,9 @@
         holonix = pkgs.mkShell {
           inputsFrom = [ self'.devShells.rustDev ];
           packages = holonixPackages ++ [ hn-introspect ];
+          shellHook = ''
+            echo Holochain development shell spawned. Type 'exit' to leave.
+          '';
         };
 
         release = pkgs.mkShell {
