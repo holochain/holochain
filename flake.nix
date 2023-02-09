@@ -32,7 +32,7 @@
     };
 
     versions = {
-      url = "github:holochain/holochain/pr_holonix_on_flakes?dir=versions/0_1";
+      url = "github:holochain/holochain?dir=versions/0_1";
     };
 
     holochain.follows = "versions/holochain";
