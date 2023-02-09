@@ -7,6 +7,7 @@ use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::new_invocation;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
+use hdk::hdi::test_utils::set_zome_types;
 use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
@@ -66,14 +67,14 @@ async fn app_validation_workflow_test() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_private_entries_are_never_passed_to_validation() {
+async fn test_private_entries_are_passed_to_validation_only_when_authored_with_full_entry() {
     observability::test_run().ok();
+
+    set_zome_types(&[(0, 3)], &[]);
 
     #[hdk_entry_helper]
     pub struct Post(String);
 
-    // #[hdk_entry_defs(skip_hdk_extern = true)]
-    // #[unit_enum(UnitEntryTypes)]
     #[derive(Serialize, Deserialize)]
     #[serde(tag = "type")]
     #[hdk_entry_defs(skip_hdk_extern = true)]
@@ -81,7 +82,6 @@ async fn test_private_entries_are_never_passed_to_validation() {
     pub enum EntryTypes {
         #[entry_def(visibility = "private")]
         Post(Post),
-        // Pub(Post),
     }
 
     let validation_successes = std::sync::Arc::new(std::sync::atomic::AtomicU8::new(0));
@@ -103,10 +103,6 @@ async fn test_private_entries_are_never_passed_to_validation() {
             secret: CapSecret::from([1; 64]),
         };
         let input = EntryTypes::Post(Post("whatever".into()));
-        // let ScopedEntryDefIndex {
-        //     zome_index,
-        //     zome_type: entry_def_index,
-        // } = (&input).try_into().unwrap();
         let location = EntryDefLocation::app(0, 0);
         let visibility = EntryVisibility::from(&input);
         assert_eq!(visibility, EntryVisibility::Private);
@@ -125,14 +121,6 @@ async fn test_private_entries_are_never_passed_to_validation() {
         ))?;
 
         Ok(())
-
-        // Ok(h.create_entry()?)
-        // Ok(h.create(CreateInput::new(
-        //     InlineZomeSet::get_entry_location(&h, EntryDefIndex(0)),
-        //     EntryVisibility::Private,
-        //     Entry::app_fancy(Post("whatever".into())).unwrap(),
-        //     ChainTopOrdering::default(),
-        // ))?)
     });
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomeset).await;
 
