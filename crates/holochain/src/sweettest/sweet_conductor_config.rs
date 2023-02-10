@@ -109,13 +109,14 @@ impl LocalRendezvous {
 pub struct SweetConductorConfig(ConductorConfig);
 
 impl SweetConductorConfig {
-    /// Standard config for SweetConductors
-    pub fn standard() -> Self {
+    /// Standard config for SweetConductors, specifying the Rendezvous
+    pub fn standard(rendezvous: &LocalRendezvous) -> Self {
         let mut tuning =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();
 
         let mut network = KitsuneP2pConfig::default();
+        network.bootstrap_service = Some(url2::url2!("http://{}", rendezvous.bootstrap_addr()));
         network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
             bind_to: None,
             override_host: None,
