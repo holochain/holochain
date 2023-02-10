@@ -1,28 +1,26 @@
 {
-  perSystem = { config, lib, ... }:
-    let
-      pkgs = config.pkgs;
-    in
-    {
+  perSystem =
+    { config
+    , lib
+    , pkgs
+    , ...
+    }: {
       options.writers = {
-        writePureShellScript = lib.mkOption {
-          type = lib.types.functionTo lib.types.anything;
-        };
-        writePureShellScriptBin = lib.mkOption {
-          type = lib.types.functionTo lib.types.anything;
-        };
+        writePureShellScript =
+          lib.mkOption { type = lib.types.functionTo lib.types.anything; };
+        writePureShellScriptBin =
+          lib.mkOption { type = lib.types.functionTo lib.types.anything; };
       };
-
 
       /*
         create a script that runs in a `pure` environment, in the sense that:
-      - PATH only contains exactly the packages passed via the PATH arg
-      - NIX_PATH is set to the path of the current `pkgs`
-      - TMPDIR is set up and cleaned up even if the script fails
-      - all environment variables are unset, except:
+        - PATH only contains exactly the packages passed via the PATH arg
+        - NIX_PATH is set to the path of the current `pkgs`
+        - TMPDIR is set up and cleaned up even if the script fails
+        - all environment variables are unset, except:
         - the ones listed in `keepVars` below
         - ones listed via the KEEP_VARS variable
-      - the behavior is similar to `nix-shell --pure`
+        - the behavior is similar to `nix-shell --pure`
       */
       config.writers =
         let
@@ -30,18 +28,18 @@
             #!${pkgs.bash}/bin/bash
             set -Eeuo pipefail
 
-            export PATH="${lib.makeBinPath PATH}"
-            export NIX_PATH=nixpkgs=${pkgs.path}
+                export PATH="${lib.makeBinPath PATH}"
+                export NIX_PATH=nixpkgs=${pkgs.path}
 
-            TMPDIR=$(${pkgs.coreutils}/bin/mktemp -d)
+            export TMPDIR=''${TMPDIR:-$(${pkgs.coreutils}/bin/mktemp -d)}
 
-            trap '${pkgs.coreutils}/bin/chmod -R +w $TMPDIR;  ${pkgs.coreutils}/bin/rm -rf "$TMPDIR"' EXIT
+            trap 'if [[ -d ''${TMPDIR:-/dev/null} ]]; then ${pkgs.coreutils}/bin/chmod -R +w $TMPDIR; ${pkgs.coreutils}/bin/rm -rf "$TMPDIR"; fi' EXIT
 
-            if [ -z "''${IMPURE:-}" ]; then
-              ${cleanEnv}
-            fi
+                if [ -z "''${IMPURE:-}" ]; then
+                  ${cleanEnv}
+                fi
 
-            ${script}
+                ${script}
           '';
 
           # list taken from nix source: src/nix-build/nix-build.cc
@@ -89,7 +87,6 @@
         echo -e "unsetting ENV variables:\n$(echo $unsetVars | tr "\n" " ")"
         unset $unsetVars
       '';
-
         in
         {
           writePureShellScript = PATH: script:
@@ -100,4 +97,3 @@
         };
     };
 }
-

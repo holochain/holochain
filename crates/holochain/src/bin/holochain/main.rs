@@ -159,12 +159,18 @@ async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
     }
 
     // Initialize the Conductor
-    Conductor::builder()
+    match Conductor::builder()
         .config(config)
         .passphrase(passphrase)
         .build()
         .await
-        .expect("Could not initialize Conductor from configuration")
+    {
+        Err(err) => panic!(
+            "Could not initialize Conductor from configuration: {:?}",
+            err
+        ),
+        Ok(res) => res,
+    }
 }
 
 /// Load config, throw friendly error on failure

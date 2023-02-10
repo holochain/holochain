@@ -61,7 +61,6 @@ codegen-units = 16
 
 [patch.crates-io]
 # tx5 = { path = "../tx5/crates/tx5" }
-# tx5-signal = { path = "../tx5/crates/tx5-signal" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }

@@ -1,10 +1,9 @@
-name: "update holochain-nixpkgs for holonix"
+name: "trigger source updates"
 on:
   # push:
   #   branches: [pr-periodic-updates]
   schedule:
-    - cron: "0 7 * * *" # run daily
-    - cron: "0 10,13,16 * * 3" # run several more times on wednesday to make up for a delayed release
+    - cron: "0 */6 * * *" # run every 6 hours
   workflow_dispatch:
     inputs:
       only-base-ref:
@@ -28,8 +27,14 @@ jobs:
             skip: false
           - name: ${{ github.ref_name }}
             skip: true
-        update_source:
-          - holochain-nixpkgs
+        update:
+          - source: "versions/0_1"
+            cmd: "nix run --override-input versions ./versions/0_1 .#scripts-repo-flake-update"
+          - source: "rust-overlay"
+            cmd: "nix flake lock --update-input rust-overlay"
+          - source: "nixpkgs"
+            cmd: "nix flake lock --update-input nixpkgs"
+
     runs-on: "ubuntu-latest"
     steps:
       - name: Evaluate skip
@@ -49,7 +54,8 @@ jobs:
         uses: ./.github/actions/update
         with:
           branch: ${{ matrix.branch.name }}
-          update_source: ${{ matrix.update_source }}
+          update_source: ${{ matrix.update.source }}
+          update_cmd: ${{ matrix.update.cmd }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
           CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_SIGNING_KEY }}
