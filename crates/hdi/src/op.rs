@@ -42,20 +42,6 @@ pub trait OpHelper {
     }
 }
 
-#[derive(Debug)]
-/// All the possible variants for entries
-/// that are in scope for a zome.
-enum InScopeEntry<ET>
-where
-    ET: UnitEnum,
-{
-    Agent(AgentPubKey),
-    App(ET),
-    PrivateApp(<ET as UnitEnum>::Unit),
-    CapClaim,
-    CapGrant,
-}
-
 /// [`RecordEntry`]s that takes a reference.
 enum RecordEntryRef<'a> {
     Present(&'a Entry),
@@ -157,7 +143,7 @@ impl OpHelper for Op {
                                 action: action.clone(),
                             },
                             EntryType::App(entry_def) => {
-                                match map_entry(entry_def, record.entry.as_option())? {
+                                match map_app_entry(entry_def, record.entry.as_option())? {
                                     UnitEnumEither::Enum(app_entry) => OpRecord::CreateEntry {
                                         app_entry,
                                         action: action.clone(),
@@ -194,7 +180,7 @@ impl OpHelper for Op {
                                 action: action.clone(),
                             },
                             EntryType::App(entry_def) => {
-                                match map_entry(entry_def, record.entry.as_option())? {
+                                match map_app_entry(entry_def, record.entry.as_option())? {
                                     UnitEnumEither::Enum(app_entry) => OpRecord::UpdateEntry {
                                         original_action_hash: original_action_hash.clone(),
                                         original_entry_hash: original_entry_hash.clone(),
@@ -258,8 +244,8 @@ impl OpHelper for Op {
                                 new_key: entry_hash.clone().into(),
                                 action: action.clone(),
                             },
-                            EntryType::App(_) => {
-                                let app_entry = map_full_entry(entry_type, entry)?;
+                            EntryType::App(entry_def) => {
+                                let app_entry = map_full_app_entry(entry_def, entry)?;
                                 OpEntry::UpdateEntry {
                                     original_action_hash: original_action_hash.clone(),
                                     original_entry_hash: original_entry_hash.clone(),
@@ -303,8 +289,8 @@ impl OpHelper for Op {
                         action: update.hashed.content.clone(),
                     },
                     EntryType::App(entry_def) => {
-                        let old = map_entry::<ET>(entry_def, original_entry.as_ref())?;
-                        let new = map_entry::<ET>(entry_def, new_entry.as_ref())?;
+                        let old = map_app_entry::<ET>(entry_def, original_entry.as_ref())?;
+                        let new = map_app_entry::<ET>(entry_def, new_entry.as_ref())?;
                         match (old, new) {
                             (UnitEnumEither::Enum(old), UnitEnumEither::Enum(new)) => {
                                 OpUpdate::Entry {
@@ -539,27 +525,33 @@ impl OpHelper for Op {
                     deletes_entry_address: original_entry_hash,
                     ..
                 } = &delete.hashed.content;
-                let r = match map_entry::<ET>(original_action.entry_type(), orig_entry.as_ref())? {
-                    InScopeEntry::Agent(_) => OpDelete::Agent {
+                let r = match original_action.entry_type() {
+                    EntryType::AgentPubKey => OpDelete::Agent {
                         original_action: original_action.clone(),
                         original_key: original_entry_hash.clone().into(),
                         action: delete.hashed.content.clone(),
                     },
-                    InScopeEntry::App(original_entry_type) => OpDelete::Entry {
+                    EntryType::App(original_entry_type) => {
+                        match map_app_entry::<ET>(original_entry_type, orig_entry.as_ref())? {
+                            UnitEnumEither::Enum(original_app_entry) => OpDelete::Entry {
+                                original_action: original_action.clone(),
+                                original_app_entry,
+                                action: delete.hashed.content.clone(),
+                            },
+                            UnitEnumEither::Unit(original_app_entry_type) => {
+                                OpDelete::PrivateEntry {
+                                    original_action: original_action.clone(),
+                                    original_app_entry_type,
+                                    action: delete.hashed.content.clone(),
+                                }
+                            }
+                        }
+                    }
+                    EntryType::CapClaim => OpDelete::CapClaim {
                         original_action: original_action.clone(),
-                        original_app_entry: original_entry_type,
                         action: delete.hashed.content.clone(),
                     },
-                    InScopeEntry::PrivateApp(original_entry_type) => OpDelete::PrivateEntry {
-                        original_action: original_action.clone(),
-                        original_app_entry_type: original_entry_type,
-                        action: delete.hashed.content.clone(),
-                    },
-                    InScopeEntry::CapClaim => OpDelete::CapClaim {
-                        original_action: original_action.clone(),
-                        action: delete.hashed.content.clone(),
-                    },
-                    InScopeEntry::CapGrant => OpDelete::CapGrant {
+                    EntryType::CapGrant => OpDelete::CapGrant {
                         original_action: original_action.clone(),
                         action: delete.hashed.content.clone(),
                     },
@@ -581,39 +573,59 @@ where
     <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
     WasmError: From<<ET as EntryTypesHelper>::Error>,
 {
-    match map_entry::<ET>(entry_type, entry_hash, RecordEntryRef::Present(entry))? {
-        InScopeEntry::App(entry_type) => Ok(OpEntry::CreateEntry {
-            app_entry: entry_type,
+    match entry_type {
+        EntryType::AgentPubKey => Ok(OpEntry::CreateAgent {
+            agent: entry_hash.clone().into(),
             action: action.clone(),
         }),
-        InScopeEntry::Agent(agent_key) => Ok(OpEntry::CreateAgent {
-            agent: agent_key,
-            action: action.clone(),
-        }),
-        _ => Err(wasm_error!(WasmErrorInner::Guest(
-            "StoreEntry should not exist for private entries Id".to_string()
-        ))),
+        EntryType::App(app_entry) => {
+            if app_entry.visibility == EntryVisibility::Public {
+                Ok(OpEntry::CreateEntry {
+                    app_entry: map_full_app_entry(app_entry, entry)?,
+                    action: action.clone(),
+                })
+            } else {
+                Err(wasm_error!(WasmErrorInner::Host(
+                    "Entry provided for private entry type!".into()
+                )))
+            }
+        }
+        EntryType::CapClaim | EntryType::CapGrant => Ok(todo!(
+            "make OpEntry variants for caps, which are indeed valid for StoreEntry!"
+        )),
     }
 }
 
-/// Maps an entry type and entry to an
-/// [`InScopeEntry`]. This will return a guest error
-/// and invalidate the op if the zome id is this zome but
-/// entry type is not in scope.
-fn map_full_entry<ET>(entry_type: &EntryType, entry: &Entry) -> Result<ET, WasmError>
+/// Maps an app entry def and entry to an EntryTypesHelper enum as specified by the zome author,
+/// including deserialized entry data
+fn map_full_app_entry<ET>(entry_def: &AppEntryDef, entry: &Entry) -> Result<ET, WasmError>
 where
     ET: EntryTypesHelper + UnitEnum,
     <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
     WasmError: From<<ET as EntryTypesHelper>::Error>,
 {
-    todo!()
+    match entry_def.visibility {
+        EntryVisibility::Public => {
+            let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
+                entry_def.zome_index,
+                entry_def.entry_index,
+                entry,
+            )?;
+            match entry_type {
+                Some(entry_type) => Ok(entry_type),
+                None => Err(deny_other_zome()),
+            }
+        }
+        EntryVisibility::Private => Err(wasm_error!(WasmErrorInner::Host(
+            "Entry visibility is private but an entry was provided!".to_string()
+        ))),
+    }
 }
 
-/// Maps an entry type and entry to an
-/// [`InScopeEntry`]. This will return a guest error
-/// and invalidate the op if the zome id is this zome but
-/// entry type is not in scope.
-fn map_entry<ET>(
+/// Maps an app entry def and entry to an EntryTypesHelper enum as specified by the zome author.
+/// If the entry is private, maps to the "unit enum" of the entry type, otherwise maps to the full
+/// enum including the deserialized entry data.
+fn map_app_entry<ET>(
     entry_def: &AppEntryDef,
     entry: Option<&Entry>,
 ) -> Result<UnitEnumEither<ET>, WasmError>
@@ -629,25 +641,7 @@ where
         ..
     } = entry_def;
     match (entry, visibility) {
-        (Some(entry), EntryVisibility::Public) => {
-            let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
-                *zome_index,
-                *entry_def_index,
-                entry,
-            )?;
-            match entry_type {
-                Some(entry_type) => Ok(UnitEnumEither::Enum(entry_type)),
-                None => Err(deny_other_zome()),
-            }
-        }
-
-        (None, EntryVisibility::Public) => Err(wasm_error!(WasmErrorInner::Host(
-            "Entry visibility is public but no entry is available".to_string()
-        ))),
-
-        (Some(_), EntryVisibility::Private) => Err(wasm_error!(WasmErrorInner::Host(
-            "Entry visibility is private but an entry was provided!".to_string()
-        ))),
+        (Some(entry), _) => map_full_app_entry(entry_def, entry).map(UnitEnumEither::Enum),
 
         (None, EntryVisibility::Private) => {
             match get_unit_entry_type::<ET>(*zome_index, *entry_def_index)? {
@@ -655,6 +649,10 @@ where
                 None => Err(deny_other_zome()),
             }
         }
+
+        (None, EntryVisibility::Public) => Err(wasm_error!(WasmErrorInner::Host(
+            "Entry visibility is public but no entry is available".to_string()
+        ))),
     }
 }
 
@@ -756,38 +754,6 @@ fn deny_other_zome() -> WasmError {
     wasm_error!(WasmErrorInner::Host(
         "Op called for zome it was not defined in. This is a Holochain bug".to_string()
     ))
-}
-
-impl<ET> InScopeEntry<ET>
-where
-    ET: UnitEnum,
-    <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
-{
-    fn into_op_record<LT>(self, action: &Create) -> Result<OpRecord<ET, LT>, WasmError>
-    where
-        LT: LinkTypesHelper,
-    {
-        match self {
-            InScopeEntry::Agent(agent) => Ok(OpRecord::CreateAgent {
-                agent,
-                action: action.clone(),
-            }),
-            InScopeEntry::App(entry_type) => Ok(OpRecord::CreateEntry {
-                app_entry: entry_type,
-                action: action.clone(),
-            }),
-            InScopeEntry::PrivateApp(entry_type) => Ok(OpRecord::CreatePrivateEntry {
-                app_entry_type: entry_type,
-                action: action.clone(),
-            }),
-            InScopeEntry::CapClaim => Ok(OpRecord::CreateCapClaim {
-                action: action.clone(),
-            }),
-            InScopeEntry::CapGrant => Ok(OpRecord::CreateCapGrant {
-                action: action.clone(),
-            }),
-        }
-    }
 }
 
 impl<'a> From<&'a RecordEntry> for RecordEntryRef<'a> {

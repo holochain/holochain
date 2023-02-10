@@ -1,6 +1,3 @@
-use holochain_integrity_types::{EntryType, RecordEntry};
-use holochain_wasmer_guest::WasmError;
-
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -183,14 +180,4 @@ pub enum OpRecord<ET: UnitEnum, LT> {
         /// The [`InitZomesComplete`] action
         action: InitZomesComplete,
     },
-}
-
-impl<ET: UnitEnum, LT> OpRecord<ET, LT> {
-    pub fn new(
-        entry_type: &EntryType,
-        entry_hash: &EntryHash,
-        entry: &RecordEntry,
-    ) -> Result<Self, WasmError> {
-        todo!()
-    }
 }

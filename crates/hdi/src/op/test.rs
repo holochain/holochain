@@ -87,98 +87,62 @@ fn test_activity_entry(
 }
 
 #[test_case(
-    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::Present(e(A{}))
-    => matches Ok(InScopeEntry::App(EntryTypes::A(A{}))) ; "a")]
+    public_app_entry_def(0, 0), Some(&e(A{}))
+    => matches Ok(UnitEnumEither::Enum(EntryTypes::A(A{}))) ; "a")]
 #[test_case(
-    EntryType::App(public_app_entry_def(0, 1)), RecordEntry::Present(e(B{}))
-    => matches Ok(InScopeEntry::App(EntryTypes::B(B{}))) ; "b")]
+    public_app_entry_def(0, 1), Some(&e(B{}))
+    => matches Ok(UnitEnumEither::Enum(EntryTypes::B(B{}))) ; "b")]
 #[test_case(
-    EntryType::App(public_app_entry_def(0, 2)), RecordEntry::Present(e(C{}))
-    => matches Ok(InScopeEntry::App(EntryTypes::C(C{}))) ; "c")]
+    public_app_entry_def(0, 2), Some(&e(C{}))
+    => matches Ok(UnitEnumEither::Enum(EntryTypes::C(C{}))) ; "c")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::Hidden
-    => matches Ok(InScopeEntry::PrivateApp(UnitEntryTypes::A)) ; "private a")]
+    private_app_entry_def(0, 0), None
+    => matches Ok(UnitEnumEither::Unit(UnitEntryTypes::A)) ; "private a")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 1)), RecordEntry::Hidden
-    => matches Ok(InScopeEntry::PrivateApp(UnitEntryTypes::B)) ; "private b")]
+    private_app_entry_def(0, 1), None
+    => matches Ok(UnitEnumEither::Unit(UnitEntryTypes::B)) ; "private b")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 2)), RecordEntry::Hidden
-    => matches Ok(InScopeEntry::PrivateApp(UnitEntryTypes::C)) ; "private c")]
+    private_app_entry_def(0, 2), None
+    => matches Ok(UnitEnumEither::Unit(UnitEntryTypes::C)) ; "private c")]
 #[test_case(
-    EntryType::AgentPubKey, RecordEntry::Present(Entry::Agent(eh(0).into()))
-    => matches Ok(InScopeEntry::Agent(_)) ; "agent")]
-#[test_case(
-    EntryType::CapClaim, RecordEntry::Hidden
-    => matches Ok(InScopeEntry::CapClaim) ; "cap claim")]
-#[test_case(
-    EntryType::CapGrant, RecordEntry::Hidden
-    => matches Ok(InScopeEntry::CapGrant) ; "cap grant")]
-#[test_case(
-    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::Present(e(D::default()))
+    public_app_entry_def(0, 0), Some(&e(D::default()))
     => matches Err(WasmErrorInner::Serialize(_)) ; "deserialization failure")]
 #[test_case(
-    EntryType::App(public_app_entry_def(0, 3)), RecordEntry::Present(e(A{}))
+    public_app_entry_def(0, 3), Some(&e(A{}))
     => matches Err(WasmErrorInner::Guest(_)) ; "entry type out of range")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 3)), RecordEntry::Hidden
+    private_app_entry_def(0, 3), None
     => matches Err(WasmErrorInner::Guest(_)) ; "private entry type out of range")]
 #[test_case(
-    EntryType::App(public_app_entry_def(1, 0)), RecordEntry::Present(e(A{}))
+    public_app_entry_def(1, 0), Some(&e(A{}))
     => matches Err(WasmErrorInner::Host(_)) ; "zome id out of range")]
 #[test_case(
-    EntryType::App(private_app_entry_def(1, 0)), RecordEntry::Hidden
+    private_app_entry_def(1, 0), None
     => matches Err(WasmErrorInner::Host(_)) ; "private entry zome id out of range")]
 #[test_case(
-    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::Hidden
+    public_app_entry_def(0, 0), None
     => matches Err(WasmErrorInner::Guest(_)) ; "public entry hidden")]
 #[test_case(
-    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::NotApplicable
+    public_app_entry_def(0, 0), None
     => matches Err(WasmErrorInner::Guest(_)) ; "public entry not applicable")]
 #[test_case(
-    EntryType::App(public_app_entry_def(0, 0)), RecordEntry::NotStored
+    public_app_entry_def(0, 0), None
     => matches Err(WasmErrorInner::Host(_)) ; "public entry not stored")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::Present(e(A{}))
+    private_app_entry_def(0, 0), Some(&e(A{}))
     => matches Err(WasmErrorInner::Guest(_)) ; "private entry present")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::NotApplicable
+    private_app_entry_def(0, 0), None
     => matches Err(WasmErrorInner::Guest(_)) ; "private entry not applicable")]
 #[test_case(
-    EntryType::App(private_app_entry_def(0, 0)), RecordEntry::NotStored
+    private_app_entry_def(0, 0), None
     => matches Err(WasmErrorInner::Host(_)) ; "private entry not stored")]
-#[test_case(
-    EntryType::AgentPubKey, RecordEntry::Hidden
-    => matches Err(WasmErrorInner::Guest(_)) ; "agent hidden")]
-#[test_case(
-    EntryType::AgentPubKey, RecordEntry::NotApplicable
-    => matches Err(WasmErrorInner::Guest(_)) ; "agent not applicable")]
-#[test_case(
-    EntryType::AgentPubKey, RecordEntry::NotStored
-    => matches Err(WasmErrorInner::Host(_)) ; "agent not stored")]
-#[test_case(
-    EntryType::CapClaim, RecordEntry::Present(e(A{}))
-    => matches Err(WasmErrorInner::Guest(_)) ; "cap claim present")]
-#[test_case(
-    EntryType::CapClaim, RecordEntry::NotApplicable
-    => matches Err(WasmErrorInner::Guest(_)) ; "cap claim not applicable")]
-#[test_case(
-    EntryType::CapClaim, RecordEntry::NotStored
-    => matches Err(WasmErrorInner::Guest(_)) ; "cap claim not stored")]
-#[test_case(
-    EntryType::CapGrant, RecordEntry::Present(e(A{}))
-    => matches Err(WasmErrorInner::Guest(_)) ; "cap grant present")]
-#[test_case(
-    EntryType::CapGrant, RecordEntry::NotApplicable
-    => matches Err(WasmErrorInner::Guest(_)) ; "cap grant not applicable")]
-#[test_case(
-    EntryType::CapGrant, RecordEntry::NotStored
-    => matches Err(WasmErrorInner::Guest(_)) ; "cap grant not stored")]
 fn test_map_entry(
-    entry_type: EntryType,
-    entry: RecordEntry,
-) -> Result<InScopeEntry<EntryTypes>, WasmErrorInner> {
+    entry_type: AppEntryDef,
+    entry: Option<&Entry>,
+) -> Result<UnitEnumEither<EntryTypes>, WasmErrorInner> {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
-    map_entry::<EntryTypes>(&entry_type, &eh(0), (&entry).into()).map_err(|e| e.error)
+    map_app_entry::<EntryTypes>(&entry_type, entry).map_err(|e| e.error)
 }
 
 #[test_case(0, 0 => matches Ok(LinkTypes::A) ; "a")]

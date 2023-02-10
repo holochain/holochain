@@ -92,7 +92,8 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         ["coordinator"],
     )
     .function("integrity", "validate", move |_h, op: Op| {
-        op.to_type::<EntryTypes, ()>().expect("op.to_type failed");
+        op.flattened::<EntryTypes, ()>()
+            .expect("op.flattened failed");
         validation_successes_2.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(ValidateResult::Valid)
     })
