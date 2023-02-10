@@ -151,8 +151,32 @@ impl OpHelper for Op {
                             entry_hash,
                             ..
                         } = action;
-                        map_entry(entry_type, entry_hash, (&record.entry).into())?
-                            .into_op_record(action)?
+                        match entry_type {
+                            EntryType::AgentPubKey => OpRecord::CreateAgent {
+                                agent: entry_hash.clone().into(),
+                                action: action.clone(),
+                            },
+                            EntryType::App(entry_def) => {
+                                match map_entry(entry_def, record.entry.as_option())? {
+                                    UnitEnumEither::Enum(app_entry) => OpRecord::CreateEntry {
+                                        app_entry,
+                                        action: action.clone(),
+                                    },
+                                    UnitEnumEither::Unit(app_entry_type) => {
+                                        OpRecord::CreatePrivateEntry {
+                                            app_entry_type,
+                                            action: action.clone(),
+                                        }
+                                    }
+                                }
+                            }
+                            EntryType::CapClaim => OpRecord::CreateCapClaim {
+                                action: action.clone(),
+                            },
+                            EntryType::CapGrant => OpRecord::CreateCapGrant {
+                                action: action.clone(),
+                            },
+                        }
                     }
                     Action::Update(action) => {
                         let Update {
@@ -162,31 +186,37 @@ impl OpHelper for Op {
                             original_entry_address: original_entry_hash,
                             ..
                         } = action;
-                        match map_entry::<ET>(entry_type, entry_hash, (&record.entry).into())? {
-                            InScopeEntry::App(entry_type) => OpRecord::UpdateEntry {
-                                original_action_hash: original_action_hash.clone(),
-                                original_entry_hash: original_entry_hash.clone(),
-                                app_entry: entry_type,
-                                action: action.clone(),
-                            },
-                            InScopeEntry::PrivateApp(entry_type) => OpRecord::UpdatePrivateEntry {
-                                original_action_hash: original_action_hash.clone(),
-                                original_entry_hash: original_entry_hash.clone(),
-                                app_entry_type: entry_type,
-                                action: action.clone(),
-                            },
-                            InScopeEntry::Agent(new_key) => OpRecord::UpdateAgent {
+                        match entry_type {
+                            EntryType::AgentPubKey => OpRecord::UpdateAgent {
                                 original_key: original_entry_hash.clone().into(),
                                 original_action_hash: original_action_hash.clone(),
-                                new_key,
+                                new_key: entry_hash.clone().into(),
                                 action: action.clone(),
                             },
-                            InScopeEntry::CapClaim => OpRecord::UpdateCapClaim {
+                            EntryType::App(entry_def) => {
+                                match map_entry(entry_def, record.entry.as_option())? {
+                                    UnitEnumEither::Enum(app_entry) => OpRecord::UpdateEntry {
+                                        original_action_hash: original_action_hash.clone(),
+                                        original_entry_hash: original_entry_hash.clone(),
+                                        app_entry,
+                                        action: action.clone(),
+                                    },
+                                    UnitEnumEither::Unit(app_entry_type) => {
+                                        OpRecord::UpdatePrivateEntry {
+                                            original_action_hash: original_action_hash.clone(),
+                                            original_entry_hash: original_entry_hash.clone(),
+                                            app_entry_type,
+                                            action: action.clone(),
+                                        }
+                                    }
+                                }
+                            }
+                            EntryType::CapClaim => OpRecord::UpdateCapClaim {
                                 original_action_hash: original_action_hash.clone(),
                                 original_entry_hash: original_entry_hash.clone(),
                                 action: action.clone(),
                             },
-                            InScopeEntry::CapGrant => OpRecord::UpdateCapGrant {
+                            EntryType::CapGrant => OpRecord::UpdateCapGrant {
                                 original_action_hash: original_action_hash.clone(),
                                 original_entry_hash: original_entry_hash.clone(),
                                 action: action.clone(),
@@ -221,28 +251,24 @@ impl OpHelper for Op {
                             entry_hash,
                             ..
                         } = action;
-                        match map_entry::<ET>(
-                            entry_type,
-                            entry_hash,
-                            RecordEntryRef::Present(entry),
-                        )? {
-                            InScopeEntry::App(entry_type) => OpEntry::UpdateEntry {
-                                original_action_hash: original_action_hash.clone(),
-                                original_entry_hash: original_entry_hash.clone(),
-                                app_entry: entry_type,
-                                action: action.clone(),
-                            },
-                            InScopeEntry::Agent(agent_key) => OpEntry::UpdateAgent {
+                        match entry_type {
+                            EntryType::AgentPubKey => OpEntry::UpdateAgent {
                                 original_key: original_entry_hash.clone().into(),
                                 original_action_hash: original_action_hash.clone(),
-                                new_key: agent_key,
+                                new_key: entry_hash.clone().into(),
                                 action: action.clone(),
                             },
-                            _ => {
-                                return Err(wasm_error!(WasmErrorInner::Guest(
-                                    "StoreEntry should not exist for private entries Id"
-                                        .to_string()
-                                )))
+                            EntryType::App(_) => {
+                                let app_entry = map_full_entry(entry_type, entry)?;
+                                OpEntry::UpdateEntry {
+                                    original_action_hash: original_action_hash.clone(),
+                                    original_entry_hash: original_entry_hash.clone(),
+                                    app_entry,
+                                    action: action.clone(),
+                                }
+                            }
+                            EntryType::CapClaim | EntryType::CapGrant => {
+                                todo!("make OpEntry variants for caps, which are indeed valid for StoreEntry!")
                             }
                         }
                     }
@@ -262,67 +288,59 @@ impl OpHelper for Op {
                     entry_hash,
                     ..
                 } = &update.hashed.content;
-                if original_action.entry_type() != entry_type
-                    && ((new_entry.is_some() && original_entry.is_some())
-                        || (new_entry.is_none() && original_entry.is_none()))
-                {
+                if original_action.entry_type() != entry_type {
                     return Err(wasm_error!(WasmErrorInner::Guest(format!(
                         "New entry type {:?} doesn't match original entry type {:?}",
                         entry_type,
                         original_action.entry_type()
                     ))));
                 }
-                let new_entry = new_entry
-                    .as_ref()
-                    .map_or(RecordEntryRef::Hidden, RecordEntryRef::Present);
-                let original_entry = original_entry
-                    .as_ref()
-                    .map_or(RecordEntryRef::Hidden, RecordEntryRef::Present);
-                let r = match map_entry::<ET>(original_action.entry_type(), entry_hash, new_entry)?
-                {
-                    InScopeEntry::Agent(new_key) => Some(OpUpdate::Agent {
+                let update = match entry_type {
+                    EntryType::AgentPubKey => OpUpdate::Agent {
                         original_key: original_entry_hash.clone().into(),
                         original_action_hash: original_action_hash.clone(),
-                        new_key,
+                        new_key: entry_hash.clone().into(),
                         action: update.hashed.content.clone(),
-                    }),
-                    InScopeEntry::App(new_entry_type) => {
-                        match map_entry::<ET>(entry_type, entry_hash, original_entry)? {
-                            InScopeEntry::App(original_entry_type) => Some(OpUpdate::Entry {
-                                original_action: original_action.clone(),
-                                app_entry: new_entry_type,
-                                original_app_entry: original_entry_type,
-                                action: update.hashed.content.clone(),
-                            }),
-                            _ => None,
-                        }
-                    }
-                    InScopeEntry::PrivateApp(new_entry_type) => {
-                        match map_entry::<ET>(entry_type, entry_hash, original_entry)? {
-                            InScopeEntry::PrivateApp(original_entry_type) => {
-                                Some(OpUpdate::PrivateEntry {
-                                    original_action_hash: original_action_hash.clone(),
-                                    app_entry_type: new_entry_type,
-                                    original_app_entry_type: original_entry_type,
+                    },
+                    EntryType::App(entry_def) => {
+                        let old = map_entry::<ET>(entry_def, original_entry.as_ref())?;
+                        let new = map_entry::<ET>(entry_def, new_entry.as_ref())?;
+                        match (old, new) {
+                            (UnitEnumEither::Enum(old), UnitEnumEither::Enum(new)) => {
+                                OpUpdate::Entry {
+                                    original_action: original_action.clone(),
+                                    app_entry: new,
+                                    original_app_entry: old,
                                     action: update.hashed.content.clone(),
-                                })
+                                }
                             }
-                            _ => None,
+                            (UnitEnumEither::Unit(old), UnitEnumEither::Unit(new)) => {
+                                OpUpdate::PrivateEntry {
+                                    original_action_hash: original_action_hash.clone(),
+                                    app_entry_type: new,
+                                    original_app_entry_type: old,
+                                    action: update.hashed.content.clone(),
+                                }
+                            }
+                            (old, new) => {
+                                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                    "Attempting to update a private entry to a public entry, or vice versa. old: {:?} new: {:?}",
+                                    original_action.entry_type(),
+                                    entry_type,
+                                ))))
+                            }
                         }
                     }
-                    InScopeEntry::CapClaim => Some(OpUpdate::CapClaim {
+                    EntryType::CapClaim => OpUpdate::CapClaim {
                         original_action_hash: original_action_hash.clone(),
                         action: update.hashed.content.clone(),
-                    }),
-                    InScopeEntry::CapGrant => Some(OpUpdate::CapGrant {
+                    },
+                    EntryType::CapGrant => OpUpdate::CapGrant {
                         original_action_hash: original_action_hash.clone(),
                         action: update.hashed.content.clone(),
-                    }),
+                    },
                 };
-                match r {
-                    Some(r) => Ok(FlatOp::RegisterUpdate(r)),
-                    None => unreachable!("As entry types are already checked to match"),
-                }
+                Ok(FlatOp::RegisterUpdate(update))
             }
             Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
                 let r = match &action.hashed.content {
@@ -521,13 +539,7 @@ impl OpHelper for Op {
                     deletes_entry_address: original_entry_hash,
                     ..
                 } = &delete.hashed.content;
-                let r = match map_entry::<ET>(
-                    original_action.entry_type(),
-                    original_entry_hash,
-                    orig_entry
-                        .as_ref()
-                        .map_or(RecordEntryRef::Hidden, RecordEntryRef::Present),
-                )? {
+                let r = match map_entry::<ET>(original_action.entry_type(), orig_entry.as_ref())? {
                     InScopeEntry::Agent(_) => OpDelete::Agent {
                         original_action: original_action.clone(),
                         original_key: original_entry_hash.clone().into(),
@@ -588,92 +600,61 @@ where
 /// [`InScopeEntry`]. This will return a guest error
 /// and invalidate the op if the zome id is this zome but
 /// entry type is not in scope.
-fn map_entry<ET>(
-    entry_type: &EntryType,
-    entry_hash: &EntryHash,
-    entry: RecordEntryRef,
-) -> Result<InScopeEntry<ET>, WasmError>
+fn map_full_entry<ET>(entry_type: &EntryType, entry: &Entry) -> Result<ET, WasmError>
 where
     ET: EntryTypesHelper + UnitEnum,
     <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
     WasmError: From<<ET as EntryTypesHelper>::Error>,
 {
-    match entry {
-        RecordEntryRef::Present(entry) => match dbg!(entry_type) {
-            EntryType::App(AppEntryDef {
-                zome_index,
-                entry_index: entry_def_index,
-                visibility: EntryVisibility::Public,
-                ..
-            }) => {
-                if !matches!(entry, Entry::App(_)) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Entry type is App but Entry is not App".to_string()
-                    )));
-                }
-                let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
-                    *zome_index,
-                    *entry_def_index,
-                    entry,
-                )?;
-                match entry_type {
-                    Some(entry_type) => Ok(InScopeEntry::App(entry_type)),
-                    None => Err(deny_other_zome()),
-                }
-            }
-            EntryType::AgentPubKey => {
-                if !matches!(entry, Entry::Agent(_)) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Entry type is AgentPubKey but Entry is not AgentPubKey".to_string()
-                    )));
-                }
-                Ok(InScopeEntry::Agent(entry_hash.clone().into()))
-            }
-            EntryType::App(AppEntryDef {
-                visibility: EntryVisibility::Private,
-                ..
-            })
-            | EntryType::CapGrant
-            | EntryType::CapClaim => {
-                dbg!("the spot");
-                Err(wasm_error!(WasmErrorInner::Guest(
-                "EntryType is CapGrant or CapClaim, but there is an entry present where there shouldn't be."
-                    .to_string()
-            )))
-            }
-        },
-        RecordEntryRef::Hidden => match entry_type {
-            EntryType::App(AppEntryDef {
-                zome_index,
-                entry_index: entry_def_index,
-                visibility: EntryVisibility::Private,
-            }) => match get_unit_entry_type::<ET>(*zome_index, *entry_def_index)? {
-                Some(unit) => Ok(InScopeEntry::PrivateApp(unit)),
+    todo!()
+}
+
+/// Maps an entry type and entry to an
+/// [`InScopeEntry`]. This will return a guest error
+/// and invalidate the op if the zome id is this zome but
+/// entry type is not in scope.
+fn map_entry<ET>(
+    entry_def: &AppEntryDef,
+    entry: Option<&Entry>,
+) -> Result<UnitEnumEither<ET>, WasmError>
+where
+    ET: EntryTypesHelper + UnitEnum,
+    <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
+    WasmError: From<<ET as EntryTypesHelper>::Error>,
+{
+    let AppEntryDef {
+        zome_index,
+        entry_index: entry_def_index,
+        visibility,
+        ..
+    } = entry_def;
+    match (entry, visibility) {
+        (Some(entry), EntryVisibility::Public) => {
+            let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
+                *zome_index,
+                *entry_def_index,
+                entry,
+            )?;
+            match entry_type {
+                Some(entry_type) => Ok(UnitEnumEither::Enum(entry_type)),
                 None => Err(deny_other_zome()),
-            },
-            EntryType::App(AppEntryDef {
-                visibility: EntryVisibility::Public,
-                ..
-            }) => Err(wasm_error!(WasmErrorInner::Guest(
-                "Entry type is public but entry is hidden".to_string()
-            ))),
-            EntryType::CapClaim => Ok(InScopeEntry::CapClaim),
-            EntryType::CapGrant => Ok(InScopeEntry::CapGrant),
-            EntryType::AgentPubKey => Err(wasm_error!(WasmErrorInner::Guest(
-                "Entry type AgentPubKey is missing entry.".to_string()
-            ))),
-        },
-        RecordEntryRef::NotApplicable => Err(wasm_error!(WasmErrorInner::Guest(
-            "Has Entry type but entry is marked not applicable".to_string()
+            }
+        }
+
+        (None, EntryVisibility::Public) => Err(wasm_error!(WasmErrorInner::Host(
+            "Entry visibility is public but no entry is available".to_string()
         ))),
-        RecordEntryRef::NotStored => match entry_type {
-            EntryType::CapClaim | EntryType::CapGrant => Err(wasm_error!(WasmErrorInner::Guest(
-                "Capability tokens are never publicly stored.".to_string()
-            ))),
-            _ => Err(wasm_error!(WasmErrorInner::Host(
-                "Has Entry type but the entry is not currently stored.".to_string()
-            ))),
-        },
+
+        (Some(_), EntryVisibility::Private) => Err(wasm_error!(WasmErrorInner::Host(
+            "Entry visibility is private but an entry was provided!".to_string()
+        ))),
+
+        (None, EntryVisibility::Private) => {
+            match get_unit_entry_type::<ET>(*zome_index, *entry_def_index)? {
+                Some(unit) => Ok(UnitEnumEither::Unit(unit)),
+                None => Err(deny_other_zome()),
+            }
+        }
     }
 }
 

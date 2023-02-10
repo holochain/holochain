@@ -263,3 +263,11 @@ impl UnitEnum for () {
         Box::new([].into_iter())
     }
 }
+
+/// A full UnitEnum, or just the unit type of that UnitEnum
+pub enum UnitEnumEither<E: UnitEnum> {
+    /// The full enum
+    Enum(E),
+    /// Just the unit enum
+    Unit(E::Unit),
+}
