@@ -344,6 +344,9 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
             let u = EntryCreationAction::Update(action);
             store_entry_entry(u, entry)
         }
+
+        FlatOp::StoreEntry(_) => todo!("test these"),
+
         FlatOp::RegisterCreateLink { action, .. } => Op::RegisterCreateLink(RegisterCreateLink {
             create_link: SignedHashed {
                 hashed: HoloHashed::from_content_sync(action),

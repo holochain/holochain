@@ -227,7 +227,35 @@ impl OpHelper for Op {
             Op::StoreEntry(StoreEntry { action, entry }) => {
                 let r = match &action.hashed.content {
                     EntryCreationAction::Create(action) => {
-                        store_entry_create(&action.entry_type, &action.entry_hash, entry, action)?
+                        let Create {
+                            entry_type,
+                            entry_hash,
+                            ..
+                        } = action;
+                        match entry_type {
+                            EntryType::AgentPubKey => OpEntry::CreateAgent {
+                                agent: entry_hash.clone().into(),
+                                action: action.clone(),
+                            },
+                            EntryType::App(app_entry) => OpEntry::CreateEntry {
+                                app_entry: map_full_app_entry(app_entry, entry)?,
+                                action: action.clone(),
+                            },
+                            EntryType::CapClaim => OpEntry::CreateCapClaim {
+                                entry: match entry {
+                                    Entry::CapClaim(entry) => entry.clone(),
+                                    _ => return Err(wasm_error!(WasmErrorInner::Host(format!("Entry type does not match. CapClaim expected but got: {:?}", entry))))
+                                },
+                                action: action.clone(),
+                            },
+                            EntryType::CapGrant => OpEntry::CreateCapGrant {
+                                entry: match entry {
+                                    Entry::CapGrant(entry) => entry.clone(),
+                                    _ => return Err(wasm_error!(WasmErrorInner::Host(format!("Entry type does not match. CapGrant expected but got: {:?}", entry))))
+                                },
+                                action: action.clone(),
+                            },
+                        }
                     }
                     EntryCreationAction::Update(action) => {
                         let Update {
@@ -253,9 +281,24 @@ impl OpHelper for Op {
                                     action: action.clone(),
                                 }
                             }
-                            EntryType::CapClaim | EntryType::CapGrant => {
-                                todo!("make OpEntry variants for caps, which are indeed valid for StoreEntry!")
-                            }
+                            EntryType::CapClaim => OpEntry::UpdateCapClaim {
+                                original_action_hash: original_action_hash.clone(),
+                                original_entry_hash: original_entry_hash.clone(),
+                                entry: match entry {
+                                    Entry::CapClaim(entry) => entry.clone(),
+                                    _ => return Err(wasm_error!(WasmErrorInner::Host(format!("Entry type does not match. CapClaim expected but got: {:?}", entry))))
+                                },
+                                action: action.clone(),
+                            },
+                            EntryType::CapGrant => OpEntry::UpdateCapGrant {
+                                original_action_hash: original_action_hash.clone(),
+                                original_entry_hash: original_entry_hash.clone(),
+                                entry: match entry {
+                                    Entry::CapGrant(entry) => entry.clone(),
+                                    _ => return Err(wasm_error!(WasmErrorInner::Host(format!("Entry type does not match. CapGrant expected but got: {:?}", entry))))
+                                },
+                                action: action.clone(),
+                            },
                         }
                     }
                 };
@@ -308,7 +351,7 @@ impl OpHelper for Op {
                                     action: update.hashed.content.clone(),
                                 }
                             }
-                            (old, new) => {
+                            (_, _) => {
                                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
                                     "Attempting to update a private entry to a public entry, or vice versa. old: {:?} new: {:?}",
                                     original_action.entry_type(),
@@ -559,40 +602,6 @@ impl OpHelper for Op {
                 Ok(FlatOp::RegisterDelete(r))
             }
         }
-    }
-}
-
-fn store_entry_create<ET>(
-    entry_type: &EntryType,
-    entry_hash: &EntryHash,
-    entry: &Entry,
-    action: &Create,
-) -> Result<OpEntry<ET>, WasmError>
-where
-    ET: EntryTypesHelper + UnitEnum,
-    <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
-    WasmError: From<<ET as EntryTypesHelper>::Error>,
-{
-    match entry_type {
-        EntryType::AgentPubKey => Ok(OpEntry::CreateAgent {
-            agent: entry_hash.clone().into(),
-            action: action.clone(),
-        }),
-        EntryType::App(app_entry) => {
-            if app_entry.visibility == EntryVisibility::Public {
-                Ok(OpEntry::CreateEntry {
-                    app_entry: map_full_app_entry(app_entry, entry)?,
-                    action: action.clone(),
-                })
-            } else {
-                Err(wasm_error!(WasmErrorInner::Host(
-                    "Entry provided for private entry type!".into()
-                )))
-            }
-        }
-        EntryType::CapClaim | EntryType::CapGrant => Ok(todo!(
-            "make OpEntry variants for caps, which are indeed valid for StoreEntry!"
-        )),
     }
 }
 

@@ -1,3 +1,5 @@
+use holochain_integrity_types::{CapClaimEntry, CapGrantEntry};
+
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,6 +49,42 @@ where
         original_action_hash: ActionHash,
         /// The [`Update`] action that updates this entry
         action: Update,
+    },
+    /// This operation stores the [`Entry`] for a CapGrant
+    CreateCapGrant {
+        /// The cap grant entry data.
+        entry: CapGrantEntry,
+        /// The [`Create`] action that creates this cap grant
+        action: Create,
+    },
+    /// This operation stores the [`Entry`] for a CapClaim
+    CreateCapClaim {
+        /// The cap claim entry data.
+        entry: CapClaimEntry,
+        /// The [`Create`] action that creates this cap claim
+        action: Create,
+    },
+    /// This operation updates the [`Entry`] for a CapGrant
+    UpdateCapGrant {
+        /// The hash of the [`Action`] that created the original [`crate::CapGrant`]
+        original_action_hash: ActionHash,
+        /// The hash of the original [`crate::CapGrant`]
+        original_entry_hash: EntryHash,
+        /// The [`Update`] action that updates the [`crate::CapGrant`]
+        action: Update,
+        /// The new entry to store
+        entry: CapGrantEntry,
+    },
+    /// This operation updates the [`Entry`] for a CapClaim
+    UpdateCapClaim {
+        /// The hash of the [`Action`] that created the original [`crate::CapClaim`]
+        original_action_hash: ActionHash,
+        /// The hash of the original [`crate::CapClaim`]
+        original_entry_hash: EntryHash,
+        /// The [`Update`] action that updates the [`crate::CapClaim`]
+        action: Update,
+        /// The new entry to store
+        entry: CapClaimEntry,
     },
 }
 
