@@ -352,7 +352,7 @@
         "scaffolding": "scaffolding"
       },
       "locked": {
-        "lastModified": 1676027271,
+        "lastModified": 1676031704,
         "narHash": "sha256-B08b2ohTeA1sofTWCgJuFlcMinxggN84IZDII4gz3iw=",
         "path": "./versions/0_1",
         "type": "path"
