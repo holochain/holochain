@@ -629,8 +629,6 @@ async fn update_arc_length(
 async fn update_single_agent_info(
     input: UpdateAgentInfoInput<'_>,
 ) -> KitsuneP2pResult<AgentInfoSigned> {
-    tracing::warn!("!@!@! UPDATE SINGLE AGENT INFO");
-
     let UpdateAgentInfoInput {
         expires_after,
         space,
@@ -653,15 +651,11 @@ async fn update_single_agent_info(
         update_arc_length(evt_sender, space.clone(), &mut arc).await?;
     }
 
-    tracing::warn!("!@!@! UPDATE SINGLE AGENT INFO 2");
-
     // Update the agents arc through the internal sender.
     internal_sender.update_agent_arc(agent.clone(), arc).await?;
 
     let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
     let expires_at_ms = signed_at_ms + expires_after;
-
-    tracing::warn!("!@!@! UPDATE SINGLE AGENT INFO 3");
 
     let agent_info_signed = AgentInfoSigned::sign(
         space.clone(),
@@ -687,8 +681,6 @@ async fn update_single_agent_info(
         },
     )
     .await?;
-
-    tracing::warn!("!@!@! UPDATE SINGLE AGENT INFO 4");
 
     tracing::debug!(?agent_info_signed);
 
@@ -722,8 +714,6 @@ async fn update_single_agent_info(
                 agent_info_signed.clone(),
             )
             .await?;
-
-            tracing::warn!("!@!@! UPDATE SINGLE AGENT INFO 5");
         }
     }
     Ok(agent_info_signed)
@@ -1334,8 +1324,6 @@ impl Space {
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
         fetch_pool: FetchPool,
     ) -> Self {
-        tracing::warn!("NEW SPACE");
-
         let metrics = MetricsSync::default();
 
         {

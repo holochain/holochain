@@ -132,7 +132,8 @@ impl ProxyUrl {
 
     /// Extract the cert digest from the url
     pub fn digest(&self) -> CertDigest {
-        if self.full.scheme() == "wss" {
+        let scheme = self.full.scheme();
+        if scheme == "wss" || scheme == "ws" {
             // override for tx5
             if let Some(mut i) = self.full.path_segments() {
                 if let Some(_u) = i.next() {

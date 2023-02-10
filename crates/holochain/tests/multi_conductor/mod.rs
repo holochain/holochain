@@ -77,8 +77,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::standard()
-        .webrtc_networking("wss://holotest.net".into());
+    let config = SweetConductorConfig::standard();
 
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 

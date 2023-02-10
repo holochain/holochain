@@ -4,9 +4,7 @@ use std::time::Instant;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
-use holochain::sweettest::{
-    standard_config, SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes,
-};
+use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes};
 use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
@@ -22,7 +20,11 @@ use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_ag
 use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
-fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) -> ConductorConfig {
+fn make_config(
+    recent: bool,
+    historical: bool,
+    recent_threshold: Option<u64>,
+) -> holochain::sweettest::SweetConductorConfig {
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
@@ -48,9 +50,7 @@ fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) ->
         override_port: None,
     }];
     network.tuning_params = Arc::new(tuning);
-    let mut config = standard_config();
-    config.network = Some(network);
-    config
+    network.into()
 }
 
 #[cfg(feature = "test_utils")]
@@ -225,7 +225,7 @@ async fn three_way_gossip_historical() {
 /// - 6MB of data can pass from node A to B,
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
-async fn three_way_gossip(config: ConductorConfig) {
+async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let mut conductors = SweetConductorBatch::from_config(2, config.clone()).await;
     let start = Instant::now();
 
