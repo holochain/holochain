@@ -42,6 +42,8 @@
           packages = with pkgs; [ cargo-nextest ];
 
           shellHook = ''
+            export PS1='\n\[\033[1;34m\][coreDev:\w]\$\[\033[0m\] '
+
             export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
             mkdir -p $HC_TEST_WASM_DIR
 
