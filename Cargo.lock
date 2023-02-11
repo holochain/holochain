@@ -227,7 +227,7 @@ dependencies = [
  "parking",
  "polling",
  "slab",
- "socket2 0.4.7",
+ "socket2",
  "waker-fn",
  "windows-sys 0.42.0",
 ]
@@ -2879,7 +2879,7 @@ dependencies = [
  "httpdate",
  "itoa 1.0.5",
  "pin-project-lite",
- "socket2 0.4.7",
+ "socket2",
  "tokio",
  "tower-service",
  "tracing",
@@ -2952,33 +2952,12 @@ dependencies = [
 
 [[package]]
 name = "if-addrs"
-version = "0.6.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2273e421f7c4f0fc99e1934fe4776f59d8df2972f4199d703fc0da9f2a9f73de"
-dependencies = [
- "if-addrs-sys",
- "libc",
- "winapi",
-]
-
-[[package]]
-name = "if-addrs"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbc0fa01ffc752e9dbc72818cdb072cd028b86be5e09dd04c5a643704fe101a9"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "if-addrs-sys"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de74b9dd780476e837e5eb5ab7c88b49ed304126e412030a0adba99c8efe79ea"
-dependencies = [
- "cc",
- "libc",
 ]
 
 [[package]]
@@ -3235,7 +3214,7 @@ dependencies = [
  "derive_more",
  "futures",
  "hyper",
- "if-addrs 0.6.7",
+ "if-addrs",
  "kitsune_p2p",
  "kitsune_p2p_bootstrap",
  "kitsune_p2p_direct_api",
@@ -3359,7 +3338,7 @@ version = "0.1.0"
 dependencies = [
  "blake2b_simd 1.0.0",
  "futures",
- "if-addrs 0.7.0",
+ "if-addrs",
  "kitsune_p2p_types",
  "nanoid 0.4.0",
  "once_cell",
@@ -3514,20 +3493,22 @@ checksum = "348108ab3fba42ec82ff6e9564fc4ca0247bdccdc68dd8af9764bbc79c3c8ffb"
 
 [[package]]
 name = "libmdns"
-version = "0.6.0"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b276920bfc6c9285e16ffd30ed410487f0185f383483f45a3446afc0554fded"
+checksum = "6a60d8339ad1ddf68a81335fcafb6c6cf20d5036138a1e4ef86b8ce87f076c92"
 dependencies = [
  "byteorder",
  "futures-util",
  "hostname",
- "if-addrs 0.6.7",
+ "if-addrs",
  "log",
  "multimap",
- "quick-error 1.2.3",
+ "nix",
  "rand 0.8.5",
- "socket2 0.3.19",
+ "socket2",
+ "thiserror",
  "tokio",
+ "winapi",
 ]
 
 [[package]]
@@ -5014,7 +4995,7 @@ dependencies = [
  "futures-util",
  "libc",
  "quinn-proto",
- "socket2 0.4.7",
+ "socket2",
  "tokio",
  "tracing",
 ]
@@ -6140,17 +6121,6 @@ checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
 name = "socket2"
-version = "0.3.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "122e570113d28d773067fab24266b66753f6ea915758651696b6e35e49f88d6e"
-dependencies = [
- "cfg-if 1.0.0",
- "libc",
- "winapi",
-]
-
-[[package]]
-name = "socket2"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02e2d2db9033d13a1567121ddd7a095ee144db4e1ca1b1bda3419bc0da294ebd"
@@ -6678,7 +6648,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2 0.4.7",
+ "socket2",
  "tokio-macros",
  "windows-sys 0.42.0",
 ]
@@ -7109,7 +7079,7 @@ dependencies = [
  "rustls-native-certs",
  "rustls-pemfile 1.0.2",
  "sha2 0.10.6",
- "socket2 0.4.7",
+ "socket2",
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite 0.17.2",
