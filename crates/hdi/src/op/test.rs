@@ -142,7 +142,8 @@ fn test_map_entry(
     entry: Option<&Entry>,
 ) -> Result<UnitEnumEither<EntryTypes>, WasmErrorInner> {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
-    map_app_entry::<EntryTypes>(&entry_type, entry).map_err(|e| e.error)
+    get_app_entry_type_for_non_store_entry_authority::<EntryTypes>(&entry_type, entry)
+        .map_err(|e| e.error)
 }
 
 #[test_case(0, 0 => matches Ok(LinkTypes::A) ; "a")]

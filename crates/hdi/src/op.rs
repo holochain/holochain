@@ -143,7 +143,10 @@ impl OpHelper for Op {
                                 action: action.clone(),
                             },
                             EntryType::App(entry_def) => {
-                                match map_app_entry(entry_def, record.entry.as_option())? {
+                                match get_app_entry_type_for_non_store_entry_authority(
+                                    entry_def,
+                                    record.entry.as_option(),
+                                )? {
                                     UnitEnumEither::Enum(app_entry) => OpRecord::CreateEntry {
                                         app_entry,
                                         action: action.clone(),
@@ -180,7 +183,10 @@ impl OpHelper for Op {
                                 action: action.clone(),
                             },
                             EntryType::App(entry_def) => {
-                                match map_app_entry(entry_def, record.entry.as_option())? {
+                                match get_app_entry_type_for_non_store_entry_authority(
+                                    entry_def,
+                                    record.entry.as_option(),
+                                )? {
                                     UnitEnumEither::Enum(app_entry) => OpRecord::UpdateEntry {
                                         original_action_hash: original_action_hash.clone(),
                                         original_entry_hash: original_entry_hash.clone(),
@@ -238,7 +244,7 @@ impl OpHelper for Op {
                                 action: action.clone(),
                             },
                             EntryType::App(app_entry) => OpEntry::CreateEntry {
-                                app_entry: map_full_app_entry(app_entry, entry)?,
+                                app_entry: get_app_entry_type_for_store_entry_authority(app_entry, entry)?,
                                 action: action.clone(),
                             },
                             EntryType::CapClaim => OpEntry::CreateCapClaim {
@@ -273,7 +279,7 @@ impl OpHelper for Op {
                                 action: action.clone(),
                             },
                             EntryType::App(entry_def) => {
-                                let app_entry = map_full_app_entry(entry_def, entry)?;
+                                let app_entry = get_app_entry_type_for_store_entry_authority(entry_def, entry)?;
                                 OpEntry::UpdateEntry {
                                     original_action_hash: original_action_hash.clone(),
                                     original_entry_hash: original_entry_hash.clone(),
@@ -332,8 +338,14 @@ impl OpHelper for Op {
                         action: update.hashed.content.clone(),
                     },
                     EntryType::App(entry_def) => {
-                        let old = map_app_entry::<ET>(entry_def, original_entry.as_ref())?;
-                        let new = map_app_entry::<ET>(entry_def, new_entry.as_ref())?;
+                        let old = get_app_entry_type_for_non_store_entry_authority::<ET>(
+                            entry_def,
+                            original_entry.as_ref(),
+                        )?;
+                        let new = get_app_entry_type_for_non_store_entry_authority::<ET>(
+                            entry_def,
+                            new_entry.as_ref(),
+                        )?;
                         match (old, new) {
                             (UnitEnumEither::Enum(old), UnitEnumEither::Enum(new)) => {
                                 OpUpdate::Entry {
@@ -575,7 +587,10 @@ impl OpHelper for Op {
                         action: delete.hashed.content.clone(),
                     },
                     EntryType::App(original_entry_type) => {
-                        match map_app_entry::<ET>(original_entry_type, orig_entry.as_ref())? {
+                        match get_app_entry_type_for_non_store_entry_authority::<ET>(
+                            original_entry_type,
+                            orig_entry.as_ref(),
+                        )? {
                             UnitEnumEither::Enum(original_app_entry) => OpDelete::Entry {
                                 original_action: original_action.clone(),
                                 original_app_entry,
@@ -605,36 +620,32 @@ impl OpHelper for Op {
     }
 }
 
-/// Maps an app entry def and entry to an EntryTypesHelper enum as specified by the zome author,
-/// including deserialized entry data
-fn map_full_app_entry<ET>(entry_def: &AppEntryDef, entry: &Entry) -> Result<ET, WasmError>
+/// Produces the user-defined entry type enum. Even if the entry is private, this will succeed.
+/// To be used only in the context of a StoreEntry authority.
+fn get_app_entry_type_for_store_entry_authority<ET>(
+    entry_def: &AppEntryDef,
+    entry: &Entry,
+) -> Result<ET, WasmError>
 where
     ET: EntryTypesHelper + UnitEnum,
     <ET as UnitEnum>::Unit: Into<ZomeEntryTypesKey>,
     WasmError: From<<ET as EntryTypesHelper>::Error>,
 {
-    match entry_def.visibility {
-        EntryVisibility::Public => {
-            let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
-                entry_def.zome_index,
-                entry_def.entry_index,
-                entry,
-            )?;
-            match entry_type {
-                Some(entry_type) => Ok(entry_type),
-                None => Err(deny_other_zome()),
-            }
-        }
-        EntryVisibility::Private => Err(wasm_error!(WasmErrorInner::Host(
-            "Entry visibility is private but an entry was provided!".to_string()
-        ))),
+    let entry_type = <ET as EntryTypesHelper>::deserialize_from_type(
+        entry_def.zome_index,
+        entry_def.entry_index,
+        entry,
+    )?;
+    match entry_type {
+        Some(entry_type) => Ok(entry_type),
+        None => Err(deny_other_zome()),
     }
 }
 
-/// Maps an app entry def and entry to an EntryTypesHelper enum as specified by the zome author.
-/// If the entry is private, maps to the "unit enum" of the entry type, otherwise maps to the full
-/// enum including the deserialized entry data.
-fn map_app_entry<ET>(
+/// Produces the user-defined entry type enum or the unit enum if entry is not present.
+/// To be used only in the context of a StoreRecord or AgentActivity authority.
+/// If the entry's availability does not match the defined visibility, an error will result.
+fn get_app_entry_type_for_non_store_entry_authority<ET>(
     entry_def: &AppEntryDef,
     entry: Option<&Entry>,
 ) -> Result<UnitEnumEither<ET>, WasmError>
@@ -650,7 +661,9 @@ where
         ..
     } = entry_def;
     match (entry, visibility) {
-        (Some(entry), _) => map_full_app_entry(entry_def, entry).map(UnitEnumEither::Enum),
+        (Some(entry), EntryVisibility::Public) => {
+            get_app_entry_type_for_store_entry_authority(entry_def, entry).map(UnitEnumEither::Enum)
+        }
 
         (None, EntryVisibility::Private) => {
             match get_unit_entry_type::<ET>(*zome_index, *entry_def_index)? {
@@ -658,6 +671,10 @@ where
                 None => Err(deny_other_zome()),
             }
         }
+
+        (Some(_), EntryVisibility::Private) => Err(wasm_error!(WasmErrorInner::Host(
+            "Entry visibility is private but an entry was provided!".to_string()
+        ))),
 
         (None, EntryVisibility::Public) => Err(wasm_error!(WasmErrorInner::Host(
             "Entry visibility is public but no entry is available".to_string()
