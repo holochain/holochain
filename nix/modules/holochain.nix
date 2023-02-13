@@ -165,11 +165,26 @@
         '';
       });
 
-      holochain-tests-wasm = craneLib.cargoTest (commonArgs // {
+      holochainWasmArgs = (commonArgs // {
         pname = "holochain-tests-wasm";
-        cargoArtifacts = holochainDeps;
         cargoExtraArgs =
-          "--lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features";
+          "--lib --all-features";
+
+        cargoToml = "${self}/crates/test_utils/wasm/wasm_workspace/Cargo.toml";
+        cargoLock = "${self}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
+
+        postUnpack = ''
+          cd $sourceRoot/crates/test_utils/wasm/wasm_workspace
+          sourceRoot="."
+        '';
+      });
+
+      holochainDepsWasm = craneLib.buildDepsOnly (holochainWasmArgs // {
+        cargoArtifacts = null;
+      });
+
+      holochain-tests-wasm = craneLib.cargoTest (holochainWasmArgs // {
+        cargoArtifacts = holochainDepsWasm;
 
         dontPatchELF = true;
         dontFixup = true;
