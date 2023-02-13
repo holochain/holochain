@@ -122,8 +122,28 @@
         });
 
       holochain-tests-nextest = craneLib.cargoNextest holochainTestsNextestArgs;
+
+      holochainNextestTx5Deps = craneLib.buildDepsOnly (commonArgs // rec {
+        pname = "holochain-nextest-tx5";
+        CARGO_PROFILE = "fast-test";
+        nativeBuildInputs = holochainTestsNextestArgs.nativeBuildInputs ++ [
+          pkgs.cargo-nextest
+          pkgs.go
+        ];
+        buildPhase = ''
+          cargo nextest run --no-run \
+          ${import ../../.config/test-args.nix} \
+          ${import ../../.config/nextest-args.nix} \
+          --features tx5 \
+        '';
+
+
+        dontCheck = true;
+      });
       holochain-tests-nextest-tx5 = craneLib.cargoNextest
         (holochainTestsNextestArgs // {
+          cargoArtifacts = holochainNextestTx5Deps;
+
           pname = "holochain-nextest-tx5";
           cargoExtraArgs = holochainTestsNextestArgs.cargoExtraArgs + '' \
             --features tx5 \
