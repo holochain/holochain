@@ -35,17 +35,13 @@ pub enum CellBlockReason {
 /// Reason why we might want to block a node.
 #[derive(Clone, serde::Serialize, Debug)]
 pub enum NodeBlockReason {
-    /// The node did some bad cryptography.
-    BadCrypto,
-    /// DOS attack.
-    DOS,
+    Kitsune(kitsune_p2p::block::NodeBlockReason),
 }
 
 /// Reason why we might want to block an IP.
 #[derive(Clone, serde::Serialize, Debug)]
 pub enum IPBlockReason {
-    /// Classic DOS.
-    DOS,
+    Kitsune(kitsune_p2p::block::IPBlockReason),
 }
 
 // @todo this is probably wrong.
