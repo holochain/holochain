@@ -143,7 +143,7 @@ impl OpHelper for Op {
                                 action: action.clone(),
                             },
                             EntryType::App(entry_def) => {
-                                match get_app_entry_type_for_non_store_entry_authority(
+                                match get_app_entry_type_for_record_authority(
                                     entry_def,
                                     record.entry.as_option(),
                                 )? {
@@ -183,7 +183,7 @@ impl OpHelper for Op {
                                 action: action.clone(),
                             },
                             EntryType::App(entry_def) => {
-                                match get_app_entry_type_for_non_store_entry_authority(
+                                match get_app_entry_type_for_record_authority(
                                     entry_def,
                                     record.entry.as_option(),
                                 )? {
@@ -338,11 +338,11 @@ impl OpHelper for Op {
                         action: update.hashed.content.clone(),
                     },
                     EntryType::App(entry_def) => {
-                        let old = get_app_entry_type_for_non_store_entry_authority::<ET>(
+                        let old = get_app_entry_type_for_record_authority::<ET>(
                             entry_def,
                             original_entry.as_ref(),
                         )?;
-                        let new = get_app_entry_type_for_non_store_entry_authority::<ET>(
+                        let new = get_app_entry_type_for_record_authority::<ET>(
                             entry_def,
                             new_entry.as_ref(),
                         )?;
@@ -587,7 +587,7 @@ impl OpHelper for Op {
                         action: delete.hashed.content.clone(),
                     },
                     EntryType::App(original_entry_type) => {
-                        match get_app_entry_type_for_non_store_entry_authority::<ET>(
+                        match get_app_entry_type_for_record_authority::<ET>(
                             original_entry_type,
                             orig_entry.as_ref(),
                         )? {
@@ -645,7 +645,7 @@ where
 /// Produces the user-defined entry type enum or the unit enum if entry is not present.
 /// To be used only in the context of a StoreRecord or AgentActivity authority.
 /// If the entry's availability does not match the defined visibility, an error will result.
-fn get_app_entry_type_for_non_store_entry_authority<ET>(
+fn get_app_entry_type_for_record_authority<ET>(
     entry_def: &AppEntryDef,
     entry: Option<&Entry>,
 ) -> Result<UnitEnumEither<ET>, WasmError>
@@ -672,13 +672,13 @@ where
             }
         }
 
-        (Some(_), EntryVisibility::Private) => Err(wasm_error!(WasmErrorInner::Host(
-            "Entry visibility is private but an entry was provided!".to_string()
-        ))),
+        (Some(_), EntryVisibility::Private) => Err(wasm_error!(WasmErrorInner::Host(format!(
+            "Entry visibility is private but an entry was provided! entry_def: {entry_def:?}"
+        )))),
 
-        (None, EntryVisibility::Public) => Err(wasm_error!(WasmErrorInner::Host(
-            "Entry visibility is public but no entry is available".to_string()
-        ))),
+        (None, EntryVisibility::Public) => Err(wasm_error!(WasmErrorInner::Host(format!(
+            "Entry visibility is public but no entry is available. entry_def: {entry_def:?}"
+        )))),
     }
 }
 

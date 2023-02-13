@@ -255,10 +255,11 @@ where
         holochain_cascade::Cascade::from_workspace_and_network(&workspace, network.clone());
     for mut chain_record in to_app_validate {
         for op_type in action_to_op_types(chain_record.action()) {
+            dbg!(&chain_record);
             let op =
                 app_validation_workflow::record_to_op(chain_record, op_type, &mut cascade).await;
 
-            let (op, activity_entry) = match op {
+            let (op, omitted_entry) = match op {
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
@@ -272,7 +273,7 @@ where
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
             map_outcome(outcome)?;
-            chain_record = app_validation_workflow::op_to_record(op, activity_entry);
+            chain_record = app_validation_workflow::op_to_record(op, omitted_entry);
         }
     }
 

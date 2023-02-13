@@ -1,6 +1,7 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_types::dht_op::DhtOpType;
+use holochain_types::prelude::backtrace;
 use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::Judged;
 use holochain_zome_types::*;
@@ -150,10 +151,9 @@ impl Query for GetEntryDetailsQuery {
             .next();
         match action {
             Some(action) => {
-                let entry_hash = action
-                    .action()
-                    .entry_hash()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.action().clone()))?;
+                let entry_hash = action.action().entry_hash().ok_or_else(|| {
+                    DhtOpError::ActionWithoutEntry(action.action().clone(), backtrace())
+                })?;
                 let author = self.1.as_ref().map(|a| a.as_ref());
                 let details = stores
                     .get_public_or_authored_entry(entry_hash, author)?

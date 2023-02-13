@@ -3,6 +3,7 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
+use crate::test_utils::consistency_10s;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::new_invocation;
 use crate::test_utils::new_zome_call;
@@ -84,7 +85,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         Post(Post),
     }
 
-    let validation_successes = std::sync::Arc::new(std::sync::atomic::AtomicU8::new(0));
+    let validation_successes = std::sync::Arc::new(parking_lot::Mutex::new(vec![]));
     let validation_successes_2 = validation_successes.clone();
 
     let zomeset = InlineZomeSet::new_unique(
@@ -94,14 +95,14 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     .function("integrity", "validate", move |_h, op: Op| {
         op.flattened::<EntryTypes, ()>()
             .expect("op.flattened failed");
-        validation_successes_2.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        validation_successes_2.lock().push(op.clone());
         Ok(ValidateResult::Valid)
     })
     .function("coordinator", "create", |h, ()| {
         let claim = CapClaimEntry {
             tag: "tag".into(),
             grantor: ::fixt::fixt!(AgentPubKey),
-            secret: CapSecret::from([1; 64]),
+            secret: ::fixt::fixt!(CapSecret),
         };
         let input = EntryTypes::Post(Post("whatever".into()));
         let location = EntryDefLocation::app(0, 0);
@@ -115,7 +116,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
             ChainTopOrdering::default(),
         ))?;
         h.create(CreateInput::new(
-            location,
+            EntryDefLocation::CapClaim,
             visibility,
             Entry::CapClaim(claim),
             ChainTopOrdering::default(),
@@ -130,18 +131,49 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         .setup_app(&"test_app", &[dna_file.clone()])
         .await
         .unwrap();
-    let ((alice,), (_bob,)) = apps.into_tuples();
+    let ((alice,), (bob,)) = apps.into_tuples();
 
     conductors.exchange_peer_info().await;
 
-    let _hash: ActionHash = conductors[0]
+    let () = conductors[0]
         .call(&alice.zome("coordinator"), "create", ())
         .await;
 
-    assert_eq!(
-        validation_successes.load(std::sync::atomic::Ordering::Relaxed),
-        3
-    );
+    consistency_10s([&alice, &bob]).await;
+
+    let mut num_store_record = 0;
+    let mut num_store_entry = 0;
+
+    let mut num_store_record_private = 0;
+    let mut num_store_entry_private = 0;
+
+    for op in validation_successes.lock().iter() {
+        match dbg!(op) {
+            Op::StoreRecord(StoreRecord { record }) => {
+                if record
+                    .action()
+                    .entry_type()
+                    .map(|et| *et.visibility() == EntryVisibility::Private)
+                    .unwrap_or(false)
+                {
+                    num_store_record_private += 1
+                }
+                let (privatized, _) = record.clone().privatized();
+                assert_eq!(record, &privatized);
+                num_store_record += 1
+            }
+            Op::StoreEntry(StoreEntry { action, entry }) => {
+                if *action.hashed.entry_type().visibility() == EntryVisibility::Private {
+                    num_store_entry_private += 1
+                }
+                num_store_entry += 1
+            }
+            Op::RegisterAgentActivity(_) => {}
+            _ => unreachable!(),
+        }
+    }
+
+    assert_eq!((num_store_record_private, num_store_entry_private), (4, 2))
 }
 
 const SELECT: &'static str = "SELECT count(hash) FROM DhtOp WHERE";

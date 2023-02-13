@@ -6,10 +6,12 @@ use thiserror::Error;
 
 use super::DhtOpType;
 
-#[derive(PartialEq, Eq, Clone, Debug, Error)]
+#[derive(Debug, Error)]
 pub enum DhtOpError {
-    #[error("Tried to create a DhtOp from a Record that requires an Entry. Action type {0:?}")]
-    ActionWithoutEntry(Action),
+    #[error(
+        "Tried to create a DhtOp from a Record that requires an Entry. Action type {:?}. Backtrace: {:?}", .0, .1
+    )]
+    ActionWithoutEntry(Action, std::sync::Arc<std::backtrace::Backtrace>),
     #[error(transparent)]
     SerializedBytesError(#[from] SerializedBytesError),
     #[error(transparent)]
@@ -21,3 +23,7 @@ pub enum DhtOpError {
 }
 
 pub type DhtOpResult<T> = Result<T, DhtOpError>;
+
+pub fn backtrace() -> std::sync::Arc<std::backtrace::Backtrace> {
+    std::sync::Arc::new(std::backtrace::Backtrace::capture())
+}
