@@ -16,7 +16,7 @@ base64 = "0.13"
 derive_more = "0.99"
 futures = "0.3.14"
 hyper = { version = "0.14", features = ["server","http1","http2","tcp"] }
-if-addrs = "0.7"
+if-addrs = "0.8"
 kitsune_p2p_bootstrap = { version = "0.0.12-dev.0", path = "../bootstrap" }
 kitsune_p2p_direct_api = { version = "0.0.1", path = "../direct_api" }
 kitsune_p2p_types = { version = "^0.1.0", path = "../types" }
