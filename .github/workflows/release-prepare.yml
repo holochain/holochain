@@ -94,24 +94,6 @@ jobs:
       # - name: Set NIX_PATH (FIXME)
       #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
-      - name: Restore holochain cargo related state and build files
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-        uses: steveeJ-forks/actions-cache/restore@retry
-        id: restore-build-files
-        with:
-          path: |
-            /var/tmp/holochain_repo/.cargo/bin/
-            /var/tmp/holochain_repo/.cargo/registry/index/
-            /var/tmp/holochain_repo/.cargo/registry/cache/
-            /var/tmp/holochain_repo/.cargo/git/db/
-            /var/tmp/holochain_repo/target/
-          key: ${{ runner.os }}-prepare-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-prepare
-            ${{ runner.os }}-test-release-cargo-test-standard
-            ${{ runner.os }}
-          required: false
-
       - name: Prepare the holochain repository
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
@@ -159,6 +141,24 @@ jobs:
             git checkout --force -B ${HOLOCHAIN_TARGET_BRANCH} origin/${HOLOCHAIN_TARGET_BRANCH}
             git merge --ff-only "${HOLOCHAIN_SOURCE_BRANCH}"
           fi
+
+      - name: Restore holochain cargo related state and build files
+        if: ${{ inputs.skip_prepare_logic != 'true' }}
+        uses: steveeJ-forks/actions-cache/restore@retry
+        id: restore-build-files
+        with:
+          path: |
+            /var/tmp/holochain_repo/.cargo/bin/
+            /var/tmp/holochain_repo/.cargo/registry/index/
+            /var/tmp/holochain_repo/.cargo/registry/cache/
+            /var/tmp/holochain_repo/.cargo/git/db/
+            /var/tmp/holochain_repo/target/
+          key: ${{ runner.os }}-prepare-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-prepare
+            ${{ runner.os }}-test-release-cargo-test-standard
+            ${{ runner.os }}
+          required: false
 
       - name: Detect missing release headings
         if: ${{ inputs.skip_prepare_logic != 'true' }}
