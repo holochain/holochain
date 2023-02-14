@@ -104,10 +104,11 @@ jobs:
         run: |
           set -exuE -o pipefail
 
-          if [[ ! -d "${HOLOCHAIN_REPO}" ]]; then
-            rm -rf "${HOLOCHAIN_REPO}"
-            mkdir -p "${HOLOCHAIN_REPO}"
+          if [[ -d "${HOLOCHAIN_REPO}" ]]; then
+            echo repository at ${HOLOCHAIN_REPO} unexpectedly exists
+            exit 1
           fi
+          mkdir -p "${HOLOCHAIN_REPO}"
 
           cd "${HOLOCHAIN_REPO}"
 
@@ -270,7 +271,7 @@ jobs:
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
-        if: ${{ failure() && inputs.debug == 'true' }}
+        if: ${{ always() && inputs.debug == 'true' }}
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         with:
