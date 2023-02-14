@@ -254,9 +254,15 @@ jobs:
       - name: Restore the holochain release repository
         env:
           HOLOCHAIN_REPO_NIX_STORE_PATH: ${{ needs.prepare.outputs.repo_nix_store_path }}
+          HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
         run: |
           set -exu
+
+          # this fetches the repo from the nix cache
           nix-store --realise ${HOLOCHAIN_REPO_NIX_STORE_PATH}
+
+          mkdir $(dirname ${HOLOCHAIN_REPO})
+          cp -rv --no-preserve=ownership ${HOLOCHAIN_REPO_NIX_STORE_PATH} ${HOLOCHAIN_REPO}
 
       - name: Restore cargo related state and build files
         uses: steveeJ-forks/actions-cache/restore@retry
@@ -388,20 +394,18 @@ jobs:
               --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
 
       - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@retry
-        with:
-          path: |
-            /var/tmp/holochain_release.sh
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
-          required: true
-
-      - name: Copy the git credentials
+        env:
+          HOLOCHAIN_REPO_NIX_STORE_PATH: ${{ needs.prepare.outputs.repo_nix_store_path }}
+          HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
         run: |
-          cd "${HOLOCHAIN_REPO}"
+          set -exu
+
+          # this fetches the repo from the nix cache
+          nix-store --realise ${HOLOCHAIN_REPO_NIX_STORE_PATH}
+
+          mkdir $(dirname ${HOLOCHAIN_REPO})
+          cp -rv --no-preserve=ownership ${HOLOCHAIN_REPO_NIX_STORE_PATH} ${HOLOCHAIN_REPO}
+
           cp -v $HOME/work/holochain/holochain/.git/config .git/config
 
       - name: Restore cargo related state and build files
@@ -422,6 +426,7 @@ jobs:
       - name: Ensure the git credentials are set
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+          HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
@@ -437,6 +442,7 @@ jobs:
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         env:
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
+          HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
