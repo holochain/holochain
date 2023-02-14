@@ -373,8 +373,8 @@ jobs:
     if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && needs.prepare.outputs.releasable_crates == 'true' }}
     needs: [vars, prepare, test]
     env:
-      HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
-      CACHIX_REV: ${{ env.CACHIX_REV }}
+      HOLOCHAIN_REPO: ${{ needs.prepare.outputs.HOLOCHAIN_REPO }}
+      CACHIX_REV: ${{ needs.prepare.outputs.CACHIX_REV }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
