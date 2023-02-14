@@ -29,7 +29,7 @@ fn query_is_blocked(
         sql_conductor::IS_BLOCKED,
         named_params! {
             ":target_id": target_id,
-            ":time_ms": timestamp,
+            ":time_us": timestamp,
         },
         |row| row.get(0),
     )?)
