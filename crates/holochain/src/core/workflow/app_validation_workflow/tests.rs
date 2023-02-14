@@ -71,8 +71,6 @@ async fn app_validation_workflow_test() {
 async fn test_private_entries_are_passed_to_validation_only_when_authored_with_full_entry() {
     observability::test_run().ok();
 
-    set_zome_types(&[(0, 3)], &[]);
-
     #[hdk_entry_helper]
     pub struct Post(String);
 
@@ -85,20 +83,30 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         Post(Post),
     }
 
-    let validation_successes = std::sync::Arc::new(parking_lot::Mutex::new(vec![]));
-    let validation_successes_2 = validation_successes.clone();
+    let validation_ops = std::sync::Arc::new(parking_lot::Mutex::new(vec![]));
+    let validation_ops_2 = validation_ops.clone();
+
+    let validation_failures = std::sync::Arc::new(parking_lot::Mutex::new(vec![]));
+    let validation_failures_2 = validation_failures.clone();
 
     let zomeset = InlineZomeSet::new_unique(
         [("integrity", vec![EntryDef::from_id("unit")], 0)],
         ["coordinator"],
     )
     .function("integrity", "validate", move |_h, op: Op| {
-        op.flattened::<EntryTypes, ()>()
-            .expect("op.flattened failed");
-        validation_successes_2.lock().push(op.clone());
+        // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
+        // and we're not guaranteed to be running on the same thread throughout the test.
+        set_zome_types(&[(0, 3)], &[]);
+        validation_ops_2.lock().push(op.clone());
+        if let Err(err) = op.flattened::<EntryTypes, ()>() {
+            validation_failures_2.lock().push(err);
+        }
         Ok(ValidateResult::Valid)
     })
     .function("coordinator", "create", |h, ()| {
+        // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
+        // and we're not guaranteed to be running on the same thread throughout the test.
+        set_zome_types(&[(0, 3)], &[]);
         let claim = CapClaimEntry {
             tag: "tag".into(),
             grantor: ::fixt::fixt!(AgentPubKey),
@@ -126,6 +134,10 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     });
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomeset).await;
 
+    // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
+    // and we're not guaranteed to be running on the same thread throughout the test.
+    set_zome_types(&[(0, 3)], &[]);
+
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors
         .setup_app(&"test_app", &[dna_file.clone()])
@@ -141,15 +153,30 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
 
     consistency_10s([&alice, &bob]).await;
 
+    {
+        let vfs = validation_failures.lock();
+        if !vfs.is_empty() {
+            panic!("{} validation failures encountered: {:#?}", vfs.len(), vfs);
+        }
+    }
+
     let mut num_store_record = 0;
     let mut num_store_entry = 0;
 
-    let mut num_store_record_private = 0;
     let mut num_store_entry_private = 0;
+    let mut num_store_record_private = 0;
+    let mut num_register_agent_activity_private = 0;
 
-    for op in validation_successes.lock().iter() {
-        match dbg!(op) {
+    for op in validation_ops.lock().iter() {
+        match op {
+            Op::StoreEntry(StoreEntry { action, entry: _ }) => {
+                if *action.hashed.entry_type().visibility() == EntryVisibility::Private {
+                    num_store_entry_private += 1
+                }
+                num_store_entry += 1
+            }
             Op::StoreRecord(StoreRecord { record }) => {
+                dbg!(&record);
                 if record
                     .action()
                     .entry_type()
@@ -162,18 +189,34 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
                 assert_eq!(record, &privatized);
                 num_store_record += 1
             }
-            Op::StoreEntry(StoreEntry { action, entry }) => {
-                if *action.hashed.entry_type().visibility() == EntryVisibility::Private {
-                    num_store_entry_private += 1
+            Op::RegisterAgentActivity(RegisterAgentActivity {
+                action,
+                cached_entry: _,
+            }) => {
+                if action
+                    .hashed
+                    .entry_type()
+                    .map(|et| *et.visibility() == EntryVisibility::Private)
+                    .unwrap_or(false)
+                {
+                    num_register_agent_activity_private += 1
                 }
-                num_store_entry += 1
             }
-            Op::RegisterAgentActivity(_) => {}
             _ => unreachable!(),
         }
     }
 
-    assert_eq!((num_store_record_private, num_store_entry_private), (4, 2))
+    // - Of the two private entries alice committed, only alice should validate these as a StoreEntry.
+    // - However, both Alice and Bob should validate and integrate the StoreRecord and RegisterAgentActivity,
+    //     even though the entries are private.
+    assert_eq!(
+        (
+            num_store_entry_private,
+            num_store_record_private,
+            num_register_agent_activity_private
+        ),
+        (2, 4, 4)
+    )
 }
 
 const SELECT: &'static str = "SELECT count(hash) FROM DhtOp WHERE";

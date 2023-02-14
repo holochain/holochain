@@ -614,6 +614,7 @@ impl IncomingDhtOpSender {
         self.send_op(record, make_store_record).await
     }
     async fn send_store_entry(self, record: Record) -> SysValidationResult<()> {
+        // TODO: MD: isn't it already too late if we've received a private entry from the network at this point?
         let is_public_entry = record.action().entry_type().map_or(false, |et| {
             matches!(et.visibility(), EntryVisibility::Public)
         });

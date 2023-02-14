@@ -105,8 +105,6 @@ impl Scratch {
     pub fn add_entry(&mut self, entry_hashed: EntryHashed, chain_top_ordering: ChainTopOrdering) {
         self.respect_chain_top_ordering(chain_top_ordering);
         let (entry, hash) = entry_hashed.into_inner();
-
-        dbg!("add_entry", std::backtrace::Backtrace::capture());
         self.entries.insert(hash, Arc::new(entry));
     }
 
