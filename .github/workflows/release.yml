@@ -370,11 +370,8 @@ jobs:
           limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
 
   finalize:
-    if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && needs.prepare.outputs.releasable_crates == 'true' }}
+    if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && (needs.prepare.outputs.releasable_crates == 'true' || needs.vars.outputs.skip_prepare_logic == 'true' }}
     needs: [vars, prepare, test]
-    env:
-      HOLOCHAIN_REPO: ${{ needs.prepare.outputs.HOLOCHAIN_REPO }}
-      CACHIX_REV: ${{ needs.prepare.outputs.CACHIX_REV }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -396,7 +393,6 @@ jobs:
       - name: Restore the holochain release repository
         env:
           HOLOCHAIN_REPO_NIX_STORE_PATH: ${{ needs.prepare.outputs.repo_nix_store_path }}
-          HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
         run: |
           set -exu
 
@@ -426,7 +422,6 @@ jobs:
       - name: Ensure the git credentials are set
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-          HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
@@ -442,19 +437,17 @@ jobs:
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         env:
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
-          HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
 
           git status
 
-          git push origin ${HOLOCHAIN_TARGET_BRANCH}
+          echo git push origin ${HOLOCHAIN_TARGET_BRANCH}
 
       - name: Push the release branch
         id: push-release-branch
         env:
-          HOLOCHAIN_REPO: ${{ needs.vars.outputs.holochain_repo}}
           RELEASE_BRANCH: ${{ needs.vars.outputs.release_branch}}
         run: |
           cd "${HOLOCHAIN_REPO}"
@@ -467,14 +460,13 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           nix-shell \
             --pure \
             --keep CARGO_REGISTRY_TOKEN \
             --argstr devShellId release  --run '
-              release-automation \
+              echo release-automation \
                 --workspace-path=$PWD \
                 --log-level=trace \
                 release \
@@ -491,7 +483,7 @@ jobs:
 
           git status
 
-          git push origin ${HOLOCHAIN_TARGET_BRANCH} --tags
+          echo git push origin ${HOLOCHAIN_TARGET_BRANCH} --tags
 
       - name: Merge release branch into source branch
         continue-on-error: true
@@ -510,9 +502,8 @@ jobs:
         continue-on-error: true
         run: |
           set -xeu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
-          git push origin ${HOLOCHAIN_SOURCE_BRANCH}
+          echo git push origin ${HOLOCHAIN_SOURCE_BRANCH}
 
       - name: Create a pull-request towards the source branch
         id: cpr
@@ -522,7 +513,6 @@ jobs:
         run: |
           set -euE -o pipefail
 
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           gh pr create \
@@ -541,9 +531,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
+          RELEASE_BRANCH: ${{ needs.vars.outputs.release_branch }}
         run: |
           set -eu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
@@ -555,7 +545,7 @@ jobs:
             export IS_HOLOCHAIN_RELEASE="true"
           fi
 
-          gh api \
+          echo gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
             /repos/holochain/holochain/releases \
