@@ -74,7 +74,6 @@ concurrency:
 
 env:
   HOLOCHAIN_REPO: "/var/tmp/holochain_repo"
-  HOLOCHAIN_RELEASE_SH: "/var/tmp/holochain_release.sh"
   CACHIX_REV: "v1.0.1"
 
 jobs:
@@ -191,7 +190,6 @@ jobs:
       HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
       HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
       HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ env.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ env.CACHIX_REV }}
     secrets:
       CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -405,7 +403,6 @@ jobs:
     needs: [vars, prepare, test]
     env:
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
     runs-on: ubuntu-latest
     steps:
