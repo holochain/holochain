@@ -255,7 +255,6 @@ where
         holochain_cascade::Cascade::from_workspace_and_network(&workspace, network.clone());
     for mut chain_record in to_app_validate {
         for op_type in action_to_op_types(chain_record.action()) {
-            dbg!(&chain_record);
             let op =
                 app_validation_workflow::record_to_op(chain_record, op_type, &mut cascade).await;
 

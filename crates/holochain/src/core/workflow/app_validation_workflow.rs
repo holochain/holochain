@@ -283,9 +283,7 @@ pub async fn record_to_op(
         record.privatized()
     };
 
-    dbg!(&record, &op_type);
     let (shh, entry) = record.into_inner();
-    dbg!(&entry);
     let mut entry = entry.into_option();
     let action = shh.into();
     // Register agent activity doesn't store the entry so we need to
@@ -293,7 +291,6 @@ pub async fn record_to_op(
     if matches!(op_type, RegisterAgentActivity) {
         hidden_entry = entry.take().or(hidden_entry);
     }
-    dbg!(&hidden_entry);
     let dht_op = DhtOp::from_type(op_type, action, entry)?;
     Ok((dhtop_to_op(dht_op, cascade).await?, hidden_entry))
 }

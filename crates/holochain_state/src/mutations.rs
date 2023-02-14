@@ -14,7 +14,6 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::{DhtOpHashed, DhtOpType};
-use holochain_types::prelude::backtrace;
 use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
@@ -106,7 +105,7 @@ pub fn insert_op_scratch(
             entry.clone(),
             action
                 .entry_hash()
-                .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone(), backtrace()))?
+                .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?
                 .clone(),
         );
         scratch.add_entry(entry_hashed, chain_top_ordering);
@@ -140,7 +139,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     if let Some(entry) = op.entry() {
         let entry_hash = action
             .entry_hash()
-            .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone(), backtrace()))?;
+            .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
 
         insert_entry(txn, entry_hash, entry)?;
     }

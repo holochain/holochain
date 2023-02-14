@@ -79,7 +79,7 @@ impl Record {
             .action()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility());
-        // dbg!(Backtrace::capture());
+
         let entry = match (maybe_entry, maybe_visibility) {
             (Some(entry), Some(_)) => RecordEntry::Present(entry),
             (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
@@ -89,6 +89,7 @@ impl Record {
             }
             (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,
         };
+
         Self {
             signed_action,
             entry,

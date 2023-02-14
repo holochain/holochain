@@ -392,8 +392,7 @@ impl DhtOp {
         let r = match op_type {
             DhtOpType::StoreRecord => DhtOp::StoreRecord(signature, action, entry.map(Box::new)),
             DhtOpType::StoreEntry => {
-                let entry = entry
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone(), backtrace()))?;
+                let entry = entry.ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
                 let action = match action {
                     Action::Create(c) => NewEntryAction::Create(c),
                     Action::Update(c) => NewEntryAction::Update(c),
@@ -517,7 +516,7 @@ impl DhtOpLight {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone(), backtrace()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
                 Self::StoreEntry(action_hash, entry_hash.clone(), entry_hash.into())
             }
             DhtOpType::RegisterAgentActivity => {
@@ -527,7 +526,7 @@ impl DhtOpLight {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone(), backtrace()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
                 let basis = match action {
                     Action::Update(update) => update.original_entry_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),
@@ -538,7 +537,7 @@ impl DhtOpLight {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone(), backtrace()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
                 let basis = match action {
                     Action::Update(update) => update.original_entry_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),

@@ -101,7 +101,6 @@ pub async fn get_ops_to_publish(
         })
         .await?;
     tracing::debug!(?results);
-    dbg!(&results);
     results
 }
 
