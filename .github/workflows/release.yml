@@ -1,10 +1,5 @@
 name: release holochain
 
-env:
-  HOLOCHAIN_REPO: "/var/tmp/holochain_repo"
-  HOLOCHAIN_RELEASE_SH: "/var/tmp/holochain_release.sh"
-  CACHIX_REV: "v1.0.1"
-
 on:
   # schedule:
   #   - cron: "0 0 * * 3" # at 0 AM on wednesday
@@ -76,6 +71,11 @@ on:
 concurrency:
   group: release-${{ github.ref_name }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event.inputs.force_cancel_in_progress == 'true' || github.event_name == 'pull_request' }}
+
+env:
+  HOLOCHAIN_REPO: "/var/tmp/holochain_repo"
+  HOLOCHAIN_RELEASE_SH: "/var/tmp/holochain_release.sh"
+  CACHIX_REV: "v1.0.1"
 
 jobs:
   vars:
@@ -244,132 +244,6 @@ jobs:
                   hc-static-checks
                   hc-test-wasm
                 '
-
-          # - name: cargo-test-standard
-          #   largeCacheStorage:
-          #     - generic
-          #     - nix
-          #   maxBuildSpace: true
-          #   hasBuildStep: true
-          #   timeout_minutes: 30
-          #   max_attempts: 2
-          #   run: |
-          #     nix-shell \
-          #       --pure \
-          #       --keep CARGO_NEXTEST_ARGS \
-          #       --keep CARGO_TEST_ARGS \
-          #       --fallback --argstr devShellId "coreDev" --run hc-test-standard-nextest
-
-          # - name: cargo-test-static
-          #   largeCacheStorage:
-          #     - generic
-          #     - nix
-          #   hasBuildStep: true
-          #   timeout_minutes: 5
-          #   max_attempts: 1
-          #   run: |
-          #     nix-shell \
-          #       --pure \
-          #       --keep CARGO_TEST_ARGS \
-          #       --fallback --argstr devShellId "coreDev" --run hc-static-checks
-
-          # - name: cargo-test-wasm
-          #   largeCacheStorage:
-          #     - generic
-          #     - nix
-          #   hasBuildStep: true
-          #   timeout_minutes: 5
-          #   max_attempts: 6
-          #   run: |
-          #     nix-shell \
-          #       --pure \
-          #       --keep CARGO_TEST_ARGS \
-          #       --fallback --argstr devShellId "coreDev" --run hc-test-wasm
-
-          - name: nix-test
-            largeCacheStorage:
-              - nix
-            hasBuildStep: false
-            timeout_minutes: 90
-            max_attempts: 1
-            run: |
-              set -x
-
-              # remove everything that wouldn't be on github either
-              git clean -fdx
-
-              # we use this git daemon to not rely on the published tag
-              git daemon --reuseaddr --base-path=. --export-all --verbose --detach
-
-              git clone "${HOLOCHAIN_NIXPKGS_URL}" "${HOLOCHAIN_NIXPKGS_REPO}" -b ${HOLOCHAIN_NIXPKGS_SOURCE_BRANCH} --depth=1
-              cd "${HOLOCHAIN_NIXPKGS_REPO}"
-
-              git checkout -b "${RELEASE_BRANCH}"
-
-              if grep --quiet ${VERSION_COMPAT} packages/holochain/versions/update_config.toml; then
-                export VERSION_COMPAT="${VERSION_COMPAT}-ci"
-                export TAG="${TAG}-ci"
-                git -C "${HOLOCHAIN_REPO}" tag --force "${TAG}"
-              fi
-
-              # TODO: use a util from the holochain-nixpkgs repo to make this change as this can get out of sync
-              cat <<EOF >> packages/holochain/versions/update_config.toml
-
-              [${VERSION_COMPAT}]
-              git-src = "revision:${TAG}"
-              git-repo = "git://localhost/"
-              EOF
-
-              # regenerate the nix sources
-              git config --global user.email "devcore@holochain.org"
-              git config --global user.name "Holochain Core Dev Team"
-              nix-shell \
-                --pure \
-                --keep VERSION_COMPAT \
-                --arg flavors '["release"]' \
-                --run 'hnixpkgs-update-single ${VERSION_COMPAT}'
-              nix-build . -A packages.holochain.holochainAllBinariesWithDeps.${VERSION_COMPAT} --no-link
-
-              git clone "${HOLONIX_URL}" "${HOLONIX_REPO}" -b ${HOLONIX_SOURCE_BRANCH} --depth=1
-              cd "${HOLONIX_REPO}"
-
-              nix-shell \
-                --pure \
-                --keep HOLOCHAIN_NIXPKGS_REPO \
-                --run '
-                  niv drop holochain-nixpkgs
-                  niv add local --path ${HOLOCHAIN_NIXPKGS_REPO} --name holochain-nixpkgs
-                '
-
-              nix-shell \
-                --pure \
-                --argstr holochainVersionId "${VERSION_COMPAT}" \
-                --arg include '{ test = true; }' \
-                --run '
-                  holochain --version
-                  hn-test
-                '
-        exclude:
-          # dont run tests on pull request
-          - event_name: pull_request
-
-          # exclude all cargo test jobs on macos
-          - platform:
-              arch: macos-x86_64
-            testCommand:
-              name: cargo-test
-
-          # exclude all cargo test jobs on github's ubuntu-latest
-          - platform:
-              runs-on: [ubuntu-latest]
-            testCommand:
-              name: cargo-test
-
-          # we only run the cargo tests on the self-hosted runners
-          - platform:
-              runs-on: [self-hosted, release]
-            testCommand:
-              name: nix-test
 
           # TODO: reenable these if or when we split the cargo tests up again
           # - platform:
