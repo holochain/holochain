@@ -250,14 +250,14 @@ impl OpHelper for Op {
                             EntryType::CapClaim => OpEntry::CreateCapClaim {
                                 entry: match entry {
                                     Entry::CapClaim(entry) => entry.clone(),
-                                    _ => return Err(wasm_error!(WasmErrorInner::Host(format!("Entry type does not match. CapClaim expected but got: {:?}", entry))))
+                                    _ => return Err(wasm_error!(WasmErrorInner::Guest(format!("Entry type does not match. CapClaim expected but got: {:?}", entry))))
                                 },
                                 action: action.clone(),
                             },
                             EntryType::CapGrant => OpEntry::CreateCapGrant {
                                 entry: match entry {
                                     Entry::CapGrant(entry) => entry.clone(),
-                                    _ => return Err(wasm_error!(WasmErrorInner::Host(format!("Entry type does not match. CapGrant expected but got: {:?}", entry))))
+                                    _ => return Err(wasm_error!(WasmErrorInner::Guest(format!("Entry type does not match. CapGrant expected but got: {:?}", entry))))
                                 },
                                 action: action.clone(),
                             },
@@ -292,7 +292,7 @@ impl OpHelper for Op {
                                 original_entry_hash: original_entry_hash.clone(),
                                 entry: match entry {
                                     Entry::CapClaim(entry) => entry.clone(),
-                                    _ => return Err(wasm_error!(WasmErrorInner::Host(format!("Entry type does not match. CapClaim expected but got: {:?}", entry))))
+                                    _ => return Err(wasm_error!(WasmErrorInner::Guest(format!("Entry type does not match. CapClaim expected but got: {:?}", entry))))
                                 },
                                 action: action.clone(),
                             },
@@ -301,7 +301,7 @@ impl OpHelper for Op {
                                 original_entry_hash: original_entry_hash.clone(),
                                 entry: match entry {
                                     Entry::CapGrant(entry) => entry.clone(),
-                                    _ => return Err(wasm_error!(WasmErrorInner::Host(format!("Entry type does not match. CapGrant expected but got: {:?}", entry))))
+                                    _ => return Err(wasm_error!(WasmErrorInner::Guest(format!("Entry type does not match. CapGrant expected but got: {:?}", entry))))
                                 },
                                 action: action.clone(),
                             },
@@ -672,11 +672,11 @@ where
             }
         }
 
-        (Some(_), EntryVisibility::Private) => Err(wasm_error!(WasmErrorInner::Host(format!(
+        (Some(_), EntryVisibility::Private) => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Entry visibility is private but an entry was provided! entry_def: {entry_def:?}"
         )))),
 
-        (None, EntryVisibility::Public) => Err(wasm_error!(WasmErrorInner::Host(format!(
+        (None, EntryVisibility::Public) => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Entry visibility is public but no entry is available. entry_def: {entry_def:?}"
         )))),
     }

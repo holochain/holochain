@@ -121,23 +121,11 @@ fn test_activity_entry(
     => matches Err(WasmErrorInner::Host(_)) ; "private entry zome id out of range")]
 #[test_case(
     public_app_entry_def(0, 0), None
-    => matches Err(WasmErrorInner::Guest(_)) ; "public entry hidden")]
-#[test_case(
-    public_app_entry_def(0, 0), None
-    => matches Err(WasmErrorInner::Guest(_)) ; "public entry not applicable")]
-#[test_case(
-    public_app_entry_def(0, 0), None
-    => matches Err(WasmErrorInner::Host(_)) ; "public entry not stored")]
+    => matches Err(WasmErrorInner::Guest(_)) ; "public entry missing")]
 #[test_case(
     private_app_entry_def(0, 0), Some(&e(A{}))
     => matches Err(WasmErrorInner::Guest(_)) ; "private entry present")]
-#[test_case(
-    private_app_entry_def(0, 0), None
-    => matches Err(WasmErrorInner::Guest(_)) ; "private entry not applicable")]
-#[test_case(
-    private_app_entry_def(0, 0), None
-    => matches Err(WasmErrorInner::Host(_)) ; "private entry not stored")]
-fn test_map_entry(
+fn test_get_app_entry_type_for_record_authority(
     entry_type: AppEntryDef,
     entry: Option<&Entry>,
 ) -> Result<UnitEnumEither<EntryTypes>, WasmErrorInner> {
