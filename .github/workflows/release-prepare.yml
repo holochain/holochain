@@ -245,13 +245,13 @@ jobs:
 
           cd "${HOLOCHAIN_REPO}"
 
-          export STORE_PATH=$(nix eval --raw --override-input holochain .  .#holochain.inputDerivation.src)
+          export STORE_PATH=$(nix store add-path --name holochain_repo .)
           export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
           export VERSION=\${TAG/holochain-/}
           export VERSION_COMPAT="v\${VERSION//./_}"
           export RELEASE_BRANCH=$(git branch --show-current)
 
-          echo "::set-output repo_nix_store_path=::${STORE_PATH}"
+          echo "::set-output name=repo_nix_store_path=::${STORE_PATH}"
           echo "::set-output name=tag::${TAG}"
           echo "::set-output name=version::${VERSION}"
           echo "::set-output name=version_compat::${VERSION_COMPAT}"
@@ -271,7 +271,7 @@ jobs:
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
-        if: ${{ always() && inputs.debug == 'true' }}
+        if: ${{ failure() || inputs.debug == 'true' }}
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         with:
