@@ -1,5 +1,10 @@
 name: release holochain
 
+env:
+  HOLOCHAIN_REPO: "/var/tmp/holochain_repo"
+  HOLOCHAIN_RELEASE_SH: "/var/tmp/holochain_release.sh"
+  CACHIX_REV: "v1.0.1"
+
 on:
   # schedule:
   #   - cron: "0 0 * * 3" # at 0 AM on wednesday
@@ -76,10 +81,6 @@ jobs:
   vars:
     runs-on: ubuntu-latest
     outputs:
-      HOLOCHAIN_REPO: ${{ steps.eval.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ steps.eval.outputs.HOLOCHAIN_RELEASE_SH}}
-      CACHIX_REV: ${{ steps.eval.outputs.CACHIX_REV}}
-
       # holochain_url: ${{ steps.eval.outputs.holochain_url }}
       # holochain_nixpkgs_url: ${{ steps.eval.outputs.holochain_nixpkgs_url }}
       # holonix_url: ${{ steps.eval.outputs.holonix_url }}
@@ -180,10 +181,6 @@ jobs:
           else
             echo "::set-output name=skip_prepare_logic::false"
           fi
-
-          echo "::set-output name=HOLOCHAIN_REPO::/var/tmp/holochain_repo"
-          echo "::set-output name=HOLOCHAIN_RELEASE_SH::/var/tmp/holochain_release.sh"
-          echo "::set-output name=CACHIX_REV::v1.0.1"
   prepare:
     needs: [vars]
     uses: ./.github/workflows/release-prepare.yml
@@ -193,9 +190,9 @@ jobs:
       skip_prepare_logic: ${{ needs.vars.outputs.skip_prepare_logic }}
       HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
       HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
-      HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
-      CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
+      HOLOCHAIN_REPO: ${{ env.HOLOCHAIN_REPO }}
+      HOLOCHAIN_RELEASE_SH: ${{ env.HOLOCHAIN_RELEASE_SH }}
+      CACHIX_REV: ${{ env.CACHIX_REV }}
     secrets:
       CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_AUTH_TOKEN }}
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -204,10 +201,6 @@ jobs:
   test:
     needs: [vars, prepare]
     if: ${{ github.event_name != 'pull_request' && needs.vars.outputs.skip_test != 'true' }}
-    env:
-      HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
-      CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
     strategy:
       fail-fast: false
       matrix:
@@ -419,16 +412,11 @@ jobs:
         run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
       - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@retry
-        with:
-          path: |
-            /var/tmp/holochain_release.sh
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
-          required: true
+        env:
+          HOLOCHAIN_REPO_NIX_STORE_PATH: ${{ needs.prepare.outputs.repo_nix_store_path }}
+        run: |
+          set -exu
+          nix-store --realise ${HOLOCHAIN_REPO_NIX_STORE_PATH}
 
       - name: Restore cargo related state and build files
         uses: steveeJ-forks/actions-cache/restore@retry
