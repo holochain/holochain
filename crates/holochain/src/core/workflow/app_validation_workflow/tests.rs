@@ -160,9 +160,6 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
         }
     }
 
-    let mut num_store_record = 0;
-    let mut num_store_entry = 0;
-
     let mut num_store_entry_private = 0;
     let mut num_store_record_private = 0;
     let mut num_register_agent_activity_private = 0;
@@ -173,10 +170,8 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
                 if *action.hashed.entry_type().visibility() == EntryVisibility::Private {
                     num_store_entry_private += 1
                 }
-                num_store_entry += 1
             }
             Op::StoreRecord(StoreRecord { record }) => {
-                dbg!(&record);
                 if record
                     .action()
                     .entry_type()
@@ -187,7 +182,6 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
                 }
                 let (privatized, _) = record.clone().privatized();
                 assert_eq!(record, &privatized);
-                num_store_record += 1
             }
             Op::RegisterAgentActivity(RegisterAgentActivity {
                 action,
