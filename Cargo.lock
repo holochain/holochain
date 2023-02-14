@@ -2775,6 +2775,7 @@ dependencies = [
  "holochain_wasmer_common",
  "kitsune_p2p_dht",
  "kitsune_p2p_timestamp",
+ "kitsune_p2p_types",
  "matches",
  "nanoid 0.3.0",
  "num_enum",

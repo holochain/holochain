@@ -13,6 +13,7 @@ edition = "2021"
 
 [dependencies]
 kitsune_p2p_timestamp = { version = "^0.1.0", path = "../kitsune_p2p/timestamp" }
+kitsune_p2p_types = { version = "^0.1.0", path = "../kitsune_p2p/types" }
 holo_hash = { version = "^0.1.0", path = "../holo_hash", features = ["encoding"] }
 holochain_integrity_types = { version = "^0.1.0", path = "../holochain_integrity_types", features = ["tracing"] }
 holochain_serialized_bytes = "=0.0.51"
