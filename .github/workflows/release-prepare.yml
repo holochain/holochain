@@ -236,27 +236,6 @@ jobs:
         if: ${{ failure() }}
         run: sudo dmesg
 
-      - name: cache the repo and set outputs
-        id: write-env-and-tag
-        env:
-          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-        run: |
-          set -exu
-
-          cd "${HOLOCHAIN_REPO}"
-
-          export STORE_PATH=$(nix store add-path --name holochain_repo .)
-          export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
-          export VERSION=\${TAG/holochain-/}
-          export VERSION_COMPAT="v\${VERSION//./_}"
-          export RELEASE_BRANCH=$(git branch --show-current)
-
-          echo "::set-output name=repo_nix_store_path=::${STORE_PATH}"
-          echo "::set-output name=tag::${TAG}"
-          echo "::set-output name=version::${VERSION}"
-          echo "::set-output name=version_compat::${VERSION_COMPAT}"
-          echo "::set-output name=release_branch::${RELEASE_BRANCH}"
-
       - name: Cache cargo related build files
         uses: steveeJ-forks/actions-cache/save@main
         if: ${{ inputs.skip_prepare_logic != 'true' }}
@@ -268,6 +247,30 @@ jobs:
             /var/tmp/holochain_repo/.cargo/git/db/
             /var/tmp/holochain_repo/target/
           key: ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
+
+      - name: cache the repo and set outputs
+        id: write-env-and-tag
+        env:
+          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
+        run: |
+          set -exu
+
+          cd "${HOLOCHAIN_REPO}"
+
+          # clean the repo before adding it to the store
+          git clean -fdx
+          export STORE_PATH=$(nix store add-path --name holochain_repo .)
+
+          export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
+          export VERSION=\${TAG/holochain-/}
+          export VERSION_COMPAT="v\${VERSION//./_}"
+          export RELEASE_BRANCH=$(git branch --show-current)
+
+          echo "::set-output name=repo_nix_store_path=::${STORE_PATH}"
+          echo "::set-output name=tag::${TAG}"
+          echo "::set-output name=version::${VERSION}"
+          echo "::set-output name=version_compat::${VERSION_COMPAT}"
+          echo "::set-output name=release_branch::${RELEASE_BRANCH}"
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
