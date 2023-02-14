@@ -262,8 +262,8 @@ jobs:
           export STORE_PATH=$(nix store add-path --name holochain_repo .)
 
           export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
-          export VERSION=\${TAG/holochain-/}
-          export VERSION_COMPAT="v\${VERSION//./_}"
+          export VERSION=${TAG/holochain-/}
+          export VERSION_COMPAT="v${VERSION//./_}"
           export RELEASE_BRANCH=$(git branch --show-current)
 
           echo "::set-output name=repo_nix_store_path=::${STORE_PATH}"
