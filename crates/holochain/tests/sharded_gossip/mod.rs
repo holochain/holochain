@@ -43,19 +43,13 @@ fn make_config(
     // so we can fallback to the next one
     tuning.default_rpc_single_timeout_ms = 3_000;
 
-    let mut network = KitsuneP2pConfig::default();
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    network.tuning_params = Arc::new(tuning);
-    network.into()
+    holochain::sweettest::SweetConductorConfig::standard()
+        .tune(Arc::new(tuning))
 }
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
+async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     let _g = observability::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
@@ -76,7 +70,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo]).await;
+    consistency_60s([&alice, &bobbo]).await;
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());

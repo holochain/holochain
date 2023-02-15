@@ -62,8 +62,23 @@ impl Drop for SweetLocalRendezvous {
 impl SweetLocalRendezvous {
     /// Create a new local rendezvous instance.
     pub async fn new() -> DynSweetRendezvous {
+        let mut addr = None;
+
+        for iface in get_if_addrs::get_if_addrs().expect("failed to get_if_addrs") {
+            if iface.is_loopback() {
+                continue;
+            }
+            if iface.ip().is_ipv6() {
+                continue;
+            }
+            addr = Some(iface.ip());
+            break;
+        }
+
+        let addr = addr.expect("failed to get_if_addrs");
+
         let (bs_driver, bs_addr, bs_shutdown) =
-            kitsune_p2p_bootstrap::run(([0, 0, 0, 0], 0), Vec::new())
+            kitsune_p2p_bootstrap::run((addr, 0), Vec::new())
                 .await
                 .unwrap();
         tokio::task::spawn(bs_driver);
@@ -84,10 +99,17 @@ impl SweetLocalRendezvous {
 
             let mut sig_conf = tx5_signal_srv::Config::default();
             sig_conf.port = 0;
-            sig_conf.ice_servers = serde_json::from_str(&turn_addr).unwrap();
+            sig_conf.ice_servers = serde_json::json!({
+                "iceServers": [
+                    serde_json::from_str::<serde_json::Value>(&turn_addr).unwrap(),
+                ],
+            });
             sig_conf.demo = false;
+            tracing::info!("RUNNING ICE SERVERS: {}", serde_json::to_string_pretty(&sig_conf.ice_servers).unwrap());
 
             let (sig_addr, sig_driver) = tx5_signal_srv::exec_tx5_signal_srv(sig_conf).unwrap();
+            let sig_port = sig_addr.port();
+            let sig_addr = (addr, sig_port).into();
             let sig_shutdown = tokio::task::spawn(sig_driver);
             tracing::info!("RUNNING SIG: {sig_addr:?}");
 
@@ -199,6 +221,12 @@ impl SweetConductorConfig {
 
         network.tuning_params = Arc::new(tuning);
         network.into()
+    }
+
+    /// Set network tuning params.
+    pub fn tune(mut self, tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams) -> Self {
+        self.0.network.as_mut().expect("failed to tune network").tuning_params = tuning_params;
+        self
     }
 
     #[cfg(feature = "tx5")]

@@ -2259,6 +2259,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
+ "get_if_addrs",
  "getrandom 0.2.8",
  "ghost_actor 0.3.0-alpha.4",
  "hdk",
@@ -7160,8 +7161,6 @@ dependencies = [
 [[package]]
 name = "tx5"
 version = "0.0.1-alpha.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d4f2f63e0150607e2660faa9e7efb35cc64bffe4a8a048a65d49f73a5caf846"
 dependencies = [
  "futures",
  "once_cell",
@@ -7171,9 +7170,21 @@ dependencies = [
  "rand-utf8",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.2",
  "tx5-go-pion",
  "tx5-signal",
+ "url 2.3.1",
+]
+
+[[package]]
+name = "tx5-core"
+version = "0.0.1-alpha.2"
+dependencies = [
+ "base64 0.13.1",
+ "once_cell",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
  "url 2.3.1",
 ]
 
@@ -7192,8 +7203,6 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion"
 version = "0.0.1-alpha.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ce036496f0e92e2a77cfd7bfc4ebff280f1cc45a6b16a438630955510c90176"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -7205,8 +7214,6 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.0.1-alpha.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f93319a2801a89d9f7be3780a7585ec7e22ef33e434b267081bf0549fd4422c8"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -7217,7 +7224,7 @@ dependencies = [
  "ouroboros",
  "sha2 0.10.6",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.2",
  "zip",
 ]
 
@@ -7234,15 +7241,13 @@ dependencies = [
  "sha2 0.10.6",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "zip",
 ]
 
 [[package]]
 name = "tx5-signal"
 version = "0.0.1-alpha.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "206ade2798fbd3e5a90ebb02460e0a088a2d0669329abe2916777ad5d14f6a84"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -7258,7 +7263,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite 0.17.2",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.2",
  "url 2.3.1",
 ]
 
@@ -7279,7 +7284,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.16",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "warp",
 ]
 
