@@ -125,6 +125,9 @@ pub use builder::*;
 mod chc;
 pub use chc::*;
 
+mod conductor_services;
+pub use conductor_services::*;
+
 pub use accessor_impls::*;
 pub use app_impls::*;
 pub use app_status_impls::*;
@@ -228,6 +231,8 @@ pub struct Conductor {
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
+
+    pub(crate) services: ConductorServices,
 }
 
 impl Conductor {
@@ -288,6 +293,7 @@ mod startup_shutdown_impls {
                 keystore,
                 holochain_p2p,
                 post_commit,
+                services: ConductorServices::default(),
             }
         }
 

@@ -98,11 +98,11 @@ where
     }
 
     // NB: this is just a placeholder for a real DPKI request to show intent
-    if api
-        .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
-        .await
-        .expect("TODO: actually implement this")
-        == "INVALID"
+    if !api
+        .conductor_services()
+        .deepkey
+        .is_key_valid(agent_pubkey.clone(), Timestamp::now())
+        .await?
     {
         return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
     }
@@ -189,7 +189,7 @@ pub mod tests {
         {
             let workspace = GenesisWorkspace::new(vault.clone().into(), dht_db.to_db()).unwrap();
             let mut api = MockCellConductorApiT::new();
-            api.expect_dpki_request().returning(|_, _| {
+            api.services().returning(|_, _| {
                 async move { Ok("mocked dpki request response".to_string()) }.boxed()
             });
             api.expect_keystore().return_const(keystore.clone());
