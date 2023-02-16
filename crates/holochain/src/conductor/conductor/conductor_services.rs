@@ -8,18 +8,23 @@ use std::sync::Arc;
 
 mod deepkey_service;
 pub use deepkey_service::*;
+mod app_store_service;
+pub use app_store_service::*;
 
 /// The set of all Conductor Services available to the conductor
 #[derive(Clone)]
 pub struct ConductorServices {
     /// The Deepkey service
     pub deepkey: Arc<dyn DeepkeyService>,
+    /// The AppStore service
+    pub app_store: Arc<dyn AppStoreService>,
 }
 
 impl Default for ConductorServices {
     fn default() -> Self {
         Self {
             deepkey: todo!("instantiate deepkey service"),
+            app_store: todo!("instantiate app_store service"),
         }
     }
 }
