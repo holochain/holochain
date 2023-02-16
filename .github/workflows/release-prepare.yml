@@ -69,8 +69,8 @@ jobs:
       version: ${{ steps.write-env-and-tag.outputs.version }}
       version_compat: ${{ steps.write-env-and-tag.outputs.version_compat }}
       release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
-      releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
       repo_nix_store_path: ${{ steps.write-env-and-tag.outputs.repo_nix_store_path }}
+      releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
 
     steps:
       - name: Checkout repository
