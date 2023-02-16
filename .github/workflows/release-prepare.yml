@@ -80,9 +80,9 @@ jobs:
         if: ${{ inputs.skip_prepare_logic != 'true' }}
 
       - name: Install nix
-        uses: cachix/install-nix-action@v17
+        uses: cachix/install-nix-action@v19
       - name: Setup cachix
-        uses: cachix/cachix-action@v11
+        uses: cachix/cachix-action@v12
         continue-on-error: ${{ github.event_name != 'pull_request' }}
         with:
           name: holochain-ci
