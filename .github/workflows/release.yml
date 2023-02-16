@@ -522,6 +522,7 @@ jobs:
       - name: Create a pull-request towards the source branch
         id: cpr
         if: ${{ always() && steps.push-release-branch.outcome == 'success' && (needs.vars.outputs.dry_run == 'true' || (steps.publish.outcome == 'failed' || steps.push-tags.outcome == 'failed' || steps.merge-into-source.outcome == 'failed')) }}
+        continue-on-error: ${{ needs.prepare.outputs.releasable_crates != 'true' }}
         env:
           RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
           HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
