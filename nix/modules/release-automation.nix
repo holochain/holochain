@@ -69,11 +69,11 @@
         buildInputs = commonArgs.buildInputs ++ [ pkgs.cacert ];
         nativeBuildInputs = commonArgs.nativeBuildInputs ++
           [
+            package
+
+            rustToolchain
             pkgs.gitFull
-            (config.writers.writePureShellScriptBin
-              "release-automation"
-              ([ pkgs.gitFull rustToolchain ] ++ commonArgs.nativeBuildInputs ++ commonArgs.buildInputs)
-              "exec ${package}/bin/release-automation $@")
+            pkgs.coreutils
           ];
 
         cargoNextestExtraArgs =
