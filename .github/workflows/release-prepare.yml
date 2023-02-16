@@ -45,18 +45,21 @@ on:
         required: true
 
     outputs:
-      releasable_crates:
-        description: "whether there are any releaseable crates"
-        value: ${{ jobs.prepare.outputs.releasable_crates }}
-      version:
-        description: "which holochain version, if one, will be released"
-        value: ${{ jobs.prepare.outputs.version }}
       tag:
         description: "which holochain tag, if one, will be released"
         value: ${{ jobs.prepare.outputs.tag }}
+      version:
+        description: "which holochain version, if one, will be released"
+        value: ${{ jobs.prepare.outputs.version }}
+      release_branch:
+        description: "the branch that contains the changes made during this action"
+        value: ${{ jobs.prepare.outputs.release_branch }}
       repo_nix_store_path:
         description: "the nix-store path for the release repo that is a result of the preparation"
         value: ${{ jobs.prepare.outputs.repo_nix_store_path }}
+      releasable_crates:
+        description: "whether there are any releaseable crates"
+        value: ${{ jobs.prepare.outputs.releasable_crates }}
 
 jobs:
   prepare:
@@ -67,8 +70,7 @@ jobs:
     outputs:
       tag: ${{ steps.write-env-and-tag.outputs.tag }}
       version: ${{ steps.write-env-and-tag.outputs.version }}
-      version_compat: ${{ steps.write-env-and-tag.outputs.version_compat }}
-      holochain_release_branch: ${{ steps.write-env-and-tag.outputs.holochain_release_branch }}
+      release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
       repo_nix_store_path: ${{ steps.write-env-and-tag.outputs.repo_nix_store_path }}
       releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
 
@@ -260,7 +262,7 @@ jobs:
           export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
           export VERSION=${TAG/holochain-/}
           export VERSION_COMPAT="v${VERSION//./_}"
-          export HOLOCHAIN_RELEASE_BRANCH="$(git branch --show-current)"
+          export RELEASE_BRANCH=$(git branch --show-current)
 
           # clean the repo before adding it to the store
           git clean -fdx
@@ -268,8 +270,7 @@ jobs:
 
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "version_compat=${VERSION_COMPAT}" >> $GITHUB_OUTPUT
-          echo holochain_release_branch="${HOLOCHAIN_RELEASE_BRANCH}" >> $GITHUB_OUTPUT
+          echo "release_branch=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
           echo "repo_nix_store_path=${STORE_PATH}" >> $GITHUB_OUTPUT
 
       - name: Setup SSH session
