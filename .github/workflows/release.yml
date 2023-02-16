@@ -411,7 +411,7 @@ jobs:
 
           mkdir -p $(dirname ${HOLOCHAIN_REPO})
           cp -rv --no-preserve=ownership ${HOLOCHAIN_REPO_NIX_STORE_PATH} ${HOLOCHAIN_REPO}
-          find ${HOLOCHAIN_REPO} -type d -exec chmod o+w {} +
+          chmod -r o+w ${HOLOCHAIN_REPO}
           cp -v $HOME/work/holochain/holochain/.git/config ${HOLOCHAIN_REPO}/.git/config
 
       - name: Restore cargo related state and build files
