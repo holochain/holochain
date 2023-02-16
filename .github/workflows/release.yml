@@ -456,8 +456,9 @@ jobs:
       - name: Push the release branch
         id: push-release-branch
         env:
-          RELEASE_BRANCH: ${{ needs.vars.outputs.release_branch}}
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch}}
         run: |
+          set -xeu
           cd "${HOLOCHAIN_REPO}"
           git checkout ${RELEASE_BRANCH}
           git push origin ${RELEASE_BRANCH}
@@ -537,7 +538,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
-          RELEASE_BRANCH: ${{ needs.vars.outputs.release_branch }}
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
         run: |
           set -eu
           cd "${HOLOCHAIN_REPO}"
