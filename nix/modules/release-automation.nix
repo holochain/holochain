@@ -88,7 +88,7 @@
           in
           '' \
             --config-file=${nextestToml} \
-          '';
+          '' + builtins.getEnv "NEXTEST_EXTRA_ARGS";
 
         dontPatchELF = true;
         dontFixup = true;
