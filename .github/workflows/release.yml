@@ -272,8 +272,6 @@ jobs:
       - name: Restore cargo related state and build files
         uses: steveeJ-forks/actions-cache/restore@retry
         if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
-        # TODO: this shouldn't necessary because 'required: false' further down is set
-        continue-on-error: true
         with:
           path: |
             /var/tmp/holochain_repo/.cargo/bin/
@@ -429,7 +427,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-test-
             ${{ runner.os }}-prepare-
-          required: true
+          required: false
 
       - name: Ensure the git credentials are set
         env:
