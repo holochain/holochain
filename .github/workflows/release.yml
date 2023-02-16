@@ -95,7 +95,7 @@ jobs:
           else
             export holochain_source_branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           fi
-          echo "::holochain_source_branch=${holochain_source_branch}" >> $GITHUB_OUTPUT
+          echo "holochain_source_branch=${holochain_source_branch}" >> $GITHUB_OUTPUT
 
           if [[ ${input_holochain_target_branch} != "" ]]; then
             echo "holochain_target_branch=${input_holochain_target_branch}" >> $GITHUB_OUTPUT
