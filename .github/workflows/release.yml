@@ -457,7 +457,8 @@ jobs:
       - name: Push the release branch
         id: push-release-branch
         env:
-          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch}}
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
+          HOLOCHAIN_REPO_NIX_STORE_PATH: ${{ needs.prepare.outputs.repo_nix_store_path }}
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
