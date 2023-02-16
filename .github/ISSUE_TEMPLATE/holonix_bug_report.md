@@ -2,7 +2,7 @@
 name: Holonix bug report
 about: Create a report to help us improve the Holonix dev shell
 title: "[BUG - HOLONIX]"
-labels: ''
+labels: ["bug", "nix"]
 assignees: ''
 
 ---
