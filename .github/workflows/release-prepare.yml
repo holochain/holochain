@@ -227,9 +227,9 @@ jobs:
             '
 
           if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH}; then
-            echo "::set-output name=releasable_crates::true"
+            echo "releasable_crates=true" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=releasable_crates::false"
+            echo "releasable_crates=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Run dmesg on error
@@ -266,11 +266,11 @@ jobs:
           git clean -fdx
           export STORE_PATH=$(nix store add-path --name holochain_repo .)
 
-          echo "::set-output name=tag::${TAG}"
-          echo "::set-output name=version::${VERSION}"
-          echo "::set-output name=version_compat::${VERSION_COMPAT}"
-          echo "::set-output name=release_branch::${RELEASE_BRANCH}"
-          echo "::set-output name=repo_nix_store_path=::${STORE_PATH}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_compat=${VERSION_COMPAT}" >> $GITHUB_OUTPUT
+          echo "release_branch=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
+          echo "repo_nix_store_path=${STORE_PATH}" >> $GITHUB_OUTPUT
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
