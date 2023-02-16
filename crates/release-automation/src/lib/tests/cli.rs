@@ -16,28 +16,22 @@ use predicates::prelude::*;
 use serde::Deserialize;
 use std::io::Write;
 
-/// creates a new temporary directory for the Command and sets HOME and CARGO_HOME respectively.
+/// uses a shared temporary directory for all Commands that and sets their HOME and CARGO_HOME respectively.
 /// optionally changes the working directory into the given path.
 pub(crate) fn command_pure(
     program: &str,
     maybe_cwd: Option<&Path>,
 ) -> Fallible<assert_cmd::Command> {
-    static TMP_HOME: once_cell::sync::Lazy<Mutex<Vec<tempfile::TempDir>>> =
-        once_cell::sync::Lazy::new(|| Default::default());
+    static TMP_HOME: once_cell::sync::Lazy<tempfile::TempDir> =
+        once_cell::sync::Lazy::new(|| tempfile::tempdir().unwrap());
 
-    let tempdir = tempfile::tempdir()?;
+    let home = TMP_HOME.path().join("home");
 
-    let home = tempdir.path().join("home");
     std::fs::create_dir_all(&home)?;
 
     let mut cmd = assert_cmd::Command::new(program);
     cmd.env("HOME", home.as_path())
         .env("CARGO_HOME", home.join(".cargo"));
-
-    TMP_HOME
-        .lock()
-        .map_err(|e| anyhow::anyhow!("{}", e))?
-        .push(tempdir);
 
     if let Some(cwd) = maybe_cwd {
         cmd.current_dir(cwd);
