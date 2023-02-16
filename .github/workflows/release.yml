@@ -459,9 +459,13 @@ jobs:
         env:
           HOLOCHAIN_RELEASE_BRANCH: ${{ needs.prepare.outputs.holochain_release_branch }}
           HOLOCHAIN_REPO_NIX_STORE_PATH: ${{ needs.prepare.outputs.repo_nix_store_path }}
+          NEEDS: ${{ toJSON(needs) }}
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
+
+          echo "${NEEDS}"
+
           git checkout ${HOLOCHAIN_RELEASE_BRANCH}
           git push origin ${HOLOCHAIN_RELEASE_BRANCH}
 
