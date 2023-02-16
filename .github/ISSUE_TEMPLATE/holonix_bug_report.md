@@ -15,7 +15,7 @@ how you encountered it, and the text of any error you received.
 A clear and concise description of what you expected to happen.
 
 **System information:**
- - OS: [e.g. iOS]
+ - OS: [e.g. macOS 13, Ubuntu Linux 22.04]
  - Nix version: (`nix --version`)
 
 **Steps to reproduce**
