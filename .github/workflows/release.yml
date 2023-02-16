@@ -266,7 +266,7 @@ jobs:
           # this fetches the repo from the nix cache
           nix-store --realise ${HOLOCHAIN_REPO_NIX_STORE_PATH}
 
-          mkdir $(dirname ${HOLOCHAIN_REPO})
+          mkdir -p $(dirname ${HOLOCHAIN_REPO})
           cp -rv --no-preserve=ownership ${HOLOCHAIN_REPO_NIX_STORE_PATH} ${HOLOCHAIN_REPO}
 
       - name: Restore cargo related state and build files
@@ -409,7 +409,7 @@ jobs:
           # this fetches the repo from the nix cache
           nix-store --realise ${HOLOCHAIN_REPO_NIX_STORE_PATH}
 
-          mkdir $(dirname ${HOLOCHAIN_REPO})
+          mkdir -p $(dirname ${HOLOCHAIN_REPO})
           cp -rv --no-preserve=ownership ${HOLOCHAIN_REPO_NIX_STORE_PATH} ${HOLOCHAIN_REPO}
           cp -v $HOME/work/holochain/holochain/.git/config .git/config
 
