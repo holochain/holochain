@@ -406,7 +406,7 @@ jobs:
         uses: cachix/install-nix-action@v17
       - name: Setup cachix
         uses: cachix/cachix-action@v11
-        if: ${{ contains(matrix.platform.largeCacheStorage.nix, 'cachix') && contains(matrix.testCommand.largeCacheStorage, 'nix') }}
+        if: ${{ matrix.platform.runs-on != 'self-hosted' }} && ${{ contains(matrix.platform.largeCacheStorage.nix, 'cachix') && contains(matrix.testCommand.largeCacheStorage, 'nix') }}
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
