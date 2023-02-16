@@ -259,9 +259,10 @@ jobs:
 
           cd "${HOLOCHAIN_REPO}"
 
+          git tag --sort=-taggerdate | grep holochain-
+
           export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
           export VERSION=${TAG/holochain-/}
-          export VERSION_COMPAT="v${VERSION//./_}"
           export RELEASE_BRANCH=$(git branch --show-current)
 
           # clean the repo before adding it to the store
