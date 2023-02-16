@@ -3,6 +3,7 @@ use holochain_zome_types::Timestamp;
 
 /// Interface for the Deepkey service
 #[async_trait::async_trait]
+#[mockall::automock]
 pub trait DeepkeyService: Send + Sync {
     /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp
     async fn is_key_valid(

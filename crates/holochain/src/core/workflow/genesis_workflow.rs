@@ -165,6 +165,7 @@ pub mod tests {
     use super::*;
 
     use crate::conductor::api::MockCellConductorApiT;
+    use crate::conductor::conductor::{ConductorServices, MockDeepkeyService};
     use crate::core::ribosome::MockRibosomeT;
     use futures::FutureExt;
     use holochain_state::prelude::test_dht_db;
@@ -188,10 +189,16 @@ pub mod tests {
 
         {
             let workspace = GenesisWorkspace::new(vault.clone().into(), dht_db.to_db()).unwrap();
+            let mut deepkey = MockDeepkeyService::new();
+            deepkey
+                .expect_is_key_valid()
+                .returning(|_, _| async move { Ok(true) }.boxed());
+
             let mut api = MockCellConductorApiT::new();
-            api.services().returning(|_, _| {
-                async move { Ok("mocked dpki request response".to_string()) }.boxed()
-            });
+            api.expect_conductor_services()
+                .return_const(ConductorServices {
+                    deepkey: Arc::new(deepkey),
+                });
             api.expect_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();
             ribosome
