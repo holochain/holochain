@@ -195,12 +195,9 @@ fn bump_release_versions<'a>(
 
     for crt in &selection {
         let current_version = crt.version();
-        let changelog = crt.changelog().ok_or_else(|| {
-            anyhow::anyhow!(
-                "[{}] cannot determine most recent release: missing changelog",
-                crt.name()
-            )
-        })?;
+        let changelog = crt
+            .changelog()
+            .ok_or_else(|| anyhow::anyhow!("[{}] missing changelog", crt.name()))?;
 
         let maybe_previous_release_version = changelog
             .topmost_release()?
@@ -217,71 +214,65 @@ fn bump_release_versions<'a>(
             .map(|fm| fm.semver_increment_mode());
         let semver_increment_mode = maybe_semver_increment_mode.unwrap_or_default();
 
-        let release_version = if let Some(mut previous_release_version) =
-            maybe_previous_release_version.clone()
-        {
-            if previous_release_version > current_version {
-                bail!("previously documented release version '{}' is greater than this release version '{}'", previous_release_version, current_version);
-            }
-
-            increment_semver(&mut previous_release_version, semver_increment_mode)?;
-
-            previous_release_version
-        } else {
-            // release the current version, or bump if the current version is a pre-release
-            let mut new_version = current_version.clone();
-
-            if new_version.is_prerelease() {
-                increment_semver(&mut new_version, semver_increment_mode)?;
-            }
-
-            new_version
+        let incremented_version = {
+            let mut v = current_version.clone();
+            increment_semver(&mut v, semver_increment_mode)?;
+            v
         };
 
-        trace!(
-            "[{}] previous release version: '{:?}', current version: '{}', release version: '{}' ",
-            crt.name(),
-            maybe_previous_release_version,
-            current_version,
-            release_version,
-        );
-
-        let greater_release = release_version > current_version;
-        if greater_release {
-            crt.set_version(cmd_args.dry_run, &release_version.clone())?;
-        }
-
-        let crate_release_heading_name = format!("{}", release_version);
-
-        if maybe_previous_release_version.is_none() || greater_release {
-            // create a new release entry in the crate's changelog and move all items from the unreleased heading if there are any
-
-            debug!(
-                "[{}] creating crate release heading '{}' in '{:?}'",
-                crt.name(),
-                crate_release_heading_name,
-                changelog.path(),
-            );
-
-            if !cmd_args.dry_run {
-                changelog
-                    .add_release(crate_release_heading_name.clone())
-                    .context(format!("adding release to changelog for '{}'", crt.name()))?;
-
-                // FIXME: now we should reread the whole thing?
-
-                if greater_release {
-                    // rewrite frontmatter to reset it to its defaults
-                    changelog.reset_front_matter_to_defaults()?;
+        let release_version = match &maybe_previous_release_version {
+            Some(previous_release_version) => {
+                if &current_version > previous_release_version {
+                    current_version.clone()
+                } else if &incremented_version > previous_release_version {
+                    crt.set_version(cmd_args.dry_run, &incremented_version)?;
+                    incremented_version.clone()
+                } else {
+                    bail!("neither current version '{}' nor incremented version '{}' exceed previously released version '{}'", &current_version, &incremented_version, previous_release_version);
                 }
             }
 
-            changed_crate_changelogs.push(WorkspaceCrateReleaseHeading {
-                prefix: crt.name(),
-                suffix: crate_release_heading_name,
-                changelog,
-            });
+            None => {
+                // default to incremented version if we don't have information on a previous release
+                crt.set_version(cmd_args.dry_run, &incremented_version.clone())?;
+                incremented_version.clone()
+            }
+        };
+
+        debug!(
+            "[{}] previous release version: '{:?}', current version: '{}', incremented version: '{}'",
+            crt.name(),
+            maybe_previous_release_version,
+            current_version,
+            incremented_version,
+        );
+
+        let crate_release_heading_name = format!("{}", release_version);
+
+        // create a new release entry in the crate's changelog and move all items from the unreleased heading if there are any
+        debug!(
+            "[{}] creating crate release heading '{}' in '{:?}'",
+            crt.name(),
+            crate_release_heading_name,
+            changelog.path(),
+        );
+
+        if !cmd_args.dry_run {
+            changelog
+                .add_release(crate_release_heading_name.clone())
+                .context(format!("adding release to changelog for '{}'", crt.name()))?;
+
+            // FIXME: now we should reread the whole thing?
+
+            // rewrite frontmatter to reset it to its defaults
+            changelog.reset_front_matter_to_defaults()?;
         }
+
+        changed_crate_changelogs.push(WorkspaceCrateReleaseHeading {
+            prefix: crt.name(),
+            suffix: crate_release_heading_name,
+            changelog,
+        });
     }
 
     ws.update_lockfile(
