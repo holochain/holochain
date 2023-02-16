@@ -293,14 +293,12 @@ jobs:
           MATRIX: ${{ toJSON(matrix) }}
         run: |
           set -ex
-          cat "${HOLOCHAIN_RELEASE_SH}"
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
 
           # TODO: handle this when we go back to parallel test runs
           echo ${MATRIX}
 
-          nix-shell --pure --run '
+          nix develop .#release --ignore-environment --command bash -c '
               cargo sweep -i
               cargo sweep -s
             '
@@ -472,16 +470,14 @@ jobs:
         run: |
           cd "${HOLOCHAIN_REPO}"
 
-          nix-shell \
-            --pure \
+          nix develop .#release \
+            --ignore-environment \
             --keep CARGO_REGISTRY_TOKEN \
-            --argstr devShellId release  --run '
-              echo release-automation \
+            --command release-automation \
                 --workspace-path=$PWD \
                 --log-level=trace \
                 release \
                   --steps=PublishToCratesIo,AddOwnersToCratesIo
-            '
 
       - name: Push the tags
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
