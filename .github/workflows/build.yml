@@ -59,8 +59,8 @@ jobs:
           lfs: false
 
       - name: Install nix
-        uses: cachix/install-nix-action@v18
         if: ${{ matrix.platform.runs-on != 'multi-arch' }}
+        uses: cachix/install-nix-action@v19
         with:
           extra_nix_config: |
             experimental-features = flakes nix-command
