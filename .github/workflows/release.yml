@@ -183,7 +183,7 @@ jobs:
 
           echo "::set-output name=HOLOCHAIN_REPO::/var/tmp/holochain_repo"
           echo "::set-output name=HOLOCHAIN_RELEASE_SH::/var/tmp/holochain_release.sh"
-          echo "::set-output name=CACHIX_REV::v1.0.1"
+          echo "::set-output name=CACHIX_REV::v1.2"
   prepare:
     needs: [vars]
     uses: ./.github/workflows/release-prepare.yml
@@ -403,9 +403,9 @@ jobs:
         if: ${{ contains(matrix.platform.runs-on, 'ubuntu-latest') && matrix.testCommand.maxBuildSpace == true }}
 
       - name: Install nix
-        uses: cachix/install-nix-action@v17
+        uses: cachix/install-nix-action@v19
       - name: Setup cachix
-        uses: cachix/cachix-action@v11
+        uses: cachix/cachix-action@v12
         if: ${{ (! contains(matrix.platform.runs-on, 'self-hosted')) && contains(matrix.platform.largeCacheStorage.nix, 'cachix') && contains(matrix.testCommand.largeCacheStorage, 'nix') }}
         with:
           name: holochain-ci
@@ -552,9 +552,9 @@ jobs:
       - name: Extend space
         uses: ./.github/actions/extend-space
       - name: Install nix
-        uses: cachix/install-nix-action@v17
+        uses: cachix/install-nix-action@v19
       - name: Setup cachix
-        uses: cachix/cachix-action@v11
+        uses: cachix/cachix-action@v12
         if: ${{ ! contains(matrix.platform.runs-on, 'self-hosted') }}
         with:
           name: holochain-ci
