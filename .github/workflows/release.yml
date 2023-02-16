@@ -457,17 +457,15 @@ jobs:
       - name: Push the release branch
         id: push-release-branch
         env:
-          HOLOCHAIN_RELEASE_BRANCH: ${{ needs.prepare.outputs.holochain_release_branch }}
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.holochain_release_branch }}
           HOLOCHAIN_REPO_NIX_STORE_PATH: ${{ needs.prepare.outputs.repo_nix_store_path }}
           NEEDS: ${{ toJSON(needs) }}
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
 
-          echo "${NEEDS}"
-
-          git checkout ${HOLOCHAIN_RELEASE_BRANCH}
-          git push origin ${HOLOCHAIN_RELEASE_BRANCH}
+          git checkout ${RELEASE_BRANCH}
+          git push origin ${RELEASE_BRANCH}
 
       - name: Publish crates
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
@@ -508,7 +506,7 @@ jobs:
 
           git fetch origin ${HOLOCHAIN_SOURCE_BRANCH}
           git checkout -B ${HOLOCHAIN_SOURCE_BRANCH} origin/${HOLOCHAIN_SOURCE_BRANCH}
-          git merge ${HOLOCHAIN_RELEASE_BRANCH}
+          git merge ${RELEASE_BRANCH}
 
       - name: Push the updated source branch
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
@@ -529,10 +527,10 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           gh pr create \
-            --title "Merge ${HOLOCHAIN_RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
+            --title "Merge ${RELEASE_BRANCH} back into ${HOLOCHAIN_SOURCE_BRANCH}" \
             --label release \
             --label "autoupdate:opt-in" \
-            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${HOLOCHAIN_RELEASE_BRANCH}" \
+            --base ${HOLOCHAIN_SOURCE_BRANCH} --head "${RELEASE_BRANCH}" \
             --body 'Please double-check the consistency of the CHANGELOG.md files' 2>&1 | tee gh-pr-create.log
             # --reviewer "holochain/core-dev" \
 
@@ -544,14 +542,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
-          HOLOCHAIN_RELEASE_BRANCH: ${{ needs.prepare.outputs.holochain_release_branch }}
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.holochain_release_branch }}
         run: |
           set -eu
           cd "${HOLOCHAIN_REPO}"
 
           # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
           if gh release view ${TAG}; then
-            export RELEASE_TAG=${HOLOCHAIN_RELEASE_BRANCH}
+            export RELEASE_TAG=${RELEASE_BRANCH}
             export IS_HOLOCHAIN_RELEASE="false"
           else
             export RELEASE_TAG=${TAG}
@@ -564,8 +562,8 @@ jobs:
             /repos/holochain/holochain/releases \
             -f tag_name="${RELEASE_TAG}" \
             -f target_commitish="${HOLOCHAIN_TARGET_BRANCH}" \
-            -f name="holochain ${VERSION} (${HOLOCHAIN_RELEASE_BRANCH#*-})" \
-            -f body="***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${HOLOCHAIN_RELEASE_BRANCH}")) to see the full list of crates that were released together.***" \
+            -f name="holochain ${VERSION} (${RELEASE_BRANCH#*-})" \
+            -f body="***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***" \
             -F draft=false \
             -F prerelease=false \
             -F generate_release_notes=false \
