@@ -532,6 +532,7 @@ fn multiple_subsequent_releases() {
     for (
         i,
         (
+            description,
             expected_versions,
             expected_crates,
             allowed_missing_dependencies,
@@ -540,8 +541,7 @@ fn multiple_subsequent_releases() {
         ),
     ) in [
         (
-            // bump the first time as they're initially released
-            // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
+            "bump the first time as they're initially released",
             vec!["0.0.0", "0.1.0", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -550,8 +550,7 @@ fn multiple_subsequent_releases() {
             Box::new(|_| {}) as F,
         ),
         (
-            // should not bump the second time without making any changes
-            // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
+            "should not bump the second time without making any changes",
             vec!["0.0.0", "0.1.0", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -560,7 +559,7 @@ fn multiple_subsequent_releases() {
             Box::new(|_| {}) as F,
         ),
         (
-            // only crate_a and crate_e have changed, expect these to be bumped
+            "only crate_a and crate_e have changed, expect these to be bumped",
             vec!["0.0.0", "0.1.1", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // crate_b won't be part of the release so we allow it to be missing as we're not publishing
@@ -586,7 +585,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // change crate_b, and as crate_a depends on crate_b it'll be bumped as well
+            "change crate_b, and as crate_a depends on crate_b it'll be bumped as well",
             vec!["0.0.1", "0.1.2", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -611,7 +610,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // add a pre-release for crate_b
+            "add a pre-release for crate_b",
             vec!["1.0.0-rc.0", "0.1.3", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -652,7 +651,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // do another pre-release for crate_b
+            "do another pre-release for crate_b",
             vec!["1.0.0-rc.1", "0.1.4", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -677,7 +676,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // do major release for crate_b
+            "do major release for crate_b",
             vec!["1.0.0", "0.1.5", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -718,7 +717,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // and a default patch release for crate_b again
+            "and a default patch release for crate_b again",
             vec!["1.0.1", "0.1.6", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -810,7 +809,8 @@ fn multiple_subsequent_releases() {
             assert_eq!(
                 expected_versions,
                 &get_crate_versions(expected_crates, &workspace),
-                "{}",
+                "{} ({})",
+                description,
                 i
             );
 
