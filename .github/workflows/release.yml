@@ -258,6 +258,11 @@ jobs:
         run: |
           set -exu
 
+          if [[ -d "${HOLOCHAIN_REPO}" ]]; then
+            echo repository at ${HOLOCHAIN_REPO} unexpectedly exists
+            exit 1
+          fi
+
           # this fetches the repo from the nix cache
           nix-store --realise ${HOLOCHAIN_REPO_NIX_STORE_PATH}
 
@@ -396,17 +401,16 @@ jobs:
         run: |
           set -exu
 
-          # this fetches the repo from the nix cache
-          nix-store --realise ${HOLOCHAIN_REPO_NIX_STORE_PATH}
-
           if [[ -d "${HOLOCHAIN_REPO}" ]]; then
             echo repository at ${HOLOCHAIN_REPO} unexpectedly exists
             exit 1
           fi
-          mkdir -p "${HOLOCHAIN_REPO}"
 
+          # this fetches the repo from the nix cache
+          nix-store --realise ${HOLOCHAIN_REPO_NIX_STORE_PATH}
+
+          mkdir $(dirname ${HOLOCHAIN_REPO})
           cp -rv --no-preserve=ownership ${HOLOCHAIN_REPO_NIX_STORE_PATH} ${HOLOCHAIN_REPO}
-          cd ${HOLOCHAIN_REPO}
           cp -v $HOME/work/holochain/holochain/.git/config .git/config
 
       - name: Restore cargo related state and build files
