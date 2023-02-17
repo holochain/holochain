@@ -1,0 +1,27 @@
+name: Ensure versions bumped
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  ensure-versions-bumped:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install nix
+        uses: cachix/install-nix-action@v19
+        with:
+          extra_nix_config: |
+            experimental-features = flakes nix-command
+
+      - name: Setup cachix
+        uses: cachix/cachix-action@v12
+        with:
+          name: holochain-ci
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: Ensure crate versions are bumped
+        run: |
+          nix run .#ensure-versions-bumped
