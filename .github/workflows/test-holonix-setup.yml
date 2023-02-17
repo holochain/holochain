@@ -9,4 +9,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Call setup script
-        run: echo "hello"
+        run: sh <(curl https://holochain.github.io/holochain/setup.sh)
