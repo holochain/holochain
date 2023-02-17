@@ -19,7 +19,7 @@ A description of what you expected to happen.
  - Nix version: (`nix --version`)
 
 **Steps to reproduce**
-Detailed, specific steps which will reliably reproduce this bug.
+Steps which will reliably reproduce this bug.
 
 If you have the means to do so, it would be extremely helpful to create a minimal reproduction of the problem.
 
