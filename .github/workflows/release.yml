@@ -10,16 +10,6 @@ on:
       #   required: false
       #   default: ""
       #   type: string
-      # holochain_nixpkgs_url:
-      #   description: "holochain-nixpkgs git repo url"
-      #   required: false
-      #   default: ""
-      #   type: string
-      # holonix_url:
-      #   description: "Holonix git repo url"
-      #   required: false
-      #   default: ""
-      #   type: string
       holochain_source_branch:
         description: "holochain source branch for the release"
         required: false
@@ -27,16 +17,6 @@ on:
         type: string
       holochain_target_branch:
         description: "holochain target branch for the release"
-        required: false
-        default: ""
-        type: string
-      holochain-nixpkgs_source_branch:
-        description: "holochain-nixpkgs source branch for the release"
-        required: false
-        default: ""
-        type: string
-      holonix_source_branch:
-        description: "holonix source branch for the release"
         required: false
         default: ""
         type: string
@@ -72,19 +52,17 @@ concurrency:
   group: release-${{ github.ref_name }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event.inputs.force_cancel_in_progress == 'true' || github.event_name == 'pull_request' }}
 
+env:
+  HOLOCHAIN_REPO: "/var/tmp/holochain_repo"
+  CACHIX_REV: "v1.2"
+
 jobs:
   vars:
     runs-on: ubuntu-latest
     outputs:
       HOLOCHAIN_REPO: ${{ steps.eval.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ steps.eval.outputs.HOLOCHAIN_RELEASE_SH}}
       CACHIX_REV: ${{ steps.eval.outputs.CACHIX_REV}}
-
       # holochain_url: ${{ steps.eval.outputs.holochain_url }}
-      # holochain_nixpkgs_url: ${{ steps.eval.outputs.holochain_nixpkgs_url }}
-      # holonix_url: ${{ steps.eval.outputs.holonix_url }}
-      holochain_nixpkgs_source_branch: ${{ steps.eval.outputs.holochain_nixpkgs_source_branch }}
-      holonix_source_branch: ${{ steps.eval.outputs.holonix_source_branch }}
       holochain_source_branch: ${{ steps.eval.outputs.holochain_source_branch }}
       holochain_target_branch: ${{ steps.eval.outputs.holochain_target_branch }}
       dry_run: ${{ steps.eval.outputs.dry_run }}
@@ -96,23 +74,20 @@ jobs:
         id: eval
         env:
           # input_holochain_url: ${{ github.event.inputs.holochain_url }}
-          # input_holochain_nixpkgs_url: ${{ github.event.inputs.holochain_nixpkgs_url }}
-          # input_holonix_url: ${{ github.event.inputs.holonix_url }}
-          input_holochain_nixpkgs_source_branch: ${{ github.event.inputs.holochain-nixpkgs_source_branch }}
-          input_holonix_source_branch: ${{ github.event.inputs.holonix_source_branch }}
           input_holochain_source_branch: ${{ github.event.inputs.holochain_source_branch }}
           input_holochain_target_branch: ${{ github.event.inputs.holochain_target_branch }}
           input_dry_run: ${{ github.event.inputs.dry_run}}
           input_debug: ${{ github.event.inputs.debug }}
           input_skip_test: ${{ github.event.inputs.skip_test }}
           input_skip_prepare_logic: ${{ github.event.inputs.skip_prepare_logic }}
+
         run: |
           set -xeu
 
           # if [[ ${input_holochain_url} != "" ]]; then
-          #   echo "::set-output name=holochain_url::${input_holochain_url}"
+          #   echo "holochain_url=${input_holochain_url}" >> $GITHUB_OUTPUT
           # else
-          #   echo "::set-output name=holochain_url::https://github.com/holochain/holochain"
+          #   echo "holochain_url=https://github.com/holochain/holochain" >> $GITHUB_OUTPUT
           # fi
 
           if [[ ${input_holochain_source_branch} != "" ]]; then
@@ -120,70 +95,57 @@ jobs:
           else
             export holochain_source_branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           fi
-          echo "::set-output name=holochain_source_branch::${holochain_source_branch}"
+          echo "holochain_source_branch=${holochain_source_branch}" >> $GITHUB_OUTPUT
 
           if [[ ${input_holochain_target_branch} != "" ]]; then
-            echo "::set-output name=holochain_target_branch::${input_holochain_target_branch}"
+            echo "holochain_target_branch=${input_holochain_target_branch}" >> $GITHUB_OUTPUT
           else
             case "${holochain_source_branch}" in
               develop*)
-                echo "::set-output name=holochain_target_branch::$(echo ${holochain_source_branch} | sed 's/^develop/main/')"
+                echo "holochain_target_branch=$(echo ${holochain_source_branch} | sed 's/^develop/main/')" >> $GITHUB_OUTPUT
                 ;;
               *)
-                echo "::set-output name=holochain_target_branch::release-target-${holochain_source_branch}"
+                echo "holochain_target_branch=release-target-${holochain_source_branch}" >> $GITHUB_OUTPUT
                 export enforce_dry_run="true"
                 ;;
             esac
           fi
 
-          if [[ ${input_holochain_nixpkgs_source_branch} != "" ]]; then
-            echo "::set-output name=holochain_nixpkgs_source_branch::${input_holochain_nixpkgs_source_branch}"
-          else
-            echo "::set-output name=holochain_nixpkgs_source_branch::develop"
-          fi
-
-          if [[ ${input_holonix_source_branch} != "" ]]; then
-            echo "::set-output name=holonix_source_branch::${input_holonix_source_branch}"
-          else
-            echo "::set-output name=holonix_source_branch::main"
-          fi
-
           if [[ "${enforce_dry_run:-false}" == "true" ]]; then
             echo dry-run enforced
-            echo "::set-output name=dry_run::true"
+            echo "dry_run=true" >> $GITHUB_OUTPUT
           elif [[ ${input_dry_run} != "" ]]; then
-            echo "::set-output name=dry_run::${input_dry_run}"
+            echo "dry_run=${input_dry_run}" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "::set-output name=dry_run::false"
+            echo "dry_run=false" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=dry_run::true"
+            echo "dry_run=true" >> $GITHUB_OUTPUT
           fi
 
           if [[ ${input_debug} != "" ]]; then
-            echo "::set-output name=debug::${input_debug}"
+            echo "debug=${input_debug}" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "::set-output name=debug::false"
+            echo "debug=false" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "::set-output name=debug::false"
+            echo "debug=false" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=debug::true"
+            echo "debug=true" >> $GITHUB_OUTPUT
           fi
 
           if [[ ${input_skip_test} != "" ]]; then
-            echo "::set-output name=skip_test::${input_skip_test}"
+            echo "skip_test=${input_skip_test}" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=skip_test::false"
+            echo "skip_test=false" >> $GITHUB_OUTPUT
           fi
 
           if [[ ${input_skip_prepare_logic} != "" ]]; then
-            echo "::set-output name=skip_prepare_logic::${input_skip_prepare_logic}"
+            echo "skip_prepare_logic=${input_skip_prepare_logic}" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=skip_prepare_logic::false"
+            echo "skip_prepare_logic=false" >> $GITHUB_OUTPUT
           fi
 
-          echo "::set-output name=HOLOCHAIN_REPO::/var/tmp/holochain_repo"
-          echo "::set-output name=HOLOCHAIN_RELEASE_SH::/var/tmp/holochain_release.sh"
-          echo "::set-output name=CACHIX_REV::v1.2"
+          echo "HOLOCHAIN_REPO=${{ env.HOLOCHAIN_REPO }}" >> $GITHUB_OUTPUT
+          echo "CACHIX_REV=${{ env.CACHIX_REV }}" >> $GITHUB_OUTPUT
   prepare:
     needs: [vars]
     uses: ./.github/workflows/release-prepare.yml
@@ -194,7 +156,6 @@ jobs:
       HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
       HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
       HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
     secrets:
       CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -204,353 +165,22 @@ jobs:
   test:
     needs: [vars, prepare]
     if: ${{ github.event_name != 'pull_request' && needs.vars.outputs.skip_test != 'true' }}
-    env:
-      HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
-      CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - arch: linux-x86_64
-            runs-on: [self-hosted, release]
-            largeCacheStorage:
-              generic:
-                - local
-              nix:
-                - cachix
-          - arch: macos-x86_64
-            runs-on: [macos-latest]
-            largeCacheStorage:
-              nix:
-                - cachix
-          - arch: linux-x86_64
-            runs-on: [ubuntu-latest]
-            largeCacheStorage:
-              generic:
-                - github
-              nix:
-                - cachix
-        testCommand:
-          - name: cargo-test
-            largeCacheStorage:
-              - generic
-              - nix
-            maxBuildSpace: true
-            hasBuildStep: true
-            timeout_minutes: 60
-            max_attempts: 2
-            run: |
-              nix-shell \
-                --pure \
-                --keep CARGO_NEXTEST_ARGS \
-                --keep CARGO_TEST_ARGS \
-                --fallback --argstr devShellId "coreDev" --run '
-                  set -e
-                  hc-test-standard-nextest
-                  hc-static-checks
-                  hc-test-wasm
-                '
-
-          # - name: cargo-test-standard
-          #   largeCacheStorage:
-          #     - generic
-          #     - nix
-          #   maxBuildSpace: true
-          #   hasBuildStep: true
-          #   timeout_minutes: 30
-          #   max_attempts: 2
-          #   run: |
-          #     nix-shell \
-          #       --pure \
-          #       --keep CARGO_NEXTEST_ARGS \
-          #       --keep CARGO_TEST_ARGS \
-          #       --fallback --argstr devShellId "coreDev" --run hc-test-standard-nextest
-
-          # - name: cargo-test-static
-          #   largeCacheStorage:
-          #     - generic
-          #     - nix
-          #   hasBuildStep: true
-          #   timeout_minutes: 5
-          #   max_attempts: 1
-          #   run: |
-          #     nix-shell \
-          #       --pure \
-          #       --keep CARGO_TEST_ARGS \
-          #       --fallback --argstr devShellId "coreDev" --run hc-static-checks
-
-          # - name: cargo-test-wasm
-          #   largeCacheStorage:
-          #     - generic
-          #     - nix
-          #   hasBuildStep: true
-          #   timeout_minutes: 5
-          #   max_attempts: 6
-          #   run: |
-          #     nix-shell \
-          #       --pure \
-          #       --keep CARGO_TEST_ARGS \
-          #       --fallback --argstr devShellId "coreDev" --run hc-test-wasm
-
-          - name: nix-test
-            largeCacheStorage:
-              - nix
-            hasBuildStep: false
-            timeout_minutes: 90
-            max_attempts: 1
-            run: |
-              set -x
-
-              # remove everything that wouldn't be on github either
-              git clean -fdx
-
-              # we use this git daemon to not rely on the published tag
-              git daemon --reuseaddr --base-path=. --export-all --verbose --detach
-
-              git clone "${HOLOCHAIN_NIXPKGS_URL}" "${HOLOCHAIN_NIXPKGS_REPO}" -b ${HOLOCHAIN_NIXPKGS_SOURCE_BRANCH} --depth=1
-              cd "${HOLOCHAIN_NIXPKGS_REPO}"
-
-              git checkout -b "${RELEASE_BRANCH}"
-
-              if grep --quiet ${VERSION_COMPAT} packages/holochain/versions/update_config.toml; then
-                export VERSION_COMPAT="${VERSION_COMPAT}-ci"
-                export TAG="${TAG}-ci"
-                git -C "${HOLOCHAIN_REPO}" tag --force "${TAG}"
-              fi
-
-              # TODO: use a util from the holochain-nixpkgs repo to make this change as this can get out of sync
-              cat <<EOF >> packages/holochain/versions/update_config.toml
-
-              [${VERSION_COMPAT}]
-              git-src = "revision:${TAG}"
-              git-repo = "git://localhost/"
-              EOF
-
-              # regenerate the nix sources
-              git config --global user.email "devcore@holochain.org"
-              git config --global user.name "Holochain Core Dev Team"
-              nix-shell \
-                --pure \
-                --keep VERSION_COMPAT \
-                --arg flavors '["release"]' \
-                --run 'hnixpkgs-update-single ${VERSION_COMPAT}'
-              nix-build . -A packages.holochain.holochainAllBinariesWithDeps.${VERSION_COMPAT} --no-link
-
-              git clone "${HOLONIX_URL}" "${HOLONIX_REPO}" -b ${HOLONIX_SOURCE_BRANCH} --depth=1
-              cd "${HOLONIX_REPO}"
-
-              nix-shell \
-                --pure \
-                --keep HOLOCHAIN_NIXPKGS_REPO \
-                --run '
-                  niv drop holochain-nixpkgs
-                  niv add local --path ${HOLOCHAIN_NIXPKGS_REPO} --name holochain-nixpkgs
-                '
-
-              nix-shell \
-                --pure \
-                --argstr holochainVersionId "${VERSION_COMPAT}" \
-                --arg include '{ test = true; }' \
-                --run '
-                  holochain --version
-                  hn-test
-                '
-        exclude:
-          # dont run tests on pull request
-          - event_name: pull_request
-
-          # exclude all cargo test jobs on macos
-          - platform:
-              arch: macos-x86_64
-            testCommand:
-              name: cargo-test
-
-          # exclude all cargo test jobs on github's ubuntu-latest
-          - platform:
-              runs-on: [ubuntu-latest]
-            testCommand:
-              name: cargo-test
-
-          # we only run the cargo tests on the self-hosted runners
-          - platform:
-              runs-on: [self-hosted, release]
-            testCommand:
-              name: nix-test
-
-          # TODO: reenable these if or when we split the cargo tests up again
-          # - platform:
-          #     arch: macos-x86_64
-          #   testCommand:
-          #     name: cargo-test-standard
-          # - platform:
-          #     arch: macos-x86_64
-          #   testCommand:
-          #     name: cargo-test-wasm
-          # - platform:
-          #     arch: macos-x86_64
-          #   testCommand:
-          #     name: cargo-test-static
-        event_name:
-          - ${{ github.event_name }}
-    runs-on: ${{ matrix.platform.runs-on }}
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Extend space
-        uses: ./.github/actions/extend-space
-        if: ${{ contains(matrix.platform.runs-on, 'ubuntu-latest') && matrix.testCommand.maxBuildSpace == true }}
-
-      - name: Install nix
-        uses: cachix/install-nix-action@v19
-      - name: Setup cachix
-        uses: cachix/cachix-action@v12
-        if: ${{ (! contains(matrix.platform.runs-on, 'self-hosted')) && contains(matrix.platform.largeCacheStorage.nix, 'cachix') && contains(matrix.testCommand.largeCacheStorage, 'nix') }}
-        with:
-          name: holochain-ci
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-          installCommand: |
-            nix-env -if https://github.com/cachix/cachix/tarball/${CACHIX_REV} \
-              --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
-              --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
-          pushFilter: "(rust-overlay|bqfq4db6nwycmkdrql9igsbrayqsw3g2)"
-      - name: Set NIX_PATH (FIXME)
-        run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
-
-      - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@retry
-        with:
-          path: |
-            /var/tmp/holochain_release.sh
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
-          required: true
-
-      - name: Restore cargo related state and build files
-        uses: steveeJ-forks/actions-cache/restore@retry
-        if: ${{ contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
-        with:
-          path: |
-            /var/tmp/holochain_repo/.cargo/bin/
-            /var/tmp/holochain_repo/.cargo/registry/index/
-            /var/tmp/holochain_repo/.cargo/registry/cache/
-            /var/tmp/holochain_repo/.cargo/git/db/
-            /var/tmp/holochain_repo/target/
-          key: ${{ runner.os }}-test-${{ matrix.testCommand.name }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ matrix.testCommand.name }}
-            ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
-            ${{ runner.os }}-prepare-${{ github.run_id }}
-            ${{ runner.os }}-prepare
-          required: false
-
-      - name: Garbage-collection pre-run procedure
-        if: ${{ contains(matrix.testCommand.largeCacheStorage, 'generic') }}
-        env:
-          MATRIX: ${{ toJSON(matrix) }}
-        run: |
-          set -ex
-          cat "${HOLOCHAIN_RELEASE_SH}"
-          source "${HOLOCHAIN_RELEASE_SH}"
-          cd "${HOLOCHAIN_REPO}"
-
-          # TODO: handle this when we go back to parallel test runs
-          echo ${MATRIX}
-
-          nix-shell --pure --run '
-              cargo sweep -i
-              cargo sweep -s
-            '
-
-      - name: ${{ matrix.testCommand.name }} (build only)
-        continue-on-error: ${{ matrix.platform.runs-on == 'macos-latest' }}
-        if: ${{ matrix.testCommand.hasBuildStep == true }}
-        env:
-          CARGO_TEST_ARGS: "--no-run"
-          CARGO_NEXTEST_ARGS: "list" # --build-jobs=2"
-          # CARGO_BUILD_JOBS: "2"
-        run: |
-          set -e
-          source "${HOLOCHAIN_RELEASE_SH}"
-          cd "${HOLOCHAIN_REPO}"
-
-          nix-shell --pure --run "cargo fetch --locked"
-
-          ${{ matrix.testCommand.run }}
-        timeout-minutes: 720
-
-      - name: ${{ matrix.testCommand.name }} (run)
-        continue-on-error: ${{ matrix.platform.runs-on == 'macos-latest' }}
-        uses: nick-fields/retry@v2.8.1
-        env:
-          HOLOCHAIN_NIXPKGS_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_nixpkgs_source_branch }}
-          HOLONIX_SOURCE_BRANCH: ${{ needs.vars.outputs.holonix_source_branch }}
-        with:
-          timeout_minutes: ${{ matrix.testCommand.timeout_minutes }}
-          max_attempts: ${{ matrix.testCommand.max_attempts }}
-          command: |
-            set -e
-            source "${HOLOCHAIN_RELEASE_SH}"
-            cd "${HOLOCHAIN_REPO}"
-
-            ${{ matrix.testCommand.run }}
-
-      - name: Garbage-collection post-run procedure
-        if: ${{ always() && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
-        env:
-          MATRIX: ${{ toJSON(matrix) }}
-        run: |
-          set -e
-          source "${HOLOCHAIN_RELEASE_SH}"
-          cd "${HOLOCHAIN_REPO}"
-
-          # TODO: handle this
-          echo ${MATRIX}
-
-          nix-shell \
-            --pure \
-            --run '
-              cargo sweep -f
-            '
-
-      - name: Cache cargo related build files
-        uses: steveeJ-forks/actions-cache/save@main
-        if: ${{ always() && contains(matrix.platform.largeCacheStorage.generic, 'github') && contains(matrix.testCommand.largeCacheStorage, 'generic') }}
-        with:
-          path: |
-            /var/tmp/holochain_repo/.cargo/bin/
-            /var/tmp/holochain_repo/.cargo/registry/index/
-            /var/tmp/holochain_repo/.cargo/registry/cache/
-            /var/tmp/holochain_repo/.cargo/git/db/
-            /var/tmp/holochain_repo/target/
-          key: ${{ runner.os }}-test-${{ matrix.testCommand.name }}-${{ github.run_id }}-${{ github.run_number }}
-
-      - name: Setup SSH session
-        uses: steveeJ-forks/action-upterm@main
-        if: ${{ failure() && needs.vars.outputs.debug == 'true' }}
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
-          ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
+      - run: |
+          echo currently unimplemented
+          exit 1
 
   finalize:
-    if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && needs.prepare.outputs.releasable_crates == 'true' }}
+    if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && (needs.prepare.outputs.releasable_crates == 'true' || needs.vars.outputs.skip_prepare_logic == 'true') }}
     needs: [vars, prepare, test]
-    env:
-      HOLOCHAIN_REPO: ${{ needs.vars.outputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ needs.vars.outputs.HOLOCHAIN_RELEASE_SH }}
-      CACHIX_REV: ${{ needs.vars.outputs.CACHIX_REV }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Extend space
         uses: ./.github/actions/extend-space
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
       - name: Install nix
         uses: cachix/install-nix-action@v19
       - name: Setup cachix
@@ -565,22 +195,23 @@ jobs:
               --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
 
       - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@retry
-        with:
-          path: |
-            /var/tmp/holochain_release.sh
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
-          required: true
-
-      - name: Copy the git credentials
+        env:
+          HOLOCHAIN_REPO_NIX_STORE_PATH: ${{ needs.prepare.outputs.repo_nix_store_path }}
         run: |
-          source ${HOLOCHAIN_RELEASE_SH}
-          cd "${HOLOCHAIN_REPO}"
-          cp -v $HOME/work/holochain/holochain/.git/config .git/config
+          set -exu
+
+          if [[ -d "${HOLOCHAIN_REPO}" ]]; then
+            echo repository at ${HOLOCHAIN_REPO} unexpectedly exists
+            exit 1
+          fi
+
+          # this fetches the repo from the nix cache
+          nix-store --realise ${HOLOCHAIN_REPO_NIX_STORE_PATH}
+
+          mkdir -p $(dirname ${HOLOCHAIN_REPO})
+          cp -rv --no-preserve=ownership ${HOLOCHAIN_REPO_NIX_STORE_PATH} ${HOLOCHAIN_REPO}
+          chmod --recursive u+w ${HOLOCHAIN_REPO}
+          cp -v $HOME/work/holochain/holochain/.git/config ${HOLOCHAIN_REPO}/.git/config
 
       - name: Restore cargo related state and build files
         uses: steveeJ-forks/actions-cache/restore@retry
@@ -595,14 +226,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-test-
             ${{ runner.os }}-prepare-
-          required: true
+          required: false
 
       - name: Ensure the git credentials are set
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
           set -xeu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           # regenerate the nix sources
@@ -618,7 +248,6 @@ jobs:
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
         run: |
           set -xeu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git status
@@ -627,9 +256,13 @@ jobs:
 
       - name: Push the release branch
         id: push-release-branch
+        env:
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
+          HOLOCHAIN_REPO_NIX_STORE_PATH: ${{ needs.prepare.outputs.repo_nix_store_path }}
         run: |
-          source ${HOLOCHAIN_RELEASE_SH}
+          set -xeu
           cd "${HOLOCHAIN_REPO}"
+
           git checkout ${RELEASE_BRANCH}
           git push origin ${RELEASE_BRANCH}
 
@@ -639,19 +272,16 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
-          nix-shell \
-            --pure \
+          nix develop .#release \
+            --ignore-environment \
             --keep CARGO_REGISTRY_TOKEN \
-            --argstr devShellId release  --run '
-              release-automation \
+            --command release-automation \
                 --workspace-path=$PWD \
                 --log-level=trace \
                 release \
                   --steps=PublishToCratesIo,AddOwnersToCratesIo
-            '
 
       - name: Push the tags
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
@@ -668,9 +298,11 @@ jobs:
       - name: Merge release branch into source branch
         continue-on-error: true
         id: merge-into-source
+        env:
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
+          HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
         run: |
           set -xeu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git fetch origin ${HOLOCHAIN_SOURCE_BRANCH}
@@ -680,21 +312,24 @@ jobs:
       - name: Push the updated source branch
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         continue-on-error: true
+        env:
+          HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
         run: |
           set -xeu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
           git push origin ${HOLOCHAIN_SOURCE_BRANCH}
 
       - name: Create a pull-request towards the source branch
         id: cpr
         if: ${{ always() && steps.push-release-branch.outcome == 'success' && (needs.vars.outputs.dry_run == 'true' || (steps.publish.outcome == 'failed' || steps.push-tags.outcome == 'failed' || steps.merge-into-source.outcome == 'failed')) }}
+        continue-on-error: ${{ needs.prepare.outputs.releasable_crates != 'true' }}
         env:
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
+          HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
           GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
           set -euE -o pipefail
 
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           gh pr create \
@@ -706,16 +341,17 @@ jobs:
             # --reviewer "holochain/core-dev" \
 
           pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
-          echo "::set-output name=pull-request-number::${pull_request_number}"
+          echo "pull-request-number=${pull_request_number}" >> $GITHUB_OUTPUT
 
       - name: Create a github release
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           set -eu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
@@ -877,7 +513,6 @@ jobs:
           Version | ${VERSION}
           --- | ---
           holochain | ${holochain_status}
-          holochain-nixpkgs | _undetermined_
           holonix | _undetermined_
           EOF
           )
