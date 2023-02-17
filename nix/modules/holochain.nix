@@ -170,8 +170,8 @@
         cargoExtraArgs =
           "--lib --all-features";
 
-        cargoToml = "${self}/crates/test_utils/wasm/wasm_workspace/Cargo.toml";
-        cargoLock = "${self}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
+        cargoToml = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.toml";
+        cargoLock = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
 
         postUnpack = ''
           cd $sourceRoot/crates/test_utils/wasm/wasm_workspace
