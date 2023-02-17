@@ -232,7 +232,7 @@ pub struct Conductor {
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 
-    pub(crate) services: ConductorServices,
+    pub(crate) services: RwShare<Option<ConductorServices>>,
 }
 
 impl Conductor {
@@ -277,7 +277,7 @@ mod startup_shutdown_impls {
                 keystore,
                 holochain_p2p,
                 post_commit,
-                services: ConductorServices::builtin(todo!(), todo!()),
+                services: RwShare::new(None),
             }
         }
 

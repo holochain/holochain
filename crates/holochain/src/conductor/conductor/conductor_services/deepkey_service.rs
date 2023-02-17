@@ -74,6 +74,8 @@ impl DeepkeyBuiltin {
     }
 }
 
+#[allow(unreachable_code)]
+#[allow(unused_variables)]
 #[async_trait::async_trait]
 impl DeepkeyService for DeepkeyBuiltin {
     async fn is_key_valid(
