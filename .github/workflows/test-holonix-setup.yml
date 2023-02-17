@@ -7,3 +7,6 @@ jobs:
   test_setup:
     name: Test Holonix Setup
     runs-on: ubuntu-latest
+    steps:
+      - name: Call setup script
+        run: echo "hello"
