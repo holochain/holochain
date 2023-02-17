@@ -7,6 +7,7 @@ if ! command -v nix &>/dev/null; then
     echo "Install Nix first, or open a new shell if it is already installed"
     echo
     echo "sh <(curl -L https://nixos.org/nix/install) --daemon"
+    exit 1
 fi
 
 echo
