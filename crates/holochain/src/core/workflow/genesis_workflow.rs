@@ -202,6 +202,7 @@ pub mod tests {
                 .return_const(ConductorServices {
                     deepkey: Arc::new(deepkey),
                     app_store: Arc::new(app_store),
+                    cell_ids: None,
                 });
             api.expect_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();

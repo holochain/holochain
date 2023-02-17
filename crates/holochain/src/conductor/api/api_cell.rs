@@ -71,8 +71,10 @@ impl CellConductorApiT for CellConductorApi {
         }
     }
 
-    fn conductor_services(&self) -> &ConductorServices {
-        &self.conductor_handle.services
+    fn conductor_services(&self) -> ConductorServices {
+        self.conductor_handle
+            .services
+            .share_ref(|s| s.clone().expect("Conductor services not yet initialized"))
     }
 
     fn keystore(&self) -> &MetaLairClient {
@@ -136,7 +138,7 @@ pub trait CellConductorApiT: Send + Sync {
     ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Access to the conductor services
-    fn conductor_services(&self) -> &ConductorServices;
+    fn conductor_services(&self) -> ConductorServices;
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;

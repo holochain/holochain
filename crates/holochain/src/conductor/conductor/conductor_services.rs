@@ -22,7 +22,7 @@ pub struct ConductorServices {
     /// The AppStore service
     pub app_store: Arc<dyn AppStoreService>,
     /// The installed cells which are used for each service
-    cell_ids: Arc<ConductorServiceCells>,
+    pub(crate) cell_ids: Option<Arc<ConductorServiceCells>>,
 }
 
 impl ConductorServices {
@@ -31,15 +31,19 @@ impl ConductorServices {
         Self {
             deepkey: DeepkeyBuiltin::new(conductor.clone(), cell_ids.deepkey.clone()),
             app_store: AppStoreBuiltin::new(conductor.clone(), cell_ids.app_store.clone()),
-            cell_ids: Arc::new(cell_ids),
+            cell_ids: Some(Arc::new(cell_ids)),
         }
     }
 
     /// Get the list of any CellIds which may be protected due to being in use by ConductorServices
     pub fn protected_cell_ids(&self) -> HashSet<&CellId> {
-        [&self.cell_ids.deepkey, &self.cell_ids.app_store]
-            .into_iter()
-            .collect()
+        if let Some(cell_ids) = self.cell_ids.as_ref() {
+            [&cell_ids.deepkey, &cell_ids.app_store]
+                .into_iter()
+                .collect()
+        } else {
+            [].into_iter().collect()
+        }
     }
 }
 
