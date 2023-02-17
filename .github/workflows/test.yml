@@ -1,0 +1,9 @@
+on:
+  push:
+    branches:
+      - "holochain.github.io"
+
+jobs:
+  test_setup:
+    name: Test Holonix Setup
+    runs-on: ubuntu-latest
