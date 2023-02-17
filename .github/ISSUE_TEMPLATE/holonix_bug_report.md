@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 **Describe the bug**
-A clear and concise description of what the bug is, which dependency it is to do with,
+A description of what the bug is, which dependency it is to do with,
 how you encountered it, and the text of any error you received.
 
 **Expected behavior**
