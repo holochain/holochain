@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
 use holochain_types::prelude::*;
+
+use crate::conductor::ConductorHandle;
 
 /// Interface for the AppStore service
 #[async_trait::async_trait]
-// #[mockall::automock]
+#[mockall::automock]
 pub trait AppStoreService: Send + Sync {
     /// Fetch a DNA bundle from the store
     async fn get_dna_bundle(&self, dna_hash: DnaHash) -> AppStoreServiceResult<Option<DnaBundle>>;
@@ -19,3 +23,27 @@ pub type AppStoreServiceResult<T> = Result<T, AppStoreServiceError>;
 
 /// This doesn't exist yet. We need to define it.
 pub enum AppHash {}
+
+/// The built-in implementation of the app store service, which runs a DNA
+pub struct AppStoreBuiltin {
+    conductor: ConductorHandle,
+    cell_id: CellId,
+}
+
+impl AppStoreBuiltin {
+    /// Constructor
+    pub fn new(conductor: ConductorHandle, cell_id: CellId) -> Arc<Self> {
+        Arc::new(Self { conductor, cell_id })
+    }
+}
+
+#[async_trait::async_trait]
+impl AppStoreService for AppStoreBuiltin {
+    async fn get_dna_bundle(&self, dna_hash: DnaHash) -> AppStoreServiceResult<Option<DnaBundle>> {
+        todo!("placeholder")
+    }
+
+    async fn get_app_bundle(&self, app_hash: AppHash) -> AppStoreServiceResult<Option<AppBundle>> {
+        todo!("placeholder")
+    }
+}
