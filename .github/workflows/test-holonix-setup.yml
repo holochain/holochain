@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Install nix
         uses: cachix/install-nix-action@v19
+        with:
+          nix_path: nixpkgs=channel:nixos-22.11
 
       - name: Call setup script
         run: sh <(curl https://holochain.github.io/holochain/setup.sh)
