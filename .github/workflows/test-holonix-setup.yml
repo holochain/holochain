@@ -19,7 +19,3 @@ jobs:
 
       - name: Call setup script
         run: bash <(curl https://holochain.github.io/holochain/setup.sh)
-
-      - name: Setup tmate session if build and test run failed
-        if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
