@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -ex
-
 if ! command -v nix &>/dev/null; then
     echo "Nix package manager not found"
     echo "Install Nix first, or open a new shell if it is already installed"
@@ -9,6 +7,8 @@ if ! command -v nix &>/dev/null; then
     echo "sh <(curl -L https://nixos.org/nix/install) --daemon"
     exit 1
 fi
+
+set -ex
 
 echo
 echo "Setting up binary cache for all users (requires root access)"
@@ -21,8 +21,8 @@ mkdir -p ~/.config/nix
 echo
 
 echo "Enabling additional Nix commands and Nix flakes"
-echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+echo "experimental-features = nix-command flakes" >>~/.config/nix/nix.conf
 echo
 
-echo "Scaffolding the example Holochain app"
+echo "Scaffolding example Holochain app"
 nix run github:holochain/holochain#hc-scaffold -- example forum
