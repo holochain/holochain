@@ -1,6 +1,7 @@
 use super::*;
 use crate::KitsuneHostDefaultError;
 use kitsune_p2p_fetch::*;
+use kitsune_p2p_timestamp::Timestamp;
 
 /// Signature for check_op_data_impl
 pub type CheckOpDataImpl = Box<
@@ -57,6 +58,14 @@ impl KitsuneHost for HostStub {
 
     fn unblock(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
         KitsuneHostDefaultError::unblock(&self.err, input)
+    }
+
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::is_blocked(&self.err, input, timestamp)
     }
 
     fn get_agent_info_signed(

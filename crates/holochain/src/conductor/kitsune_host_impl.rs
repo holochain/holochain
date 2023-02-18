@@ -19,6 +19,7 @@ use holochain_types::{
     prelude::{DhtOpHash, DnaError},
     share::RwShare,
 };
+use holochain_zome_types::Timestamp;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
     event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
@@ -72,6 +73,19 @@ impl KitsuneHost for KitsuneHostImpl {
     fn unblock(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()> {
         async move {
             let result = self.spaces.unblock(input.into()).await;
+            Ok(result?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> KitsuneHostResult<bool> {
+        async move {
+            let result = self.spaces.is_blocked(input.into(), timestamp).await;
             Ok(result?)
         }
         .boxed()

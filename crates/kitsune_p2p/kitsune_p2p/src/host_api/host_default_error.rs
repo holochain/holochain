@@ -1,4 +1,5 @@
 use kitsune_p2p_fetch::FetchPoolConfig;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
@@ -18,6 +19,14 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
 
     fn unblock(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
         box_fut(Ok(()))
+    }
+
+    fn is_blocked(
+        &self,
+        _input: kitsune_p2p_block::BlockTargetId,
+        _timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(false))
     }
 
     fn get_agent_info_signed(
@@ -140,6 +149,14 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
 
     fn unblock(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
         KitsuneHostDefaultError::unblock(self, input)
+    }
+
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::is_blocked(self, input, timestamp)
     }
 
     fn get_agent_info_signed(

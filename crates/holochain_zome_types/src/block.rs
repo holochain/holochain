@@ -104,6 +104,19 @@ pub enum BlockTargetId {
     Ip(IpV4),
 }
 
+impl From<kitsune_p2p_block::BlockTargetId> for BlockTargetId {
+    fn from(kblock_target_id: kitsune_p2p_block::BlockTargetId) -> Self {
+        match kblock_target_id {
+            kitsune_p2p_block::BlockTargetId::AgentSpace(agent, space) => Self::Cell(CellId::new(
+                DnaHash::from_raw_36(space.0.clone()),
+                AgentPubKey::from_raw_36(agent.0.clone()),
+            )),
+            kitsune_p2p_block::BlockTargetId::Node(node_id) => Self::Node(node_id),
+            kitsune_p2p_block::BlockTargetId::Ip(ip_addr) => Self::Ip(ip_addr),
+        }
+    }
+}
+
 impl From<BlockTarget> for BlockTargetId {
     fn from(block_target: BlockTarget) -> Self {
         match block_target {

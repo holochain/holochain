@@ -55,8 +55,8 @@ use crate::core::{
         },
     },
 };
-
 use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTargetId;
 
 use super::{
     conductor::RwShare,
@@ -166,13 +166,22 @@ impl Spaces {
     }
 
     /// Block some target.
-    pub async fn block(&self, block: Block) -> DatabaseResult<()> {
-        Ok(holochain_state::block::block(&self.conductor_db, block).await?)
+    pub async fn block(&self, input: Block) -> DatabaseResult<()> {
+        holochain_state::block::block(&self.conductor_db, input).await
     }
 
     /// Unblock some target.
-    pub async fn unblock(&self, block: Block) -> DatabaseResult<()> {
-        Ok(holochain_state::block::unblock(&self.conductor_db, block).await?)
+    pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
+        holochain_state::block::unblock(&self.conductor_db, input).await
+    }
+
+    /// Check if some target is blocked.
+    pub async fn is_blocked(
+        &self,
+        input: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> StateQueryResult<bool> {
+        holochain_state::block::is_blocked(&self.conductor_db, input, timestamp).await
     }
 
     /// Get the holochain conductor state

@@ -34,6 +34,25 @@ pub enum BlockTarget {
     Ip(std::net::Ipv4Addr, IpBlockReason),
 }
 
+pub enum BlockTargetId {
+    AgentSpace(
+        Arc<kitsune_p2p_types::bin_types::KitsuneAgent>,
+        Arc<kitsune_p2p_types::bin_types::KitsuneSpace>,
+    ),
+    Node(NodeId),
+    Ip(std::net::Ipv4Addr),
+}
+
+impl From<BlockTarget> for BlockTargetId {
+    fn from(block_target: BlockTarget) -> Self {
+        match block_target {
+            BlockTarget::AgentSpace(agent, space, _) => Self::AgentSpace(agent, space),
+            BlockTarget::Node(node_id, _) => Self::Node(node_id),
+            BlockTarget::Ip(ip_addr, _) => Self::Ip(ip_addr),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Block {
     target: BlockTarget,
