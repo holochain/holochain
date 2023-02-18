@@ -195,6 +195,34 @@ impl rusqlite::types::FromSql for Timestamp {
     }
 }
 
+/// It's an interval bounded by timestamps that are not infinite.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct InclusiveTimestampInterval {
+    start: Timestamp,
+    end: Timestamp,
+}
+
+impl InclusiveTimestampInterval {
+    /// Try to make the interval but fail if it ends before it starts.
+    pub fn try_new(start: Timestamp, end: Timestamp) -> TimestampResult<Self> {
+        if start > end {
+            Err(TimestampError::OutOfOrder)
+        } else {
+            Ok(Self { start, end })
+        }
+    }
+
+    /// Accessor for start timestamp.
+    pub fn start(&self) -> &Timestamp {
+        &self.start
+    }
+
+    /// Accessor for end timestamp.
+    pub fn end(&self) -> &Timestamp {
+        &self.end
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
@@ -243,5 +271,21 @@ mod tests {
         let s: S = sb.try_into().unwrap();
         let t = s.0;
         assert_eq!(TEST_TS, &t.to_string());
+    }
+
+    #[test]
+    fn inclusive_timestamp_interval_test_new() {
+        // valids.
+        for (start, end) in vec![(0, 0), (-1, 0), (0, 1), (i64::MIN, i64::MAX)] {
+            InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end)).unwrap();
+        }
+
+        // invalids.
+        for (start, end) in vec![(0, -1), (1, 0), (i64::MAX, i64::MIN)] {
+            assert!(
+                super::InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end))
+                    .is_err()
+            );
+        }
     }
 }

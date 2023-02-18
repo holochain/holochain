@@ -54,6 +54,14 @@ impl FetchPoolConfig for SwitchboardEventHandler {
 }
 
 impl KitsuneHost for SwitchboardEventHandler {
+    fn block(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn unblock(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
     fn get_agent_info_signed(
         &self,
         GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,

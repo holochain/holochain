@@ -91,7 +91,6 @@ pub mod agent_store {
 }
 
 pub mod actor;
-pub mod block;
 pub mod event;
 pub(crate) mod gossip;
 #[allow(missing_docs)]

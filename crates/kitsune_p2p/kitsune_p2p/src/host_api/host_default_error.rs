@@ -12,6 +12,14 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
     /// Name to be printed out on unimplemented error
     const NAME: &'static str;
 
+    fn block(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn unblock(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
     fn get_agent_info_signed(
         &self,
         _input: GetAgentInfoSignedEvt,
@@ -126,6 +134,14 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
 }
 
 impl<T: KitsuneHostDefaultError> KitsuneHost for T {
+    fn block(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::block(self, input)
+    }
+
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::unblock(self, input)
+    }
+
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,

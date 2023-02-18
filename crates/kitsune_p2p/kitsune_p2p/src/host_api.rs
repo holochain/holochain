@@ -23,7 +23,12 @@ pub type KitsuneHostResult<'a, T> =
 /// The interface to be implemented by the host, which handles various requests
 /// for data
 pub trait KitsuneHost: 'static + Send + Sync {
-    fn block(&self, )
+    /// We are requesting a block.
+    fn block(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()>;
+
+    /// We are requesting an unblock.
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()>;
+
     /// We need to get previously stored agent info.
     fn get_agent_info_signed(
         &self,

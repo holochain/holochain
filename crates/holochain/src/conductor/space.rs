@@ -56,6 +56,8 @@ use crate::core::{
     },
 };
 
+use holochain_zome_types::block::Block;
+
 use super::{
     conductor::RwShare,
     error::ConductorResult,
@@ -161,6 +163,16 @@ impl Spaces {
             wasm_db,
             network_config: config.network.clone().unwrap_or_default(),
         })
+    }
+
+    /// Block some target.
+    pub async fn block(&self, block: Block) -> DatabaseResult<()> {
+        Ok(holochain_state::block::block(&self.conductor_db, block).await?)
+    }
+
+    /// Unblock some target.
+    pub async fn unblock(&self, block: Block) -> DatabaseResult<()> {
+        Ok(holochain_state::block::unblock(&self.conductor_db, block).await?)
     }
 
     /// Get the holochain conductor state

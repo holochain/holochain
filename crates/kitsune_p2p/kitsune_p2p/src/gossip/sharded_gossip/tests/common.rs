@@ -24,6 +24,14 @@ impl FetchPoolConfig for StandardResponsesHostApi {
 }
 
 impl KitsuneHost for StandardResponsesHostApi {
+    fn block(&self, _: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn unblock(&self, _: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,

@@ -327,17 +327,19 @@ pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
     // Build one new block from the extremums.
     insert_block_inner(
         txn,
-        Block::try_new(
+        Block::new(
             block.target().clone(),
-            match maybe_min_maybe_max.0 {
-                Some(min) => std::cmp::min(Timestamp(min), block.start()),
-                None => block.start(),
-            },
-            match maybe_min_maybe_max.1 {
-                Some(max) => std::cmp::max(Timestamp(max), block.end()),
-                None => block.end(),
-            },
-        )?,
+            InclusiveTimestampInterval::try_new(
+                match maybe_min_maybe_max.0 {
+                    Some(min) => std::cmp::min(Timestamp(min), *block.start()),
+                    None => *block.start(),
+                },
+                match maybe_min_maybe_max.1 {
+                    Some(max) => std::cmp::max(Timestamp(max), *block.end()),
+                    None => *block.end(),
+                },
+            )?,
+        ),
     )
 }
 
@@ -355,7 +357,10 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
                 if preblock_start <= preblock_end {
                     insert_block_inner(
                         txn,
-                        Block::try_new(unblock0.target().clone(), preblock_start, preblock_end)?,
+                        Block::new(
+                            unblock0.target().clone(),
+                            InclusiveTimestampInterval::try_new(preblock_start, preblock_end)?,
+                        ),
                     )?
                 }
             }
@@ -376,7 +381,10 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
                 if postblock_start <= postblock_end {
                     insert_block_inner(
                         txn,
-                        Block::try_new(unblock.target().clone(), postblock_start, postblock_end)?,
+                        Block::new(
+                            unblock.target().clone(),
+                            InclusiveTimestampInterval::try_new(postblock_start, postblock_end)?,
+                        ),
                     )?
                 }
             }

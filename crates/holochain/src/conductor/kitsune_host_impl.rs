@@ -60,6 +60,24 @@ impl KitsuneHostImpl {
 }
 
 impl KitsuneHost for KitsuneHostImpl {
+    fn block(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()> {
+        async move {
+            let result = self.spaces.block(input.into()).await;
+            Ok(result?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()> {
+        async move {
+            let result = self.spaces.unblock(input.into()).await;
+            Ok(result?)
+        }
+        .boxed()
+        .into()
+    }
+
     fn peer_extrapolated_coverage(
         &self,
         space: std::sync::Arc<kitsune_p2p::KitsuneSpace>,
