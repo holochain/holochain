@@ -8,5 +8,8 @@ jobs:
     name: Test Holonix Setup
     runs-on: ubuntu-latest
     steps:
+      - name: Install nix
+        uses: cachix/install-nix-action@v19
+
       - name: Call setup script
         run: sh <(curl https://holochain.github.io/holochain/setup.sh)
