@@ -14,7 +14,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-22.11
 
       - name: Call setup script
-        run: sh <(curl https://holochain.github.io/holochain/setup.sh)
+        run: bash <(curl https://holochain.github.io/holochain/setup.sh)
 
       - name: Setup tmate session if build and test run failed
         if: ${{ failure() }}

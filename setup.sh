@@ -13,6 +13,7 @@ set -ex
 echo
 echo "Setting up binary cache for all users (requires root access)"
 sudo --preserve-env=PATH,NIX_CONFIG nix run nixpkgs/nixos-22.11#cachix --extra-experimental-features "nix-command flakes" -- use holochain-ci -m root-nixconf
+# restarting Nix daemon
 sudo pkill nix-daemon
 echo
 
