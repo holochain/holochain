@@ -3,6 +3,10 @@ on:
     branches:
       - "holochain.github.io"
 
+concurrency:
+  group: ${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   test_setup:
     name: Test Holonix Setup
