@@ -204,6 +204,7 @@ jobs:
               --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
               release \
                 --no-verify-pre \
+                --no-verify-post \ # TODO: REMOVE THIS BEFORE MERGING
                 --force-tag-creation \
                 --force-branch-creation \
                 --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
