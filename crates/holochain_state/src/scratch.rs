@@ -130,14 +130,12 @@ impl Scratch {
     }
 
     pub fn records(&self) -> impl Iterator<Item = Record> + '_ {
-        dbg!(&self.entries.keys().collect::<Vec<_>>());
         self.actions.iter().cloned().map(move |shh| {
             let entry = shh
                 .action()
                 .entry_hash()
                 // TODO: let's use Arc<Entry> from here on instead of dereferencing
                 .and_then(|eh| self.entries.get(eh).map(|e| (**e).clone()));
-            dbg!(shh.action(), &entry);
             Record::new(shh, entry)
         })
     }
