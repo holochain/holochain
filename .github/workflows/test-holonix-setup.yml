@@ -14,3 +14,5 @@ jobs:
     steps:
       - name: Call setup script
         run: bash <(curl https://holochain.github.io/holochain/setup.sh)
+      - name: Test nix command
+        run: nix run --version
