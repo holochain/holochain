@@ -138,8 +138,7 @@ impl ProxyUrl {
             if let Some(mut i) = self.full.path_segments() {
                 if let Some(_u) = i.next() {
                     if let Some(u) = i.next() {
-                        let digest =
-                            base64::decode_config(u, base64::URL_SAFE_NO_PAD).unwrap();
+                        let digest = base64::decode_config(u, base64::URL_SAFE_NO_PAD).unwrap();
                         return CertDigest::from_slice(&digest);
                     }
                 }

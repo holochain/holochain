@@ -77,10 +77,9 @@ impl SweetLocalRendezvous {
 
         let addr = addr.expect("failed to get_if_addrs");
 
-        let (bs_driver, bs_addr, bs_shutdown) =
-            kitsune_p2p_bootstrap::run((addr, 0), Vec::new())
-                .await
-                .unwrap();
+        let (bs_driver, bs_addr, bs_shutdown) = kitsune_p2p_bootstrap::run((addr, 0), Vec::new())
+            .await
+            .unwrap();
         tokio::task::spawn(bs_driver);
         tracing::info!("RUNNING BOOTSTRAP: {bs_addr:?}");
 
@@ -105,7 +104,10 @@ impl SweetLocalRendezvous {
                 ],
             });
             sig_conf.demo = false;
-            tracing::info!("RUNNING ICE SERVERS: {}", serde_json::to_string_pretty(&sig_conf.ice_servers).unwrap());
+            tracing::info!(
+                "RUNNING ICE SERVERS: {}",
+                serde_json::to_string_pretty(&sig_conf.ice_servers).unwrap()
+            );
 
             let (sig_addr, sig_driver) = tx5_signal_srv::exec_tx5_signal_srv(sig_conf).unwrap();
             let sig_port = sig_addr.port();
@@ -173,7 +175,9 @@ impl SweetConductorConfig {
         let mut config = self.0;
 
         if let Some(n) = config.network.as_mut() {
-            if n.bootstrap_service.is_some() && n.bootstrap_service.as_ref().unwrap().to_string() == "rendezvous:" {
+            if n.bootstrap_service.is_some()
+                && n.bootstrap_service.as_ref().unwrap().to_string() == "rendezvous:"
+            {
                 n.bootstrap_service = Some(url2::url2!("http://{}", rendezvous.bootstrap_addr()));
             }
 
@@ -224,8 +228,15 @@ impl SweetConductorConfig {
     }
 
     /// Set network tuning params.
-    pub fn tune(mut self, tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams) -> Self {
-        self.0.network.as_mut().expect("failed to tune network").tuning_params = tuning_params;
+    pub fn tune(
+        mut self,
+        tuning_params: kitsune_p2p_types::config::KitsuneP2pTuningParams,
+    ) -> Self {
+        self.0
+            .network
+            .as_mut()
+            .expect("failed to tune network")
+            .tuning_params = tuning_params;
         self
     }
 

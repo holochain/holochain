@@ -43,8 +43,7 @@ fn make_config(
     // so we can fallback to the next one
     tuning.default_rpc_single_timeout_ms = 3_000;
 
-    holochain::sweettest::SweetConductorConfig::standard()
-        .tune(Arc::new(tuning))
+    holochain::sweettest::SweetConductorConfig::standard().tune(Arc::new(tuning))
 }
 
 #[cfg(feature = "test_utils")]

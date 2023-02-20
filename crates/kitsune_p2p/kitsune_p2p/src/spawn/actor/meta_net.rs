@@ -188,7 +188,6 @@ impl MetaNetCon {
             #[cfg(feature = "tx5")]
             {
                 if let MetaNetCon::Tx5(ep, rem_url, _res_store) = self {
-
                     let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                     let wrap = WireWrap::notify(msg_id, WireData(wire));
 
@@ -203,7 +202,8 @@ impl MetaNetCon {
             }
 
             Err("invalid features".into())
-        })().await;
+        })()
+        .await;
 
         let elapsed_s = start.elapsed().as_secs_f64();
 
@@ -257,7 +257,8 @@ impl MetaNetCon {
             }
 
             Err("invalid features".into())
-        })().await;
+        })()
+        .await;
 
         let elapsed_s = start.elapsed().as_secs_f64();
 
