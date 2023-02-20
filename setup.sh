@@ -10,6 +10,8 @@ if ! command -v nix &>/dev/null; then
     sh <(curl -L https://nixos.org/nix/install) --daemon
 
     echo "Sourcing shell resource file for changes to be effective"
+    source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh > /dev/null 2>&1
+    source /nix/var/nix/profiles/default/etc/profile.d/nix.sh > /dev/null 2>&1
 fi
 
 echo
