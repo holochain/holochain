@@ -1,2 +1,3 @@
-## test test
-This is the description of the autorebase workflow
+## autorebase.yml
+
+Automatically rebases open PRs onto develop

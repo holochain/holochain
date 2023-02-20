@@ -21,14 +21,6 @@ on:
         type: string
         required: false
         default: "https://github.com/holochain/holochain"
-      HOLOCHAIN_NIXPKGS_URL:
-        type: string
-        required: false
-        default: "https://github.com/holochain/holochain-nixkpgs.git"
-      HOLONIX_URL:
-        type: string
-        required: false
-        default: "https://github.com/holochain/holonix.git"
       HOLOCHAIN_REPO:
         type: string
         required: false
@@ -91,7 +83,7 @@ jobs:
       # - name: Set NIX_PATH (FIXME)
       #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
-      - name: Prepare the holochain repository
+      - name: Merge ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }} into ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
           HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
