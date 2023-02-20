@@ -14,10 +14,5 @@ jobs:
     steps:
       - name: Call setup script
         run: bash <(curl https://holochain.github.io/holochain/setup.sh)
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
       - name: Test nix command
-        run: |
-          echo "/nix/var/nix/profiles/default/bin" >> "$GITHUB_PATH" && \
-          echo "/nix/var/nix/profiles/per-user/$USER/profile/bin" >> "$GITHUB_PATH" && \
-          nix run --version
+        run: $(which nix) run --version
