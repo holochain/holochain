@@ -12,12 +12,14 @@ if ! command -v nix &>/dev/null; then
     echo "Starting Nix daemon"
     source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh > /dev/null 2>&1
     source /nix/var/nix/profiles/default/etc/profile.d/nix.sh > /dev/null 2>&1
+    echo
 fi
 
-echo
 echo "Setting up binary cache for all users (requires root access)"
 echo "sudo --preserve-env=PATH $(which nix) run nixpkgs/nixos-22.11#cachix --extra-experimental-features \"nix-command flakes\" -- use holochain-ci -m root-nixconf"
 sudo --preserve-env=PATH $(which nix) run nixpkgs/nixos-22.11#cachix --extra-experimental-features "nix-command flakes" -- use holochain-ci -m root-nixconf
+echo
+
 echo "Restarting Nix daemon"
 echo "sudo pkill nix-daemon"
 sudo pkill nix-daemon
