@@ -6,6 +6,7 @@ on:
       repo_path:
         description: "a path to the holochain repository"
         required: false
+        type: string
         default: "."
 
 jobs:
