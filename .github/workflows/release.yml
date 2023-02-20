@@ -165,7 +165,7 @@ jobs:
   holochain-build-and-test:
     needs: [vars, prepare]
     if: ${{ github.event_name != 'pull_request' && needs.vars.outputs.skip_test != 'true' }}
-    uses: ./.github/actions/holochain-build-and-test.yml
+    uses: ./.github/workflows/holochain-build-and-test.yml
     with:
       repo_path: ${{ needs.prepare.outputs.repo_nix_store_path }}
 

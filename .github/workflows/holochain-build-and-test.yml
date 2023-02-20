@@ -1,10 +1,12 @@
 name: "holochain build and test"
 
-inputs:
-  repo_path:
-    description: "a path to the holochain repository"
-    required: false
-    default: "."
+on:
+  workflow_call:
+    inputs:
+      repo_path:
+        description: "a path to the holochain repository"
+        required: false
+        default: "."
 
 jobs:
   "test":

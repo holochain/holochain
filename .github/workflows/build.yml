@@ -9,4 +9,4 @@ concurrency:
 
 jobs:
   holochain-build-and-test:
-    uses: ./.github/actions/holochain-build-and-test.yml
+    uses: ./.github/workflows/holochain-build-and-test.yml
