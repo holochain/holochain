@@ -162,7 +162,7 @@ jobs:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
       HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
 
-  holochain-build-and-test:
+  test:
     needs: [vars, prepare]
     if: ${{ github.event_name != 'pull_request' && needs.vars.outputs.skip_test != 'true' }}
     uses: ./.github/workflows/holochain-build-and-test.yml
