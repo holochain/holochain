@@ -19,7 +19,7 @@ name = "discover"
 path = "examples/discover.rs"
 
 [dependencies]
-libmdns = "=0.7.3"
+libmdns = "=0.7.4"
 mdns = "=3.0.0"
 futures-util = "0.3.1"
 futures-core = "0.3.1"

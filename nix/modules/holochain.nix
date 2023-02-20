@@ -55,14 +55,16 @@
       });
 
       # derivation with the main crates
-      holochain = (craneLib.buildPackage (commonArgs // {
-        CARGO_PROFILE = "release";
-        cargoArtifacts = holochainDepsRelease;
-        src = flake.config.srcCleanedHolochain;
-        doCheck = false;
-      })) // {
-        src.rev = inputs.holochain.rev;
-      };
+      holochain = lib.attrsets.recursiveUpdate
+        (craneLib.buildPackage (commonArgs // {
+          CARGO_PROFILE = "release";
+          cargoArtifacts = holochainDepsRelease;
+          src = flake.config.srcCleanedHolochain;
+          doCheck = false;
+        }))
+        {
+          src.rev = inputs.holochain.rev;
+        };
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // rec {
         pname = "holochain-nextest";
@@ -165,11 +167,26 @@
         '';
       });
 
-      holochain-tests-wasm = craneLib.cargoTest (commonArgs // {
+      holochainWasmArgs = (commonArgs // {
         pname = "holochain-tests-wasm";
-        cargoArtifacts = holochainDeps;
         cargoExtraArgs =
-          "--lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features";
+          "--lib --all-features";
+
+        cargoToml = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.toml";
+        cargoLock = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
+
+        postUnpack = ''
+          cd $sourceRoot/crates/test_utils/wasm/wasm_workspace
+          sourceRoot="."
+        '';
+      });
+
+      holochainDepsWasm = craneLib.buildDepsOnly (holochainWasmArgs // {
+        cargoArtifacts = null;
+      });
+
+      holochain-tests-wasm = craneLib.cargoTest (holochainWasmArgs // {
+        cargoArtifacts = holochainDepsWasm;
 
         dontPatchELF = true;
         dontFixup = true;
