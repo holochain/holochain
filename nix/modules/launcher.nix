@@ -46,6 +46,10 @@
             perl
             pkg-config
           ])
+          ++ (lib.optionals pkgs.stdenv.isLinux
+            (with pkgs; [
+              wrapGAppsHook
+            ]))
           ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs; [
             xcbuild
             libiconv
