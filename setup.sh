@@ -9,6 +9,7 @@ if ! command -v nix &>/dev/null; then
     echo "sh <(curl -L https://nixos.org/nix/install) --daemon"
     sh <(curl -L https://nixos.org/nix/install) --daemon
 
+    echo
     echo "Starting Nix daemon"
     source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh > /dev/null 2>&1
     source /nix/var/nix/profiles/default/etc/profile.d/nix.sh > /dev/null 2>&1
@@ -34,3 +35,5 @@ echo "Enabling additional Nix commands and Nix flakes"
 echo "echo \"experimental-features = nix-command flakes\" >>~/.config/nix/nix.conf"
 echo "experimental-features = nix-command flakes" >>~/.config/nix/nix.conf
 echo
+
+echo "Please close this shell and open a new one to start using Nix".
