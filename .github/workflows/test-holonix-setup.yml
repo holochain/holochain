@@ -12,10 +12,10 @@ jobs:
     name: Test Holonix Setup
     runs-on: ubuntu-latest
     steps:
-      - name: Install nix
-        uses: cachix/install-nix-action@v19
-        with:
-          nix_path: nixpkgs=channel:nixos-22.11
+      # - name: Install nix
+      #   uses: cachix/install-nix-action@v19
+      #   with:
+      #     nix_path: nixpkgs=channel:nixos-22.11
 
       - name: Call setup script
         run: bash <(curl https://holochain.github.io/holochain/setup.sh)
