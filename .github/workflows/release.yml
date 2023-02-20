@@ -162,14 +162,12 @@ jobs:
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
       HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN}}
 
-  test:
+  holochain-build-and-test:
     needs: [vars, prepare]
     if: ${{ github.event_name != 'pull_request' && needs.vars.outputs.skip_test != 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          echo currently unimplemented
-          exit 1
+    uses: ./.github/actions/holochain-build-and-test.yml
+    with:
+      repo_path: ${{ needs.prepare.outputs.repo_nix_store_path }}
 
   finalize:
     if: ${{ always() && needs.prepare.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') && github.event_name != 'pull_request' && (needs.prepare.outputs.releasable_crates == 'true' || needs.vars.outputs.skip_prepare_logic == 'true') }}
