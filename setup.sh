@@ -1,29 +1,32 @@
 #!/usr/bin/env bash
 
+set -e
+
 if ! command -v nix &>/dev/null; then
     echo "Nix package manager not found"
-    echo "Install Nix first, or open a new shell if it is already installed"
+    echo "Installing Nix"
     echo
     echo "sh <(curl -L https://nixos.org/nix/install) --daemon"
-    exit 1
-fi
+    sh <(curl -L https://nixos.org/nix/install) --daemon
 
-set -ex
+    echo "Sourcing shell resource file for changes to be effective"
+fi
 
 echo
 echo "Setting up binary cache for all users (requires root access)"
+echo "sudo --preserve-env=PATH $(which nix) run nixpkgs/nixos-22.11#cachix --extra-experimental-features \"nix-command flakes\" -- use holochain-ci -m root-nixconf"
 sudo --preserve-env=PATH $(which nix) run nixpkgs/nixos-22.11#cachix --extra-experimental-features "nix-command flakes" -- use holochain-ci -m root-nixconf
-# restarting Nix daemon
+echo "Restarting Nix daemon"
+echo "sudo pkill nix-daemon"
 sudo pkill nix-daemon
 echo
 
 echo "Creating Nix user config in ~/.config/nix/nix.conf"
+echo "mkdir -p ~/.config/nix"
 mkdir -p ~/.config/nix
 echo
 
 echo "Enabling additional Nix commands and Nix flakes"
+echo "echo \"experimental-features = nix-command flakes\" >>~/.config/nix/nix.conf"
 echo "experimental-features = nix-command flakes" >>~/.config/nix/nix.conf
 echo
-
-echo "Scaffolding example Holochain app"
-nix run github:holochain/holochain#hc-scaffold -- example forum
