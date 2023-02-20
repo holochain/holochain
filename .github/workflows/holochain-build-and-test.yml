@@ -60,25 +60,6 @@ jobs:
         with:
           lfs: false
 
-      # - name: Install nix
-      #   uses: cachix/install-nix-action@v19
-      #   if: ${{ ! contains(matrix.platform.runs-on, 'self-hosted') }}
-      #   with:
-      #     extra_nix_config: |
-      #       experimental-features = flakes nix-command
-      # - name: Setup cachix
-      #   uses: cachix/cachix-action@v12
-      #   if: ${{ ! contains(matrix.platform.runs-on, 'self-hosted') }}
-      #   with:
-      #     name: holochain-ci
-      #     authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-      #     pushFilter: "tmp-.*-"
-      # - name: Restart nix-daemon
-      #   if: ${{ matrix.platform.runs-on == 'ubuntu-latest' }}
-      #   run: |
-      #     sudo bash -c 'echo extra-experimental-features = ca-derivations impure-derivations >> /etc/nix/nix.conf'
-      #     sudo systemctl stop nix-daemon
-
       - name: Print matrix
         env:
           MATRIX: ${{ toJSON(matrix) }}
@@ -101,6 +82,7 @@ jobs:
             --override-input versions ./versions/0_1 \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
 
+          # TODO: remove this once we've implemented all tests and know that we don't need it
           # if there's something to run we generate separate commands
           # if [[ ${{ matrix.cmd.verb }} == "run" ]]; then
           #   export basecmd="nix run -L --show-trace .#packages.${system}."
