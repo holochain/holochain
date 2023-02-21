@@ -69,7 +69,7 @@
       #   build can succees with the workspace's Cargo.toml but fail without it.
       # This ensures that individual packages can be installed from crates.io.
       holochain-crates-standalone = craneLib.buildPackage (commonArgs // rec {
-        name = "holchain-crates-standalone";
+        name = "holochain-crates-standalone";
         src = flake.config.srcCleanedHolochain;
         cargoArtifacts = holochainDepsRelease;
         CARGO_PROFILE = "release";
