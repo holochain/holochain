@@ -178,9 +178,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Extend space
-        uses: ./.github/actions/extend-space
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
       - name: Install nix
         uses: cachix/install-nix-action@v19
       - name: Setup cachix
