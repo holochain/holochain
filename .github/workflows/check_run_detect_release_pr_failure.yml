@@ -1,3 +1,9 @@
+# Identifies new branches created with `release-` prefix and warns users about this in mattermost:
+# ` this PR was determined to be part of a release due to its branch prefix release-`
+#
+# TODO: Why is this needed?
+
+
 name: detect critical check failures
 
 on:

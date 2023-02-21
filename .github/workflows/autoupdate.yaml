@@ -1,3 +1,5 @@
+# Operates on open PRs and automatically merges updates on target branches into the PR branch.
+
 name: autoupdate
 
 on:

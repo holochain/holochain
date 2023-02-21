@@ -1,3 +1,5 @@
+# Builds the holochain crates and runs tests
+
 name: holochain build and test
 on:
   workflow_dispatch:
