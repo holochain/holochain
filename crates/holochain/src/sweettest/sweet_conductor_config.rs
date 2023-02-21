@@ -61,6 +61,7 @@ impl Drop for SweetLocalRendezvous {
 
 impl SweetLocalRendezvous {
     /// Create a new local rendezvous instance.
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> DynSweetRendezvous {
         let mut addr = None;
 
