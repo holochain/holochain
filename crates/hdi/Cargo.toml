@@ -38,3 +38,4 @@ mockall = { version = "0.10.2", optional = true }
 fixt = { path = "../fixt" }
 test-case = "2.1"
 arbitrary = { version = "1.0", features = ["derive"] }
+subtle-encoding = "0.5"
