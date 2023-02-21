@@ -194,19 +194,3 @@ safety requirements. This is why we call our approach "Scaling Consent."
 It is what enables coherent collaborative action without first achieving
 global consensus.
 
-
-
-[^1]: Some readers may come to the problems of distributed coordination
-    from the framework laid out by the literature on Byzantine Fault
-    Tolerance. These axioms and a discussion of why start with them are
-    explained in our paper The Players of Ludos: Beyond Byzantium
-    \[LINK: [[The Players of
-    Ludos]{.underline}](https://docs.google.com/document/d/1HBNgIooElD5widCuX9XmiOzbVIpEF5XXH67mZbnUFjo/edit#)\].
-
-[^2]: Antifragile: Things that Gain from Disorder. Nassim Nicholas Taleb
-
-[^3]: In Reaching Agreement in the Presence of Faults:
-    [[https://dl.acm.org/doi/pdf/10.1145/322186.322188]{.underline}](https://dl.acm.org/doi/pdf/10.1145/322186.322188)
-    MARSHALL PEASE, ROBERT SHOSTAK, and LESLIE LAMPORT, this single data
-    reality is called "interactive consistency" as is about the vector
-    of "Private Values" sent by each node.

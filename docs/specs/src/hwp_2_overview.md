@@ -208,8 +208,7 @@ all the agent's "playing" a Game to be able to verify the Game and its
 
 All subsequent Records in the Source Chain are simply the Actions taken
 by that Agent. Note that Source Chains may end with a Closing Record
-which points to an opening record in a new Game. See the section on Game
-evolution for more information.
+which points to an opening record in a new Game. 
 
 #### The Ledger as Validated Shared State: Graphing DHT
 
@@ -260,25 +259,8 @@ Agents who cheat, including by changing their (or other's) history's,
 will be found out, and because all data includes Provenance, any bad
 actors can be definitively identified and ejected from the system.
 
-See the System Details section for more information on how publishing
-fragments the Source Chain data into the collectively stored data
-format, and how this works to provide eventual consistency, and the
-sections in System Correctness below for details on detection of
+See the [Formal Design Elements](hwp_4_formal.md) section for more information
+on how we publish convert Source Chain data and publish it into the collectively stored data
+on the DHT, and how this works to provide eventual consistency, and the
+sections in [System Correctness](hwp_3_correctness.md) details on detection of
 malicious actors.
-
-
-[^4]: You can think of this somewhat like correspondence chess, but with
-    substantial more formality.
-
-[^5]: In many cryptographic systems hash-chains are thought of as having
-    "headers" and "entries". Historically in Holochain development we
-    also originally used that nomenclature, but realized that the name
-    "header" comes from an implementation detail in building hash
-    chains. Ontologically what's actually happening is that in building
-    such intrinsic integrity data structures, not only must we record
-    the "content" of what is to be written, but we must also record data
-    about the act of writing itself, i.e. who is doing the writing, when
-    they did so, and what they previously wrote. Thus, in keeping with
-    the core ontology of agent-centricity we switched to using the term
-    "Action" instead of Header, but we retain the name Entry for that
-    which is written.

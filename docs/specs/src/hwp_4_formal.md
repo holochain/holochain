@@ -41,7 +41,7 @@ When a DNA is installed using a public/private keypair, it becomes a "cell" whic
 
 
 #### The Conductor
-Much of the discussion below is from the perspective of a single DNA, which is the core unit in Holochain that provides a set of integrity guarantees for running an application in a distributed context.  However, Holochain can also be seen as micro-service provider with each DNA providing one micro-service.  From this perspective, a Holochain node is a running process that manages many connections to many DNAs simultaneously, both from user interfaces initiating actions, as well as from other nodes communicating with DNA instances retrieving DHT data.  Thus, we call a Holochain node the **Conductor** as it manages the information flows from "outside" (UI calls) and from "inside" (network interactions) as they flow into and out of the may DNA instances running code.  This terms was chosen as it suggests the feel of musical cordination of a group as well as the conduit of an electrical flow.  Please see the [Holochain Implementation Spec](https://hackmd.io/FINMThETQUmCrNn8uXlr9w#Ribosome-the-Application-%E2%80%9Cvirtual-machine%E2%80%9D) for a more detailed on how a complete Holochain Conductor must be built.
+Much of the discussion below is from the perspective of a single DNA, which is the core unit in Holochain that provides a set of integrity guarantees for running an application in a distributed context.  However, Holochain can also be seen as micro-service provider with each DNA providing one micro-service.  From this perspective, a Holochain node is a running process that manages many connections to many DNAs simultaneously, both from user interfaces initiating actions, as well as from other nodes communicating with DNA instances retrieving DHT data.  Thus, we call a Holochain node the **Conductor** as it manages the information flows from "outside" (UI calls) and from "inside" (network interactions) as they flow into and out of the may DNA instances running code.  This terms was chosen as it suggests the feel of musical cordination of a group as well as the conduit of an electrical flow.  Please see the [Implementation Spec (Appendix A)](hwp_A_implementation_spec.md) for a more detailed on how a complete Holochain Conductor must be built.
 
 ## Integrity Guarantees
 
@@ -400,4 +400,4 @@ Given the above formal description of our local state model (Source Chain) and s
 - Application Interface (Conductor API)
 - Secure Private Key Management (lair-keystore)
 
-Please see the [Holochain Implementation Spec](https://hackmd.io/FINMThETQUmCrNn8uXlr9w) for details.
+Please see the [Implementation Spec (Appendix A)](hwp_A_implementation_spec.md) for details.
