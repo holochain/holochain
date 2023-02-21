@@ -191,6 +191,7 @@ jobs:
           HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
         run: |
           set -exu
+
           cd ${HOLOCHAIN_REPO}
 
           nix develop .#release --ignore-environment --command bash -c '
@@ -200,24 +201,14 @@ jobs:
             release-automation \
               --workspace-path=$PWD \
               --log-level=debug \
-              release \
-                --force-branch-creation \
-                --steps=CreateReleaseBranch
-
-            release-automation \
-              --workspace-path=$PWD \
-              crate apply-dev-versions --commit --no-verify
-
-            release-automation \
-              --workspace-path=$PWD \
-              --log-level=debug \
               --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
               release \
                 --no-verify-pre \
                 --force-tag-creation \
+                --force-branch-creation \
                 --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
                 --disallowed-version-reqs=">=0.3" \
-                --steps=BumpReleaseVersions
+                --steps=CreateReleaseBranch,BumpReleaseVersions
 
             cargo sweep -f
             '
@@ -270,7 +261,7 @@ jobs:
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
-        if: ${{ failure() || inputs.debug == 'true' }}
+        if: ${{ failure() && inputs.debug == 'true' }}
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         with:

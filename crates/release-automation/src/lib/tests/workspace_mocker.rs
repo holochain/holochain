@@ -427,7 +427,7 @@ pub fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
         },
         MockProject {
             name: "crate_e".to_string(),
-            version: "0.0.1".to_string(),
+            version: "0.0.1-dev.0".to_string(),
             dependencies: vec![],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Lib,

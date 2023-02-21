@@ -33,6 +33,7 @@ jobs:
           # we only run repo consistency checks on x86_64-linux
           - cmd:
               pkgs:
+                - holochain-crates-standalone
                 - release-automation-tests
                 - release-automation-tests-repo
                 - holochain-tests-clippy
