@@ -203,12 +203,20 @@ jobs:
               --log-level=debug \
               --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
               release \
-                --no-verify-pre \
+                --no-verify \
                 --force-tag-creation \
                 --force-branch-creation \
                 --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
                 --disallowed-version-reqs=">=0.3" \
                 --steps=CreateReleaseBranch,BumpReleaseVersions
+
+            release-automation \
+                --workspace-path=$PWD \
+                --log-level=debug \
+                release \
+                  --dry-run \
+                  --no-verify \
+                  --steps=PublishToCratesIo
 
             cargo sweep -f
             '

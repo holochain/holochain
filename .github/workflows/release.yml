@@ -281,6 +281,7 @@ jobs:
                 --workspace-path=$PWD \
                 --log-level=trace \
                 release \
+                  --no-verify \
                   --steps=PublishToCratesIo,AddOwnersToCratesIo
 
       - name: Push the tags
