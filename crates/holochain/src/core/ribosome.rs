@@ -42,6 +42,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::nonce::*;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::GlobalZomeTypes;
+use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
 use std::iter::Iterator;
 use std::sync::Arc;
@@ -370,10 +371,29 @@ impl ZomeCallInvocation {
         )
     }
 
+    pub async fn verify_blocked_provenance(
+        &self,
+        host_access: &ZomeCallHostAccess,
+    ) -> RibosomeResult<ZomeCallAuthorization> {
+        if host_access
+            .call_zome_handle
+            .is_blocked(BlockTargetId::Cell(CellId::new(
+                (*self.cell_id.dna_hash()).clone(),
+                self.provenance.clone(),
+            )), Timestamp::now())
+            .await?
+        {
+            Ok(ZomeCallAuthorization::Authorized)
+        } else {
+            Ok(ZomeCallAuthorization::BlockedProvenance)
+        }
+    }
+
     /// to verify if the zome call is authorized:
     /// - the signature must be valid
     /// - the nonce must not have already been seen
     /// - the grant must be valid
+    /// - the provenance must not have any active blocks against them right now
     /// the checks MUST be done in this order as witnessing the nonce is a write
     /// and so we MUST NOT write nonces until after we verify the signature.
     #[allow(clippy::extra_unused_lifetimes)]
@@ -383,7 +403,12 @@ impl ZomeCallInvocation {
     ) -> RibosomeResult<ZomeCallAuthorization> {
         Ok(match self.verify_signature().await? {
             ZomeCallAuthorization::Authorized => match self.verify_nonce(host_access).await? {
-                ZomeCallAuthorization::Authorized => self.verify_grant(host_access).await?,
+                ZomeCallAuthorization::Authorized => match self.verify_grant(host_access).await? {
+                    ZomeCallAuthorization::Authorized => {
+                        self.verify_blocked_provenance(host_access).await?
+                    }
+                    unauthorized => unauthorized,
+                },
                 unauthorized => unauthorized,
             },
             unauthorized => unauthorized,

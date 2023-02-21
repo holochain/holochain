@@ -7,13 +7,13 @@ use holochain_types::prelude::*;
 use holochain_zome_types::TryInto;
 use tracing::*;
 
-use holochain_zome_types::block::CellBlockReason;
+use super::error::WorkflowResult;
 use crate::conductor::conductor::CellStatus;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::WorkComplete;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTarget;
-use super::error::WorkflowResult;
+use holochain_zome_types::block::CellBlockReason;
 
 #[cfg(test)]
 mod tests;
@@ -105,10 +105,13 @@ pub async fn validation_receipt_workflow(
             // Block BEFORE we integrate the outcome because this is not atomic
             // and if something goes wrong we know the integration will retry.
             conductor
-                .block(Block::new(BlockTarget::Cell(
-                    CellId::new((*dna_hash).clone(), author.clone()),
-                    CellBlockReason::Validation(receipt.dht_op_hash.clone()),
-                ), InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX)?))
+                .block(Block::new(
+                    BlockTarget::Cell(
+                        CellId::new((*dna_hash).clone(), author.clone()),
+                        CellBlockReason::Validation(receipt.dht_op_hash.clone()),
+                    ),
+                    InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX)?,
+                ))
                 .await?;
         }
 
