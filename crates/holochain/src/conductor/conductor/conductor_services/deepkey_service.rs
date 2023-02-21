@@ -26,6 +26,9 @@ pub trait DeepkeyService: Send + Sync {
         old_key: Option<AgentPubKey>,
         new_key: Option<AgentPubKey>,
     ) -> DeepkeyServiceResult<()>;
+
+    /// The CellIds in use by this service, which need to be protected
+    fn cell_ids<'a>(&'a self) -> std::collections::HashSet<&'a CellId>;
 }
 
 /// The errors which can be produced by Deepkey
@@ -105,4 +108,21 @@ impl DeepkeyService for DeepkeyBuiltin {
     ) -> DeepkeyServiceResult<()> {
         todo!()
     }
+
+    fn cell_ids<'a>(&'a self) -> std::collections::HashSet<&'a CellId> {
+        [&self.cell_id].into_iter().collect()
+    }
+}
+
+/// Create a minimal usable mock of deepkey
+pub fn mock_deepkey() -> MockDeepkeyService {
+    use futures::FutureExt;
+    let mut deepkey = MockDeepkeyService::new();
+    deepkey
+        .expect_is_key_valid()
+        .returning(|_, _| async move { Ok(true) }.boxed());
+    deepkey
+        .expect_cell_ids()
+        .return_const(std::collections::HashSet::new());
+    deepkey
 }
