@@ -2061,6 +2061,7 @@ dependencies = [
  "paste",
  "serde",
  "serde_bytes",
+ "subtle-encoding",
  "test-case 2.2.2",
  "tracing",
  "tracing-core",

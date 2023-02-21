@@ -79,19 +79,14 @@ pub fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
     set_hdi(TestHdi(ScopedZomeTypesSet {
         entries: ScopedZomeTypes(
             entries
-                .into_iter()
-                .map(|(z, types)| {
-                    (
-                        ZomeIndex(*z),
-                        (0..*types).map(|t| EntryDefIndex(t)).collect(),
-                    )
-                })
+                .iter()
+                .map(|(z, types)| (ZomeIndex(*z), (0..*types).map(EntryDefIndex).collect()))
                 .collect(),
         ),
         links: ScopedZomeTypes(
             links
-                .into_iter()
-                .map(|(z, types)| (ZomeIndex(*z), (0..*types).map(|t| LinkType(t)).collect()))
+                .iter()
+                .map(|(z, types)| (ZomeIndex(*z), (0..*types).map(LinkType).collect()))
                 .collect(),
         ),
     }));

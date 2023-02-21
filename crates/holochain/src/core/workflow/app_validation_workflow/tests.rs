@@ -1,17 +1,22 @@
 use crate::conductor::ConductorHandle;
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::sweettest::SweetConductorBatch;
 use crate::sweettest::SweetDnaFile;
+use crate::test_utils::consistency_10s;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::new_invocation;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
+use hdk::hdi::test_utils::set_zome_types;
+use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateQueryResult;
+use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
@@ -60,6 +65,152 @@ async fn app_validation_workflow_test() {
         expected_count,
     )
     .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_private_entries_are_passed_to_validation_only_when_authored_with_full_entry() {
+    observability::test_run().ok();
+
+    #[hdk_entry_helper]
+    pub struct Post(String);
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(tag = "type")]
+    #[hdk_entry_defs(skip_hdk_extern = true)]
+    #[unit_enum(UnitEntryTypes)]
+    pub enum EntryTypes {
+        #[entry_def(visibility = "private")]
+        Post(Post),
+    }
+
+    let validation_ops = std::sync::Arc::new(parking_lot::Mutex::new(vec![]));
+    let validation_ops_2 = validation_ops.clone();
+
+    let validation_failures = std::sync::Arc::new(parking_lot::Mutex::new(vec![]));
+    let validation_failures_2 = validation_failures.clone();
+
+    let zomeset = InlineZomeSet::new_unique(
+        [("integrity", vec![EntryDef::from_id("unit")], 0)],
+        ["coordinator"],
+    )
+    .function("integrity", "validate", move |_h, op: Op| {
+        // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
+        // and we're not guaranteed to be running on the same thread throughout the test.
+        set_zome_types(&[(0, 3)], &[]);
+        validation_ops_2.lock().push(op.clone());
+        if let Err(err) = op.flattened::<EntryTypes, ()>() {
+            validation_failures_2.lock().push(err);
+        }
+        Ok(ValidateResult::Valid)
+    })
+    .function("coordinator", "create", |h, ()| {
+        // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
+        // and we're not guaranteed to be running on the same thread throughout the test.
+        set_zome_types(&[(0, 3)], &[]);
+        let claim = CapClaimEntry {
+            tag: "tag".into(),
+            grantor: ::fixt::fixt!(AgentPubKey),
+            secret: ::fixt::fixt!(CapSecret),
+        };
+        let input = EntryTypes::Post(Post("whatever".into()));
+        let location = EntryDefLocation::app(0, 0);
+        let visibility = EntryVisibility::from(&input);
+        assert_eq!(visibility, EntryVisibility::Private);
+        let entry = input.try_into().unwrap();
+        h.create(CreateInput::new(
+            location.clone(),
+            visibility,
+            entry,
+            ChainTopOrdering::default(),
+        ))?;
+        h.create(CreateInput::new(
+            EntryDefLocation::CapClaim,
+            visibility,
+            Entry::CapClaim(claim),
+            ChainTopOrdering::default(),
+        ))?;
+
+        Ok(())
+    });
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomeset).await;
+
+    // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
+    // and we're not guaranteed to be running on the same thread throughout the test.
+    set_zome_types(&[(0, 3)], &[]);
+
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let apps = conductors
+        .setup_app(&"test_app", &[dna_file.clone()])
+        .await
+        .unwrap();
+    let ((alice,), (bob,)) = apps.into_tuples();
+
+    conductors.exchange_peer_info().await;
+
+    let () = conductors[0]
+        .call(&alice.zome("coordinator"), "create", ())
+        .await;
+
+    consistency_10s([&alice, &bob]).await;
+
+    {
+        let vfs = validation_failures.lock();
+        if !vfs.is_empty() {
+            panic!("{} validation failures encountered: {:#?}", vfs.len(), vfs);
+        }
+    }
+
+    let mut num_store_entry_private = 0;
+    let mut num_store_record_private = 0;
+    let mut num_register_agent_activity_private = 0;
+
+    for op in validation_ops.lock().iter() {
+        match op {
+            Op::StoreEntry(StoreEntry { action, entry: _ }) => {
+                if *action.hashed.entry_type().visibility() == EntryVisibility::Private {
+                    num_store_entry_private += 1
+                }
+            }
+            Op::StoreRecord(StoreRecord { record }) => {
+                if record
+                    .action()
+                    .entry_type()
+                    .map(|et| *et.visibility() == EntryVisibility::Private)
+                    .unwrap_or(false)
+                {
+                    num_store_record_private += 1
+                }
+                let (privatized, _) = record.clone().privatized();
+                assert_eq!(record, &privatized);
+            }
+            Op::RegisterAgentActivity(RegisterAgentActivity {
+                action,
+                cached_entry: _,
+            }) => {
+                if action
+                    .hashed
+                    .entry_type()
+                    .map(|et| *et.visibility() == EntryVisibility::Private)
+                    .unwrap_or(false)
+                {
+                    num_register_agent_activity_private += 1
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    // - Of the two private entries alice committed, only alice should validate these as a StoreEntry.
+    // - However, both Alice and Bob should validate and integrate the StoreRecord and RegisterAgentActivity,
+    //     even though the entries are private.
+    assert_eq!(
+        (
+            num_store_entry_private,
+            num_store_record_private,
+            num_register_agent_activity_private
+        ),
+        (2, 4, 4)
+    )
 }
 
 const SELECT: &'static str = "SELECT count(hash) FROM DhtOp WHERE";

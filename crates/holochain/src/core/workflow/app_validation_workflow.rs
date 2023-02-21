@@ -269,41 +269,62 @@ pub async fn record_to_op(
     cascade: &mut Cascade,
 ) -> AppValidationOutcome<(Op, Option<Entry>)> {
     use DhtOpType::*;
-    let mut activity_entry = None;
+
+    // Hide private data where appropriate
+    let (record, mut hidden_entry) = if matches!(op_type, DhtOpType::StoreEntry) {
+        // We don't want to hide private data for a StoreEntry, because when doing
+        // inline validation as an author, we want to validate and integrate our own entry!
+        // Publishing and gossip rules state that a private StoreEntry will never be transmitted
+        // to another node.
+        (record, None)
+    } else {
+        // All other records have private entry data hidden, including from ourselves if we are
+        // authoring private data.
+        record.privatized()
+    };
+
     let (shh, entry) = record.into_inner();
     let mut entry = entry.into_option();
     let action = shh.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
     if matches!(op_type, RegisterAgentActivity) {
-        activity_entry = entry.take();
+        hidden_entry = entry.take().or(hidden_entry);
     }
     let dht_op = DhtOp::from_type(op_type, action, entry)?;
-    Ok((dhtop_to_op(dht_op, cascade).await?, activity_entry))
+    Ok((dhtop_to_op(dht_op, cascade).await?, hidden_entry))
 }
 
-pub fn op_to_record(op: Op, activity_entry: Option<Entry>) -> Record {
+pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     match op {
-        Op::StoreRecord(StoreRecord { record }) => record,
+        Op::StoreRecord(StoreRecord { mut record }) => {
+            if let Some(e) = omitted_entry {
+                *record.as_entry_mut() = RecordEntry::Present(e);
+            }
+            record
+        }
         Op::StoreEntry(StoreEntry { action, entry }) => {
             Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
         }
         Op::RegisterUpdate(RegisterUpdate {
             update, new_entry, ..
         }) => Record::new(SignedActionHashed::raw_from_same_hash(update), new_entry),
-        Op::RegisterDelete(RegisterDelete { delete, .. }) => {
-            Record::new(SignedActionHashed::raw_from_same_hash(delete), None)
-        }
+        Op::RegisterDelete(RegisterDelete { delete, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete),
+            omitted_entry,
+        ),
         Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Record::new(
             SignedActionHashed::raw_from_same_hash(action),
-            activity_entry,
+            omitted_entry,
         ),
-        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => {
-            Record::new(SignedActionHashed::raw_from_same_hash(create_link), None)
-        }
-        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
-            Record::new(SignedActionHashed::raw_from_same_hash(delete_link), None)
-        }
+        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(create_link),
+            omitted_entry,
+        ),
+        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete_link),
+            omitted_entry,
+        ),
     }
 }
 

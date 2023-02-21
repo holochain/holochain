@@ -6,6 +6,7 @@ pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_valid_record;
 pub use crate::entry_defs;
+pub use crate::flat_op::*;
 pub use crate::hash::*;
 pub use crate::hdi::*;
 pub use crate::info::dna_info;
