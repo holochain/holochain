@@ -153,7 +153,7 @@ tx5 = [ "kitsune_p2p/tx5" ]
 # This feature should be turned off for production builds.
 test_utils = [
   "ghost_actor/test_utils",
-  "hdk",
+  "hdk/test_utils",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",
   "holochain_types/test_utils",

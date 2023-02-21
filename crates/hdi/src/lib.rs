@@ -108,7 +108,7 @@
 //! # #[cfg(feature = "test_utils")]
 //! # hdi::test_utils::set_zome_types(&[(0, 2)], &[(0, 2)]);
 //! # let result: Result<hdi::prelude::ValidateCallbackResult, Box<dyn std::error::Error>> =
-//! match op.to_type()? {
+//! match op.flattened()? {
 //!     FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
 //!         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
 //!         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
@@ -120,6 +120,7 @@
 //!         target_address: _,
 //!         tag: _,
 //!         link_type,
+//!         action: _,
 //!     } => match link_type {
 //!         LinkTypes::A => Ok(ValidateCallbackResult::Valid),
 //!         LinkTypes::B => Ok(ValidateCallbackResult::Invalid(

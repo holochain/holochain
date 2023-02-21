@@ -614,6 +614,7 @@ impl IncomingDhtOpSender {
         self.send_op(record, make_store_record).await
     }
     async fn send_store_entry(self, record: Record) -> SysValidationResult<()> {
+        // TODO: MD: isn't it already too late if we've received a private entry from the network at this point?
         let is_public_entry = record.action().entry_type().map_or(false, |et| {
             matches!(et.visibility(), EntryVisibility::Public)
         });
@@ -674,7 +675,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
         .retrieve(hash.clone(), Default::default())
         .await?
     {
-        Some(el) => Ok(Source::Network(el.privatized())),
+        Some(el) => Ok(Source::Network(el.privatized().0)),
         None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }
@@ -688,7 +689,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 /// to return an error.
 fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, record_entry) = record.privatized().into_inner();
+    let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
