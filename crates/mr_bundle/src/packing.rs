@@ -42,7 +42,7 @@ impl<M: Manifest> Bundle<M> {
                 let resource_path = ffs::canonicalize(base_path.join(&relative_path)).await?;
                 ffs::read(&resource_path)
                     .await
-                    .map(|resource| (relative_path, resource))
+                    .map(|resource| (relative_path, resource.into()))
             },
         ))
         .await
@@ -87,7 +87,7 @@ async fn unpack_yaml<M: serde::Serialize>(
     }
     ffs::create_dir_all(&base_path).await?;
     for (relative_path, resource) in resources {
-        let path = base_path.join(&relative_path);
+        let path = base_path.join(relative_path);
         let path_clone = path.clone();
         let parent = path_clone
             .parent()

@@ -1,7 +1,7 @@
 use crate::test_util::hash_op_data;
 pub use crate::test_util::spawn_handler;
 use crate::{HostStub, KitsuneHost};
-use kitsune_p2p_fetch::FetchQueueConfig;
+use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
@@ -17,7 +17,7 @@ pub struct StandardResponsesHostApi {
     with_data: bool,
 }
 
-impl FetchQueueConfig for StandardResponsesHostApi {
+impl FetchPoolConfig for StandardResponsesHostApi {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }
@@ -35,6 +35,14 @@ impl KitsuneHost for StandardResponsesHostApi {
             .find(|a| a.agent == input.agent)
             .unwrap();
         box_fut(Ok(Some(agent)))
+    }
+
+    fn remove_agent_info_signed(
+        &self,
+        _input: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<bool> {
+        // unimplemented
+        box_fut(Ok(false))
     }
 
     fn peer_extrapolated_coverage(

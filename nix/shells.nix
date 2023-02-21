@@ -4,6 +4,7 @@
 , rustup
 , coreutils
 , cargo-nextest
+, crate2nix
 
 , holonix
 , hcToplevelDir
@@ -57,14 +58,20 @@ rec {
       gh
       nixpkgs-fmt
       cargo-sweep
-      crate2nix
-    ]);
+      go
+    ])
+      ++ (lib.optionals stdenv.isDarwin
+      (with holonix.pkgs.darwin; [
+        Security
+        IOKit
+        apple_sdk_11_0.frameworks.CoreFoundation
+      ])
+    );
   };
 
   release = coreDev.overrideAttrs (attrs: {
     nativeBuildInputs = attrs.nativeBuildInputs ++ (with holonix.pkgs; [
       niv
-      cargo-readme
       (import ../crates/release-automation/default.nix { })
     ]);
   });

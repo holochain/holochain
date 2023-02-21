@@ -16,7 +16,7 @@ use holochain_serialized_bytes::prelude::*;
 
 /// a chain record containing the signed action along with the
 /// entry if the action type has one.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Record<A = SignedActionHashed> {
     /// The signed action for this record
@@ -73,11 +73,13 @@ where
 
 impl Record {
     /// Raw record constructor.  Used only when we know that the values are valid.
+    /// NOTE: this will NOT hide private entry data if present!
     pub fn new(signed_action: SignedActionHashed, maybe_entry: Option<Entry>) -> Self {
         let maybe_visibility = signed_action
             .action()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility());
+
         let entry = match (maybe_entry, maybe_visibility) {
             (Some(entry), Some(_)) => RecordEntry::Present(entry),
             (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
@@ -87,6 +89,7 @@ impl Record {
             }
             (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,
         };
+
         Self {
             signed_action,
             entry,
@@ -108,25 +111,27 @@ impl Record {
     }
 
     /// If the Record contains private entry data, set the RecordEntry
-    /// to Hidden so that it cannot be leaked
-    pub fn privatized(self) -> Self {
-        let entry = if let Some(EntryVisibility::Private) = self
+    /// to Hidden so that it cannot be leaked. If the entry was hidden,
+    /// return it separately.
+    pub fn privatized(self) -> (Self, Option<Entry>) {
+        let (entry, hidden) = if let Some(EntryVisibility::Private) = self
             .signed_action
             .action()
             .entry_data()
             .map(|(_, entry_type)| entry_type.visibility())
         {
             match self.entry {
-                RecordEntry::Present(_) => RecordEntry::Hidden,
-                other => other,
+                RecordEntry::Present(entry) => (RecordEntry::Hidden, Some(entry)),
+                other => (other, None),
             }
         } else {
-            self.entry
+            (self.entry, None)
         };
-        Self {
+        let privatized = Self {
             signed_action: self.signed_action,
             entry,
-        }
+        };
+        (privatized, hidden)
     }
 
     /// Access the action address from this record's signed action

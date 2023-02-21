@@ -13,6 +13,7 @@ use holochain_p2p::{
     dht::{spacetime::Topology, ArqStrat},
     DnaHashExt,
 };
+use holochain_sqlite::prelude::AsP2pStateTxExt;
 use holochain_types::{
     db::PermittedConn,
     prelude::{DhtOpHash, DnaError},
@@ -22,7 +23,9 @@ use kitsune_p2p::{
     agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
     event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
 };
-use kitsune_p2p_types::{config::KitsuneP2pTuningParams, KOpData, KOpHash};
+use kitsune_p2p_types::{
+    config::KitsuneP2pTuningParams, dependencies::lair_keystore_api, KOpData, KOpHash,
+};
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
@@ -31,6 +34,8 @@ pub struct KitsuneHostImpl {
     ribosome_store: RwShare<RibosomeStore>,
     tuning_params: KitsuneP2pTuningParams,
     strat: ArqStrat,
+    lair_tag: Option<Arc<str>>,
+    lair_client: Option<lair_keystore_api::LairClient>,
 }
 
 impl KitsuneHostImpl {
@@ -40,12 +45,16 @@ impl KitsuneHostImpl {
         ribosome_store: RwShare<RibosomeStore>,
         tuning_params: KitsuneP2pTuningParams,
         strat: ArqStrat,
+        lair_tag: Option<Arc<str>>,
+        lair_client: Option<lair_keystore_api::LairClient>,
     ) -> Arc<Self> {
         Arc::new(Self {
             spaces,
             ribosome_store,
             tuning_params,
             strat,
+            lair_tag,
+            lair_client,
         })
     }
 }
@@ -99,6 +108,21 @@ impl KitsuneHost for KitsuneHostImpl {
         let db = self.spaces.p2p_agents_db(&dna_hash);
         async move {
             Ok(super::p2p_agent_store::get_agent_info_signed(db?.into(), space, agent).await?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn remove_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
+    ) -> KitsuneHostResult<bool> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        let db = self.spaces.p2p_agents_db(&dna_hash);
+        async move {
+            Ok(db?
+                .async_commit(move |txn| txn.p2p_remove_agent(&agent))
+                .await?)
         }
         .boxed()
         .into()
@@ -228,5 +252,13 @@ impl KitsuneHost for KitsuneHostImpl {
         }
         .boxed()
         .into()
+    }
+
+    fn lair_tag(&self) -> Option<Arc<str>> {
+        self.lair_tag.clone()
+    }
+
+    fn lair_client(&self) -> Option<lair_keystore_api::LairClient> {
+        self.lair_client.clone()
     }
 }

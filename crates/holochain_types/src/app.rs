@@ -400,10 +400,8 @@ impl From<StoppedApp> for InstalledApp {
 pub struct InstalledAppCommon {
     /// The unique identifier for an installed app in this conductor
     installed_app_id: InstalledAppId,
-    /// The agent key used to install this app. Currently this is meaningless,
-    /// but I'm leaving it here as a placeholder in case we ever want it to
-    /// have formal significance.
-    _agent_key: AgentPubKey,
+    /// The agent key used to install this app.
+    agent_key: AgentPubKey,
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
     role_assignments: HashMap<RoleName, AppRoleAssignment>,
 }
@@ -412,7 +410,7 @@ impl InstalledAppCommon {
     /// Constructor
     pub fn new<S: ToString, I: IntoIterator<Item = (RoleName, AppRoleAssignment)>>(
         installed_app_id: S,
-        _agent_key: AgentPubKey,
+        agent_key: AgentPubKey,
         role_assignments: I,
     ) -> AppResult<Self> {
         let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
@@ -425,7 +423,7 @@ impl InstalledAppCommon {
         }
         Ok(InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
-            _agent_key,
+            agent_key,
             role_assignments,
         })
     }
@@ -503,11 +501,22 @@ impl InstalledAppCommon {
             .chain(self.disabled_clone_cell_ids())
     }
 
+    /// Iterator of all running cells, both provisioned and cloned.
+    /// Provisioned cells will always be running if the app is running,
+    /// but some cloned cells may be disabled and will not be returned.
+    pub fn all_enabled_cells(&self) -> impl Iterator<Item = &CellId> {
+        self.provisioned_cells()
+            .map(|(_, c)| c)
+            .chain(self.clone_cell_ids())
+    }
+
     /// Iterator of all "required" cells, meaning Cells which must be running
-    /// for this App to be able to run. The notion of "required cells" is not
-    /// yet solidified, so for now this placeholder equates to "all cells".
+    /// for this App to be able to run.
+    ///
+    /// Currently this is simply all provisioned cells, but this concept may
+    /// become more nuanced in the future.
     pub fn required_cells(&self) -> impl Iterator<Item = &CellId> {
-        self.all_cells()
+        self.provisioned_cells().map(|(_, c)| c)
     }
 
     /// Accessor for particular role
@@ -670,8 +679,8 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn _agent_key(&self) -> &AgentPubKey {
-        &self._agent_key
+    pub fn agent_key(&self) -> &AgentPubKey {
+        &self.agent_key
     }
 
     /// Constructor for apps not using a manifest.
@@ -731,7 +740,7 @@ impl InstalledAppCommon {
             .collect();
         Ok(Self {
             installed_app_id,
-            _agent_key,
+            agent_key: _agent_key,
             role_assignments: roles,
         })
     }
@@ -1001,7 +1010,7 @@ impl AppRoleAssignment {
 
     /// Accessor
     pub fn clone_ids(&self) -> impl Iterator<Item = &CloneId> {
-        self.clones.iter().map(|(clone_id, _)| clone_id)
+        self.clones.keys()
     }
 
     /// Accessor

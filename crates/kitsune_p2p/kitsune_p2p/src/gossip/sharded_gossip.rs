@@ -4,6 +4,7 @@
 
 use crate::agent_store::AgentInfoSigned;
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
+use crate::meta_net::*;
 use crate::types::event::*;
 use crate::types::gossip::*;
 use crate::{types::*, HostApi};
@@ -11,7 +12,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
-use kitsune_p2p_fetch::{FetchQueue, FetchQueueReader, FetchSource, OpHashSized};
+use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -19,7 +20,6 @@ use kitsune_p2p_types::dht::region::{Region, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
-use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -118,7 +118,7 @@ pub struct ShardedGossip {
     /// ShardedGossipLocal handles the non-networking concerns of gossip
     gossip: ShardedGossipLocal,
     // The endpoint to use for all outgoing comms
-    ep_hnd: Tx2EpHnd<wire::Wire>,
+    ep_hnd: MetaNet,
     /// The internal mutable state
     pub(crate) state: Share<ShardedGossipState>,
     /// Bandwidth for incoming and outgoing gossip.
@@ -168,13 +168,13 @@ impl ShardedGossip {
     pub fn new(
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         evt_sender: EventSender,
         host_api: HostApi,
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
-        fetch_queue: FetchQueue,
+        fetch_pool: FetchPool,
         #[cfg(feature = "test")] enable_history: bool,
     ) -> Arc<Self> {
         #[cfg(feature = "test")]
@@ -198,7 +198,7 @@ impl ShardedGossip {
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
-                fetch_queue,
+                fetch_pool,
             },
             bandwidth,
         });
@@ -292,7 +292,7 @@ impl ShardedGossip {
                     .to_string()
                     .replace("ShardedGossipWire::", ""),
                 msg.2.encode_vec().expect("can't encode msg").len(),
-                self.ep_hnd.local_cert(),
+                self.ep_hnd.local_id(),
                 &msg.0,
                 self.gossip
                     .inner
@@ -308,15 +308,15 @@ impl ShardedGossip {
                 .to_string()
                 .replace("ShardedGossipWire::", "");
             let len = msg.encode_vec().expect("can't encode msg").len();
-            let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
+            let outgoing = match self.gossip.process_incoming(con.peer_id(), msg).await {
                 Ok(r) => {
                     tracing::debug!(
                         "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> {:?} [{}]",
                         gossip_type_char,
                         variant_type,
                         len,
-                        con.peer_cert(),
-                        self.ep_hnd.local_cert(),
+                        con.peer_id(),
+                        self.ep_hnd.local_id(),
                         self.gossip
                             .inner
                             .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))
@@ -326,15 +326,15 @@ impl ShardedGossip {
                 }
                 Err(e) => {
                     tracing::error!("FAILED to process incoming gossip {:?}", e);
-                    self.gossip.remove_state(&con.peer_cert(), true)?;
+                    self.gossip.remove_state(&con.peer_id(), true)?;
                     vec![ShardedGossipWire::error(e.to_string())]
                 }
             };
             self.state.share_mut(|i, _| {
                 i.push_outgoing(outgoing.into_iter().map(|msg| {
                     (
-                        con.peer_cert(),
-                        HowToConnect::Con(con.clone(), remote_url.clone()),
+                        con.peer_id(),
+                        HowToConnect::Con(con.clone(), remote_url.to_string()),
                         msg,
                     )
                 }));
@@ -431,24 +431,24 @@ pub struct ShardedGossipLocal {
     host_api: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
-    fetch_queue: FetchQueue,
+    fetch_pool: FetchPool,
 }
 
-/// Incoming gossip.
-type Incoming = (Tx2ConHnd<wire::Wire>, TxUrl, ShardedGossipWire, usize);
-/// Outgoing gossip.
-type Outgoing = (Tx2Cert, HowToConnect, ShardedGossipWire);
+type StateKey = Arc<[u8; 32]>;
 
-type StateKey = Tx2Cert;
+/// Incoming gossip.
+type Incoming = (MetaNetCon, String, ShardedGossipWire, usize);
+/// Outgoing gossip.
+type Outgoing = (StateKey, HowToConnect, ShardedGossipWire);
 
 /// A peer (from the perspective of any other node) is uniquely identified by its Cert
-pub type NodeId = Tx2Cert;
+pub type NodeId = StateKey;
 
 /// Info associated with an outgoing gossip target
 #[derive(Debug)]
 pub(crate) struct ShardedGossipTarget {
     pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
-    pub(crate) cert: Tx2Cert,
+    pub(crate) cert: StateKey,
     pub(crate) tie_break: u32,
     pub(crate) when_initiated: Option<tokio::time::Instant>,
     #[allow(dead_code)]
@@ -827,7 +827,7 @@ impl ShardedGossipLocal {
 
     async fn process_incoming(
         &self,
-        peer_cert: Tx2Cert,
+        peer_cert: StateKey,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let s = match self.gossip_type {
@@ -1265,8 +1265,8 @@ kitsune_p2p_types::write_codec_enum! {
 impl AsGossipModule for ShardedGossip {
     fn incoming_gossip(
         &self,
-        con: Tx2ConHnd<wire::Wire>,
-        remote_url: TxUrl,
+        con: MetaNetCon,
+        remote_url: String,
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()> {
         use kitsune_p2p_types::codec::*;
@@ -1284,7 +1284,7 @@ impl AsGossipModule for ShardedGossip {
             // If we are overloaded then return busy to any new initiates.
             if overloaded && new_initiate {
                 i.push_outgoing([(
-                    con.peer_cert(),
+                    con.peer_id(),
                     HowToConnect::Con(con, remote_url),
                     ShardedGossipWire::busy(),
                 )]);
@@ -1343,11 +1343,11 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         &self,
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
-        fetch_queue: FetchQueue,
+        fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1358,7 +1358,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
-            fetch_queue,
+            fetch_pool,
         ))
     }
 }
@@ -1378,11 +1378,11 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         &self,
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
-        fetch_queue: FetchQueue,
+        fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1393,7 +1393,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             GossipType::Historical,
             self.bandwidth.clone(),
             metrics,
-            fetch_queue,
+            fetch_pool,
         ))
     }
 }
@@ -1446,6 +1446,6 @@ impl TryFrom<u8> for MissingOpsStatus {
 pub struct KitsuneDiagnostics {
     /// Access to metrics info
     pub metrics: MetricsSync,
-    /// Access to FetchQueue,
-    pub fetch_queue: FetchQueueReader,
+    /// Access to FetchPool,
+    pub fetch_pool: FetchPoolReader,
 }

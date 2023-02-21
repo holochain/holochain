@@ -1,7 +1,7 @@
 use crate::sweettest::*;
 use crate::test_utils::conductor_setup::ConductorTestData;
-use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
+use crate::test_utils::{consistency_10s, consistency_60s};
 use hdk::prelude::*;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::fresh_reader_test;
@@ -26,7 +26,7 @@ async fn gossip_test() {
         .call(&cell_1.zome(TestWasm::Anchor), "anchor", anchor)
         .await;
 
-    consistency_10s([&cell_1, &cell_2]).await;
+    consistency_60s([&cell_1, &cell_2]).await;
 
     let hashes: EntryHashes = conductors[1]
         .call(

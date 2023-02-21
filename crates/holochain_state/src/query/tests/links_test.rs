@@ -24,18 +24,21 @@ struct TestData {
 fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
     let mut tag_fix = BytesFixturator::new(Predictable);
     let mut data = Vec::new();
+    let mut agent_pub_key_fixt = AgentPubKeyFixturator::new(Predictable);
     let mut base_hash_fixt = EntryHashFixturator::new(Predictable);
     let mut target_hash_fixt = EntryHashFixturator::new(Unpredictable);
     for i in 0..n {
         // Create a known link add
         let base_address = base_hash_fixt.next().unwrap();
         let target_address = target_hash_fixt.next().unwrap();
+        let agent_pub_key = agent_pub_key_fixt.next().unwrap();
 
         let tag = LinkTag::new(tag_fix.next().unwrap());
         let zome_index = ZomeIndex(i as u8);
         let link_type = LinkType(i as u8);
 
         let link_add = KnownCreateLink {
+            author: agent_pub_key.clone(),
             base_address: base_address.clone().into(),
             target_address: target_address.clone().into(),
             zome_index,
@@ -50,6 +53,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
             ActionHashed::from_content_sync(Action::CreateLink(link_add.clone())).into();
 
         let expected_link = Link {
+            author: agent_pub_key,
             create_link_hash: link_add_hash.clone(),
             target: target_address.clone().into(),
             zome_index,

@@ -20,7 +20,7 @@ impl KitsuneHostDefaultError for HostStubErr {
     const NAME: &'static str = "HostStub";
 }
 
-impl FetchQueueConfig for HostStubErr {
+impl FetchPoolConfig for HostStubErr {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }
@@ -56,6 +56,10 @@ impl KitsuneHost for HostStub {
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         KitsuneHostDefaultError::get_agent_info_signed(&self.err, input)
+    }
+
+    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::remove_agent_info_signed(&self.err, input)
     }
 
     fn peer_extrapolated_coverage(
@@ -121,7 +125,7 @@ impl KitsuneHost for HostStub {
     }
 }
 
-impl FetchQueueConfig for HostStub {
+impl FetchPoolConfig for HostStub {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }

@@ -31,7 +31,7 @@ impl Location {
         if let Location::Path(path) = self {
             if path.is_relative() {
                 if let Some(dir) = root_dir {
-                    Ok(Location::Path(ffs::sync::canonicalize(dir.join(&path))?))
+                    Ok(Location::Path(ffs::sync::canonicalize(dir.join(path))?))
                 } else {
                     Err(BundleError::RelativeLocalPath(path.to_owned()).into())
                 }
@@ -45,7 +45,7 @@ impl Location {
 }
 
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
-    Ok(ffs::read(path).await?)
+    Ok(ffs::read(path).await?.into())
 }
 
 pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
@@ -54,7 +54,8 @@ pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
         .bytes()
         .await?
         .into_iter()
-        .collect())
+        .collect::<Vec<_>>()
+        .into())
 }
 
 #[cfg(test)]

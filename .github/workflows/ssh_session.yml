@@ -26,27 +26,24 @@ jobs:
         if: ${{ github.event.inputs.runs-on == 'ubuntu-latest'  && github.event.inputs.extend-space == 'true' }}
 
       - name: Install nix
-        uses: cachix/install-nix-action@v16
-
-      # - name: Use cachix
-      #   id: cachix_use
-      #   continue-on-error: true
-      #   env:
-      #     CACHIX_AUTH_TOKEN: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-      #     CACHIX_SIGNING_KEY: "${{ secrets.CACHIX_SIGNING_KEY }}"
-      #   run: |
-      #     cachix use holochain-ci
+        uses: cachix/install-nix-action@v18
+        if: ${{ github.event.inputs.runs-on != 'multi-arch' }}
+        with:
+          extra_nix_config: |
+            experimental-features = flakes nix-command
 
       - name: Setup cachix
-        uses: cachix/cachix-action@v11
-        if: ${{ steps.cachix_use.outcome != 'success'  }}
+        uses: cachix/cachix-action@v12
+        if: ${{ matrix.platform.runs-on != 'multi-arch' }}
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-          installCommand: |
-            nix-env -if https://github.com/cachix/cachix/tarball/master \
-              --substituters 'https://cache.nixos.org https://cachix.cachix.org' \
-              --trusted-public-keys 'cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY='
+
+      - name: Restart nix-daemon
+        if: ${{ github.event.inputs.runs-on == 'ubuntu-latest' }}
+        run: |
+          sudo bash -c 'echo extra-experimental-features = impure-derivations >> /etc/nix/nix.conf'
+          sudo systemctl stop nix-daemon
 
       - name: Create /var/tmp
         run: |
@@ -96,6 +93,8 @@ jobs:
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
+        env:
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         if: ${{ always() }}
         with:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow

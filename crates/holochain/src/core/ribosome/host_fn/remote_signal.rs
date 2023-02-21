@@ -133,8 +133,9 @@ mod tests {
                 api.emit_signal(AppSignal::new(signal)).map_err(Into::into)
             })
             .function("init", move |api, ()| {
-                let mut functions: GrantedFunctions = BTreeSet::new();
-                functions.insert((api.zome_info(()).unwrap().name, "recv_remote_signal".into()));
+                let mut fns = BTreeSet::new();
+                fns.insert((api.zome_info(()).unwrap().name, "recv_remote_signal".into()));
+                let functions = GrantedFunctions::Listed(fns);
                 let cap_grant_entry = CapGrantEntry {
                     tag: "".into(),
                     // empty access converts to unrestricted

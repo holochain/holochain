@@ -191,7 +191,5 @@ async fn ser_regression_test() {
         _ => panic!("{:?}", output),
     };
 
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
+    handle.shutdown().await.unwrap().unwrap();
 }

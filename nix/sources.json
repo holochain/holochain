@@ -5,22 +5,22 @@
         "homepage": "",
         "owner": "kolloch",
         "repo": "crate2nix",
-        "rev": "78258f27fc3121562a44eb02c652a5ec77cf8d02",
-        "sha256": "0l15czzn8ck315dlwza2gynhrbh2iqy2wm75f52g57cfr1ki4klf",
+        "rev": "8241d5f1069cd0fc2b8eb8b69b13d68933834373",
+        "sha256": "1m4ggqczfjgzn9vyih6j89km8dgnasl0526sk1ahlp9vq2bdgwfv",
         "type": "tarball",
-        "url": "https://github.com/kolloch/crate2nix/archive/78258f27fc3121562a44eb02c652a5ec77cf8d02.tar.gz",
+        "url": "https://github.com/kolloch/crate2nix/archive/8241d5f1069cd0fc2b8eb8b69b13d68933834373.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
-    "holonix": {
+    "holochain-nixpkgs": {
         "branch": "develop",
-        "description": "NixOS && Holochain",
-        "homepage": "",
+        "description": null,
+        "homepage": null,
         "owner": "holochain",
-        "repo": "holonix",
-        "rev": "2b874668324ae5a7804066f61afbed913ac0cb9c",
-        "sha256": "1brdayg4kaf0ybmgjli6z8v137apyyknq1w9i3cswy9n4yq5mqcv",
+        "repo": "holochain-nixpkgs",
+        "rev": "3f65731f306d5f67b5c4c68651e5008b58db9d41",
+        "sha256": "03sr8djgci2jvvc70bchdjwkxaazy9wisssknamx9s0aini11klz",
         "type": "tarball",
-        "url": "https://github.com/holochain/holonix/archive/2b874668324ae5a7804066f61afbed913ac0cb9c.tar.gz",
+        "url": "https://github.com/holochain/holochain-nixpkgs/archive/3f65731f306d5f67b5c4c68651e5008b58db9d41.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nextest": {

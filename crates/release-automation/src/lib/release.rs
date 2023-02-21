@@ -34,7 +34,7 @@ use crate::{
     crate_::ensure_crate_io_owners,
     crate_selection::{ensure_release_order_consistency, Crate},
 };
-pub(crate) use crate_selection::{ReleaseWorkspace, SelectionCriteria};
+pub use crate_selection::{ReleaseWorkspace, SelectionCriteria};
 
 const TARGET_DIR_SUFFIX: &str = "target/release_automation";
 
@@ -42,7 +42,7 @@ const TARGET_DIR_SUFFIX: &str = "target/release_automation";
 #[bitflags]
 #[repr(u64)]
 #[derive(enum_utils::FromStr, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum ReleaseSteps {
+pub enum ReleaseSteps {
     /// create a new release branch based on develop
     CreateReleaseBranch,
     /// substeps: get crate selection, bump cargo toml versions, rotate
@@ -61,7 +61,7 @@ pub(crate) enum ReleaseSteps {
 /// derive from it the steps that required to proceed with the release.
 ///
 /// For now it is manual and the release phases need to be given as an instruction.
-pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -> CommandResult {
+pub fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -> CommandResult {
     for step in &cmd_args.steps {
         trace!("Processing step '{:?}'", step);
 
@@ -97,10 +97,10 @@ pub(crate) fn cmd(args: &crate::cli::Args, cmd_args: &crate::cli::ReleaseArgs) -
     Ok(())
 }
 
-pub(crate) const RELEASE_BRANCH_PREFIX: &str = "release-";
+pub const RELEASE_BRANCH_PREFIX: &str = "release-";
 
 /// Generate a time-derived name for a new release branch.
-pub(crate) fn generate_release_branch_name() -> String {
+pub fn generate_release_branch_name() -> String {
     format!(
         "{}{}",
         RELEASE_BRANCH_PREFIX,
@@ -109,7 +109,7 @@ pub(crate) fn generate_release_branch_name() -> String {
 }
 
 /// Create a new git release branch.
-pub(crate) fn create_release_branch<'a>(
+pub fn create_release_branch<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     cmd_args: &ReleaseArgs,
 ) -> Fallible<()> {
@@ -185,6 +185,7 @@ fn bump_release_versions<'a>(
             &selection,
             true,
             true,
+            false,
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
@@ -195,88 +196,84 @@ fn bump_release_versions<'a>(
 
     for crt in &selection {
         let current_version = crt.version();
-        let changelog = crt.changelog().ok_or_else(|| {
-            anyhow::anyhow!(
-                "[{}] cannot determine most recent release: missing changelog",
-                crt.name()
-            )
-        })?;
+        let changelog = crt
+            .changelog()
+            .ok_or_else(|| anyhow::anyhow!("[{}] missing changelog", crt.name()))?;
 
         let maybe_previous_release_version = changelog
             .topmost_release()?
             .map(|change| semver::Version::parse(change.title()))
-            .transpose()?;
+            .transpose()
+            .context(format!(
+                "parsing {:#?} in {:#?} as a semantic version",
+                changelog.topmost_release(),
+                changelog.path(),
+            ))?;
 
         let maybe_semver_increment_mode = changelog
             .front_matter()?
             .map(|fm| fm.semver_increment_mode());
         let semver_increment_mode = maybe_semver_increment_mode.unwrap_or_default();
 
-        let release_version = if let Some(mut previous_release_version) =
-            maybe_previous_release_version.clone()
-        {
-            if previous_release_version > current_version {
-                bail!("previously documented release version '{}' is greater than this release version '{}'", previous_release_version, current_version);
-            }
-
-            increment_semver(&mut previous_release_version, semver_increment_mode)?;
-
-            previous_release_version
-        } else {
-            // release the current version, or bump if the current version is a pre-release
-            let mut new_version = current_version.clone();
-
-            if new_version.is_prerelease() {
-                increment_semver(&mut new_version, semver_increment_mode)?;
-            }
-
-            new_version
+        let incremented_version = {
+            let mut v = current_version.clone();
+            increment_semver(&mut v, semver_increment_mode)?;
+            v
         };
 
-        trace!(
-            "[{}] previous release version: '{:?}', current version: '{}', release version: '{}' ",
-            crt.name(),
-            maybe_previous_release_version,
-            current_version,
-            release_version,
-        );
-
-        let greater_release = release_version > current_version;
-        if greater_release {
-            crt.set_version(cmd_args.dry_run, &release_version.clone())?;
-        }
-
-        let crate_release_heading_name = format!("{}", release_version);
-
-        if maybe_previous_release_version.is_none() || greater_release {
-            // create a new release entry in the crate's changelog and move all items from the unreleased heading if there are any
-
-            debug!(
-                "[{}] creating crate release heading '{}' in '{:?}'",
-                crt.name(),
-                crate_release_heading_name,
-                changelog.path(),
-            );
-
-            if !cmd_args.dry_run {
-                changelog
-                    .add_release(crate_release_heading_name.clone())
-                    .context(format!("adding release to changelog for '{}'", crt.name()))?;
-
-                // FIXME: now we should reread the whole thing?
-
-                if greater_release {
-                    // rewrite frontmatter to reset it to its defaults
-                    changelog.reset_front_matter_to_defaults()?;
+        let release_version = match &maybe_previous_release_version {
+            Some(previous_release_version) => {
+                if &current_version > previous_release_version {
+                    current_version.clone()
+                } else if &incremented_version > previous_release_version {
+                    crt.set_version(cmd_args.dry_run, &incremented_version)?;
+                    incremented_version.clone()
+                } else {
+                    bail!("neither current version '{}' nor incremented version '{}' exceed previously released version '{}'", &current_version, &incremented_version, previous_release_version);
                 }
             }
 
-            changed_crate_changelogs.push(WorkspaceCrateReleaseHeading {
-                prefix: crt.name(),
-                suffix: crate_release_heading_name,
-                changelog,
-            });
+            None => {
+                // default to incremented version if we don't have information on a previous release
+                crt.set_version(cmd_args.dry_run, &incremented_version.clone())?;
+                incremented_version.clone()
+            }
+        };
+
+        debug!(
+            "[{}] previous release version: '{:?}', current version: '{}', incremented version: '{}'",
+            crt.name(),
+            maybe_previous_release_version,
+            current_version,
+            incremented_version,
+        );
+
+        let crate_release_heading_name = format!("{}", release_version);
+
+        // create a new release entry in the crate's changelog and move all items from the unreleased heading if there are any
+        debug!(
+            "[{}] creating crate release heading '{}' in '{:?}'",
+            crt.name(),
+            crate_release_heading_name,
+            changelog.path(),
+        );
+
+        if !cmd_args.dry_run {
+            changelog
+                .add_release(crate_release_heading_name.clone())
+                .context(format!("adding release to changelog for '{}'", crt.name()))?;
+
+            // FIXME: now we should reread the whole thing?
+
+            // rewrite frontmatter to reset it to its defaults
+            changelog.reset_front_matter_to_defaults()?;
         }
+
+        changed_crate_changelogs.push(WorkspaceCrateReleaseHeading {
+            prefix: crt.name(),
+            suffix: crate_release_heading_name,
+            changelog,
+        });
     }
 
     ws.update_lockfile(
@@ -284,12 +281,39 @@ fn bump_release_versions<'a>(
         cmd_args.additional_manifests.iter().map(|mp| mp.as_str()),
     )?;
 
+    /* TODO: the workspace probably needs to be re-read here because otherwise the publish dry-run will assume the previous crate versions
+     * either this or something else is leading to this issue where the verify_post checks aren't effective
+     *
+     * > [INFO  release_automation::lib::common] crates selected for the release process: [
+     * >         "holochain_cli-0.1.0-a-minor-release-test.2",
+     * >     ]
+     * > [DEBUG release_automation::lib::crate_selection] setting version to 0.1.0-a-minor-release-test.3 in manifest at "/home/steveej/src/holo/holochain/crates/hc/Cargo.toml"
+     * > [DEBUG release_automation::lib::release] [holochain_cli] creating crate release heading '0.1.0-a-minor-release-test.3' in '"/home/steveej/src/holo/holochain/crates/hc/CHANGELOG.md"'
+     * > [DEBUG release_automation::lib::crate_selection] running command: "cargo" "fetch" "--verbose" "--manifest-path" "Cargo.toml"
+     * > [DEBUG release_automation::lib::crate_selection] running command: "cargo" "update" "--workspace" "--offline" "--verbose"
+     * > [DEBUG release_automation::lib::crate_selection] running command: "cargo" "fetch" "--verbose" "--manifest-path" "crates/test_utils/wasm/wasm_workspace/Cargo.toml"
+     * >     Blocking waiting for file lock on package cache
+     * >     Blocking waiting for file lock on package cache
+     * > [DEBUG release_automation::lib::crate_selection] running command: "cargo" "update" "--workspace" "--offline" "--verbose" "--manifest-path" "crates/test_utils/wasm/wasm_workspace/Cargo.toml"
+     * >     Blocking waiting for file lock on package cache
+     * > [INFO  release_automation::lib::release] running consistency checks after changing the versions...
+     * > [DEBUG release_automation::lib::release] attempting to publish {"holochain_cli"}
+     * > [DEBUG release_automation::lib::release] holochain_cli-0.1.0-a-minor-release-test.2 is unchanged and already published, skipping..
+     * > [DEBUG release_automation::lib::release] Running command: "cargo" "check" "--locked" "--verbose" "--release" "--manifest-path=/home/steveej/src/holo/holochain/crates/hc/Cargo.toml"
+     * > [DEBUG release_automation::lib::release] Running command: "cargo" "publish" "--locked" "--verbose" "--no-verify" "--manifest-path=/home/steveej/src/holo/holochain/crates/hc/Cargo.toml" "--dry-run" "--allow-dirty"
+     * > [INFO  release_automation::lib::release] successfully published holochain_cli-0.1.0-a-minor-release-test.2
+     * > [INFO  release_automation::lib::release] crates processed: 1, consistent: 1, published: 1, skipped: 1, tolerated: 0
+     *
+     * the above shouldn't have looked up .2 but rather .3, which it wouldn't have found
+     */
+
     if !cmd_args.no_verify && !cmd_args.no_verify_post {
         info!("running consistency checks after changing the versions...");
         do_publish_to_crates_io(
             &selection,
             true,
             true,
+            false,
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
@@ -358,7 +382,7 @@ fn bump_release_versions<'a>(
     Ok(())
 }
 
-pub(crate) fn publish_to_crates_io<'a>(
+pub fn publish_to_crates_io<'a>(
     ws: &'a ReleaseWorkspace<'a>,
     cmd_args: &'a ReleaseArgs,
 ) -> Fallible<()> {
@@ -368,6 +392,7 @@ pub(crate) fn publish_to_crates_io<'a>(
         &crates,
         cmd_args.dry_run,
         false,
+        cmd_args.no_verify,
         &Default::default(),
         &cmd_args.cargo_target_dir,
     )?;
@@ -411,7 +436,7 @@ fn latest_release_crates<'a>(ws: &'a ReleaseWorkspace<'a>) -> Fallible<Vec<&Crat
 
 /// This models the information in the failure output of `cargo publish --dry-run`.
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
-pub(crate) enum PublishError {
+pub enum PublishError {
     #[error(
         "{package}@{path}: '{dependency}' dependency by {package_found} not found at {location}"
     )]
@@ -465,7 +490,7 @@ pub(crate) enum PublishError {
 }
 
 impl PublishError {
-    pub(crate) fn with_str(package: String, version: String, input: String) -> Self {
+    pub fn with_str(package: String, version: String, input: String) -> Self {
         static PACKAGE_NOT_FOUND_RE: OnceCell<regex::Regex> = OnceCell::new();
         static PACKAGE_VERSION_NOT_FOUND_RE: OnceCell<regex::Regex> = OnceCell::new();
         static ALREADY_UPLOADED_RE: OnceCell<regex::Regex> = OnceCell::new();
@@ -603,6 +628,8 @@ impl PublishError {
                 captures.name("location"),
                 captures.name("retry_after"),
             ) {
+                // TODO FIXME
+                #[allow(deprecated)]
                 let retry_after =
                 chrono::Utc.timestamp(
                     chrono::DateTime::parse_from_rfc2822(retry_after_string.as_str())
@@ -628,14 +655,15 @@ impl PublishError {
 ///
 /// For this to work properly all changed crates need to have their dev versions applied.
 /// If they don't, `cargo publish` will prefer a published crates to the local ones.
-pub(crate) fn do_publish_to_crates_io<'a>(
+pub fn do_publish_to_crates_io<'a>(
     crates: &[&'a Crate<'a>],
     dry_run: bool,
     allow_dirty: bool,
+    no_verify: bool,
     allowed_missing_dependencies: &HashSet<String>,
     cargo_target_dir: &Option<PathBuf>,
 ) -> Fallible<()> {
-    ensure_release_order_consistency(&crates)?;
+    ensure_release_order_consistency(&crates).context("release ordering is broken")?;
 
     let crate_names: HashSet<String> = crates.iter().map(|crt| crt.name()).collect();
 
@@ -680,9 +708,14 @@ pub(crate) fn do_publish_to_crates_io<'a>(
     };
 
     while let Some(crt) = queue.pop_front() {
-        if !crt.state().changed()
-            && crates_index_helper::is_version_published(&crt.name(), &crt.version(), false)?
-        {
+        let state_changed = crt.state().changed();
+
+        let name = crt.name().to_owned();
+        let ver = crt.version().to_owned();
+
+        let is_version_published = crates_index_helper::is_version_published(&name, &ver, false)?;
+
+        if !state_changed && is_version_published {
             debug!(
                 "{} is unchanged and already published, skipping..",
                 crt.name_version()
@@ -695,41 +728,43 @@ pub(crate) fn do_publish_to_crates_io<'a>(
             .as_ref()
             .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy()));
 
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.args(
-            [
-                vec![
-                    "check",
-                    "--locked",
-                    "--verbose",
-                    "--release",
-                    &format!("--manifest-path={}", manifest_path.to_string_lossy()),
-                ],
-                if let Some(target_dir) = cargo_target_dir_string.as_ref() {
-                    vec![target_dir]
-                } else {
-                    vec![]
-                },
-            ]
-            .concat(),
-        );
-        debug!("Running command: {:?}", cmd);
-        let output = cmd.output().context("process exitted unsuccessfully")?;
-        if !output.status.success() {
-            let mut details = String::new();
-            for line in output.stderr.lines_with_terminator() {
-                let line = line.to_str_lossy();
-                details += &line;
-            }
+        if !no_verify {
+            let mut cmd = std::process::Command::new("cargo");
+            cmd.args(
+                [
+                    vec![
+                        "check",
+                        "--locked",
+                        "--verbose",
+                        "--release",
+                        &format!("--manifest-path={}", manifest_path.to_string_lossy()),
+                    ],
+                    if let Some(target_dir) = cargo_target_dir_string.as_ref() {
+                        vec![target_dir]
+                    } else {
+                        vec![]
+                    },
+                ]
+                .concat(),
+            );
+            debug!("Running command: {:?}", cmd);
+            let output = cmd.output().context("process exitted unsuccessfully")?;
+            if !output.status.success() {
+                let mut details = String::new();
+                for line in output.stderr.lines_with_terminator() {
+                    let line = line.to_str_lossy();
+                    details += &line;
+                }
 
-            let error = PublishError::CheckFailure {
-                package: crt.name(),
-                version: crt.version().to_string(),
-                log: details,
-            };
-            errors.push(error);
-        } else {
-            check_cntr += 1;
+                let error = PublishError::CheckFailure {
+                    package: crt.name(),
+                    version: crt.version().to_string(),
+                    log: details,
+                };
+                errors.push(error);
+            } else {
+                check_cntr += 1;
+            }
         }
 
         let mut cmd = std::process::Command::new("cargo");
@@ -740,6 +775,8 @@ pub(crate) fn do_publish_to_crates_io<'a>(
                     "--locked",
                     "--verbose",
                     "--no-verify",
+                    "--registry",
+                    "crates-io",
                     &format!("--manifest-path={}", manifest_path.to_string_lossy()),
                 ],
                 if dry_run { vec!["--dry-run"] } else { vec![] },
@@ -876,7 +913,7 @@ fn create_crate_tags<'a>(
 }
 
 /// Ensure we're on a branch that starts with `Self::RELEASE_BRANCH_PREFIX`
-pub(crate) fn ensure_release_branch<'a>(ws: &'a ReleaseWorkspace<'a>) -> Fallible<String> {
+pub fn ensure_release_branch<'a>(ws: &'a ReleaseWorkspace<'a>) -> Fallible<String> {
     let branch_name = ws.git_head_branch_name()?;
     if !branch_name.starts_with(RELEASE_BRANCH_PREFIX) {
         bail!(

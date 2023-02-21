@@ -6,7 +6,7 @@
 //!
 //! hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
 //! data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
-//! [Holochain Deterministic Integrity (HDI)](hdi) for more information.
+//! [Holochain Deterministic Integrity (HDI)](crate::prelude::hdi) for more information.
 //!
 //! Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
 //! Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
@@ -42,7 +42,7 @@
 //! The wasm workspace contains examples of integrity zomes like this:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
 //!
-//! Refer to the [HDI crate](hdi) for more information on the integrity layer.
+//! Refer to the [HDI crate](crate::prelude::hdi) for more information on the integrity layer.
 //!
 //! # Coordinator zomes 🐜
 //!
@@ -57,19 +57,20 @@
 //! HDK implements several key features:
 //!
 //! - Base HDKT trait for standardisation, mocking, unit testing support: [`hdk`] module
-//! - Capabilities and function level access control: [`capability`] module
-//! - [Holochain Deterministic Integrity (HDI)](hdi)
-//! - Application data and entry definitions for the source chain and DHT: [`entry`] module and [`entry_defs`] callback
-//! - Referencing/linking entries on the DHT together into a graph structure: [`link`] module
-//! - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`] module
+//! - Capabilities and function level access control: [`capability`](crate::capability) module
+//! - [Holochain Deterministic Integrity (HDI)](crate::hdi)
+//! - Application data and entry definitions for the source chain and DHT: [`entry`](crate::entry)
+//! module and [`entry_defs`](crate::prelude::entry_defs) callback
+//! - Referencing/linking entries on the DHT together into a graph structure: [`link`](crate::link) module
+//! - Defining tree-like structures out of links and entries for discoverability and scalability: [`hash_path`](crate::hash_path) module
 //! - Create, read, update, delete (CRUD) operations on the above
-//! - Libsodium compatible symmetric/secret (secretbox) and asymmetric/keypair (box) encryption: [`x_salsa20_poly1305`] module
-//! - Ed25519 signing and verification of data: [`ed25519`] module
-//! - Exposing information about the current execution context such as zome name: [`info`] module
+//! - Libsodium compatible symmetric/secret (secretbox) and asymmetric/keypair (box) encryption: [`x_salsa20_poly1305`](crate::x_salsa20_poly1305) module
+//! - Ed25519 signing and verification of data: [`ed25519`](crate::ed25519) module
+//! - Exposing information about the current execution context such as zome name: [`info`](crate::info) module
 //! - Other utility functions provided by the host such as generating randomness and timestamps that are impossible in WASM: utility module
-//! - Exposing functions to external processes and callbacks to the host: [`hdk_extern!`] and [`map_extern!`] macros
+//! - Exposing functions to external processes and callbacks to the host: [`hdk_extern!`](macro@crate::prelude::hdk_extern) and [`map_extern!`](macro@crate::prelude::map_extern) macros
 //! - Integration with the Rust [tracing](https://docs.rs/tracing/0.1.23/tracing/) crate
-//! - Exposing a [`prelude`] of common types and functions for convenience
+//! - Exposing a [`prelude`](crate::prelude) of common types and functions for convenience
 //!
 //! Generally these features are structured logically into modules but there are some affordances to the layering of abstractions.
 //!
@@ -98,14 +99,14 @@
 //!
 //! ## Extern callbacks
 //!
-//! To extend a Rust function so that it can be called by the host, add the [`hdk_extern!`] attribute.
+//! To extend a Rust function so that it can be called by the host, add the [`hdk_extern!`](macro@crate::prelude::hdk_extern) attribute.
 //!
 //! - The function must take _one_ argument that implements `serde::Serialize + std::fmt::Debug`
 //! - The function must return an `ExternResult` where the success value implements `serde::Serialize + std::fmt::Debug`
 //! - The function must have a unique name across all externs as they share a global namespace in WASM
 //! - Everything inside the function is Rust-as-usual including `?` to interact with `ExternResult` that fails as `WasmError`
-//! - Use the [`wasm_error!`](holochain_wasmer_guest::wasm_error) macro along with the
-//! [`WasmErrorInner::Guest`](holochain_wasmer_guest::WasmErrorInner::Guest) variant for failure conditions that the host or
+//! - Use the [`wasm_error!`](crate::prelude::wasm_error) macro along with the
+//! [`WasmErrorInner::Guest`](crate::prelude::WasmErrorInner::Guest) variant for failure conditions that the host or
 //! external processes need to be aware of
 //! - Externed functions can be called as normal by other functions inside the same WASM
 //!
@@ -139,13 +140,22 @@
 //!
 //! The callbacks are:
 //!
-//! - `fn entry_defs(_: ()) -> ExternResult<EntryDefs>`:
+//! - `fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult>`:
+//!   - Typically implemented automatically by macros in the HDK so does NOT
+//!     require writing the extern for it manually.
 //!   - `EntryDefs` is a vector defining all entries used by this app.
 //!   - All zomes in a DNA define all their entries at the same time for the host.
 //!   - All entry defs are combined into a single ordered list per zome and exposed to tooling such as DNA generation.
 //!   - Entry defs are referenced by `u8` numerical position externally and in DHT actions, and by id/name e.g. "post" in sparse callbacks.
+//! - `fn genesis_self_check(_: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult>`:
+//!   - Allows each agent to validate itself before attempting to join the
+//!     network.
+//!   - Receives `GenesisSelfCheckData` that includes DNA information, the agent
+//!     key for the candidate source chain and the membrane proof.
+//!   - Runs _before the agent exists on the network_ so has no ability to use
+//!     the network and generally only has access to deterministic HDK functions.
 //! - `fn init(_: ()) -> ExternResult<InitCallbackResult>`:
-//!   - Allows the guest to pass/fail/retry initialization with [`InitCallbackResult`](holochain_zome_types::init::InitCallbackResult).
+//!   - Allows the guest to pass/fail/retry initialization with [`InitCallbackResult`](crate::prelude::holochain_zome_types::init::InitCallbackResult).
 //!   - Lazy execution - only runs when any zome of the DNA is first called.
 //!   - All zomes in a DNA init at the same time.
 //!   - Any zome failure fails initialization for the DNA, any zome retry (missing dependencies) causes the DNA to retry.
@@ -161,17 +171,11 @@
 //!   - Executes after the WASM call that originated the commits so not bound by the original atomic transaction.
 //!   - Input is all the action hashes that were committed.
 //!   - The zome that originated the commits is called.
-//! - `fn validate_create_link(create_link_data: ValidateCreateLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
-//!   - Allows the guest to pass/fail/retry link creation validation.
-//!   - Only the zome that created the link is called.
-//! - `fn validate_delete_link(delete_link_data: ValidateDeleteLinkData) -> ExternResult<ValidateLinkCallbackResult>`:
-//!   - Allows the guest to pass/fail/retry link deletion validation.
-//!   - Only the zome that deleted the link is called.
 //! - `fn validate(op: Op) -> ExternResult<ValidateCallbackResult>`:
 //!   - Allows the guest to pass/fail/retry any operation.
 //!   - Only the originating zome is called.
 //!   - Failure overrides retry.
-//!   - See [`validate`](hdi::prelude::validate) for more details.
+//!   - See [`validate`](crate::hdi::prelude::validate) for more details.
 //!
 //! # HDK has layers 🧅
 //!
@@ -179,7 +183,7 @@
 //! The code is not strictly organised this way but you'll get a feel for it as you write your own hApps.
 //!
 //! Roughly speaking, 80% of your apps can be production ready using just 20% of the HDK features and code.
-//! These are the 'high level' functions such as [`crate::entry::create_entry`] and macros like [`hdk_extern!`].
+//! These are the 'high level' functions such as [`crate::entry::create_entry`] and macros like [`hdk_extern!`](macro@crate::prelude::hdk_extern).
 //! Every Holochain function is available with a typed and documented wrapper and there is a set of macros for exposing functions and defining entries.
 //!
 //! The 20% of the time that you need to go deeper there is another layer followng its own 80/20 rule.
@@ -233,7 +237,7 @@
 //!
 //! # HDK is integrated with rust tracing for better debugging 🐛
 //!
-//! Every extern defined with the [`hdk_extern!`] attribute registers a [tracing subscriber](https://crates.io/crates/tracing-subscriber) that works in WASM.
+//! Every extern defined with the [`hdk_extern!`](macro@crate::prelude::hdk_extern) attribute registers a [tracing subscriber](https://crates.io/crates/tracing-subscriber) that works in WASM.
 //!
 //! All the basic tracing macros `trace!`, `debug!`, `warn!`, `error!` are implemented.
 //!
@@ -254,10 +258,9 @@
 //! The __guest must handle this error__ and either return it back to the host which _then_ rolls back writes (see above), or implement some kind of graceful failure or retry logic.
 //!
 //! The `Result` from the host in the case of host calls indicates whether the execution _completed_ successfully and is _in addition to_ other Result-like enums.
-//! For example, a remote call can be `Ok` from the host's perspective but contain an [ `crate::prelude::ZomeCallResponse::Unauthorized` ] "failure" enum variant from the remote agent.
+//! For example, a remote call can be `Ok` from the host's perspective but contain an
+//! [`ZomeCallResponse::Unauthorized`](crate::prelude::ZomeCallResponse::Unauthorized) "failure" enum variant from the remote agent.
 //! Both need to be handled in context.
-//!
-//! [`hdk_extern!`]: hdk_derive::hdk_extern
 
 pub use hdi::HDI_VERSION;
 
@@ -298,11 +301,13 @@ getrandom::register_custom_getrandom!(wasm_getrandom);
 
 /// Capability claims and grants.
 ///
-/// Every exposed function in Holochain uses capability grants/claims to secure access.
+/// Every exposed function in Holochain uses capability grants/claims to secure
+/// access.Capability grants are system entries committed to the source chain
+/// that define access. Capability claims are system entries that reference a
+/// grant on a source chain.
 ///
-/// Capability grants are system entries committed to the source chain that define access.
-///
-/// Capability claims are system entries that reference a grant on a source chain.
+/// # Examples
+/// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/coordinator.rs>
 ///
 /// 0. When Alice wants Bob to be able to call a function on her running conductor she commits a grant for Bob.
 /// 0. Bob commits the grant as a claim on his source chain.
@@ -331,9 +336,30 @@ getrandom::register_custom_getrandom!(wasm_getrandom);
 ///
 /// For best security, assign grants to specific agents if you can as the assignment check _does_ cryptographically validate the caller.
 ///
-/// @todo in the future grant secrets may be moved to lair somehow.
+// @todo in the future grant secrets may be moved to lair somehow.
 pub mod capability;
 
+/// Signing a single chain entry between multiple participants.
+///
+/// The basic goal is to enable a kind of atomicity across multiple source chains
+/// in an environment where countersigners trust each other in some ways but not
+/// entirely. Countersigning provides several trust models, including nominating
+/// a single party to gather signatures, M of N signers, majority signing buckets,
+/// etc.
+///
+/// The integrity layer enforces very little other than the structure of a
+/// countersigned entry, to define the session parameters and uniqueness and final
+/// signature set. Implementations are expected to drive countersigning sessions
+/// through coordinator zomes based on understanding both the expected network
+/// topologies and trust between peers on the network.
+///
+/// As various models for driving and finalising systems on the network are
+/// defined and implemented they all end up in the countersigning crate.
+///
+/// This is a network level implementation of countersigning which has pros and
+/// cons. There are also cryptographic methods of countersigning such as
+/// threshold signatures that produce a single proof between multiple
+/// participants, which are NOT included in this crate.
 pub mod countersigning;
 
 /// Working with app and system entries.
@@ -353,14 +379,16 @@ pub mod countersigning;
 /// An example of a coordinator zome with functions to manipulate entries:
 /// <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/coordinator_zome/src/lib.rs>
 ///
-/// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes) representing new states of a shared identity.
+/// # CRUD
+///
+/// CRUD in Holochain is represented as a graph/tree of Records referencing each other (via Action hashes), representing new states of a shared identity.
 /// Because the network is always subject to the possibility of partitions, there is no way to assert an objective truth about the 'current' or 'real' value that all participants will agree on.
 /// This is a key difference between Holochain and blockchains.
-/// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value while Holochain lets each participant discover their own truth.
+/// Where blockchains define a consensus algorithm that brings all participants as close as possible to a single value, while Holochain lets each participant discover their own truth.
 ///
-/// The practical implication of this is that agents fetch as much information as they can from the network then follow an algorithm to 'walk' or 'reduce' the revisions and discover 'current' for themselves.
+/// The practical implication of this is that agents fetch as much information as they can from the network, then follow an algorithm to 'walk' or 'reduce' the revisions and discover 'current' for themselves.
 ///
-/// In Holochain terms, blockchain consensus is walking all the known 'updates' (blocks) that pass validation then walking/reducing down them to disover the 'chain with the most work' or similar.
+/// In Holochain terms, blockchain consensus is walking all the known 'updates' (blocks) that pass validation, then walking/reducing down them to disover the 'chain with the most work' or similar.
 /// For example, to implement a blockchain in Holochain, attach a proof of work to each update and then follow the updates with the most work to the end.
 ///
 /// There are many other ways to discover the correct path through updates, for example a friendly game of chess between two players could involve consensual re-orgs or 'undos' of moves by countersigning a different update higher up the tree, to branch out a new revision history.
@@ -468,8 +496,8 @@ pub mod prelude;
 ///
 /// Note that the secrets are located within the secure lair keystore (@todo actually secretbox puts the secret in WASM, but this will be fixed soon) and never touch WASM memory.
 /// The WASM must provide either the public key for box or an opaque _reference_ to the secret key so that lair can encrypt or decrypt as required.
-///
-/// @todo implement a way to export/send an encrypted shared secret for a peer from lair
+//
+// @todo implement a way to export/send an encrypted shared secret for a peer from lair
 ///
 /// Note that even though the elliptic curve is the same as is used by ed25519, the keypairs cannot be shared because the curve is mathematically translated in the signing vs. encryption algorithms.
 /// In theory the keypairs could also be translated to move between the two algorithms but Holochain doesn't offer a way to do this (yet?).
@@ -535,9 +563,10 @@ pub mod info;
 /// At a high level:
 ///
 /// - Can implement direct or indirect circular references
-/// - Have a base and target entry
+/// - Reference data by its hash
+/// - Have a base and target entry, action or external hash
 /// - Can either exist or be deleted (i.e. there is no revision history, deleting removes a link permanently)
-/// - Many links can point from/to the same entry
+/// - Many links can point from/to the same hash
 /// - Links reference entry hashes not actions
 ///
 /// Links are retrived from the DHT by performing [ `link::get_links` ] or [ `link::get_link_details` ] against the _base_ of a link.
@@ -556,8 +585,8 @@ pub mod link;
 ///
 /// All function calls use capability grants and claims to authenticate and authorize.
 /// Signals simply forward information about the introduction of new data on the DHT so that agents can push updates to each other rather than relying purely on polling.
-///
-/// @todo introduce a pubsub mechanism
+//
+// @todo introduce a pubsub mechanism
 pub mod p2p;
 
 /// Integrates HDK with the Rust tracing crate.
@@ -574,8 +603,8 @@ pub mod trace;
 /// Everything related to inspecting or responding to time.
 ///
 /// Currently only fetching the host's opinion of the local time is supported.
-///
-/// @todo implement scheduled execution and sleeping
+//
+// @todo implement scheduled execution and sleeping
 pub mod time;
 
 /// Generate cryptographic strength random data

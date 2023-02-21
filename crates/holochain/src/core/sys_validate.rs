@@ -32,7 +32,7 @@ mod tests;
 /// (Assuming a baseline 5mbps upload for now... update this
 /// as consumer internet connections trend toward more upload)
 /// Consider splitting large entries up.
-pub const MAX_ENTRY_SIZE: usize = 4_000_000;
+pub const MAX_ENTRY_SIZE: usize = ENTRY_SIZE_LIMIT;
 
 /// 1kb limit on LinkTags.
 /// Tags are used as keys to the database to allow
@@ -599,9 +599,14 @@ impl IncomingDhtOpSender {
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(record) {
             let ops = vec![op];
-            incoming_dht_ops_workflow(self.space.as_ref(), self.sys_validation_trigger, ops, false)
-                .await
-                .map_err(Box::new)?;
+            incoming_dht_ops_workflow(
+                self.space.as_ref().clone(),
+                self.sys_validation_trigger,
+                ops,
+                false,
+            )
+            .await
+            .map_err(Box::new)?;
         }
         Ok(())
     }
@@ -609,6 +614,7 @@ impl IncomingDhtOpSender {
         self.send_op(record, make_store_record).await
     }
     async fn send_store_entry(self, record: Record) -> SysValidationResult<()> {
+        // TODO: MD: isn't it already too late if we've received a private entry from the network at this point?
         let is_public_entry = record.action().entry_type().map_or(false, |et| {
             matches!(et.visibility(), EntryVisibility::Public)
         });
@@ -669,7 +675,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
         .retrieve(hash.clone(), Default::default())
         .await?
     {
-        Some(el) => Ok(Source::Network(el.privatized())),
+        Some(el) => Ok(Source::Network(el.privatized().0)),
         None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }
@@ -683,7 +689,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 /// to return an error.
 fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, record_entry) = record.privatized().into_inner();
+    let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 

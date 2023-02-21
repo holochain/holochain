@@ -2,7 +2,7 @@ use super::*;
 use crate::metrics::*;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
-use kitsune_p2p_fetch::FetchQueue;
+use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
@@ -25,7 +25,7 @@ type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
-type WireConHnd = Tx2ConHnd<wire::Wire>;
+type WireConHnd = MetaNetCon;
 type Payload = Box<[u8]>;
 type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
@@ -89,27 +89,27 @@ ghost_actor::ghost_chan! {
         fn resolve_publish_pending_delegates(space: KSpace, op_hash: KOpHash) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+        fn incoming_gossip(space: KSpace, con: MetaNetCon, remote_url: String, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
 
         /// Incoming Metric Exchange
         fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
 
         /// New Con
-        fn new_con(url: TxUrl, con: WireConHnd) -> ();
+        fn new_con(url: String, con: WireConHnd) -> ();
 
         /// Del Con
-        fn del_con(url: TxUrl) -> ();
+        fn del_con(url: String) -> ();
     }
 }
 
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
-    ep_hnd: Tx2EpHnd<wire::Wire>,
+    ep_hnd: MetaNet,
     host: HostApi,
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
-    fetch_queue: FetchQueue,
+    fetch_pool: FetchPool,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     ghost_actor::GhostSender<SpaceInternal>,
@@ -138,7 +138,7 @@ pub(crate) async fn spawn_space(
         config,
         bandwidth_throttles,
         parallel_notify_permit,
-        fetch_queue,
+        fetch_pool,
     )));
 
     Ok((sender, i_s, evt_recv))
@@ -190,7 +190,7 @@ impl SpaceInternalHandler for Space {
             .gossip_single_storage_arc_per_space;
         let internal_sender = self.i_s.clone();
         Ok(async move {
-            let urls = vec![ep_hnd.local_addr()?];
+            let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
             let mut peer_data = Vec::with_capacity(agent_list.len());
             for (agent, arc) in agent_list {
                 let input = UpdateAgentInfoInput {
@@ -241,7 +241,7 @@ impl SpaceInternalHandler for Space {
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
-            let urls = vec![ep_hnd.local_addr()?];
+            let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
             let input = UpdateAgentInfoInput {
                 expires_after,
                 space: space.clone(),
@@ -474,7 +474,7 @@ impl SpaceInternalHandler for Space {
                     continue;
                 } else {
                     // Add this hash to our fetch queue.
-                    ro_inner.fetch_queue.push(FetchQueuePush {
+                    ro_inner.fetch_pool.push(FetchPoolPush {
                         key: FetchKey::Op(op_hash.data()),
                         space: space.clone(),
                         source: FetchSource::Agent(source.clone()),
@@ -556,8 +556,8 @@ impl SpaceInternalHandler for Space {
     fn handle_incoming_gossip(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        con: Tx2ConHnd<wire::Wire>,
-        remote_url: TxUrl,
+        con: MetaNetCon,
+        remote_url: String,
         data: Box<[u8]>,
         module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
@@ -580,16 +580,12 @@ impl SpaceInternalHandler for Space {
         unit_ok_fut()
     }
 
-    fn handle_new_con(
-        &mut self,
-        url: TxUrl,
-        con: Tx2ConHnd<wire::Wire>,
-    ) -> InternalHandlerResult<()> {
+    fn handle_new_con(&mut self, url: String, con: MetaNetCon) -> InternalHandlerResult<()> {
         self.ro_inner.metric_exchange.write().new_con(url, con);
         unit_ok_fut()
     }
 
-    fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
+    fn handle_del_con(&mut self, url: String) -> InternalHandlerResult<()> {
         self.ro_inner.metric_exchange.write().del_con(url);
         unit_ok_fut()
     }
@@ -759,6 +755,7 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
         initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
+        tracing::debug!(?space, ?agent, ?initial_arc, "handle_join");
         if let Some(initial_arc) = initial_arc {
             self.agent_arcs.insert(agent.clone(), initial_arc);
         }
@@ -1218,7 +1215,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<KitsuneDiagnostics> {
         let diagnostics = KitsuneDiagnostics {
             metrics: self.ro_inner.metrics.clone(),
-            fetch_queue: self.ro_inner.fetch_queue.clone().into(),
+            fetch_pool: self.ro_inner.fetch_pool.clone().into(),
         };
         Ok(async move { Ok(diagnostics) }.boxed().into())
     }
@@ -1239,7 +1236,7 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) host_api: HostApi,
-    pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
+    pub(crate) ep_hnd: MetaNet,
     #[allow(dead_code)]
     pub(crate) config: Arc<KitsuneP2pConfig>,
     pub(crate) parallel_notify_permit: Arc<tokio::sync::Semaphore>,
@@ -1247,7 +1244,7 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) metric_exchange: MetricExchangeSync,
     pub(crate) publish_pending_delegates: parking_lot::Mutex<HashMap<KOpHash, PendingDelegate>>,
     #[allow(dead_code)]
-    pub(crate) fetch_queue: FetchQueue,
+    pub(crate) fetch_pool: FetchPool,
 }
 
 impl SpaceReadOnlyInner {
@@ -1304,7 +1301,7 @@ pub(crate) struct Space {
     pub(crate) space: Arc<KitsuneSpace>,
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    pub(crate) _host_api: HostApi,
+    pub(crate) host_api: HostApi,
     pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
@@ -1321,11 +1318,11 @@ impl Space {
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         host_api: HostApi,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         config: Arc<KitsuneP2pConfig>,
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
-        fetch_queue: FetchQueue,
+        fetch_pool: FetchPool,
     ) -> Self {
         let metrics = MetricsSync::default();
 
@@ -1394,7 +1391,7 @@ impl Space {
                         evt_sender.clone(),
                         host_api.clone(),
                         metrics.clone(),
-                        fetch_queue.clone(),
+                        fetch_pool.clone(),
                     ),
                 )
             })
@@ -1494,7 +1491,7 @@ impl Space {
             metrics,
             metric_exchange,
             publish_pending_delegates: parking_lot::Mutex::new(HashMap::new()),
-            fetch_queue,
+            fetch_pool,
         });
 
         Self {
@@ -1502,7 +1499,7 @@ impl Space {
             space,
             i_s,
             evt_sender,
-            _host_api: host_api,
+            host_api,
             local_joined_agents: HashSet::new(),
             agent_arcs: HashMap::new(),
             config,
@@ -1515,8 +1512,8 @@ impl Space {
     fn update_metric_exchange_arcset(&mut self) {
         let arc_set = self
             .agent_arcs
-            .iter()
-            .map(|(_, a)| DhtArcSet::from_interval(DhtArcRange::from(a)))
+            .values()
+            .map(|a| DhtArcSet::from_interval(DhtArcRange::from(a)))
             .fold(DhtArcSet::new_empty(), |a, i| a.union(&i));
         self.ro_inner.metric_exchange.write().update_arcset(arc_set);
     }
@@ -1530,6 +1527,8 @@ impl Space {
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        let host = self.host_api.clone();
+
         Ok(async move {
             let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
             let expires_at_ms = signed_at_ms + expires_after;
@@ -1560,12 +1559,12 @@ impl Space {
 
             tracing::debug!(?agent_info_signed);
 
-            evt_sender
-                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                    space: space.clone(),
-                    peer_data: vec![agent_info_signed.clone()],
-                })
-                .await?;
+            // TODO: at some point, we should not remove agents who have left, but rather
+            // there should be a flag indicating they have left. The removed agent may just
+            // get re-gossiped to another local agent in the same space, defeating the purpose.
+            host.remove_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
+                .await
+                .map_err(KitsuneP2pError::other)?;
 
             // Push to the network as well
             match network_type {

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::types::event::{KitsuneP2pEvent, KitsuneP2pEventHandler, KitsuneP2pEventHandlerResult};
 use crate::{event::*, KitsuneHost};
 use futures::FutureExt;
-use kitsune_p2p_fetch::{FetchQueueConfig, OpHashSized};
+use kitsune_p2p_fetch::{FetchPoolConfig, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::combinators::second;
@@ -47,7 +47,7 @@ impl SwitchboardEventHandler {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for SwitchboardEventHandler {}
 impl ghost_actor::GhostControlHandler for SwitchboardEventHandler {}
 
-impl FetchQueueConfig for SwitchboardEventHandler {
+impl FetchPoolConfig for SwitchboardEventHandler {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }
@@ -65,6 +65,18 @@ impl KitsuneHost for SwitchboardEventHandler {
                 .get(&loc)
                 .map(|e| e.info.to_owned())
                 .or_else(|| node.remote_agents.get(&loc).cloned())
+        })))
+    }
+
+    fn remove_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(self.sb.share(|state| {
+            let node = state.nodes.get_mut(&self.node).unwrap();
+            node.local_agents
+                .retain(|_, entry| entry.info.agent == agent);
+            true
         })))
     }
 
@@ -145,7 +157,7 @@ impl KitsuneHost for SwitchboardEventHandler {
                                 .get(loc8)
                                 .map(|o| o.is_integrated)
                                 .unwrap_or_default();
-                            owned && arc.contains(&loc) && t0 <= op.timestamp && op.timestamp < t1
+                            owned && arc.contains(loc) && t0 <= op.timestamp && op.timestamp < t1
                         })
                         .map(second)
                         .cloned()
@@ -277,7 +289,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                 // NB: this may be problematic on the receiving end because we
                 // actually care whether this Loc8 is interpreted as u8 or i8,
                 // and we lose that information here.
-                let loc = op.0[0] as u8 as i32;
+                let loc = op.0[0] as i32;
                 if loc == 192 {
                     dbg!((&self.node, loc));
                 }
@@ -361,7 +373,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             FetchOpDataEvtQuery::Regions(bounds) => bounds
                 .into_iter()
                 .flat_map(|b| {
-                    // dbg!(&b);
                     sb.ops.iter().filter_map(move |(loc, o)| {
                         let contains = b.contains(&DhtLocation::from(*loc), &o.timestamp);
                         contains.then(|| (o.hash.clone(), KitsuneOpData::new(vec![loc.as_u8()])))

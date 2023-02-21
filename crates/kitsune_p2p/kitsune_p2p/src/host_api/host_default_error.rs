@@ -1,4 +1,4 @@
-use kitsune_p2p_fetch::FetchQueueConfig;
+use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
@@ -8,7 +8,7 @@ use super::*;
 /// Allows only specifying the methods you care about, and letting all the rest
 /// throw errors if called
 #[allow(missing_docs)]
-pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
+pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
     /// Name to be printed out on unimplemented error
     const NAME: &'static str;
 
@@ -19,6 +19,15 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
             "get_agent_info_signed",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn remove_agent_info_signed(&self, _input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "remove_agent_info_signed",
             Self::NAME
         )
         .into()))
@@ -122,6 +131,10 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         KitsuneHostDefaultError::get_agent_info_signed(self, input)
+    }
+
+    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::remove_agent_info_signed(self, input)
     }
 
     fn peer_extrapolated_coverage(

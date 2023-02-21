@@ -29,7 +29,6 @@ pub use crate::rate_limit::*;
 pub use crate::record::error::*;
 pub use crate::record::*;
 pub use crate::signal::*;
-pub use crate::validate::*;
 
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::TimestampFixturator;
