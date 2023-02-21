@@ -60,7 +60,7 @@
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
-        passthru.rev = inputs.holochain.rev;
+        passthru.src.rev = inputs.holochain.rev;
       });
 
       # Tests if all workspace crates can be built via their own Cargo.toml,
