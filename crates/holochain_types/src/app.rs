@@ -85,7 +85,7 @@ pub struct UpdateCoordinatorsPayload {
 pub struct CreateCloneCellPayload {
     /// The app id that the DNA to clone belongs to
     pub app_id: InstalledAppId,
-    /// The DNA's role id to clone
+    /// The DNA's role name to clone
     pub role_name: RoleName,
     /// Modifiers to set for the new cell.
     /// At least one of the modifiers must be set to obtain a distinct hash for
@@ -101,7 +101,7 @@ pub struct CreateCloneCellPayload {
 #[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum CloneCellId {
-    /// Clone id consisting of role id and clone index.
+    /// Clone id consisting of role name and clone index.
     CloneId(CloneId),
     /// Cell id consisting of DNA hash and agent pub key.
     CellId(CellId),
@@ -414,7 +414,7 @@ impl InstalledAppCommon {
         role_assignments: I,
     ) -> AppResult<Self> {
         let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
-        // ensure no role id contains a clone id delimiter
+        // ensure no role name contains a clone id delimiter
         if let Some((illegal_role_name, _)) = role_assignments
             .iter()
             .find(|(role_name, _)| role_name.contains(CLONE_ID_DELIMITER))
