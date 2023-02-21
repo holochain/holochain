@@ -185,6 +185,7 @@ fn bump_release_versions<'a>(
             &selection,
             true,
             true,
+            false,
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
@@ -195,12 +196,9 @@ fn bump_release_versions<'a>(
 
     for crt in &selection {
         let current_version = crt.version();
-        let changelog = crt.changelog().ok_or_else(|| {
-            anyhow::anyhow!(
-                "[{}] cannot determine most recent release: missing changelog",
-                crt.name()
-            )
-        })?;
+        let changelog = crt
+            .changelog()
+            .ok_or_else(|| anyhow::anyhow!("[{}] missing changelog", crt.name()))?;
 
         let maybe_previous_release_version = changelog
             .topmost_release()?
@@ -217,71 +215,65 @@ fn bump_release_versions<'a>(
             .map(|fm| fm.semver_increment_mode());
         let semver_increment_mode = maybe_semver_increment_mode.unwrap_or_default();
 
-        let release_version = if let Some(mut previous_release_version) =
-            maybe_previous_release_version.clone()
-        {
-            if previous_release_version > current_version {
-                bail!("previously documented release version '{}' is greater than this release version '{}'", previous_release_version, current_version);
-            }
-
-            increment_semver(&mut previous_release_version, semver_increment_mode)?;
-
-            previous_release_version
-        } else {
-            // release the current version, or bump if the current version is a pre-release
-            let mut new_version = current_version.clone();
-
-            if new_version.is_prerelease() {
-                increment_semver(&mut new_version, semver_increment_mode)?;
-            }
-
-            new_version
+        let incremented_version = {
+            let mut v = current_version.clone();
+            increment_semver(&mut v, semver_increment_mode)?;
+            v
         };
 
-        trace!(
-            "[{}] previous release version: '{:?}', current version: '{}', release version: '{}' ",
-            crt.name(),
-            maybe_previous_release_version,
-            current_version,
-            release_version,
-        );
-
-        let greater_release = release_version > current_version;
-        if greater_release {
-            crt.set_version(cmd_args.dry_run, &release_version.clone())?;
-        }
-
-        let crate_release_heading_name = format!("{}", release_version);
-
-        if maybe_previous_release_version.is_none() || greater_release {
-            // create a new release entry in the crate's changelog and move all items from the unreleased heading if there are any
-
-            debug!(
-                "[{}] creating crate release heading '{}' in '{:?}'",
-                crt.name(),
-                crate_release_heading_name,
-                changelog.path(),
-            );
-
-            if !cmd_args.dry_run {
-                changelog
-                    .add_release(crate_release_heading_name.clone())
-                    .context(format!("adding release to changelog for '{}'", crt.name()))?;
-
-                // FIXME: now we should reread the whole thing?
-
-                if greater_release {
-                    // rewrite frontmatter to reset it to its defaults
-                    changelog.reset_front_matter_to_defaults()?;
+        let release_version = match &maybe_previous_release_version {
+            Some(previous_release_version) => {
+                if &current_version > previous_release_version {
+                    current_version.clone()
+                } else if &incremented_version > previous_release_version {
+                    crt.set_version(cmd_args.dry_run, &incremented_version)?;
+                    incremented_version.clone()
+                } else {
+                    bail!("neither current version '{}' nor incremented version '{}' exceed previously released version '{}'", &current_version, &incremented_version, previous_release_version);
                 }
             }
 
-            changed_crate_changelogs.push(WorkspaceCrateReleaseHeading {
-                prefix: crt.name(),
-                suffix: crate_release_heading_name,
-                changelog,
-            });
+            None => {
+                // default to incremented version if we don't have information on a previous release
+                crt.set_version(cmd_args.dry_run, &incremented_version.clone())?;
+                incremented_version.clone()
+            }
+        };
+
+        debug!(
+            "[{}] previous release version: '{:?}', current version: '{}', incremented version: '{}'",
+            crt.name(),
+            maybe_previous_release_version,
+            current_version,
+            incremented_version,
+        );
+
+        let crate_release_heading_name = format!("{}", release_version);
+
+        // create a new release entry in the crate's changelog and move all items from the unreleased heading if there are any
+        debug!(
+            "[{}] creating crate release heading '{}' in '{:?}'",
+            crt.name(),
+            crate_release_heading_name,
+            changelog.path(),
+        );
+
+        if !cmd_args.dry_run {
+            changelog
+                .add_release(crate_release_heading_name.clone())
+                .context(format!("adding release to changelog for '{}'", crt.name()))?;
+
+            // FIXME: now we should reread the whole thing?
+
+            // rewrite frontmatter to reset it to its defaults
+            changelog.reset_front_matter_to_defaults()?;
         }
+
+        changed_crate_changelogs.push(WorkspaceCrateReleaseHeading {
+            prefix: crt.name(),
+            suffix: crate_release_heading_name,
+            changelog,
+        });
     }
 
     ws.update_lockfile(
@@ -321,6 +313,7 @@ fn bump_release_versions<'a>(
             &selection,
             true,
             true,
+            false,
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
@@ -399,6 +392,7 @@ pub fn publish_to_crates_io<'a>(
         &crates,
         cmd_args.dry_run,
         false,
+        cmd_args.no_verify,
         &Default::default(),
         &cmd_args.cargo_target_dir,
     )?;
@@ -665,6 +659,7 @@ pub fn do_publish_to_crates_io<'a>(
     crates: &[&'a Crate<'a>],
     dry_run: bool,
     allow_dirty: bool,
+    no_verify: bool,
     allowed_missing_dependencies: &HashSet<String>,
     cargo_target_dir: &Option<PathBuf>,
 ) -> Fallible<()> {
@@ -733,41 +728,43 @@ pub fn do_publish_to_crates_io<'a>(
             .as_ref()
             .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy()));
 
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.args(
-            [
-                vec![
-                    "check",
-                    "--locked",
-                    "--verbose",
-                    "--release",
-                    &format!("--manifest-path={}", manifest_path.to_string_lossy()),
-                ],
-                if let Some(target_dir) = cargo_target_dir_string.as_ref() {
-                    vec![target_dir]
-                } else {
-                    vec![]
-                },
-            ]
-            .concat(),
-        );
-        debug!("Running command: {:?}", cmd);
-        let output = cmd.output().context("process exitted unsuccessfully")?;
-        if !output.status.success() {
-            let mut details = String::new();
-            for line in output.stderr.lines_with_terminator() {
-                let line = line.to_str_lossy();
-                details += &line;
-            }
+        if !no_verify {
+            let mut cmd = std::process::Command::new("cargo");
+            cmd.args(
+                [
+                    vec![
+                        "check",
+                        "--locked",
+                        "--verbose",
+                        "--release",
+                        &format!("--manifest-path={}", manifest_path.to_string_lossy()),
+                    ],
+                    if let Some(target_dir) = cargo_target_dir_string.as_ref() {
+                        vec![target_dir]
+                    } else {
+                        vec![]
+                    },
+                ]
+                .concat(),
+            );
+            debug!("Running command: {:?}", cmd);
+            let output = cmd.output().context("process exitted unsuccessfully")?;
+            if !output.status.success() {
+                let mut details = String::new();
+                for line in output.stderr.lines_with_terminator() {
+                    let line = line.to_str_lossy();
+                    details += &line;
+                }
 
-            let error = PublishError::CheckFailure {
-                package: crt.name(),
-                version: crt.version().to_string(),
-                log: details,
-            };
-            errors.push(error);
-        } else {
-            check_cntr += 1;
+                let error = PublishError::CheckFailure {
+                    package: crt.name(),
+                    version: crt.version().to_string(),
+                    log: details,
+                };
+                errors.push(error);
+            } else {
+                check_cntr += 1;
+            }
         }
 
         let mut cmd = std::process::Command::new("cargo");

@@ -43,28 +43,55 @@
       };
 
       # derivation building all dependencies
-      holochainDeps = craneLib.buildDepsOnly (commonArgs // rec {
+      holochainDeps = craneLib.buildDepsOnly (commonArgs // {
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
       });
 
-      holochainDepsRelease = craneLib.buildDepsOnly (commonArgs // rec {
+      holochainDepsRelease = craneLib.buildDepsOnly (commonArgs // {
         CARGO_PROFILE = "release";
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
       });
 
       # derivation with the main crates
-      holochain = (craneLib.buildPackage (commonArgs // {
+      holochain = craneLib.buildPackage (commonArgs // {
         CARGO_PROFILE = "release";
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
-      })) // {
-        src.rev = inputs.holochain.rev;
-      };
+        passthru.src.rev = inputs.holochain.rev;
+      });
 
-      holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // rec {
+      # Tests if all workspace crates can be built via their own Cargo.toml,
+      #   ignoring the workspace Cargo.toml file
+      # Due to differences in the Cargo.toml's specified features, a package
+      #   build can succees with the workspace's Cargo.toml but fail without it.
+      # This ensures that individual packages can be installed from crates.io.
+      holochain-crates-standalone = craneLib.buildPackage (commonArgs // rec {
+        name = "holochain-crates-standalone";
+        src = flake.config.srcCleanedHolochain;
+        cargoArtifacts = holochainDepsRelease;
+        CARGO_PROFILE = "release";
+        doCheck = false;
+        dontInstall = true;
+        buildPhase = ''
+          export workspace=$(realpath .)
+          ${lib.concatStringsSep "\n" (map buildCommandCrate members)}
+          touch $out
+        '';
+      });
+      cargoToml = builtins.fromTOML (builtins.readFile (self + /Cargo.toml));
+      members = cargoToml.workspace.members;
+      buildCommandCrate = member: ''
+        echo "changing to directory $workspace/${member} to build crate ${member}"
+        cd $workspace/${member}
+        cargo check \
+          --profile $CARGO_PROFILE \
+          --manifest-path=$workspace/${member}/Cargo.toml
+      '';
+
+      holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
         pname = "holochain-nextest";
         CARGO_PROFILE = "fast-test";
         nativeBuildInputs = [ pkgs.cargo-nextest ];
@@ -165,11 +192,26 @@
         '';
       });
 
-      holochain-tests-wasm = craneLib.cargoTest (commonArgs // {
+      holochainWasmArgs = (commonArgs // {
         pname = "holochain-tests-wasm";
-        cargoArtifacts = holochainDeps;
         cargoExtraArgs =
-          "--lib --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml --all-features";
+          "--lib --all-features";
+
+        cargoToml = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.toml";
+        cargoLock = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
+
+        postUnpack = ''
+          cd $sourceRoot/crates/test_utils/wasm/wasm_workspace
+          sourceRoot="."
+        '';
+      });
+
+      holochainDepsWasm = craneLib.buildDepsOnly (holochainWasmArgs // {
+        cargoArtifacts = null;
+      });
+
+      holochain-tests-wasm = craneLib.cargoTest (holochainWasmArgs // {
+        cargoArtifacts = holochainDepsWasm;
 
         dontPatchELF = true;
         dontFixup = true;
@@ -188,9 +230,16 @@
     in
     {
       packages = {
-        inherit holochain holochain-tests-nextest holochain-tests-nextest-tx5 holochain-tests-doc;
-
-        inherit holochain-tests-wasm holochain-tests-fmt holochain-tests-clippy;
+        inherit
+          holochain
+          holochain-crates-standalone
+          holochain-tests-nextest
+          holochain-tests-nextest-tx5
+          holochain-tests-doc
+          holochain-tests-wasm
+          holochain-tests-fmt
+          holochain-tests-clippy
+          ;
       };
     };
 }
