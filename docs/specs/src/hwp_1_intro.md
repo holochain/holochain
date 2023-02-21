@@ -13,7 +13,7 @@ scaling consent; we present an informal description of the system; we
 provide a more formal outline of the necessary integrity guarantees and
 system components needed to deliver those guarantees; and finally we
 conclude with a high-level yet sufficiently detailed technical
-specification of what's need to implement such a system.
+specification of what's needed to implement such a system.
 
 Introduction
 ============
@@ -153,11 +153,11 @@ The second point we deliver through various types of **Intrinsic Data
 Integrity**. We use a number of cryptographic methods to create
 self-proving data of various types:
 
--   Provenance: An agent's network address is their public-key. Thus,
+-   Provenance: An agent's network address is their public key. Thus,
   when interacting with agents it's possible to have deterministic
   confidence in who one is interacting with because there is no
   identity layer between network locations subject to attack
-  surface. I.e. Unlike the web address, you don't need a domain name
+  surface. I.e. unlike the web address, you don't need a domain name
   certificate associated with the domain name to become confident of
   "who" you are talking to.
 
@@ -178,7 +178,7 @@ self-proving data of various types:
   something has become true, it can't become untrue) \[TODO: ACB\]
 
 -   Common Genesis: The Validation Rules and joining criteria of an
-  application are the first first entry in every chain. This
+  application are the first entry in every chain. This
   provides a mechanism for self-proving shared ground rules. Any
   agent can examine the chain of any other agent all the way back to
   the source and thus have high confidence that they have actually
