@@ -779,12 +779,12 @@ mod network_impls {
         }
 
         /// Block some target.
-        pub async fn block(&self, input: Block) -> ConductorResult<()> {
+        pub async fn block(&self, input: Block) -> DatabaseResult<()> {
             Ok(self.spaces.block(input).await?)
         }
 
         /// Unblock some target.
-        pub async fn unblock(&self, input: Block) -> ConductorResult<()> {
+        pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
             Ok(self.spaces.unblock(input).await?)
         }
 

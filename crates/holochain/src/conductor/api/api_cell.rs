@@ -21,6 +21,7 @@ use holochain_zome_types::block::Block;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
 use tracing::*;
+use holochain_state::prelude::DatabaseResult;
 
 /// The concrete implementation of [`CellConductorApiT`], which is used to give
 /// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).
@@ -208,10 +209,10 @@ pub trait CellConductorReadHandleT: Send + Sync {
     ) -> ConductorResult<Option<CellId>>;
 
     /// Expose block functionality to zomes.
-    async fn block(&self, block: Block) -> ConductorResult<()>;
+    async fn block(&self, block: Block) -> DatabaseResult<()>;
 
     /// Expose unblock functionality to zomes.
-    async fn unblock(&self, block: Block) -> ConductorResult<()>;
+    async fn unblock(&self, block: Block) -> DatabaseResult<()>;
 }
 
 #[async_trait]
@@ -264,11 +265,11 @@ impl CellConductorReadHandleT for CellConductorApi {
             .await
     }
 
-    async fn block(&self, block: Block) -> ConductorResult<()> {
+    async fn block(&self, block: Block) -> DatabaseResult<()> {
         self.conductor_handle.block(block).await
     }
 
-    async fn unblock(&self, block: Block) -> ConductorResult<()> {
+    async fn unblock(&self, block: Block) -> DatabaseResult<()> {
         self.conductor_handle.unblock(block).await
     }
 }

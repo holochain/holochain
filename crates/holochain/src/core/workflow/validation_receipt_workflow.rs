@@ -7,10 +7,12 @@ use holochain_types::prelude::*;
 use holochain_zome_types::TryInto;
 use tracing::*;
 
+use holochain_zome_types::block::CellBlockReason;
 use crate::conductor::conductor::CellStatus;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::WorkComplete;
-
+use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTarget;
 use super::error::WorkflowResult;
 
 #[cfg(test)]
@@ -99,6 +101,17 @@ pub async fn validation_receipt_workflow(
             continue;
         }
 
+        if matches!(receipt.validation_status, ValidationStatus::Rejected) {
+            // Block BEFORE we integrate the outcome because this is not atomic
+            // and if something goes wrong we know the integration will retry.
+            conductor
+                .block(Block::new(BlockTarget::Cell(
+                    CellId::new((*dna_hash).clone(), author.clone()),
+                    CellBlockReason::Validation(receipt.dht_op_hash.clone()),
+                ), InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX)?))
+                .await?;
+        }
+
         let op_hash = receipt.dht_op_hash.clone();
 
         // Sign on the dotted line.
@@ -126,6 +139,7 @@ pub async fn validation_receipt_workflow(
             // No one home, they will need to publish again.
             info!(failed_send_receipt = ?e);
         }
+
         // Attempted to send the receipt so we now mark
         // it to not send in the future.
         vault

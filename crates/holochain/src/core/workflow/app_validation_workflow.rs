@@ -183,7 +183,6 @@ async fn app_validation_workflow_inner(
                         }
                     }
 
-
                     if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
                         warn!(
                             msg = "DhtOp has failed app validation",
@@ -206,7 +205,7 @@ async fn app_validation_workflow_inner(
                         }
                         Outcome::Rejected(_) => {
                             rejected += 1;
-                            tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
+                            tracing::warn!("Received invalid op. The op author will be blocked.\nOp: {:?}", op_light);
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {

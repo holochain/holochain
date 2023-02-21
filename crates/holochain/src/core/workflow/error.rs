@@ -96,6 +96,9 @@ pub enum WorkflowError {
     #[error(transparent)]
     SystemTimeError(#[from] std::time::SystemTimeError),
 
+    #[error(transparent)]
+    TimestampError(#[from] holochain_zome_types::TimestampError),
+
     #[error("RecvError")]
     RecvError,
 
