@@ -1,6 +1,5 @@
-# Builds the holochain crates and runs tests
+# Builds all components and runs their tests
 
-name: holochain build and test
 on:
   workflow_dispatch:
   pull_request:
@@ -10,70 +9,5 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  "test":
-    strategy:
-      fail-fast: false
-      matrix:
-        cmd:
-          # ensure functionality on multiple platforms
-          - pkgs:
-              - holochain-tests-wasm
-              - holochain-tests-nextest
-              - holochain-tests-nextest-tx5
-              - holonix-tests-integration
-            extra_arg: '--override-input holochain "."'
-          # ensures to keep the cache populated for the most recent stable version on multiple platforms
-          - pkgs:
-              - holonix-tests-integration
-            extra_arg: ""
-        platform:
-          # - system: x86_64-darwin
-          - system: aarch64-darwin
-          - system: x86_64-linux
-
-        include:
-          # we only run repo consistency checks on x86_64-linux
-          - cmd:
-              pkgs:
-                - holochain-crates-standalone
-                - release-automation-tests
-                - release-automation-tests-repo
-                - holochain-tests-clippy
-                - holochain-tests-fmt
-                - holochain-tests-doc
-              extra_arg: '--override-input holochain "."'
-            platform:
-              system: x86_64-linux
-
-          # only needed as long as x86_64-darwin is excluded in the matrix
-          - cmd:
-              pkgs:
-                - holonix-tests-integration
-              extra_arg: ""
-            platform:
-              system: x86_64-darwin
-
-    # runs-on: ${{ matrix.platform.runs-on }}
-    runs-on: [self-hosted, multi-arch]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          lfs: false
-
-      - name: Print matrix
-        env:
-          MATRIX: ${{ toJSON(matrix) }}
-        run: echo ${MATRIX}
-
-      - name: "Test comand ${{ matrix.nixCommand }}"
-        env:
-          system: ${{ matrix.platform.system }}
-        run: |
-          set -xe
-
-          # first build all derivations. this could be enough for test derivations.
-          nix build -L --show-trace \
-            ${{ matrix.cmd.extra_arg }} \
-            --override-input versions ./versions/0_1 \
-            .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
+  holochain-build-and-test:
+    uses: ./.github/workflows/holochain-build-and-test.yml
