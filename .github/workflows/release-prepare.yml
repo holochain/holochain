@@ -1,3 +1,23 @@
+# Loaded as part for `release.yml`
+# Contains a single job called `prepare`.
+#
+# As input it receives a branch to be released (aka. source branch).
+# It then merges the source branch into the release branch (usually `release`).
+#
+# The merged state of the repo is then serialized and cached to use in the subsequent `release.yml` workflow.
+#
+# This workflow also caches cargo related state and build files between runs.
+#
+#
+# Relevant Steps:
+# - Merge the source branch into the release branch
+# - Restore holochain cargo related state and build files
+# - (Checks files) Detect missing release headings
+# - (Changes files) Generate crate READMEs from doc comments
+# - (Changes files) Bump the crate versions for the release
+# - Cache the repo and set outputs
+
+
 on:
   workflow_call:
     inputs:
@@ -21,14 +41,6 @@ on:
         type: string
         required: false
         default: "https://github.com/holochain/holochain"
-      HOLOCHAIN_NIXPKGS_URL:
-        type: string
-        required: false
-        default: "https://github.com/holochain/holochain-nixkpgs.git"
-      HOLONIX_URL:
-        type: string
-        required: false
-        default: "https://github.com/holochain/holonix.git"
       HOLOCHAIN_REPO:
         type: string
         required: false
@@ -91,7 +103,7 @@ jobs:
       # - name: Set NIX_PATH (FIXME)
       #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
-      - name: Prepare the holochain repository
+      - name: Merge ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }} into ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
           HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}

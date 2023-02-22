@@ -251,6 +251,22 @@
         "type": "github"
       }
     },
+    "pre-commit-hooks-nix": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1676513100,
+        "narHash": "sha256-MK39nQV86L2ag4TmcK5/+r1ULpzRLPbbfvWbPvIoYJE=",
+        "owner": "cachix",
+        "repo": "pre-commit-hooks.nix",
+        "rev": "5f0cba88ac4d6dd8cad5c6f6f1540b3d6a21a798",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cachix",
+        "repo": "pre-commit-hooks.nix",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "cargo-chef": "cargo-chef",
@@ -273,6 +289,7 @@
         ],
         "nix-filter": "nix-filter",
         "nixpkgs": "nixpkgs",
+        "pre-commit-hooks-nix": "pre-commit-hooks-nix",
         "rust-overlay": "rust-overlay_2",
         "scaffolding": [
           "versions",

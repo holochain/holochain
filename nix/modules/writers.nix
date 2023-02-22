@@ -84,7 +84,6 @@
             -3
         )
 
-        echo -e "unsetting ENV variables:\n$(echo $unsetVars | tr "\n" " ")"
         unset $unsetVars
       '';
         in
