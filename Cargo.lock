@@ -7222,6 +7222,7 @@ dependencies = [
 [[package]]
 name = "tx5"
 version = "0.0.1-alpha.4"
+source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
 dependencies = [
  "bytes",
  "futures",
@@ -7232,21 +7233,9 @@ dependencies = [
  "rand-utf8",
  "tokio",
  "tracing",
- "tx5-core 0.0.1-alpha.2",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c)",
  "tx5-go-pion",
  "tx5-signal",
- "url 2.3.1",
-]
-
-[[package]]
-name = "tx5-core"
-version = "0.0.1-alpha.2"
-dependencies = [
- "base64 0.13.1",
- "once_cell",
- "rand 0.8.5",
- "serde",
- "serde_json",
  "url 2.3.1",
 ]
 
@@ -7263,8 +7252,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tx5-core"
+version = "0.0.1-alpha.2"
+source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
+dependencies = [
+ "base64 0.13.1",
+ "once_cell",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "url 2.3.1",
+]
+
+[[package]]
 name = "tx5-go-pion"
 version = "0.0.1-alpha.4"
+source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -7276,6 +7279,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.0.1-alpha.6"
+source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -7286,7 +7290,7 @@ dependencies = [
  "ouroboros",
  "sha2 0.10.6",
  "tracing",
- "tx5-core 0.0.1-alpha.2",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c)",
  "zip",
 ]
 
@@ -7310,6 +7314,7 @@ dependencies = [
 [[package]]
 name = "tx5-signal"
 version = "0.0.1-alpha.2"
+source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -7325,7 +7330,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite 0.17.2",
  "tracing",
- "tx5-core 0.0.1-alpha.2",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c)",
  "url 2.3.1",
 ]
 
