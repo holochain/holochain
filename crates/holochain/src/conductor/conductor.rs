@@ -2409,6 +2409,17 @@ impl Conductor {
         let dna_modifiers = clone_dna.dna().modifiers.clone();
         let clone_dna_hash = clone_dna.dna_hash().to_owned();
 
+        // if DNA hash of new clone cell already exists, reject as duplicate
+        if self
+            .ribosome_store
+            .share_ref(|ribosome_store| ribosome_store.get_dna_def(&clone_dna_hash))
+            .is_some()
+        {
+            return Err(ConductorError::AppError(AppError::DuplicateDnaHash(
+                clone_dna_hash,
+            )));
+        }
+
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
