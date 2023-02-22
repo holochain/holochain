@@ -1,19 +1,43 @@
-Holochain
-
-Distributed Coordination by Scaled Consent not Global Consensus
-
-Abstract
-========
-
-In this paper we present a frame and a specification for a generalized  
-system for large scale distributed coordination that does not rely on
-global consensus. We start with some axioms; we proceed to describe the
-consequences of these axioms, looking at the problem through the lens of
-scaling consent; we present an informal description of the system; we
-provide a more formal outline of the necessary integrity guarantees and
-system components needed to deliver those guarantees; and finally we
-conclude with a high-level yet sufficiently detailed technical
-specification of what's needed to implement such a system.
+---
+title: 'Holochain'
+subtitle: 'Distributed Coordination by Scaled Consent not Global Consensus'
+author: 
+ - Eric Harris-Braun
+ - Arthur Brock
+abstract: |
+ In this paper we present a frame and a specification for a generalized system for 
+ large scale distributed coordination that does not rely on global consensus. We start
+ with some axioms; we proceed to describe the consequences of these axioms, looking 
+ at the problem through the lens of scaling consent; we present an informal description 
+ of the system; we provide a more formal outline of the necessary integrity guarantees 
+ and system components needed to deliver those guarantees; and finally we conclude with 
+ a high-level yet sufficiently detailed technical specification of our implementation 
+ of such a system.
+documentclass: 'revtex4-1'
+references:
+- type: article-journal
+  id: xxx
+  author:
+  - family: Watson
+    given: J. D.
+  - family: Crick
+    given: F. H. C.
+  issued:
+    date-parts:
+    - - 1953
+      - 4
+      - 25
+  title: 'Molecular structure of nucleic acids: a structure for
+    deoxyribose nucleic acid'
+  title-short: Molecular structure of nucleic acids
+  container-title: Nature
+  volume: 171
+  issue: 4356
+  page: 737-738
+  DOI: 10.1038/171737a0
+  URL: https://www.nature.com/articles/171737a0
+  language: en-GB
+---
 
 Introduction
 ============
@@ -22,8 +46,8 @@ Preamble
 --------
 
 The first version of the [[Holochain white
-paper]{.underline}](https://github.com/holochain/holochain-proto/blob/whitepaper/holochain.pdf)
-took on a very formal approach to describing generalized distributed
+paper]{.underline}](https://github.com/holochain/holochain-proto/blob/whitepaper/holochain.pdf)\cite{xxx}
+took a very formal approach to describing generalized distributed
 computation schemes and carefully compared the approach taken by
 Blockchain based systems with the approach taken by Holochain as well as
 providing formal reasoning for the benefits of Holochain's agent centric
@@ -42,7 +66,14 @@ specification in Appendix A.
 Axioms
 ------
 
-We begin by stating our axioms[^1] regarding the nature of coordination:
+We begin by stating our axioms[^byzantine] regarding the nature of coordination:
+
+[^byzantine]: Some readers may come to the problems of distributed coordination
+    from the framework laid out by the literature on Byzantine Fault
+    Tolerance. These axioms and a discussion of why start with them are
+    explained in our paper The Players of Ludos: Beyond Byzantium
+    \[LINK: [[The Players of
+    Ludos]{.underline}](https://docs.google.com/document/d/1HBNgIooElD5widCuX9XmiOzbVIpEF5XXH67mZbnUFjo/edit#)\].
 
 1.  **Coordination arises from agents** starting from the same
   ground-rules and acting as soon as each party in any interaction
@@ -51,7 +82,7 @@ We begin by stating our axioms[^1] regarding the nature of coordination:
   coordination looks like alignment heading in the same direction,
   rather than agreement proceeding in lockstep.)
 
-2.  **Coordination is grammatic**, in that it comes from embodying a
+1.  **Coordination is grammatic**, in that it comes from embodying a
   geometry that removes uncertainty, and embodying an ability to
   compose different coordinative subsystems that have different
   ground-rules.
@@ -73,7 +104,7 @@ of a system using this alternate frame.
 
 Axiom 2 arises from the insight that systems for successful large scale
 coordination demand the property of anti-fragility, that is, they must
-perform better under perturbation[^2]. Coordination happens in the
+perform better under perturbation[^antifragile]. Coordination happens in the
 context of fundamentally dynamic environments in which the coordinating
 elements are changed by the fact of their coordination. Coordination is
 a co-evolutionary context. We claim by this axiom that what meets the
@@ -84,14 +115,22 @@ and by which agents in that context can react powerfully to
 perturbations because the available composability is dimensionally
 aligned.
 
+[^antifragile]: Antifragile: Things that Gain from Disorder. Nassim Nicholas Taleb
+
 The core axiom (though not explicitly stated as such) of the Byzantine
 Generals Problem is that coordination starts AFTER "consensus on state",
 i.e. that the Lieutenants can't execute their plan until they have
-followed the consensus algorithm and arrived at single data reality[^3].
+followed the consensus algorithm and arrived at single data reality[^faults].
 This axiom leads system designers to figure out how to implement
 machinery for **Global Consensus**. Our axioms lead us, instead, to
 implement tooling for **Scaling Consent** as an alternate solution to
 the Byzantine Generals Problem.
+
+[^faults]: In Reaching Agreement in the Presence of Faults:
+    [[https://dl.acm.org/doi/pdf/10.1145/322186.322188]{.underline}](https://dl.acm.org/doi/pdf/10.1145/322186.322188)
+    MARSHALL PEASE, ROBERT SHOSTAK, and LESLIE LAMPORT, this single data
+    reality is called "interactive consistency" as is about the vector
+    of "Private Values" sent by each node.
 
 From Global Consensus to Scaled Consent
 ---------------------------------------

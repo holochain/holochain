@@ -13,7 +13,9 @@ $if(CJKmainfont)$
 \PassOptionsToPackage{space}{xeCJK}
 $endif$
 %
-\documentclass[
+\documentclass[twocolumn,showpacs,%
+  nofootinbib,aps,superscriptaddress,%
+  eqsecnum,prd,notitlepage,showkeys,10pt,
 $if(fontsize)$
   $fontsize$,
 $endif$
@@ -370,24 +372,17 @@ $if(csl-refs)$
   \everypar{\setlength{\hangindent}{\cslhangindent}}\ignorespaces$endif$}%
   {\par}
 $endif$
+\usepackage{etoolbox}
+
+\begin{document}
 
 $if(title)$
-\title{$title$$if(thanks)$\thanks{$thanks$}$endif$}
+\title{$title$$if(thanks)$\thanks{$thanks$}$endif$$if(subtitle)$ \\
+\small $subtitle$$endif$}
 $endif$
-$if(subtitle)$
-$if(beamer)$
-$else$
-\usepackage{etoolbox}
-\makeatletter
-\providecommand{\subtitle}[1]{% add subtitle to \maketitle
-  \apptocmd{\@title}{\par {\large #1 \par}}{}{}
-}
-\makeatother
-$endif$
-\subtitle{$subtitle$}
-$endif$
-\author{$for(author)$$author$$sep$ \and $endfor$}
-\date{$date$}
+$for(author)$\author{$author$}
+$endfor$
+$-- \date{$date$}
 $if(beamer)$
 $if(institute)$
 \institute{$for(institute)$$institute$$sep$ \and $endfor$}
@@ -400,7 +395,6 @@ $if(logo)$
 $endif$
 $endif$
 
-\begin{document}
 $if(has-frontmatter)$
 \frontmatter
 $endif$
@@ -408,12 +402,12 @@ $if(title)$
 $if(beamer)$
 \frame{\titlepage}
 $else$
-\maketitle
-$endif$
 $if(abstract)$
 \begin{abstract}
 $abstract$
 \end{abstract}
+$endif$
+\maketitle
 $endif$
 $endif$
 

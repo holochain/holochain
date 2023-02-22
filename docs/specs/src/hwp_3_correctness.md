@@ -55,7 +55,7 @@ malicious action, see the [section on Security](#security).
   possible fault is that the corruption resulted in data that has
   the same hash. For Sha256 hashing (which is what we use), this is
   known to be a vanishingly small possibility for both intentional
-  and unintentional data corruption.[^6] Furthermore because all
+  and unintentional data corruption.[^corruption] Furthermore because all
   data is stored as hash-chains, it is not possible for portions of
   data to be retroactively changed. Agent's Source Chains thus
   become immutable append-only event logs.\
@@ -89,6 +89,9 @@ malicious action, see the [section on Security](#security).
   Additionally see the section on "Entwined multi-agent state
   change" for more details on how some of the use cases addressed by
   consensus systems are handled in this system.
+
+
+[^corruption]: CITATION NEEDED
 
 Completeness/Fit
 ----------------
@@ -241,9 +244,11 @@ functions can make calls to other zome functions on remote nodes in the
 same app, or to other DNAs running on the same conductor. All of these
 calls must happen in the context of some kind of permissioning system.
 Holochain\'s security model for calls is based on the
-Object-capability[^7] security model, but for a distributed
+Object-capability[^object_capability] security model, but for a distributed
 cryptographic context in which we use cryptographic signatures to prove
 the necessary agency for taking action.
+
+[^object_capability]: https://en.wikipedia.org/wiki/Object-capability\_model
 
 Access is thus mediated by Capability grants of 4 types:
 
@@ -390,7 +395,9 @@ so:
   applications. Applications themselves can be assembled at the User
   Interface level. A number of frameworks in the Holochain ecosystem
   are already building off of this deep level capacity for
-  evolvability that's built into the system's architecture[^8].
+  evolvability that's built into the system's architecture[^evolvability].
 
 3.  **Membranics:** \[todo: EHB\]
 
+[^evolvability]: We, Neighborhoods, Ad4m (https://ad4m.dev/) \[TODO: insert links
+    here\]

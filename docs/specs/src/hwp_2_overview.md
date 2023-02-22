@@ -10,7 +10,10 @@ Playing Games
 People define the rules of a *Game* they want to play together. As
 *Players* join the *Game*, they alter their state by appending records
 to their *Action* history. Then they update the *Game Board* by sharing
-the *Records* of their *Actions*[^4].
+the *Records* of their *Actions*[^chess].
+
+[^chess]: You can think of this somewhat like correspondence chess, but with
+    substantial more formality.
 
 The first requirement to create social coherence is ensuring that people
 are playing the same game, therefore the very first record in every
@@ -128,7 +131,7 @@ Actions have these properties:
   not the content. Entries are addressed by their hash, and thus for
   CreateEntry Actions, this hash is included in it. Thus sometimes
   the Action is considered to be "meta-data" where the Entry is
-  considered "data"[^5] .
+  considered "data"[^headers] .
 
 2.  UpdateEntry: An Action which adds new Game-specific content onto the
   chain that is intended to update previous content.
@@ -151,6 +154,19 @@ Actions have these properties:
   atomically recording the Action in their history through
   Countersigning. Countersigning can also be seen as an affordance
   in the system for "micro-consensus" when that is necessary.
+
+[^headers]: In many cryptographic systems hash-chains are thought of as having
+    "headers" and "entries". Historically in Holochain development we
+    also originally used that nomenclature, but realized that the name
+    "header" comes from an implementation detail in building hash
+    chains. Ontologically what's actually happening is that in building
+    such intrinsic integrity data structures, not only must we record
+    the "content" of what is to be written, but we must also record data
+    about the act of writing itself, i.e. who is doing the writing, when
+    they did so, and what they previously wrote. Thus, in keeping with
+    the core ontology of agent-centricity we switched to using the term
+    "Action" instead of Header, but we retain the name Entry for that
+    which is written.
 
 ### The Distributed Ledger
 
