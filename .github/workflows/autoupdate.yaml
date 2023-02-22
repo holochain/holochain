@@ -1,4 +1,6 @@
-# Operates on open PRs and automatically merges updates on target branches into the PR branch.
+# Operates on open PRs and automatically merges updates on the target branch into the PR branch.
+# Like autorebase.yml, but with merging instead of rebasing.
+# Is triggered on a PR if labeled `autoupdate:opt-in`.
 
 name: autoupdate
 
