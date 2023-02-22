@@ -1,15 +1,16 @@
 use crate::{
-    conductor::{api::error::ConductorApiError, CellError},
+    conductor::{api::error::ConductorApiError, error::ConductorError, CellError},
     sweettest::*,
 };
 use holo_hash::ActionHash;
 use holochain_conductor_api::CellInfo;
 use holochain_types::{
     app::CreateCloneCellPayload,
-    prelude::{CloneCellId, DeleteCloneCellPayload, DisableCloneCellPayload},
+    prelude::{AppError, CloneCellId, DeleteCloneCellPayload, DisableCloneCellPayload},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CloneId, DnaModifiersOpt, RoleName};
+use matches::matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_without_modifiers_fails() {
@@ -157,17 +158,38 @@ async fn create_identical_clone_cell_twice_fails() {
         name: None,
     };
 
-    let _clone_cell = conductor
+    let clone_cell = conductor
         .clone()
         .create_clone_cell(clone_cell_payload.clone())
         .await
         .unwrap();
 
-    let identical_clone_cell = conductor
+    let identical_clone_cell_err = conductor
+        .clone()
+        .create_clone_cell(clone_cell_payload.clone())
+        .await;
+    matches!(
+        identical_clone_cell_err,
+        Err(ConductorError::AppError(AppError::DuplicateDnaHash(dna_hash))) if dna_hash == *clone_cell.cell_id.dna_hash()
+    );
+
+    // disable clone cell and try again to create an identical clone
+    conductor
+        .clone()
+        .disable_clone_cell(&DisableCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
+        })
+        .await
+        .unwrap();
+    let identical_clone_cell_err = conductor
         .clone()
         .create_clone_cell(clone_cell_payload)
         .await;
-    assert!(identical_clone_cell.is_err());
+    matches!(
+        identical_clone_cell_err,
+        Err(ConductorError::AppError(AppError::DuplicateDnaHash(dna_hash))) if dna_hash == *clone_cell.cell_id.dna_hash()
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
