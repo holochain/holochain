@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Call setup script
-        run: sh <(curl https://holochain.github.io/holochain/setup.sh)
+        run: bash <(curl https://holochain.github.io/holochain/setup.sh)
       - name: Test nix command
         run: |
           source /etc/profile.d/nix.sh
