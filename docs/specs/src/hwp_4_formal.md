@@ -25,23 +25,23 @@ Unlike monolithic blockchains where every transaction and Dapp run on a single c
 Holochain operates different sub-systems, each of which function on separate workflows and change models. Even though Holochain functions as a common underlying database on the back-end, the workflows in each sub-system each have different input channels which trigger different transformational processes. Each workflow has distinct structural bottlenecks and security constraints.
 
 Discrete Workflows in separate sub-systems:
-1. **Distributed Application:** Apps are compiled and distributed into Web Assembly (WASM) code bundles which we call a DNA. Data integrity is enforced by the structures and validation defined in an app's DNA, which is comprised of data structures, functions, and callbacks packaged in Zomes (short for chromosome) which function like reusable modules.
+1. **Distributed Application:** Apps are compiled and distributed into WebAssembly (WASM) code bundles which we call a DNA. Data integrity is enforced by the structures and validation defined in an app's DNA, which is composed of data structures, functions, and callbacks packaged in Zomes (short for chromosome) which function like reusable modules.
 3. **Local Agent State:** Represented as changes to an agent's state by signing new records, using their private key, to a local hash chain of their action history called a Source Chain. Initial chain genesis happens upon installation/activation, and all following changes result from "zome calls" into the app code.
 4. **Global Visibility of Local State Changes:** After data has been signed to a Source Chain it gets published to a Graphing DHT (Distributed Hash Table) where it is validated by the peers who will store and serve it. The DHT is consistently balanced and healed by gossip among the peers.
-5. **Network Protocols:** Holochain instantiates the execution of app DNA on each node under the agency identified by the public key, transforming code into a collective networked organism. An agents public key ***is*** their network address, and is used as the to/from target for remote zome calls, signals, publishing, and gossip. Holochain is transport agnostic, and can operate on any network transport protocol which a node has installed for routing, bootstrapping, or proxying connections through NAT and firewalls.
+5. **Network Protocols:** Holochain instantiates the execution of app DNA on each node under the agency identified by the public key, transforming code into a collective networked organism. An agent's public key ***is*** their network address, and is used as the to/from target for remote zome calls, signals, publishing, and gossip. Holochain is transport agnostic, and can operate on any network transport protocol which a node has installed for routing, bootstrapping, or proxying connections through NAT and firewalls.
 
 ### Some notes on terminology:
 
 #### Biological Language
-We have chosen bological language to ground us in the pattern of collective distributed coherence that we observe in biological organisms.  This is a pattern where the agents that comprise an organism (cells), all start with the same ground rules (DNA). Every agent has a copy of the rules that ALL the other agents are playing by and by clearly identify membership in the collective self based on matching DNA. 
+We have chosen biological language to ground us in the pattern of collective distributed coherence that we observe in biological organisms.  This is a pattern where the agents that compose an organism (cells) all start with the same ground rules (DNA). Every agent has a copy of the rules that ALL the other agents are playing by, clearly identify membership in the collective self based on matching DNA. 
 
-This is true of every Holochain DNA which can also be combined together to create a multi-DNA application (with each DNA functioning like distinct micro-service in a more complex application). In a hApp bundle, each DNA file is the complete set of code (WASM) and settings which also become the first genesis entry in the agent's source chain. Therefore, if your first chain entry, does not match my DNA entry, we are not cells of the same network organism. A "zome" is a compositional unit which functions as a code module assembled together as the complete set of an application's DNA.
+This is true of every Holochain DNA which can also be combined together to create a multi-DNA application (with each DNA functioning like a distinct micro-service in a more complex application). In a hApp bundle, each DNA file is the complete set of code (WASM) and settings which also become the first genesis entry in the agent's source chain. Therefore, if your first chain entry does not match mine, we are not cells of the same network organism. A "zome" is a compositional unit which functions as a code module assembled together as the complete set of an application's DNA.
 
 When a DNA is installed using a public/private keypair, it becomes a "cell" which is identified by the combination of the DNA hash and the public key. Students of biology may recognize ways that our language doesn't fully mesh with their expectations. Please forgive any imprecision with understanding of our intent to build better language for the nature of distributed computing that more closely matches biology than typical mechanistic models.
 
 
 #### The Conductor
-Much of the discussion below is from the perspective of a single DNA, which is the core unit in Holochain that provides a set of integrity guarantees for running an application in a distributed context.  However, Holochain can also be seen as micro-service provider with each DNA providing one micro-service.  From this perspective, a Holochain node is a running process that manages many connections to many DNAs simultaneously, both from user interfaces initiating actions, as well as from other nodes communicating with DNA instances retrieving DHT data.  Thus, we call a Holochain node the **Conductor** as it manages the information flows from "outside" (UI calls) and from "inside" (network interactions) as they flow into and out of the may DNA instances running code.  This terms was chosen as it suggests the feel of musical cordination of a group as well as the conduit of an electrical flow.  Please see the [Holochain Implementation Spec](https://hackmd.io/FINMThETQUmCrNn8uXlr9w#Ribosome-the-Application-%E2%80%9Cvirtual-machine%E2%80%9D) for a more detailed on how a complete Holochain Conductor must be built.
+Much of the discussion below is from the perspective of a single DNA, which is the core unit in Holochain that provides a set of integrity guarantees for running an application in a distributed context.  However, Holochain can also be seen as micro-service provider with each DNA providing one micro-service.  From this perspective, a Holochain node is a running process that manages many connections to many DNAs simultaneously, both from user interfaces initiating actions, as well as from other nodes communicating with DNA instances retrieving DHT data.  Thus, we call a Holochain node the **Conductor** as it manages the information flows from "outside" (UI calls) and from "inside" (network interactions) as they flow into and out of the may DNA instances running code.  This term was chosen as it suggests the feel of musical cordination of a group as well as the conduit of an electrical flow.  Please see the [Holochain Implementation Spec](https://hackmd.io/FINMThETQUmCrNn8uXlr9w#Ribosome-the-Application-%E2%80%9Cvirtual-machine%E2%80%9D) for a more detailed on how a complete Holochain Conductor must be built.
 
 ## Integrity Guarantees
 
@@ -69,11 +69,11 @@ Data in Holochain is kept in Content Addressable Stores which are key-value stor
 
 The code that comprises a Holochain application is categorized into two different types of zomes: 
 
-1. **Integrity Zomes:** which provide the immutable portion of the app's code that:
+1. **Integrity Zomes** which provide the immutable portion of the app's code that:
   - identifies the types of entries and links able to be committed in the app, 
   - defines the structure of data entries, and 
   - defines the validation code each node runs for each type of entry or link. 
-2. **Coordination Zomes:** which can be modified or added to while an app is live, contain various CRUD operations for entries and links, functions related to following graph links and querying collections of data on the DHT, and any auxillary functionality someone wants to bundle in their application.
+2. **Coordination Zomes** which can be modified or added to while an app is live, contain various CRUD operations for entries and links, functions related to following graph links and querying collections of data on the DHT, and any auxillary functionality someone wants to bundle in their application.
 
 Each application running on Holochain is uniquely identified by a DNA hash of the integrity zome code compiled to Web Assembly (WASM) and bundled with additional settings and properties required for that app. 
 
@@ -94,11 +94,11 @@ $$
 
 *Note about Functions: Most zome calls don't need to be in the immutable mutually enforced rules included in the DNA hash (Integrity Zomes) because since there's no way to verify what functions were involved in producing data, other nodes can only look at the outputs produced to ensure data is structured and validated correctly.*
 
-The first entry of each agent's source chain contains the app DNA. The hash of this initial DNA entry is what demonstrates that each agent possessed identical and complete copies of the the rules by which they will manage and mutually enforce all state changes. If a node has a different DNA hash, then it is in a different network playing by a different set of rules.
+The first record in each agent's source chain contains the DNA hash. This initial record is what demonstrates that each agent possessed identical and complete copies of the the rules by which they will manage and mutually enforce all state changes. If a node has a different DNA hash, then it is in a different network playing by a different set of rules.
 
 **Genesis:** The genesis process for each agent creates three initial entries. 
 
-1. The DNA is stored in the first chain entry with action $C _0$ like this:
+1. The DNA is stored in the first chain record with action $C _0$ like this:
 
 $$
 C _0 = WASM
@@ -152,18 +152,19 @@ First, Holochain's "subconscious" security system confirms the $CapTokenSecret$ 
 
 *Note on Permissions: Capabilities tokens function similarly to API keys. Cap token grants are explicitly saved as private entries on the granting agent's source chain and contain a secret used to call them. Cap token claims are saved on the calling agent's chain so they can be used later to make calls that execute the capabilities that have been granted.*
 
-If the Zome call is one which alters local state (distinct from a call that just reads from the chain or DHT state), we must construct a bundle of state changes that will attempt to be appended to the source chain in an atomic/transactional commit:
+If the Zome call is one which alters local state (distinct from a call that just reads from the chain or DHT state), we must construct a bundle of state changes that will attempt to be appended to the source chain in an atomic commit:
 
-$$ \Delta C ( C _n, Z _c ) \to C _{n+1} $$
+$$ \Delta _C ( C _n, Z _c ) = \begin{Bmatrix}
+    h ^\prime & h ^{\prime\prime} & \dots & {h ^x}  \\
+    e ^\prime & e ^{\prime\prime} & \dots & {e ^x} 
+\end{Bmatrix} $$
 
-where a Chain is comprised of paired entries, $e^x$, and actions, $h^x$: (actions were formerly called headers and we're still using this *h* in our formal symbols)
+where a Chain is composed of paired entries, $e^x$, and actions, $h^x$: (actions were formerly called headers and we're still using this *h* in our formal symbols).
+
+The next chain state is obtained by appending the changes produced by a zome call to the state of the chain at that point.
 
 $$
- C _{n+1} - C _n = 
-\begin{Bmatrix}
-    h ^\prime, h ^{\prime\prime} \dots {h ^x}  \\ 
-    e ^\prime, e ^{\prime\prime} \dots {e ^x} 
-\end{Bmatrix}
+ C _{n+1} = C _n + \Delta _C ( C _n, Z _c )
 $$
 
 *If the validation rules pass* for these state changes **and the current top of chain is still in state $C_n$** then the transaction is committed to the persistent store. and the chain updated as follows:
@@ -171,8 +172,8 @@ $$
 $$
 C _n = 
 \begin{Bmatrix}
-    h ^\text{DNA} \dots h ^n  \\ 
-    e ^\text{DNA} \dots e ^n
+    h ^\text{DNA} & \dots & h ^n  \\ 
+    e ^\text{DNA} & \dots & e ^n
 \end{Bmatrix}
 $$
 
