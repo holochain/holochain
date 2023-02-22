@@ -49,6 +49,9 @@
 
             export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
             mkdir -p $HC_WASM_CACHE_PATH
+
+            # Enables the pre-commit hooks
+            ${config.pre-commit.installationScript}
           '';
         };
 
@@ -65,7 +68,6 @@
               export CARGO_CACHE_RUSTC_INFO=1
               export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
               export NIX_PATH="nixpkgs=${pkgs.path}"
-              ${config.pre-commit.installationScript}
             '' + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
               export DYLD_FALLBACK_LIBRARY_PATH="$(rustc --print sysroot)/lib"
             '');
