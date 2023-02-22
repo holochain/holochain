@@ -25,6 +25,12 @@
       url = "github:edolstra/flake-compat";
       flake = false;
     };
+
+    # To execute checks when making a commit
+    # Only /flake-module.nix is needed here -> Importing with `flake=false`.
+    pre-commit-hooks-nix.url = "github:cachix/pre-commit-hooks.nix";
+    pre-commit-hooks-nix.flake = false;
+
     # rustup, rust and cargo
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -61,9 +67,15 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "aarch64-darwin" "x86_64-linux" "x86_64-darwin" "aarch64-linux" ];
 
-      # auto import all nix code from `./modules`, treat each one as a flake and merge them
-      imports = map (m: "${./.}/nix/modules/${m}")
-        (builtins.attrNames (builtins.readDir ./nix/modules));
+      imports =
+        # auto import all nix code from `./modules`, treat each one as a flake and merge them
+        (
+          map (m: "${./.}/nix/modules/${m}")
+            (builtins.attrNames (builtins.readDir ./nix/modules))
+        )
+        ++ [
+          (inputs.pre-commit-hooks-nix + /flake-module.nix)
+        ];
 
       perSystem = { pkgs, ... }: {
         legacyPackages = pkgs;

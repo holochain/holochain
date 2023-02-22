@@ -185,6 +185,7 @@ fn bump_release_versions<'a>(
             &selection,
             true,
             true,
+            false,
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
@@ -312,6 +313,7 @@ fn bump_release_versions<'a>(
             &selection,
             true,
             true,
+            false,
             &cmd_args.allowed_missing_dependencies,
             &cmd_args.cargo_target_dir,
         )
@@ -390,6 +392,7 @@ pub fn publish_to_crates_io<'a>(
         &crates,
         cmd_args.dry_run,
         false,
+        cmd_args.no_verify,
         &Default::default(),
         &cmd_args.cargo_target_dir,
     )?;
@@ -656,6 +659,7 @@ pub fn do_publish_to_crates_io<'a>(
     crates: &[&'a Crate<'a>],
     dry_run: bool,
     allow_dirty: bool,
+    no_verify: bool,
     allowed_missing_dependencies: &HashSet<String>,
     cargo_target_dir: &Option<PathBuf>,
 ) -> Fallible<()> {
@@ -724,41 +728,43 @@ pub fn do_publish_to_crates_io<'a>(
             .as_ref()
             .map(|target_dir| format!("--target-dir={}", target_dir.to_string_lossy()));
 
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.args(
-            [
-                vec![
-                    "check",
-                    "--locked",
-                    "--verbose",
-                    "--release",
-                    &format!("--manifest-path={}", manifest_path.to_string_lossy()),
-                ],
-                if let Some(target_dir) = cargo_target_dir_string.as_ref() {
-                    vec![target_dir]
-                } else {
-                    vec![]
-                },
-            ]
-            .concat(),
-        );
-        debug!("Running command: {:?}", cmd);
-        let output = cmd.output().context("process exitted unsuccessfully")?;
-        if !output.status.success() {
-            let mut details = String::new();
-            for line in output.stderr.lines_with_terminator() {
-                let line = line.to_str_lossy();
-                details += &line;
-            }
+        if !no_verify {
+            let mut cmd = std::process::Command::new("cargo");
+            cmd.args(
+                [
+                    vec![
+                        "check",
+                        "--locked",
+                        "--verbose",
+                        "--release",
+                        &format!("--manifest-path={}", manifest_path.to_string_lossy()),
+                    ],
+                    if let Some(target_dir) = cargo_target_dir_string.as_ref() {
+                        vec![target_dir]
+                    } else {
+                        vec![]
+                    },
+                ]
+                .concat(),
+            );
+            debug!("Running command: {:?}", cmd);
+            let output = cmd.output().context("process exitted unsuccessfully")?;
+            if !output.status.success() {
+                let mut details = String::new();
+                for line in output.stderr.lines_with_terminator() {
+                    let line = line.to_str_lossy();
+                    details += &line;
+                }
 
-            let error = PublishError::CheckFailure {
-                package: crt.name(),
-                version: crt.version().to_string(),
-                log: details,
-            };
-            errors.push(error);
-        } else {
-            check_cntr += 1;
+                let error = PublishError::CheckFailure {
+                    package: crt.name(),
+                    version: crt.version().to_string(),
+                    log: details,
+                };
+                errors.push(error);
+            } else {
+                check_cntr += 1;
+            }
         }
 
         let mut cmd = std::process::Command::new("cargo");
