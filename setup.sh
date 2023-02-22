@@ -6,8 +6,8 @@ if ! command -v nix &>/dev/null; then
     echo "Nix package manager not found"
     echo "Installing Nix"
     echo
-    echo "sh <(curl -L https://nixos.org/nix/install) --daemon"
-    sh <(curl -L https://nixos.org/nix/install) --daemon
+    echo "sh <'(curl -L https://nixos.org/nix/install)' --daemon"
+    sh <'(curl -L https://nixos.org/nix/install)' --daemon
 
     echo
     echo "Starting Nix daemon"
