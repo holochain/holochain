@@ -140,6 +140,37 @@ async fn create_clone_cell_run_twice_returns_correct_clones() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn create_identical_clone_cell_twice_fails() {
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let role_name: RoleName = "dna_1".to_string();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let alice = SweetAgents::one(conductor.keystore()).await;
+    let app = conductor
+        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna.clone())])
+        .await
+        .unwrap();
+    let clone_cell_payload = CreateCloneCellPayload {
+        app_id: app.installed_app_id().clone(),
+        role_name: role_name.clone(),
+        modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
+        membrane_proof: None,
+        name: None,
+    };
+
+    let _clone_cell = conductor
+        .clone()
+        .create_clone_cell(clone_cell_payload.clone())
+        .await
+        .unwrap();
+
+    let identical_clone_cell = conductor
+        .clone()
+        .create_clone_cell(clone_cell_payload)
+        .await;
+    assert!(identical_clone_cell.is_err());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn clone_cell_deletion() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
