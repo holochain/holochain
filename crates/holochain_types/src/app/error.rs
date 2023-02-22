@@ -8,6 +8,9 @@ pub enum AppError {
     #[error("Clone limit of {0} exceeded for app role assignment: {1:?}")]
     CloneLimitExceeded(u32, AppRoleAssignment),
 
+    #[error("Tried to create a clone cell with existing DNA hash '{0}'")]
+    DuplicateDnaHash(DnaHash),
+
     #[error("Tried to create a clone cell with existing clone cell id '{0}'")]
     DuplicateCloneIds(CloneId),
 
