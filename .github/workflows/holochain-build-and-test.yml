@@ -27,7 +27,7 @@ jobs:
               - holonix-tests-integration
             extra_arg: ""
         platform:
-          # - system: x86_64-darwin
+          - system: x86_64-darwin
           - system: aarch64-darwin
           - system: x86_64-linux
 
@@ -44,14 +44,6 @@ jobs:
               extra_arg: "--override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux
-
-          # only needed as long as x86_64-darwin is excluded in the matrix
-          - cmd:
-              pkgs:
-                - holonix-tests-integration
-              extra_arg: ""
-            platform:
-              system: x86_64-darwin
 
     # runs-on: ${{ matrix.platform.runs-on }}
     runs-on: [self-hosted, multi-arch]
