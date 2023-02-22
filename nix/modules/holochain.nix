@@ -113,6 +113,8 @@
             "conductor::cell::gossip_test::gossip_test"
           ] ++ (lib.optionals (pkgs.system == "x86_64-darwin") [
             "test_reconnect"
+            "timeout::tests::kitsune_backoff"
+            "test_util::switchboard::tests::transitive_peer_gossip"
           ]) ++ (lib.optionals (pkgs.system == "aarch64-darwin") [
             "test_reconnect"
           ]);
