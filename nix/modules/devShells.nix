@@ -49,6 +49,9 @@
 
             export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
             mkdir -p $HC_WASM_CACHE_PATH
+
+            # Enables the pre-commit hooks
+            ${config.pre-commit.installationScript}
           '';
         };
 

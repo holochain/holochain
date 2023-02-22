@@ -1,3 +1,5 @@
+# An action triggered manually to debug the cached state for `release.yml` and `release-prepare.yml`
+
 name: SSH session
 
 on:
