@@ -14,6 +14,7 @@ edition = "2021"
 arrayref = "0.3.6"
 base64 = "0.13"
 bloomfilter = { version = "1.0.5", features = ["serde"] }
+bytes = "1.4.0"
 derive_more = "0.99.11"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"

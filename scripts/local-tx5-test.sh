@@ -6,5 +6,5 @@ if test ! -f "$name"; then
   exit 127
 fi
 
-cmd="cargo nextest --config-file .config/nextest.toml run $(cat .config/test-args.nix | xargs) $(cat .config/nextest-args.nix | xargs) --features tx5"
+cmd="cargo nextest --config-file .config/nextest.toml run $(xargs <.config/test-args.nix) $(xargs <.config/nextest-args.nix) --features tx5"
 $cmd

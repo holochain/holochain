@@ -191,10 +191,8 @@ impl MetaNetCon {
                     let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                     let wrap = WireWrap::notify(msg_id, WireData(wire));
 
-                    let mut writer = tx5::Buf::from_writer().map_err(KitsuneError::other)?;
-                    wrap.encode(&mut writer).map_err(KitsuneError::other)?;
-                    let data = writer.finish();
-                    ep.send(rem_url.clone(), data)
+                    let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+                    ep.send(rem_url.clone(), data.as_slice())
                         .await
                         .map_err(KitsuneError::other)?;
                     return Ok(());
@@ -245,11 +243,9 @@ impl MetaNetCon {
 
                     let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                     let wrap = WireWrap::request(msg_id, WireData(wire));
+                    let data = wrap.encode_vec().map_err(KitsuneError::other)?;
 
-                    let mut writer = tx5::Buf::from_writer().map_err(KitsuneError::other)?;
-                    wrap.encode(&mut writer).map_err(KitsuneError::other)?;
-                    let data = writer.finish();
-                    ep.send(rem_url.clone(), data)
+                    ep.send(rem_url.clone(), data.as_slice())
                         .await
                         .map_err(KitsuneError::other)?;
                     return Ok(r.await.map_err(|_| KitsuneError::other("timeout"))?);
@@ -574,11 +570,11 @@ impl MetaNet {
                     }
                     tx5::EpEvt::Data {
                         rem_cli_url,
-                        mut data,
+                        data,
                         permit,
                     } => {
-                        tracing::trace!(%rem_cli_url, byte_count=?data.len(), "received bytes");
-                        let data = match WireWrap::decode(&mut data) {
+                        tracing::trace!(%rem_cli_url, byte_count=?data.remaining(), "received bytes");
+                        let data = match WireWrap::decode(&mut bytes::Buf::reader(data)) {
                             Ok(WireWrap::Notify(Notify { msg_id, data })) => {
                                 match wire::Wire::decode_ref(&data) {
                                     Ok((_, data)) => {
@@ -618,15 +614,13 @@ impl MetaNet {
                                                 };
                                                 let wrap =
                                                     WireWrap::response(msg_id, WireData(wire));
-                                                let mut writer = match tx5::Buf::from_writer() {
-                                                    Ok(writer) => writer,
+                                                let data = match wrap.encode_vec() {
+                                                    Ok(data) => data,
                                                     Err(_) => return,
                                                 };
-                                                if wrap.encode(&mut writer).is_err() {
-                                                    return;
-                                                }
-                                                let data = writer.finish();
-                                                let _ = ep_hnd.send(rem_cli_url2, data).await;
+                                                let _ = ep_hnd
+                                                    .send(rem_cli_url2, data.as_slice())
+                                                    .await;
                                             });
                                             out
                                         });

@@ -3256,6 +3256,7 @@ dependencies = [
  "base64 0.13.1",
  "blake2b_simd 0.5.11",
  "bloomfilter",
+ "bytes",
  "contrafact",
  "derive_more",
  "fixt",
@@ -7222,6 +7223,7 @@ dependencies = [
 name = "tx5"
 version = "0.0.1-alpha.4"
 dependencies = [
+ "bytes",
  "futures",
  "once_cell",
  "parking_lot 0.12.1",
