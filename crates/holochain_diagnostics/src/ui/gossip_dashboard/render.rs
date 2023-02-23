@@ -1,5 +1,4 @@
 use super::*;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfoStateful;
 
 impl GossipDashboard {
     pub fn render<K: Backend>(&self, f: &mut Frame<K>, state: &impl ClientState) {
@@ -9,7 +8,7 @@ impl GossipDashboard {
             let metrics: Vec<_> = state
                 .nodes()
                 .iter()
-                .map(|n| (n.diagnostics.metrics.read(), n.cert.clone()))
+                .map(|n| (n.diagnostics.metrics.read(), n.id.clone()))
                 .collect();
 
             let queue_info: Vec<_> = state
@@ -17,14 +16,14 @@ impl GossipDashboard {
                 .iter()
                 .enumerate()
                 .map(|(i, n)| {
-                    tracing::info!("{} {:?}\n{}", i, n.cert, n.diagnostics.fetch_pool.summary());
+                    // tracing::info!("{} {:?}\n{}", i, n.cert, n.diagnostics.fetch_pool.summary());
                     (
                         n.diagnostics.fetch_pool.info(
                             [n.zome.cell_id().dna_hash().to_kitsune()]
                                 .into_iter()
                                 .collect(),
                         ),
-                        n.cert.clone(),
+                        n.id.clone(),
                     )
                 })
                 .collect();

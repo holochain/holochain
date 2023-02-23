@@ -254,7 +254,7 @@ pub mod test {
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use holochain_zome_types::ExternIO;
     use kitsune_p2p::agent_store::AgentInfoSigned;
-    use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfoStateful;
+    use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfo;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
@@ -479,7 +479,7 @@ pub mod test {
                     assert_eq!(
                         info,
                         vec![NetworkInfo {
-                            fetch_pool_info: FetchPoolInfoStateful::default()
+                            fetch_pool_info: FetchPoolInfo::default()
                         }]
                     )
                 }

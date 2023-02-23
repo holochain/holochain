@@ -188,7 +188,7 @@ With
 When we plan to change the versions of many or all workspace crates, there's a command that can be used to overwrite the frontmatter of multiple crates' changelogs in one go:
 
 ```console
-nix-shell --pure --argstr flavor release --run 'release-automation --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
+nix-shell --pure --argstr devShellId release --run 'release-automation --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
 (...)
 EOF
 )
@@ -202,7 +202,7 @@ The ellipsis give the position of the new YAML code for the frontmatters.
 
 
 ```console
-nix-shell --pure --argstr flavor release --run 'release-automation --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
+nix-shell --pure --argstr devShellId release --run 'release-automation --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
 default_semver_increment_mode: !pre_minor beta-rc
 EOF
 )
@@ -212,7 +212,7 @@ EOF
 ### Example: initiate a one-time minor version bump
 
 ```console
-nix-shell --pure --argstr flavor release --run 'release-automation --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
+nix-shell --pure --argstr devShellId release --run 'release-automation --workspace-path=$PWD --log-level=debug --match-filter=".*" changelog set-frontmatter <(cat <<EOF
 semver_increment_mode: !minor
 EOF
 )

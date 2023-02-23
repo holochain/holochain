@@ -4,7 +4,7 @@ use holochain::{
     conductor::api::NetworkInfo,
     prelude::{
         dht::region::Region,
-        gossip::sharded_gossip::{KitsuneDiagnostics, RegionDiffs},
+        gossip::sharded_gossip::{KitsuneDiagnostics, NodeId, RegionDiffs},
         kitsune_p2p::dependencies::{
             kitsune_p2p_proxy,
             kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},
@@ -57,7 +57,7 @@ pub struct Node {
     pub conductor: Arc<SweetConductor>,
     pub zome: SweetZome,
     pub diagnostics: KitsuneDiagnostics,
-    pub cert: Tx2Cert,
+    pub id: NodeId,
 }
 
 impl Node {
@@ -75,24 +75,24 @@ impl Node {
             .unwrap();
         assert_eq!(infos.len(), 1);
         let info = infos.pop().unwrap();
-        let mut certs: Vec<_> = info
+        let mut ids: Vec<_> = info
             .url_list
             .iter()
             .filter_map(|url| {
                 kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
                     .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
                     .ok()
-                    .map(|purl| Tx2Cert::from(purl.digest()))
+                    .map(|purl| purl.digest().cloned_inner())
             })
             .collect();
-        assert_eq!(certs.len(), 1);
-        let cert = certs.pop().unwrap();
+        assert_eq!(ids.len(), 1);
+        let id = ids.pop().unwrap();
 
         Self {
             conductor,
             zome,
             diagnostics,
-            cert,
+            id,
         }
     }
 

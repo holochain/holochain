@@ -1,68 +1,27 @@
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 
-use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KSpace};
+use kitsune_p2p_types::KSpace;
 
 use crate::FetchPool;
 
 /// Read-only access to the queue
-#[derive(Clone)]
-pub struct FetchPoolReader {
-    pool: FetchPool,
-    max_info: Arc<ShareOpen<FetchPoolInfo>>,
-}
+#[derive(Debug, Clone, derive_more::From)]
+pub struct FetchPoolReader(FetchPool);
 
 impl FetchPoolReader {
-    /// Constructor
-    pub fn new(pool: FetchPool) -> Self {
-        Self {
-            pool,
-            max_info: Arc::new(ShareOpen::new(Default::default())),
-        }
-    }
-
     /// Get info about the queue, filtered by space
-    pub fn info(&self, spaces: HashSet<KSpace>) -> FetchPoolInfoStateful {
-        let (count, bytes) = self.pool.state.share_ref(|s| {
+    pub fn info(&self, spaces: HashSet<KSpace>) -> FetchPoolInfo {
+        let (count, bytes) = self.0.state.share_ref(|s| {
             s.queue
                 .values()
                 .filter(|v| spaces.contains(&v.space))
                 .filter_map(|v| v.size.map(|s| s.get()))
                 .fold((0, 0), |(c, s), t| (c + 1, s + t))
         });
-
-        let max = self.max_info.share_mut(|i| {
-            if count > i.num_ops_to_fetch {
-                i.num_ops_to_fetch = count;
-            }
-            if bytes > i.op_bytes_to_fetch {
-                i.op_bytes_to_fetch = bytes;
-            }
-            if count == 0 && bytes == 0 {
-                i.num_ops_to_fetch = 0;
-                i.op_bytes_to_fetch = 0;
-            }
-            i.clone()
-        });
-
-        let current = FetchPoolInfo {
+        FetchPoolInfo {
             op_bytes_to_fetch: bytes,
             num_ops_to_fetch: count,
-        };
-        FetchPoolInfoStateful { current, max }
-    }
-
-    /// Get a concise textual summary of the contents of the FetchPool
-    pub fn summary(&self) -> String {
-        self.pool.state.share_ref(|s| s.summary())
-    }
-}
-
-impl std::fmt::Debug for FetchPoolReader {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FetchPoolReader")
-            .field("queue", &self.pool)
-            .field("max_info", &self.max_info.share_ref(|i| i.clone()))
-            .finish()
+        }
     }
 }
 
@@ -74,15 +33,6 @@ pub struct FetchPoolInfo {
 
     /// Total number of ops expected to be received through fetches
     pub num_ops_to_fetch: usize,
-}
-
-/// The instantaneous and accumulated max FetchPoolInfo
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct FetchPoolInfoStateful {
-    /// The instantaneous info
-    pub current: FetchPoolInfo,
-    /// The max info since the last time it went to zero
-    pub max: FetchPoolInfo,
 }
 
 #[cfg(test)]
@@ -109,19 +59,14 @@ mod tests {
             queue[1].1.size = Some(1000.into());
 
             let queue = queue.into_iter().collect();
-            FetchPoolReader {
-                pool: FetchPool {
-                    config: Arc::new(cfg),
-                    state: ShareOpen::new(State { queue }),
-                },
-                max_info: Arc::new(ShareOpen::new(Default::default())),
-            }
+            FetchPoolReader(FetchPool {
+                config: Arc::new(cfg),
+                state: ShareOpen::new(State { queue }),
+            })
         };
-        println!("{}", State::summary_heading());
-        println!("{}", q.summary());
         let info = q.info([space(0)].into_iter().collect());
         // The item without a size is not returned.
-        assert_eq!(info.current.num_ops_to_fetch, 2);
-        assert_eq!(info.current.op_bytes_to_fetch, 1100);
+        assert_eq!(info.num_ops_to_fetch, 2);
+        assert_eq!(info.op_bytes_to_fetch, 1100);
     }
 }

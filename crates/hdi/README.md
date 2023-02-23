@@ -9,6 +9,8 @@
 [![Crate](https://img.shields.io/crates/v/hdi.svg)](https://crates.io/crates/hdi)
 [![API Docs](https://docs.rs/hdi/badge.svg)](https://docs.rs/hdi)
 
+<!-- cargo-rdme start -->
+
 Holochain Deterministic Integrity (HDI) is Holochain's data model and integrity toolset for
 writing zomes.
 
@@ -17,13 +19,13 @@ Integrity is the part of the hApp that defines the data types and validates data
 manipulations. Coordination encompasses the domain logic and implements the functions
 that manipulate data.
 
-## Examples
+# Examples
 
 An example of an integrity zome with data definition and data validation can be found in the
 wasm workspace of the Holochain repository:
 <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>.
 
-## Data definition
+# Data definition
 
 The DNA's data model is defined in integrity zomes. They comprise all data type definitions
 as well as relationships between those types. Integrity zomes are purely definitions and do
@@ -36,7 +38,7 @@ of the data. In practice, this means three things:
 - entry type definitions
 - link type definitions
 - a validation callback that constrains the kinds of data that can validly be called entries
-and links of those types (see also [`holochain_integrity_types::Op`]).
+and links of those types (see also `Op`).
 
 **The coordination zomes comprise the application's controller layer** — the code that actually
 writes and retrieves data, handles countersigning sessions and sends and receives messages
@@ -54,31 +56,31 @@ zome's data types and implement functions for data manipulation. This composabil
 integrity and coordinator zomes allows for a multitude of permutations with shared integrity
 zomes, i. e. a shared data model.
 
-## Data validation
+# Data validation
 
-The second fundamental part of integrity zomes is data validation. For every [operation](holochain_integrity_types::Op)
-that is produced by an [action](holochain_integrity_types::Action), a
+The second fundamental part of integrity zomes is data validation. For every
+operation
+that is produced by an action, a
 validation rule can be specified. Both data types and data values can be
 validated.
 
 All of these validation rules are declared in the `validate` callback. It
 is executed for a new action by each validation authority.
 
-There's a helper type called [`OpType`](holochain_integrity_types::OpType) available for easy
+There's a helper type called `FlatOp` available for easy
 access to all link and entry variants when validating an operation. In many cases, this type can
-be easier to work with than the bare [`Op`](holochain_integrity_types::Op), which contains the
-same information as `OpType`, but the former has a flatter data structure, whereas the latter has
-a deeply nested structure.
+be easier to work with than the bare `Op`. `FlatOp` contains the
+same information as `Op` but with a flatter, more accessible data structure than `Op`'s deeply nested and concise structure.
 
 ```rust
-match op.to_type()? {
-    OpType::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+match op.flattened()? {
+    FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
             "No Bs allowed in this app".to_string(),
         )),
     },
-    OpType::RegisterCreateLink {
+    FlatOp::RegisterCreateLink {
         base_address: _,
         target_address: _,
         tag: _,
@@ -95,6 +97,8 @@ match op.to_type()? {
 See an example of the `validate` callback in an integrity zome in the WASM workspace:
 <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/validate/src/integrity.rs>.
 Many more validation examples can be browsed in that very workspace.
+
+<!-- cargo-rdme end -->
 
 ## License
  [![License: CAL 1.0](https://img.shields.io/badge/License-CAL-1.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)

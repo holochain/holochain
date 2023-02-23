@@ -25,7 +25,7 @@ type KSpace = Arc<KitsuneSpace>;
 type KAgent = Arc<KitsuneAgent>;
 type KBasis = Arc<KitsuneBasis>;
 type VecMXM = Vec<MetricExchangeMsg>;
-type WireConHnd = Tx2ConHnd<wire::Wire>;
+type WireConHnd = MetaNetCon;
 type Payload = Box<[u8]>;
 type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
@@ -89,22 +89,22 @@ ghost_actor::ghost_chan! {
         fn resolve_publish_pending_delegates(space: KSpace, op_hash: KOpHash) -> ();
 
         /// Incoming Gossip
-        fn incoming_gossip(space: KSpace, con: WireConHnd, remote_url: TxUrl, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
+        fn incoming_gossip(space: KSpace, con: MetaNetCon, remote_url: String, data: Payload, module_type: crate::types::gossip::GossipModuleType) -> ();
 
         /// Incoming Metric Exchange
         fn incoming_metric_exchange(space: KSpace, msgs: VecMXM) -> ();
 
         /// New Con
-        fn new_con(url: TxUrl, con: WireConHnd) -> ();
+        fn new_con(url: String, con: WireConHnd) -> ();
 
         /// Del Con
-        fn del_con(url: TxUrl) -> ();
+        fn del_con(url: String) -> ();
     }
 }
 
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
-    ep_hnd: Tx2EpHnd<wire::Wire>,
+    ep_hnd: MetaNet,
     host: HostApi,
     config: Arc<KitsuneP2pConfig>,
     bandwidth_throttles: BandwidthThrottles,
@@ -190,7 +190,7 @@ impl SpaceInternalHandler for Space {
             .gossip_single_storage_arc_per_space;
         let internal_sender = self.i_s.clone();
         Ok(async move {
-            let urls = vec![ep_hnd.local_addr()?];
+            let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
             let mut peer_data = Vec::with_capacity(agent_list.len());
             for (agent, arc) in agent_list {
                 let input = UpdateAgentInfoInput {
@@ -241,7 +241,7 @@ impl SpaceInternalHandler for Space {
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
-            let urls = vec![ep_hnd.local_addr()?];
+            let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
             let input = UpdateAgentInfoInput {
                 expires_after,
                 space: space.clone(),
@@ -556,8 +556,8 @@ impl SpaceInternalHandler for Space {
     fn handle_incoming_gossip(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        con: Tx2ConHnd<wire::Wire>,
-        remote_url: TxUrl,
+        con: MetaNetCon,
+        remote_url: String,
         data: Box<[u8]>,
         module_type: GossipModuleType,
     ) -> InternalHandlerResult<()> {
@@ -580,16 +580,12 @@ impl SpaceInternalHandler for Space {
         unit_ok_fut()
     }
 
-    fn handle_new_con(
-        &mut self,
-        url: TxUrl,
-        con: Tx2ConHnd<wire::Wire>,
-    ) -> InternalHandlerResult<()> {
+    fn handle_new_con(&mut self, url: String, con: MetaNetCon) -> InternalHandlerResult<()> {
         self.ro_inner.metric_exchange.write().new_con(url, con);
         unit_ok_fut()
     }
 
-    fn handle_del_con(&mut self, url: TxUrl) -> InternalHandlerResult<()> {
+    fn handle_del_con(&mut self, url: String) -> InternalHandlerResult<()> {
         self.ro_inner.metric_exchange.write().del_con(url);
         unit_ok_fut()
     }
@@ -1219,7 +1215,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<KitsuneDiagnostics> {
         let diagnostics = KitsuneDiagnostics {
             metrics: self.ro_inner.metrics.clone(),
-            fetch_pool: FetchPoolReader::new(self.ro_inner.fetch_pool.clone()),
+            fetch_pool: self.ro_inner.fetch_pool.clone().into(),
         };
         Ok(async move { Ok(diagnostics) }.boxed().into())
     }
@@ -1240,7 +1236,7 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) host_api: HostApi,
-    pub(crate) ep_hnd: Tx2EpHnd<wire::Wire>,
+    pub(crate) ep_hnd: MetaNet,
     #[allow(dead_code)]
     pub(crate) config: Arc<KitsuneP2pConfig>,
     pub(crate) parallel_notify_permit: Arc<tokio::sync::Semaphore>,
@@ -1322,7 +1318,7 @@ impl Space {
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         host_api: HostApi,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         config: Arc<KitsuneP2pConfig>,
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,

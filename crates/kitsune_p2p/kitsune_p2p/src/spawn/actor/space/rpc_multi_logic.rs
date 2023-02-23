@@ -26,7 +26,7 @@ pub(crate) async fn handle_rpc_multi_as_single(
     let space = &space;
     let payload = &payload;
 
-    let make_req = move |con_hnd: Tx2ConHnd<crate::wire::Wire>,
+    let make_req = move |con_hnd: MetaNetCon,
                          agent: Arc<KitsuneAgent>|
           -> BoxFuture<'_, KitsuneP2pResult<Vec<actor::RpcMultiResponse>>> {
         async move {

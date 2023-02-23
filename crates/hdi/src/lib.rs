@@ -25,7 +25,7 @@
 //! - entry type definitions
 //! - link type definitions
 //! - a validation callback that constrains the kinds of data that can validly be called entries
-//! and links of those types (see also [`holochain_integrity_types::Op`]).
+//! and links of those types (see also [`Op`](crate::prelude::holochain_integrity_types::Op)).
 //!
 //! **The coordination zomes comprise the application's controller layer** — the code that actually
 //! writes and retrieves data, handles countersigning sessions and sends and receives messages
@@ -45,19 +45,20 @@
 //!
 //! # Data validation
 //!
-//! The second fundamental part of integrity zomes is data validation. For every [operation](holochain_integrity_types::Op)
-//! that is produced by an [action](holochain_integrity_types::Action), a
+//! The second fundamental part of integrity zomes is data validation. For every
+//! [operation](crate::prelude::holochain_integrity_types::Op)
+//! that is produced by an [action](crate::prelude::holochain_integrity_types::Action), a
 //! validation rule can be specified. Both data types and data values can be
 //! validated.
 //!
 //! All of these validation rules are declared in the `validate` callback. It
 //! is executed for a new action by each validation authority.
 //!
-//! There's a helper type called [`OpType`](holochain_integrity_types::OpType) available for easy
+//! There's a helper type called [`FlatOp`](crate::prelude::holochain_integrity_types::FlatOp) available for easy
 //! access to all link and entry variants when validating an operation. In many cases, this type can
-//! be easier to work with than the bare [`Op`](holochain_integrity_types::Op), which contains the
-//! same information as `OpType`, but the former has a flatter data structure, whereas the latter has
-//! a deeply nested structure.
+//! be easier to work with than the bare [`Op`](crate::prelude::holochain_integrity_types::Op).
+//! `FlatOp` contains the same information as `Op` but with a flatter, more accessible data structure
+//! than `Op`'s deeply nested and concise structure.
 //!
 //! ```
 //! # #[cfg(not(feature = "test_utils"))]
@@ -107,18 +108,19 @@
 //! # #[cfg(feature = "test_utils")]
 //! # hdi::test_utils::set_zome_types(&[(0, 2)], &[(0, 2)]);
 //! # let result: Result<hdi::prelude::ValidateCallbackResult, Box<dyn std::error::Error>> =
-//! match op.to_type()? {
-//!     OpType::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+//! match op.flattened()? {
+//!     FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
 //!         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
 //!         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
 //!             "No Bs allowed in this app".to_string(),
 //!         )),
 //!     },
-//!     OpType::RegisterCreateLink {
+//!     FlatOp::RegisterCreateLink {
 //!         base_address: _,
 //!         target_address: _,
 //!         tag: _,
 //!         link_type,
+//!         action: _,
 //!     } => match link_type {
 //!         LinkTypes::A => Ok(ValidateCallbackResult::Valid),
 //!         LinkTypes::B => Ok(ValidateCallbackResult::Invalid(
@@ -283,6 +285,9 @@ pub mod chain;
 
 #[deny(missing_docs)]
 pub mod op;
+
+#[deny(missing_docs)]
+pub mod flat_op;
 
 #[cfg(any(feature = "test_utils", test))]
 pub mod test_utils;

@@ -269,7 +269,7 @@ impl State {
         let new_index = self.nodes.len();
         self.link_counts
             .push(vec![(0, Instant::now()); self.num_bases()]);
-        self.node_cert_index.insert(node.cert.clone(), new_index);
+        self.node_cert_index.insert(node.id.clone(), new_index);
         self.nodes.push(node);
     }
 }

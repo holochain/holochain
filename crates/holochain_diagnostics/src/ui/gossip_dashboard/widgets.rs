@@ -1,5 +1,5 @@
 use holochain::prelude::metrics::PeerAgentHistory;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfoStateful;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolInfo;
 
 use super::*;
 
@@ -33,35 +33,36 @@ pub fn ui_throughput_summary(sums: Vec<u32>) -> List<'static> {
     )
 }
 
-pub fn ui_gossip_progress_gauge(info: FetchPoolInfoStateful) -> Gauge<'static> {
-    let d = info.max.op_bytes_to_fetch;
-    let n = d.saturating_sub(info.current.op_bytes_to_fetch);
+pub fn ui_gossip_progress_gauge(info: FetchPoolInfo) -> Gauge<'static> {
+    todo!("rebuild the stateful progress bar")
+    // let d = info.max.op_bytes_to_fetch;
+    // let n = d.saturating_sub(info.current.op_bytes_to_fetch);
 
-    if d > 0 {
-        let r = n as f64 / d as f64;
-        let mut style = Style::default().fg(Color::Blue).bg(Color::Gray);
-        if r > 1.0 {
-            style = style
-                .add_modifier(Modifier::ITALIC)
-                .add_modifier(Modifier::BOLD)
-        }
-        let clamped = r.min(1.0).max(0.0);
-        Gauge::default()
-            .label(format!(
-                "{} / {} ({:3.1}%)",
-                n.human_count_bytes(),
-                d.human_count_bytes(),
-                r * 100.0,
-            ))
-            .ratio(clamped)
-            .gauge_style(style)
-    } else {
-        let style = Style::default().fg(Color::Green).bg(Color::Gray);
-        Gauge::default()
-            .label("complete")
-            .ratio(1.0)
-            .gauge_style(style)
-    }
+    // if d > 0 {
+    //     let r = n as f64 / d as f64;
+    //     let mut style = Style::default().fg(Color::Blue).bg(Color::Gray);
+    //     if r > 1.0 {
+    //         style = style
+    //             .add_modifier(Modifier::ITALIC)
+    //             .add_modifier(Modifier::BOLD)
+    //     }
+    //     let clamped = r.min(1.0).max(0.0);
+    //     Gauge::default()
+    //         .label(format!(
+    //             "{} / {} ({:3.1}%)",
+    //             n.human_count_bytes(),
+    //             d.human_count_bytes(),
+    //             r * 100.0,
+    //         ))
+    //         .ratio(clamped)
+    //         .gauge_style(style)
+    // } else {
+    //     let style = Style::default().fg(Color::Green).bg(Color::Gray);
+    //     Gauge::default()
+    //         .label("complete")
+    //         .ratio(1.0)
+    //         .gauge_style(style)
+    // }
 }
 
 pub fn ui_basis_table(underline_duration: Duration, counts: LinkCountsRef) -> Table<'static> {
