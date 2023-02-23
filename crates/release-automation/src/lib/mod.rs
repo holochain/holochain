@@ -128,6 +128,8 @@ pub mod cli {
 
         /// If given, only these SemverIncrementMode values will be allowed.
         /// Comma separated.
+        /// The values shall be given as YAML strings, matching the way they are configured in the CHANGELOG.md front matters.
+        /// For a list of values and examples please see [this document](https://github.com/holochain/holochain/blob/develop/docs/release/release.md#permanently-marking-a-crate-for-majorminorpatchpre-version-bumps).
         #[structopt(long, parse(try_from_str = parse_semverincrementmode))]
         allowed_semver_increment_modes: Option<HashSet<SemverIncrementMode>>,
     }
