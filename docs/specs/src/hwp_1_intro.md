@@ -169,8 +169,9 @@ across the participants in the network. This approach requires that we:
 2.  Ensure that all agents can *reliably* see what's going on. i.e.
   offer a framework for adding to and querying a collectively held
   database in which there is a knowable level of confidence in its
-  reliability and integrity that can also be graduated to fit the
-  circumstances.
+  reliability and integrity that can also be graduated to fit the 
+  circumstances, ranging from an arbitrarily low level of confidence 
+  to the highest possible level of certainty.
 
 The first point we deliver through various types of **Validation
 Rules**. Validation rules create certainty in the following dimensions

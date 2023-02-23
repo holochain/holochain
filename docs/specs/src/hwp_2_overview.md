@@ -8,9 +8,10 @@ Playing Games
 -------------
 
 People define the rules of a *Game* they want to play together. As
-*Players* join the *Game*, they alter their state by appending records
-to their *Action* history. Then they update the *Game Board* by sharing
-the *Records* of their *Actions*[^chess].
+*Players* join the *Game* and start playing, they append new *Records* of 
+their play to their own *Action* history. Then they update 
+the *Game Board* by sharing the *Records* of their *Actions*[^chess] with
+other players.
 
 [^chess]: You can think of this somewhat like correspondence chess, but with
     substantial more formality.
