@@ -44,6 +44,7 @@ $if(background-image)$
   \includegraphics[width=\paperwidth]{$background-image$}%
 }
 $endif$
+
 \usepackage{pgfpages}
 \setbeamertemplate{caption}[numbered]
 \setbeamertemplate{caption label separator}{: }
@@ -373,6 +374,12 @@ $if(csl-refs)$
   {\par}
 $endif$
 \usepackage{etoolbox}
+
+\usepackage{titlesec}
+\titleformat{\paragraph}[hang]{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
+\titlespacing*{\paragraph}{0pt}{3.25ex plus 1ex minus .2ex}{1em}
+\titleformat{\subparagraph}[hang]{\normalfont\normalsize\bfseries}{\thesubparagraph}{1em}{}
+\titlespacing*{\subparagraph}{0pt}{3.25ex plus 1ex minus .2ex}{.5em}
 
 \begin{document}
 

@@ -39,7 +39,7 @@ The Holochain Deterministic Integrity (HDI) component of the Holochain architect
 
 The following data structures, functions and callbacks are necessary and sufficient to implement an HDI:
 
-#### Core Holochain data types
+#### Core Holochain Data Types
 
 ##### The `Action` Data Type
 
