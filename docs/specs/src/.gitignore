@@ -5,3 +5,7 @@
 *.tex
 *.aux
 *.docx
+*.bib
+*.bbl
+*.blg
+hwp.*

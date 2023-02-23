@@ -1,5 +1,5 @@
-Appendix A: System Details Holochain Implementation
-===================================================
+\onecolumngrid
+# Appendix A: Holochain Implementation Spec v0.1.0 Beta
 
 So far we have described the necessary components of a scalable
 coordination and collaboration system. We have built an "industrial
@@ -8,7 +8,7 @@ deployment, under the name Holochain. Here we describe the technical
 implementation details that achieve the various requirements described
 above.
 
-# Holochain Implementation Spec v0.1.0 Beta
+
 
 This specification assumes that the reader has understood context and background provided in the the [Holochain Formalization](https://hackmd.io/2E2Wx_8FT0iTXk4Eyp12wA)
 
