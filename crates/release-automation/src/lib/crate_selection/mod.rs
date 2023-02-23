@@ -489,6 +489,7 @@ impl CrateState {
             | MissingDescription
             | MissingLicense
             | HasWildcardDependency
+            | HasWildcardDevDependency
             | ManifestKeywordExceeds20Chars
             | ManifestKeywordContainsInvalidChar
             | ManifestKeywordsMoreThan5
