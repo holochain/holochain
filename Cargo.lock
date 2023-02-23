@@ -7222,7 +7222,7 @@ dependencies = [
 [[package]]
 name = "tx5"
 version = "0.0.1-alpha.4"
-source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
+source = "git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de#6a5fe14924f6496d43a567096802505a9e5c46de"
 dependencies = [
  "bytes",
  "futures",
@@ -7233,7 +7233,7 @@ dependencies = [
  "rand-utf8",
  "tokio",
  "tracing",
- "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?branch=chunknplex)",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de)",
  "tx5-go-pion",
  "tx5-signal",
  "url 2.3.1",
@@ -7254,7 +7254,7 @@ dependencies = [
 [[package]]
 name = "tx5-core"
 version = "0.0.1-alpha.2"
-source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
+source = "git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de#6a5fe14924f6496d43a567096802505a9e5c46de"
 dependencies = [
  "base64 0.13.1",
  "once_cell",
@@ -7267,7 +7267,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion"
 version = "0.0.1-alpha.4"
-source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
+source = "git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de#6a5fe14924f6496d43a567096802505a9e5c46de"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -7279,7 +7279,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.0.1-alpha.6"
-source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
+source = "git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de#6a5fe14924f6496d43a567096802505a9e5c46de"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -7290,30 +7290,31 @@ dependencies = [
  "ouroboros",
  "sha2 0.10.6",
  "tracing",
- "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?branch=chunknplex)",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de)",
  "zip",
 ]
 
 [[package]]
 name = "tx5-go-pion-turn"
 version = "0.0.1-alpha.2"
-source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
+source = "git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de#6a5fe14924f6496d43a567096802505a9e5c46de"
 dependencies = [
  "base64 0.13.1",
  "dirs 4.0.0",
+ "dunce",
  "get_if_addrs",
  "once_cell",
  "sha2 0.10.6",
  "tokio",
  "tracing",
- "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?branch=chunknplex)",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de)",
  "zip",
 ]
 
 [[package]]
 name = "tx5-signal"
 version = "0.0.1-alpha.2"
-source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
+source = "git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de#6a5fe14924f6496d43a567096802505a9e5c46de"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -7329,7 +7330,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite 0.17.2",
  "tracing",
- "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?branch=chunknplex)",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=6a5fe14924f6496d43a567096802505a9e5c46de)",
  "url 2.3.1",
 ]
 
