@@ -93,10 +93,12 @@ Games have these properties:
   exists as a unique and independent network of Agents playing that
   Game, i.e. Games cannot interact with each other directly as all
   action in the system is only taken by Agents. Note that Games can
-  be composed together, but only by Agents playing across multiple
-  games. This at first may seem like a weakness, but it's part of a
+  be composed together, but only by groups of Agents all playing across 
+  multiple games. This at first may seem like a weakness, but it's part of a
   key design decision that contributes to the system's overall
-  design goals of evolvability.
+  design goals of evolvability. Essentially this creates the pattern of
+  game-within-a-game.  For example a chess tournament is really two games:
+  the game of "chess", and the game of "tournament".
 
 In keeping with the metaphor of Game, we also refer to the Integrity
 specification as the Validation rules of the Game.
