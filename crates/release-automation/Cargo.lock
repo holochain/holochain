@@ -2125,7 +2125,7 @@ dependencies = [
  "enumflags2",
  "env_logger 0.8.4",
  "fancy-regex",
- "git2 0.15.0",
+ "git2 0.16.1",
  "indoc",
  "itertools",
  "linked-hash-map",
