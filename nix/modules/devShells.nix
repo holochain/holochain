@@ -39,7 +39,16 @@
         coreDev = pkgs.mkShell {
           inputsFrom = [ self'.devShells.rustDev ];
 
-          packages = with pkgs; [ cargo-nextest ];
+          packages = with pkgs; [
+            cargo-nextest
+
+            (pkgs.writeShellScriptBin "scripts-cargo-regen-lockfiles" ''
+              cargo fetch --locked
+              cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
+              cargo generate-lockfile --offline
+              cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
+            '')
+          ];
 
           shellHook = ''
             export PS1='\n\[\033[1;34m\][coreDev:\w]\$\[\033[0m\] '
