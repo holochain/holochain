@@ -1668,14 +1668,14 @@ dependencies = [
 
 [[package]]
 name = "filetime"
-version = "0.2.19"
+version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e884668cd0c7480504233e951174ddc3b382f7c2666e3b7310b5c4e7b0c37f9"
+checksum = "8a3de6e8d11b22ff9edc6d916f890800597d60f8b2da1caf2955c274638d6412"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "redox_syscall 0.2.16",
- "windows-sys 0.42.0",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -2238,6 +2238,12 @@ checksum = "ee512640fe35acbfb4bb779db6f0d80704c2cacfa2e39b601ef3e3f47d1ae4c7"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "hermit-abi"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fed44880c466736ef9a5c5b5facefb5ed0785676d0c02d612db14e54f0d84286"
 
 [[package]]
 name = "hex"
@@ -3172,12 +3178,12 @@ dependencies = [
 
 [[package]]
 name = "io-lifetimes"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7d6c6f8c91b4b9ed43484ad1a938e393caf35960fce7f82a040497207bd8e9e"
+checksum = "1abeb7a0dd0f8181267ff8adc397075586500b81b28a73e8a0208b00fc170fb3"
 dependencies = [
  "libc",
- "windows-sys 0.42.0",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -3188,14 +3194,14 @@ checksum = "30e22bd8629359895450b59ea7a776c850561b96a3b1d31321c1949d9e6c9146"
 
 [[package]]
 name = "is-terminal"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28dfb6c8100ccc63462345b67d1bbc3679177c75ee4bf59bf29c8b1d110b8189"
+checksum = "22e18b0a45d56fe973d6db23972bf5bc46f988a4a2385deac9cc29572f09daef"
 dependencies = [
- "hermit-abi 0.2.6",
+ "hermit-abi 0.3.1",
  "io-lifetimes",
  "rustix",
- "windows-sys 0.42.0",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -3947,14 +3953,14 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5d732bc30207a6423068df043e3d02e0735b155ad7ce1a6f76fe2baa5b158de"
+checksum = "5b9d9a46eff5b4ff64b45a9e316a6d1e0bc719ef429cbec4dc630684212bfdf9"
 dependencies = [
  "libc",
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
- "windows-sys 0.42.0",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -5803,16 +5809,16 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.36.7"
+version = "0.36.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4fdebc4b395b7fbb9ab11e462e20ed9051e7b16e42d24042c776eca0ac81b03"
+checksum = "f43abb88211988493c1abb44a70efa56ff0ce98f233b7b276146f1f3f7ba9644"
 dependencies = [
  "bitflags",
  "errno",
  "io-lifetimes",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.42.0",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -6593,12 +6599,12 @@ dependencies = [
 
 [[package]]
 name = "terminal_size"
-version = "0.2.3"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb20089a8ba2b69debd491f8d2d023761cbf196e999218c591fa1e7e15a21907"
+checksum = "4c9afddd2cec1c0909f06b00ef33f94ab2cc0578c4a610aa208ddfec8aa2b43a"
 dependencies = [
  "rustix",
- "windows-sys 0.42.0",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -6839,7 +6845,7 @@ dependencies = [
  "bytes",
  "libc",
  "memchr",
- "mio 0.8.5",
+ "mio 0.8.6",
  "num_cpus",
  "parking_lot 0.12.1",
  "pin-project-lite",
@@ -7216,7 +7222,7 @@ dependencies = [
 [[package]]
 name = "tx5"
 version = "0.0.1-alpha.4"
-source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
+source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
 dependencies = [
  "bytes",
  "futures",
@@ -7227,7 +7233,7 @@ dependencies = [
  "rand-utf8",
  "tokio",
  "tracing",
- "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c)",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?branch=chunknplex)",
  "tx5-go-pion",
  "tx5-signal",
  "url 2.3.1",
@@ -7248,7 +7254,7 @@ dependencies = [
 [[package]]
 name = "tx5-core"
 version = "0.0.1-alpha.2"
-source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
+source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
 dependencies = [
  "base64 0.13.1",
  "once_cell",
@@ -7261,7 +7267,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion"
 version = "0.0.1-alpha.4"
-source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
+source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -7273,7 +7279,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.0.1-alpha.6"
-source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
+source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -7284,15 +7290,14 @@ dependencies = [
  "ouroboros",
  "sha2 0.10.6",
  "tracing",
- "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c)",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?branch=chunknplex)",
  "zip",
 ]
 
 [[package]]
 name = "tx5-go-pion-turn"
 version = "0.0.1-alpha.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7ac9d7abc183adfbbf2e58f4f38f9beaeaea814744bc4c3ebd6d523216f9313"
+source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
 dependencies = [
  "base64 0.13.1",
  "dirs 4.0.0",
@@ -7301,14 +7306,14 @@ dependencies = [
  "sha2 0.10.6",
  "tokio",
  "tracing",
- "tx5-core 0.0.1-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?branch=chunknplex)",
  "zip",
 ]
 
 [[package]]
 name = "tx5-signal"
 version = "0.0.1-alpha.2"
-source = "git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c#3e4eb893e79ca6a6b1f2e02318abc66a2551df4c"
+source = "git+https://github.com/holochain/tx5.git?branch=chunknplex#8aac640c36eb379d6cecdb7f25465f4bd02bcbbe"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -7324,7 +7329,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite 0.17.2",
  "tracing",
- "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?rev=3e4eb893e79ca6a6b1f2e02318abc66a2551df4c)",
+ "tx5-core 0.0.1-alpha.2 (git+https://github.com/holochain/tx5.git?branch=chunknplex)",
  "url 2.3.1",
 ]
 

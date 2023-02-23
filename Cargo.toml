@@ -60,7 +60,8 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-tx5 = { git = "https://github.com/holochain/tx5.git", rev = "3e4eb893e79ca6a6b1f2e02318abc66a2551df4c" }
+tx5 = { git = "https://github.com/holochain/tx5.git", branch = "chunknplex" }
+tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", branch = "chunknplex" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
