@@ -943,6 +943,7 @@ fn release_dry_run_fails_on_unallowed_conditions() {
             "--log-level=debug",
             "release",
             "--dry-run",
+            "--no-verify",
             "--steps=BumpReleaseVersions",
         ]);
 
