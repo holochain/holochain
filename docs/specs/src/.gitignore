@@ -8,4 +8,6 @@
 *.bib
 *.bbl
 *.blg
+*.out
 hwp.*
+!hwp_alpha.tex

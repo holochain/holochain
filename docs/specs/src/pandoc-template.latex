@@ -376,10 +376,11 @@ $endif$
 \usepackage{etoolbox}
 
 \usepackage{titlesec}
-\titleformat{\paragraph}[hang]{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
-\titlespacing*{\paragraph}{0pt}{3.25ex plus 1ex minus .2ex}{1em}
-\titleformat{\subparagraph}[hang]{\normalfont\normalsize\bfseries}{\thesubparagraph}{1em}{}
-\titlespacing*{\subparagraph}{0pt}{3.25ex plus 1ex minus .2ex}{.5em}
+\titleformat{\section}{\center\normalfont\large\scshape}{\thesection}{1em}{}
+\titleformat{\subsection}{\center\normalfont\scshape}{\thesubsection}{1em}{}
+\titlespacing*{\subsection}{0pt}{3.25ex plus 1ex minus .2ex}{.5em}
+\titleformat{\subsubsection}{\center\normalfont}{\thesubsubsection}{1em}{}
+\titlespacing*{\subsubsection}{0pt}{3.25ex plus 1ex minus .2ex}{.5em}
 
 \begin{document}
 
