@@ -38,14 +38,14 @@ Agents have these properties:
 
 1.  Agents are the only source of Actions in the system, thus Agents are
   the source of agency. All such Actions are uniquely identifiable
-  as to which Agent took them, i.e. all Actions are
-  cryptographically signed (see Actions below).
+  as to which Agent took them, i.e. all Actions are signed 
+  by public-key cryptography (see Actions below).
 
 2.  Agents are uniquely addressable by other Agents.
 
 3.  An Agent's address is its public key.
 
-4.  Agents share Records of the Actions they take with other Agents for
+4.  Agents share Records of the Actions they take with other Agents through
   distributed storage so that those Records can be retrieved by
   other Agents reliably.
 
@@ -71,7 +71,7 @@ Games have these properties:
 
     b.  A deterministic description of the validity of the contents of
   an Entry along with the validity of an Agent taking any
-  Action, i.e. some Actions may to be taken in some contexts but
+  Action, i.e. some Actions may be taken in some contexts but
   not in others, as in making a move out-of-turn, or by an Agent
   not allowed to play a certain role.
 
@@ -88,7 +88,7 @@ Games have these properties:
   well as links relating the post to other Entries (see below for
   definitions of Actions and Source Chain).
 
-3.  Each instance of the Game is played on it's own Game Board which
+3.  Each instance of the Game is played on its own Game Board which
   exists as a unique and independent network of Agents playing that
   Game, i.e. Games cannot interact with each other directly as all
   action in the system is only taken by Agents. Note that Games can
@@ -139,15 +139,16 @@ Actions have these properties:
 3.  MarkEntryAsDeleted: An Action which indicates a previous entry
   should be considered deleted.
 
-4.  CreateLink: An Action that links one hash to another
+4.  CreateLink: An Action that unidirectionally links one hash to another
 
 5.  DeleteLink: An Action that indicates a previous link action should
   be considered deleted.
 
-6.  A Record is just a name for both an Action and its Entry taken
-  together. As an implementation detail, note that for actions other
-  than CreateEntry and UpdateEntry we don't need to address the
-  content of the Action separately and so we simply retrieve all the
+6.  A Record is just a name for both an Action and, when applicable, 
+  its Entry, taken together. As an implementation detail, note that for 
+  actions other than CreateEntry and UpdateEntry we don't need to 
+  address the content of the Action separately, in which case the Record 
+  contains no Entry and we simply retrieve all the we simply retrieve all the
   data we need from the recorded Action.
 
 7.  Subsets of Agents can mutually consent to a single Action by
@@ -178,7 +179,7 @@ forms:
 1.  As self-recorded Source Chains of each of the Agent's Actions
 
 2.  As a Graphing Distributed Hash Table that results from the sharing
-  and validation of these Actions across Agents collectively sharing
+  and validation of these Actions across Agents, collectively sharing
   portions of the data
 
 The first form ensures the integrity of all data stored in the network
@@ -203,7 +204,7 @@ by the Action includes the Action type (e.g. create/update/delete/link,
 etc) a time-stamp, the hash of the previous Action (to create the
 chain), and the hash of the Entry.
 
-The first few Records of every Source Chain create a "common ground" for
+The first few Records of every Source Chain - called Genesis Records - create a "common ground" for
 all the agent's "playing" a Game to be able to verify the Game and its
 "players" as follows:
 
@@ -216,7 +217,7 @@ all the agent's "playing" a Game to be able to verify the Game and its
   Games to create Validation rules for permissioned access to a
   Game.
 
-3.  The third Record is the Agent's address, i.e. it's public key.
+3.  The third Record is the Agent's address, i.e. its public key.
 
 4.  The final Genesis Records are any Game specific Records added during
   Genesis followed by an "init-complete" Record indicating the end
@@ -261,7 +262,7 @@ portions of the overall data by using a nearness algorithm between the
 Agent's public key and the hash of the data to be stored. Agents that
 are "close" to a given piece of data are responsible to store it and are
 said to comprise a Neighborhood for that data. Hashing creates an
-essentially random distribution of which data will be stored with
+essentially random distribution of which data will be stored with which
 Agents. The degree of redundancy of how many Agents should store copies
 of data is a per-Game parameter.
 
@@ -271,7 +272,7 @@ Records accordingly. This gossip ensures that eventually all Agents
 querying a Neighborhood for information will receive the same
 information. Furthermore it creates a social space for detecting bad
 actors. Because all gossiped data can intrinsically be validated, any
-Agents who cheat, including by changing their (or other's) history's,
+Agents who cheat, including by changing their (or other's) histories,
 will be found out, and because all data includes Provenance, any bad
 actors can be definitively identified and ejected from the system.
 

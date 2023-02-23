@@ -109,7 +109,7 @@ context of fundamentally dynamic environments in which the coordinating
 elements are changed by the fact of their coordination. Coordination is
 a co-evolutionary context. We claim by this axiom that what meets the
 challenge of anti-fragility in such contexts is composable sub-systems,
-in which the composition comes out of a grammatics that embodies the
+in which the composition comes out of a grammar that embodies the
 actual dimensionality of the problem subdomains (i.e. their geometry),
 and by which agents in that context can react powerfully to
 perturbations because the available composability is dimensionally
