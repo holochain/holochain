@@ -145,20 +145,27 @@ async fn create_identical_clone_cell_twice_fails() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
-    let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna.clone())])
+    let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
+    let apps = conductor
+        .setup_app_for_agents(
+            "app",
+            &[alice.clone(), bob.clone()],
+            [&(role_name.clone(), dna.clone())],
+        )
         .await
-        .unwrap();
-    let clone_cell_payload = CreateCloneCellPayload {
-        app_id: app.installed_app_id().clone(),
+        .unwrap()
+        .into_inner();
+    let alice_app = &apps[0];
+    let bob_app = &apps[1];
+    let mut clone_cell_payload = CreateCloneCellPayload {
+        app_id: alice_app.installed_app_id().clone(),
         role_name: role_name.clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
         membrane_proof: None,
         name: None,
     };
 
-    let clone_cell = conductor
+    let alice_clone_cell = conductor
         .clone()
         .create_clone_cell(clone_cell_payload.clone())
         .await
@@ -170,25 +177,41 @@ async fn create_identical_clone_cell_twice_fails() {
         .await;
     matches!(
         identical_clone_cell_err,
-        Err(ConductorError::AppError(AppError::DuplicateDnaHash(dna_hash))) if dna_hash == *clone_cell.cell_id.dna_hash()
+        Err(ConductorError::AppError(AppError::DuplicateCellId(cell_id))) if cell_id == alice_clone_cell.cell_id
     );
 
     // disable clone cell and try again to create an identical clone
     conductor
         .clone()
         .disable_clone_cell(&DisableCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
-            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
+            app_id: alice_app.installed_app_id().clone(),
+            clone_cell_id: CloneCellId::CellId(alice_clone_cell.cell_id.clone()),
         })
         .await
         .unwrap();
     let identical_clone_cell_err = conductor
         .clone()
-        .create_clone_cell(clone_cell_payload)
+        .create_clone_cell(clone_cell_payload.clone())
         .await;
     matches!(
         identical_clone_cell_err,
-        Err(ConductorError::AppError(AppError::DuplicateDnaHash(dna_hash))) if dna_hash == *clone_cell.cell_id.dna_hash()
+        Err(ConductorError::AppError(AppError::DuplicateCellId(cell_id))) if cell_id == alice_clone_cell.cell_id
+    );
+
+    // ensure that bob can clone cell with identical hash in same conductor
+    clone_cell_payload.app_id = bob_app.installed_app_id().clone();
+    let bob_clone_cell = conductor
+        .clone()
+        .create_clone_cell(clone_cell_payload)
+        .await
+        .unwrap();
+    assert_eq!(
+        alice_clone_cell.original_dna_hash,
+        bob_clone_cell.original_dna_hash
+    );
+    assert_eq!(
+        alice_clone_cell.cell_id.dna_hash(),
+        bob_clone_cell.cell_id.dna_hash()
     );
 }
 
