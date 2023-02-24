@@ -70,7 +70,6 @@ impl GossipDashboard {
                 .collect();
 
             if let Some(selected) = selected {
-                // node.conductor.get_agent_infos(Some(node.zome.cell_id().clone()))
                 let node = &state.nodes()[selected];
                 let metrics = &node.diagnostics.metrics.read();
                 let rounds = state.node_rounds_sorted(metrics);

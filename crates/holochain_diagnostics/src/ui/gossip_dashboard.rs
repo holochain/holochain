@@ -40,7 +40,6 @@ use self::widgets::{
 mod input;
 mod layout;
 mod render;
-mod state;
 mod widgets;
 
 pub use input::*;
@@ -251,25 +250,3 @@ impl GossipDashboard {
         f.render_widget(tui::widgets::Clear, f.size())
     }
 }
-
-// agent_node_index: HashMap<AgentPubKey, usize>,
-
-// let agent_node_index: HashMap<_, _> = agents.enumerate().map(|(i, n)| (n, i)).collect();
-
-// fn node_infos<'a>(&self, metrics: &'a Metrics) -> NodeInfoList<'a, usize> {
-//     let mut infos: Vec<_> = metrics
-//         .node_info()
-//         .iter()
-//         .map(|(agent, info)| {
-//             (
-//                 *self
-//                     .agent_node_index
-//                     .get(&AgentPubKey::from_kitsune(agent))
-//                     .unwrap(),
-//                 info,
-//             )
-//         })
-//         .collect();
-//     infos.sort_unstable_by_key(|(i, _)| *i);
-//     infos
-// }

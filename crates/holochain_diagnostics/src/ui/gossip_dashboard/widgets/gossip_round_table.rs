@@ -58,7 +58,6 @@ pub fn gossip_round_table<Id: Display + Clone>(
                     .as_ref()
                     .map(|(ours, theirs)| ours.is_empty() && theirs.is_empty())
                     .unwrap_or(false);
-                // .unwrap_or_else(|| todo!("check num ops"));
                 if state.filter_zeroes && zero {
                     None
                 } else {

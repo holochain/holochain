@@ -107,15 +107,6 @@ pub fn syn_zome() -> InlineIntegrityZome {
                     agents,
                     signal: ExternIO::encode(msg).unwrap(),
                 })?;
-
-                // let res = api.call(vec![Call {
-                //     target: CallTarget::NetworkAgent(agents[1].clone()),
-                //     zome_name: "zome".into(),
-                //     fn_name: "recv_remote_signal".into(),
-                //     cap_secret: None,
-                //     payload: msg.into(),
-                // }])?;
-                // dbg!(res);
                 Ok(())
             },
         )

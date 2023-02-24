@@ -46,7 +46,6 @@ pub fn enter_tui(stdout: &mut io::Stdout) -> Result<(), crossterm::ErrorKind> {
     execute!(stdout, EnterAlternateScreen /* , EnableMouseCapture */)
 }
 
-// pub fn exit_tui<B: Backend>(terminal: &mut Terminal<B>) -> Result<(), crossterm::ErrorKind> {
 pub fn exit_tui<B: Backend + io::Write>(backend: &mut B) -> Result<(), crossterm::ErrorKind> {
     execute!(backend, LeaveAlternateScreen)
 }

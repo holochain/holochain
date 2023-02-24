@@ -11,14 +11,6 @@ pub fn setup_logging(file: Option<(&Path, bool)>) {
         }
     };
 
-    // let writer = || {
-    //     if let Some(p) = path {
-    //         let f = std::fs::File::open(p).expect("Couldn't open file for logging");
-    //     } else {
-    //         std::io::stderr()
-    //     }
-    // };
-
     let subscriber = FmtSubscriber::builder()
         .with_target(true)
         .with_env_filter(filter);
