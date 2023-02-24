@@ -95,45 +95,6 @@ impl Default for State {
     }
 }
 
-/// A mutable iterator over the FetchPool State
-pub struct StateIter<'a> {
-    state: &'a mut State,
-    config: &'a dyn FetchPoolConfig,
-}
-
-/// Fetch item within the fetch queue state.
-#[derive(Debug, PartialEq, Eq)]
-struct Sources(Vec<SourceRecord>);
-
-/// An item in the queue, corresponding to a single op or region to fetch
-#[derive(Debug, PartialEq, Eq)]
-pub struct FetchPoolItem {
-    /// Known sources from whom we can fetch this item.
-    /// Sources will always be tried in order.
-    sources: Sources,
-    /// The space to retrieve this op from
-    space: KSpace,
-    /// Approximate size of the item. If set, the item will be counted towards overall progress.
-    size: Option<RoughInt>,
-    /// Opaque user data specified by the host
-    pub context: Option<FetchContext>,
-    /// The last time we tried fetching this item from any source
-    last_fetch: Option<Instant>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct SourceRecord {
-    source: FetchSource,
-    last_request: Option<Instant>,
-}
-
-/// A source to fetch from: either a node, or an agent on a node
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum FetchSource {
-    /// An agent on a node
-    Agent(KAgent),
-}
-
 // TODO: move this to host, but for now, for convenience, we just use this one config
 // for every queue
 struct FetchPoolConfigBitwiseOr;
@@ -261,6 +222,51 @@ impl State {
     pub fn remove(&mut self, key: &FetchKey) -> Option<FetchPoolItem> {
         self.queue.remove(key)
     }
+
+    /// Get a string summary of the queue's contents
+    #[cfg(feature = "test_utils")]
+    pub fn summary(&self) -> String {
+        use human_repr::HumanCount;
+
+        let table = self
+            .queue
+            .iter()
+            .map(|(k, v)| {
+                let key = match k {
+                    FetchKey::Op(hash) => {
+                        let h = hash.to_string();
+                        format!("{}..{}", &h[0..4], &h[h.len() - 4..])
+                    }
+                    FetchKey::Region(_) => "[region]".to_string(),
+                };
+
+                let size = v.size.unwrap_or_default().get();
+                format!(
+                    "{:10}  {:^6} {:^6} {:>6}",
+                    key,
+                    v.sources.0.len(),
+                    v.last_fetch
+                        .map(|t| format!("{:?}", t.elapsed()))
+                        .unwrap_or("-".to_string()),
+                    size.human_count_bytes(),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("{}\n{} items total", table, self.queue.len())
+    }
+
+    /// The heading to go along with the summary
+    #[cfg(feature = "test_utils")]
+    pub fn summary_heading() -> String {
+        format!("{:10}  {:>6} {:>6} {}", "key", "#src", "last", "size")
+    }
+}
+
+/// A mutable iterator over the FetchPool State
+pub struct StateIter<'a> {
+    state: &'a mut State,
+    config: &'a dyn FetchPoolConfig,
 }
 
 impl<'a> Iterator for StateIter<'a> {
@@ -292,6 +298,28 @@ impl<'a> Iterator for StateIter<'a> {
     }
 }
 
+/// An item in the queue, corresponding to a single op or region to fetch
+#[derive(Debug, PartialEq, Eq)]
+pub struct FetchPoolItem {
+    /// Known sources from whom we can fetch this item.
+    /// Sources will always be tried in order.
+    sources: Sources,
+    /// The space to retrieve this op from
+    space: KSpace,
+    /// Approximate size of the item. If set, the item will be counted towards overall progress.
+    size: Option<RoughInt>,
+    /// Opaque user data specified by the host
+    pub context: Option<FetchContext>,
+    /// The last time we tried fetching this item from any source
+    last_fetch: Option<Instant>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SourceRecord {
+    source: FetchSource,
+    last_request: Option<Instant>,
+}
+
 impl SourceRecord {
     fn new(source: FetchSource) -> Self {
         Self {
@@ -307,6 +335,10 @@ impl SourceRecord {
         }
     }
 }
+
+/// Fetch item within the fetch queue state.
+#[derive(Debug, PartialEq, Eq)]
+struct Sources(Vec<SourceRecord>);
 
 impl Sources {
     fn next(&mut self, interval: Duration) -> Option<FetchSource> {
@@ -328,6 +360,13 @@ impl Sources {
             None
         }
     }
+}
+
+/// A source to fetch from: either a node, or an agent on a node
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum FetchSource {
+    /// An agent on a node
+    Agent(KAgent),
 }
 
 #[cfg(test)]

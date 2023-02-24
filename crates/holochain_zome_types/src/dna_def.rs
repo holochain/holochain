@@ -54,7 +54,6 @@ pub struct DnaModifiers {
     pub quantum_time: Duration,
 }
 
-#[cfg(feature = "full-dna-def")]
 const fn standard_quantum_time() -> Duration {
     kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME
 }
@@ -364,7 +363,7 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             name: &self.name,
-            modifiers: &self.modifiers,
+            modifiers: &self.modifiers.clone().into(),
             integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(
