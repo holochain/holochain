@@ -644,8 +644,6 @@ mod dna_impls {
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
                     .collect()
             });
-            self.running_cells.share_ref(|cells| dbg!(cells.len()));
-
             for (cell_id, item) in to_cleanup {
                 if let Err(err) = item.cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
@@ -2409,26 +2407,29 @@ impl Conductor {
         let dna_modifiers = clone_dna.dna().modifiers.clone();
         let clone_dna_hash = clone_dna.dna_hash().to_owned();
 
-        // if DNA hash of new clone cell already exists, reject as duplicate
-        if self
-            .ribosome_store
-            .share_ref(|ribosome_store| ribosome_store.get_dna_def(&clone_dna_hash))
-            .is_some()
-        {
-            return Err(ConductorError::AppError(AppError::DuplicateDnaHash(
-                clone_dna_hash,
-            )));
-        }
-
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
+                let state_copy = state.clone();
                 let app = state.get_app_mut(&app_id)?;
                 let agent_key = app.role(&role_name)?.agent_key().to_owned();
-                let cell_id = CellId::new(clone_dna_hash, agent_key);
-                let clone_id = app.add_clone(&role_name, &cell_id)?;
+                let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
+
+                // if cell id of new clone cell already exists, reject as duplicate
+                if state_copy
+                    .installed_apps()
+                    .iter()
+                    .flat_map(|(_, app)| app.all_cells())
+                    .any(|cell_id| *cell_id == clone_cell_id)
+                {
+                    return Err(ConductorError::AppError(AppError::DuplicateCellId(
+                        clone_cell_id,
+                    )));
+                }
+
+                let clone_id = app.add_clone(&role_name, &clone_cell_id)?;
                 let installed_clone_cell = ClonedCell {
-                    cell_id,
+                    cell_id: clone_cell_id,
                     clone_id,
                     original_dna_hash,
                     dna_modifiers,
