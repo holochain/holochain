@@ -15,7 +15,7 @@ impl GossipDashboard {
                 .nodes()
                 .iter()
                 .enumerate()
-                .map(|(i, n)| {
+                .map(|(_i, n)| {
                     // tracing::info!("{} {:?}\n{}", i, n.cert, n.diagnostics.fetch_pool.summary());
                     (
                         n.diagnostics.fetch_pool.info(
@@ -66,7 +66,7 @@ impl GossipDashboard {
             }
             let gauges: Vec<_> = queue_info
                 .iter()
-                .map(|(i, _)| ui_gossip_progress_gauge(i.clone()))
+                .map(|(i, _)| Paragraph::new(i.op_bytes_to_fetch.human_count_bytes().to_string()))
                 .collect();
 
             if let Some(selected) = selected {

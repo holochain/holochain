@@ -35,7 +35,6 @@ use tui::{
 use self::widgets::{
     gossip_region_table::{gossip_region_table, GossipRegionTableState},
     gossip_round_table::{gossip_round_table, GossipRoundTableState},
-    ui_gossip_progress_gauge,
 };
 
 mod input;

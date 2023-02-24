@@ -48,6 +48,8 @@ fn config() -> ConductorConfig {
             tp.gossip_outbound_target_mbps = 1000000.0;
             tp.gossip_historic_outbound_target_mbps = 1000000.0;
             tp.gossip_historic_inbound_target_mbps = 1000000.0;
+
+            tp.gossip_peer_on_success_next_gossip_delay_ms = 1000 * 5;
             tp
         });
     });
