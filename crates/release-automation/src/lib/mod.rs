@@ -26,6 +26,7 @@ pub type Fallible<T> = anyhow::Result<T>;
 pub type CommandResult = Fallible<()>;
 
 pub mod cli {
+    use crate::common::SemverIncrementMode;
     use crate::crate_::CrateArgs;
 
     use super::*;
@@ -124,6 +125,13 @@ pub mod cli {
         /// Exclude optional dependencies.
         #[structopt(long)]
         pub exclude_optional_deps: bool,
+
+        /// If given, only these SemverIncrementMode values will be allowed.
+        /// Comma separated.
+        /// The values shall be given as YAML strings, matching the way they are configured in the CHANGELOG.md front matters.
+        /// For a list of values and examples please see [this document](https://github.com/holochain/holochain/blob/develop/docs/release/release.md#permanently-marking-a-crate-for-majorminorpatchpre-version-bumps).
+        #[structopt(long, parse(try_from_str = parse_semverincrementmode))]
+        allowed_semver_increment_modes: Option<HashSet<SemverIncrementMode>>,
     }
 
     fn parse_depkind(input: &str) -> Fallible<HashSet<CargoDepKind>> {
@@ -162,6 +170,24 @@ pub mod cli {
             )
     }
 
+    fn parse_semverincrementmode(input: &str) -> Fallible<HashSet<SemverIncrementMode>> {
+        input
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|sim| {
+                serde_yaml::from_str(sim).map_err(|_| {
+                    anyhow::anyhow!("could not parse '{}' as SemverIncrementMode", input)
+                })
+            })
+            .try_fold(
+                Default::default(),
+                |mut acc, elem| -> Fallible<HashSet<SemverIncrementMode>> {
+                    acc.insert(elem?);
+                    Ok(acc)
+                },
+            )
+    }
+
     impl CheckArgs {
         /// Boilerplate to instantiate `SelectionCriteria` from `CheckArgs`
         pub fn to_selection_criteria(&self, args: &Args) -> SelectionCriteria {
@@ -172,6 +198,7 @@ pub mod cli {
                 allowed_dev_dependency_blockers: self.allowed_dev_dependency_blockers,
                 allowed_selection_blockers: self.allowed_matched_blockers,
                 exclude_optional_deps: self.exclude_optional_deps,
+                allowed_semver_increment_modes: self.allowed_semver_increment_modes.clone(),
             }
         }
     }

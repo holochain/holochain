@@ -3,6 +3,7 @@
 use crate::changelog::{
     self, ChangeT, ChangelogT, ChangelogType, CrateChangelog, WorkspaceChangelog,
 };
+use crate::common::SemverIncrementMode;
 use crate::Fallible;
 use cargo::core::Dependency;
 use log::{debug, info, trace, warn};
@@ -407,6 +408,7 @@ pub struct SelectionCriteria {
     pub disallowed_version_reqs: Vec<semver::VersionReq>,
     pub allowed_dev_dependency_blockers: BitFlags<CrateStateFlags>,
     pub allowed_selection_blockers: BitFlags<CrateStateFlags>,
+    pub allowed_semver_increment_modes: Option<HashSet<SemverIncrementMode>>,
     pub exclude_optional_deps: bool,
 }
 
@@ -450,6 +452,7 @@ pub enum CrateStateFlags {
     ManifestKeywordExceeds20Chars,
     ManifestKeywordContainsInvalidChar,
     ManifestKeywordsMoreThan5,
+    AllowedSemverIncrementModeViolated,
 }
 
 /// Defines the meta states that can be derived from the more detailed `CrateStateFlags`.
@@ -492,6 +495,7 @@ impl CrateState {
             | ManifestKeywordExceeds20Chars
             | ManifestKeywordContainsInvalidChar
             | ManifestKeywordsMoreThan5
+            | AllowedSemverIncrementModeViolated
     });
 
     pub fn new(
@@ -949,6 +953,22 @@ impl<'a> ReleaseWorkspace<'a> {
                     }
                 }
 
+                // semver_increment_mode checks
+                if let Some(allowed_semver_increment_modes) = &self.criteria.allowed_semver_increment_modes {
+                    let effective_semver_increment_mode  = member
+                        .changelog()
+                        .map(|cl| cl.front_matter().ok())
+                        .flatten()
+                        .flatten()
+                        .map(|fm| fm.semver_increment_mode())
+                        .unwrap_or_default();
+
+
+                    if !allowed_semver_increment_modes.contains(&effective_semver_increment_mode) {
+                        debug!("Blocking {} due to {:?} with mode: {effective_semver_increment_mode:?}", member.name(), CrateStateFlags::AllowedSemverIncrementModeViolated);
+                        insert_state!(CrateStateFlags::AllowedSemverIncrementModeViolated);
+                    }
+                }
             }
 
             Ok(members_states)
