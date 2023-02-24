@@ -1,0 +1,23 @@
+[package]
+name = "holochain_diagnostics"
+version = "0.0.1"
+description = "Tools and patterns for writing Holochain diagnostic tests"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_diagnostics"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo" ]
+edition = "2021"
+
+[dependencies]
+anyhow = "*"
+arbitrary = { version = "=1.0.0" }
+holochain = { path = "../holochain", features = ["no-deps"] }
+human-repr = "1"
+rand = "0.8"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = "0.3"
+
+crossterm = "*"
+tui = "*"

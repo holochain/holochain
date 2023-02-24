@@ -12,6 +12,7 @@ members = [
   "crates/holochain",
   "crates/holochain_cascade",
   "crates/holochain_conductor_api",
+  "crates/holochain_diagnostics",
   "crates/holochain_integrity_types",
   "crates/holochain_keystore",
   "crates/holochain_p2p",
@@ -43,6 +44,8 @@ members = [
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
+
+  "crates/diagnostic_tests",
 ]
 
 exclude = ["crates/release-automation"]
