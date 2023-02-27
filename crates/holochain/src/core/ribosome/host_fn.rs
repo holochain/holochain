@@ -63,8 +63,14 @@ host_fn_api_impls! {
     // holochain_zome_types::zome_io
     // MAYBE: is there a way to unhygienically import this code in both places?
 
+    // Attempt to accept a preflight request.
+    fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
+
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
+
+    // Block some agent on the same DNA.
+    fn block_agent (zt::block::BlockAgentInput) -> ();
 
     // @todo
     fn dna_info (()) -> zt::info::DnaInfo;
@@ -160,9 +166,6 @@ host_fn_api_impls! {
 
     fn must_get_agent_activity (zt::chain::MustGetAgentActivityInput) -> Vec<zt::op::RegisterAgentActivity>;
 
-    // Attempt to accept a preflight request.
-    fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
-
     // Query the source chain for data.
     fn query (zt::query::ChainQueryFilter) -> Vec<Record>;
 
@@ -193,6 +196,9 @@ host_fn_api_impls! {
 
     // Current system time, in the opinion of the host, as a `Duration`.
     fn sys_time (()) -> zt::timestamp::Timestamp;
+
+    // Unblock some previously blocked agent.
+    fn unblock_agent (zt::block::BlockAgentInput) -> ();
 
     // Same as  but also takes the ActionHash of the updated record.
     fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
