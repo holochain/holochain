@@ -32,7 +32,7 @@ if ! command -v nix &>/dev/null; then
 fi
 
 echo "Setting up binary cache for all users (requires root access)"
-echo "sudo --preserve-env=PATH $(which nix) run nixpkgs/nixos-22.11#cachix --extra-experimental-features \"nix-command flakes\" -- use holochain-ci -m root-nixconf"
+echo "sudo --preserve-env=NIX_CONFIG,PATH $(which nix) run nixpkgs/nixos-22.11#cachix --extra-experimental-features \"nix-command flakes\" -- use holochain-ci -m root-nixconf"
 sudo --preserve-env=PATH $(which nix) run nixpkgs/nixos-22.11#cachix --extra-experimental-features "nix-command flakes" -- use holochain-ci -m root-nixconf
 echo
 
