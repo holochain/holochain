@@ -16,9 +16,15 @@ if ! command -v nix &>/dev/null; then
     fi
 
     echo
-    echo "Starting Nix daemon"
-    source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh > /dev/null 2>&1
-    source /nix/var/nix/profiles/default/etc/profile.d/nix.sh > /dev/null 2>&1
+    echo "Sourcing the nix config files"
+    source /etc/profile
+    for file in \
+        /etc/profile \
+        /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
+        /nix/var/nix/profiles/default/etc/profile.d/nix.sh
+    do
+        source $file > /dev/null 2>&1 || :
+    done
     echo
 fi
 
