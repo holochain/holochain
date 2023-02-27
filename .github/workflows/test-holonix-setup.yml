@@ -23,5 +23,15 @@ jobs:
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.ref_name }}/setup.sh)
       - name: Test nix command
         run: |
-          source /etc/profile.d/nix.sh
+          set -x +e
+          for file in \
+              ~/.profile \
+              /etc/profile \
+              /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
+              /nix/var/nix/profiles/default/etc/profile.d/nix.sh
+          do
+              source $file > /dev/null 2>&1
+              if command -v nix; then break; fi
+          done
+          set -e
           nix run --version
