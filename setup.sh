@@ -23,7 +23,7 @@ echo
 
 echo "Restarting Nix daemon"
 echo "sudo pkill nix-daemon"
-sudo pkill nix-daemon
+sudo pkill nix-daemon || :
 echo
 
 echo "Creating Nix user config in ~/.config/nix/nix.conf"
