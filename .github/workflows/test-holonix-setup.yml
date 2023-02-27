@@ -16,6 +16,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Call setup script
+        env:
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         run: |
           set -xe
           bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.ref_name }}/setup.sh)
