@@ -17,14 +17,17 @@ if ! command -v nix &>/dev/null; then
 
     echo
     echo "Sourcing the nix config files"
-    source /etc/profile
+    set +e
     for file in \
+        ~/.profile \
         /etc/profile \
         /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
         /nix/var/nix/profiles/default/etc/profile.d/nix.sh
     do
-        source $file > /dev/null 2>&1 || :
+        source $file > /dev/null 2>&1
+        if command -v nix; then break; fi
     done
+    set -e
     echo
 fi
 
