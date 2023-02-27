@@ -3,7 +3,7 @@ on:
     branches:
       - "holochain.github.io"
   pull_request_target:
-    # Sequence of patterns matched against refs/heads
+    types: [opened, synchronize, reopened]
     branches:
       - "holochain.github.io"
   workflow_dispatch: {}
