@@ -30,8 +30,15 @@
               gdk-pixbuf
               gtk3
             ]))
-          ++ lib.optionals pkgs.stdenv.isDarwin (builtins.attrValues (builtins.removeAttrs pkgs.darwin.apple_sdk.frameworks [ "QuickTime" ]))
-        ;
+          ++ (lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk.frameworks; [
+            AppKit
+            CoreFoundation
+            CoreServices
+            Security
+            IOKit
+            WebKit
+          ]));
+
 
         nativeBuildInputs =
           (with pkgs;

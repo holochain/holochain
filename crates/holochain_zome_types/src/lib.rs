@@ -13,6 +13,8 @@
 pub mod action;
 #[allow(missing_docs)]
 pub mod agent_activity;
+#[allow(missing_docs)]
+pub mod block;
 pub mod bytes;
 #[allow(missing_docs)]
 pub mod call;
