@@ -2,10 +2,11 @@ on:
   push:
     branches:
       - "holochain.github.io"
-
-concurrency:
-  group: ${{ github.ref_name }}
-  cancel-in-progress: true
+  pull_request_target:
+    # Sequence of patterns matched against refs/heads
+    branches:
+      - "holochain.github.io"
+  workflow_dispatch: {}
 
 jobs:
   test_setup:
@@ -13,7 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Call setup script
-        run: bash <(curl https://holochain.github.io/holochain/setup.sh)
+        run: |
+          set -xe
+          bash <(curl https://raw.githubusercontent.com/holochain/holochain/${{ github.ref_name }}/setup.sh)
       - name: Test nix command
         run: |
           source /etc/profile.d/nix.sh
