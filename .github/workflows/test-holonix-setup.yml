@@ -9,9 +9,11 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  test_setup:
-    name: Test Holonix Setup
-    runs-on: ubuntu-latest
+  test_holonix_setup:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Call setup script
         run: |
