@@ -373,7 +373,6 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             FetchOpDataEvtQuery::Regions(bounds) => bounds
                 .into_iter()
                 .flat_map(|b| {
-                    // dbg!(&b);
                     sb.ops.iter().filter_map(move |(loc, o)| {
                         let contains = b.contains(&DhtLocation::from(*loc), &o.timestamp);
                         contains.then(|| (o.hash.clone(), KitsuneOpData::new(vec![loc.as_u8()])))

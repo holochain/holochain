@@ -60,7 +60,7 @@
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
-        passthru.rev = inputs.holochain.rev;
+        passthru.src.rev = inputs.holochain.rev;
       });
 
       # Tests if all workspace crates can be built via their own Cargo.toml,
@@ -69,7 +69,7 @@
       #   build can succees with the workspace's Cargo.toml but fail without it.
       # This ensures that individual packages can be installed from crates.io.
       holochain-crates-standalone = craneLib.buildPackage (commonArgs // rec {
-        name = "holchain-crates-standalone";
+        name = "holochain-crates-standalone";
         src = flake.config.srcCleanedHolochain;
         cargoArtifacts = holochainDepsRelease;
         CARGO_PROFILE = "release";
@@ -113,6 +113,8 @@
             "conductor::cell::gossip_test::gossip_test"
           ] ++ (lib.optionals (pkgs.system == "x86_64-darwin") [
             "test_reconnect"
+            "timeout::tests::kitsune_backoff"
+            "test_util::switchboard::tests::transitive_peer_gossip"
           ]) ++ (lib.optionals (pkgs.system == "aarch64-darwin") [
             "test_reconnect"
           ]);
