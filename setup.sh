@@ -6,8 +6,14 @@ if ! command -v nix &>/dev/null; then
     echo "Nix package manager not found"
     echo "Installing Nix"
     echo
-    echo "bash <(curl -L https://nixos.org/nix/install) --daemon"
-    bash <(curl -L https://nixos.org/nix/install) --daemon
+
+    if [[ $(uname -r) == *"WSL2" ]]; then
+        echo "bash <(curl -L https://nixos.org/nix/install) --no-daemon"
+        bash <(curl -L https://nixos.org/nix/install) --no-daemon
+    else
+        echo "bash <(curl -L https://nixos.org/nix/install) --daemon"
+        bash <(curl -L https://nixos.org/nix/install) --daemon
+    fi
 
     echo
     echo "Starting Nix daemon"
