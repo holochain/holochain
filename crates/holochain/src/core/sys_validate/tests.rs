@@ -568,3 +568,40 @@ fn valid_chain_test() {
         );
     });
 }
+
+#[test]
+fn test_agent_update() {
+    // use holochain_zome_types::holochain_integrity_types::action::builder;
+
+    let agent1 = fixt!(AgentPubKey);
+    let ts = Timestamp::now();
+    let sec = std::time::Duration::from_secs(1);
+
+    let mut chain = vec![];
+
+    chain.push(Action::Dna(Dna {
+        author: agent1.clone(),
+        timestamp: ts,
+        hash: fixt!(DnaHash),
+    }));
+
+    chain.push(Action::AgentValidationPkg(AgentValidationPkg {
+        author: agent1.clone(),
+        timestamp: (ts + sec * 1).unwrap(),
+        action_seq: 1,
+        prev_action: chain[0].to_hash(),
+        membrane_proof: None,
+    }));
+
+    chain.push(Action::Create(Create {
+        author: agent1.clone(),
+        timestamp: (ts + sec * 2).unwrap(),
+        action_seq: 2,
+        prev_action: chain[1].to_hash(),
+        entry_type: EntryType::AgentPubKey,
+        entry_hash: agent1.clone().into(),
+        weight: EntryRateWeight::default(),
+    }));
+
+    todo!("test that this is all valid by sys validation standards");
+}

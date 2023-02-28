@@ -271,6 +271,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 
 /// Check the AppEntryDef is valid for the zome.
 /// Check the EntryDefId and ZomeIndex are in range.
+// TODO: MD: shouldn't this be part of App validation, since it invokes Wasm?
 pub async fn check_app_entry_def(
     dna_hash: &DnaHash,
     entry_type: &AppEntryDef,
