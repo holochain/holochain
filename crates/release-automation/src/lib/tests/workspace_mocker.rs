@@ -427,7 +427,7 @@ pub fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
         },
         MockProject {
             name: "crate_e".to_string(),
-            version: "0.0.1".to_string(),
+            version: "0.0.1-dev.0".to_string(),
             dependencies: vec![],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Lib,
@@ -765,6 +765,22 @@ pub fn example_workspace_4<'a>() -> Fallible<WorkspaceMocker> {
                 "five".to_string(),
                 "many".to_string(),
             ],
+            ..Default::default()
+        },
+        MockProject {
+            name: "disallowed_semver_increment_mode".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"---
+                default_semver_increment_mode: minor
+                ---
+                # Changelog
+                "#
+            )),
+            keywords: vec![],
             ..Default::default()
         },
     ];

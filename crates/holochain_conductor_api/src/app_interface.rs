@@ -247,27 +247,39 @@ impl CellInfo {
 /// Not yet implemented.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StemCell {
+    /// The hash of the DNA that this cell would be instantiated from
     pub original_dna_hash: DnaHash,
+    /// The DNA modifiers that will be used when instantiating the cell
     pub dna_modifiers: DnaModifiers,
+    /// An optional name to override the cell's bundle name when instantiating
     pub name: Option<String>,
 }
 
 /// Provisioned cell, a cell instantiated from a DNA on app installation.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProvisionedCell {
+    /// The cell's identifying data
     pub cell_id: CellId,
+    /// The DNA modifiers that were used to instantiate the cell
     pub dna_modifiers: DnaModifiers,
+    /// The name the cell was instantiated with
     pub name: String,
 }
 
 /// Cloned cell that was created from a provisioned cell at runtime.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ClonedCell {
+    /// The cell's identifying data
     pub cell_id: CellId,
+    /// A conductor-local clone identifier
     pub clone_id: CloneId,
+    /// The hash of the DNA that this cell was instantiated from
     pub original_dna_hash: DnaHash,
+    /// The DNA modifiers that were used to instantiate this clone cell
     pub dna_modifiers: DnaModifiers,
+    /// The name the cell was instantiated with
     pub name: String,
+    /// Whether or not the cell is running
     pub enabled: bool,
 }
 

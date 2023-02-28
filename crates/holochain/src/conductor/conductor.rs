@@ -1345,7 +1345,7 @@ mod clone_cell_impls {
                         .join(", ");
 
                     ConductorError::CloneCellError(format!(
-                        "no base cell found for provided role id. Available role names are: ({})",
+                        "no base cell found for provided role name. Available role names are: ({})",
                         role_names
                     ))
                 })?;

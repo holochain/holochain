@@ -1,3 +1,8 @@
+# Scheduled action to update:
+# - flake inputs of ./versions/
+# - rust-overlay flake input
+# - nixpkgs flake input
+
 name: "trigger source updates"
 on:
   # push:

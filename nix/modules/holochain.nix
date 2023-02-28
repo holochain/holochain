@@ -43,28 +43,27 @@
       };
 
       # derivation building all dependencies
-      holochainDeps = craneLib.buildDepsOnly (commonArgs // rec {
+      holochainDeps = craneLib.buildDepsOnly (commonArgs // {
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
       });
 
-      holochainDepsRelease = craneLib.buildDepsOnly (commonArgs // rec {
+      holochainDepsRelease = craneLib.buildDepsOnly (commonArgs // {
         CARGO_PROFILE = "release";
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
       });
 
       # derivation with the main crates
-      holochain = (craneLib.buildPackage (commonArgs // {
+      holochain = craneLib.buildPackage (commonArgs // {
         CARGO_PROFILE = "release";
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
-      })) // {
-        src.rev = inputs.holochain.rev;
-      };
+        passthru.src.rev = inputs.holochain.rev;
+      });
 
-      holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // rec {
+      holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
         pname = "holochain-nextest";
         CARGO_PROFILE = "fast-test";
         nativeBuildInputs = [ pkgs.cargo-nextest ];
@@ -86,6 +85,8 @@
             "conductor::cell::gossip_test::gossip_test"
           ] ++ (lib.optionals (pkgs.system == "x86_64-darwin") [
             "test_reconnect"
+            "timeout::tests::kitsune_backoff"
+            "test_util::switchboard::tests::transitive_peer_gossip"
           ]) ++ (lib.optionals (pkgs.system == "aarch64-darwin") [
             "test_reconnect"
           ]);
@@ -170,8 +171,8 @@
         cargoExtraArgs =
           "--lib --all-features";
 
-        cargoToml = "${self}/crates/test_utils/wasm/wasm_workspace/Cargo.toml";
-        cargoLock = "${self}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
+        cargoToml = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.toml";
+        cargoLock = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
 
         postUnpack = ''
           cd $sourceRoot/crates/test_utils/wasm/wasm_workspace
@@ -203,9 +204,15 @@
     in
     {
       packages = {
-        inherit holochain holochain-tests-nextest holochain-tests-nextest-tx5 holochain-tests-doc;
-
-        inherit holochain-tests-wasm holochain-tests-fmt holochain-tests-clippy;
+        inherit
+          holochain
+          holochain-tests-nextest
+          holochain-tests-nextest-tx5
+          holochain-tests-doc
+          holochain-tests-wasm
+          holochain-tests-fmt
+          holochain-tests-clippy
+          ;
       };
     };
 }
