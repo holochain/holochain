@@ -57,6 +57,9 @@ pub mod sql_cell {
 pub mod sql_conductor {
     pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/nonce_already_seen.sql");
     pub const DELETE_EXPIRED_NONCE: &str = include_str!("sql/conductor/delete_expired_nonce.sql");
+    pub const FROM_BLOCK_SPAN_WHERE_OVERLAPPING: &str =
+        include_str!("sql/conductor/from_block_span_where_overlapping.sql");
+    pub const IS_BLOCKED: &str = include_str!("sql/conductor/is_blocked.sql");
 }
 
 pub(crate) mod sql_p2p_agent_store {
