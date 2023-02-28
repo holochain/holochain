@@ -13,7 +13,6 @@
 #   - create a pull-request towards the source branch
 #   - create a github release
 
-
 name: release holochain
 
 on:
@@ -361,17 +360,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
           RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
-          TAG: ${{ needs.prepare.outputs.tag }}
+          LATEST_HOLOCHAIN_TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
         run: |
           set -eu
           cd "${HOLOCHAIN_REPO}"
 
           # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
-          if gh release view ${TAG}; then
+          if gh release view ${LATEST_HOLOCHAIN_TAG}; then
             export RELEASE_TAG=${RELEASE_BRANCH}
             export IS_HOLOCHAIN_RELEASE="false"
           else
-            export RELEASE_TAG=${TAG}
+            export RELEASE_TAG=${LATEST_HOLOCHAIN_TAG}
             export IS_HOLOCHAIN_RELEASE="true"
           fi
 
@@ -422,8 +421,8 @@ jobs:
         continue-on-error: true
         env:
           STATUS: ${{ steps.check-status.outcome }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
+          TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
 
@@ -495,8 +494,8 @@ jobs:
         continue-on-error: true
         env:
           STATUS: ${{ steps.check-status.outcome }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
+          TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
