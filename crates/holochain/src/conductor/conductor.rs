@@ -244,6 +244,8 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
+    use kitsune_p2p_types::box_fut_plain;
+
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
 
     use super::*;
@@ -331,6 +333,24 @@ mod startup_shutdown_impls {
                 }
                 let task = spawn_task_outcome_handler(self.clone(), outcome_rx);
                 *lock = Some(task);
+            });
+
+            self.services.share_mut(|services| {
+                let mut deepkey = MockDeepkeyService::new();
+                deepkey
+                    .expect_is_key_valid()
+                    .returning(|_, _| box_fut_plain(Ok(true)));
+
+                deepkey
+                    .expect_key_mutation()
+                    .returning(|_, _| box_fut_plain(Ok(())));
+
+                let app_store = MockAppStoreService::new();
+
+                *services = Some(ConductorServices {
+                    deepkey: Arc::new(deepkey),
+                    app_store: Arc::new(app_store),
+                });
             });
 
             self.clone().add_admin_interfaces(admin_configs).await?;

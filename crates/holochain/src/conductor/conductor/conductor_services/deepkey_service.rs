@@ -32,7 +32,7 @@ pub trait DeepkeyService: Send + Sync {
 }
 
 /// The errors which can be produced by Deepkey
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 #[allow(missing_docs)]
 pub enum DeepkeyServiceError {
     #[error("Deepkey DNA could not be called: {0}")]
