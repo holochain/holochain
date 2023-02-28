@@ -56,12 +56,12 @@ on:
         required: true
 
     outputs:
-      tag:
+      latest_holochain_tag:
         description: "which holochain tag, if one, will be released"
-        value: ${{ jobs.prepare.outputs.tag }}
-      version:
+        value: ${{ jobs.prepare.outputs.latest_holochain_tag }}
+      latest_holochain_version:
         description: "which holochain version, if one, will be released"
-        value: ${{ jobs.prepare.outputs.version }}
+        value: ${{ jobs.prepare.outputs.latest_holochain_version }}
       release_branch:
         description: "the branch that contains the changes made during this action"
         value: ${{ jobs.prepare.outputs.release_branch }}
@@ -84,6 +84,8 @@ jobs:
       release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
       repo_nix_store_path: ${{ steps.write-env-and-tag.outputs.repo_nix_store_path }}
       releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
+      latest_holochain_tag: ${{ steps.bump-versions.outputs.latest_holochain_tag }}
+      latest_holochain_version: ${{ steps.bump-versions.outputs.latest_holochain_version }}
 
     steps:
       - name: Checkout repository
@@ -261,16 +263,16 @@ jobs:
 
           git tag --sort=-taggerdate | grep holochain-
 
-          export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
-          export VERSION=${TAG/holochain-/}
+          export LATEST_HOLOCHAIN_TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
+          export LATEST_HOLOCHAIN_VERSION=${LATEST_HOLOCHAIN_TAG/holochain-/}
           export RELEASE_BRANCH=$(git branch --show-current)
 
           # clean the repo before adding it to the store
           git clean -ffdx
           export STORE_PATH=$(nix store add-path --name holochain_repo .)
 
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "latest_holochain_tag=${LATEST_HOLOCHAIN_TAG}" >> $GITHUB_OUTPUT
+          echo "latest_holochain_version=${LATEST_HOLOCHAIN_VERSION}" >> $GITHUB_OUTPUT
           echo "release_branch=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
           echo "repo_nix_store_path=${STORE_PATH}" >> $GITHUB_OUTPUT
 
