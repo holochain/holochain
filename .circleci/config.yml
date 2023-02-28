@@ -1,0 +1,18 @@
+version: 2.1
+
+commands: {}
+
+jobs:
+   ci-jobs-succeed:
+      docker:
+         - image: bash
+      steps:
+         - run:
+              name: echo
+              command: echo
+
+workflows:
+   tests:
+      jobs:
+         - ci-jobs-succeed:
+              requires: []
