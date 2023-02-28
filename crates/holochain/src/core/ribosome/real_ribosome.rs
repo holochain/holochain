@@ -24,6 +24,7 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
+use crate::core::ribosome::host_fn::block_agent::block_agent;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_info::call_info;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
@@ -54,6 +55,7 @@ use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
 use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
+use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::version::version;
@@ -520,6 +522,13 @@ impl RealRibosome {
         };
 
         host_fn_builder
+            .with_host_function(
+                &mut ns,
+                "__hc__accept_countersigning_preflight_request_1",
+                accept_countersigning_preflight_request,
+            )
+            .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
+            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
             .with_host_function(&mut ns, "__hc__trace_1", trace)
             .with_host_function(&mut ns, "__hc__hash_1", hash)
             .with_host_function(&mut ns, "__hc__version_1", version)
@@ -572,7 +581,6 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__random_bytes_1", random_bytes)
             .with_host_function(&mut ns, "__hc__sys_time_1", sys_time)
             .with_host_function(&mut ns, "__hc__sleep_1", sleep)
-            .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
             .with_host_function(&mut ns, "__hc__capability_claims_1", capability_claims)
             .with_host_function(&mut ns, "__hc__capability_grants_1", capability_grants)
             .with_host_function(&mut ns, "__hc__capability_info_1", capability_info)
@@ -593,11 +601,6 @@ impl RealRibosome {
                 "__hc__must_get_agent_activity_1",
                 must_get_agent_activity,
             )
-            .with_host_function(
-                &mut ns,
-                "__hc__accept_countersigning_preflight_request_1",
-                accept_countersigning_preflight_request,
-            )
             .with_host_function(&mut ns, "__hc__query_1", query)
             .with_host_function(&mut ns, "__hc__remote_signal_1", remote_signal)
             .with_host_function(&mut ns, "__hc__call_1", call)
@@ -607,7 +610,8 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__delete_link_1", delete_link)
             .with_host_function(&mut ns, "__hc__update_1", update)
             .with_host_function(&mut ns, "__hc__delete_1", delete)
-            .with_host_function(&mut ns, "__hc__schedule_1", schedule);
+            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
 
         imports.register("env", ns);
 

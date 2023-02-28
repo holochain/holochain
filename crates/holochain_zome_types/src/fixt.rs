@@ -32,6 +32,11 @@ fixturator!(
     from Bytes;
 );
 
+fixturator!(
+    CellId;
+    constructor fn new(DnaHash, AgentPubKey);
+);
+
 // Create random timestamps that are guaranteed to be valid UTC date and time (see datetime
 // from_timestamp implementation)
 //  - valid +'ve seconds, convertible to +'ve i32 when divided by days
