@@ -1,11 +1,17 @@
 use super::*;
 use crate::conductor::space::TestSpaces;
+use crate::core::workflow::inline_validation;
+use crate::sweettest::SweetAgents;
+use crate::sweettest::SweetConductor;
+use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
+use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
@@ -569,39 +575,78 @@ fn valid_chain_test() {
     });
 }
 
-#[test]
-fn test_agent_update() {
-    // use holochain_zome_types::holochain_integrity_types::action::builder;
+#[tokio::test(flavor = "multi_thread")]
+async fn test_agent_update() {
+    let dna = SweetDnaFile::unique_empty().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agent1 = SweetAgents::one(conductor.keystore()).await;
+    conductor
+        .setup_app_for_agent("app", agent1.clone(), vec![&dna])
+        .await
+        .unwrap();
 
-    let agent1 = fixt!(AgentPubKey);
+    let dna_def = Arc::new(fixt!(DnaDef));
+    let dna_hash = dna_def.to_hash();
+    let space = conductor
+        .get_spaces()
+        .get_or_create_space(&dna_hash)
+        .unwrap();
+
+    let chain = space
+        .source_chain(conductor.keystore(), agent1.clone())
+        .await
+        .unwrap();
+
+    let network = conductor.holochain_p2p().to_dna(dna_hash.clone(), None);
+
     let ts = Timestamp::now();
     let sec = std::time::Duration::from_secs(1);
 
-    let mut chain = vec![];
-
-    chain.push(Action::Dna(Dna {
+    let a0 = Action::Dna(Dna {
         author: agent1.clone(),
         timestamp: ts,
         hash: fixt!(DnaHash),
-    }));
+    });
 
-    chain.push(Action::AgentValidationPkg(AgentValidationPkg {
+    let a1 = Action::AgentValidationPkg(AgentValidationPkg {
         author: agent1.clone(),
         timestamp: (ts + sec * 1).unwrap(),
         action_seq: 1,
-        prev_action: chain[0].to_hash(),
+        prev_action: a0.to_hash(),
         membrane_proof: None,
-    }));
+    });
 
-    chain.push(Action::Create(Create {
+    let a2 = Action::Create(Create {
         author: agent1.clone(),
         timestamp: (ts + sec * 2).unwrap(),
         action_seq: 2,
-        prev_action: chain[1].to_hash(),
+        prev_action: a1.to_hash(),
         entry_type: EntryType::AgentPubKey,
         entry_hash: agent1.clone().into(),
         weight: EntryRateWeight::default(),
-    }));
+    });
 
-    todo!("test that this is all valid by sys validation standards");
+    chain
+        .put_with_action(a0, None, ChainTopOrdering::Strict)
+        .await
+        .unwrap();
+    chain
+        .put_with_action(a1, None, ChainTopOrdering::Strict)
+        .await
+        .unwrap();
+    chain
+        .put_with_action(a2, None, ChainTopOrdering::Strict)
+        .await
+        .unwrap();
+    chain.flush(&network).await.unwrap();
+
+    // let workspace = space
+    //     .source_chain_workspace(conductor.keystore(), agent1, dna_def.clone())
+    //     .await
+    //     .unwrap();
+    // let ribosome = conductor.get_ribosome(&dna_hash).unwrap();
+
+    // inline_validation(workspace, network, conductor.raw_handle(), ribosome)
+    //     .await
+    //     .unwrap();
 }

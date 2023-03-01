@@ -3,7 +3,7 @@
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
+use holo_hash::{AgentPubKey, DhtOpHash, DnaHash, HashableContentExtSync};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{
@@ -28,6 +28,7 @@ use holochain_sqlite::{
     prelude::{DatabaseError, DatabaseResult},
 };
 use holochain_state::{
+    host_fn_workspace::SourceChainWorkspace,
     mutations,
     prelude::{from_blob, StateQueryResult},
     query::{map_sql_dht_op_common, StateQueryError},
@@ -37,7 +38,7 @@ use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
 };
-use holochain_zome_types::{Entry, EntryVisibility, SignedAction, Timestamp};
+use holochain_zome_types::{CellId, DnaDef, Entry, EntryVisibility, SignedAction, Timestamp};
 use kitsune_p2p::{
     event::{TimeWindow, TimeWindowInclusive},
     KitsuneP2pConfig,
@@ -725,6 +726,25 @@ impl Space {
             author,
         )
         .await
+    }
+
+    /// Create a SourceChainWorkspace from this Space
+    pub async fn source_chain_workspace(
+        &self,
+        keystore: MetaLairClient,
+        agent_pubkey: AgentPubKey,
+        dna_def: Arc<DnaDef>,
+    ) -> ConductorResult<SourceChainWorkspace> {
+        Ok(SourceChainWorkspace::new(
+            self.authored_db.clone(),
+            self.dht_db.clone(),
+            self.dht_query_cache.clone(),
+            self.cache_db.clone(),
+            keystore,
+            agent_pubkey,
+            dna_def,
+        )
+        .await?)
     }
 }
 
