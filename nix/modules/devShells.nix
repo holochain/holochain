@@ -36,33 +36,65 @@
           ++ (with pkgs; [ cargo-readme cargo-sweep gh gitFull cacert ]);
         };
 
-        coreDev = pkgs.mkShell {
-          inputsFrom = [ self'.devShells.rustDev ];
+        coreDev =
+          let
+            holochainTestDrvs =
+              (
+                lib.attrsets.filterAttrs
+                  (name: _package:
+                    (builtins.match "^holochain-tests.*" name) != null
+                  )
+                  self'.packages
+              );
+          in
+          pkgs.mkShell {
+            inputsFrom = [ self'.devShells.rustDev ] ++ (builtins.attrValues holochainTestDrvs);
 
-          packages = with pkgs; [
-            cargo-nextest
+            packages = with pkgs; [
+              cargo-nextest
 
-            (pkgs.writeShellScriptBin "scripts-cargo-regen-lockfiles" ''
-              cargo fetch --locked
-              cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
-              cargo generate-lockfile --offline
-              cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
-            '')
-          ];
+              (pkgs.writeShellScriptBin "scripts-cargo-regen-lockfiles" ''
+                cargo fetch --locked
+                cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
+                cargo generate-lockfile --offline
+                cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
+              '')
 
-          shellHook = ''
-            export PS1='\n\[\033[1;34m\][coreDev:\w]\$\[\033[0m\] '
+            ]
 
-            export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
-            mkdir -p $HC_TEST_WASM_DIR
+            # generate one script for each of the "holochain-tests-" prefixed derivations by reusing their checkPhase
+            ++ (builtins.attrValues (builtins.mapAttrs
+              (name: package:
+                pkgs.writeShellScriptBin "scripts-${name}"
+                  (
+                    ''
+                      set -xue
+                    ''
+                    # remove the craneLib internals that are part of the checkPhase and
+                    # some characters that would prevent the passing of args
+                    + (builtins.replaceStrings
+                      [ "cargoWithProfile" "runHook preCheck" "runHook postCheck" "\n" "\\" "  " ]
+                      [ "cargo" "" "" "" "" " " ]
+                      package.checkPhase)
+                    + "$@"
+                  )
+              )
+              holochainTestDrvs)
+            );
 
-            export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
-            mkdir -p $HC_WASM_CACHE_PATH
+            shellHook = ''
+              export PS1='\n\[\033[1;34m\][coreDev:\w]\$\[\033[0m\] '
 
-            # Enables the pre-commit hooks
-            ${config.pre-commit.installationScript}
-          '';
-        };
+              export HC_TEST_WASM_DIR="$CARGO_TARGET_DIR/.wasm_target"
+              mkdir -p $HC_TEST_WASM_DIR
+
+              export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
+              mkdir -p $HC_WASM_CACHE_PATH
+
+              # Enables the pre-commit hooks
+              ${config.pre-commit.installationScript}
+            '';
+          };
 
         rustDev = pkgs.mkShell
           {

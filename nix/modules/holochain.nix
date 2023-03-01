@@ -64,7 +64,7 @@
       });
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
-        pname = "holochain-nextest";
+        pname = "holochain-tests-nextest";
         CARGO_PROFILE = "fast-test";
         nativeBuildInputs = [ pkgs.cargo-nextest ];
         buildPhase = ''
@@ -100,6 +100,8 @@
           __noChroot = pkgs.stdenv.isLinux;
           cargoArtifacts = holochainNextestDeps;
 
+          pname = "holochain-tests-nextest";
+
           preCheck = ''
             export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
           '';
@@ -125,7 +127,7 @@
       holochain-tests-nextest = craneLib.cargoNextest holochainTestsNextestArgs;
       holochain-tests-nextest-tx5 = craneLib.cargoNextest
         (holochainTestsNextestArgs // {
-          pname = "holochain-nextest-tx5";
+          pname = "holochain-tests-nextest-tx5";
           cargoExtraArgs = holochainTestsNextestArgs.cargoExtraArgs + '' \
             --features tx5 \
           '';
