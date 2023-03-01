@@ -602,7 +602,7 @@ where
 
     pub fn chain_head_nonempty(&self) -> SourceChainResult<HeadInfo> {
         // Check scratch for newer head.
-        Ok(self.chain_head()?.ok_or(SourceChainError::ChainEmpty)?)
+        self.chain_head()?.ok_or(SourceChainError::ChainEmpty)
     }
 
     #[allow(clippy::len_without_is_empty)]

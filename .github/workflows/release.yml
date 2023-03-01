@@ -13,7 +13,6 @@
 #   - create a pull-request towards the source branch
 #   - create a github release
 
-
 name: release holochain
 
 on:
@@ -193,7 +192,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Install nix
-        uses: cachix/install-nix-action@v19
+        uses: cachix/install-nix-action@v20
       - name: Setup cachix
         uses: cachix/cachix-action@v12
         if: ${{ ! contains(matrix.platform.runs-on, 'self-hosted') }}

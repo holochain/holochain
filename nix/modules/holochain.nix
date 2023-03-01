@@ -150,12 +150,7 @@
         cargoArtifacts = holochainDeps;
         doCheck = false;
 
-        cargoClippyExtraArgs = ''
-          -- \
-          -A clippy::nursery -D clippy::style -A clippy::cargo \
-          -A clippy::pedantic -A clippy::restriction \
-          -D clippy::complexity -D clippy::perf -D clippy::correctness
-        '';
+        cargoClippyExtraArgs = "-- ${import ../../.config/clippy-args.nix}";
 
         dontPatchELF = true;
         dontFixup = true;
