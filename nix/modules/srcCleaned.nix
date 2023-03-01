@@ -26,4 +26,13 @@ in
     ];
     root = "${self}/crates/release-automation";
   };
+
+  options.srcCleanedHolonix = lib.mkOption { type = lib.types.raw; };
+  config.srcCleanedHolonix = inputs.nix-filter.lib {
+    include = [
+      "holonix"
+    ];
+    root = self;
+  };
+
 }
