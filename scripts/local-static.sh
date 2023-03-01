@@ -6,14 +6,4 @@ if test ! -f "$name"; then
   exit 127
 fi
 
-cargo fmt --check && \
-  cargo clippy -- \
-  -A clippy::nursery \
-  -D clippy::style \
-  -A clippy::cargo \
-  -A clippy::pedantic \
-  -A clippy::restriction \
-  -D clippy::complexity \
-  -D clippy::perf \
-  -D clippy::correctness
-
+cargo fmt --check && cargo clippy -- $(xargs <.config/clippy-args.nix)

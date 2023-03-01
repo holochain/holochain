@@ -60,6 +60,8 @@ kitsune_p2p_types::write_codec_enum! {
 
 fn next_msg_id() -> u64 {
     static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    // MAYBE - track these message ids at the connection level
+    // to prevent mismatches
     MSG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
@@ -236,8 +238,7 @@ impl MetaNetCon {
 
                     let res_store = res_store.clone();
                     tokio::task::spawn(async move {
-                        // TODO - use tuning_params.implicit_timeout
-                        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                        tokio::time::sleep(timeout.time_remaining()).await;
                         res_store.lock().remove(&msg_id);
                     });
 
