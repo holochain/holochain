@@ -626,6 +626,18 @@ async fn test_agent_update() {
         weight: EntryRateWeight::default(),
     });
 
+    // holochain_state::source_chain::genesis(
+    //     space.vault.clone(),
+    //     space.dht_db.clone(),
+    //     &dht_db_cache,
+    //     api.keystore().clone(),
+    //     dna_file.dna_hash().clone(),
+    //     agent_pubkey,
+    //     membrane_proof,
+    //     chc,
+    // )
+    // .await?;
+
     chain
         .put_with_action(a0, None, ChainTopOrdering::Strict)
         .await
