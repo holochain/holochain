@@ -1,9 +1,9 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
+use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use crate::core::ribosome::RibosomeError;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -25,33 +25,38 @@ pub fn agent_info<'a>(
                 .expect("Must have source chain if agent_info access is given")
                 .agent_pubkey()
                 .clone();
+            let head = call_context
+                .host_context
+                .workspace()
+                .source_chain()
+                .as_ref()
+                .expect("Must have source chain if agent_info access is given")
+                .chain_head_nonempty()
+                .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
             Ok(AgentInfo {
                 agent_initial_pubkey: agent_pubkey.clone(),
                 agent_latest_pubkey: agent_pubkey,
-                chain_head: call_context
-                    .host_context
-                    .workspace()
-                    .source_chain()
-                    .as_ref()
-                    .expect("Must have source chain if agent_info access is given")
-                    .chain_head()
-                    .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?,
+                chain_head: head.into_tuple(),
             })
         }
-        _ => Err(wasm_error!(WasmErrorInner::Host(RibosomeError::HostFnPermissions(
-            call_context.zome.zome_name().clone(),
-            call_context.function_name().clone(),
-            "agent_info".into()
-        ).to_string())).into())
+        _ => Err(wasm_error!(WasmErrorInner::Host(
+            RibosomeError::HostFnPermissions(
+                call_context.zome.zome_name().clone(),
+                call_context.function_name().clone(),
+                "agent_info".into()
+            )
+            .to_string()
+        ))
+        .into()),
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use holochain_wasm_test_utils::TestWasm;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_info_test() {

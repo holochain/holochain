@@ -55,7 +55,7 @@ pub fn create<'a>(
                             entry_def_index,
                         }) => {
                             let app_entry_def =
-                            AppEntryDef::new(entry_def_index, zome_index, entry_visibility);
+                                AppEntryDef::new(entry_def_index, zome_index, entry_visibility);
                             EntryType::App(app_entry_def)
                         }
                         EntryDefLocation::CapGrant => EntryType::CapGrant,
@@ -155,8 +155,10 @@ pub mod wasm_test {
                     .source_chain()
                     .as_ref()
                     .unwrap()
-                    .chain_head()?
-                    .0,
+                    .chain_head()
+                    .unwrap()
+                    .unwrap()
+                    .action,
             )
         })
         .unwrap();

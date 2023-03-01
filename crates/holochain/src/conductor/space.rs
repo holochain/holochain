@@ -3,7 +3,7 @@
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use holo_hash::{AgentPubKey, DhtOpHash, DnaHash, HashableContentExtSync};
+use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{
@@ -38,7 +38,7 @@ use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
 };
-use holochain_zome_types::{CellId, DnaDef, Entry, EntryVisibility, SignedAction, Timestamp};
+use holochain_zome_types::{DnaDef, Entry, EntryVisibility, SignedAction, Timestamp};
 use kitsune_p2p::{
     event::{TimeWindow, TimeWindowInclusive},
     KitsuneP2pConfig,
