@@ -163,16 +163,15 @@
 
       holochainWasmArgs = (commonArgs // {
         pname = "holochain-tests-wasm";
-        cargoExtraArgs =
-          "--lib --all-features";
 
-        cargoToml = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.toml";
-        cargoLock = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
-
-        postUnpack = ''
-          cd $sourceRoot/crates/test_utils/wasm/wasm_workspace
-          sourceRoot="."
+        postConfigure = ''
+          export CARGO_TARGET_DIR=''${CARGO_TARGET_DIR:-$PWD/target}
         '';
+
+        cargoExtraArgs =
+          "--lib --all-features --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml";
+
+        cargoLock = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
       });
 
       holochainDepsWasm = craneLib.buildDepsOnly (holochainWasmArgs // {
