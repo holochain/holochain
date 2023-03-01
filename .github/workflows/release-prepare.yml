@@ -266,7 +266,7 @@ jobs:
           export RELEASE_BRANCH=$(git branch --show-current)
 
           # clean the repo before adding it to the store
-          git clean -fdx
+          git clean -ffdx
           export STORE_PATH=$(nix store add-path --name holochain_repo .)
 
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
