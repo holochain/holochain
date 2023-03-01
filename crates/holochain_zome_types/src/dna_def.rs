@@ -363,7 +363,7 @@ impl HashableContent for DnaDef {
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
             name: &self.name,
-            modifiers: &self.modifiers.clone().into(),
+            modifiers: &self.modifiers,
             integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(
