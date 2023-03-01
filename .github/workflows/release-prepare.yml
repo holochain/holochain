@@ -89,7 +89,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Install nix
-        uses: cachix/install-nix-action@v19
+        uses: cachix/install-nix-action@v20
       - name: Setup cachix
         uses: cachix/cachix-action@v12
         with:
@@ -266,7 +266,7 @@ jobs:
           export RELEASE_BRANCH=$(git branch --show-current)
 
           # clean the repo before adding it to the store
-          git clean -fdx
+          git clean -ffdx
           export STORE_PATH=$(nix store add-path --name holochain_repo .)
 
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
