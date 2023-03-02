@@ -325,7 +325,6 @@ pub mod agent_info;
 pub mod async_lazy;
 mod auto_stream_select;
 pub use auto_stream_select::*;
-pub mod bin_types;
 pub mod bootstrap;
 pub mod codec;
 pub mod combinators;
@@ -335,6 +334,7 @@ pub mod metrics;
 pub mod reverse_semaphore;
 pub mod task_agg;
 pub mod tls;
+pub use kitsune_p2p_bin_data as bin_types;
 
 #[cfg(feature = "tx2")]
 pub mod tx2;
