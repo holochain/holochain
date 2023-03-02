@@ -45,7 +45,7 @@ We gladly welcome pull requests that help us identify and fix bugs!
 
 The end goal of addressing any bug is to have a test written in our codebase to reproduce the bug, and of course to implement the fix for the bug. A PR with at least a minimal reproduction demonstrating the bug is extremely helpful, even if the fix has not been discovered.
 
-To write a minimal reproduction of a problem discovered "in the wild", we recommend you to write a sample zome, DNA, or hApp which demonstrates the problem, and open a PR with your failing test. We have a library called [`sweettest`](https://docs.rs/holochain/latest/holochain/sweettest/index.html) which is well-suited to the task of testing the behavior of Holochain applications. 
+To write a minimal reproduction of a problem discovered "in the wild", we recommend you to write a sample zome, DNA, or hApp which demonstrates the problem, and open a PR with your failing test. We have a library called [`sweettest`](https://docs.rs/holochain/latest/holochain/sweettest/index.html) which is well-suited to the task of testing the behavior of Holochain applications.
 
 When writing your reproduction PR, you can recreate the problematic part of your app in one of two ways: "inline zomes", or "test wasms".
 
@@ -105,10 +105,10 @@ We use rust-fmt to enforce code style so that we don't spend time arguing about 
 Run the formatter with:
 
 ``` shell
-nix-shell --run hc-rust-fmt
+nix develop .#coreDev --command cargo fmt
 ```
 
-or, if you have a version of `cargo` locally installed which matches the version used in the nix-shell:
+or, if you have a version of `cargo` locally installed which matches the version used in the `nix develop` environment:
 
 ```shell
 cargo fmt

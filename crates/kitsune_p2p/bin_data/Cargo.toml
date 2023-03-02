@@ -1,0 +1,25 @@
+[package]
+name = "kitsune_p2p_bin_data"
+version = "0.1.0"
+description = "Binary data types for kitsune_p2p"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/kitsune_p2p_bin_data"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
+edition = "2021"
+
+[dependencies]
+kitsune_p2p_dht_arc = { version = "^0.1.0", path = "../dht_arc" }
+shrinkwraprs = "0.3.0"
+derive_more = "0.99.7"
+serde = { version = "1", features = [ "derive", "rc" ] }
+base64 = "0.13"
+serde_bytes = "0.11"
+arbitrary = { version = "1.0", features = ["derive"], optional = true}
+
+[features]
+test_utils = [
+  "arbitrary"
+]

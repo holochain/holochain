@@ -23,7 +23,7 @@
           '';
     in
     {
-      packages.holonix-tests-integration = self'.devShells.holonix.overrideAttrs (old: {
+      packages.build-holonix-tests-integration = self'.devShells.holonix.overrideAttrs (old: {
         buildPhase = ''
           ${testScript}
           touch $out
