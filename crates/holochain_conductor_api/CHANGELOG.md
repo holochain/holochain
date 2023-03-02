@@ -7,7 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 - Reject creation of duplicate clone cells. It was possible to create a clone cell with a DNA hash identical to an already existing DNA. [\#1997](https://github.com/holochain/holochain/pull/1997)
-- Adds doc comments for `StemCell`, `ProvisionedCell` and `CloneCell` structs
+- Add doc comments for `StemCell`, `ProvisionedCell` and `CloneCell` structs
+- Add links to more info on the conductor to the conductor API module.
 
 ## 0.1.0
 
