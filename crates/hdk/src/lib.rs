@@ -4,7 +4,7 @@
 //! Its [Conductor API](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api) can be queried
 //! by a client to manage hApps and send requests to hApp functions.
 //! [Read more on Holochain's architecture.](https://developer.holochain.org/concepts/2_application_architecture)
-//! 
+//!
 //! hApps can be developed using the HDK. See the [Holochain Quick Start Guide](https://developer.holochain.org/quick-start)
 //! to get started with hApp development.
 //!
@@ -19,9 +19,9 @@
 //!
 //! Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 //! Some of the examples are very contrived, none are intended as production grade hApp examples, but do highlight key functionality.
-//! 
+//!
 //! # Zomes are separated into data model and domain logic
-//! 
+//!
 //! hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
 //! data model is defined in integrity zomes and the domain logic is written in coordinator zomes.
 //!
@@ -67,12 +67,12 @@
 //!
 //!
 //! # Zomes are based on callbacks 👂
-//! 
+//!
 //! The only way to execute logic inside WASM is by having the conductor (host) call a function that is marked as an `extern` by the zome (guest).
 //!
 //! > Note: From the perspective of hApp development in WASM, the "guest" is the WASM and the "host" is the running Holochain conductor.
 //! The host is _not_ the "host operating system" in this context.
-//! 
+//!
 //! Similarly, the only way for the guest to do anything other than process data and calculations is to call functions the host provides to the guest at runtime.
 //!
 //! The latter are all defined by the Holochain conductor and implemented by HDK for you, but the former need to all be defined by your application.
@@ -87,7 +87,7 @@
 //! ```
 //!
 //! And every host function defined by Holochain has a convenience wrapper in HDK that does the type juggling for you.
-//! 
+//!
 //! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
 //! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
 //!
@@ -194,7 +194,7 @@
 //!
 //!
 //! # HDK is atomic on the source chain ⚛
-//! 
+//!
 //! [Read up on what the source chain is in Holochain.](https://developer.holochain.org/concepts/3_source_chain)
 //!
 //! All writes to the source chain are atomic within a single extern/callback call.

@@ -6,7 +6,7 @@
 //! Refer to [Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture)
 //! for more info. Read about hApp development in the
 //! [Happ Development Kit (HDK) documentation](https://docs.rs/hdk/latest/hdk).
-//! 
+//!
 //! There is a [Holochain client for JavaScript](https://github.com/holochain/holochain-client-js)
 //! and a [Rust client](https://github.com/holochain/holochain-client-rust)
 //! to connect to the Conductor.
