@@ -213,13 +213,13 @@ impl InclusiveTimestampInterval {
     }
 
     /// Accessor for start timestamp.
-    pub fn start(&self) -> &Timestamp {
-        &self.start
+    pub fn start(&self) -> Timestamp {
+        self.start
     }
 
     /// Accessor for end timestamp.
-    pub fn end(&self) -> &Timestamp {
-        &self.end
+    pub fn end(&self) -> Timestamp {
+        self.end
     }
 }
 

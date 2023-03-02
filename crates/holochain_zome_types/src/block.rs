@@ -201,11 +201,11 @@ impl Block {
         &self.interval
     }
 
-    pub fn start(&self) -> &Timestamp {
+    pub fn start(&self) -> Timestamp {
         self.interval.start()
     }
 
-    pub fn end(&self) -> &Timestamp {
+    pub fn end(&self) -> Timestamp {
         self.interval.end()
     }
 }
