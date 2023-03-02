@@ -10,20 +10,29 @@ These tests will be run every time you post a new pull request in CircleCI.
 
 ## Requirements
 
-- Having `nix-shell` installed ([instructions](https://nixos.org/download.html)).
-- Having rust and `cargo` installed and in the stable toolchain
+Either of these:
+
+- *(recommended)* Having `nix` installed ([instructions](https://nixos.org/download.html)).
+- *(alternative)* Having rust and `cargo` installed and in the stable toolchain
 
 ## Running tests
 
-First of all, from the root folder, run `nix-shell`.
+First of all, from the root folder, run `nix develop .#coreDev`.
 
-- To run all tests in from all the crates, run this from the root folder:
+### Using test preconfigured impure test scripts
+
+The _coreDev_ developer shell provides impure test scripts that are automatically generated from the Nix derivations that we use for testing on CI.
+They are prefixed with *script-* and you should be able to autocomplete them by typing _script-<TAB>_.
+
+For example To run all tests in from all the crates, run this from the root folder:
 
 ```bash
-hc-merge-test
+script-holochain-tests-all
 ```
 
-You can also use `hc-test` if you don't want to run cargo fmt and cargo clippy, but both of this will be RUN on CircleCI.
+Or use `script-holochain-tests-unit-all` if you don't want to run the static checks (cargo doc, cargo fmt and cargo clippy, but all of these this will be RUN on CI.
+
+### Using `cargo test` manually
 
 - To run only one test from your crate, run this command:
 
