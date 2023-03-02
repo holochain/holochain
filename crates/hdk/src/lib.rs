@@ -1,27 +1,21 @@
 //! The Holochain Development Kit (HDK) provides high and low level functions for writing Holochain applications.
+//! 
+//! The Holochain framework provides the HDK to develop Holochain applications (hApps).
+//! It exposes the [Conductor API](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api)
+//! through websockets to manage hApps and send requests to their functions.
 //!
-//! Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes".
+//! Functions of a hApp can be organized into reusable components. In Holochain terminology these components are called "zomes".
 //! One or multiple zomes are compiled into a WebAssembly (WASM) binary, referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
 //! In short, that structure is __hApp -> DNA -> zome -> function__.
+//!
+//! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
+//! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
 //!
 //! hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
 //! data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
 //! [Holochain Deterministic Integrity (HDI)](crate::prelude::hdi) for more information.
 //!
-//! Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
-//! Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
-//! Holochain makes use of WASM as the format of its applications. WASM binaries meet the aforementioned requirements as per the
-//! [WebAssembly specification](https://webassembly.github.io/spec/core).
-//!
-//! hApps can be installed on a device that's running a so-called conductor, Holochain's runtime. Clients can then call each zome's functions via Remote Procedure Calls (RPC).
-//! Holochain employs websocket ports for these RPCs, served by the conductor. Calls are made either from a client on localhost or from other nodes on the network.
-//! The zome function to be executed must be specified in each call. Every zome function defines the response it returns to the client.
-//! [More info on Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture)
-//!
-//! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
-//! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
-//!
-//! See the [Holochain Learning Resources](https://developer.holochain.org/learning) to get started with hApp development.
+//! See the [Holochain Quick Start Guide](https://developer.holochain.org/quick-start) to get started with hApp development.
 //!
 //! # Example zomes 🍭
 //!
