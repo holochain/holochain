@@ -11,7 +11,6 @@ use error::SysValidationError;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
