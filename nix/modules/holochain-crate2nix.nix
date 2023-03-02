@@ -31,7 +31,7 @@
     in
     {
       packages = {
-        holochain-crates-standalone =
+        build-holochain-build-crates-standalone =
           mkNoIfdPackage "holochain" cargoNix.allWorkspaceMembers;
       };
     };
