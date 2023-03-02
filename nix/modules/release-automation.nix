@@ -105,7 +105,7 @@
       packages = {
         release-automation = package;
 
-        release-automation-tests = tests;
+        build-release-automation-tests = tests;
 
         # check the state of the repository
         # TODO: to get the actual .git repo we could be something like this:
@@ -121,7 +121,7 @@
         # nix flake lock --update-input repo-git --override-input repo-git "path:$tmpdir"
         # rm -rf $tmpgit
         # ```
-        release-automation-tests-repo = pkgs.runCommand
+        build-release-automation-tests-repo = pkgs.runCommand
           "release-automation-tests-repo"
           {
             __noChroot = pkgs.stdenv.isLinux;

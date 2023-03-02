@@ -638,11 +638,6 @@ async fn test_agent_update() {
         weight: EntryRateWeight::default(),
     });
 
-    // chain
-    //     .put_with_action(a0, None, ChainTopOrdering::Strict)
-    //     .await
-    //     .unwrap();
-
     chain
         .put_with_action(a1, None, ChainTopOrdering::Strict)
         .await
@@ -661,9 +656,6 @@ async fn test_agent_update() {
     .await
     .unwrap();
 
-    // // this should be valid
-    // chain.flush(&network).await.unwrap();
-
     chain
         .put_with_action(a3, Some(Entry::Agent(agent3)), ChainTopOrdering::Strict)
         .await
@@ -672,14 +664,4 @@ async fn test_agent_update() {
     inline_validation(workspace, network, conductor.raw_handle(), ribosome.clone())
         .await
         .unwrap_err();
-
-    // let workspace = space
-    //     .source_chain_workspace(conductor.keystore(), agent1, dna_def.clone())
-    //     .await
-    //     .unwrap();
-    // let ribosome = conductor.get_ribosome(&dna_hash).unwrap();
-
-    // inline_validation(workspace, network, conductor.raw_handle(), ribosome)
-    //     .await
-    //     .unwrap();
 }
