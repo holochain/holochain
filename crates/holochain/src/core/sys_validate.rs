@@ -268,8 +268,7 @@ pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationRe
     if let Some(error) = maybe_error {
         Err(PrevActionError::InvalidSuccessor(
             error.to_string(),
-            prev_action.clone(),
-            action.clone(),
+            Box::new((prev_action.clone(), action.clone())),
         ))
         .map_err(|e| ValidationOutcome::from(e).into())
     } else {

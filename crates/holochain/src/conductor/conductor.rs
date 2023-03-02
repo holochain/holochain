@@ -340,7 +340,6 @@ mod startup_shutdown_impls {
                 deepkey
                     .expect_is_key_valid()
                     .returning(|_, _| box_fut_plain(Ok(true)));
-
                 deepkey
                     .expect_key_mutation()
                     .returning(|_, _| box_fut_plain(Ok(())));

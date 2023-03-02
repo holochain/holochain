@@ -7,6 +7,7 @@ use crate::conductor::ConductorHandle;
 /// Interface for the AppStore service
 #[async_trait::async_trait]
 #[mockall::automock]
+#[allow(clippy::needless_lifetimes)]
 pub trait AppStoreService: Send + Sync {
     /// Fetch a DNA bundle from the store
     async fn get_dna_bundle(&self, dna_hash: DnaHash) -> AppStoreServiceResult<Option<DnaBundle>>;
@@ -44,6 +45,7 @@ impl AppStoreBuiltin {
 }
 
 #[async_trait::async_trait]
+#[allow(clippy::needless_lifetimes)]
 impl AppStoreService for AppStoreBuiltin {
     async fn get_dna_bundle(&self, _dna_hash: DnaHash) -> AppStoreServiceResult<Option<DnaBundle>> {
         todo!("placeholder")
