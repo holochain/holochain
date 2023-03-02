@@ -17,9 +17,35 @@ Either of these:
 
 ## Running tests
 
-First of all, from the root folder, run `nix develop .#coreDev`.
+
+### Using the same Nix derivations as CI
+
+CI runs all Holochain tests via the `nix build` command by referencing the various packages.
+As of 2023-03-02, we have the following test derivations:
+
+- build-holochain-tests-all
+- build-holochain-tests-static-all
+- build-holochain-tests-static-clippy
+- build-holochain-tests-static-doc
+- build-holochain-tests-static-fmt
+- build-holochain-tests-unit
+- build-holochain-tests-unit-all
+- build-holochain-tests-unit-tx5
+- build-holochain-tests-unit-wasm
+
+The ones ending in *-all* are meta packages, combining all tests in the same category.
+
+The following command builds the meta-package that incorporates all Holochain tests, and passes the current directory as the source that's to be tested:
+
+```
+nix build -L \
+  --override-input holochain . \
+  .#build-holochain-tests-all
+```
 
 ### Using test preconfigured impure test scripts
+
+First of all, from the root folder, run `nix develop .#coreDev`.
 
 The _coreDev_ developer shell provides impure test scripts that are automatically generated from the Nix derivations that we use for testing on CI.
 They are prefixed with *script-* and you should be able to autocomplete them by typing _script-<TAB>_.
