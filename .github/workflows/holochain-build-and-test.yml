@@ -17,14 +17,12 @@ jobs:
         cmd:
           # ensure functionality on multiple platforms
           - pkgs:
-              - holochain-tests-wasm
-              - holochain-tests-nextest
-              - holochain-tests-nextest-tx5
-              - holonix-tests-integration
+              - build-holochain-tests-unit-all
+              - build-holonix-tests-integration
             extra_arg: "--override-input holochain ${{ inputs.repo_path }}"
           # ensures to keep the cache populated for the most recent stable version on multiple platforms
           - pkgs:
-              - holonix-tests-integration
+              - build-holonix-tests-integration
             extra_arg: ""
         platform:
           - system: x86_64-darwin
@@ -35,12 +33,10 @@ jobs:
           # we only run repo consistency checks on x86_64-linux
           - cmd:
               pkgs:
-                - holochain-crates-standalone
-                - release-automation-tests
-                - release-automation-tests-repo
-                - holochain-tests-clippy
-                - holochain-tests-fmt
-                - holochain-tests-doc
+                - build-holochain-build-crates-standalone
+                - build-release-automation-tests
+                - build-release-automation-tests-repo
+                - build-holochain-tests-static-all
               extra_arg: "--override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux

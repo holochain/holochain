@@ -64,7 +64,7 @@
       });
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
-        pname = "holochain-nextest";
+        pname = "holochain-tests-nextest";
         CARGO_PROFILE = "fast-test";
         nativeBuildInputs = [ pkgs.cargo-nextest ];
         buildPhase = ''
@@ -100,6 +100,8 @@
           __noChroot = pkgs.stdenv.isLinux;
           cargoArtifacts = holochainNextestDeps;
 
+          pname = "holochain-tests-nextest";
+
           preCheck = ''
             export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
           '';
@@ -122,10 +124,10 @@
           '';
         });
 
-      holochain-tests-nextest = craneLib.cargoNextest holochainTestsNextestArgs;
-      holochain-tests-nextest-tx5 = craneLib.cargoNextest
+      build-holochain-tests-unit = craneLib.cargoNextest holochainTestsNextestArgs;
+      build-holochain-tests-unit-tx5 = craneLib.cargoNextest
         (holochainTestsNextestArgs // {
-          pname = "holochain-nextest-tx5";
+          pname = "holochain-tests-nextest-tx5";
           cargoExtraArgs = holochainTestsNextestArgs.cargoExtraArgs + '' \
             --features tx5 \
           '';
@@ -135,7 +137,7 @@
           ];
         });
 
-      holochain-tests-fmt = craneLib.cargoFmt (commonArgs // {
+      build-holochain-tests-static-fmt = craneLib.cargoFmt (commonArgs // {
         src = flake.config.srcCleanedHolochain;
         cargoArtifacts = null;
         doCheck = false;
@@ -144,7 +146,7 @@
         dontFixup = true;
       });
 
-      holochain-tests-clippy = craneLib.cargoClippy (commonArgs // {
+      build-holochain-tests-static-clippy = craneLib.cargoClippy (commonArgs // {
         pname = "holochain-tests-clippy";
         src = flake.config.srcCleanedHolochain;
         cargoArtifacts = holochainDeps;
@@ -163,23 +165,22 @@
 
       holochainWasmArgs = (commonArgs // {
         pname = "holochain-tests-wasm";
-        cargoExtraArgs =
-          "--lib --all-features";
 
-        cargoToml = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.toml";
-        cargoLock = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
-
-        postUnpack = ''
-          cd $sourceRoot/crates/test_utils/wasm/wasm_workspace
-          sourceRoot="."
+        postConfigure = ''
+          export CARGO_TARGET_DIR=''${CARGO_TARGET_DIR:-$PWD/target}
         '';
+
+        cargoExtraArgs =
+          "--lib --all-features --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml";
+
+        cargoLock = "${flake.config.srcCleanedHolochain}/crates/test_utils/wasm/wasm_workspace/Cargo.lock";
       });
 
       holochainDepsWasm = craneLib.buildDepsOnly (holochainWasmArgs // {
         cargoArtifacts = null;
       });
 
-      holochain-tests-wasm = craneLib.cargoTest (holochainWasmArgs // {
+      build-holochain-tests-unit-wasm = craneLib.cargoTest (holochainWasmArgs // {
         cargoArtifacts = holochainDepsWasm;
 
         dontPatchELF = true;
@@ -191,23 +192,50 @@
         '';
       });
 
-      holochain-tests-doc = craneLib.cargoDoc (commonArgs // {
+      build-holochain-tests-static-doc = craneLib.cargoDoc (commonArgs // {
         pname = "holochain-tests-docs";
         cargoArtifacts = holochainDeps;
       });
 
+
+
+      # meta packages to build multiple test packages at once
+      build-holochain-tests-unit-all = config.lib.mkMetaPkg "holochain-tests-unit-all" [
+        build-holochain-tests-unit
+        build-holochain-tests-unit-tx5
+        build-holochain-tests-unit-wasm
+      ];
+
+      build-holochain-tests-static-all = config.lib.mkMetaPkg "holochain-tests-static-all" [
+        build-holochain-tests-static-doc
+        build-holochain-tests-static-fmt
+        build-holochain-tests-static-clippy
+      ];
+
+      build-holochain-tests-all = config.lib.mkMetaPkg "build-holochain-tests-all" [
+        build-holochain-tests-unit-all
+        build-holochain-tests-static-all
+      ];
+
     in
     {
-      packages = {
-        inherit
-          holochain
-          holochain-tests-nextest
-          holochain-tests-nextest-tx5
-          holochain-tests-doc
-          holochain-tests-wasm
-          holochain-tests-fmt
-          holochain-tests-clippy
-          ;
-      };
+      packages =
+        {
+          inherit
+            holochain
+
+            build-holochain-tests-unit
+            build-holochain-tests-unit-tx5
+            build-holochain-tests-unit-wasm
+            build-holochain-tests-unit-all
+
+            build-holochain-tests-static-doc
+            build-holochain-tests-static-fmt
+            build-holochain-tests-static-clippy
+            build-holochain-tests-static-all
+
+            build-holochain-tests-all
+            ;
+        };
     };
 }
