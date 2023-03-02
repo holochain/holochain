@@ -8,6 +8,7 @@ use crate::conductor::ConductorHandle;
 /// Interface for the Deepkey service
 #[async_trait::async_trait]
 #[mockall::automock]
+#[allow(clippy::needless_lifetimes)]
 pub trait DeepkeyService: Send + Sync {
     /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp
     async fn is_key_valid(
@@ -79,6 +80,7 @@ impl DeepkeyBuiltin {
 
 #[allow(unreachable_code)]
 #[allow(unused_variables)]
+#[allow(clippy::needless_lifetimes)]
 #[async_trait::async_trait]
 impl DeepkeyService for DeepkeyBuiltin {
     async fn is_key_valid(
@@ -88,14 +90,21 @@ impl DeepkeyService for DeepkeyBuiltin {
     ) -> DeepkeyServiceResult<bool> {
         let keystore = self.conductor.keystore();
         let cell_id = self.cell_id.clone();
-        let zome_name: String = todo!("depends on dna implementation");
-        let fn_name: String = todo!("depends on dna implementation");
-        let payload = todo!("depends on dna implementation");
+        let zome_name: String = "TODO: depends on dna implementation".to_string();
+        let fn_name: String = "TODO: depends on dna implementation".to_string();
+        let payload = "TODO: depends on dna implementation".to_string();
         let cap_secret = None;
-        let provenance = cell_id.agent_pubkey();
+        let provenance = cell_id.agent_pubkey().clone();
         let is_valid: bool = self
             .conductor
-            .easy_call_zome(provenance, cap_secret, cell_id, zome_name, fn_name, payload)
+            .easy_call_zome(
+                &provenance,
+                cap_secret,
+                cell_id,
+                zome_name,
+                fn_name,
+                payload,
+            )
             .await
             .map_err(|e| DeepkeyServiceError::ZomeCallFailed(e.to_string()))?;
         Ok(is_valid)

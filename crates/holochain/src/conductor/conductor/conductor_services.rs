@@ -27,8 +27,8 @@ impl ConductorServices {
     /// Construct services from the default built-in implementations
     pub fn builtin(conductor: ConductorHandle, cell_ids: ConductorServiceCells) -> Self {
         Self {
-            deepkey: DeepkeyBuiltin::new(conductor.clone(), cell_ids.deepkey.clone()),
-            app_store: AppStoreBuiltin::new(conductor.clone(), cell_ids.app_store.clone()),
+            deepkey: DeepkeyBuiltin::new(conductor.clone(), cell_ids.deepkey),
+            app_store: AppStoreBuiltin::new(conductor, cell_ids.app_store),
         }
     }
 
@@ -37,7 +37,7 @@ impl ConductorServices {
         self.deepkey
             .cell_ids()
             .union(&self.app_store.cell_ids())
-            .map(|cell_id| *cell_id)
+            .copied()
             .collect()
     }
 }
