@@ -27,7 +27,7 @@ pub enum CellBlockReason {
     #[serde(with = "serde_bytes")]
     App(Vec<u8>),
     /// Invalid validation result.
-    Validation(DhtOpHash),
+    InvalidOp(DhtOpHash),
     /// Some bad cryptography.
     BadCrypto,
 }
@@ -201,11 +201,11 @@ impl Block {
         &self.interval
     }
 
-    pub fn start(&self) -> &Timestamp {
+    pub fn start(&self) -> Timestamp {
         self.interval.start()
     }
 
-    pub fn end(&self) -> &Timestamp {
+    pub fn end(&self) -> Timestamp {
         self.interval.end()
     }
 }

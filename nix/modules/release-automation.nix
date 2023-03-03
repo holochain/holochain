@@ -69,11 +69,11 @@
         buildInputs = commonArgs.buildInputs ++ [ pkgs.cacert ];
         nativeBuildInputs = commonArgs.nativeBuildInputs ++
           [
+            package
+
+            rustToolchain
             pkgs.gitFull
-            (config.writers.writePureShellScriptBin
-              "release-automation"
-              ([ pkgs.gitFull rustToolchain ] ++ commonArgs.nativeBuildInputs ++ commonArgs.buildInputs)
-              "exec ${package}/bin/release-automation $@")
+            pkgs.coreutils
           ];
 
         cargoNextestExtraArgs =
@@ -88,7 +88,7 @@
           in
           '' \
             --config-file=${nextestToml} \
-          '';
+          '' + builtins.getEnv "NEXTEST_EXTRA_ARGS";
 
         dontPatchELF = true;
         dontFixup = true;
@@ -105,7 +105,7 @@
       packages = {
         release-automation = package;
 
-        release-automation-tests = tests;
+        build-release-automation-tests = tests;
 
         # check the state of the repository
         # TODO: to get the actual .git repo we could be something like this:
@@ -121,7 +121,7 @@
         # nix flake lock --update-input repo-git --override-input repo-git "path:$tmpdir"
         # rm -rf $tmpgit
         # ```
-        release-automation-tests-repo = pkgs.runCommand
+        build-release-automation-tests-repo = pkgs.runCommand
           "release-automation-tests-repo"
           {
             __noChroot = pkgs.stdenv.isLinux;
@@ -141,7 +141,7 @@
           export TEST_WORKSPACE="''${HOME:?}/src"
 
           cp -r --no-preserve=mode,ownership ${flake.config.srcCleanedRepo} ''${TEST_WORKSPACE:?}
-          cp --no-preserve=mode,ownership ${../../CHANGELOG.md} ''${TEST_WORKSPACE:?}/CHANGELOG.md
+          cp --no-preserve=mode,ownership ${self}/CHANGELOG.md ''${TEST_WORKSPACE:?}/CHANGELOG.md
           cd ''${TEST_WORKSPACE:?}
 
           git init
@@ -152,23 +152,25 @@
           git commit -am "main"
 
           release-automation \
-              --workspace-path=''${TEST_WORKSPACE:?} \
-              --log-level=debug \
-            crate \
-              apply-dev-versions \
-              --commit \
-              --no-verify
+            --workspace-path=''${TEST_WORKSPACE:?} \
+            --log-level=debug \
+            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+            release \
+              --no-verify \
+              --force-tag-creation \
+              --force-branch-creation \
+              --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
+              --disallowed-version-reqs=">=0.3" \
+              --steps=CreateReleaseBranch,BumpReleaseVersions
 
           release-automation \
               --workspace-path=''${TEST_WORKSPACE:?} \
               --log-level=debug \
-              --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-            release \
-              --no-verify-pre \
-              --force-branch-creation \
-              --disallowed-version-reqs=">=0.3" \
-              --allowed-matched-blockers=UnreleasableViaChangelogFrontmatter \
-              --steps=CreateReleaseBranch,BumpReleaseVersions
+              release \
+                --dry-run \
+                --no-verify \
+                --steps=PublishToCratesIo
+
 
           rm -rf target
           mv ''${TEST_WORKSPACE:?} $out

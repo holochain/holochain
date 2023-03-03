@@ -12,5 +12,5 @@ edition = "2021"
 
 [dependencies]
 kitsune_p2p_timestamp = { version = "^0.1.0", path = "../timestamp", features = ["now"] }
-kitsune_p2p_types = { version = "^0.1.0", path = "../types" }
+kitsune_p2p_bin_data = { version = "^0.1.0", path = "../bin_data" }
 serde = { version = "1.0", features = ["derive"] }

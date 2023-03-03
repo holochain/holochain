@@ -209,10 +209,17 @@ pub trait CellConductorReadHandleT: Send + Sync {
     ) -> ConductorResult<Option<CellId>>;
 
     /// Expose block functionality to zomes.
+<<<<<<< HEAD
     async fn block(&self, block: Block) -> DatabaseResult<()>;
 
     /// Expose unblock functionality to zomes.
     async fn unblock(&self, block: Block) -> DatabaseResult<()>;
+=======
+    async fn block(&self, block: Block) -> ConductorResult<()>;
+
+    /// Expose unblock functionality to zomes.
+    async fn unblock(&self, block: Block) -> ConductorResult<()>;
+>>>>>>> 0b6b70b9160f2b2013880d6597f0c0396d359611
 }
 
 #[async_trait]
@@ -265,11 +272,11 @@ impl CellConductorReadHandleT for CellConductorApi {
             .await
     }
 
-    async fn block(&self, block: Block) -> DatabaseResult<()> {
+    async fn block(&self, block: Block) -> ConductorResult<()> {
         self.conductor_handle.block(block).await
     }
 
-    async fn unblock(&self, block: Block) -> DatabaseResult<()> {
+    async fn unblock(&self, block: Block) -> ConductorResult<()> {
         self.conductor_handle.unblock(block).await
     }
 }
