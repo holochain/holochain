@@ -2321,6 +2321,7 @@ dependencies = [
  "isotest",
  "itertools 0.10.5",
  "kitsune_p2p",
+ "kitsune_p2p_block",
  "kitsune_p2p_bootstrap",
  "kitsune_p2p_types",
  "lazy_static",
@@ -2906,6 +2907,7 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_serialized_bytes 0.0.51",
  "holochain_wasmer_common",
+ "kitsune_p2p_block",
  "kitsune_p2p_dht",
  "kitsune_p2p_timestamp",
  "matches",
@@ -3265,6 +3267,7 @@ dependencies = [
  "governor",
  "itertools 0.10.5",
  "kitsune_p2p",
+ "kitsune_p2p_block",
  "kitsune_p2p_bootstrap",
  "kitsune_p2p_fetch",
  "kitsune_p2p_mdns",
@@ -3295,6 +3298,28 @@ dependencies = [
  "tracing-subscriber 0.2.25",
  "tx5",
  "url2",
+]
+
+[[package]]
+name = "kitsune_p2p_bin_data"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "base64 0.13.1",
+ "derive_more",
+ "kitsune_p2p_dht_arc",
+ "serde",
+ "serde_bytes",
+ "shrinkwraprs",
+]
+
+[[package]]
+name = "kitsune_p2p_block"
+version = "0.1.0"
+dependencies = [
+ "kitsune_p2p_bin_data",
+ "kitsune_p2p_timestamp",
+ "serde",
 ]
 
 [[package]]
@@ -3521,6 +3546,7 @@ dependencies = [
  "derive_more",
  "futures",
  "ghost_actor 0.3.0-alpha.4",
+ "kitsune_p2p_bin_data",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_types",
