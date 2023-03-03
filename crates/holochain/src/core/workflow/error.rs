@@ -3,7 +3,7 @@
 
 use super::app_validation_workflow::AppValidationError;
 use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::conductor::DeepkeyServiceError;
+use crate::conductor::conductor::DpkiServiceError;
 use crate::conductor::CellError;
 use crate::core::queue_consumer::QueueTriggerClosedError;
 use crate::core::ribosome::error::RibosomeError;
@@ -38,7 +38,7 @@ pub enum WorkflowError {
     CounterSigningError(#[from] CounterSigningError),
 
     #[error(transparent)]
-    DeepkeyServiceError(#[from] DeepkeyServiceError),
+    DpkiServiceError(#[from] DpkiServiceError),
 
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),

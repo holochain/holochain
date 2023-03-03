@@ -5,17 +5,14 @@ use holochain_zome_types::{CellId, Timestamp};
 
 use crate::conductor::ConductorHandle;
 
-/// Interface for the Deepkey service
+/// Interface for the DPKI service
 #[async_trait::async_trait]
 #[mockall::automock]
 #[allow(clippy::needless_lifetimes)]
-pub trait DeepkeyService: Send + Sync {
+pub trait DpkiService: Send + Sync {
     /// Check if the key is valid (properly created and not revoked) as-at the given Timestamp
-    async fn is_key_valid(
-        &self,
-        key: AgentPubKey,
-        timestamp: Timestamp,
-    ) -> DeepkeyServiceResult<bool>;
+    async fn is_key_valid(&self, key: AgentPubKey, timestamp: Timestamp)
+        -> DpkiServiceResult<bool>;
 
     /// Defines the different ways that keys can be created and destroyed:
     /// If an old_key is specified, it will be destroyed
@@ -26,27 +23,27 @@ pub trait DeepkeyService: Send + Sync {
         &self,
         old_key: Option<AgentPubKey>,
         new_key: Option<AgentPubKey>,
-    ) -> DeepkeyServiceResult<()>;
+    ) -> DpkiServiceResult<()>;
 
     /// The CellIds in use by this service, which need to be protected
     fn cell_ids<'a>(&'a self) -> std::collections::HashSet<&'a CellId>;
 }
 
-/// The errors which can be produced by Deepkey
+/// The errors which can be produced by DPKI
 #[derive(thiserror::Error, Debug, Clone)]
 #[allow(missing_docs)]
-pub enum DeepkeyServiceError {
-    #[error("Deepkey DNA could not be called: {0}")]
+pub enum DpkiServiceError {
+    #[error("DPKI DNA could not be called: {0}")]
     ZomeCallFailed(String),
 }
 /// Alias
-pub type DeepkeyServiceResult<T> = Result<T, DeepkeyServiceError>;
+pub type DpkiServiceResult<T> = Result<T, DpkiServiceError>;
 
 /// Some more helpful methods built around the methods provided by the service
 #[async_trait::async_trait]
-pub trait DeepkeyServiceExt: DeepkeyService {
-    /// Register a newly created key with Deepkey
-    async fn register_key(&self, key: AgentPubKey) -> DeepkeyServiceResult<()> {
+pub trait DpkiServiceExt: DpkiService {
+    /// Register a newly created key with DPKI
+    async fn register_key(&self, key: AgentPubKey) -> DpkiServiceResult<()> {
         self.key_mutation(None, Some(key)).await
     }
 
@@ -55,17 +52,17 @@ pub trait DeepkeyServiceExt: DeepkeyService {
         &self,
         old_key: AgentPubKey,
         new_key: AgentPubKey,
-    ) -> DeepkeyServiceResult<()> {
+    ) -> DpkiServiceResult<()> {
         self.key_mutation(Some(old_key), Some(new_key)).await
     }
 
     /// Replace an old key with a new one
-    async fn remove_key(&self, key: AgentPubKey) -> DeepkeyServiceResult<()> {
+    async fn remove_key(&self, key: AgentPubKey) -> DpkiServiceResult<()> {
         self.key_mutation(Some(key), None).await
     }
 }
 
-/// The built-in implementation of the deepkey service, which runs a DNA
+/// The built-in implementation of the DPKI service contract, which runs a DNA
 pub struct DeepkeyBuiltin {
     conductor: ConductorHandle,
     cell_id: CellId,
@@ -82,12 +79,12 @@ impl DeepkeyBuiltin {
 #[allow(unused_variables)]
 #[allow(clippy::needless_lifetimes)]
 #[async_trait::async_trait]
-impl DeepkeyService for DeepkeyBuiltin {
+impl DpkiService for DeepkeyBuiltin {
     async fn is_key_valid(
         &self,
         key: AgentPubKey,
         timestamp: Timestamp,
-    ) -> DeepkeyServiceResult<bool> {
+    ) -> DpkiServiceResult<bool> {
         let keystore = self.conductor.keystore();
         let cell_id = self.cell_id.clone();
         let zome_name: String = "TODO: depends on dna implementation".to_string();
@@ -106,7 +103,7 @@ impl DeepkeyService for DeepkeyBuiltin {
                 payload,
             )
             .await
-            .map_err(|e| DeepkeyServiceError::ZomeCallFailed(e.to_string()))?;
+            .map_err(|e| DpkiServiceError::ZomeCallFailed(e.to_string()))?;
         Ok(is_valid)
     }
 
@@ -114,7 +111,7 @@ impl DeepkeyService for DeepkeyBuiltin {
         &self,
         old_key: Option<AgentPubKey>,
         new_key: Option<AgentPubKey>,
-    ) -> DeepkeyServiceResult<()> {
+    ) -> DpkiServiceResult<()> {
         todo!()
     }
 
@@ -123,15 +120,13 @@ impl DeepkeyService for DeepkeyBuiltin {
     }
 }
 
-/// Create a minimal usable mock of deepkey
-pub fn mock_deepkey() -> MockDeepkeyService {
+/// Create a minimal usable mock of DPKI
+pub fn mock_dpki() -> MockDpkiService {
     use futures::FutureExt;
-    let mut deepkey = MockDeepkeyService::new();
-    deepkey
-        .expect_is_key_valid()
+    let mut dpki = MockDpkiService::new();
+    dpki.expect_is_key_valid()
         .returning(|_, _| async move { Ok(true) }.boxed());
-    deepkey
-        .expect_cell_ids()
+    dpki.expect_cell_ids()
         .return_const(std::collections::HashSet::new());
-    deepkey
+    dpki
 }
