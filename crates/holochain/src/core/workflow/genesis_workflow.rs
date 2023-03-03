@@ -100,7 +100,7 @@ where
     // NB: this is just a placeholder for a real DPKI request to show intent
     if !api
         .conductor_services()
-        .deepkey
+        .dpki
         .is_key_valid(agent_pubkey.clone(), Timestamp::now())
         .await?
     {
@@ -165,7 +165,7 @@ pub mod tests {
     use super::*;
 
     use crate::conductor::api::MockCellConductorApiT;
-    use crate::conductor::conductor::{mock_app_store, mock_deepkey, ConductorServices};
+    use crate::conductor::conductor::{mock_app_store, mock_dpki, ConductorServices};
     use crate::core::ribosome::MockRibosomeT;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
@@ -192,7 +192,7 @@ pub mod tests {
             let mut api = MockCellConductorApiT::new();
             api.expect_conductor_services()
                 .return_const(ConductorServices {
-                    deepkey: Arc::new(mock_deepkey()),
+                    dpki: Arc::new(mock_dpki()),
                     app_store: Arc::new(mock_app_store()),
                 });
             api.expect_keystore().return_const(keystore.clone());

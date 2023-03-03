@@ -336,18 +336,16 @@ mod startup_shutdown_impls {
             });
 
             self.services.share_mut(|services| {
-                let mut deepkey = MockDeepkeyService::new();
-                deepkey
-                    .expect_is_key_valid()
+                let mut dpki = MockDpkiService::new();
+                dpki.expect_is_key_valid()
                     .returning(|_, _| box_fut_plain(Ok(true)));
-                deepkey
-                    .expect_key_mutation()
+                dpki.expect_key_mutation()
                     .returning(|_, _| box_fut_plain(Ok(())));
 
                 let app_store = MockAppStoreService::new();
 
                 *services = Some(ConductorServices {
-                    deepkey: Arc::new(deepkey),
+                    dpki: Arc::new(dpki),
                     app_store: Arc::new(app_store),
                 });
             });
