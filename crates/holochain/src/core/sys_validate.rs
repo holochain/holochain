@@ -258,9 +258,13 @@ pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationRe
             Some("Every AgentValidationPkg must be followed by a Create for an AgentPubKey")
         }
 
-        (_, Action::Create(Create { .. })) => {
-            Some("Every Create for an AgentPubKey must be preceded by an AgentValidationPkg")
-        }
+        (
+            _,
+            Action::Create(Create {
+                entry_type: EntryType::AgentPubKey,
+                ..
+            }),
+        ) => Some("Every Create for an AgentPubKey must be preceded by an AgentValidationPkg"),
 
         _ => None,
     };
