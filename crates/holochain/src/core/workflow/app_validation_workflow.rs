@@ -205,7 +205,10 @@ async fn app_validation_workflow_inner(
                         }
                         Outcome::Rejected(_) => {
                             rejected += 1;
-                            tracing::info!("Received invalid op. The op author will be blocked.\nOp: {:?}", op_light);
+                            tracing::info!(
+                                "Received invalid op. The op author will be blocked.\nOp: {:?}",
+                                op_light
+                            );
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {

@@ -1,3 +1,5 @@
+use crate::core::ribosome::guest_callback::validate::ValidateResult;
+use crate::prelude::InlineZomeSet;
 use crate::sweettest::*;
 use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
@@ -88,4 +90,70 @@ async fn test_validation_receipt() {
         },
         vec![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_block_invalid_receipt() {
+    observability::test_run().ok();
+    let unit_entry_def = EntryDef::from_id("unit");
+
+    let zomes_that_create = InlineZomeSet::new_single(
+        "integrity",
+        "coordinator",
+        "a",
+        "b",
+        vec![unit_entry_def.clone()],
+        0,
+    )
+    .function("coordinator", "create", move |api, ()| {
+        let entry = Entry::app(().try_into().unwrap()).unwrap();
+        let hash = api.create(CreateInput::new(
+            InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+            EntryVisibility::Public,
+            entry,
+            ChainTopOrdering::default(),
+        ))?;
+        Ok(hash)
+    });
+
+    let zomes_that_check = InlineZomeSet::new_single(
+        "integrity",
+        "coordinator",
+        "a",
+        "c",
+        vec![unit_entry_def.clone()],
+        0,
+    )
+    .function("integrity", "validate", |_api, op: Op| match op {
+        Op::StoreEntry(StoreEntry { action, .. })
+            if action.hashed.content.app_entry_def().is_some() =>
+        {
+            Ok(ValidateResult::Invalid("Entry defs are bad".into()))
+        }
+        _ => Ok(ValidateResult::Valid),
+    });
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
+
+    let (dna_that_creates, _, _) =
+        SweetDnaFile::from_inline_zomes("network_seed".into(), zomes_that_create).await;
+
+    let (dna_that_checks, _, _) =
+        SweetDnaFile::from_inline_zomes("network_seed".into(), zomes_that_check).await;
+
+    let alice_apps = conductor
+        .setup_app_for_agents("app-", &[alice_pubkey.clone(),], &[dna_that_creates])
+        .await.unwrap();
+
+    let ((alice_cell,),) = alice_apps.into_tuples();
+
+    let bob_apps = conductor.setup_app_for_agents("app-", &[bob_pubkey.clone()], &[dna_that_checks]).await.unwrap();
+
+    let ((bob_cell,),) = bob_apps.into_tuples();
+
+    let action_hash: ActionHash = conductor.call(&alice_cell.zome("coordinator"), "create", ()).await;
+
+    consistency_10s([&alice_cell, &bob_cell]).await;
+
 }
