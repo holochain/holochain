@@ -45,8 +45,8 @@ pub struct SweetConductor {
 }
 
 /// Standard config for SweetConductors
-pub fn standard_config() -> SweetConductorConfig {
-    SweetConductorConfig::standard()
+pub fn standard_config() -> ConductorConfig {
+    SweetConductorConfig::standard().into()
 }
 
 /// A DnaFile with a role name assigned
