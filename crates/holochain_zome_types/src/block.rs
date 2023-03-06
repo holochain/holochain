@@ -27,7 +27,7 @@ pub enum CellBlockReason {
     #[serde(with = "serde_bytes")]
     App(Vec<u8>),
     /// Invalid validation result.
-    InvalidOp(DhtOpHash),
+    Validation(DhtOpHash),
     /// Some bad cryptography.
     BadCrypto,
 }
