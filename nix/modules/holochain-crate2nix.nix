@@ -6,6 +6,8 @@
       };
       customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
         defaultCrateOverrides = pkgs.defaultCrateOverrides // {
+          buildInputs = (with pkgs; [ go ]) ++ (lib.optionals);
+          nativeBuildInputs = (with pkgs; [ go ]) ++ (lib.optionals);
           holochain = attrs: {
             codegenUnits = 8;
           };
