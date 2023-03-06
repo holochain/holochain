@@ -249,7 +249,7 @@ impl MetaNetCon {
                     ep.send(rem_url.clone(), data.as_slice())
                         .await
                         .map_err(KitsuneError::other)?;
-                    return Ok(r.await.map_err(|_| KitsuneError::other("timeout"))?);
+                    return r.await.map_err(|_| KitsuneError::other("timeout"));
                 }
             }
 
@@ -575,7 +575,7 @@ impl MetaNet {
                         permit,
                     } => {
                         tracing::trace!(%rem_cli_url, byte_count=?data.remaining(), "received bytes");
-                        let data = match WireWrap::decode(&mut bytes::Buf::reader(data)) {
+                        match WireWrap::decode(&mut bytes::Buf::reader(data)) {
                             Ok(WireWrap::Notify(Notify { msg_id, data })) => {
                                 match wire::Wire::decode_ref(&data) {
                                     Ok((_, data)) => {
@@ -668,7 +668,7 @@ impl MetaNet {
                                 // TODO - drop connection??
                                 continue;
                             }
-                        };
+                        }
                     }
                     tx5::EpEvt::Demo { rem_cli_url: _ } => (),
                 }
