@@ -2,6 +2,10 @@
 
 set -e
 
+# bump this to the most recent version when the following bugs have been resolved
+# - https://github.com/NixOS/nix/issues/7984
+export NIX_INSTALLER_URL=${NIX_INSTALLER_URL:-https://releases.nixos.org/nix/nix-2.13.3/install}
+
 run_cmd() {
     echo "$@"
     "$@"
@@ -13,9 +17,9 @@ if ! command -v nix &>/dev/null; then
     echo
 
     if [[ $(uname -r) == *"WSL2" ]]; then
-        run_cmd bash <(curl -L https://nixos.org/nix/install) --no-daemon
+        run_cmd bash <(curl -L "${NIX_INSTALLER_URL}") --no-daemon
     else
-        run_cmd bash <(curl -L https://nixos.org/nix/install) --daemon
+        run_cmd bash <(curl -L "${NIX_INSTALLER_URL}") --daemon
     fi
 
     echo
