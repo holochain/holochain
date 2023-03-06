@@ -6,6 +6,7 @@ pub enum TimestampError {
     Overflow,
     #[cfg(feature = "chrono")]
     ParseError(ParseError),
+    OutOfOrder,
 }
 
 pub type TimestampResult<T> = Result<T, TimestampError>;
@@ -16,6 +17,7 @@ impl std::error::Error for TimestampError {
         match self {
             TimestampError::Overflow => None,
             TimestampError::ParseError(e) => e.source(),
+            TimestampError::OutOfOrder => None,
         }
     }
 }
@@ -32,10 +34,13 @@ impl core::fmt::Display for TimestampError {
         match self {
             TimestampError::Overflow => write!(
                 f,
-                "Overflow in adding, subtracting or creating from a Duration"
+                "Overflow in adding, subtracting or creating from a Duration."
             ),
             #[cfg(feature = "chrono")]
             TimestampError::ParseError(s) => s.fmt(f),
+            TimestampError::OutOfOrder => {
+                write!(f, "Start was after the end of a Timestamp bounded range.")
+            }
         }
     }
 }

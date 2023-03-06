@@ -304,6 +304,12 @@ impl ConductorBuilder {
         let spaces = Spaces::new(&self.config)?;
         let tag = spaces.get_state().await?.tag().clone();
 
+        let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
+        let _ = keystore
+            .lair_client()
+            .new_seed(tag_ed.clone(), None, false)
+            .await;
+
         let network_config = self.config.network.clone().unwrap_or_default();
         let tuning_params = network_config.tuning_params.clone();
         let strat = ArqStrat::from_params(tuning_params.gossip_redundancy_target);
@@ -314,7 +320,7 @@ impl ConductorBuilder {
             ribosome_store.clone(),
             tuning_params,
             strat,
-            Some(tag.0),
+            Some(tag_ed),
             Some(keystore.lair_client()),
         );
 

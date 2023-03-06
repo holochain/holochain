@@ -1,4 +1,5 @@
 use kitsune_p2p_fetch::OpHashSized;
+use kitsune_p2p_timestamp::Timestamp;
 use must_future::MustBoxFuture;
 use std::sync::Arc;
 
@@ -23,6 +24,19 @@ pub type KitsuneHostResult<'a, T> =
 /// The interface to be implemented by the host, which handles various requests
 /// for data
 pub trait KitsuneHost: 'static + Send + Sync {
+    /// We are requesting a block.
+    fn block(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()>;
+
+    /// We are requesting an unblock.
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()>;
+
+    /// We want to know if a target is blocked.
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> KitsuneHostResult<bool>;
+
     /// We need to get previously stored agent info.
     fn get_agent_info_signed(
         &self,

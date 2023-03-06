@@ -2,7 +2,8 @@
 // TODO [ B-03669 ] move to own crate
 
 use super::{
-    SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig, SweetConductorHandle,
+    DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
+    SweetConductorHandle, SweetLocalRendezvous,
 };
 use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
@@ -40,11 +41,12 @@ pub struct SweetConductor {
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
+    _rendezvous: Option<DynSweetRendezvous>,
 }
 
 /// Standard config for SweetConductors
-pub fn standard_config() -> ConductorConfig {
-    SweetConductorConfig::standard().into()
+pub fn standard_config() -> SweetConductorConfig {
+    SweetConductorConfig::standard()
 }
 
 /// A DnaFile with a role name assigned
@@ -78,6 +80,7 @@ impl SweetConductor {
         handle: ConductorHandle,
         env_dir: TestDir,
         config: ConductorConfig,
+        _rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
         // Automatically add a test app interface
         handle
@@ -110,15 +113,30 @@ impl SweetConductor {
             config,
             dnas: Vec::new(),
             signal_stream: Some(Box::new(signal_stream)),
+            _rendezvous,
         }
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config<C: Into<ConductorConfig>>(config: C) -> SweetConductor {
-        let config = config.into();
+    pub async fn from_config<C>(config: C) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+    {
+        let rendezvous = SweetLocalRendezvous::new().await;
+        Self::from_config_rendezvous(config, rendezvous).await
+    }
+
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    pub async fn from_config_rendezvous<C, R>(config: C, rendezvous: R) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+        R: Into<DynSweetRendezvous>,
+    {
+        let rendezvous = rendezvous.into();
+        let config = config.into().into_conductor_config(&*rendezvous).await;
         let dir = TestDir::new(test_db_dir());
         let handle = Self::handle_from_existing(&dir, test_keystore(), &config, &[]).await;
-        Self::new(handle, dir, config).await
+        Self::new(handle, dir, config, Some(rendezvous)).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
@@ -126,7 +144,7 @@ impl SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
         let handle = builder.test(&db_dir, &[]).await.unwrap();
-        Self::new(handle, db_dir, config).await
+        Self::new(handle, db_dir, config, None).await
     }
 
     /// Create a handle from an existing environment and config
