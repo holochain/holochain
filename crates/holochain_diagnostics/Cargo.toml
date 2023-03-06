@@ -11,7 +11,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "*"
-arbitrary = { version = "=1.0.0" }
+arbitrary = { version = "1.0" }
 holochain = { path = "../holochain", features = ["no-deps"] }
 human-repr = "1"
 rand = "0.8"
