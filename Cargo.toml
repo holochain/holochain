@@ -8,7 +8,7 @@ members = [
   "crates/hdi",
   "crates/mock_hdi",
   "crates/mr_bundle",
-  
+
   "crates/holochain_integrity_types",
   "crates/holochain_zome_types",
   "crates/holochain_types",
@@ -43,6 +43,9 @@ members = [
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
+
+  "crates/holochain_diagnostics",
+  "crates/diagnostic_tests",
 ]
 
 exclude = ["crates/release-automation"]
