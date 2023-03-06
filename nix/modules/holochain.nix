@@ -37,7 +37,7 @@
             IOKit
           ]));
 
-        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config ])
+        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config go ])
           ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
       };
