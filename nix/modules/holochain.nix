@@ -27,7 +27,7 @@
         OPENSSL_LIB_DIR = "${opensslStatic.out}/lib";
         OPENSSL_INCLUDE_DIR = "${opensslStatic.dev}/include";
 
-        buildInputs = (with pkgs; [ openssl opensslStatic sqlcipher ])
+        buildInputs = (with pkgs; [ openssl opensslStatic sqlcipher go ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
@@ -125,17 +125,6 @@
         });
 
       build-holochain-tests-unit = craneLib.cargoNextest holochainTestsNextestArgs;
-      build-holochain-tests-unit-tx5 = craneLib.cargoNextest
-        (holochainTestsNextestArgs // {
-          pname = "holochain-tests-nextest-tx5";
-          cargoExtraArgs = holochainTestsNextestArgs.cargoExtraArgs + '' \
-            --features tx5 \
-          '';
-
-          nativeBuildInputs = holochainTestsNextestArgs.nativeBuildInputs ++ [
-            pkgs.go
-          ];
-        });
 
       build-holochain-tests-static-fmt = craneLib.cargoFmt (commonArgs // {
         src = flake.config.srcCleanedHolochain;
@@ -202,7 +191,6 @@
       # meta packages to build multiple test packages at once
       build-holochain-tests-unit-all = config.lib.mkMetaPkg "holochain-tests-unit-all" [
         build-holochain-tests-unit
-        build-holochain-tests-unit-tx5
         build-holochain-tests-unit-wasm
       ];
 
@@ -225,7 +213,6 @@
             holochain
 
             build-holochain-tests-unit
-            build-holochain-tests-unit-tx5
             build-holochain-tests-unit-wasm
             build-holochain-tests-unit-all
 

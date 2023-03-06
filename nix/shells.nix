@@ -94,6 +94,7 @@ rec {
       sqlcipher
       binaryen
       gdb
+      go
     ])
     ;
   };
