@@ -14,6 +14,7 @@ edition = "2021"
 arrayref = "0.3.6"
 base64 = "0.13"
 bloomfilter = { version = "1.0.5", features = ["serde"] }
+bytes = "1.4.0"
 derive_more = "0.99.11"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
@@ -42,7 +43,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.11", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
-tx5 = { version = "0.0.1-alpha.4", optional = true }
+tx5 = { version = "0.0.1-alpha.5", optional = true }
 url2 = "0.0.6"
 fixt = { path = "../../fixt", version = "^0.1.0"}
 

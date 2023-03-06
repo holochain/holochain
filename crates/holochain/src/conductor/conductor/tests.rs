@@ -369,6 +369,7 @@ async fn test_signing_error_during_genesis() {
         SweetConductor::handle_from_existing(db_dir.path(), bad_keystore, &config, &[]).await,
         db_dir.into(),
         config,
+        None,
     )
     .await;
 
