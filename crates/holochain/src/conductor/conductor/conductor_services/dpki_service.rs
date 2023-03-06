@@ -15,7 +15,7 @@ pub trait DpkiService: Send + Sync {
         -> DpkiServiceResult<bool>;
 
     /// Defines the different ways that keys can be created and destroyed:
-    /// If an old_key is specified, it will be destroyed
+    /// If an old key is specified, it will be destroyed
     /// If a new key is specified, it will be registered
     /// If both a new and an old key are specified, the new key will atomically replace the old key
     /// (If no keys are specified, nothing will happen)
@@ -56,7 +56,7 @@ pub trait DpkiServiceExt: DpkiService {
         self.key_mutation(Some(old_key), Some(new_key)).await
     }
 
-    /// Replace an old key with a new one
+    /// Delete an existing key
     async fn remove_key(&self, key: AgentPubKey) -> DpkiServiceResult<()> {
         self.key_mutation(Some(key), None).await
     }
