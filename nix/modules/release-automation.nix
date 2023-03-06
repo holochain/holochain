@@ -130,9 +130,11 @@
 
               pkgs.coreutils
               pkgs.gitFull
+              pkgs.go
             ];
             buildInputs = self'.packages.holochain.buildInputs ++ [
               pkgs.cacert
+              pkgs.go
             ];
           } ''
           set -euo pipefail
