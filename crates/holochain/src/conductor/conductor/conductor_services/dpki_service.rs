@@ -56,7 +56,8 @@ pub trait DpkiServiceExt: DpkiService {
         self.key_mutation(Some(old_key), Some(new_key)).await
     }
 
-    /// Delete an existing key
+    /// Delete an existing key without replacing it with a new one.
+    /// This effectively terminates the "lineage" that this key was a part of.
     async fn remove_key(&self, key: AgentPubKey) -> DpkiServiceResult<()> {
         self.key_mutation(Some(key), None).await
     }

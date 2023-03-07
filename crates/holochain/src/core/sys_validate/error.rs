@@ -170,4 +170,6 @@ pub enum PrevActionError {
     MissingPrev,
     #[error("The previous action's timestamp is not before the current action's timestamp: {0:?} >= {1:?}")]
     Timestamp(Timestamp, Timestamp),
+    #[error("It is invalid for these two actions to be paired with each other. context: {0}, actions: {1:?}")]
+    InvalidSuccessor(String, Box<(Action, Action)>),
 }
