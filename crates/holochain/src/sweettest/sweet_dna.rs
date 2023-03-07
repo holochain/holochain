@@ -200,6 +200,13 @@ impl SweetDnaFile {
     ) -> (DnaFile, Vec<IntegrityZome>, Vec<CoordinatorZome>) {
         Self::from_inline_zomes(random_network_seed(), zomes).await
     }
+
+    /// Create a unique DnaFile with no validation and no zome functions
+    pub async fn unique_empty() -> DnaFile {
+        Self::unique_from_inline_zomes(InlineZomeSet::new([], []))
+            .await
+            .0
+    }
 }
 
 /// Helpful constructors for DnaDefs used in tests

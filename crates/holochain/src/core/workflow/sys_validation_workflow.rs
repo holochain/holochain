@@ -597,6 +597,7 @@ async fn store_record(
             .retrieve_action(prev_action_hash.clone(), Default::default())
             .await?
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
+        check_prev_type(action, prev_action.action())?;
         check_prev_timestamp(action, prev_action.action())?;
         check_prev_seq(action, prev_action.action())?;
     }

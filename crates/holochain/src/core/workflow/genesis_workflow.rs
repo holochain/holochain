@@ -98,11 +98,11 @@ where
     }
 
     // NB: this is just a placeholder for a real DPKI request to show intent
-    if api
-        .dpki_request("is_agent_pubkey_valid".into(), agent_pubkey.to_string())
-        .await
-        .expect("TODO: actually implement this")
-        == "INVALID"
+    if !api
+        .conductor_services()
+        .dpki
+        .is_key_valid(agent_pubkey.clone(), Timestamp::now())
+        .await?
     {
         return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
     }
@@ -165,8 +165,8 @@ pub mod tests {
     use super::*;
 
     use crate::conductor::api::MockCellConductorApiT;
+    use crate::conductor::conductor::{mock_app_store, mock_dpki, ConductorServices};
     use crate::core::ribosome::MockRibosomeT;
-    use futures::FutureExt;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
     use holochain_types::test_utils::fake_agent_pubkey_1;
@@ -188,10 +188,13 @@ pub mod tests {
 
         {
             let workspace = GenesisWorkspace::new(vault.clone().into(), dht_db.to_db()).unwrap();
+
             let mut api = MockCellConductorApiT::new();
-            api.expect_dpki_request().returning(|_, _| {
-                async move { Ok("mocked dpki request response".to_string()) }.boxed()
-            });
+            api.expect_conductor_services()
+                .return_const(ConductorServices {
+                    dpki: Arc::new(mock_dpki()),
+                    app_store: Arc::new(mock_app_store()),
+                });
             api.expect_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();
             ribosome

@@ -5,14 +5,16 @@ use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, 
 use kitsune_p2p::KitsuneP2pConfig;
 
 /// Wrapper around ConductorConfig with some helpful builder methods
-#[derive(Clone, Debug, PartialEq)]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    derive_more::From,
+    derive_more::Into,
+)]
 pub struct SweetConductorConfig(ConductorConfig);
-
-impl From<ConductorConfig> for SweetConductorConfig {
-    fn from(c: ConductorConfig) -> Self {
-        Self(c)
-    }
-}
 
 impl From<KitsuneP2pConfig> for SweetConductorConfig {
     fn from(network: KitsuneP2pConfig) -> Self {
