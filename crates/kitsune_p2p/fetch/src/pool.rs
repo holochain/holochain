@@ -247,7 +247,7 @@ impl State {
                     v.sources.0.len(),
                     v.last_fetch
                         .map(|t| format!("{:?}", t.elapsed()))
-                        .unwrap_or("-".to_string()),
+                        .unwrap_or_else(|| "-".to_string()),
                     size.human_count_bytes(),
                 )
             })
