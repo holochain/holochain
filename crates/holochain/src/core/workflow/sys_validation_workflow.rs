@@ -450,7 +450,6 @@ pub async fn sys_validate_record(
     network: HolochainP2pDna,
     conductor_handle: &Conductor,
 ) -> SysValidationOutcome<()> {
-    trace!(?record);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
     let workspace = SysValidationWorkspace::from(call_zome_workspace);
     let result =
@@ -459,7 +458,11 @@ pub async fn sys_validate_record(
             Ok(_) => Ok(()),
             // Validation failed so exit with that outcome
             Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
-                error!(msg = "Direct validation failed", ?record);
+                error!(
+                    msg = "Direct validation failed",
+                    ?validation_outcome,
+                    ?record,
+                );
                 validation_outcome.into_outcome()
             }
             // An error occurred so return it
