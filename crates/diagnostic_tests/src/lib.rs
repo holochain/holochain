@@ -29,7 +29,7 @@ pub async fn setup_conductors_with_single_dna(
     println!("Conductors created (t={:3.1?}).", start.elapsed());
 
     let apps = conductors.setup_app("basic", &[dna]).await.unwrap();
-    let cells = apps.cells_flattened().clone();
+    let cells = apps.cells_flattened();
     println!("Apps setup (t={:3.1?}).", start.elapsed());
     println!(
         "agents: {:#?}",
