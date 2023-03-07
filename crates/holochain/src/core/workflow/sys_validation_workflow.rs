@@ -283,7 +283,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::EntryDefId(_) => Rejected,
         ValidationOutcome::EntryHash => Rejected,
         ValidationOutcome::EntryTooLarge(_, _) => Rejected,
-        ValidationOutcome::EntryType => Rejected,
+        ValidationOutcome::EntryTypeMismatch => Rejected,
         ValidationOutcome::EntryVisibility(_) => Rejected,
         ValidationOutcome::TagTooLarge(_, _) => Rejected,
         ValidationOutcome::NotCreateLink(_) => Rejected,

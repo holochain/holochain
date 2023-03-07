@@ -1,3 +1,32 @@
+//! Sys validation tests
+//!
+//! TESTED:
+//! - Mismatched signatures are rejected
+//! - Any action other than DNA cannot be at seq 0
+//! - The DNA action can only be validated if the chain is empty,
+//!     and its timestamp must not be less than the origin time
+//!     (this "if chain not empty" thing is a bit weird,
+//!     TODO refactor to not look in the db)
+//! - Timestamps must increase monotonically
+//! - Sequence numbers must increment by 1 for each new action
+//! - Entry type in the action matches the entry variant
+//! - Hash integrity check. The hash of an entry always matches what's in the action.
+//! - The size of an entry does not exceed the max.
+//! - Check that updates can't switch the entry type
+//! - The link tag size is bounded
+//! - Check the AppEntryDef is valid for the zome and the EntryDefId and ZomeIndex are in range.
+//! - Check that StoreEntry never contains a private entry type
+//! - Test that a given sequence of actions constitutes a valid chain w.r.t. its backlinks
+//!
+//! TO TEST:
+//! - Create and Update Agent can only be preceded by AgentValidationPkg
+//! - Author must match the entry hash of the most recent Create/Update Agent
+//! - Genesis must be correct:
+//!     - Explicitly check action seqs 0, 1, and 2.
+//! - There can only be one InitZomesCompleted
+//! - All backlinks are in-chain (prev action, etc.)
+//!
+
 use super::*;
 use crate::conductor::space::TestSpaces;
 use crate::core::workflow::inline_validation;
@@ -24,6 +53,7 @@ use matches::assert_matches;
 use observability;
 use std::convert::TryFrom;
 
+/// Mismatched signatures are rejected
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_action_signature_test() {
     let keystore = holochain_state::test_utils::test_keystore();
@@ -47,6 +77,7 @@ async fn verify_action_signature_test() {
     );
 }
 
+/// Any action other than DNA cannot be at seq 0
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_action() {
     let mut action = fixt!(CreateLink);
@@ -65,6 +96,9 @@ async fn check_previous_action() {
     assert_matches!(check_prev_action(&action.into()), Ok(()));
 }
 
+/// The DNA action can only be validated if the chain is empty,
+/// and its timestamp must not be less than the origin time
+/// (this "if chain not empty" thing is a bit weird, TODO refactor to not look in the db)
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
     let tmp = test_authored_db();
@@ -137,6 +171,7 @@ async fn check_valid_if_dna_test() {
     );
 }
 
+/// Timestamps must increase monotonically
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_timestamp() {
     let mut action = fixt!(CreateLink);
@@ -159,6 +194,7 @@ async fn check_previous_timestamp() {
     );
 }
 
+/// Sequence numbers must increment by 1 for each new action
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_seq() {
     let mut action = fixt!(CreateLink);
@@ -197,6 +233,7 @@ async fn check_previous_seq() {
     );
 }
 
+/// Entry type in the action matches the entry variant
 #[tokio::test(flavor = "multi_thread")]
 async fn check_entry_type_test() {
     let entry_fixt = EntryFixturator::new(Predictable);
@@ -215,12 +252,13 @@ async fn check_entry_type_test() {
         assert_matches!(
             check_entry_type(&et, &e),
             Err(SysValidationError::ValidationOutcome(
-                ValidationOutcome::EntryType
+                ValidationOutcome::EntryTypeMismatch
             ))
         );
     }
 }
 
+/// Hash integrity check. The hash of an entry always matches what's in the action.
 #[tokio::test(flavor = "multi_thread")]
 async fn check_entry_hash_test() {
     let mut ec = fixt!(Create);
@@ -252,6 +290,7 @@ async fn check_entry_hash_test() {
     );
 }
 
+/// The size of an entry does not exceed the max
 #[tokio::test(flavor = "multi_thread")]
 async fn check_entry_size_test() {
     // let tiny = Entry::App(SerializedBytes::from(UnsafeBytes::from(vec![0; 1])));
@@ -265,6 +304,7 @@ async fn check_entry_size_test() {
     // );
 }
 
+/// Check that updates can't switch the entry type
 #[tokio::test(flavor = "multi_thread")]
 async fn check_update_reference_test() {
     let mut ec = fixt!(Create);
@@ -304,6 +344,7 @@ async fn check_update_reference_test() {
     );
 }
 
+/// The link tag size is bounded
 #[tokio::test(flavor = "multi_thread")]
 async fn check_link_tag_size_test() {
     let tiny = LinkTag(vec![0; 1]);
@@ -322,6 +363,7 @@ async fn check_link_tag_size_test() {
     );
 }
 
+/// Check the AppEntryDef is valid for the zome and the EntryDefId and ZomeIndex are in range.
 #[tokio::test(flavor = "multi_thread")]
 async fn check_app_entry_def_test() {
     observability::test_run().ok();
@@ -404,6 +446,7 @@ async fn check_app_entry_def_test() {
     );
 }
 
+/// Check that StoreEntry does not have a private entry type
 #[tokio::test(flavor = "multi_thread")]
 async fn check_entry_not_private_test() {
     let mut ed = fixt!(EntryDef);
@@ -419,6 +462,7 @@ async fn check_entry_not_private_test() {
     );
 }
 
+// TODO: move elsewhere
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_filters_private_entry() {
     let dna = fixt!(DnaHash);
@@ -465,7 +509,8 @@ async fn incoming_ops_filters_private_entry() {
 }
 
 #[test]
-/// Test the chain validation works.
+/// Test that a given sequence of actions constitutes a valid chain wrt
+/// its backlinks
 fn valid_chain_test() {
     isotest::isotest!(TestChainItem, TestChainHash => |iso_a, iso_h| {
         // Create a valid chain.

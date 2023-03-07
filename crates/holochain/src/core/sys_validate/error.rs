@@ -114,7 +114,7 @@ pub enum ValidationOutcome {
     #[error("The entry size {0} was bigger then the MAX_ENTRY_SIZE {1}")]
     EntryTooLarge(usize, usize),
     #[error("The entry has a different type to the action's entry type")]
-    EntryType,
+    EntryTypeMismatch,
     #[error("The app entry def {0:?} visibility didn't match the zome")]
     EntryVisibility(AppEntryDef),
     #[error("The link tag size {0} was bigger then the MAX_TAG_SIZE {1}")]

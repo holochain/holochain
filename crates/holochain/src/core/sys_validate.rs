@@ -311,7 +311,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
         (EntryType::App(_), Entry::CounterSign(_, _)) => Ok(()),
         (EntryType::CapClaim, Entry::CapClaim(_)) => Ok(()),
         (EntryType::CapGrant, Entry::CapGrant(_)) => Ok(()),
-        _ => Err(ValidationOutcome::EntryType.into()),
+        _ => Err(ValidationOutcome::EntryTypeMismatch.into()),
     }
 }
 
