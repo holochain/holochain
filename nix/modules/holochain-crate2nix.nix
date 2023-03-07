@@ -6,8 +6,8 @@
       };
       customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
         defaultCrateOverrides = pkgs.defaultCrateOverrides // {
-          buildInputs = (with pkgs; [ go ]) ++ (lib.optionals);
-          nativeBuildInputs = (with pkgs; [ go ]) ++ (lib.optionals);
+          tx5-go-pion-sys = _: { nativeBuildInputs = with pkgs; [ go ]; };
+          tx5-go-pion-turn = _: { nativeBuildInputs = with pkgs; [ go ]; };
           holochain = attrs: {
             codegenUnits = 8;
           };
