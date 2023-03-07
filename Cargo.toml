@@ -50,6 +50,9 @@ members = [
 
 exclude = ["crates/release-automation"]
 
+[build]
+incremental = true
+
 [profile.fast-test]
 inherits = "dev"
 debug = 1

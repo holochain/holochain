@@ -3,6 +3,8 @@ use holochain_sqlite::rusqlite::*;
 use holochain_zome_types::*;
 use std::fmt::Debug;
 
+use crate::prelude::HeadInfo;
+
 use super::Params;
 use super::*;
 
@@ -18,7 +20,7 @@ impl ChainHeadQuery {
 impl Query for ChainHeadQuery {
     type Item = Judged<SignedActionHashed>;
     type State = Option<SignedActionHashed>;
-    type Output = Option<(ActionHash, u32, Timestamp)>;
+    type Output = Option<HeadInfo>;
 
     fn query(&self) -> String {
         "
@@ -75,8 +77,12 @@ impl Query for ChainHeadQuery {
         Ok(state.map(|sh| {
             let seq = sh.action().action_seq();
             let timestamp = sh.action().timestamp();
-            let hash = sh.hashed.hash;
-            (hash, seq, timestamp)
+            let action = sh.hashed.hash;
+            HeadInfo {
+                action,
+                seq,
+                timestamp,
+            }
         }))
     }
 
@@ -167,11 +173,11 @@ mod tests {
         // let head = query.run(Txn::from(&txn)).unwrap();
         assert_eq!(
             head.unwrap(),
-            (
-                expected_head.as_hash().clone(),
-                expected_head.action().action_seq(),
-                expected_head.action().timestamp()
-            )
+            HeadInfo {
+                action: expected_head.as_hash().clone(),
+                seq: expected_head.action().action_seq(),
+                timestamp: expected_head.action().timestamp()
+            }
         );
     }
 }

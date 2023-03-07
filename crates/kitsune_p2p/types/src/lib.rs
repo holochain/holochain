@@ -53,12 +53,18 @@ pub fn ok_fut<E1, R: Send + 'static>(result: R) -> Result<MustBoxFuture<'static,
 }
 
 /// Helper function for the common case of returning this boxed future type.
-pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
+pub fn box_fut_plain<'a, R: Send + 'a>(result: R) -> BoxFuture<'a, R> {
     use futures::FutureExt;
-    async move { result }.boxed().into()
+    async move { result }.boxed()
+}
+
+/// Helper function for the common case of returning this boxed future type.
+pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
+    box_fut_plain(result).into()
 }
 
 use ::ghost_actor::dependencies::tracing;
+use futures::future::BoxFuture;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 
 /// 32 byte binary TLS certificate digest.

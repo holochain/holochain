@@ -255,6 +255,16 @@ async fn remote_signals() -> anyhow::Result<()> {
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
         future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
 
+    // Check that there are no duplicate agents
+    assert_eq!(
+        all_agents.len(),
+        all_agents
+            .clone()
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    );
+
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
         .0;
