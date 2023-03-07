@@ -10,13 +10,14 @@ use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 
-pub async fn block(db: &DbWrite<DbKindConductor>, block: Block) -> DatabaseResult<()> {
-    db.async_commit(move |txn| mutations::insert_block(txn, block))
+pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
+    dbg!("block", &input);
+    db.async_commit(move |txn| mutations::insert_block(txn, input))
         .await
 }
 
-pub async fn unblock(db: &DbWrite<DbKindConductor>, block: Block) -> DatabaseResult<()> {
-    db.async_commit(move |txn| mutations::insert_unblock(txn, block))
+pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
+    db.async_commit(move |txn| mutations::insert_unblock(txn, input))
         .await
 }
 

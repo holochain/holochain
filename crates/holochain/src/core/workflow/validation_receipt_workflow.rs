@@ -30,6 +30,7 @@ pub async fn validation_receipt_workflow(
     keystore: MetaLairClient,
     conductor: ConductorHandle,
 ) -> WorkflowResult<WorkComplete> {
+    dbg!("validation_receipt_workflow");
     // Who we are.
     // TODO: I think this is right but maybe we need to make sure these cells are in
     // running apps?.
@@ -74,18 +75,19 @@ pub async fn validation_receipt_workflow(
                 let ops = stmt
                     .query_and_then([], |r| {
                         let author: AgentPubKey = r.get("author")?;
-                        let dht_op_hash = r.get("hash")?;
+                        let dht_op_hash: DhtOpHash = r.get("hash")?;
                         let validation_status = r.get("validation_status")?;
                         // NB: timestamp will never be null, so this is OK
                         let when_integrated = r.get("when_integrated")?;
                         StateQueryResult::Ok((
                             ValidationReceipt {
-                                dht_op_hash,
+                                dht_op_hash: dht_op_hash.clone(),
                                 validation_status,
                                 validators: validators.clone(),
                                 when_integrated,
                             },
                             author,
+                            dht_op_hash,
                         ))
                     })?
                     .collect::<StateQueryResult<Vec<_>>>()?;
@@ -94,13 +96,17 @@ pub async fn validation_receipt_workflow(
         })
         .await?;
 
+    dbg!(&receipts);
+
     // Send the validation receipts
-    for (receipt, author) in receipts {
+    for (receipt, author, _) in &receipts {
         // Don't send receipt to self.
-        if validators.iter().any(|validator| *validator == author) {
+        if validators.iter().any(|validator| validator == author) {
+            dbg!("self receipt");
             continue;
         }
 
+        dbg!("validation receipt");
         if matches!(receipt.validation_status, ValidationStatus::Rejected) {
             // Block BEFORE we integrate the outcome because this is not atomic
             // and if something goes wrong we know the integration will retry.
@@ -115,10 +121,8 @@ pub async fn validation_receipt_workflow(
                 .await?;
         }
 
-        let op_hash = receipt.dht_op_hash.clone();
-
         // Sign on the dotted line.
-        let receipt = match ValidationReceipt::sign(receipt, &keystore).await {
+        let receipt = match ValidationReceipt::sign(receipt.clone(), &keystore).await {
             Ok(Some(r)) => r,
             Ok(None) => {
                 return Ok(WorkComplete::Incomplete);
@@ -134,7 +138,7 @@ pub async fn validation_receipt_workflow(
         // instead of waiting for response.
         if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipt(
             &network,
-            author,
+            author.clone(),
             receipt.try_into()?,
         )
         .await
@@ -142,11 +146,14 @@ pub async fn validation_receipt_workflow(
             // No one home, they will need to publish again.
             info!(failed_send_receipt = ?e);
         }
+    }
 
+    // Record that every receipt has been processed.
+    for (_, _, dht_op_hash) in receipts {
         // Attempted to send the receipt so we now mark
         // it to not send in the future.
         vault
-            .async_commit(move |txn| set_require_receipt(txn, &op_hash, false))
+            .async_commit(move |txn| set_require_receipt(txn, &dht_op_hash, false))
             .await?;
     }
 
