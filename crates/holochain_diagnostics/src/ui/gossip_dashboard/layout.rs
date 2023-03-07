@@ -66,7 +66,7 @@ pub(super) fn layout<K: Backend>(n: usize, b: usize, f: &mut Frame<K>) -> UiLayo
         height: 1,
     };
 
-    let mut gauges_rect = table_extras.clone();
+    let mut gauges_rect = table_extras;
     gauges_rect.y += 1;
     gauges_rect.height -= 1;
 

@@ -161,7 +161,7 @@ pub struct LocalState {
 impl LocalState {
     pub fn node_selector(&mut self, i: isize, max: usize) {
         if let Some(s) = self.node_list_state.selected() {
-            let n = (s as isize + i).min(max as isize).max(0);
+            let n = (s as isize + i).clamp(0, max as isize);
             self.node_list_state.select(Some(n as usize));
         }
     }
@@ -183,7 +183,7 @@ impl LocalState {
     pub fn selected_node(&self) -> Option<usize> {
         self.node_list_state
             .selected()
-            .and_then(|s| (s > 0).then(|| s - 1))
+            .and_then(|s| (s > 0).then_some(s - 1))
     }
 }
 
@@ -207,8 +207,8 @@ impl<'a, Id: Clone> NodeRounds<'a, Id> {
             .flat_map(|(n, info)| info.completed_rounds.iter().map(|r| (n.clone(), r)))
             .collect();
 
-        currents.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-        completed.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        currents.sort_unstable_by(|a, b| b.1.cmp(a.1));
+        completed.sort_unstable_by(|a, b| b.1.cmp(a.1));
 
         Self {
             currents,

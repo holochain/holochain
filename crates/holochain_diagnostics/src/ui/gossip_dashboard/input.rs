@@ -11,6 +11,7 @@ pub enum InputCmd {
 }
 
 impl GossipDashboard {
+    #[allow(clippy::single_match)]
     pub fn input<S: ClientState>(&self, state: RwShare<S>) -> Option<InputCmd> {
         if event::poll(self.refresh_rate).unwrap() {
             if let Event::Key(key) = event::read().unwrap() {

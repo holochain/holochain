@@ -90,6 +90,7 @@ pub fn gossip_round_table<Id: Display + Clone>(
     ])
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_gossip_metric_row<Id: Display>(
     node_id: &Id,
     round_id: &String,
@@ -156,8 +157,8 @@ fn render_gossip_metric_row<Id: Display>(
     });
 
     if let Some((ours, theirs)) = region_diffs {
-        let outgoing: RegionData = ours.into_iter().map(|r| r.data.clone()).sum();
-        let incoming: RegionData = theirs.into_iter().map(|r| r.data.clone()).sum();
+        let outgoing: RegionData = ours.iter().map(|r| r.data.clone()).sum();
+        let incoming: RegionData = theirs.iter().map(|r| r.data.clone()).sum();
         cells.extend([
             number_cell(incoming.count),
             number_cell(outgoing.count),

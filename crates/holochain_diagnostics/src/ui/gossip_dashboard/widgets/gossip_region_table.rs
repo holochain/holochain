@@ -12,7 +12,7 @@ pub fn gossip_region_table(state: &GossipRegionTableState) -> Table<'static> {
     let header = Row::new(["coords", "#", "size" /* , "hash"*/])
         .style(Style::default().add_modifier(Modifier::UNDERLINED));
 
-    let rows: Vec<_> = state.regions.iter().map(|r| gossip_region_row(r)).collect();
+    let rows: Vec<_> = state.regions.iter().map(gossip_region_row).collect();
     Table::new(rows).header(header).widths(&[
         Constraint::Max(120),
         Constraint::Min(4),
