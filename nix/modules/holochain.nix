@@ -66,7 +66,7 @@
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
         pname = "holochain-tests-nextest";
         CARGO_PROFILE = "fast-test";
-        nativeBuildInputs = [ pkgs.cargo-nextest ];
+        nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ pkgs.cargo-nextest ];
         buildPhase = ''
           cargo nextest run --no-run \
           ${import ../../.config/test-args.nix} \
