@@ -464,7 +464,7 @@ async fn validate_op_outer(
         .get_ribosome(dna_hash.as_ref())
         .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
-    validate_op(op, host_fn_workspace, network, &ribosome).await
+    validate_op(op, host_fn_workspace, network, &ribosome, conductor_handle).await
 }
 
 pub async fn validate_op<R>(
@@ -472,10 +472,13 @@ pub async fn validate_op<R>(
     workspace: HostFnWorkspaceRead,
     network: &HolochainP2pDna,
     ribosome: &R,
+    conductor_handle: &ConductorHandle,
 ) -> AppValidationOutcome<Outcome>
 where
     R: RibosomeT,
 {
+    validate_op_entry_def(op, &network.dna_hash(), conductor_handle).await?;
+
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
         Op::StoreRecord(StoreRecord { record }) => {
@@ -680,6 +683,27 @@ where
             }
         }
     }
+}
+
+async fn validate_op_entry_def(
+    op: &Op,
+    dna_hash: &DnaHash,
+    conductor_handle: &ConductorHandle,
+) -> AppValidationOutcome<()> {
+    let entry_type = match op {
+        Op::StoreRecord(StoreRecord { record }) => record.action().entry_type().to_owned(),
+        Op::StoreEntry(StoreEntry { action, .. }) => Some(action.hashed.entry_type()),
+        _ => None,
+    };
+
+    if let Some(EntryType::App(app_entry_def)) = entry_type {
+        let entry_def = crate::core::check_app_entry_def(dna_hash, app_entry_def, conductor_handle)
+            .await
+            .map_err(AppValidationError::SysValidationError)?;
+        crate::core::check_not_private(&entry_def)
+            .map_err(AppValidationError::SysValidationError)?;
+    }
+    Ok(())
 }
 
 pub struct AppValidationWorkspace {

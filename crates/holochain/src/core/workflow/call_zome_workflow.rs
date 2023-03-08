@@ -242,7 +242,7 @@ where
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
-            sys_validate_record(&record, &cascade, &conductor_handle)
+            sys_validate_record(&record, &cascade)
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
@@ -268,6 +268,7 @@ where
                 workspace.clone().into(),
                 &network,
                 &ribosome,
+                &conductor_handle,
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
