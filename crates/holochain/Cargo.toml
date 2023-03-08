@@ -40,6 +40,7 @@ holochain_zome_types = { version = "^0.1.0", path = "../holochain_zome_types", f
 human-panic = "1.0.3"
 kitsune_p2p = { version = "^0.1.0", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
 kitsune_p2p_types = { version = "^0.1.0", path = "../kitsune_p2p/types" }
+kitsune_p2p_block = { version = "^0.1.0", path = "../kitsune_p2p/block" }
 lazy_static = "1.4.0"
 mockall = "0.10.2"
 mr_bundle = { version = "^0.1.0", path = "../mr_bundle" }
@@ -148,7 +149,7 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "glacial_tests", "test_utils", "no-deps", "tx2"]
+default = ["slow_tests", "glacial_tests", "test_utils", "no-deps", "tx2", "tx5"]
 
 tx2 = [ "kitsune_p2p/tx2" ]
 tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]

@@ -125,6 +125,9 @@ pub use builder::*;
 mod chc;
 pub use chc::*;
 
+mod conductor_services;
+pub use conductor_services::*;
+
 pub use accessor_impls::*;
 pub use app_impls::*;
 pub use app_status_impls::*;
@@ -228,6 +231,8 @@ pub struct Conductor {
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
+
+    pub(crate) services: RwShare<Option<ConductorServices>>,
 }
 
 impl Conductor {
@@ -239,6 +244,8 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
+    use kitsune_p2p_types::box_fut_plain;
+
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
 
     use super::*;
@@ -272,6 +279,7 @@ mod startup_shutdown_impls {
                 keystore,
                 holochain_p2p,
                 post_commit,
+                services: RwShare::new(None),
             }
         }
 
@@ -325,6 +333,21 @@ mod startup_shutdown_impls {
                 }
                 let task = spawn_task_outcome_handler(self.clone(), outcome_rx);
                 *lock = Some(task);
+            });
+
+            self.services.share_mut(|services| {
+                let mut dpki = MockDpkiService::new();
+                dpki.expect_is_key_valid()
+                    .returning(|_, _| box_fut_plain(Ok(true)));
+                dpki.expect_key_mutation()
+                    .returning(|_, _| box_fut_plain(Ok(())));
+
+                let app_store = MockAppStoreService::new();
+
+                *services = Some(ConductorServices {
+                    dpki: Arc::new(dpki),
+                    app_store: Arc::new(app_store),
+                });
             });
 
             self.clone().add_admin_interfaces(admin_configs).await?;
@@ -731,6 +754,10 @@ mod network_impls {
     use holochain_p2p::HolochainP2pSender;
     use holochain_zome_types::block::Block;
 
+    use crate::conductor::api::error::{
+        zome_call_response_to_conductor_api_result, ConductorApiError,
+    };
+
     use super::*;
 
     impl Conductor {
@@ -777,13 +804,13 @@ mod network_impls {
         }
 
         /// Block some target.
-        pub async fn block(&self, block: Block) -> ConductorResult<()> {
-            Ok(holochain_state::block::block(&self.spaces.conductor_db, block).await?)
+        pub async fn block(&self, input: Block) -> ConductorResult<()> {
+            Ok(self.spaces.block(input).await?)
         }
 
         /// Unblock some target.
-        pub async fn unblock(&self, block: Block) -> ConductorResult<()> {
-            Ok(holochain_state::block::unblock(&self.spaces.conductor_db, block).await?)
+        pub async fn unblock(&self, input: Block) -> ConductorResult<()> {
+            Ok(self.spaces.unblock(input).await?)
         }
 
         pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
@@ -1027,6 +1054,45 @@ mod network_impls {
             debug!(cell_id = ?call.cell_id);
             let cell = self.cell_by_id(&call.cell_id)?;
             Ok(cell.call_zome(call, Some(workspace_lock)).await?)
+        }
+
+        /// Make a zome call with deserialization and some error unwrapping built in
+        pub async fn easy_call_zome<I, O, Z, F>(
+            &self,
+            provenance: &AgentPubKey,
+            cap_secret: Option<CapSecret>,
+            cell_id: CellId,
+            zome_name: Z,
+            fn_name: F,
+            payload: I,
+        ) -> ConductorApiResult<O>
+        where
+            FunctionName: From<F>,
+            ZomeName: From<Z>,
+            I: Serialize + std::fmt::Debug,
+            O: serde::de::DeserializeOwned + std::fmt::Debug,
+        {
+            let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
+            let now = Timestamp::now();
+            let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(now)?;
+            let call_unsigned = ZomeCallUnsigned {
+                cell_id,
+                zome_name: zome_name.into(),
+                fn_name: fn_name.into(),
+                cap_secret,
+                provenance: provenance.clone(),
+                payload,
+                nonce,
+                expires_at,
+            };
+            let call =
+                ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
+            let response = self.call_zome(call).await;
+            match response {
+                Ok(Ok(response)) => Ok(zome_call_response_to_conductor_api_result(response)?),
+                Ok(Err(error)) => Err(ConductorApiError::Other(Box::new(error))),
+                Err(error) => Err(error),
+            }
         }
     }
 }

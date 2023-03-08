@@ -1,0 +1,16 @@
+[package]
+name = "diagnostic_tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chashmap = "2.2"
+colored = "2"
+futures = "*"
+holochain_diagnostics = { path = "../holochain_diagnostics" }
+observability = "0.1"
+tokio = { version = "1.11", features = ["full"] }
+tokio-stream = "*"
+
+crossterm = "*"
+tui = "*"

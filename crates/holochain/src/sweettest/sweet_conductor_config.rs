@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::sweettest::SweetRendezvous;
 use holochain_conductor_api::{conductor::ConductorConfig, AdminInterfaceConfig, InterfaceDriver};
 use kitsune_p2p::KitsuneP2pConfig;
 
@@ -238,15 +239,6 @@ impl SweetConductorConfig {
             .as_mut()
             .expect("failed to tune network")
             .tuning_params = tuning_params;
-        self
-    }
-
-    #[cfg(feature = "tx5")]
-    /// Setup for webrtc networking
-    pub fn webrtc_networking(mut self, signal_url: String) -> Self {
-        let mut network = KitsuneP2pConfig::default();
-        network.transport_pool = vec![kitsune_p2p::TransportConfig::WebRTC { signal_url }];
-        self.0.network = Some(network);
         self
     }
 

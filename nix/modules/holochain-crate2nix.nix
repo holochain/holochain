@@ -6,6 +6,8 @@
       };
       customBuildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
         defaultCrateOverrides = pkgs.defaultCrateOverrides // {
+          tx5-go-pion-sys = _: { nativeBuildInputs = with pkgs; [ go ]; };
+          tx5-go-pion-turn = _: { nativeBuildInputs = with pkgs; [ go ]; };
           holochain = attrs: {
             codegenUnits = 8;
           };
@@ -31,7 +33,7 @@
     in
     {
       packages = {
-        holochain-crates-standalone =
+        build-holochain-build-crates-standalone =
           mkNoIfdPackage "holochain" cargoNix.allWorkspaceMembers;
       };
     };

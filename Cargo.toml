@@ -44,9 +44,15 @@ members = [
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
+
+  "crates/holochain_diagnostics",
+  "crates/diagnostic_tests",
 ]
 
 exclude = ["crates/release-automation"]
+
+[build]
+incremental = true
 
 [profile.fast-test]
 inherits = "dev"

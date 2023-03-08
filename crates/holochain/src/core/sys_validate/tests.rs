@@ -1,10 +1,15 @@
 use super::*;
 use crate::conductor::space::TestSpaces;
+use crate::core::workflow::inline_validation;
+use crate::sweettest::SweetAgents;
+use crate::sweettest::SweetConductor;
+use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
+use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::test_authored_db;
@@ -567,4 +572,95 @@ fn valid_chain_test() {
             ))
         );
     });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_agent_update() {
+    let dna = SweetDnaFile::unique_empty().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let (agent1, agent2, agent3) = SweetAgents::three(conductor.keystore()).await;
+    conductor
+        .setup_app_for_agent("app", agent1.clone(), vec![&dna])
+        .await
+        .unwrap();
+
+    let dna_hash = dna.dna_hash().clone();
+    let space = conductor
+        .get_spaces()
+        .get_or_create_space(&dna_hash)
+        .unwrap();
+
+    let workspace = space
+        .source_chain_workspace(
+            conductor.keystore(),
+            agent1.clone(),
+            Arc::new(dna.dna_def().clone()),
+        )
+        .await
+        .unwrap();
+    let chain = workspace.source_chain().clone();
+
+    assert_eq!(chain.len().unwrap(), 3);
+
+    let network = conductor.holochain_p2p().to_dna(dna_hash.clone(), None);
+    let ribosome = conductor.get_ribosome(&dna_hash).unwrap();
+
+    let sec = std::time::Duration::from_secs(1);
+
+    let head = chain.chain_head().unwrap().unwrap();
+
+    let a1 = Action::AgentValidationPkg(AgentValidationPkg {
+        author: agent2.clone(),
+        timestamp: (head.timestamp + sec).unwrap(),
+        action_seq: head.seq + 1,
+        prev_action: head.action,
+        membrane_proof: None,
+    });
+
+    let a2 = Action::Create(Create {
+        author: agent2.clone(),
+        timestamp: (a1.timestamp() + sec).unwrap(),
+        action_seq: a1.action_seq() + 1,
+        prev_action: a1.to_hash(),
+        entry_type: EntryType::AgentPubKey,
+        entry_hash: agent2.clone().into(),
+        weight: EntryRateWeight::default(),
+    });
+
+    let a3 = Action::Create(Create {
+        author: agent3.clone(),
+        timestamp: (a2.timestamp() + sec).unwrap(),
+        action_seq: a2.action_seq() + 1,
+        prev_action: a2.to_hash(),
+        entry_type: EntryType::AgentPubKey,
+        entry_hash: agent3.clone().into(),
+        weight: EntryRateWeight::default(),
+    });
+
+    chain
+        .put_with_action(a1, None, ChainTopOrdering::Strict)
+        .await
+        .unwrap();
+    chain
+        .put_with_action(a2, Some(Entry::Agent(agent2)), ChainTopOrdering::Strict)
+        .await
+        .unwrap();
+
+    inline_validation(
+        workspace.clone(),
+        network.clone(),
+        conductor.raw_handle(),
+        ribosome.clone(),
+    )
+    .await
+    .unwrap();
+
+    chain
+        .put_with_action(a3, Some(Entry::Agent(agent3)), ChainTopOrdering::Strict)
+        .await
+        .unwrap();
+    // this should be invalid
+    inline_validation(workspace, network, conductor.raw_handle(), ribosome.clone())
+        .await
+        .unwrap_err();
 }
