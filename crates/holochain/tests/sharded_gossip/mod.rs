@@ -9,7 +9,7 @@ use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
-use holochain::test_utils::{consistency_10s, consistency_60s, consistency_60s_advanced};
+use holochain::test_utils::{consistency_10s, consistency_60s, consistency_advanced};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
@@ -285,7 +285,12 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     conductors.add_conductor(conductor);
     conductors.exchange_peer_info().await;
 
-    consistency_60s_advanced([(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
+    consistency_advanced(
+        [(&cells[0], false), (&cells[1], true), (&cell, true)],
+        30,
+        std::time::Duration::from_secs(1),
+    )
+    .await;
 
     println!(
         "Done waiting for consistency between last two nodes. Elapsed: {:?}",

@@ -234,6 +234,52 @@ pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
     Ok(())
 }
 
+/// Check previous action type is valid
+pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+    let maybe_error = match (prev_action, action) {
+        (
+            Action::AgentValidationPkg(AgentValidationPkg {
+                author: author1, ..
+            }),
+            Action::Create(Create {
+                author: author2,
+                entry_type: EntryType::AgentPubKey,
+                ..
+            }),
+        ) => {
+            if author1 != author2 {
+                Some("author of agent validation package must match succeeding agent")
+            } else {
+                None
+            }
+        }
+
+        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => {
+            Some("Every AgentValidationPkg must be followed by a Create for an AgentPubKey")
+        }
+
+        (
+            _,
+            Action::Create(Create {
+                entry_type: EntryType::AgentPubKey,
+                ..
+            }),
+        ) => Some("Every Create for an AgentPubKey must be preceded by an AgentValidationPkg"),
+
+        _ => None,
+    };
+
+    if let Some(error) = maybe_error {
+        Err(PrevActionError::InvalidSuccessor(
+            error.to_string(),
+            Box::new((prev_action.clone(), action.clone())),
+        ))
+        .map_err(|e| ValidationOutcome::from(e).into())
+    } else {
+        Ok(())
+    }
+}
+
 /// Check previous action timestamp is before this action
 pub fn check_prev_timestamp(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
     let t1 = prev_action.timestamp();
@@ -271,6 +317,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 
 /// Check the AppEntryDef is valid for the zome.
 /// Check the EntryDefId and ZomeIndex are in range.
+// TODO: MD: shouldn't this be part of App validation, since it invokes Wasm?
 pub async fn check_app_entry_def(
     dna_hash: &DnaHash,
     entry_type: &AppEntryDef,

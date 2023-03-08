@@ -638,6 +638,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cassowary"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df8670b8c7b9dae1793364eafadf7239c40d669904660c5960d74cfd80b46a53"
+
+[[package]]
 name = "cast"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -803,6 +809,17 @@ name = "colored"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4ffc801dacf156c5854b9df4f425a626539c3a6ef7893cc0c5084a23f0b6c59"
+dependencies = [
+ "atty",
+ "lazy_static",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "colored"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
 dependencies = [
  "atty",
  "lazy_static",
@@ -1072,7 +1089,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c36c10130df424b2f3552fcc2ddcd9b28a27b1e54b358b45874f88d1ca6888c"
 dependencies = [
  "bitflags",
- "crossterm_winapi",
+ "crossterm_winapi 0.7.0",
  "lazy_static",
  "libc",
  "mio 0.7.14",
@@ -1082,10 +1099,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossterm"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e64e6c0fbe2c17357405f7c758c1ef960fce08bdfb2c03d88d2a18d7e09c4b67"
+dependencies = [
+ "bitflags",
+ "crossterm_winapi 0.9.0",
+ "libc",
+ "mio 0.8.6",
+ "parking_lot 0.12.1",
+ "signal-hook 0.3.15",
+ "signal-hook-mio",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "crossterm"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84cda67535339806297f1b331d6dd6320470d2a0fe65381e79ee9e156dd3d13"
+dependencies = [
+ "bitflags",
+ "crossterm_winapi 0.9.0",
+ "libc",
+ "mio 0.8.6",
+ "parking_lot 0.12.1",
+ "signal-hook 0.3.15",
+ "signal-hook-mio",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "crossterm_winapi"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0da8964ace4d3e4a044fd027919b2237000b24315a37c916f61809f1ff2140b9"
+dependencies = [
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "crossterm_winapi"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ae1b35a484aa10e07fe0638d02301c5ad24de82d310ccbd2f3693da5f09bf1c"
 dependencies = [
  "winapi 0.3.9",
 ]
@@ -1380,6 +1438,21 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn",
+]
+
+[[package]]
+name = "diagnostic_tests"
+version = "0.1.0"
+dependencies = [
+ "chashmap",
+ "colored 2.0.0",
+ "crossterm 0.26.1",
+ "futures",
+ "holochain_diagnostics",
+ "observability",
+ "tokio",
+ "tokio-stream",
+ "tui",
 ]
 
 [[package]]
@@ -2499,6 +2572,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_diagnostics"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "crossterm 0.26.1",
+ "holochain",
+ "human-repr",
+ "rand 0.8.5",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber 0.3.16",
+ "tui",
+]
+
+[[package]]
 name = "holochain_integrity_types"
 version = "0.1.0"
 dependencies = [
@@ -2999,6 +3088,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "human-repr"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0fb489e3108b684bba475a4cb9804260365870e2f60058265e3d0a3b309bdb1"
+
+[[package]]
 name = "hyper"
 version = "0.14.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3348,7 +3443,7 @@ dependencies = [
 name = "kitsune_p2p_dht"
 version = "0.1.0"
 dependencies = [
- "colored",
+ "colored 1.9.3",
  "derivative",
  "derive_more",
  "futures",
@@ -3449,6 +3544,7 @@ dependencies = [
  "derive_more",
  "futures",
  "holochain_serialized_bytes 0.0.51",
+ "human-repr",
  "kitsune_p2p_fetch",
  "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
@@ -3487,7 +3583,7 @@ dependencies = [
  "base64 0.13.1",
  "blake2b_simd 0.5.11",
  "criterion",
- "crossterm",
+ "crossterm 0.19.0",
  "derive_more",
  "futures",
  "kitsune_p2p_transport_quic",
@@ -6268,6 +6364,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-hook-mio"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29ad2e15f37ec9a6cc544097b78a1ec90001e9f71b81338ca39f430adaca99af"
+dependencies = [
+ "libc",
+ "mio 0.8.6",
+ "signal-hook 0.3.15",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6822,8 +6929,10 @@ version = "0.3.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd0cbfecb4d19b5ea75bb31ad904eb5b9fa13f21079c3b92017ebdf4999a5890"
 dependencies = [
+ "itoa",
  "serde",
  "time-core",
+ "time-macros",
 ]
 
 [[package]]
@@ -6831,6 +6940,15 @@ name = "time-core"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
+
+[[package]]
+name = "time-macros"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd80a657e71da814b8e5d60d3374fc6d35045062245d80224748ae522dd76f36"
+dependencies = [
+ "time-core",
+]
 
 [[package]]
 name = "tiny-keccak"
@@ -7064,6 +7182,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-appender"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09d48f71a791638519505cefafe162606f706c25592e4bde4d97600c0195312e"
+dependencies = [
+ "crossbeam-channel",
+ "time 0.3.20",
+ "tracing-subscriber 0.3.16",
+]
+
+[[package]]
 name = "tracing-attributes"
 version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7194,6 +7323,19 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "termcolor",
+]
+
+[[package]]
+name = "tui"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccdd26cbd674007e649a272da4475fb666d3aa0ad0531da7136db6fab0e5bad1"
+dependencies = [
+ "bitflags",
+ "cassowary",
+ "crossterm 0.25.0",
+ "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]
@@ -7769,9 +7911,9 @@ checksum = "0046fef7e28c3804e5e38bfa31ea2a0f73905319b677e57ebe37e49358989b5d"
 
 [[package]]
 name = "wasm-encoder"
-version = "0.24.1"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68f7d56227d910901ce12dfd19acc40c12687994dfb3f57c90690f80be946ec5"
+checksum = "4eff853c4f09eec94d76af527eddad4e9de13b11d6286a1ef7134bc30135a2b7"
 dependencies = [
  "leb128",
 ]
@@ -8027,9 +8169,9 @@ checksum = "718ed7c55c2add6548cca3ddd6383d738cd73b892df400e96b9aa876f0141d7a"
 
 [[package]]
 name = "wast"
-version = "54.0.1"
+version = "55.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d48d9d731d835f4f8dacbb8de7d47be068812cb9877f5c60d408858778d8d2a"
+checksum = "4984d3e1406571f4930ba5cf79bd70f75f41d0e87e17506e0bd19b0e5d085f05"
 dependencies = [
  "leb128",
  "memchr",
@@ -8039,9 +8181,9 @@ dependencies = [
 
 [[package]]
 name = "wat"
-version = "1.0.60"
+version = "1.0.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1db2e3ed05ea31243761439194bec3af6efbbaf87c4c8667fb879e4f23791a0"
+checksum = "af2b53f4da14db05d32e70e9c617abdf6620c575bd5dd972b7400037b4df2091"
 dependencies = [
  "wast",
 ]

@@ -45,8 +45,8 @@ pub struct SweetConductor {
 }
 
 /// Standard config for SweetConductors
-pub fn standard_config() -> SweetConductorConfig {
-    SweetConductorConfig::standard()
+pub fn standard_config() -> ConductorConfig {
+    SweetConductorConfig::standard().into()
 }
 
 /// A DnaFile with a role name assigned
@@ -454,9 +454,9 @@ impl SweetConductor {
         self.handle.is_some()
     }
 
-    // NB: keep this private to prevent leaking out owned references
+    /// Get the underlying SweetConductorHandle.
     #[allow(dead_code)]
-    fn sweet_handle(&self) -> SweetConductorHandle {
+    pub fn sweet_handle(&self) -> SweetConductorHandle {
         self.handle
             .as_ref()
             .map(|h| h.clone_privately())
