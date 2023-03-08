@@ -181,4 +181,5 @@ async fn test_block_invalid_receipt() {
     dbg!(action_hash);
 
     consistency_10s([&alice_cell, &bob_cell]).await;
+    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 }

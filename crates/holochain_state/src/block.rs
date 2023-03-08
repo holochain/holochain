@@ -11,7 +11,6 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 
 pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
-    dbg!("block", &input);
     db.async_commit(move |txn| mutations::insert_block(txn, input))
         .await
 }

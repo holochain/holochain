@@ -18,43 +18,11 @@ use holochain_zome_types::block::CellBlockReason;
 #[cfg(test)]
 mod tests;
 
-#[instrument(skip(vault, network, keystore, conductor))]
-/// Send validation receipts to their authors in serial and without waiting for
-/// responses.
-/// TODO: Currently still waiting for responses because we don't have a network call
-/// that doesn't.
-pub async fn validation_receipt_workflow(
-    dna_hash: Arc<DnaHash>,
-    vault: DbWrite<DbKindDht>,
-    network: HolochainP2pDna,
-    keystore: MetaLairClient,
-    conductor: ConductorHandle,
-) -> WorkflowResult<WorkComplete> {
-    dbg!("validation_receipt_workflow");
-    // Who we are.
-    // TODO: I think this is right but maybe we need to make sure these cells are in
-    // running apps?.
-    let cell_ids = conductor.list_cell_ids(Some(CellStatus::Joined));
-
-    if cell_ids.is_empty() {
-        return Ok(WorkComplete::Complete);
-    }
-
-    let validators = cell_ids
-        .into_iter()
-        .filter_map(|id| {
-            let (d, a) = id.into_dna_and_agent();
-            if d == *dna_hash {
-                Some(a)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-
-    // Get out all ops that are marked for sending receipt.
-    // FIXME: Test this query.
-    let receipts = vault
+pub async fn pending_receipts(
+    vault: &DbRead<DbKindDht>,
+    validators: Vec<AgentPubKey>,
+) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
+    Ok(vault
         .async_reader({
             let validators = validators.clone();
             move |txn| {
@@ -94,7 +62,46 @@ pub async fn validation_receipt_workflow(
                 StateQueryResult::Ok(ops)
             }
         })
-        .await?;
+        .await?)
+}
+
+#[instrument(skip(vault, network, keystore, conductor))]
+/// Send validation receipts to their authors in serial and without waiting for
+/// responses.
+/// TODO: Currently still waiting for responses because we don't have a network call
+/// that doesn't.
+pub async fn validation_receipt_workflow(
+    dna_hash: Arc<DnaHash>,
+    vault: DbWrite<DbKindDht>,
+    network: HolochainP2pDna,
+    keystore: MetaLairClient,
+    conductor: ConductorHandle,
+) -> WorkflowResult<WorkComplete> {
+    dbg!("validation_receipt_workflow");
+    // Who we are.
+    // TODO: I think this is right but maybe we need to make sure these cells are in
+    // running apps?.
+    let cell_ids = conductor.list_cell_ids(Some(CellStatus::Joined));
+
+    if cell_ids.is_empty() {
+        return Ok(WorkComplete::Complete);
+    }
+
+    let validators = cell_ids
+        .into_iter()
+        .filter_map(|id| {
+            let (d, a) = id.into_dna_and_agent();
+            if d == *dna_hash {
+                Some(a)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // Get out all ops that are marked for sending receipt.
+    // FIXME: Test this query.
+    let receipts = pending_receipts(&vault, validators.clone()).await?;
 
     dbg!(&receipts);
 
@@ -108,6 +115,7 @@ pub async fn validation_receipt_workflow(
 
         dbg!("validation receipt");
         if matches!(receipt.validation_status, ValidationStatus::Rejected) {
+            dbg!("validation_receipt_workflow BLOCKED");
             // Block BEFORE we integrate the outcome because this is not atomic
             // and if something goes wrong we know the integration will retry.
             conductor
