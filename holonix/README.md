@@ -20,7 +20,7 @@ as an exmaple, here is a _flake.nix_ that references a custom branch.
 
     holochain = {
       url = "github:holochain/holochain/pr_holonix_on_flakes";
-      inputs.versions.url = "github:holochain/holochain?dir=versions/0_1";
+      inputs.versions.url = "github:holochain/holochain/?dir=versions/0_1";
       inputs.versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.3";
     };
   };
@@ -42,7 +42,7 @@ as an exmaple, here is a _flake.nix_ that references a custom branch.
               inputsFrom = [ inputs.holochain.devShells.${system}.holonix ];
               packages = with pkgs; [
                   # more packages go here
-              ]
+              ];
             };
           };
       };
