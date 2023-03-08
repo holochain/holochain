@@ -20,8 +20,8 @@ as an exmaple, here is a _flake.nix_ that references a custom branch.
 
     holochain = {
       url = "github:holochain/holochain/pr_holonix_on_flakes";
-      inputs.versions.url = "github:holochain/holochain/pr_holonix_on_flakes?dir=versions/0_1";
-      inputs.versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.0";
+      inputs.versions.url = "github:holochain/holochain?dir=versions/0_1";
+      inputs.versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.3";
     };
   };
 
@@ -53,7 +53,7 @@ this exmaple would translate to the following CLI invocatin
 
 ```shell=
 nix develop \
-  github:holochain/holochain/pr_holonix_on_flakes#holonix \
-  --override-input versions 'github:holochain/holochain/pr_holonix_on_flakes?dir=versions/0_1' \
-  --override-input versions/holochain 'github:holochain/holochain/holochain-0.1.0'
+  github:holochain/holochain#holonix \
+  --override-input versions 'github:holochain/holochain/?dir=versions/0_1' \
+  --override-input versions/holochain 'github:holochain/holochain/holochain-0.1.3'
 ```
