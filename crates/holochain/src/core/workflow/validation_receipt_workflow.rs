@@ -77,7 +77,6 @@ pub async fn validation_receipt_workflow(
     keystore: MetaLairClient,
     conductor: ConductorHandle,
 ) -> WorkflowResult<WorkComplete> {
-    dbg!("validation_receipt_workflow");
     // Who we are.
     // TODO: I think this is right but maybe we need to make sure these cells are in
     // running apps?.
@@ -103,19 +102,15 @@ pub async fn validation_receipt_workflow(
     // FIXME: Test this query.
     let receipts = pending_receipts(&vault, validators.clone()).await?;
 
-    dbg!(&receipts);
-
     // Send the validation receipts
     for (receipt, author, _) in &receipts {
-        // Don't send receipt to self.
+        // Don't send receipt to self. Don't block self.
         if validators.iter().any(|validator| validator == author) {
-            dbg!("self receipt");
             continue;
         }
 
-        dbg!("validation receipt");
+        // Block authors of invalid ops.
         if matches!(receipt.validation_status, ValidationStatus::Rejected) {
-            dbg!("validation_receipt_workflow BLOCKED");
             // Block BEFORE we integrate the outcome because this is not atomic
             // and if something goes wrong we know the integration will retry.
             conductor
@@ -156,7 +151,8 @@ pub async fn validation_receipt_workflow(
         }
     }
 
-    // Record that every receipt has been processed.
+    // Record that every receipt has been processed. This is after the main loop
+    // above so that we pick up self receipts as well.
     for (_, _, dht_op_hash) in receipts {
         // Attempted to send the receipt so we now mark
         // it to not send in the future.

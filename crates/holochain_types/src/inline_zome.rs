@@ -143,14 +143,11 @@ impl InlineZomeSet {
             integrity_order,
         } = self;
 
-        dbg!(zome_name, name);
-
         match integrity_zomes.remove_entry(zome_name) {
             Some((k, v)) => {
                 integrity_zomes.insert(k, v.function(name, f));
             }
             None => {
-                dbg!(zome_name, name);
                 let (k, v) = coordinator_zomes.remove_entry(zome_name).unwrap();
                 coordinator_zomes.insert(k, v.function(name, f));
             }

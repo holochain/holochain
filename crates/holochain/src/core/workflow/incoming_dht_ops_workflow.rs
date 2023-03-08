@@ -124,7 +124,6 @@ pub async fn incoming_dht_ops_workflow(
     mut ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
-    dbg!("incoming_dht_ops_workflow");
     let Space {
         incoming_op_hashes,
         incoming_ops_batch,

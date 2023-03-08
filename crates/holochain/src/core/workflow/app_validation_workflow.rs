@@ -91,7 +91,6 @@ async fn app_validation_workflow_inner(
     tracing::debug!("validating {} ops", start_len);
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
-    dbg!("app_validation_workflow_inner");
 
     // Validate all the ops
     let iter = sorted_ops.into_iter().map({
@@ -193,7 +192,6 @@ async fn app_validation_workflow_inner(
                     match outcome {
                         Outcome::Accepted => {
                             total += 1;
-                            dbg!("outcome accepted", &op_hash);
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Valid)?;
                             } else {
@@ -212,7 +210,6 @@ async fn app_validation_workflow_inner(
                                 op_light
                             );
                             if let Dependency::Null = dependency {
-                                dbg!("outcome rejected", &op_hash);
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
                                 put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
@@ -224,30 +221,6 @@ async fn app_validation_workflow_inner(
             })
             .await?;
 
-        let _ = db.async_reader({
-            move |txn| {
-                let mut stmt = txn.prepare("SELECT * FROM DhtOp")?;
-                let ops = stmt.query_and_then([], |r| {
-                    let op_hash: DhtOpHash = r.get("hash").unwrap();
-                    let validation_status: Option<ValidationStatus> = r.get("validation_status").unwrap();
-                    let require_receipt: bool = r.get("require_receipt").unwrap();
-                    DatabaseResult::Ok((
-                        op_hash,
-                        validation_status,
-                        require_receipt
-                    ))
-                })?.collect::<DatabaseResult<Vec<_>>>().unwrap();
-                dbg!("ooo", ops);
-                DatabaseResult::Ok(())
-            }
-        }).await.ok();
-
-        dbg!(
-            "av receipts",
-            crate::core::workflow::validation_receipt_workflow::pending_receipts(&db, vec![])
-                .await
-                .unwrap()
-        );
         // Once the database transaction is committed, add agent activity to the cache
         // that is ready for integration.
         for (author, seq, has_no_dependency) in activity {

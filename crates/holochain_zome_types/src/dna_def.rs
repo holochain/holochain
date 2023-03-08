@@ -234,7 +234,6 @@ impl DnaDef {
         &self,
         zome_name: &ZomeName,
     ) -> Result<zome::IntegrityZome, ZomeError> {
-        dbg!();
         self.integrity_zomes
             .iter()
             .find(|(name, _)| name == zome_name)
@@ -255,7 +254,6 @@ impl DnaDef {
         &self,
         zome_name: &ZomeName,
     ) -> Result<zome::CoordinatorZome, ZomeError> {
-        dbg!();
         self.coordinator_zomes
             .iter()
             .find(|(name, _)| name == zome_name)
@@ -266,14 +264,12 @@ impl DnaDef {
 
     /// Find a any zome from a [`ZomeName`].
     pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, ZomeError> {
-        dbg!(&self.integrity_zomes);
         self.integrity_zomes
             .iter()
             .find(|(name, _)| name == zome_name)
             .cloned()
             .map(|(name, def)| Zome::new(name, def.erase_type()))
             .or_else(|| {
-                dbg!(&self.coordinator_zomes, zome_name);
                 self.coordinator_zomes
                     .iter()
                     .find(|(name, _)| name == zome_name)

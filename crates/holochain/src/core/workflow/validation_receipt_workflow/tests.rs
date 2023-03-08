@@ -1,3 +1,4 @@
+use crate::conductor::api::error::ConductorApiResult;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::prelude::InlineZomeSet;
 use crate::sweettest::*;
@@ -8,6 +9,7 @@ use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
+use holochain_types::prelude::block::BlockTargetId;
 use holochain_types::prelude::*;
 use rusqlite::Transaction;
 
@@ -92,6 +94,21 @@ async fn test_validation_receipt() {
     );
 }
 
+macro_rules! wait_until {
+    ($expression:expr; $interval_ms:literal; $timeout_ms:literal; $wait_msg:literal; $timeout_msg:literal;) => {
+        let timeout = (Timestamp::now() + std::time::Duration::from_millis($timeout_ms)).unwrap();
+        let interval_duration = std::time::Duration::from_millis($interval_ms);
+        tokio::time::sleep(interval_duration).await;
+        while !$expression {
+            if Timestamp::now() > timeout {
+                panic!($timeout_msg);
+            }
+            dbg!($wait_msg);
+            tokio::time::sleep(interval_duration).await;
+        }
+    };
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_block_invalid_receipt() {
     observability::test_run().ok();
@@ -132,17 +149,13 @@ async fn test_block_invalid_receipt() {
         vec![unit_entry_def.clone()],
         0,
     )
-    .function(integrity_name, "validate", |_api, op: Op| {
-        dbg!("VALIDATE");
-        match op {
-            Op::StoreEntry(StoreEntry { action, .. })
-                if action.hashed.content.app_entry_def().is_some() =>
-            {
-                dbg!("INVALID");
-                Ok(ValidateResult::Invalid("Entry defs are bad".into()))
-            }
-            _ => Ok(ValidateResult::Valid),
+    .function(integrity_name, "validate", |_api, op: Op| match op {
+        Op::StoreEntry(StoreEntry { action, .. })
+            if action.hashed.content.app_entry_def().is_some() =>
+        {
+            Ok(ValidateResult::Invalid("Entry defs are bad".into()))
         }
+        _ => Ok(ValidateResult::Valid),
     });
 
     let config = SweetConductorConfig::standard();
@@ -174,12 +187,101 @@ async fn test_block_invalid_receipt() {
 
     let ((bob_cell,),) = bob_apps.into_tuples();
 
-    let action_hash: ActionHash = alice_conductor
+    let _action_hash: ActionHash = alice_conductor
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    dbg!(action_hash);
-
     consistency_10s([&alice_cell, &bob_cell]).await;
+
+    let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
+    let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());
+
+    for now in vec![Timestamp::now(), Timestamp::MIN, Timestamp::MAX] {
+        assert!(!alice_conductor
+            .spaces
+            .is_blocked(alice_block_target.clone(), now)
+            .await
+            .unwrap());
+        assert!(!alice_conductor
+            .spaces
+            .is_blocked(bob_block_target.clone(), now)
+            .await
+            .unwrap());
+        assert!(!bob_conductor
+            .spaces
+            .is_blocked(bob_block_target.clone(), now)
+            .await
+            .unwrap());
+
+        // It can take a little more than consistency to have the receipts
+        // processed.
+        wait_until!(
+            bob_conductor.spaces.is_blocked(alice_block_target.clone(), now).await.unwrap();
+            100;
+            10000;
+            "waiting for block due to warrant";
+            "warrant block never happened";
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_not_block_self_receipt() {
+    observability::test_run().ok();
+
+    let unit_entry_def = EntryDef::from_id("unit");
+    let zomes = InlineZomeSet::new_single(
+        "integrity",
+        "coordinator",
+        "a",
+        "b",
+        vec![unit_entry_def.clone()],
+        0,
+    )
+    .function("coordinator", "create", move |api, ()| {
+        let entry = Entry::app(().try_into().unwrap()).unwrap();
+        let hash = api.create(CreateInput::new(
+            InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+            EntryVisibility::Public,
+            entry,
+            ChainTopOrdering::default(),
+        ))?;
+        Ok(hash)
+    })
+    .function("integrity", "validate", |_api, op: Op| match op {
+        Op::StoreEntry(StoreEntry { action, .. })
+            if action.hashed.content.app_entry_def().is_some() =>
+        {
+            Ok(ValidateResult::Invalid("Entry defs are bad".into()))
+        }
+        _ => Ok(ValidateResult::Valid),
+    });
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let alice_pubkey = SweetAgents::alice();
+    let (dna, _, _) = SweetDnaFile::from_inline_zomes("network_seed".into(), zomes).await;
+
+    let apps = conductor
+        .setup_app_for_agents("app-", &[alice_pubkey.clone()], &[dna])
+        .await
+        .unwrap();
+
+    let ((alice_cell,),) = apps.into_tuples();
+
+    let maybe_action_hash: ConductorApiResult<ActionHash> = conductor
+        .call_fallible(&alice_cell.zome("coordinator"), "create", ())
+        .await;
+    assert!(maybe_action_hash.is_err());
+
+    let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
+
+    // Give some time to ensure alice clears workflows.
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+
+    // Alice should not block herself for finding her own invalid entry.
+    assert!(!conductor
+        .spaces
+        .is_blocked(alice_block_target, Timestamp::now())
+        .await
+        .unwrap());
 }
