@@ -20,7 +20,7 @@ use holochain_zome_types::ValidationStatus;
 async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     td_record: &RecordTestData,
-    cascade: &mut Cascade<N>,
+    cascade: &Cascade<N>,
     options: GetOptions,
 ) {
     // - Get via entry hash
@@ -84,7 +84,7 @@ async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
 async fn assert_is_none<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     td_record: &RecordTestData,
-    cascade: &mut Cascade<N>,
+    cascade: &Cascade<N>,
     options: GetOptions,
 ) {
     // - Get via entry hash
@@ -123,7 +123,7 @@ async fn assert_is_none<N: HolochainP2pDnaT + Clone + Send + 'static>(
 async fn assert_rejected<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     td_record: &RecordTestData,
-    cascade: &mut Cascade<N>,
+    cascade: &Cascade<N>,
     options: GetOptions,
 ) {
     // - Get via entry hash
@@ -181,7 +181,7 @@ async fn assert_rejected<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
 async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
-    cascade: &mut Cascade<N>,
+    cascade: &Cascade<N>,
     options: GetOptions,
 ) {
     // - Retrieve via entry hash
@@ -241,9 +241,9 @@ async fn entry_not_authority_or_authoring() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = Cascade::empty().with_network(network, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &mut cascade, GetOptions::latest()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -277,11 +277,11 @@ async fn entry_authoring() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let mut cascade = Cascade::empty()
+    let cascade = Cascade::empty()
         .with_scratch(scratch.into_sync())
         .with_network(mock, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &mut cascade, GetOptions::latest()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -305,11 +305,11 @@ async fn entry_authority() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let mut cascade = Cascade::empty()
+    let cascade = Cascade::empty()
         .with_authored(vault.to_db().into())
         .with_network(mock, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &mut cascade, GetOptions::latest()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -333,11 +333,11 @@ async fn content_not_authority_or_authoring() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let mut cascade = Cascade::empty()
+    let cascade = Cascade::empty()
         .with_authored(vault.to_db().into())
         .with_network(mock, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &mut cascade, GetOptions::content()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::content()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -371,11 +371,11 @@ async fn content_authoring() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let mut cascade = Cascade::empty()
+    let cascade = Cascade::empty()
         .with_scratch(scratch.into_sync())
         .with_network(mock, cache.to_db());
 
-    assert_can_get(&td_entry, &td_record, &mut cascade, GetOptions::content()).await;
+    assert_can_get(&td_entry, &td_record, &cascade, GetOptions::content()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -397,11 +397,11 @@ async fn content_authority() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let mut cascade = Cascade::empty()
+    let cascade = Cascade::empty()
         .with_authored(vault.to_db().into())
         .with_network(mock, cache.to_db());
 
-    assert_is_none(&td_entry, &td_record, &mut cascade, GetOptions::content()).await;
+    assert_is_none(&td_entry, &td_record, &cascade, GetOptions::content()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -422,8 +422,8 @@ async fn rejected_ops() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
-    assert_rejected(&td_entry, &td_record, &mut cascade, GetOptions::latest()).await;
+    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    assert_rejected(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -444,8 +444,8 @@ async fn check_can_handle_rejected_ops_in_cache() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
-    assert_rejected(&td_entry, &td_record, &mut cascade, GetOptions::latest()).await;
+    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    assert_rejected(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -493,18 +493,18 @@ async fn test_pending_data_isnt_returned() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = Cascade::empty().with_network(network, cache.to_db());
 
-    assert_is_none(&td_entry, &td_record, &mut cascade, GetOptions::latest()).await;
+    assert_is_none(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 
-    assert_can_retrieve(&td_entry, &mut cascade, GetOptions::latest()).await;
+    assert_can_retrieve(&td_entry, &cascade, GetOptions::latest()).await;
 
     let network = PassThroughNetwork::authority_for_all(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let mut cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = Cascade::empty().with_network(network, cache.to_db());
 
-    assert_is_none(&td_entry, &td_record, &mut cascade, GetOptions::latest()).await;
+    assert_is_none(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 
-    assert_can_retrieve(&td_entry, &mut cascade, GetOptions::latest()).await;
+    assert_can_retrieve(&td_entry, &cascade, GetOptions::latest()).await;
 }

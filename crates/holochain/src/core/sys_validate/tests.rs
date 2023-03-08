@@ -90,13 +90,13 @@ async fn check_valid_if_dna_test() {
     );
 
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Ok(())
     );
     let mut action = fixt!(Dna);
 
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Ok(())
     );
 
@@ -105,7 +105,7 @@ async fn check_valid_if_dna_test() {
     dna_def.modifiers.origin_time = Timestamp::MAX;
     workspace.dna_def = Arc::new(dna_def);
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PrevActionError(PrevActionError::InvalidRootOriginTime)
         ))
@@ -130,7 +130,7 @@ async fn check_valid_if_dna_test() {
         .unwrap();
 
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PrevActionError(PrevActionError::InvalidRoot)
         ))

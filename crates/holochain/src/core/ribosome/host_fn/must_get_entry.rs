@@ -23,7 +23,7 @@ pub fn must_get_entry<'a>(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = match call_context.host_context {
+                let cascade = match call_context.host_context {
                     HostContext::Validate(_) => {
                         Cascade::from_workspace_stores(workspace.stores(), None)
                     }
@@ -32,6 +32,7 @@ pub fn must_get_entry<'a>(
                         call_context.host_context.network().clone(),
                     ),
                 };
+
                 match cascade
                     .retrieve_entry(entry_hash.clone(), NetworkGetOptions::must_get_options())
                     .await

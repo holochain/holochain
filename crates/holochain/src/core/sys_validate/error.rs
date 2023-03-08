@@ -111,13 +111,13 @@ pub enum ValidationOutcome {
     EntryDefId(AppEntryDef),
     #[error("The entry has a different hash to the action's entry hash")]
     EntryHash,
-    #[error("The entry size {0} was bigger then the MAX_ENTRY_SIZE {1}")]
+    #[error("The entry size {0} was larger than the MAX_ENTRY_SIZE {1}")]
     EntryTooLarge(usize, usize),
     #[error("The entry has a different type to the action's entry type")]
     EntryType,
     #[error("The app entry def {0:?} visibility didn't match the zome")]
     EntryVisibility(AppEntryDef),
-    #[error("The link tag size {0} was bigger then the MAX_TAG_SIZE {1}")]
+    #[error("The link tag size {0} was larger than the MAX_TAG_SIZE {1}")]
     TagTooLarge(usize, usize),
     #[error("The action {0:?} was expected to be a link add action")]
     NotCreateLink(ActionHash),
@@ -131,6 +131,10 @@ pub enum ValidationOutcome {
     PrevActionError(#[from] PrevActionError),
     #[error("StoreEntry should not be gossiped for private entries")]
     PrivateEntry,
+    #[error(
+        "The DNA does not belong in this space! Action DNA hash: {0:?}, expected DNA hash: {1:?}"
+    )]
+    WrongDna(DnaHash, DnaHash),
     #[error("Update original EntryType: {0:?} doesn't match new EntryType {1:?}")]
     UpdateTypeMismatch(EntryType, EntryType),
     #[error("Signature {0:?} failed to verify for Action {1:?}")]
