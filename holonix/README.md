@@ -21,7 +21,7 @@ as an exmaple, here is a _flake.nix_ that references a custom branch.
     holochain-flake = {
       url = "github:holochain/holochain";
       inputs.versions.url = "github:holochain/holochain/?dir=versions/0_1";
-      inputs.versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.3";
+      inputs.holochain.url = "github:holochain/holochain/holochain-0.1.3";
     };
   };
 
