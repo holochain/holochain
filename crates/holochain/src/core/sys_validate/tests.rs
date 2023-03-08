@@ -37,6 +37,7 @@ use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
+use futures::FutureExt;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_serialized_bytes::SerializedBytes;
@@ -617,6 +618,28 @@ fn valid_chain_test() {
             ))
         );
     });
+}
+
+#[tokio::test(flavor = "multi_thread")]
+/// Test that the valid_chain contrafact matches our chain validation function
+async fn valid_chain_fact_test() {
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let keystore = SweetConductor::from_standard_config().await.keystore();
+    let author = SweetAgents::one(keystore.clone()).await;
+    let chain: Vec<_> = futures::future::join_all(
+        contrafact::build_seq(
+            &mut u,
+            100,
+            holochain_zome_types::action::facts::valid_chain(author),
+        )
+        .into_iter()
+        .map(|a| {
+            SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
+                .map(|r| r.unwrap())
+        }),
+    )
+    .await;
+    validate_chain(chain.iter(), &None).unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]

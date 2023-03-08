@@ -17,10 +17,10 @@ use holo_hash::*;
 /// - constrain seq num
 /// - constrain prev_hashes
 /// ...but, this does it all in one Fact
-#[derive(Default)]
 struct ValidChainFact {
     hash: Option<ActionHash>,
     seq: u32,
+    author: AgentPubKey,
 }
 
 impl Fact<Action> for ValidChainFact {
@@ -68,6 +68,8 @@ impl Fact<Action> for ValidChainFact {
             *action = Action::Dna(Dna::arbitrary(u).unwrap());
         }
 
+        *action.author_mut() = self.author.clone();
+
         // println!(
         //     "{}  =>  {:?}\n",
         //     ActionHash::with_data_sync(action),
@@ -96,8 +98,12 @@ pub fn is_new_entry_action() -> Facts<'static, Action> {
 }
 
 /// WIP: Fact: The actions form a valid SourceChain
-pub fn valid_chain() -> Facts<'static, Action> {
-    facts![ValidChainFact::default(),]
+pub fn valid_chain(author: AgentPubKey) -> Facts<'static, Action> {
+    facts![ValidChainFact {
+        hash: None,
+        seq: 0,
+        author
+    },]
 }
 
 /// Fact: The action must be a NewEntryAction
@@ -115,9 +121,10 @@ mod tests {
     #[test]
     fn test_valid_chain_fact() {
         let mut u = Unstructured::new(&crate::NOISE);
+        let author = ::fixt::fixt!(AgentPubKey);
 
-        let chain = build_seq(&mut u, 5, valid_chain());
-        check_seq(chain.as_slice(), valid_chain()).unwrap();
+        let chain = build_seq(&mut u, 5, valid_chain(author.clone()));
+        check_seq(chain.as_slice(), valid_chain(author)).unwrap();
 
         let hashes: Vec<_> = chain
             .iter()
