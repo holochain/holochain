@@ -6,6 +6,7 @@ use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
 use holochain::test_utils::setup_app;
+use holochain_state::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
@@ -106,61 +107,89 @@ async fn ser_regression_test() {
 
     let channel = ChannelName("hello world".into());
 
-    let invocation = ZomeCall {
-        cell_id: alice_cell_id.clone(),
-        zome_name: TestWasm::SerRegression.into(),
-        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: "create_channel".into(),
-        payload: ExternIO::encode(channel).unwrap(),
-        provenance: alice_agent_id.clone(),
-    };
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+    let mut invocation = ZomeCall::try_from_unsigned_zome_call(
+        handle.keystore(),
+        ZomeCallUnsigned {
+            cell_id: alice_cell_id.clone(),
+            zome_name: TestWasm::SerRegression.into(),
+            cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+            fn_name: "create_channel".into(),
+            payload: ExternIO::encode(channel).unwrap(),
+            provenance: alice_agent_id.clone(),
+            nonce,
+            expires_at,
+        },
+    )
+    .await
+    .unwrap();
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCall(request).try_into().unwrap();
+    let request = AppRequest::CallZome(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _channel_hash: EntryHash = match response {
-        AppResponse::ZomeCall(r) => r.decode().unwrap(),
+        AppResponse::ZomeCalled(r) => r.decode().unwrap(),
         _ => unreachable!(),
     };
 
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+    invocation.nonce = nonce;
+    invocation.expires_at = expires_at;
+    let invocation = invocation
+        .resign_zome_call(handle.keystore(), alice_agent_id.clone())
+        .await
+        .unwrap();
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
     let channel_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
-        _ => unreachable!(),
+        _ => panic!("{:?}", output),
     };
 
     let message = CreateMessageInput {
         channel_hash,
         content: "Hello from alice :)".into(),
     };
-    let invocation = ZomeCall {
-        cell_id: alice_cell_id.clone(),
-        zome_name: TestWasm::SerRegression.into(),
-        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: "create_message".into(),
-        payload: ExternIO::encode(message).unwrap(),
-        provenance: alice_agent_id.clone(),
-    };
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+    let mut invocation = ZomeCall::try_from_unsigned_zome_call(
+        handle.keystore(),
+        ZomeCallUnsigned {
+            cell_id: alice_cell_id.clone(),
+            zome_name: TestWasm::SerRegression.into(),
+            cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+            fn_name: "create_message".into(),
+            payload: ExternIO::encode(message).unwrap(),
+            provenance: alice_agent_id.clone(),
+            nonce,
+            expires_at,
+        },
+    )
+    .await
+    .unwrap();
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCall(request).try_into().unwrap();
+    let request = AppRequest::CallZome(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _msg_hash: EntryHash = match response {
-        AppResponse::ZomeCall(r) => r.decode().unwrap(),
+        AppResponse::ZomeCalled(r) => r.decode().unwrap(),
         _ => unreachable!(),
     };
 
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
+    invocation.nonce = nonce;
+    invocation.expires_at = expires_at;
+    let invocation = invocation
+        .resign_zome_call(handle.keystore(), alice_agent_id.clone())
+        .await
+        .unwrap();
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
     let _msg_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
-        _ => unreachable!(),
+        _ => panic!("{:?}", output),
     };
 
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
+    handle.shutdown().await.unwrap().unwrap();
 }

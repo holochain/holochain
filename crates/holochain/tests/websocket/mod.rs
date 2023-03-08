@@ -16,7 +16,7 @@ use holochain::{
 };
 use holochain_types::{
     prelude::*,
-    test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
+    test_utils::{fake_dna_zomes, write_fake_dna_file},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
@@ -119,7 +119,7 @@ async fn call_zome() {
     let (holochain, admin_port) = start_holochain(config_path.clone()).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
     let (_, receiver2) = websocket_client_by_port(admin_port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
@@ -129,22 +129,25 @@ async fn call_zome() {
     );
     let original_dna_hash = dna.dna_hash().clone();
 
+    let agent_key = fake_agent_pubkey_1();
+
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let _dna_hash = register_and_install_dna(
-        &mut client,
+    let dna_hash = register_and_install_dna(
+        &mut admin_tx,
         original_dna_hash.clone(),
-        fake_agent_pubkey_1(),
+        agent_key.clone(),
         fake_dna_path,
         None,
         "".into(),
         10000,
     )
     .await;
+    let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // List Dnas
     let request = AdminRequest::ListDnas;
-    let response = client.request(request);
+    let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
 
     let expects = vec![original_dna_hash.clone()];
@@ -154,16 +157,44 @@ async fn call_zome() {
     let request = AdminRequest::EnableApp {
         installed_app_id: "test".to_string(),
     };
-    let response = client.request(request);
+    let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
+    // Generate signing key pair
+    let mut rng = rand_dalek::thread_rng();
+    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+
+    // Grant zome call capability for agent
+    let zome_name = TestWasm::Foo.coordinator_zome_name();
+    let fn_name = FunctionName("foo".into());
+    let cap_secret = grant_zome_call_capability(
+        &mut admin_tx,
+        &cell_id,
+        zome_name.clone(),
+        fn_name.clone(),
+        signing_key,
+    )
+    .await;
+
     // Attach App Interface
-    let app_port = attach_app_interface(&mut client, None).await;
+    let app_port = attach_app_interface(&mut admin_tx, None).await;
+
+    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
 
     // Call Zome
     tracing::info!("Calling zome");
-    call_foo_fn(app_port, original_dna_hash.clone()).await;
+    call_zome_fn(
+        &mut app_tx,
+        cell_id.clone(),
+        &signing_keypair,
+        cap_secret.clone(),
+        zome_name.clone(),
+        fn_name.clone(),
+        &(),
+    )
+    .await;
 
     // Ensure that the other client does not receive any messages, i.e. that
     // responses are not broadcast to all connected clients, only the one
@@ -177,28 +208,39 @@ async fn call_zome() {
 
     // Shutdown holochain
     std::mem::drop(holochain);
-    std::mem::drop(client);
+    std::mem::drop(admin_tx);
 
     // Call zome after restart
     tracing::info!("Restarting conductor");
     let (_holochain, admin_port) = start_holochain(config_path).await;
     let admin_port = admin_port.await.unwrap();
 
-    let (mut client, _) = websocket_client_by_port(admin_port).await.unwrap();
+    let (mut admin_tx, _) = websocket_client_by_port(admin_port).await.unwrap();
 
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
     let request = AdminRequest::ListAppInterfaces;
-    let response = client.request(request);
+    let response = admin_tx.request(request);
     let response = check_timeout(response, 3000).await;
     let app_port = match response {
         AdminResponse::AppInterfacesListed(ports) => *ports.first().unwrap(),
         _ => panic!("Unexpected response"),
     };
 
+    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
+
     // Call Zome again on the existing app interface port
     tracing::info!("Calling zome again");
-    call_foo_fn(app_port, original_dna_hash).await;
+    call_zome_fn(
+        &mut app_tx,
+        cell_id.clone(),
+        &signing_keypair,
+        cap_secret.clone(),
+        zome_name.clone(),
+        fn_name.clone(),
+        &(),
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -212,6 +254,16 @@ async fn remote_signals() -> anyhow::Result<()> {
     // MAYBE: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
         future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
+
+    // Check that there are no duplicate agents
+    assert_eq!(
+        all_agents.len(),
+        all_agents
+            .clone()
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    );
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
@@ -251,7 +303,7 @@ async fn remote_signals() -> anyhow::Result<()> {
     for mut rx in rxs {
         let r = rx.try_recv();
         // Each handle should recv a signal
-        assert_matches!(r, Ok(Signal::App(_, a)) if a == signal);
+        assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
     }
 
     Ok(())
@@ -284,13 +336,14 @@ async fn emit_signals() {
     );
     let orig_dna_hash = dna.dna_hash().clone();
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
-    // Install Dna
+
     let agent_key = fake_agent_pubkey_1();
 
+    // Install Dna
     let dna_hash = register_and_install_dna(
         &mut admin_tx,
         orig_dna_hash,
-        fake_agent_pubkey_1(),
+        agent_key.clone(),
         fake_dna_path,
         None,
         "".into(),
@@ -307,6 +360,23 @@ async fn emit_signals() {
     let response = check_timeout(response, 3000).await;
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
+    // Generate signing key pair
+    let mut rng = rand_dalek::thread_rng();
+    let signing_keypair = ed25519_dalek::Keypair::generate(&mut rng);
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+
+    // Grant zome call capability for agent
+    let zome_name = TestWasm::EmitSignal.coordinator_zome_name();
+    let fn_name = FunctionName("emit".into());
+    let cap_secret = grant_zome_call_capability(
+        &mut admin_tx,
+        &cell_id,
+        zome_name.clone(),
+        fn_name.clone(),
+        signing_key,
+    )
+    .await;
+
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
 
@@ -319,9 +389,11 @@ async fn emit_signals() {
     call_zome_fn(
         &mut app_tx_1,
         cell_id.clone(),
-        TestWasm::EmitSignal,
-        "emit".into(),
-        (),
+        &signing_keypair,
+        cap_secret,
+        zome_name.clone(),
+        fn_name,
+        &(),
     )
     .await;
 
@@ -340,7 +412,11 @@ async fn emit_signals() {
     assert!(!msg2.is_request());
 
     assert_eq!(
-        Signal::App(cell_id, AppSignal::new(ExternIO::encode(()).unwrap())),
+        Signal::App {
+            cell_id,
+            zome_name,
+            signal: AppSignal::new(ExternIO::encode(()).unwrap())
+        },
         Signal::try_from(sig1.clone()).unwrap(),
     );
     assert_eq!(sig1, sig2);
@@ -525,7 +601,7 @@ async fn concurrent_install_dna() {
 
     let (client, _) = websocket_client_by_port(admin_port).await.unwrap();
 
-    let before = std::time::Instant::now();
+    //let before = std::time::Instant::now();
 
     let install_tasks_stream = futures::stream::iter((0..NUM_DNA).into_iter().map(|i| {
         let zomes = vec![(TestWasm::Foo.into(), TestWasm::Foo.into())];
@@ -538,9 +614,9 @@ async fn concurrent_install_dna() {
             let original_dna_hash = dna.dna_hash().clone();
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
             let agent_key = generate_agent_pubkey(&mut client, REQ_TIMEOUT_MS).await;
-            println!("[{}] Agent pub key generated", i);
+            //println!("[{}] Agent pub key generated", i);
 
-            let dna_hash = register_and_install_dna_named(
+            let _dna_hash = register_and_install_dna_named(
                 &mut client,
                 original_dna_hash.clone(),
                 agent_key,
@@ -552,10 +628,10 @@ async fn concurrent_install_dna() {
             )
             .await;
 
-            println!(
-                "[{}] installed dna with hash {} and name {}",
-                i, dna_hash, name
-            );
+            //println!(
+            //    "[{}] installed dna with hash {} and name {}",
+            //    i, _dna_hash, name
+            //);
         })
     }))
     .buffer_unordered(NUM_CONCURRENT_INSTALLS.into());
@@ -566,11 +642,11 @@ async fn concurrent_install_dna() {
         r.unwrap();
     }
 
-    println!(
-        "installed {} dna in {:?}",
-        NUM_CONCURRENT_INSTALLS,
-        before.elapsed()
-    );
+    //println!(
+    //    "installed {} dna in {:?}",
+    //    NUM_CONCURRENT_INSTALLS,
+    //    before.elapsed()
+    //);
 }
 
 #[tokio::test(flavor = "multi_thread")]

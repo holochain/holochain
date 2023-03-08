@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
+use arbitrary::Arbitrary;
+use ed25519_dalek::{Keypair, Signer};
 use holochain::conductor::ConductorHandle;
 use holochain_conductor_api::FullStateDump;
 use holochain_websocket::WebsocketReceiver;
@@ -38,8 +40,6 @@ use tokio::process::Command;
 use tracing::instrument;
 
 use hdk::prelude::*;
-use holochain::fixt::NamedInvocation;
-use holochain::fixt::ZomeCallInvocationFixturator;
 use holochain::{
     conductor::api::ZomeCall,
     conductor::api::{AdminRequest, AdminResponse, AppRequest},
@@ -47,7 +47,6 @@ use holochain::{
 use holochain_conductor_api::AppResponse;
 use holochain_types::prelude::*;
 use holochain_util::tokio_helper;
-use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 
 /// Wrapper that synchronously waits for the Child to terminate on drop.
@@ -83,36 +82,80 @@ pub async fn start_holochain(
     (SupervisedChild("Holochain".to_string(), child), admin_port)
 }
 
-pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash) {
-    // Connect to App Interface
-    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
-    let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
-    call_zome_fn(&mut app_tx, cell_id, TestWasm::Foo, "foo".into(), ()).await;
+pub async fn grant_zome_call_capability(
+    admin_tx: &mut WebsocketSender,
+    cell_id: &CellId,
+    zome_name: ZomeName,
+    fn_name: FunctionName,
+    signing_key: AgentPubKey,
+) -> CapSecret {
+    let mut fns = BTreeSet::new();
+    fns.insert((zome_name, fn_name));
+    let functions = GrantedFunctions::Listed(fns);
+
+    let mut assignees = BTreeSet::new();
+    assignees.insert(signing_key.clone());
+
+    let mut buf = arbitrary::Unstructured::new(&[]);
+    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
+
+    let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
+        cell_id: cell_id.clone(),
+        cap_grant: ZomeCallCapGrant {
+            tag: "".into(),
+            access: CapAccess::Assigned {
+                secret: cap_secret,
+                assignees,
+            },
+            functions,
+        },
+    }));
+    let response = admin_tx.request(request);
+    let response = check_timeout(response, 3000).await;
+    assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted);
+    cap_secret
 }
 
 pub async fn call_zome_fn<S>(
     app_tx: &mut WebsocketSender,
     cell_id: CellId,
-    wasm: TestWasm,
-    fn_name: String,
-    input: S,
+    signing_keypair: &Keypair,
+    cap_secret: CapSecret,
+    zome_name: ZomeName,
+    fn_name: FunctionName,
+    input: &S,
 ) where
     S: Serialize + std::fmt::Debug,
 {
-    let call: ZomeCall = ZomeCallInvocationFixturator::new(NamedInvocation(
-        cell_id,
-        wasm,
-        fn_name,
-        ExternIO::encode(input).unwrap(),
-    ))
-    .next()
-    .unwrap()
-    .into();
-    let request = AppRequest::ZomeCall(Box::new(call));
+    let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(Timestamp::now()).unwrap();
+    let signing_key = AgentPubKey::from_raw_32(signing_keypair.public.as_bytes().to_vec());
+    let zome_call_unsigned = ZomeCallUnsigned {
+        cap_secret: Some(cap_secret),
+        cell_id: cell_id.clone(),
+        zome_name: zome_name.clone(),
+        fn_name: fn_name.clone(),
+        provenance: signing_key,
+        payload: ExternIO::encode(input).unwrap(),
+        nonce: Nonce256Bits::from(nonce),
+        expires_at,
+    };
+    let signature = signing_keypair.sign(&zome_call_unsigned.data_to_sign().unwrap());
+    let call = ZomeCall {
+        cell_id: zome_call_unsigned.cell_id,
+        zome_name: zome_call_unsigned.zome_name,
+        fn_name: zome_call_unsigned.fn_name,
+        payload: zome_call_unsigned.payload,
+        cap_secret: zome_call_unsigned.cap_secret,
+        provenance: zome_call_unsigned.provenance,
+        nonce: zome_call_unsigned.nonce,
+        expires_at: zome_call_unsigned.expires_at,
+        signature: Signature::from(signature.to_bytes()),
+    };
+    let request = AppRequest::CallZome(Box::new(call));
     let response = app_tx.request(request);
     let call_response = check_timeout(response, 6000).await;
     trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeCall(_));
+    assert_matches!(call_response, AppResponse::ZomeCalled(_));
 }
 
 pub async fn attach_app_interface(client: &mut WebsocketSender, port: Option<u16>) -> u16 {
@@ -180,7 +223,7 @@ pub async fn register_and_install_dna(
 
 pub async fn register_and_install_dna_named(
     client: &mut WebsocketSender,
-    orig_dna_hash: DnaHash,
+    _orig_dna_hash: DnaHash,
     agent_key: AgentPubKey,
     dna_path: PathBuf,
     properties: Option<YamlProperties>,
@@ -188,32 +231,54 @@ pub async fn register_and_install_dna_named(
     name: String,
     timeout: u64,
 ) -> DnaHash {
-    let register_payload = RegisterDnaPayload {
-        modifiers: DnaModifiersOpt {
-            properties,
-            ..Default::default()
-        },
-        source: DnaSource::Path(dna_path),
-    };
-    let request = AdminRequest::RegisterDna(Box::new(register_payload));
-    let response = client.request(request);
-    let response = check_timeout_named("RegisterDna", response, timeout).await;
-    assert_matches!(response, AdminResponse::DnaRegistered(_));
-    let dna_hash = if let AdminResponse::DnaRegistered(h) = response {
-        h.clone()
-    } else {
-        orig_dna_hash
+    let mods = DnaModifiersOpt {
+        properties,
+        ..Default::default()
     };
 
-    let dna_payload = InstallAppDnaPayload {
-        hash: dna_hash.clone(),
-        role_name,
-        membrane_proof: None,
-    };
+    let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
+    let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
+    let (_dna, dna_hash) = dna_bundle1
+        .into_dna_file(mods.clone().serialized().unwrap())
+        .await
+        .unwrap();
+
+    let version = DnaVersionSpec::from(vec![dna_hash.clone().into()]).into();
+
+    let roles = vec![AppRoleManifest {
+        name: role_name,
+        dna: AppRoleDnaManifest {
+            location: Some(DnaLocation::Bundled(dna_path.clone())),
+            modifiers: mods,
+            version: Some(version),
+            clone_limit: 0,
+        },
+        provisioning: Some(CellProvisioning::Create { deferred: false }),
+    }];
+
+    let manifest = AppManifestCurrentBuilder::default()
+        .name(name.clone())
+        .description(None)
+        .roles(roles)
+        .build()
+        .unwrap();
+
+    let resources = vec![(dna_path.clone(), dna_bundle)];
+
+    let bundle = AppBundle::new(
+        manifest.clone().into(),
+        resources,
+        PathBuf::from(dna_path.clone()),
+    )
+    .await
+    .unwrap();
+
     let payload = InstallAppPayload {
-        dnas: vec![dna_payload],
-        installed_app_id: name,
         agent_key,
+        source: AppBundleSource::Bundle(bundle),
+        installed_app_id: Some(name),
+        network_seed: None,
+        membrane_proofs: std::collections::HashMap::new(),
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);

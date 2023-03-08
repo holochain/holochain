@@ -71,10 +71,10 @@ pub mod test {
         assert_eq!(
             zome_info.extern_fns,
             vec![
-                FunctionName::new("__allocate"),
                 FunctionName::new("__data_end"),
-                FunctionName::new("__deallocate"),
                 FunctionName::new("__getrandom_custom"),
+                FunctionName::new("__hc__allocate_1"),
+                FunctionName::new("__hc__deallocate_1"),
                 FunctionName::new("__heap_base"),
                 FunctionName::new("assert_indexes"),
                 FunctionName::new("entry_defs"),

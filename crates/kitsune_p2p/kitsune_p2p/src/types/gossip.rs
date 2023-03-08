@@ -1,9 +1,9 @@
+use crate::meta_net::*;
 use crate::metrics::*;
 use crate::types::*;
 use crate::HostApi;
+use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::tx2::tx2_api::*;
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use kitsune_p2p_types::*;
 use std::sync::Arc;
 
@@ -21,8 +21,8 @@ pub trait AsGossipModule: 'static + Send + Sync {
     fn close(&self);
     fn incoming_gossip(
         &self,
-        con: Tx2ConHnd<wire::Wire>,
-        remote_url: TxUrl,
+        con: crate::meta_net::MetaNetCon,
+        remote_url: String,
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()>;
     fn local_agent_join(&self, a: Arc<KitsuneAgent>);
@@ -40,8 +40,8 @@ impl GossipModule {
 
     pub fn incoming_gossip(
         &self,
-        con: Tx2ConHnd<wire::Wire>,
-        remote_url: TxUrl,
+        con: crate::meta_net::MetaNetCon,
+        remote_url: String,
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()> {
         self.0.incoming_gossip(con, remote_url, gossip_data)
@@ -69,30 +69,41 @@ impl std::fmt::Debug for GossipModule {
 
 /// Represents an interchangeable gossip strategy module factory
 pub trait AsGossipModuleFactory: 'static + Send + Sync {
+    #[allow(clippy::too_many_arguments)]
     fn spawn_gossip_task(
         &self,
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
+        fetch_pool: FetchPool,
     ) -> GossipModule;
 }
 
 pub struct GossipModuleFactory(pub Arc<dyn AsGossipModuleFactory>);
 
 impl GossipModuleFactory {
+    #[allow(clippy::too_many_arguments)]
     pub fn spawn_gossip_task(
         &self,
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
+        fetch_pool: FetchPool,
     ) -> GossipModule {
-        self.0
-            .spawn_gossip_task(tuning_params, space, ep_hnd, evt_sender, host, metrics)
+        self.0.spawn_gossip_task(
+            tuning_params,
+            space,
+            ep_hnd,
+            evt_sender,
+            host,
+            metrics,
+            fetch_pool,
+        )
     }
 }

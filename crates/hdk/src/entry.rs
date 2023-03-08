@@ -18,8 +18,8 @@ pub fn create(create_input: CreateInput) -> ExternResult<ActionHash> {
 /// General function that can update any entry type.
 ///
 /// This is used under the hood by [`update_entry`], [`update_cap_grant`] and `update_cap_claim`.
-///
-/// @todo implement update_cap_claim
+//
+// @todo implement update_cap_claim
 ///
 /// The host builds an [`Update`] action for the passed entry value and commits a new update to the
 /// chain.
@@ -33,8 +33,8 @@ pub fn update(input: UpdateInput) -> ExternResult<ActionHash> {
 /// General function that can delete any entry type.
 ///
 /// This is used under the hood by [`delete_entry`], [`delete_cap_grant`] and `delete_cap_claim`.
-///
-/// @todo implement delete_cap_claim
+//
+// @todo implement delete_cap_claim
 ///
 /// The host builds a [`Delete`] action for the passed entry and commits a new record to the chain.
 ///
@@ -150,9 +150,9 @@ where
 /// let foo_zero_action_hash: ActionHash = create_entry(EntryTypes::Foo(Foo(0)))?;
 /// let foo_ten_update_action_hash: ActionHash = update_entry(foo_zero_action_hash, EntryTypes::Foo(Foo(10)))?;
 /// ```
-///
-/// @todo in the future this will be true because we will have the concept of 'redirects':
-/// Works as an app entry delete+create.
+//
+// @todo in the future this will be true because we will have the concept of 'redirects':
+// Works as an app entry delete+create.
 ///
 /// See [`create_entry`]
 /// See [`update`]
@@ -236,11 +236,18 @@ where
 /// Note: The return details will be inferred by the hash type passed in, be careful to pass in the
 ///       correct hash type for the details you want.
 ///
-/// Note: If an action hash is passed in the record returned is the specified record.
-///       If an entry hash is passed in all the actions (so implicitly all the records) are
-///       returned for the entry that matches that hash.
-///       See [`get`] for more information about what "oldest live" means.
+/// This is implemented in the [`RecordDetails`] variants:
 ///
+/// [`Details::Record`] for an action hash returns:
+/// - the record for this action hash if it exists
+/// - all update and delete _records_ that reference that specified action
+///
+/// [`Details::Entry`] for an entry hash returns:
+/// - all creates, updates and delete _records_ that reference that entry hash
+/// - all update and delete _records_ that reference the records that reference the entry hash
+///
+/// If an action hash is passed in, the action's record will be returned.
+/// If an entry hash is passed in, all the actions and records for that entry are returned.
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
 ///
 /// Creates are initial action/entry combinations (records) produced by create_entry and cannot
@@ -252,11 +259,11 @@ where
 /// Full records are returned for direct references to the passed hash.
 /// Action hashes are returned for references to references to the passed hash.
 ///
-/// [`Details`] for an action hash return:
+/// [`Details::Record`] for an action hash return:
 /// - the record for this action hash if it exists
 /// - all update and delete _records_ that reference that specified action
 ///
-/// [`Details`] for an entry hash return:
+/// [`Details::Entry`] for an entry hash return:
 /// - all creates, updates and delete _records_ that reference that entry hash
 /// - all update and delete _records_ that reference the records that reference the entry hash
 ///

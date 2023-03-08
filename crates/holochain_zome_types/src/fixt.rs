@@ -32,6 +32,11 @@ fixturator!(
     from Bytes;
 );
 
+fixturator!(
+    CellId;
+    constructor fn new(DnaHash, AgentPubKey);
+);
+
 // Create random timestamps that are guaranteed to be valid UTC date and time (see datetime
 // from_timestamp implementation)
 //  - valid +'ve seconds, convertible to +'ve i32 when divided by days
@@ -106,6 +111,7 @@ fixturator!(
 );
 
 pub struct KnownCreateLink {
+    pub author: AgentPubKey,
     pub base_address: AnyLinkableHash,
     pub target_address: AnyLinkableHash,
     pub tag: LinkTag,
@@ -122,6 +128,7 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
     type Item = CreateLink;
     fn next(&mut self) -> Option<Self::Item> {
         let mut f = fixt!(CreateLink);
+        f.author = self.0.curve.author.clone();
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
@@ -305,11 +312,11 @@ fixturator!(
                 let mut rng = rng();
                 let number_of_zomes = rng.gen_range(0..5);
 
-                let mut granted_functions: GrantedFunctions = BTreeSet::new();
+                let mut fns = BTreeSet::new();
                 for _ in 0..number_of_zomes {
-                    granted_functions.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
+                    fns.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
                 }
-                granted_functions
+                GrantedFunctions::Listed(fns)
             }, // CurryPayloadsFixturator::new(Empty).next().unwrap(),
         )
     };
@@ -321,15 +328,15 @@ fixturator!(
                 let mut rng = rand::thread_rng();
                 let number_of_zomes = rng.gen_range(0..5);
 
-                let mut granted_functions: GrantedFunctions = BTreeSet::new();
+                let mut fns = BTreeSet::new();
                 for _ in 0..number_of_zomes {
-                    granted_functions.insert(
-                        GrantedFunctionFixturator::new(Unpredictable)
-                            .next()
-                            .unwrap(),
+                    fns.insert(
+                    GrantedFunctionFixturator::new(Unpredictable)
+                        .next()
+                        .unwrap(),
                     );
                 }
-                granted_functions
+                GrantedFunctions::Listed(fns)
             },
             // CurryPayloadsFixturator::new(Unpredictable).next().unwrap(),
         )
@@ -343,14 +350,16 @@ fixturator!(
                 .next()
                 .unwrap(),
             {
-                let mut granted_functions: GrantedFunctions = BTreeSet::new();
-                for _ in 0..get_fixt_index!() % 3 {
-                    granted_functions
-                        .insert(GrantedFunctionFixturator::new(Predictable).next().unwrap());
+                if get_fixt_index!() %2 == 0{
+                    let mut fns = BTreeSet::new();
+                    for _ in 0..get_fixt_index!() % 3 {
+                        fns.insert(GrantedFunctionFixturator::new(Predictable).next().unwrap());
+                    }
+                    GrantedFunctions::Listed(fns)
+                } else {
+                    GrantedFunctions::All
                 }
-                granted_functions
-            },
-            // CurryPayloadsFixturator::new(Predictable).next().unwrap(),
+            }
         )
     };
 );

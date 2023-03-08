@@ -127,21 +127,19 @@ pub mod tuning_params_struct {
         /// [Default: 5 minutes]
         gossip_agent_info_update_interval_ms: u32 = 1000 * 60 * 5,
 
-        /// How frequently we should locally sync when there is
-        /// no new data. Agents arc can change so this shouldn't
-        /// be too long. [Default: 1 minutes]
-        gossip_local_sync_delay_ms: u32 = 1000 * 60,
 
         /// The target redundancy is the number of peers we expect to hold any
         /// given Op.
         gossip_redundancy_target: f64 = 100.0,
 
-        /// The max number of bytes of op data to send in a single message.
+        /// The max number of bytes of data to send in a single message.
+        ///
+        /// This setting was more relevant when entire Ops were being gossiped,
+        /// but now that only hashes are gossiped, it would take a lot of hashes
+        /// to reach this limit (1MB = approx 277k hashes).
+        ///
         /// Payloads larger than this are split into multiple batches
-        /// when possible  -- currently, a single Op exceeding this size
-        /// will not be further split up, and there are other cases where
-        /// densely populated DHT regions may contain more than this
-        /// limit when transferred.
+        /// when possible.
         gossip_max_batch_size: u32 = 1_000_000,
 
         /// Should gossip dynamically resize storage arcs?
@@ -212,6 +210,22 @@ pub mod tuning_params_struct {
         /// [Default: 200 ms]
         tx2_initial_connect_retry_delay_ms: usize = 200,
 
+        /// Tx5 max pending send byte count limit.
+        /// [Default: 16 MiB]
+        tx5_max_send_bytes: u32 = 16 * 1024 * 1024,
+
+        /// Tx5 max pending recv byte count limit.
+        /// [Default: 16 MiB]
+        tx5_max_recv_bytes: u32 = 16 * 1024 * 1024,
+
+        /// Tx5 max concurrent connection limit.
+        /// [Default: 255]
+        tx5_max_conn_count: u32 = 255,
+
+        /// Tx5 max init (connect) time for a connection in seconds.
+        /// [Default: 60]
+        tx5_max_conn_init_s: u32 = 60,
+
         /// if you would like to be able to use an external tool
         /// to debug the QUIC messages sent and received by kitsune
         /// you'll need the decryption keys.
@@ -252,6 +266,11 @@ pub mod tuning_params_struct {
         /// Get the gossip recent threshold param as a proper Duration
         pub fn danger_gossip_recent_threshold(&self) -> std::time::Duration {
             std::time::Duration::from_secs(self.danger_gossip_recent_threshold_secs)
+        }
+
+        /// Get the tx5_max_conn_init_s param as a Duration.
+        pub fn tx5_max_conn_init(&self) -> std::time::Duration {
+            std::time::Duration::from_secs(self.tx5_max_conn_init_s as u64)
         }
 
         /// returns true if we should initialize a tls keylog

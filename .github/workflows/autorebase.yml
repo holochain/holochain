@@ -1,3 +1,7 @@
+# Operates on open PRs and automatically rebases the PR branch onto the target branch.
+# Like autoupdate.yml, but with rebasing instead of merging.
+# Is triggered on a PR if labeled `autorebase:opt-in`.
+
 name: autorebase
 
 on:

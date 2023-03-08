@@ -29,17 +29,24 @@ pub enum WireMessage {
         zome_name: ZomeName,
         fn_name: FunctionName,
         from_agent: holo_hash::AgentPubKey,
+        signature: Signature,
+        to_agent: AgentPubKey,
         cap_secret: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
+        nonce: Box<Nonce256Bits>,
+        expires_at: Timestamp,
     },
-    Publish {
-        request_validation_receipt: bool,
-        countersigning_session: bool,
-        // For backward compat with holochain < 0.0.164
-        #[serde(alias = "dht_hash")]
-        basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+    CallRemoteMulti {
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        from_agent: holo_hash::AgentPubKey,
+        to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
+        cap_secret: Option<CapSecret>,
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+        nonce: Box<Nonce256Bits>,
+        expires_at: Timestamp,
     },
     ValidationReceipt {
         #[serde(with = "serde_bytes")]
@@ -69,6 +76,10 @@ pub enum WireMessage {
     CountersigningSessionNegotiation {
         message: event::CountersigningSessionNegotiationMessage,
     },
+    PublishCountersign {
+        flag: bool,
+        op: DhtOp,
+    },
 }
 
 #[allow(missing_docs)]
@@ -81,33 +92,56 @@ impl WireMessage {
         holochain_serialized_bytes::decode(&data)
     }
 
+    pub fn publish_countersign(flag: bool, op: DhtOp) -> WireMessage {
+        Self::PublishCountersign { flag, op }
+    }
+
+    /// For an outgoing remote call.
+    #[allow(clippy::too_many_arguments)]
     pub fn call_remote(
         zome_name: ZomeName,
         fn_name: FunctionName,
         from_agent: holo_hash::AgentPubKey,
+        signature: Signature,
+        to_agent: holo_hash::AgentPubKey,
         cap_secret: Option<CapSecret>,
         payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> WireMessage {
         Self::CallRemote {
             zome_name,
             fn_name,
             from_agent,
+            to_agent,
+            signature,
             cap_secret,
             data: payload.into_vec(),
+            nonce: Box::new(nonce),
+            expires_at,
         }
     }
 
-    pub fn publish(
-        request_validation_receipt: bool,
-        countersigning_session: bool,
-        basis_hash: holo_hash::OpBasis,
-        ops: Vec<holochain_types::dht_op::DhtOp>,
+    #[allow(clippy::too_many_arguments)]
+    pub fn call_remote_multi(
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        from_agent: holo_hash::AgentPubKey,
+        to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
+        cap_secret: Option<CapSecret>,
+        payload: ExternIO,
+        nonce: Nonce256Bits,
+        expires_at: Timestamp,
     ) -> WireMessage {
-        Self::Publish {
-            request_validation_receipt,
-            countersigning_session,
-            basis_hash,
-            ops,
+        Self::CallRemoteMulti {
+            zome_name,
+            fn_name,
+            from_agent,
+            to_agents,
+            cap_secret,
+            data: payload.into_vec(),
+            nonce: Box::new(nonce),
+            expires_at,
         }
     }
 

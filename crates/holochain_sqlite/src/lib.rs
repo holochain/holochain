@@ -10,6 +10,7 @@ pub mod error;
 pub mod exports;
 pub mod fatal;
 pub mod functions;
+pub mod nonce;
 pub mod prelude;
 pub mod schema;
 pub mod sql;

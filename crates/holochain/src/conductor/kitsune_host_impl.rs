@@ -1,5 +1,6 @@
 //! Implementation of the Kitsune Host API
 
+mod query_region_op_hashes;
 mod query_region_set;
 mod query_size_limited_regions;
 
@@ -12,11 +13,20 @@ use holochain_p2p::{
     dht::{spacetime::Topology, ArqStrat},
     DnaHashExt,
 };
-use holochain_types::{db::PermittedConn, prelude::DnaError, share::RwShare};
-use kitsune_p2p::{
-    agent_store::AgentInfoSigned, event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
+use holochain_sqlite::prelude::AsP2pStateTxExt;
+use holochain_types::{
+    db::PermittedConn,
+    prelude::{DhtOpHash, DnaError},
+    share::RwShare,
 };
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use holochain_zome_types::Timestamp;
+use kitsune_p2p::{
+    agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
+    event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
+};
+use kitsune_p2p_types::{
+    config::KitsuneP2pTuningParams, dependencies::lair_keystore_api, KOpData, KOpHash,
+};
 
 /// Implementation of the Kitsune Host API.
 /// Lets Kitsune make requests of Holochain
@@ -25,6 +35,8 @@ pub struct KitsuneHostImpl {
     ribosome_store: RwShare<RibosomeStore>,
     tuning_params: KitsuneP2pTuningParams,
     strat: ArqStrat,
+    lair_tag: Option<Arc<str>>,
+    lair_client: Option<lair_keystore_api::LairClient>,
 }
 
 impl KitsuneHostImpl {
@@ -34,17 +46,52 @@ impl KitsuneHostImpl {
         ribosome_store: RwShare<RibosomeStore>,
         tuning_params: KitsuneP2pTuningParams,
         strat: ArqStrat,
+        lair_tag: Option<Arc<str>>,
+        lair_client: Option<lair_keystore_api::LairClient>,
     ) -> Arc<Self> {
         Arc::new(Self {
             spaces,
             ribosome_store,
             tuning_params,
             strat,
+            lair_tag,
+            lair_client,
         })
     }
 }
 
 impl KitsuneHost for KitsuneHostImpl {
+    fn block(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()> {
+        async move {
+            let result = self.spaces.block(input.into()).await;
+            Ok(result?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()> {
+        async move {
+            let result = self.spaces.unblock(input.into()).await;
+            Ok(result?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> KitsuneHostResult<bool> {
+        async move {
+            let result = self.spaces.is_blocked(input.into(), timestamp).await;
+            Ok(result?)
+        }
+        .boxed()
+        .into()
+    }
+
     fn peer_extrapolated_coverage(
         &self,
         space: std::sync::Arc<kitsune_p2p::KitsuneSpace>,
@@ -98,6 +145,21 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
+    fn remove_agent_info_signed(
+        &self,
+        GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
+    ) -> KitsuneHostResult<bool> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        let db = self.spaces.p2p_agents_db(&dna_hash);
+        async move {
+            Ok(db?
+                .async_commit(move |txn| txn.p2p_remove_agent(&agent))
+                .await?)
+        }
+        .boxed()
+        .into()
+    }
+
     fn query_region_set(
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -124,12 +186,28 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<Vec<holochain_p2p::dht::region::Region>> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
-            let topology = self.get_topology(space.clone()).await?;
+            let topology = self.get_topology(space).await?;
             let db = self.spaces.dht_db(&dna_hash)?;
             Ok(query_size_limited_regions::query_size_limited_regions(
                 db, topology, regions, size_limit,
             )
             .await?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        region: holochain_p2p::dht::region::RegionCoords,
+    ) -> KitsuneHostResult<Vec<OpHashSized>> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        async move {
+            let db = self.spaces.dht_db(&dna_hash)?;
+            let topology = self.get_topology(space).await?;
+            let bounds = region.to_bounds(&topology);
+            Ok(query_region_op_hashes::query_region_op_hashes(db.clone(), bounds).await?)
         }
         .boxed()
         .into()
@@ -143,5 +221,76 @@ impl KitsuneHost for KitsuneHostImpl {
             .ok_or(DnaError::DnaMissing(dna_hash));
         let cutoff = self.tuning_params.danger_gossip_recent_threshold();
         async move { Ok(dna_def?.topology(cutoff)) }.boxed().into()
+    }
+
+    fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {
+        use holochain_p2p::DhtOpHashExt;
+
+        async move {
+            let op = holochain_p2p::WireDhtOpData::decode(op_data.0.clone())?;
+
+            let op_hash = DhtOpHash::with_data_sync(&op.op_data).into_kitsune();
+
+            Ok(op_hash)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn check_op_data(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        op_hash_list: Vec<KOpHash>,
+        context: Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
+    ) -> KitsuneHostResult<Vec<bool>> {
+        use holochain_p2p::{DhtOpHashExt, FetchContextExt};
+        use rusqlite::ToSql;
+
+        async move {
+            let db = self.spaces.dht_db(&DnaHash::from_kitsune(&space))?;
+            let results = db
+                .async_commit(move |txn| {
+                    let mut out = Vec::new();
+                    for op_hash in op_hash_list {
+                        let op_hash = DhtOpHash::from_kitsune(&op_hash);
+                        match txn.query_row(
+                            "SELECT 1 FROM DhtOp WHERE hash = ?",
+                            [&op_hash],
+                            |_row| Ok(()),
+                        ) {
+                            Ok(_) => {
+                                // might be tempted to remove this given we
+                                // are currently reflecting publishes,
+                                // but we still need this for the delegate
+                                // broadcast case.
+                                if let Some(context) = context {
+                                    if context.has_request_validation_receipt() {
+                                        txn.execute(
+                                            "UPDATE DhtOp SET require_receipt = ? WHERE DhtOp.hash = ?",
+                                            [&true as &dyn ToSql, &op_hash as &dyn ToSql],
+                                        )?;
+                                    }
+                                }
+                                out.push(true)
+                            }
+                            Err(_) => out.push(false),
+                        }
+                    }
+                    holochain_sqlite::prelude::DatabaseResult::Ok(out)
+                })
+                .await?;
+
+            Ok(results)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn lair_tag(&self) -> Option<Arc<str>> {
+        self.lair_tag.clone()
+    }
+
+    fn lair_client(&self) -> Option<lair_keystore_api::LairClient> {
+        self.lair_client.clone()
     }
 }

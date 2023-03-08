@@ -1,3 +1,5 @@
+use kitsune_p2p_fetch::FetchPoolConfig;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
@@ -7,9 +9,25 @@ use super::*;
 /// Allows only specifying the methods you care about, and letting all the rest
 /// throw errors if called
 #[allow(missing_docs)]
-pub trait KitsuneHostDefaultError: KitsuneHost {
+pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
     /// Name to be printed out on unimplemented error
     const NAME: &'static str;
+
+    fn block(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn unblock(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn is_blocked(
+        &self,
+        _input: kitsune_p2p_block::BlockTargetId,
+        _timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(false))
+    }
 
     fn get_agent_info_signed(
         &self,
@@ -18,6 +36,15 @@ pub trait KitsuneHostDefaultError: KitsuneHost {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
             "get_agent_info_signed",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn remove_agent_info_signed(&self, _input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "remove_agent_info_signed",
             Self::NAME
         )
         .into()))
@@ -87,14 +114,60 @@ pub trait KitsuneHostDefaultError: KitsuneHost {
         )
         .into()))
     }
+
+    fn op_hash(&self, _op_data: KOpData) -> KitsuneHostResult<KOpHash> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "op_hash",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _region: RegionCoords,
+    ) -> KitsuneHostResult<Vec<OpHashSized>> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "query_op_hashes_by_region",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        0
+    }
 }
 
 impl<T: KitsuneHostDefaultError> KitsuneHost for T {
+    fn block(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::block(self, input)
+    }
+
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::unblock(self, input)
+    }
+
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::is_blocked(self, input, timestamp)
+    }
+
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         KitsuneHostDefaultError::get_agent_info_signed(self, input)
+    }
+
+    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::remove_agent_info_signed(self, input)
     }
 
     fn peer_extrapolated_coverage(
@@ -132,5 +205,17 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
 
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
         KitsuneHostDefaultError::get_topology(self, space)
+    }
+
+    fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {
+        KitsuneHostDefaultError::op_hash(self, op_data)
+    }
+
+    fn query_op_hashes_by_region(
+        &self,
+        space: Arc<KitsuneSpace>,
+        region: RegionCoords,
+    ) -> KitsuneHostResult<Vec<OpHashSized>> {
+        KitsuneHostDefaultError::query_op_hashes_by_region(self, space, region)
     }
 }

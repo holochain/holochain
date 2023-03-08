@@ -46,7 +46,7 @@ impl Sign {
     }
 }
 
-/// Ephemerally sign a vector of bytes (i.e. a Vec<Vec<u8>>)
+/// Ephemerally sign a vector of bytes (i.e. a `Vec<Vec<u8>>`)
 /// Each of the items of the outer vector represents something to sign
 /// and will have a corresponding Signature in the output.
 /// The public key for the ephemeral operation will be returned in the output.

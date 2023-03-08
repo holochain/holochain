@@ -100,17 +100,14 @@ async fn async_main() {
     #[cfg(unix)]
     let _ = notify(true, &[NotifyState::Ready]);
 
-    // Await on the main JoinHandle, keeping the process alive until all
-    // Conductor activity has ceased
-    let result = conductor
-        .take_shutdown_handle()
-        .expect("The shutdown handle has already been taken.")
-        .await;
-
-    handle_shutdown(result);
-
-    // TODO: on SIGINT/SIGKILL, kill the conductor:
-    // conductor.kill().await
+    // wait for a unix signal or ctrl-c instruction to
+    // shutdown holochain
+    tokio::signal::ctrl_c()
+        .await
+        .unwrap_or_else(|e| tracing::error!("Could not handle termination signal: {:?}", e));
+    tracing::info!("Gracefully shutting down conductor...");
+    let shutdown_result = conductor.shutdown().await;
+    handle_shutdown(shutdown_result);
 }
 
 async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
@@ -162,12 +159,18 @@ async fn conductor_handle_from_config_path(opt: &Opt) -> ConductorHandle {
     }
 
     // Initialize the Conductor
-    Conductor::builder()
+    match Conductor::builder()
         .config(config)
         .passphrase(passphrase)
         .build()
         .await
-        .expect("Could not initialize Conductor from configuration")
+    {
+        Err(err) => panic!(
+            "Could not initialize Conductor from configuration: {:?}",
+            err
+        ),
+        Ok(res) => res,
+    }
 }
 
 /// Load config, throw friendly error on failure

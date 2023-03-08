@@ -1,8 +1,54 @@
+---
+default_semver_increment_mode: !pre_minor alpha
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+- Reject creation of duplicate clone cells. It was possible to create a clone cell with a DNA hash identical to an already existing DNA. [\#1997](https://github.com/holochain/holochain/pull/1997)
+- Adds doc comments for `StemCell`, `ProvisionedCell` and `CloneCell` structs
+
+## 0.1.0
+
+## 0.1.0-beta-rc.4
+
+- **BREAKING CHANGE**: `CreateCloneCell` returns `ClonedCell` instead of `InstalledCell`.
+- **BREAKING CHANGE**: `EnableCloneCell` returns `ClonedCell` instead of `InstalledCell`.
+- **BREAKING CHANGE**: Remove unused call `AdminRequest::StartApp`.
+- **BREAKING CHANGE**: `Cell` is split up into `ProvisionedCell` and `ClonedCell`.
+- **BREAKING CHANGE**: `CellInfo` variants are renamed to snake case during serde.
+- Return additional field `agent_pub_key` in `AppInfo`.
+
+## 0.1.0-beta-rc.3
+
+## 0.1.0-beta-rc.2
+
+## 0.1.0-beta-rc.1
+
+- Fix error while installing app and return app info of newly installed app. [\#1725](https://github.com/holochain/holochain/pull/1725)
+
+## 0.1.0-beta-rc.0
+
+- **BREAKING CHANGE**: Remove deprecated Admin and App API calls.
+
+- **BREAKING CHANGE**: Remove call `InstallApp`.
+
+- **BREAKING CHANGE**: Rename `InstallAppBundle` to `InstallApp`.
+
+- **BREAKING CHANGE**: Rename `ZomeCall` to `CallZome`. [\#1707](https://github.com/holochain/holochain/pull/1707)
+
+- **BREAKING CHANGE**: Rename ArchiveCloneCell to DisableCloneCell.
+
+- **BREAKING CHANGE**: Rename RestoreArchivedCloneCell to EnableCloneCell.
+
+- **BREAKING CHANGE**: Move EnableCloneCell to App API.
+
+- **BREAKING CHANGE**: Refactor DeleteCloneCell to delete a single disabled clone cell. [\#1704](https://github.com/holochain/holochain/pull/1704)
+
+- **BREAKING CHANGE**: Refactor `AppInfo` to return all cells and DNA modifiers.
+
+- **BREAKING CHANGE**: Rename `RequestAgentInfo` to `AgentInfo`. [\#1719](https://github.com/holochain/holochain/pull/1719)
 
 ## 0.0.72
 

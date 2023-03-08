@@ -1,11 +1,16 @@
-use crate::sweettest::*;
+use crate::{
+    conductor::{api::error::ConductorApiError, error::ConductorError, CellError},
+    sweettest::*,
+};
 use holo_hash::ActionHash;
+use holochain_conductor_api::CellInfo;
 use holochain_types::{
     app::CreateCloneCellPayload,
-    prelude::{ArchiveCloneCellPayload, CloneCellId, DeleteArchivedCloneCellsPayload},
+    prelude::{AppError, CloneCellId, DeleteCloneCellPayload, DisableCloneCellPayload},
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CloneId, DnaModifiersOpt, RoleName};
+use matches::matches;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_without_modifiers_fails() {
@@ -60,50 +65,6 @@ async fn create_clone_cell_with_wrong_app_or_role_name_fails() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn create_clone_cell_run_twice_returns_correct_clone_indexes() {
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let role_name: RoleName = "dna_1".to_string();
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let alice = SweetAgents::one(conductor.keystore()).await;
-    let app = conductor
-        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna)])
-        .await
-        .unwrap();
-
-    let installed_clone_cell_0 = conductor
-        .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
-            role_name: role_name.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
-            membrane_proof: None,
-            name: None,
-        })
-        .await
-        .unwrap();
-    assert_eq!(
-        installed_clone_cell_0.into_role_name(),
-        *CloneId::new(&role_name, 0).as_app_role_name()
-    ); // clone index starts at 0
-
-    let installed_clone_cell_1 = conductor
-        .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
-            role_name: role_name.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("seed_2".to_string()),
-            membrane_proof: None,
-            name: None,
-        })
-        .await
-        .unwrap();
-    assert_eq!(
-        installed_clone_cell_1.into_role_name(),
-        *CloneId::new(&role_name, 1).as_app_role_name()
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn create_clone_cell_creates_callable_cell() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
@@ -114,19 +75,23 @@ async fn create_clone_cell_creates_callable_cell() {
         .await
         .unwrap();
 
-    let installed_clone_cell = conductor
+    let clone_name = "test_name".to_string();
+    let clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
             membrane_proof: None,
-            name: None,
+            name: Some(clone_name.clone()),
         })
         .await
         .unwrap();
+    assert_eq!(clone_cell.enabled, true);
+    assert_eq!(clone_cell.name, clone_name);
+
     let zome = SweetZome::new(
-        installed_clone_cell.as_id().clone(),
+        clone_cell.cell_id.clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let zome_call_response: Result<ActionHash, _> = conductor
@@ -136,20 +101,20 @@ async fn create_clone_cell_creates_callable_cell() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn app_info_includes_cloned_cells() {
+async fn create_clone_cell_run_twice_returns_correct_clones() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let role_name: RoleName = "dna_1".to_string();
     let mut conductor = SweetConductor::from_standard_config().await;
     let alice = SweetAgents::one(conductor.keystore()).await;
-    let app_id = "app";
-    conductor
-        .setup_app_for_agent(app_id, alice.clone(), [&(role_name.clone(), dna)])
+    let app = conductor
+        .setup_app_for_agent("app", alice.clone(), [&(role_name.clone(), dna.clone())])
         .await
         .unwrap();
-    let installed_clone_cell = conductor
+
+    let clone_cell_0 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
-            app_id: app_id.to_string(),
+            app_id: app.installed_app_id().clone(),
             role_name: role_name.clone(),
             modifiers: DnaModifiersOpt::none().with_network_seed("seed_1".to_string()),
             membrane_proof: None,
@@ -157,15 +122,97 @@ async fn app_info_includes_cloned_cells() {
         })
         .await
         .unwrap();
+    assert_eq!(clone_cell_0.clone_id, CloneId::new(&role_name, 0)); // clone index starts at 0
+    assert_eq!(clone_cell_0.original_dna_hash, dna.dna_hash().to_owned());
 
-    let app_info = conductor
-        .get_app_info(&app_id.to_string())
+    let clone_cell_1 = conductor
+        .clone()
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            role_name: role_name.clone(),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed_2".to_string()),
+            membrane_proof: None,
+            name: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(clone_cell_1.clone_id, CloneId::new(&role_name, 1));
+    assert_eq!(clone_cell_1.original_dna_hash, dna.dna_hash().to_owned());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn create_identical_clone_cell_twice_fails() {
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let role_name: RoleName = "dna_1".to_string();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
+    let apps = conductor
+        .setup_app_for_agents(
+            "app",
+            &[alice.clone(), bob.clone()],
+            [&(role_name.clone(), dna.clone())],
+        )
         .await
         .unwrap()
+        .into_inner();
+    let alice_app = &apps[0];
+    let bob_app = &apps[1];
+    let mut clone_cell_payload = CreateCloneCellPayload {
+        app_id: alice_app.installed_app_id().clone(),
+        role_name: role_name.clone(),
+        modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
+        membrane_proof: None,
+        name: None,
+    };
+
+    let alice_clone_cell = conductor
+        .clone()
+        .create_clone_cell(clone_cell_payload.clone())
+        .await
         .unwrap();
 
-    assert_eq!(app_info.cell_data.len(), 2);
-    assert!(app_info.cell_data.contains(&installed_clone_cell));
+    let identical_clone_cell_err = conductor
+        .clone()
+        .create_clone_cell(clone_cell_payload.clone())
+        .await;
+    matches!(
+        identical_clone_cell_err,
+        Err(ConductorError::AppError(AppError::DuplicateCellId(cell_id))) if cell_id == alice_clone_cell.cell_id
+    );
+
+    // disable clone cell and try again to create an identical clone
+    conductor
+        .clone()
+        .disable_clone_cell(&DisableCloneCellPayload {
+            app_id: alice_app.installed_app_id().clone(),
+            clone_cell_id: CloneCellId::CellId(alice_clone_cell.cell_id.clone()),
+        })
+        .await
+        .unwrap();
+    let identical_clone_cell_err = conductor
+        .clone()
+        .create_clone_cell(clone_cell_payload.clone())
+        .await;
+    matches!(
+        identical_clone_cell_err,
+        Err(ConductorError::AppError(AppError::DuplicateCellId(cell_id))) if cell_id == alice_clone_cell.cell_id
+    );
+
+    // ensure that bob can clone cell with identical hash in same conductor
+    clone_cell_payload.app_id = bob_app.installed_app_id().clone();
+    let bob_clone_cell = conductor
+        .clone()
+        .create_clone_cell(clone_cell_payload)
+        .await
+        .unwrap();
+    assert_eq!(
+        alice_clone_cell.original_dna_hash,
+        bob_clone_cell.original_dna_hash
+    );
+    assert_eq!(
+        alice_clone_cell.cell_id.dna_hash(),
+        bob_clone_cell.cell_id.dna_hash()
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -179,7 +226,7 @@ async fn clone_cell_deletion() {
         .setup_app_for_agent(app_id, alice.clone(), [&(role_name.clone(), dna)])
         .await
         .unwrap();
-    let installed_clone_cell = conductor
+    let clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.to_string(),
@@ -190,30 +237,21 @@ async fn clone_cell_deletion() {
         })
         .await
         .unwrap();
+    let clone_id = CloneCellId::CloneId(clone_cell.clone().clone_id);
 
-    // archive clone cell
+    // disable clone cell
     conductor
         .raw_handle()
-        .archive_clone_cell(&ArchiveCloneCellPayload {
+        .disable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.to_string(),
-            clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
-            ),
+            clone_cell_id: clone_id.clone(),
         })
         .await
         .unwrap();
 
-    // assert that the cell doesn't appear any longer in app info's cell data
-    let app_info = conductor
-        .get_app_info(&app_id.to_string())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(app_info.cell_data.contains(&installed_clone_cell), false);
-
-    // calling the cell after archiving fails
+    // calling the cell after disabling fails
     let zome = SweetZome::new(
-        installed_clone_cell.as_id().clone(),
+        clone_cell.cell_id.clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let zome_call_response: Result<ActionHash, _> = conductor
@@ -221,20 +259,18 @@ async fn clone_cell_deletion() {
         .await;
     assert!(zome_call_response.is_err());
 
-    // restore the archived clone cell by clone id
-    let restored_cell = conductor
+    // enable the disabled clone cell by clone id
+    let enabled_clone_cell = conductor
         .raw_handle()
-        .restore_archived_clone_cell(&ArchiveCloneCellPayload {
+        .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
-            clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
-            ),
+            clone_cell_id: clone_id.clone(),
         })
         .await
         .unwrap();
 
-    // assert the restored clone cell is the previously created clone cell
-    assert_eq!(restored_cell, installed_clone_cell);
+    // assert the enabled clone cell is the previously created clone cell
+    assert_eq!(enabled_clone_cell, clone_cell);
 
     // assert that the cell appears in app info's cell data again
     let app_info = conductor
@@ -242,7 +278,15 @@ async fn clone_cell_deletion() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(app_info.cell_data.contains(&installed_clone_cell), true);
+    let cell_info_for_role = app_info.cell_info.get(&role_name).unwrap();
+    assert!(cell_info_for_role
+        .iter()
+        .find(|cell_info| if let CellInfo::Cloned(cell) = cell_info {
+            cell.cell_id == clone_cell.cell_id.clone()
+        } else {
+            false
+        })
+        .is_some());
 
     // calling the cell after restoring succeeds
     let zome_call_response: Result<ActionHash, _> = conductor
@@ -250,61 +294,55 @@ async fn clone_cell_deletion() {
         .await;
     assert!(zome_call_response.is_ok());
 
-    // archive clone cell again
+    // disable clone cell again
     conductor
         .raw_handle()
-        .archive_clone_cell(&ArchiveCloneCellPayload {
+        .disable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.to_string(),
-            clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
-            ),
+            clone_cell_id: clone_id.clone(),
         })
         .await
         .unwrap();
 
-    // restore clone cell by cell id
-    let restored_cell = conductor
+    // enable clone cell by cell id
+    let enabled_clone_cell = conductor
         .raw_handle()
-        .restore_archived_clone_cell(&ArchiveCloneCellPayload {
+        .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
-            clone_cell_id: CloneCellId::CellId(installed_clone_cell.as_id().clone()),
+            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
         })
         .await
         .unwrap();
 
-    // assert the restored clone cell is the previously created clone cell
-    assert_eq!(restored_cell, installed_clone_cell);
+    // assert the enabled clone cell is the previously created clone cell
+    assert_eq!(enabled_clone_cell, clone_cell);
 
-    // archive and delete clone cell
+    // disable and delete clone cell
     conductor
         .raw_handle()
-        .archive_clone_cell(&ArchiveCloneCellPayload {
+        .disable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.to_string(),
-            clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
-            ),
+            clone_cell_id: clone_id.clone(),
         })
         .await
         .unwrap();
     conductor
         .raw_handle()
-        .delete_archived_clone_cells(&DeleteArchivedCloneCellsPayload {
+        .delete_clone_cell(&DeleteCloneCellPayload {
             app_id: app_id.into(),
-            role_name: role_name.clone(),
+            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
         })
         .await
         .unwrap();
-    // assert the deleted cell cannot be restored
-    let restore_result = conductor
+    // assert the deleted cell cannot be enabled
+    let disable_result = conductor
         .raw_handle()
-        .restore_archived_clone_cell(&ArchiveCloneCellPayload {
+        .enable_clone_cell(&DisableCloneCellPayload {
             app_id: app_id.into(),
-            clone_cell_id: CloneCellId::CloneId(
-                CloneId::try_from(installed_clone_cell.clone().into_role_name()).unwrap(),
-            ),
+            clone_cell_id: clone_id.clone(),
         })
         .await;
-    assert!(restore_result.is_err());
+    assert!(disable_result.is_err());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -318,7 +356,7 @@ async fn conductor_can_startup_with_cloned_cell() {
         .await
         .unwrap();
 
-    let _ = conductor
+    let clone_cell = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app.installed_app_id().clone(),
@@ -330,8 +368,58 @@ async fn conductor_can_startup_with_cloned_cell() {
         .await
         .unwrap();
 
+    // calling the cell works
+    let zome = SweetZome::new(
+        clone_cell.cell_id.clone(),
+        TestWasm::Create.coordinator_zome_name(),
+    );
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    assert!(zome_call_response.is_ok());
+
     conductor.shutdown().await;
     conductor.startup().await;
 
-    // Simply test that the conductor can startup with a cloned cell present.
+    // calling the cell works after restart
+    let zome = SweetZome::new(
+        clone_cell.cell_id.clone(),
+        TestWasm::Create.coordinator_zome_name(),
+    );
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    assert!(zome_call_response.is_ok());
+
+    conductor
+        .clone()
+        .disable_clone_cell(&DisableCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            clone_cell_id: CloneCellId::CellId(clone_cell.cell_id.clone()),
+        })
+        .await
+        .unwrap();
+
+    // calling the cell after disabling fails
+    let zome = SweetZome::new(
+        clone_cell.cell_id.clone(),
+        TestWasm::Create.coordinator_zome_name(),
+    );
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(cell_id))) if cell_id == clone_cell.cell_id.clone());
+
+    conductor.shutdown().await;
+    conductor.startup().await;
+
+    // calling the cell still fails after restart, cell still disabled
+    let zome = SweetZome::new(
+        clone_cell.cell_id.clone(),
+        TestWasm::Create.coordinator_zome_name(),
+    );
+    let zome_call_response: Result<ActionHash, _> = conductor
+        .call_fallible(&zome, "call_create_entry", ())
+        .await;
+    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(cell_id))) if cell_id == clone_cell.cell_id.clone());
 }

@@ -9,6 +9,13 @@ impl<T: 'static + Send> Clone for Share<T> {
     }
 }
 
+impl<T: 'static + Send + std::fmt::Debug> std::fmt::Debug for Share<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.share_ref(|s| Ok(f.debug_tuple("Share").field(s).finish()))
+            .unwrap()
+    }
+}
+
 impl<T: 'static + Send> PartialEq for Share<T> {
     fn eq(&self, oth: &Self) -> bool {
         Arc::ptr_eq(&self.0, &oth.0)
@@ -82,5 +89,43 @@ impl<T: 'static + Send> Share<T> {
     /// Explicity drop the internal state.
     pub fn close(&self) {
         *(self.0.lock()) = None;
+    }
+}
+
+/// A version of Share which can never be closed, and thus every
+/// share is infallible (no Err possible).
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct ShareOpen<T: 'static + Send>(Share<T>);
+
+impl<T: 'static + Send> Clone for ShareOpen<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: 'static + Send> ShareOpen<T> {
+    /// Create a new share lock.
+    pub fn new(t: T) -> Self {
+        Self(Share::new(t))
+    }
+
+    /// Execute code with immutable access to the internal state.
+    pub fn share_ref<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&T) -> R,
+    {
+        self.0
+            .share_ref(|s| Ok(f(s)))
+            .expect("ShareOpen state is never dropped")
+    }
+
+    /// Execute code with mutable access to the internal state.
+    pub fn share_mut<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        self.0
+            .share_mut(|s, _| Ok(f(s)))
+            .expect("ShareOpen state is never dropped")
     }
 }

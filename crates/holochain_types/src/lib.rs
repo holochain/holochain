@@ -9,6 +9,8 @@
 #![deny(missing_docs)]
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
+// TODO - address the underlying issue:
+#![allow(clippy::result_large_err)]
 
 pub mod access;
 pub mod action;
@@ -35,7 +37,6 @@ pub mod share;
 pub mod signal;
 #[warn(missing_docs)]
 pub mod sql;
-pub mod validate;
 pub mod web_app;
 pub mod zome_types;
 

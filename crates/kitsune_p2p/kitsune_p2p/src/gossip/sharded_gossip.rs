@@ -4,6 +4,7 @@
 
 use crate::agent_store::AgentInfoSigned;
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter};
+use crate::meta_net::*;
 use crate::types::event::*;
 use crate::types::gossip::*;
 use crate::{types::*, HostApi};
@@ -11,6 +12,7 @@ use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};
 use governor::RateLimiter;
+use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
@@ -18,12 +20,10 @@ use kitsune_p2p_types::dht::region::{Region, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
-use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom, TryInto};
-use std::iter::Sum;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -118,7 +118,7 @@ pub struct ShardedGossip {
     /// ShardedGossipLocal handles the non-networking concerns of gossip
     gossip: ShardedGossipLocal,
     // The endpoint to use for all outgoing comms
-    ep_hnd: Tx2EpHnd<wire::Wire>,
+    ep_hnd: MetaNet,
     /// The internal mutable state
     pub(crate) state: Share<ShardedGossipState>,
     /// Bandwidth for incoming and outgoing gossip.
@@ -168,12 +168,13 @@ impl ShardedGossip {
     pub fn new(
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         evt_sender: EventSender,
         host_api: HostApi,
         gossip_type: GossipType,
         bandwidth: Arc<BandwidthThrottle>,
         metrics: MetricsSync,
+        fetch_pool: FetchPool,
         #[cfg(feature = "test")] enable_history: bool,
     ) -> Arc<Self> {
         #[cfg(feature = "test")]
@@ -197,6 +198,7 @@ impl ShardedGossip {
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
                 gossip_type,
                 closing: AtomicBool::new(false),
+                fetch_pool,
             },
             bandwidth,
         });
@@ -230,7 +232,7 @@ impl ShardedGossip {
             GossipType::Historical => {
                 let s = tracing::trace_span!("process_outgoing_historical", cert = ?cert, agents = ?self.gossip.show_local_agents());
                 match &gossip {
-                    ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
+                    ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished }) => {
                         s.in_scope(|| {
                             tracing::trace!(
                                 num_ops = %ops.len(),
@@ -245,43 +247,6 @@ impl ShardedGossip {
                 }
             }
         };
-
-        // Record size metrics
-        self.gossip
-            .inner
-            .share_mut(|i, _| {
-                if let Some(state) = i.round_map.get_mut(&cert) {
-                    match &gossip {
-                        ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
-                            state.throughput.op_bloom_count.outgoing += 1;
-                            state.throughput.op_bloom_bytes.outgoing +=
-                                missing_hashes.size() as u32;
-                        }
-                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => (),
-                        ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
-                            state.throughput.op_count.outgoing += ops.len() as u32;
-                            state.throughput.op_bytes.outgoing +=
-                                ops.iter().map(|op| op.size() as u32).sum::<u32>();
-                        }
-                        ShardedGossipWire::Initiate(_) => {}
-                        ShardedGossipWire::Accept(_) => {}
-                        ShardedGossipWire::Agents(_) => {}
-                        ShardedGossipWire::MissingAgents(_) => {}
-                        ShardedGossipWire::OpBatchReceived(_) => {}
-                        ShardedGossipWire::Error(_) => {}
-                        ShardedGossipWire::Busy(_) => {}
-                        ShardedGossipWire::NoAgents(_) => {}
-                        ShardedGossipWire::AlreadyInProgress(_) => {}
-                    }
-                    i.metrics.write().update_current_round(
-                        &cert,
-                        self.gossip.gossip_type.into(),
-                        state,
-                    );
-                }
-                Ok(())
-            })
-            .ok();
 
         let gossip = gossip.encode_vec().map_err(KitsuneError::other)?;
         let bytes = gossip.len();
@@ -327,7 +292,7 @@ impl ShardedGossip {
                     .to_string()
                     .replace("ShardedGossipWire::", ""),
                 msg.2.encode_vec().expect("can't encode msg").len(),
-                self.ep_hnd.local_cert(),
+                self.ep_hnd.local_id(),
                 &msg.0,
                 self.gossip
                     .inner
@@ -343,15 +308,15 @@ impl ShardedGossip {
                 .to_string()
                 .replace("ShardedGossipWire::", "");
             let len = msg.encode_vec().expect("can't encode msg").len();
-            let outgoing = match self.gossip.process_incoming(con.peer_cert(), msg).await {
+            let outgoing = match self.gossip.process_incoming(con.peer_id(), msg).await {
                 Ok(r) => {
                     tracing::debug!(
                         "INCOMING GOSSIP [{}] <=  {:17} ({:10}) : {:?} -> {:?} [{}]",
                         gossip_type_char,
                         variant_type,
                         len,
-                        con.peer_cert(),
-                        self.ep_hnd.local_cert(),
+                        con.peer_id(),
+                        self.ep_hnd.local_id(),
                         self.gossip
                             .inner
                             .share_mut(|s, _| Ok(s.round_map.current_rounds().len()))
@@ -361,15 +326,15 @@ impl ShardedGossip {
                 }
                 Err(e) => {
                     tracing::error!("FAILED to process incoming gossip {:?}", e);
-                    self.gossip.remove_state(&con.peer_cert(), true)?;
+                    self.gossip.remove_state(&con.peer_id(), true)?;
                     vec![ShardedGossipWire::error(e.to_string())]
                 }
             };
             self.state.share_mut(|i, _| {
                 i.push_outgoing(outgoing.into_iter().map(|msg| {
                     (
-                        con.peer_cert(),
-                        HowToConnect::Con(con.clone(), remote_url.clone()),
+                        con.peer_id(),
+                        HowToConnect::Con(con.clone(), remote_url.to_string()),
                         msg,
                     )
                 }));
@@ -466,23 +431,24 @@ pub struct ShardedGossipLocal {
     host_api: HostApi,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
+    fetch_pool: FetchPool,
 }
 
-/// Incoming gossip.
-type Incoming = (Tx2ConHnd<wire::Wire>, TxUrl, ShardedGossipWire, usize);
-/// Outgoing gossip.
-type Outgoing = (Tx2Cert, HowToConnect, ShardedGossipWire);
+type StateKey = Arc<[u8; 32]>;
 
-type StateKey = Tx2Cert;
+/// Incoming gossip.
+type Incoming = (MetaNetCon, String, ShardedGossipWire, usize);
+/// Outgoing gossip.
+type Outgoing = (StateKey, HowToConnect, ShardedGossipWire);
 
 /// A peer (from the perspective of any other node) is uniquely identified by its Cert
-pub type NodeId = Tx2Cert;
+pub type NodeId = StateKey;
 
 /// Info associated with an outgoing gossip target
 #[derive(Debug)]
 pub(crate) struct ShardedGossipTarget {
     pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
-    pub(crate) cert: Tx2Cert,
+    pub(crate) cert: StateKey,
     pub(crate) tie_break: u32,
     pub(crate) when_initiated: Option<tokio::time::Instant>,
     #[allow(dead_code)]
@@ -666,7 +632,7 @@ pub struct RoundState {
     /// If historic gossip, we calculated and queued our region diff (will be true for Recent)
     regions_are_queued: bool,
     /// Number of ops blooms we have sent for this round, which is also the
-    /// number of MissingOps sets we expect in response
+    /// number of MissingOpHashes sets we expect in response
     num_expected_op_blooms: u16,
     /// Received all responses to OpRegions, which is the batched set of Op data
     /// in the diff of regions
@@ -684,8 +650,6 @@ pub struct RoundState {
     /// The RegionSet we will send to our gossip partner during Historical
     /// gossip (will be None for Recent).
     region_set_sent: Option<Arc<RegionSetLtcs>>,
-    /// Stats about ops, regions, bloom filter, and bytes sent and received,
-    pub(crate) throughput: RoundThroughput,
     /// Region diffs, if doing Historical gossip
     pub(crate) region_diffs: RegionDiffs,
     /// Unique string ID for this round
@@ -716,33 +680,8 @@ impl RoundState {
             last_touch: Instant::now(),
             round_timeout,
             region_set_sent,
-            throughput: Default::default(),
             region_diffs: Default::default(),
         }
-    }
-}
-
-/// Stats about ops, regions, and blooms sent and received
-#[derive(Debug, Clone, Default, PartialEq, Eq, derive_more::Add)]
-pub struct RoundThroughput {
-    /// Number of ops blooms we have sent for this round, which is also the
-    /// number of MissingOps sets we expect in response
-    pub op_bloom_count: InOut,
-    /// Total number of bytes sent for bloom filters
-    pub op_bloom_bytes: InOut,
-    /// Total number of bytes expected to be sent for region data (historical only)
-    pub expected_op_bytes: InOut,
-    /// Total number of ops expected to be sent for region data (historical only)
-    pub expected_op_count: InOut,
-    /// Total number of ops sent
-    pub op_count: InOut,
-    /// Total number of bytes sent for op data
-    pub op_bytes: InOut,
-}
-
-impl Sum for RoundThroughput {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self::default(), |a, r| a + r)
     }
 }
 
@@ -888,7 +827,7 @@ impl ShardedGossipLocal {
 
     async fn process_incoming(
         &self,
-        peer_cert: Tx2Cert,
+        peer_cert: StateKey,
         msg: ShardedGossipWire,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let s = match self.gossip_type {
@@ -898,8 +837,8 @@ impl ShardedGossipLocal {
                 s
             }
             GossipType::Historical => match &msg {
-                ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
-                    let s = tracing::trace_span!("process_incoming_historical", ?peer_cert, agents = ?self.show_local_agents(), msg = %"MissingOps", num_ops = %ops.len(), ?finished);
+                ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished }) => {
+                    let s = tracing::trace_span!("process_incoming_historical", ?peer_cert, agents = ?self.show_local_agents(), msg = %"MissingOpHashes", num_ops = %ops.len(), ?finished);
                     s.in_scope(|| self.log_state());
                     s
                 }
@@ -910,44 +849,6 @@ impl ShardedGossipLocal {
                 }
             },
         };
-
-        // Record size metrics
-        self.inner
-            .share_mut(|i, _| {
-                if let Some(state) = i.round_map.get_mut(&peer_cert) {
-                    match &msg {
-                        ShardedGossipWire::OpBloom(OpBloom { missing_hashes, .. }) => {
-                            state.throughput.op_bloom_count.incoming += 1;
-                            state.throughput.op_bloom_bytes.incoming +=
-                                missing_hashes.size() as u32;
-                        }
-                        ShardedGossipWire::OpRegions(OpRegions { region_set: _, .. }) => {}
-                        ShardedGossipWire::MissingOps(MissingOps { ops, .. }) => {
-                            state.throughput.op_count.incoming += ops.len() as u32;
-                            state.throughput.op_bytes.incoming +=
-                                ops.iter().map(|op| op.size() as u32).sum::<u32>();
-                        }
-                        ShardedGossipWire::Initiate(_) => {}
-                        ShardedGossipWire::Accept(_) => {}
-                        ShardedGossipWire::Agents(_) => {}
-                        ShardedGossipWire::MissingAgents(_) => {}
-                        ShardedGossipWire::OpBatchReceived(_) => {}
-                        ShardedGossipWire::Error(_) => {}
-                        ShardedGossipWire::Busy(_) => {}
-                        ShardedGossipWire::NoAgents(_) => {}
-                        ShardedGossipWire::AlreadyInProgress(_) => {}
-                    }
-
-                    i.metrics.write().update_current_round(
-                        &peer_cert,
-                        self.gossip_type.into(),
-                        state,
-                    );
-                    // println!("throughput IN {:?}", state.throughput);
-                }
-                Ok(())
-            })
-            .ok();
 
         // If we don't have the state for a message then the other node will need to timeout.
         let r = match msg {
@@ -1021,7 +922,7 @@ impl ShardedGossipLocal {
                     vec![]
                 }
             }
-            ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
+            ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished }) => {
                 let mut gossip = Vec::with_capacity(0);
                 let finished = MissingOpsStatus::try_from(finished)?;
 
@@ -1064,7 +965,24 @@ impl ShardedGossipLocal {
                 if (self.gossip_type == GossipType::Historical || state.is_some())
                     && !ops.is_empty()
                 {
-                    self.incoming_missing_ops(ops).await?;
+                    if let Some(state) = state.as_ref() {
+                        if let Some(agent) = state.remote_agent_list.get(0) {
+                            // there is at least 1 agent
+                            let agent = agent.agent.clone();
+                            let source = FetchSource::Agent(agent);
+                            self.incoming_missing_op_hashes(source, ops).await?;
+                        } else {
+                            tracing::warn!(
+                                "Op hashes were received for a round with no remote agent(s). {} ops dropped!",
+                                ops.len()
+                            );
+                        }
+                    } else {
+                        tracing::warn!(
+                            "Op hashes were received after a round was dropped. {} ops dropped!",
+                            ops.len()
+                        );
+                    }
                 }
                 gossip
             }
@@ -1104,7 +1022,7 @@ impl ShardedGossipLocal {
             let ops_s = r
                 .iter()
                 .map(|g| match &g {
-                    ShardedGossipWire::MissingOps(MissingOps { ops, finished }) => {
+                    ShardedGossipWire::MissingOpHashes(MissingOpHashes { ops, finished }) => {
                         format!("num_ops = {}, finished = {}", ops.len(), finished)
                     }
                     _ => {
@@ -1289,9 +1207,9 @@ kitsune_p2p_types::write_codec_enum! {
         },
 
         /// Any ops that were missing from the remote bloom.
-        MissingOps(0x60) {
-            /// The missing ops
-            ops.0: Vec<KOp>,
+        MissingOpHashes(0x60) {
+            /// The missing op hashes
+            ops.0: Vec<OpHashSized>,
             /// Ops that are missing from a bloom that you have sent.
             /// These will be chunked into a maximum size of about 16MB.
             /// If the amount of missing ops is larger then the
@@ -1347,8 +1265,8 @@ kitsune_p2p_types::write_codec_enum! {
 impl AsGossipModule for ShardedGossip {
     fn incoming_gossip(
         &self,
-        con: Tx2ConHnd<wire::Wire>,
-        remote_url: TxUrl,
+        con: MetaNetCon,
+        remote_url: String,
         gossip_data: Box<[u8]>,
     ) -> KitsuneResult<()> {
         use kitsune_p2p_types::codec::*;
@@ -1366,7 +1284,7 @@ impl AsGossipModule for ShardedGossip {
             // If we are overloaded then return busy to any new initiates.
             if overloaded && new_initiate {
                 i.push_outgoing([(
-                    con.peer_cert(),
+                    con.peer_id(),
                     HowToConnect::Con(con, remote_url),
                     ShardedGossipWire::busy(),
                 )]);
@@ -1425,10 +1343,11 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
         &self,
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
+        fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1439,6 +1358,7 @@ impl AsGossipModuleFactory for ShardedRecentGossipFactory {
             GossipType::Recent,
             self.bandwidth.clone(),
             metrics,
+            fetch_pool,
         ))
     }
 }
@@ -1458,10 +1378,11 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
         &self,
         tuning_params: KitsuneP2pTuningParams,
         space: Arc<KitsuneSpace>,
-        ep_hnd: Tx2EpHnd<wire::Wire>,
+        ep_hnd: MetaNet,
         evt_sender: futures::channel::mpsc::Sender<event::KitsuneP2pEvent>,
         host: HostApi,
         metrics: MetricsSync,
+        fetch_pool: FetchPool,
     ) -> GossipModule {
         GossipModule(ShardedGossip::new(
             tuning_params,
@@ -1472,6 +1393,7 @@ impl AsGossipModuleFactory for ShardedHistoricalGossipFactory {
             GossipType::Historical,
             self.bandwidth.clone(),
             metrics,
+            fetch_pool,
         ))
     }
 }
@@ -1521,7 +1443,9 @@ impl TryFrom<u8> for MissingOpsStatus {
 
 /// Data and handlers for diagnostic info, to be used by the host.
 #[derive(Clone, Debug)]
-pub struct GossipDiagnostics {
+pub struct KitsuneDiagnostics {
     /// Access to metrics info
     pub metrics: MetricsSync,
+    /// Access to FetchPool,
+    pub fetch_pool: FetchPoolReader,
 }

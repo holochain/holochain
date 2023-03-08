@@ -68,23 +68,7 @@ pub fn must_get_entry<'a>(
                                             )
                                         ),
                                     )
-                                    .map_err(
-                                        |e| -> RuntimeError { wasm_error!(e).into() }
-                                    )?
-                                )
-                                .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
-                            ))
-                            .into())
-                        }
-                        HostContext::ValidationPackage(_) => {
-                            Err(wasm_error!(WasmErrorInner::HostShortCircuit(
-                                holochain_serialized_bytes::encode(
-                                    &ExternIO::encode(
-                                        ValidationPackageCallbackResult::UnresolvedDependencies(
-                                            vec![entry_hash.into(),]
-                                        ),
-                                    )
-                                    .map_err(|e| wasm_error!(e))?
+                                    .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
                                 )
                                 .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
                             ))

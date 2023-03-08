@@ -1,8 +1,27 @@
+---
+default_semver_increment_mode: !pre_minor alpha
+---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+- Add block/unblock agent functions to HDK [\#1828](https://github.com/holochain/holochain/pull/1828)
+
+## 0.1.0
+
+- Add note in HDK documentation about links not deduplicating. ([\#1791](https://github.com/holochain/holochain/pull/1791))
+
+## 0.1.0-beta-rc.3
+
+- Fix typos and links in docs and add links to wasm examples.
+
+## 0.1.0-beta-rc.2
+
+## 0.1.0-beta-rc.1
+
+## 0.1.0-beta-rc.0
 
 ## 0.0.163
 
@@ -222,14 +241,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 - hdk: implements multi-call for:
-  
+
   - `remote_call`
   - `call`
   - `get`
   - `get_details`
   - `get_links`
   - `get_link_details`
-  
+
   We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
 
 ## 0.0.102

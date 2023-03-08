@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.0.52"
+version = "0.1.0"
 description = "p2p / dht communication framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,16 +14,19 @@ edition = "2021"
 arrayref = "0.3.6"
 base64 = "0.13"
 bloomfilter = { version = "1.0.5", features = ["serde"] }
+bytes = "1.4.0"
 derive_more = "0.99.11"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.4"
 governor = "0.3.2"
 itertools = "0.10"
-kitsune_p2p_mdns = { version = "0.0.3", path = "../mdns" }
-kitsune_p2p_proxy = { version = "^0.0.39", path = "../proxy" }
-kitsune_p2p_timestamp = { version = "^0.0.15", path = "../timestamp", features = ["now"] }
-kitsune_p2p_transport_quic = { version = "^0.0.39", path = "../transport_quic" }
-kitsune_p2p_types = { version = "^0.0.39", path = "../types" }
+kitsune_p2p_fetch = { version = "^0.1.0", path = "../fetch" }
+kitsune_p2p_mdns = { version = "^0.1.0", path = "../mdns" }
+kitsune_p2p_proxy = { version = "^0.1.0", path = "../proxy" }
+kitsune_p2p_timestamp = { version = "^0.1.0", path = "../timestamp", features = ["now"] }
+kitsune_p2p_block = { version = "^0.1.0", path = "../block" }
+kitsune_p2p_transport_quic = { version = "^0.1.0", path = "../transport_quic", optional = true }
+kitsune_p2p_types = { version = "^0.1.0", path = "../types", default-features = false }
 must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
@@ -40,8 +43,9 @@ thiserror = "1.0.22"
 tokio = { version = "1.11", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
+tx5 = { version = "0.0.1-alpha.5", optional = true }
 url2 = "0.0.6"
-fixt = { path = "../../fixt", version = "0.0.14"}
+fixt = { path = "../../fixt", version = "^0.1.0"}
 
 # arbitrary could be made optional
 arbitrary = { version = "1.0", features = ["derive"] }
@@ -66,6 +70,8 @@ tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.2"
 
 [features]
+default = [ "tx2", "tx5" ]
+
 test_utils = [
   "blake2b_simd",
   "tokio/test-util",
@@ -80,4 +86,4 @@ mock_network = [
   "mockall",
 ]
 
-# [workspace]
+tx2 = [ "kitsune_p2p_types/tx2", "kitsune_p2p_transport_quic" ]

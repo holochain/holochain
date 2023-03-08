@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_mdns"
-version = "0.0.3"
+version = "0.1.0"
 description = "p2p / mdns discovery framework"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -19,7 +19,7 @@ name = "discover"
 path = "examples/discover.rs"
 
 [dependencies]
-libmdns = "=0.6.0"
+libmdns = "=0.7.4"
 mdns = "=3.0.0"
 futures-util = "0.3.1"
 futures-core = "0.3.1"

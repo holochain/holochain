@@ -1,0 +1,13 @@
+# Builds all components and runs their tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+concurrency:
+  group: build-${{ github.ref_name }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  holochain-build-and-test:
+    uses: ./.github/workflows/holochain-build-and-test.yml

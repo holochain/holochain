@@ -1,9 +1,6 @@
 use super::SweetZome;
-use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::{api::error::ConductorApiResult, ConductorHandle};
-use holochain_conductor_api::ZomeCall;
 use holochain_types::prelude::*;
-use unwrap_to::unwrap_to;
 
 /// A wrapper around ConductorHandle with more convenient methods for testing
 /// and a cleanup drop
@@ -71,41 +68,21 @@ impl SweetConductorHandle {
         I: Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
-        let call = ZomeCall {
-            cell_id: zome.cell_id().clone(),
-            zome_name: zome.name().clone(),
-            fn_name: fn_name.into(),
-            cap_secret,
-            provenance: provenance.clone(),
-            payload,
-        };
-        match self.0.call_zome(call).await {
-            Ok(Ok(response)) => Ok(unwrap_to!(response => ZomeCallResponse::Ok)
-                .decode()
-                .expect("Couldn't deserialize zome call output")),
-            Ok(Err(error)) => Err(ConductorApiError::Other(Box::new(error))),
-            Err(error) => Err(error),
-        }
+        self.0
+            .easy_call_zome(
+                provenance,
+                cap_secret,
+                zome.cell_id().clone(),
+                zome.name().clone(),
+                fn_name,
+                payload,
+            )
+            .await
     }
 
     /// Get a stream of all Signals emitted since the time of this function call.
     pub async fn signal_stream(&self) -> impl tokio_stream::Stream<Item = Signal> {
         self.0.signal_broadcaster().subscribe_merged()
-    }
-
-    /// Manually await shutting down the conductor.
-    /// Conductors are already cleaned up on drop but this
-    /// is useful if you need to know when it's finished cleaning up.
-    pub async fn shutdown_and_wait(&self) {
-        let c = &self.0;
-        if let Some(shutdown) = c.take_shutdown_handle() {
-            c.shutdown();
-            shutdown
-                .await
-                .expect("Failed to await shutdown handle")
-                .expect("Conductor shutdown error");
-        }
     }
 
     /// Intentionally private clone function, only to be used internally

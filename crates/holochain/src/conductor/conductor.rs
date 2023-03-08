@@ -37,17 +37,13 @@ use super::config::InterfaceDriver;
 use super::entry_def_store::get_entry_defs;
 use super::error::ConductorError;
 use super::interface::error::InterfaceResult;
-use super::interface::websocket::spawn_admin_interface_task;
+use super::interface::websocket::spawn_admin_interface_tasks;
 use super::interface::websocket::spawn_app_interface_task;
 use super::interface::websocket::spawn_websocket_listener;
 use super::interface::websocket::SIGNAL_BUFFER_SIZE;
 use super::interface::AppInterfaceRuntime;
 use super::interface::SignalBroadcaster;
-use super::manager::keep_alive_task;
-use super::manager::spawn_task_manager;
-use super::manager::ManagedTaskAdd;
-use super::manager::ManagedTaskHandle;
-use super::manager::TaskManagerRunHandle;
+use super::manager::TaskManagerResult;
 use super::p2p_agent_store;
 use super::p2p_agent_store::P2pBatch;
 use super::p2p_agent_store::*;
@@ -83,10 +79,11 @@ use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
+use holochain_conductor_api::ClonedCell;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
-use holochain_conductor_api::InstalledAppInfo;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
@@ -99,6 +96,8 @@ use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::witness_nonce;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::from_blob;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
@@ -112,6 +111,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
+use tokio::task::JoinHandle;
 use tracing::*;
 
 #[cfg(any(test, feature = "test_utils"))]
@@ -124,6 +124,9 @@ pub use builder::*;
 
 mod chc;
 pub use chc::*;
+
+mod conductor_services;
+pub use conductor_services::*;
 
 pub use accessor_impls::*;
 pub use app_impls::*;
@@ -181,13 +184,14 @@ impl CellItem {
     }
 }
 
-pub(crate) type StopBroadcaster = tokio::sync::broadcast::Sender<()>;
-pub(crate) type StopReceiver = tokio::sync::broadcast::Receiver<()>;
+#[allow(dead_code)]
+pub(crate) type StopBroadcaster = task_motel::StopBroadcaster;
+pub(crate) type StopReceiver = task_motel::StopListener;
 
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
-    /// The collection of cells associated with this Conductor
-    cells: RwShare<HashMap<CellId, CellItem>>,
+    /// The collection of available, running cells associated with this Conductor
+    running_cells: RwShare<HashMap<CellId, CellItem>>,
 
     /// The config used to create this Conductor
     pub config: ConductorConfig,
@@ -207,9 +211,13 @@ pub struct Conductor {
     /// Collection app interface data, keyed by id
     app_interfaces: RwShare<HashMap<AppInterfaceId, AppInterfaceRuntime>>,
 
-    /// The channels and handles needed to interact with the task_manager task.
-    /// If this is None, then the task manager has not yet been initialized.
-    pub(crate) task_manager: RwShare<Option<TaskManagerClient>>,
+    /// The interface to the task manager
+    task_manager: TaskManagerClient,
+
+    /// The JoinHandle for the long-running task which processes the outcomes of ended tasks,
+    /// taking actions like disabling cells or shutting down the conductor on errors.
+    /// It terminates only when the TaskManager and all of its tasks have ended and dropped.
+    pub(crate) outcomes_task: RwShare<Option<JoinHandle<TaskManagerResult>>>,
 
     /// Placeholder for what will be the real DNA/Wasm cache
     ribosome_store: RwShare<RibosomeStore>,
@@ -223,6 +231,8 @@ pub struct Conductor {
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
+
+    pub(crate) services: RwShare<Option<ConductorServices>>,
 }
 
 impl Conductor {
@@ -234,8 +244,15 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
+    use kitsune_p2p_types::box_fut_plain;
+
+    use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
+
     use super::*;
 
+    //-----------------------------------------------------------------------------
+    /// Methods used by the [ConductorHandle]
+    //-----------------------------------------------------------------------------
     impl Conductor {
         #[allow(clippy::too_many_arguments)]
         pub(crate) fn new(
@@ -245,20 +262,24 @@ mod startup_shutdown_impls {
             holochain_p2p: holochain_p2p::HolochainP2pRef,
             spaces: Spaces,
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
+            outcome_sender: OutcomeSender,
         ) -> Self {
             Self {
                 spaces,
-                cells: RwShare::new(HashMap::new()),
+                running_cells: RwShare::new(HashMap::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 app_interfaces: RwShare::new(HashMap::new()),
-                task_manager: RwShare::new(None),
+                task_manager: TaskManagerClient::new(outcome_sender),
+                // Must be initialized later, since it requires an Arc<Conductor>
+                outcomes_task: RwShare::new(None),
                 admin_websocket_ports: RwShare::new(Vec::new()),
                 scheduler: Arc::new(parking_lot::Mutex::new(None)),
                 ribosome_store,
                 keystore,
                 holochain_p2p,
                 post_commit,
+                services: RwShare::new(None),
             }
         }
 
@@ -275,58 +296,58 @@ mod startup_shutdown_impls {
             }
         }
 
-        /// Broadcasts the shutdown signal to all managed tasks.
-        /// To actually wait for these tasks to complete, be sure to
-        /// `take_shutdown_handle` to await for completion.
-        pub fn shutdown(&self) {
+        /// Take ownership of the TaskManagerClient as well as the task which completes
+        /// when all managed tasks have completed
+        pub fn detach_task_management(&self) -> Option<JoinHandle<TaskManagerResult>> {
+            self.outcomes_task.share_mut(|tm| tm.take())
+        }
+
+        /// Broadcasts the shutdown signal to all managed tasks
+        /// and returns a future to await for shutdown to complete.
+        pub fn shutdown(&self) -> JoinHandle<TaskManagerResult> {
             self.shutting_down
                 .store(true, std::sync::atomic::Ordering::Relaxed);
 
             use ghost_actor::GhostControlSender;
-            let fut = self.holochain_p2p.ghost_actor_shutdown_immediate();
-            tokio::task::spawn(fut);
-
-            self.task_manager.share_ref(|tm| {
-                if let Some(manager) = tm {
-                    tracing::info!(
-                        "Sending shutdown signal to {} managed tasks.",
-                        manager.task_stop_broadcaster().receiver_count(),
-                    );
-                    manager
-                        .task_stop_broadcaster()
-                        .send(())
-                        .map(|_| ())
-                        .unwrap_or_else(|e| {
-                            error!(?e, "Couldn't broadcast stop signal to managed tasks!");
-                        })
-                }
-            });
-        }
-
-        /// Return the handle which waits for the task manager task to complete
-        pub fn take_shutdown_handle(&self) -> Option<TaskManagerRunHandle> {
-            self.task_manager
-                .share_mut(|tm| tm.as_mut().and_then(|manager| manager.take_handle()))
+            let ghost_shutdown = self.holochain_p2p.ghost_actor_shutdown_immediate();
+            let mut tm = self.task_manager();
+            let task = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
+            tokio::task::spawn(async move {
+                tracing::info!("Sending shutdown signal to all managed tasks.");
+                let (_, _, r) = futures::join!(ghost_shutdown, tm.shutdown().boxed(), task,);
+                r?
+            })
         }
 
         pub(crate) async fn initialize_conductor(
             self: Arc<Self>,
+            outcome_rx: OutcomeReceiver,
             admin_configs: Vec<AdminInterfaceConfig>,
         ) -> ConductorResult<CellStartupErrors> {
             self.load_dnas().await?;
 
             // Start the task manager
-            let (task_add_sender, run_handle) = spawn_task_manager(self.clone());
-            let (task_stop_broadcaster, _) = tokio::sync::broadcast::channel::<()>(1);
-            self.task_manager.share_mut(|tm| {
-                if tm.is_some() {
+            self.outcomes_task.share_mut(|lock| {
+                if lock.is_some() {
                     panic!("Cannot start task manager twice");
                 }
-                *tm = Some(TaskManagerClient::new(
-                    task_add_sender,
-                    task_stop_broadcaster,
-                    run_handle,
-                ));
+                let task = spawn_task_outcome_handler(self.clone(), outcome_rx);
+                *lock = Some(task);
+            });
+
+            self.services.share_mut(|services| {
+                let mut dpki = MockDpkiService::new();
+                dpki.expect_is_key_valid()
+                    .returning(|_, _| box_fut_plain(Ok(true)));
+                dpki.expect_key_mutation()
+                    .returning(|_, _| box_fut_plain(Ok(())));
+
+                let app_store = MockAppStoreService::new();
+
+                *services = Some(ConductorServices {
+                    dpki: Arc::new(dpki),
+                    app_store: Arc::new(app_store),
+                });
             });
 
             self.clone().add_admin_interfaces(admin_configs).await?;
@@ -343,6 +364,7 @@ mod startup_shutdown_impls {
 
 /// Methods related to conductor interfaces
 mod interface_impls {
+
     use super::*;
 
     impl Conductor {
@@ -353,30 +375,27 @@ mod interface_impls {
             configs: Vec<AdminInterfaceConfig>,
         ) -> ConductorResult<()> {
             let admin_api = RealAdminInterfaceApi::new(self.clone());
-            let stop_tx = self.task_manager.share_ref(|tm| {
-                tm.as_ref()
-                    .expect("Task manager not started yet")
-                    .task_stop_broadcaster()
-                    .clone()
-            });
+            let tm = self.task_manager();
 
             // Closure to process each admin config item
             let spawn_from_config = |AdminInterfaceConfig { driver, .. }| {
                 let admin_api = admin_api.clone();
-                let stop_tx = stop_tx.clone();
+                let tm = tm.clone();
                 async move {
                     match driver {
                         InterfaceDriver::Websocket { port } => {
                             let (listener_handle, listener) =
                                 spawn_websocket_listener(port).await?;
                             let port = listener_handle.local_addr().port().unwrap_or(port);
-                            let handle: ManagedTaskHandle = spawn_admin_interface_task(
+                            spawn_admin_interface_tasks(
+                                tm.clone(),
                                 listener_handle,
                                 listener,
                                 admin_api.clone(),
-                                stop_tx.subscribe(),
-                            )?;
-                            InterfaceResult::Ok((port, handle))
+                                port,
+                            );
+
+                            InterfaceResult::Ok(port)
                         }
                     }
                 }
@@ -384,42 +403,25 @@ mod interface_impls {
 
             // spawn interface tasks, collect their JoinHandles,
             // panic on errors.
-            let handles: Result<Vec<_>, _> =
+            let ports: Result<Vec<_>, _> =
                 future::join_all(configs.into_iter().map(spawn_from_config))
                     .await
                     .into_iter()
                     .collect();
             // Exit if the admin interfaces fail to be created
-            let handles = handles.map_err(Box::new)?;
+            let ports = ports.map_err(Box::new)?;
 
-            {
-                let mut ports = Vec::new();
-
-                // First, register the keepalive task, to ensure the conductor doesn't shut down
-                // in the absence of other "real" tasks
-                self.manage_task(ManagedTaskAdd::ignore(
-                    tokio::spawn(keep_alive_task(stop_tx.subscribe())),
-                    "keepalive task",
-                ))
-                .await?;
-
-                // Now that tasks are spawned, register them with the TaskManager
-                for (port, handle) in handles {
-                    ports.push(port);
-                    self.manage_task(ManagedTaskAdd::ignore(
-                        handle,
-                        &format!("admin interface, port {}", port),
-                    ))
-                    .await?
-                }
-                for p in ports {
-                    self.add_admin_port(p);
-                }
+            for p in ports {
+                self.add_admin_port(p);
             }
             Ok(())
         }
 
-        pub(crate) async fn add_app_interface(
+        /// Spawn a new app interface task, register it with the TaskManager,
+        /// and modify the conductor accordingly, based on the config passed in
+        /// which is just a networking port number (or 0 to auto-select one).
+        /// Returns the given or auto-chosen port number if giving an Ok Result
+        pub async fn add_app_interface(
             self: Arc<Self>,
             port: either::Either<u16, AppInterfaceId>,
         ) -> ConductorResult<u16> {
@@ -433,21 +435,13 @@ mod interface_impls {
             // This receiver is thrown away because we can produce infinite new
             // receivers from the Sender
             let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
-            let stop_rx = self.task_manager.share_ref(|tm| {
-                tm.as_ref()
-                    .expect("Task manager not initialized")
-                    .task_stop_broadcaster()
-                    .subscribe()
-            });
-            let (port, task) = spawn_app_interface_task(port, app_api, signal_tx.clone(), stop_rx)
+
+            let tm = self.task_manager();
+
+            // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
+            let port = spawn_app_interface_task(tm.clone(), port, app_api, signal_tx.clone())
                 .await
                 .map_err(Box::new)?;
-            // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
-            self.manage_task(ManagedTaskAdd::ignore(
-                task,
-                &format!("app interface, port {}", port),
-            ))
-            .await?;
             let interface = AppInterfaceRuntime::Websocket { signal_tx };
 
             self.app_interfaces.share_mut(|app_interfaces| {
@@ -473,10 +467,11 @@ mod interface_impls {
         /// Returns a port which is guaranteed to have a websocket listener with an Admin interface
         /// on it. Useful for specifying port 0 and letting the OS choose a free port.
         pub fn get_arbitrary_admin_websocket_port(&self) -> Option<u16> {
-            self.admin_websocket_ports.share_ref(|p| p.get(0).copied())
+            self.admin_websocket_ports.share_ref(|p| p.first().copied())
         }
 
-        pub(crate) async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
+        /// Give a list of networking ports taken up as running app interface tasks
+        pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
             Ok(self
                 .get_state()
                 .await?
@@ -525,6 +520,21 @@ mod dna_impls {
             self.ribosome_store().share_ref(|ds| ds.get_entry_def(key))
         }
 
+        /// Create a hash map of all existing DNA definitions, mapped to cell
+        /// ids.
+        pub fn get_dna_definitions(
+            &self,
+            app: &InstalledApp,
+        ) -> ConductorResult<HashMap<CellId, DnaDefHashed>> {
+            let mut dna_defs = HashMap::new();
+            for cell_id in app.all_cells() {
+                let ribosome = self.get_ribosome(cell_id.dna_hash())?;
+                let dna_def = ribosome.dna_def();
+                dna_defs.insert(cell_id.to_owned(), dna_def.to_owned());
+            }
+            Ok(dna_defs)
+        }
+
         pub(crate) async fn register_dna_wasm(
             &self,
             ribosome: RealRibosome,
@@ -563,7 +573,7 @@ mod dna_impls {
             let db = &self.spaces.wasm_db;
 
             // Load out all dna defs
-            let (wasm_tasks, defs) = db
+            let (wasms, defs) = db
                 .async_reader(move |txn| {
                     // Get all the dna defs.
                     let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
@@ -590,7 +600,7 @@ mod dna_impls {
                                 .map(|wasm| (wasm_hash, wasm))
                         })
                         .collect::<ConductorResult<HashMap<_, _>>>()?;
-                    let wasm_tasks = holochain_state::dna_def::get_all(&txn)?
+                    let wasms = holochain_state::dna_def::get_all(&txn)?
                         .into_iter()
                         .map(|dna_def| {
                             // Load all wasms for each dna_def from the wasm db into memory
@@ -600,20 +610,21 @@ mod dna_impls {
                                 wasms.get(&wasm_hash).cloned()
                             });
                             let wasms = wasms.collect::<Vec<_>>();
-                            async move {
-                                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                                let ribosome = RealRibosome::new(dna_file)?;
-                                ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
-                            }
+                            (dna_def, wasms)
                         })
                         // This needs to happen due to the environment not being Send
                         .collect::<Vec<_>>();
                     let defs = holochain_state::entry_def::get_all(&txn)?;
-                    ConductorResult::Ok((wasm_tasks, defs))
+                    ConductorResult::Ok((wasms, defs))
                 })
                 .await?;
             // try to join all the tasks and return the list of dna files
-            let dnas = futures::future::try_join_all(wasm_tasks).await?;
+            let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
+                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
+                let ribosome = RealRibosome::new(dna_file)?;
+                ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
+            });
+            let dnas = futures::future::try_join_all(wasms).await?;
             Ok((dnas, defs))
         }
 
@@ -634,7 +645,7 @@ mod dna_impls {
 
         /// Remove cells from the cell map in the Conductor
         pub(crate) async fn remove_cells(&self, cell_ids: &[CellId]) {
-            let to_cleanup: Vec<_> = self.cells.share_mut(|cells| {
+            let to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
                 cell_ids
                     .iter()
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
@@ -677,12 +688,7 @@ mod dna_impls {
             ribosome: RealRibosome,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             let dna_def = ribosome.dna_def().clone();
-            let code = ribosome
-                .dna_file()
-                .code()
-                .clone()
-                .into_iter()
-                .map(|(_, c)| c);
+            let code = ribosome.dna_file().code().clone().into_values();
             let zome_defs = get_entry_defs(ribosome).await?;
             self.put_wasm_code(dna_def, code, zome_defs).await
         }
@@ -744,8 +750,13 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use holochain_conductor_api::DnaGossipInfo;
+    use holochain_conductor_api::NetworkInfo;
     use holochain_p2p::HolochainP2pSender;
+    use holochain_zome_types::block::Block;
+
+    use crate::conductor::api::error::{
+        zome_call_response_to_conductor_api_result, ConductorApiError,
+    };
 
     use super::*;
 
@@ -776,12 +787,38 @@ mod network_impls {
             }
         }
 
+        pub(crate) async fn witness_nonce_from_calling_agent(
+            &self,
+            agent: AgentPubKey,
+            nonce: Nonce256Bits,
+            expires: Timestamp,
+        ) -> ConductorResult<WitnessNonceResult> {
+            Ok(witness_nonce(
+                &self.spaces.conductor_db,
+                agent,
+                nonce,
+                Timestamp::now(),
+                expires,
+            )
+            .await?)
+        }
+
+        /// Block some target.
+        pub async fn block(&self, input: Block) -> ConductorResult<()> {
+            Ok(self.spaces.block(input).await?)
+        }
+
+        /// Unblock some target.
+        pub async fn unblock(&self, input: Block) -> ConductorResult<()> {
+            Ok(self.spaces.unblock(input).await?)
+        }
+
         pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
             use holochain_p2p::AgentPubKeyExt;
 
             let mut space_to_agents = HashMap::new();
 
-            for cell in self.cells.share_ref(|c| {
+            for cell in self.running_cells.share_ref(|c| {
                 <Result<_, one_err::OneErr>>::Ok(c.keys().cloned().collect::<Vec<_>>())
             })? {
                 space_to_agents
@@ -798,21 +835,14 @@ mod network_impls {
             Ok(())
         }
 
-        pub(crate) async fn gossip_info(
+        pub(crate) async fn network_info(
             &self,
             dnas: &[DnaHash],
-        ) -> ConductorResult<Vec<DnaGossipInfo>> {
+        ) -> ConductorResult<Vec<NetworkInfo>> {
             futures::future::join_all(dnas.iter().map(|dna| async move {
-                let m = self
-                    .holochain_p2p()
-                    .get_diagnostics(dna.clone())
-                    .await?
-                    .metrics;
-                let total_historical_gossip_throughput =
-                    m.read().total_current_historical_throughput().into();
-                ConductorResult::Ok(DnaGossipInfo {
-                    total_historical_gossip_throughput,
-                })
+                let d = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
+                let fetch_pool_info = d.fetch_pool.info([dna.to_kitsune()].into_iter().collect());
+                ConductorResult::Ok(NetworkInfo { fetch_pool_info })
             }))
             .await
             .into_iter()
@@ -1025,6 +1055,45 @@ mod network_impls {
             let cell = self.cell_by_id(&call.cell_id)?;
             Ok(cell.call_zome(call, Some(workspace_lock)).await?)
         }
+
+        /// Make a zome call with deserialization and some error unwrapping built in
+        pub async fn easy_call_zome<I, O, Z, F>(
+            &self,
+            provenance: &AgentPubKey,
+            cap_secret: Option<CapSecret>,
+            cell_id: CellId,
+            zome_name: Z,
+            fn_name: F,
+            payload: I,
+        ) -> ConductorApiResult<O>
+        where
+            FunctionName: From<F>,
+            ZomeName: From<Z>,
+            I: Serialize + std::fmt::Debug,
+            O: serde::de::DeserializeOwned + std::fmt::Debug,
+        {
+            let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
+            let now = Timestamp::now();
+            let (nonce, expires_at) = holochain_state::nonce::fresh_nonce(now)?;
+            let call_unsigned = ZomeCallUnsigned {
+                cell_id,
+                zome_name: zome_name.into(),
+                fn_name: fn_name.into(),
+                cap_secret,
+                provenance: provenance.clone(),
+                payload,
+                nonce,
+                expires_at,
+            };
+            let call =
+                ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
+            let response = self.call_zome(call).await;
+            match response {
+                Ok(Ok(response)) => Ok(zome_call_response_to_conductor_api_result(response)?),
+                Ok(Err(error)) => Err(ConductorApiError::Other(Box::new(error))),
+                Err(error) => Err(error),
+            }
+        }
     }
 }
 
@@ -1059,9 +1128,9 @@ mod app_impls {
         /// Install DNAs and set up Cells as specified by an AppBundle
         pub async fn install_app_bundle(
             self: Arc<Self>,
-            payload: InstallAppBundlePayload,
+            payload: InstallAppPayload,
         ) -> ConductorResult<StoppedApp> {
-            let InstallAppBundlePayload {
+            let InstallAppPayload {
                 source,
                 agent_key,
                 installed_app_id,
@@ -1069,7 +1138,7 @@ mod app_impls {
                 network_seed,
             } = payload;
 
-            let bundle: AppBundle = {
+            let bundle = {
                 let original_bundle = source.resolve().await?;
                 if let Some(network_seed) = network_seed {
                     let mut manifest = original_bundle.manifest().to_owned();
@@ -1087,6 +1156,22 @@ mod app_impls {
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
+
+            // check if cells_to_create contains a cell identical to an existing one
+            let state = self.get_state().await?;
+            let all_cells: HashSet<_> = state
+                .installed_apps()
+                .values()
+                .flat_map(|app| app.all_cells())
+                .collect();
+            let maybe_duplicate_cell_id = cells_to_create
+                .iter()
+                .find(|(cell_id, _)| all_cells.contains(cell_id));
+            if let Some((duplicate_cell_id, _)) = maybe_duplicate_cell_id {
+                return Err(ConductorError::CellAlreadyExists(
+                    duplicate_cell_id.to_owned(),
+                ));
+            };
 
             for (dna, _) in ops.dnas_to_register {
                 self.clone().register_dna(dna).await?;
@@ -1130,7 +1215,7 @@ mod app_impls {
         pub async fn list_apps(
             &self,
             status_filter: Option<AppStatusFilter>,
-        ) -> ConductorResult<Vec<InstalledAppInfo>> {
+        ) -> ConductorResult<Vec<AppInfo>> {
             use AppStatusFilter::*;
             let conductor_state = self.get_state().await?;
 
@@ -1143,12 +1228,15 @@ mod app_impls {
                 None => conductor_state.installed_apps().keys().collect(),
             };
 
-            let apps_info: Vec<InstalledAppInfo> = apps_ids
+            let app_infos: Vec<AppInfo> = apps_ids
                 .into_iter()
-                .filter_map(|app_id| conductor_state.get_app_info(app_id))
+                .map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
                 .collect();
 
-            Ok(apps_info)
+            Ok(app_infos)
         }
 
         /// Get the IDs of all active installed Apps which use this Cell
@@ -1206,8 +1294,24 @@ mod app_impls {
         pub async fn get_app_info(
             &self,
             installed_app_id: &InstalledAppId,
-        ) -> ConductorResult<Option<InstalledAppInfo>> {
-            Ok(self.get_state().await?.get_app_info(installed_app_id))
+        ) -> ConductorResult<Option<AppInfo>> {
+            let state = self.get_state().await?;
+            let maybe_app_info = self.get_app_info_inner(installed_app_id, &state)?;
+            Ok(maybe_app_info)
+        }
+
+        fn get_app_info_inner(
+            &self,
+            app_id: &InstalledAppId,
+            state: &ConductorState,
+        ) -> ConductorResult<Option<AppInfo>> {
+            match state.installed_apps().get(app_id) {
+                None => Ok(None),
+                Some(app) => {
+                    let dna_definitions = self.get_dna_definitions(app)?;
+                    Ok(Some(AppInfo::from_installed_app(app, &dna_definitions)))
+                }
+            }
         }
     }
 }
@@ -1218,7 +1322,7 @@ mod cell_impls {
     impl Conductor {
         pub(crate) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
             let cell = self
-                .cells
+                .running_cells
                 .share_ref(|c| c.get(cell_id).map(|i| i.cell.clone()))
                 .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
             Ok(cell)
@@ -1227,7 +1331,7 @@ mod cell_impls {
         /// Iterator over only the cells which are fully running. Generally used
         /// to handle conductor interface requests
         pub fn running_cell_ids(&self) -> HashSet<CellId> {
-            self.cells.share_ref(|c| {
+            self.running_cells.share_ref(|c| {
                 c.iter()
                     .filter_map(|(id, item)| {
                         if item.is_running() {
@@ -1242,7 +1346,7 @@ mod cell_impls {
 
         /// List CellIds for Cells which match a status filter
         pub fn list_cell_ids(&self, filter: Option<CellStatusFilter>) -> Vec<CellId> {
-            self.cells.share_ref(|cells| {
+            self.running_cells.share_ref(|cells| {
                 cells
                     .iter()
                     .filter_map(|(id, cell)| {
@@ -1265,6 +1369,9 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
+    use holochain_conductor_api::ClonedCell;
+    use itertools::Itertools;
+
     use super::*;
 
     impl Conductor {
@@ -1276,7 +1383,7 @@ mod clone_cell_impls {
         pub async fn create_clone_cell(
             self: Arc<Self>,
             payload: CreateCloneCellPayload,
-        ) -> ConductorResult<InstalledCell> {
+        ) -> ConductorResult<ClonedCell> {
             let CreateCloneCellPayload {
                 app_id,
                 role_name,
@@ -1292,16 +1399,23 @@ mod clone_cell_impls {
             }
             let state = self.get_state().await?;
             let app = state.get_app(&app_id)?;
+
             app.provisioned_cells()
                 .find(|(app_role_name, _)| **app_role_name == role_name)
                 .ok_or_else(|| {
-                    ConductorError::CloneCellError(
-                        "no base cell found for provided role id".to_string(),
-                    )
+                    let role_names = app
+                        .provisioned_cells()
+                        .map(|(role_name, _)| format!("'{}'", role_name))
+                        .join(", ");
+
+                    ConductorError::CloneCellError(format!(
+                        "no base cell found for provided role name. Available role names are: ({})",
+                        role_names
+                    ))
                 })?;
 
             // add cell to app
-            let installed_clone_cell = self
+            let clone_cell = self
                 .add_clone_cell_to_app(
                     app_id.clone(),
                     role_name.clone(),
@@ -1311,20 +1425,20 @@ mod clone_cell_impls {
                 .await?;
 
             // run genesis on cloned cell
-            let cells = vec![(installed_clone_cell.as_id().clone(), membrane_proof)];
+            let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
             self.create_and_add_initialized_cells_for_running_apps(Some(&app_id))
                 .await?;
-            Ok(installed_clone_cell)
+            Ok(clone_cell)
         }
 
-        /// Archive a clone cell for future deletion from the app.
-        pub(crate) async fn archive_clone_cell(
+        /// Disable a clone cell.
+        pub(crate) async fn disable_clone_cell(
             &self,
-            ArchiveCloneCellPayload {
+            DisableCloneCellPayload {
                 app_id,
                 clone_cell_id,
-            }: &ArchiveCloneCellPayload,
+            }: &DisableCloneCellPayload,
         ) -> ConductorResult<()> {
             let (_, removed_cell_id) = self
                 .update_state_prime({
@@ -1334,7 +1448,7 @@ mod clone_cell_impls {
                         let app = state.get_app_mut(&app_id)?;
                         let clone_id = app.get_clone_id(&clone_cell_id)?;
                         let cell_id = app.get_clone_cell_id(&clone_cell_id)?;
-                        app.archive_clone_cell(&clone_id)?;
+                        app.disable_clone_cell(&clone_id)?;
                         Ok((state, cell_id))
                     }
                 })
@@ -1343,57 +1457,65 @@ mod clone_cell_impls {
             Ok(())
         }
 
-        /// Restore an archived clone cell for an app.
-        pub(crate) async fn restore_clone_cell(
-            &self,
-            ArchiveCloneCellPayload {
-                app_id,
-                clone_cell_id,
-            }: &ArchiveCloneCellPayload,
-        ) -> ConductorResult<InstalledCell> {
-            let (_, restored_cell) = self
+        /// Enable a disabled clone cell.
+        pub async fn enable_clone_cell(
+            self: Arc<Self>,
+            payload: &EnableCloneCellPayload,
+        ) -> ConductorResult<ClonedCell> {
+            let conductor = self.clone();
+            let (_, enabled_cell) = self
                 .update_state_prime({
-                    let app_id = app_id.to_owned();
-                    let clone_cell_id = clone_cell_id.to_owned();
+                    let app_id = payload.app_id.to_owned();
+                    let clone_cell_id = payload.clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
-                        let clone_id = app.get_archived_clone_id(&clone_cell_id)?;
-                        let restored_cell = app.restore_clone_cell(&clone_id)?;
-                        Ok((state, restored_cell))
+                        let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                        let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
+                        let app_role = app.role(&clone_id.as_base_role_name())?;
+                        let original_dna_hash = app_role.dna_hash().clone();
+                        let ribosome = conductor.get_ribosome(cell_id.dna_hash())?;
+                        let dna = ribosome.dna_file.dna();
+                        let dna_modifiers = dna.modifiers.clone();
+                        let name = dna.name.clone();
+                        let enabled_cell = ClonedCell {
+                            cell_id,
+                            clone_id,
+                            original_dna_hash,
+                            dna_modifiers,
+                            name,
+                            enabled: true,
+                        };
+                        Ok((state, enabled_cell))
                     }
                 })
                 .await?;
-            Ok(restored_cell)
+
+            self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
+                .await?;
+            Ok(enabled_cell)
         }
 
-        /// Remove a clone cell from an app.
-        pub(crate) async fn delete_archived_clone_cells(
+        /// Delete a clone cell.
+        pub(crate) async fn delete_clone_cell(
             &self,
-            DeleteArchivedCloneCellsPayload { app_id, role_name }: &DeleteArchivedCloneCellsPayload,
+            DeleteCloneCellPayload {
+                app_id,
+                clone_cell_id,
+            }: &DeleteCloneCellPayload,
         ) -> ConductorResult<()> {
             self.update_state_prime({
                 let app_id = app_id.clone();
-                let role_name = role_name.clone();
+                let clone_cell_id = clone_cell_id.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    app.delete_archived_clone_cells_for_role(&role_name)?;
+                    let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                    app.delete_clone_cell(&clone_id)?;
                     Ok((state, ()))
                 }
             })
             .await?;
             self.remove_dangling_cells().await?;
             Ok(())
-        }
-
-        /// Restore an archived clone cell
-        pub async fn restore_archived_clone_cell(
-            self: Arc<Self>,
-            payload: &ArchiveCloneCellPayload,
-        ) -> ConductorResult<InstalledCell> {
-            let restored_cell = self.restore_clone_cell(payload).await?;
-            self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
-                .await?;
-            Ok(restored_cell)
         }
     }
 }
@@ -1674,7 +1796,7 @@ mod app_status_impls {
         /// Silently ignores Cells that don't exist.
         pub(crate) fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus) {
             for cell_id in cell_ids {
-                self.cells.share_mut(|cells| {
+                self.running_cells.share_mut(|cells| {
                     if let Some(mut cell) = cells.get_mut(cell_id) {
                         cell.status = status.clone();
                     }
@@ -1714,20 +1836,6 @@ mod state_impls {
         {
             self.check_running()?;
             self.spaces.update_state_prime(f).await
-        }
-
-        /// Sends a JoinHandle to the TaskManager task to be managed
-        pub(crate) async fn manage_task(&self, handle: ManagedTaskAdd) -> ConductorResult<()> {
-            self.task_manager
-                .share_ref(|tm| {
-                    tm.as_ref()
-                        .expect("Task manager not initialized")
-                        .task_add_sender()
-                        .clone()
-                })
-                .send(handle)
-                .await
-                .map_err(|e| ConductorError::SubmitTaskError(format!("{}", e)))
         }
     }
 }
@@ -2063,6 +2171,11 @@ mod accessor_impls {
         pub fn get_config(&self) -> &ConductorConfig {
             &self.config
         }
+
+        /// Get a TaskManagerClient
+        pub fn task_manager(&self) -> TaskManagerClient {
+            self.task_manager.clone()
+        }
     }
 }
 
@@ -2075,7 +2188,7 @@ impl Conductor {
     /// Add fully constructed cells to the cell map in the Conductor
     fn add_and_initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
         let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
-        self.cells.share_mut(|cells| {
+        self.running_cells.share_mut(|cells| {
             for cell in new_cells {
                 let cell_id = cell.id().clone();
                 tracing::debug!(?cell_id, "added cell");
@@ -2099,7 +2212,7 @@ impl Conductor {
     /// Used to discover which cells need to be joined to the network.
     /// The cells' status are upgraded to `Joining` when this function is called.
     fn mark_pending_cells_as_joining(&self) -> Vec<(CellId, Arc<Cell>)> {
-        self.cells.share_mut(|cells| {
+        self.running_cells.share_mut(|cells| {
             cells
                 .iter_mut()
                 .filter_map(|(id, item)| {
@@ -2118,29 +2231,84 @@ impl Conductor {
     /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
         let state = self.get_state().await?;
-        let keepers: HashSet<CellId> = state
+
+        let keepers: HashSet<&CellId> = state
             .enabled_apps()
-            .flat_map(|(_, app)| app.all_cells().cloned().collect::<HashSet<_>>())
+            .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
+            .collect();
+
+        let all_cells: HashSet<&CellId> = state
+            .installed_apps()
+            .iter()
+            .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 
         // Clean up all cells that will be dropped (leave network, etc.)
-        let to_cleanup: Vec<_> = self.cells.share_mut(|cells| {
-            let to_remove = cells
+        let cells_to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
+            let to_remove: Vec<_> = cells
                 .keys()
                 .filter(|id| !keepers.contains(id))
                 .cloned()
-                .collect::<Vec<_>>();
+                .collect();
 
+            // remove all but the keepers
             to_remove
                 .iter()
                 .filter_map(|cell_id| cells.remove(cell_id))
+                .map(|item| item.cell)
                 .collect()
         });
-        for cell in to_cleanup {
-            cell.cell.cleanup().await?;
+
+        // Stop all long-running tasks for cells about to be dropped
+        for cell in cells_to_cleanup.iter() {
+            cell.cleanup().await?;
         }
 
-        // drop all but the keepers
+        // Find any DNAs from cleaned up cells which don't have representation in any cells
+        // in any app. In other words, find the DNAs which are *only* represented in uninstalled apps.
+        let all_dnas: HashSet<_> = all_cells
+            .into_iter()
+            .map(|cell_id| cell_id.dna_hash())
+            .collect();
+        let dnas_to_cleanup = cells_to_cleanup
+            .iter()
+            .map(|cell| cell.id().dna_hash())
+            .filter(|dna| !all_dnas.contains(dna));
+
+        // For any unrepresented DNAs, clean up those DNA-specific databases
+        for dna_hash in dnas_to_cleanup {
+            futures::future::join_all(
+                [
+                    self.spaces
+                        .authored_db(dna_hash)
+                        .unwrap()
+                        .async_commit(|txn| {
+                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
+                        })
+                        .boxed(),
+                    self.spaces
+                        .dht_db(dna_hash)
+                        .unwrap()
+                        .async_commit(|txn| {
+                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
+                        })
+                        .boxed(),
+                    self.spaces
+                        .cache(dna_hash)
+                        .unwrap()
+                        .async_commit(|txn| {
+                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
+                        })
+                        .boxed(),
+                    // TODO: also delete stale Wasms
+                ]
+                .into_iter(),
+            )
+            .await
+            .into_iter()
+            .collect::<Result<Vec<usize>, _>>()?;
+        }
+
         Ok(())
     }
 
@@ -2156,16 +2324,6 @@ impl Conductor {
         self: Arc<Self>,
         app_id: Option<&InstalledAppId>,
     ) -> ConductorResult<Vec<Result<(Cell, InitialQueueTriggers), (CellId, CellError)>>> {
-        // Data required to create apps
-        let (managed_task_add_sender, managed_task_stop_broadcaster) =
-            self.task_manager.share_ref(|tm| {
-                let tm = tm.as_ref().expect("Task manager not initialized");
-                (
-                    tm.task_add_sender().clone(),
-                    tm.task_stop_broadcaster().clone(),
-                )
-            });
-
         // Closure for creating all cells in an app
         let state = self.get_state().await?;
 
@@ -2173,7 +2331,7 @@ impl Conductor {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
                 if app.status().is_running() {
-                    app.all_cells().into_iter().cloned().collect()
+                    app.all_enabled_cells().into_iter().cloned().collect()
                 } else {
                     HashSet::new()
                 }
@@ -2185,7 +2343,7 @@ impl Conductor {
                     .installed_apps()
                     .iter()
                     .filter(|(_, app)| app.status().is_running())
-                    .flat_map(|(_id, app)| app.all_cells().collect::<Vec<&CellId>>())
+                    .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
                     .cloned()
                     .collect()
             }
@@ -2193,12 +2351,12 @@ impl Conductor {
 
         // calculate the existing cells so we can filter those out, only creating
         // cells for CellIds that don't have cells
-        let on_cells: HashSet<CellId> = self.cells.share_ref(|c| c.keys().cloned().collect());
+        let on_cells: HashSet<CellId> = self
+            .running_cells
+            .share_ref(|c| c.keys().cloned().collect());
 
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             let handle = self.clone();
-            let managed_task_add_sender = managed_task_add_sender.clone();
-            let managed_task_stop_broadcaster = managed_task_stop_broadcaster.clone();
             let chc = handle.chc(cell_id);
             async move {
                 let holochain_p2p_cell =
@@ -2209,16 +2367,9 @@ impl Conductor {
                     .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()))
                     .map_err(|err| (cell_id.clone(), err))?;
 
-                Cell::create(
-                    cell_id.clone(),
-                    handle,
-                    space,
-                    holochain_p2p_cell,
-                    managed_task_add_sender,
-                    managed_task_stop_broadcaster,
-                )
-                .await
-                .map_err(|err| (cell_id.clone(), err))
+                Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell)
+                    .await
+                    .map_err(|err| (cell_id.clone(), err))
             }
         });
 
@@ -2295,7 +2446,7 @@ impl Conductor {
         role_name: RoleName,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
-    ) -> ConductorResult<InstalledCell> {
+    ) -> ConductorResult<ClonedCell> {
         let ribosome_store = &self.ribosome_store;
         // retrieve base cell DNA hash from conductor
         let (_, base_cell_dna_hash) = self
@@ -2304,24 +2455,23 @@ impl Conductor {
                 let role_name = role_name.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    let app_role_assignment = app
-                        .roles()
-                        .get(&role_name)
-                        .ok_or_else(|| AppError::RoleNameMissing(role_name.to_owned()))?;
-                    if app_role_assignment.is_clone_limit_reached() {
+                    let app_role = app.role(&role_name)?;
+                    if app_role.is_clone_limit_reached() {
                         return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
-                            app_role_assignment.clone_limit(),
-                            app_role_assignment.clone(),
+                            app_role.clone_limit(),
+                            app_role.clone(),
                         )));
                     }
-                    let parent_dna_hash = app_role_assignment.dna_hash().clone();
-                    Ok((state, parent_dna_hash))
+                    let original_dna_hash = app_role.dna_hash().clone();
+                    Ok((state, original_dna_hash))
                 }
             })
             .await?;
+        let original_dna_hash = base_cell_dna_hash.clone();
+
         // clone cell from base cell DNA
-        let clone_dna = ribosome_store.share_ref(|ds| {
-            let mut dna_file = ds
+        let clone_dna = ribosome_store.share_ref(|rs| {
+            let mut dna_file = rs
                 .get_dna_file(&base_cell_dna_hash)
                 .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
                 .update_modifiers(dna_modifiers);
@@ -2330,16 +2480,39 @@ impl Conductor {
             }
             Ok::<_, DnaError>(dna_file)
         })?;
+        let name = clone_dna.dna().name.clone();
+        let dna_modifiers = clone_dna.dna().modifiers.clone();
         let clone_dna_hash = clone_dna.dna_hash().to_owned();
+
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
+                let state_copy = state.clone();
                 let app = state.get_app_mut(&app_id)?;
                 let agent_key = app.role(&role_name)?.agent_key().to_owned();
-                let cell_id = CellId::new(clone_dna_hash, agent_key);
-                let clone_id = app.add_clone(&role_name, &cell_id)?;
-                let installed_clone_cell =
-                    InstalledCell::new(cell_id, clone_id.as_app_role_name().clone());
+                let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
+
+                // if cell id of new clone cell already exists, reject as duplicate
+                if state_copy
+                    .installed_apps()
+                    .iter()
+                    .flat_map(|(_, app)| app.all_cells())
+                    .any(|cell_id| *cell_id == clone_cell_id)
+                {
+                    return Err(ConductorError::AppError(AppError::DuplicateCellId(
+                        clone_cell_id,
+                    )));
+                }
+
+                let clone_id = app.add_clone(&role_name, &clone_cell_id)?;
+                let installed_clone_cell = ClonedCell {
+                    cell_id: clone_cell_id,
+                    clone_id,
+                    original_dna_hash,
+                    dna_modifiers,
+                    name,
+                    enabled: true,
+                };
                 Ok((state, installed_clone_cell))
             })
             .await?;
@@ -2495,7 +2668,6 @@ pub(crate) async fn genesis_cells(
 
         Err(ConductorError::GenesisFailed { errors })
     } else {
-        // No errors so return the cells
         Ok(())
     }
 }

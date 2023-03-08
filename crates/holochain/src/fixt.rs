@@ -12,8 +12,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
@@ -319,7 +317,7 @@ fixturator!(
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
-                Arc::new(fixt!(DnaDef))
+                Arc::new(fixt!(DnaDef)),
             ).await.unwrap()
         })
     };
@@ -395,7 +393,7 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna);
+    constructor fn new(HostFnWorkspace, MetaLairClient, HolochainP2pDna, SignalBroadcaster);
 );
 
 fixturator!(
@@ -409,16 +407,6 @@ fixturator!(
 );
 
 fixturator!(
-    ValidationPackageInvocation;
-    constructor fn new(IntegrityZome, AppEntryDef);
-);
-
-fixturator!(
-    ValidationPackageHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna);
-);
-
-fixturator!(
     HostContext;
     variants [
         ZomeCall(ZomeCallHostAccess)
@@ -426,7 +414,6 @@ fixturator!(
         Init(InitHostAccess)
         EntryDefs(EntryDefsHostAccess)
         MigrateAgent(MigrateAgentHostAccess)
-        ValidationPackage(ValidationPackageHostAccess)
         PostCommit(PostCommitHostAccess)
     ];
 );
@@ -450,6 +437,9 @@ fixturator!(
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
+        signature: SignatureFixturator::new(Empty).next().unwrap(),
+        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()).unwrap(),
+        expires_at: TimestampFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
@@ -458,6 +448,10 @@ fixturator!(
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
+        signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
+        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()).unwrap(),
+        // @todo should this be less predictable?
+        expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
     curve Predictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -478,6 +472,10 @@ fixturator!(
         provenance: AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
+        signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        nonce: Nonce256Bits::try_from(ThirtyTwoBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()).unwrap(),
+        // @todo should this be more predictable?
+        expires_at: (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap(),
     };
 );
 

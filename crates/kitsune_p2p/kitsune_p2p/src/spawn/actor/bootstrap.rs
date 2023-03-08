@@ -45,6 +45,18 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
     kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input)?;
     match url {
         Some(url) => {
+            let url = {
+                #[cfg(feature = "tx5")]
+                {
+                    format!("{}?net=tx5", url.as_str())
+                }
+
+                #[cfg(not(feature = "tx5"))]
+                {
+                    format!("{}?net=tx2", url.as_str())
+                }
+            };
+
             let res = CLIENT
                 .post(url.as_str())
                 .body(body_data)

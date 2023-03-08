@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
+use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
@@ -15,10 +16,11 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::nonce::WitnessNonceResult;
 use holochain_types::prelude::*;
+use holochain_zome_types::block::Block;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
-use tracing::*;
 
 /// The concrete implementation of [`CellConductorApiT`], which is used to give
 /// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).
@@ -70,9 +72,10 @@ impl CellConductorApiT for CellConductorApi {
         }
     }
 
-    async fn dpki_request(&self, _method: String, _args: String) -> ConductorApiResult<String> {
-        warn!("Using placeholder dpki");
-        Ok("TODO".to_string())
+    fn conductor_services(&self) -> ConductorServices {
+        self.conductor_handle
+            .services
+            .share_ref(|s| s.clone().expect("Conductor services not yet initialized"))
     }
 
     fn keystore(&self) -> &MetaLairClient {
@@ -135,9 +138,8 @@ pub trait CellConductorApiT: Send + Sync {
         call: ZomeCall,
     ) -> ConductorApiResult<ZomeCallResult>;
 
-    /// Make a request to the DPKI service running for this Conductor.
-    /// TODO: decide on actual signature
-    async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
+    /// Access to the conductor services
+    fn conductor_services(&self) -> ConductorServices;
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;
@@ -189,6 +191,14 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
+    /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
+    async fn witness_nonce_from_calling_agent(
+        &self,
+        agent: AgentPubKey,
+        nonce: Nonce256Bits,
+        expires: Timestamp,
+    ) -> ConductorApiResult<WitnessNonceResult>;
+
     /// Find the first cell ID across all apps the given cell id is in that
     /// is assigned to the given role.
     async fn find_cell_with_role_alongside_cell(
@@ -196,6 +206,12 @@ pub trait CellConductorReadHandleT: Send + Sync {
         cell_id: &CellId,
         role_name: &RoleName,
     ) -> ConductorResult<Option<CellId>>;
+
+    /// Expose block functionality to zomes.
+    async fn block(&self, block: Block) -> ConductorResult<()>;
+
+    /// Expose unblock functionality to zomes.
+    async fn unblock(&self, block: Block) -> ConductorResult<()>;
 }
 
 #[async_trait]
@@ -226,6 +242,18 @@ impl CellConductorReadHandleT for CellConductorApi {
         CellConductorApiT::get_entry_def(self, key)
     }
 
+    async fn witness_nonce_from_calling_agent(
+        &self,
+        agent: AgentPubKey,
+        nonce: Nonce256Bits,
+        expires: Timestamp,
+    ) -> ConductorApiResult<WitnessNonceResult> {
+        Ok(self
+            .conductor_handle
+            .witness_nonce_from_calling_agent(agent, nonce, expires)
+            .await?)
+    }
+
     async fn find_cell_with_role_alongside_cell(
         &self,
         cell_id: &CellId,
@@ -234,5 +262,13 @@ impl CellConductorReadHandleT for CellConductorApi {
         self.conductor_handle
             .find_cell_with_role_alongside_cell(cell_id, role_name)
             .await
+    }
+
+    async fn block(&self, block: Block) -> ConductorResult<()> {
+        self.conductor_handle.block(block).await
+    }
+
+    async fn unblock(&self, block: Block) -> ConductorResult<()> {
+        self.conductor_handle.unblock(block).await
     }
 }

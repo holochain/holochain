@@ -247,7 +247,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                     // For some reason calling pragma_update is necessary to prove the database file is valid.
                     .and_then(|mut c| {
                         crate::conn::initialize_connection(&mut c, sync_level)?;
-                        c.pragma_update(None, "synchronous", &"0".to_string())
+                        c.pragma_update(None, "synchronous", "0".to_string())
                     }) {
                     Ok(_) => (),
                     // These are the two errors that can
@@ -286,7 +286,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         let pool = new_connection_pool(path.as_ref().map(|p| p.as_ref()), sync_level);
         let mut conn = pool.get()?;
         // set to faster write-ahead-log mode
-        conn.pragma_update(None, "journal_mode", &"WAL".to_string())?;
+        conn.pragma_update(None, "journal_mode", "WAL".to_string())?;
         crate::table::initialize_database(&mut conn, kind.kind())?;
 
         Ok(DbWrite(DbRead {
@@ -328,15 +328,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test_in_mem(kind: Kind) -> DatabaseResult<Self> {
         Self::new(None, kind, DbSyncLevel::default())
-    }
-
-    /// Remove the db and directory
-    #[deprecated = "is this used?"]
-    pub async fn remove(self) -> DatabaseResult<()> {
-        if let Some(parent) = self.0.path.parent() {
-            std::fs::remove_dir_all(parent)?;
-        }
-        Ok(())
     }
 
     pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>

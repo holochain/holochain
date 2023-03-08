@@ -63,29 +63,13 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
-            #[allow(deprecated)]
-            AppRequest::ZomeCallInvocation(call) => {
-                tracing::warn!(
-                    "AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)"
-                );
-                self.handle_app_request_inner(AppRequest::ZomeCall(call))
-                    .await
-                    .map(|r| {
-                        match r {
-                            // if successful, re-wrap in the deprecated response type
-                            AppResponse::ZomeCall(zc) => AppResponse::ZomeCallInvocation(zc),
-                            // else (probably an error), return as-is
-                            other => other,
-                        }
-                    })
-            }
-            AppRequest::ZomeCall(call) => {
+            AppRequest::CallZome(call) => {
                 match self.conductor_handle.call_zome(*call.clone()).await? {
-                    Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCall(Box::new(output))),
-                    Ok(ZomeCallResponse::Unauthorized(_, _, _, _)) => Ok(AppResponse::Error(
+                    Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
+                    Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, _, zome_name, fn_name, _)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
-                            "No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}",
-                            call.cap_secret, call.fn_name, call.zome_name
+                            "Call was not authorized with reason {:?}, cap secret {:?} to call the function {} in zome {}",
+                            zome_call_authorization, call.cap_secret, fn_name, zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(
@@ -102,26 +86,32 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 }
             }
             AppRequest::CreateCloneCell(payload) => {
-                let installed_clone_cell = self
+                let clone_cell = self
                     .conductor_handle
                     .clone()
                     .create_clone_cell(*payload)
                     .await?;
-                Ok(AppResponse::CloneCellCreated(installed_clone_cell))
+                Ok(AppResponse::CloneCellCreated(clone_cell))
             }
-            AppRequest::ArchiveCloneCell(payload) => {
+            AppRequest::DisableCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .archive_clone_cell(&*payload)
+                    .disable_clone_cell(&payload)
                     .await?;
-                Ok(AppResponse::CloneCellArchived)
+                Ok(AppResponse::CloneCellDisabled)
             }
-            AppRequest::GossipInfo(payload) => {
-                let info = self.conductor_handle.gossip_info(&payload.dnas).await?;
-                Ok(AppResponse::GossipInfo(info))
+            AppRequest::EnableCloneCell(payload) => {
+                let enabled_cell = self
+                    .conductor_handle
+                    .clone()
+                    .enable_clone_cell(&payload)
+                    .await?;
+                Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
-            AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
-            AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),
+            AppRequest::NetworkInfo(payload) => {
+                let info = self.conductor_handle.network_info(&payload.dnas).await?;
+                Ok(AppResponse::NetworkInfo(info))
+            }
         }
     }
 }

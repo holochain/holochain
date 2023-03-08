@@ -3,6 +3,7 @@
 use crate::changelog::{
     self, ChangeT, ChangelogT, ChangelogType, CrateChangelog, WorkspaceChangelog,
 };
+use crate::common::SemverIncrementMode;
 use crate::Fallible;
 use cargo::core::Dependency;
 use log::{debug, info, trace, warn};
@@ -24,7 +25,7 @@ use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub(crate) mod aliases {
+pub mod aliases {
     pub use cargo::core::dependency::DepKind as CargoDepKind;
     pub use cargo::core::package::Package as CargoPackage;
     pub use cargo::core::Workspace as CargoWorkspace;
@@ -41,7 +42,7 @@ fn releaseworkspace_path_only_fmt(
 type DependenciesT = LinkedHashMap<String, Vec<cargo::core::Dependency>>;
 
 #[derive(custom_debug::Debug)]
-pub(crate) struct Crate<'a> {
+pub struct Crate<'a> {
     package: CargoPackage,
     changelog: Option<ChangelogT<'a, CrateChangelog>>,
     #[debug(with = "releaseworkspace_path_only_fmt")]
@@ -54,7 +55,7 @@ pub(crate) struct Crate<'a> {
 
 impl<'a> Crate<'a> {
     /// Instantiate a new Crate with the given CargoPackage.
-    pub(crate) fn with_cargo_package(
+    pub fn with_cargo_package(
         package: CargoPackage,
         workspace: &'a ReleaseWorkspace<'a>,
     ) -> Fallible<Self> {
@@ -77,13 +78,13 @@ impl<'a> Crate<'a> {
     }
 
     /// Return the path of the package's manifest.
-    pub(crate) fn manifest_path(&self) -> &Path {
+    pub fn manifest_path(&self) -> &Path {
         self.package.manifest_path()
     }
 
     /// Sets the new version for the given crate, updates all workspace dependants,
     /// and returns a refrence to them for post-processing.
-    pub(crate) fn set_version(
+    pub fn set_version(
         &'a self,
         dry_run: bool,
         release_version: &semver::Version,
@@ -117,7 +118,7 @@ impl<'a> Crate<'a> {
 
     /// Set a dependency to a specific version
     // Adapted from https://github.com/sunng87/cargo-release/blob/f94938c3f20ef20bc8f971d59de75574a0b18931/src/cargo.rs#L122-L154
-    pub(crate) fn set_dependency_version(
+    pub fn set_dependency_version(
         &self,
         name: &str,
         version: &Version,
@@ -231,11 +232,11 @@ impl<'a> Crate<'a> {
     }
 
     /// Return a reference to the package.
-    pub(crate) fn package(&self) -> &CargoPackage {
+    pub fn package(&self) -> &CargoPackage {
         &self.package
     }
 
-    pub(crate) fn state(&self) -> CrateState {
+    pub fn state(&self) -> CrateState {
         self.workspace
             .members_states()
             .expect("should be initialised")
@@ -245,27 +246,27 @@ impl<'a> Crate<'a> {
     }
 
     /// This crate's name as given in the Cargo.toml file
-    pub(crate) fn name(&self) -> String {
+    pub fn name(&self) -> String {
         self.package.name().to_string()
     }
 
     /// This crate's current version as given in the Cargo.toml file
-    pub(crate) fn version(&self) -> Version {
+    pub fn version(&self) -> Version {
         self.package.version().to_owned()
     }
 
     /// Return a string in the from of '{package_name}-{package_version}'
-    pub(crate) fn name_version(&self) -> String {
+    pub fn name_version(&self) -> String {
         format!("{}-{}", self.name(), self.version())
     }
 
     /// This crate's changelog.
-    pub(crate) fn changelog(&'a self) -> Option<&ChangelogT<'a, CrateChangelog>> {
+    pub fn changelog(&'a self) -> Option<&ChangelogT<'a, CrateChangelog>> {
         self.changelog.as_ref()
     }
 
     /// Returns the crates in the same workspace that this crate depends on.
-    pub(crate) fn dependencies_in_workspace(&'a self) -> Fallible<&'a DependenciesT> {
+    pub fn dependencies_in_workspace(&'a self) -> Fallible<&'a DependenciesT> {
         self.dependencies_in_workspace.get_or_try_init(|| {
             // LinkedHashSet automatically deduplicates while maintaining the insertion order.
             let mut dependencies = LinkedHashMap::new();
@@ -328,14 +329,14 @@ impl<'a> Crate<'a> {
 
     /// Returns a reference to all workspace crates that depend on this crate.
     // todo: write a unit test for this
-    pub(crate) fn dependants_in_workspace(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
+    pub fn dependants_in_workspace(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
         self.dependants_in_workspace_filtered(|_| true)
     }
 
     /// Returns a reference to all workspace crates that depend on this crate.
     /// Features filtering by applying a filter function to the dependant's dependencies.
     // todo: write a unit test for this
-    pub(crate) fn dependants_in_workspace_filtered<F>(
+    pub fn dependants_in_workspace_filtered<F>(
         &'a self,
         filter_fn: F,
     ) -> Fallible<&'a Vec<&'a Crate<'a>>>
@@ -366,11 +367,11 @@ impl<'a> Crate<'a> {
         })
     }
 
-    pub(crate) fn root(&self) -> &Path {
+    pub fn root(&self) -> &Path {
         self.package.root()
     }
 
-    pub(crate) fn workspace(&self) -> &'a ReleaseWorkspace<'a> {
+    pub fn workspace(&self) -> &'a ReleaseWorkspace<'a> {
         self.workspace
     }
 }
@@ -378,7 +379,7 @@ impl<'a> Crate<'a> {
 type MemberStates = LinkedHashMap<String, CrateState>;
 
 #[derive(custom_debug::Debug)]
-pub(crate) struct ReleaseWorkspace<'a> {
+pub struct ReleaseWorkspace<'a> {
     root_path: PathBuf,
     criteria: SelectionCriteria,
     git_config_name: String,
@@ -400,21 +401,22 @@ pub(crate) struct ReleaseWorkspace<'a> {
 /// Configuration criteria for the crate selection.
 #[derive(Educe, Debug)]
 #[educe(Default)]
-pub(crate) struct SelectionCriteria {
+pub struct SelectionCriteria {
     #[educe(Default(expression = r#"fancy_regex::Regex::new(".*").expect("matching anything is valid")"#r))]
-    pub(crate) match_filter: fancy_regex::Regex,
-    pub(crate) enforced_version_reqs: Vec<semver::VersionReq>,
-    pub(crate) disallowed_version_reqs: Vec<semver::VersionReq>,
-    pub(crate) allowed_dev_dependency_blockers: BitFlags<CrateStateFlags>,
-    pub(crate) allowed_selection_blockers: BitFlags<CrateStateFlags>,
-    pub(crate) exclude_optional_deps: bool,
+    pub match_filter: fancy_regex::Regex,
+    pub enforced_version_reqs: Vec<semver::VersionReq>,
+    pub disallowed_version_reqs: Vec<semver::VersionReq>,
+    pub allowed_dev_dependency_blockers: BitFlags<CrateStateFlags>,
+    pub allowed_selection_blockers: BitFlags<CrateStateFlags>,
+    pub allowed_semver_increment_modes: Option<HashSet<SemverIncrementMode>>,
+    pub exclude_optional_deps: bool,
 }
 
 /// Defines detailed crate's state in terms of the release process.
 #[bitflags]
 #[repr(u32)]
 #[derive(enum_utils::FromStr, Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum CrateStateFlags {
+pub enum CrateStateFlags {
     /// matches a package filter
     Matched,
     /// in the dependency tree of a matched package
@@ -450,13 +452,14 @@ pub(crate) enum CrateStateFlags {
     ManifestKeywordExceeds20Chars,
     ManifestKeywordContainsInvalidChar,
     ManifestKeywordsMoreThan5,
+    AllowedSemverIncrementModeViolated,
 }
 
 /// Defines the meta states that can be derived from the more detailed `CrateStateFlags`.
 #[bitflags]
 #[repr(u16)]
 #[derive(enum_utils::FromStr, Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum MetaCrateStateFlags {
+pub enum MetaCrateStateFlags {
     Allowed,
     Blocked,
     Changed,
@@ -464,14 +467,14 @@ pub(crate) enum MetaCrateStateFlags {
 }
 
 impl CrateStateFlags {
-    pub(crate) fn empty_set() -> BitFlags<Self> {
+    pub fn empty_set() -> BitFlags<Self> {
         BitFlags::empty()
     }
 }
 
 /// Implements the logic for determining a crate's starte in terms of the release process.
 #[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct CrateState {
+pub struct CrateState {
     flags: BitFlags<CrateStateFlags>,
     meta_flags: BitFlags<MetaCrateStateFlags>,
 
@@ -480,7 +483,7 @@ pub(crate) struct CrateState {
 }
 
 impl CrateState {
-    pub(crate) const BLOCKING_STATES: BitFlags<CrateStateFlags> = enumflags2::make_bitflags!(
+    pub const BLOCKING_STATES: BitFlags<CrateStateFlags> = enumflags2::make_bitflags!(
         CrateStateFlags::{MissingChangelog
             | MissingReadme
             | UnreleasableViaChangelogFrontmatter
@@ -492,9 +495,10 @@ impl CrateState {
             | ManifestKeywordExceeds20Chars
             | ManifestKeywordContainsInvalidChar
             | ManifestKeywordsMoreThan5
+            | AllowedSemverIncrementModeViolated
     });
 
-    pub(crate) fn new(
+    pub fn new(
         flags: BitFlags<CrateStateFlags>,
         allowed_dev_dependency_blockers: BitFlags<CrateStateFlags>,
         allowed_selection_blockers: BitFlags<CrateStateFlags>,
@@ -509,29 +513,29 @@ impl CrateState {
         new
     }
 
-    pub(crate) fn contains(&self, flag: CrateStateFlags) -> bool {
+    pub fn contains(&self, flag: CrateStateFlags) -> bool {
         self.flags.contains(flag)
     }
 
-    pub(crate) fn merge(&mut self, other: Self) {
+    pub fn merge(&mut self, other: Self) {
         self.flags.extend(other.flags.iter());
         self.update_meta_flags();
     }
 
-    pub(crate) fn insert(&mut self, flag: CrateStateFlags) {
+    pub fn insert(&mut self, flag: CrateStateFlags) {
         self.flags.insert(flag);
         self.update_meta_flags();
     }
 
-    pub(crate) fn is_matched(&self) -> bool {
+    pub fn is_matched(&self) -> bool {
         self.flags.contains(CrateStateFlags::Matched)
     }
 
-    pub(crate) fn is_dependency(&self) -> bool {
+    pub fn is_dependency(&self) -> bool {
         self.flags.contains(CrateStateFlags::IsWorkspaceDependency)
     }
 
-    pub(crate) fn is_dev_dependency(&self) -> bool {
+    pub fn is_dev_dependency(&self) -> bool {
         self.flags
             .contains(CrateStateFlags::IsWorkspaceDevDependency)
     }
@@ -587,7 +591,7 @@ impl CrateState {
     }
 
     /// There are changes to be released.
-    pub(crate) fn changed(&self) -> bool {
+    pub fn changed(&self) -> bool {
         self.flags.contains(CrateStateFlags::NoPreviousRelease)
             || self.flags.contains(CrateStateFlags::MissingReleaseTag)
             || self
@@ -596,33 +600,33 @@ impl CrateState {
     }
 
     /// At least one dependency is marked as changed.
-    pub(crate) fn dependency_changed(&self) -> bool {
+    pub fn dependency_changed(&self) -> bool {
         self.flags.contains(CrateStateFlags::DependencyChanged)
     }
 
     /// There are changes to be released since the previous release
-    pub(crate) fn changed_since_previous_release(&self) -> bool {
+    pub fn changed_since_previous_release(&self) -> bool {
         self.flags
             .contains(CrateStateFlags::ChangedSincePreviousRelease)
     }
 
     /// Has a prevoius release.
-    pub(crate) fn has_previous_release(&self) -> bool {
+    pub fn has_previous_release(&self) -> bool {
         self.flags.contains(CrateStateFlags::HasPreviousRelease)
     }
 
     /// Has been matched explicitly or as a consequence of a dependency.
-    pub(crate) fn selected(&self) -> bool {
+    pub fn selected(&self) -> bool {
         self.is_matched() || self.is_dependency() || self.is_dev_dependency()
     }
 
     /// Will be included in the release
-    pub(crate) fn release_selection(&self) -> bool {
+    pub fn release_selection(&self) -> bool {
         !self.blocked() && (self.changed() || self.dependency_changed()) && self.selected()
     }
 
     /// Returns a formatted string with an overview of crates and their states.
-    pub(crate) fn format_crates_states<'cs, CS>(
+    pub fn format_crates_states<'cs, CS>(
         states: CS,
         title: &str,
         show_blocking: bool,
@@ -949,6 +953,22 @@ impl<'a> ReleaseWorkspace<'a> {
                     }
                 }
 
+                // semver_increment_mode checks
+                if let Some(allowed_semver_increment_modes) = &self.criteria.allowed_semver_increment_modes {
+                    let effective_semver_increment_mode  = member
+                        .changelog()
+                        .map(|cl| cl.front_matter().ok())
+                        .flatten()
+                        .flatten()
+                        .map(|fm| fm.semver_increment_mode())
+                        .unwrap_or_default();
+
+
+                    if !allowed_semver_increment_modes.contains(&effective_semver_increment_mode) {
+                        debug!("Blocking {} due to {:?} with mode: {effective_semver_increment_mode:?}", member.name(), CrateStateFlags::AllowedSemverIncrementModeViolated);
+                        insert_state!(CrateStateFlags::AllowedSemverIncrementModeViolated);
+                    }
+                }
             }
 
             Ok(members_states)
@@ -962,7 +982,7 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     /// Returns the crates that are going to be processed for release.
-    pub(crate) fn release_selection(&'a self) -> Fallible<Vec<&'a Crate>> {
+    pub fn release_selection(&'a self) -> Fallible<Vec<&'a Crate>> {
         let members = self.members()?;
 
         let all_crates_states_iter = members.iter().map(|member| (member.name(), member.state()));
@@ -1024,7 +1044,7 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     /// Return all member crates matched by `SelectionCriteria::match_filter`
-    pub(crate) fn members_matched(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
+    pub fn members_matched(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
         self.members_matched.get_or_try_init(|| {
             let states = self.members_states()?;
 
@@ -1052,7 +1072,7 @@ impl<'a> ReleaseWorkspace<'a> {
 
     /// Returns all non-excluded workspace members.
     /// Members are sorted according to their dependency tree from most independent to most dependent.
-    pub(crate) fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
+    pub fn members(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
         self.members_sorted.get_or_try_init(|| -> Fallible<_> {
             let mut members = self
                 .members_unsorted()?
@@ -1120,16 +1140,16 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     /// Return the root path of the workspace.
-    pub(crate) fn root(&'a self) -> &Path {
+    pub fn root(&'a self) -> &Path {
         &self.root_path
     }
 
-    pub(crate) fn git_repo(&'a self) -> &git2::Repository {
+    pub fn git_repo(&'a self) -> &git2::Repository {
         &self.git_repo
     }
 
     /// Tries to resolve the git HEAD to its corresponding branch.
-    pub(crate) fn git_head_branch(&'a self) -> Fallible<(git2::Branch, git2::BranchType)> {
+    pub fn git_head_branch(&'a self) -> Fallible<(git2::Branch, git2::BranchType)> {
         for branch in self.git_repo.branches(None)? {
             let branch = branch?;
             if branch.0.is_head() {
@@ -1141,7 +1161,7 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     /// Calls Self::git_head_branch and tries to resolve its name to String.
-    pub(crate) fn git_head_branch_name(&'a self) -> Fallible<String> {
+    pub fn git_head_branch_name(&'a self) -> Fallible<String> {
         self.git_head_branch().map(|(branch, _)| {
             branch
                 .name()?
@@ -1151,7 +1171,7 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     /// Creates a git branch with the given name off of the current HEAD, optionally overwriting the branch if it exists.
-    pub(crate) fn git_checkout_branch(&'a self, name: &str, force: bool) -> Fallible<git2::Branch> {
+    pub fn git_checkout_branch(&'a self, name: &str, force: bool) -> Fallible<git2::Branch> {
         let head_commit = self.git_repo.head()?.peel_to_commit()?;
 
         let new_branch = self.git_repo.branch(name, &head_commit, force)?;
@@ -1172,7 +1192,7 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     /// Creates a new git branch with the given name off of the current HEAD.
-    pub(crate) fn git_checkout_new_branch(&'a self, name: &str) -> Fallible<git2::Branch> {
+    pub fn git_checkout_new_branch(&'a self, name: &str) -> Fallible<git2::Branch> {
         self.git_checkout_branch(name, false)
     }
 
@@ -1185,7 +1205,7 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     /// Add the given files and create a commit.
-    pub(crate) fn git_add_all_and_commit(
+    pub fn git_add_all_and_commit(
         &'a self,
         msg: &str,
         path_filter: Option<&mut git2::IndexMatchedPath<'_>>,
@@ -1216,7 +1236,7 @@ impl<'a> ReleaseWorkspace<'a> {
     }
 
     /// Create a new git tag from HEAD
-    pub(crate) fn git_tag(&self, name: &str, force: bool) -> Fallible<git2::Oid> {
+    pub fn git_tag(&self, name: &str, force: bool) -> Fallible<git2::Oid> {
         let head = self
             .git_repo
             .head()?
@@ -1233,15 +1253,11 @@ impl<'a> ReleaseWorkspace<'a> {
             .context(format!("creating tag '{}'", name))
     }
 
-    pub(crate) fn changelog(&'a self) -> Option<&'a ChangelogT<'a, WorkspaceChangelog>> {
+    pub fn changelog(&'a self) -> Option<&'a ChangelogT<'a, WorkspaceChangelog>> {
         self.changelog.as_ref()
     }
 
-    pub(crate) fn update_lockfile<T>(
-        &'a self,
-        dry_run: bool,
-        additional_manifests: T,
-    ) -> Fallible<()>
+    pub fn update_lockfile<T>(&'a self, dry_run: bool, additional_manifests: T) -> Fallible<()>
     where
         T: Iterator<Item = &'a str>,
         T: Clone,
@@ -1295,7 +1311,7 @@ impl<'a> ReleaseWorkspace<'a> {
         Ok(())
     }
 
-    pub(crate) fn cargo_check<T>(&'a self, offline: bool, additional_manifests: T) -> Fallible<()>
+    pub fn cargo_check<T>(&'a self, offline: bool, additional_manifests: T) -> Fallible<()>
     where
         T: Iterator<Item = &'a str>,
     {
@@ -1376,7 +1392,7 @@ fn changed_files(dir: &Path, from_rev: &str, to_rev: &str) -> Fallible<Vec<PathB
 
 /// Find a git tag in a repository
 // todo: refactor into common place module
-pub(crate) fn git_lookup_tag(git_repo: &git2::Repository, tag_name: &str) -> Option<String> {
+pub fn git_lookup_tag(git_repo: &git2::Repository, tag_name: &str) -> Option<String> {
     let tag = git_repo
         .revparse_single(tag_name)
         .ok()
@@ -1390,7 +1406,7 @@ pub(crate) fn git_lookup_tag(git_repo: &git2::Repository, tag_name: &str) -> Opt
 }
 
 // we shouldn't need this check but so far the failing case hasn't been reproduced in a test.
-pub(crate) fn ensure_release_order_consistency<'a>(
+pub fn ensure_release_order_consistency<'a>(
     crates: &[&'a Crate<'a>],
 ) -> Fallible<LinkedHashSet<String>> {
     crates
@@ -1427,4 +1443,4 @@ pub(crate) fn ensure_release_order_consistency<'a>(
 }
 
 #[cfg(test)]
-pub(crate) mod tests;
+pub mod tests;

@@ -115,7 +115,14 @@ pub enum CountersigningSessionNegotiationMessage {
 #[derive(Debug, derive_more::From)]
 pub enum FetchOpDataQuery {
     /// Fetch all ops with the hashes specified
-    Hashes(Vec<holo_hash::DhtOpHash>),
+    Hashes {
+        /// list of ops to fetch
+        op_hash_list: Vec<holo_hash::DhtOpHash>,
+
+        /// should we include limbo ops
+        include_limbo: bool,
+    },
+
     /// Fetch all ops within the time and space bounds specified
     Regions(Vec<RegionBounds>),
 }
@@ -124,12 +131,16 @@ impl FetchOpDataQuery {
     /// Convert from the kitsune form of this query
     pub fn from_kitsune(kit: FetchOpDataEvtQuery) -> Self {
         match kit {
-            FetchOpDataEvtQuery::Hashes(hashes) => Self::Hashes(
-                hashes
+            FetchOpDataEvtQuery::Hashes {
+                op_hash_list,
+                include_limbo,
+            } => Self::Hashes {
+                op_hash_list: op_hash_list
                     .into_iter()
                     .map(|h| DhtOpHash::from_kitsune(&h))
                     .collect::<Vec<_>>(),
-            ),
+                include_limbo,
+            },
             FetchOpDataEvtQuery::Regions(coords) => Self::Regions(coords),
         }
     }
@@ -165,12 +176,15 @@ ghost_actor::ghost_chan! {
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
             dna_hash: DnaHash,
-            to_agent: AgentPubKey,
             from_agent: AgentPubKey,
+            signature: Signature,
+            to_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap_secret: Option<CapSecret>,
             payload: ExternIO,
+            nonce: Nonce256Bits,
+            expires_at: Timestamp,
         ) -> SerializedBytes;
 
         /// A remote node is publishing data in a range we claim to be holding.

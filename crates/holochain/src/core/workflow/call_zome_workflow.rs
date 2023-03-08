@@ -86,8 +86,15 @@ where
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =
-                                super::countersigning_workflow::countersigning_publish(&network, op)
-                                    .await
+                                super::countersigning_workflow::countersigning_publish(
+                                    &network,
+                                    op,
+                                    (*workspace.author().ok_or_else(|| {
+                                        WorkflowError::Other("author required".into())
+                                    })?)
+                                    .clone(),
+                                )
+                                .await
                             {
                                 return Ok(Ok(error_response));
                             }
@@ -196,22 +203,24 @@ pub async fn call_zome_function_authorized<R>(
 where
     R: RibosomeT + 'static,
 {
-    if invocation.is_authorized(&host_access).await? {
-        tokio::task::spawn_blocking(|| {
-            let r = ribosome.call_zome_function(host_access, invocation);
-            Ok((ribosome, r))
-        })
-        .await?
-    } else {
-        Ok((
+    match invocation.is_authorized(&host_access).await? {
+        ZomeCallAuthorization::Authorized => {
+            tokio::task::spawn_blocking(|| {
+                let r = ribosome.call_zome_function(host_access, invocation);
+                Ok((ribosome, r))
+            })
+            .await?
+        }
+        not_authorized_reason => Ok((
             ribosome,
             Ok(ZomeCallResponse::Unauthorized(
+                not_authorized_reason,
                 invocation.cell_id.clone(),
                 invocation.zome.zome_name().clone(),
                 invocation.fn_name.clone(),
                 invocation.provenance.clone(),
             )),
-        ))
+        )),
     }
 }
 /// Run validation inline and wait for the result.
@@ -230,7 +239,7 @@ where
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
-            sys_validate_record(&record, &workspace, network.clone(), &(*conductor_handle))
+            sys_validate_record(&record, &workspace, network.clone(), &conductor_handle)
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
@@ -249,7 +258,7 @@ where
             let op =
                 app_validation_workflow::record_to_op(chain_record, op_type, &mut cascade).await;
 
-            let (op, activity_entry) = match op {
+            let (op, omitted_entry) = match op {
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
@@ -263,7 +272,7 @@ where
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
             map_outcome(outcome)?;
-            chain_record = app_validation_workflow::op_to_record(op, activity_entry);
+            chain_record = app_validation_workflow::op_to_record(op, omitted_entry);
         }
     }
 

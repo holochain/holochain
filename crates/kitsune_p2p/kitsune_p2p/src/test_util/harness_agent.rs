@@ -31,6 +31,12 @@ impl HarnessHost {
     }
 }
 
+impl FetchPoolConfig for HarnessHost {
+    fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
+        unimplemented!()
+    }
+}
+
 impl KitsuneHostDefaultError for HarnessHost {
     const NAME: &'static str = "HarnessHost";
 
@@ -90,6 +96,7 @@ pub(crate) async fn spawn_test_agent(
     Ok((agent, p2p, control))
 }
 
+use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
@@ -270,10 +277,11 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    fn handle_gossip(
+    fn handle_receive_ops(
         &mut self,
         _space: Arc<super::KitsuneSpace>,
         ops: Vec<KOp>,
+        _context: Option<kitsune_p2p_fetch::FetchContext>,
     ) -> KitsuneP2pEventHandlerResult<()> {
         for op_data in ops {
             // TODO: check that we're handling string data uniformly in both directions
@@ -309,7 +317,10 @@ impl KitsuneP2pEventHandler for AgentHarness {
     ) -> KitsuneP2pEventHandlerResult<Vec<(Arc<super::KitsuneOpHash>, KOp)>> {
         let mut out = Vec::new();
         match input.query {
-            FetchOpDataEvtQuery::Hashes(hashes) => {
+            FetchOpDataEvtQuery::Hashes {
+                op_hash_list: hashes,
+                ..
+            } => {
                 for hash in hashes {
                     if let Some(op) = self.gossip_store.get(&hash) {
                         let data = KitsuneOpData::new(op.clone().into_bytes());

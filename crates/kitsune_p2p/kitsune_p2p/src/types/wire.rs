@@ -1,15 +1,26 @@
 //! KitsuneP2p Wire Protocol Encoding Decoding
 
-use crate::actor::BroadcastTo;
+use crate::actor::BroadcastData;
 use crate::agent_store::AgentInfoSigned;
 use crate::types::*;
 use derive_more::*;
+use kitsune_p2p_fetch::FetchKey;
 use kitsune_p2p_types::dht_arc::DhtLocation;
 use std::sync::Arc;
 
 /// Type used for content data of wire messages.
 #[derive(
-    Debug, Clone, PartialEq, Eq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Deref,
+    AsRef,
+    From,
+    Into,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
@@ -32,6 +43,21 @@ pub enum MetricExchangeMsg {
     UnknownMessage,
 }
 
+/// An individual op item within a "PushOpData" wire message.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub struct PushOpItem {
+    /// The payload of this op.
+    pub op_data: Arc<KitsuneOpData>,
+
+    /// If this op is a response to a "region" request,
+    /// includes the region coords and a bool that, if true,
+    /// indicates this is the final op in the region list.
+    /// NOTE: we may want to just ignore this bool, as out-of-order
+    /// messages could lead us to ignore valid ops coming in for the region.
+    pub region: Option<(dht::prelude::RegionCoords, bool)>,
+}
+
 kitsune_p2p_types::write_codec_enum! {
     /// KitsuneP2p Wire Protocol Top-Level Enum.
     codec Wire {
@@ -41,7 +67,7 @@ kitsune_p2p_types::write_codec_enum! {
         },
 
         /// "Call" to the remote.
-        Call(0x010) {
+        Call(0x10) {
             space.0: Arc<KitsuneSpace>,
             to_agent.1: Arc<KitsuneAgent>,
             data.2: WireData,
@@ -68,9 +94,7 @@ kitsune_p2p_types::write_codec_enum! {
             /// see mod_idx description
             mod_cnt.4: u32,
 
-            destination.5: BroadcastTo,
-
-            data.6: WireData,
+            data.5: BroadcastData,
         },
 
         /// Fire-and-forget broadcast message.
@@ -78,8 +102,7 @@ kitsune_p2p_types::write_codec_enum! {
         Broadcast(0x23) {
             space.0: Arc<KitsuneSpace>,
             to_agent.1: Arc<KitsuneAgent>,
-            destination.2: BroadcastTo,
-            data.3: WireData,
+            data.2: BroadcastData,
         },
 
         /// Gossip op with opaque data section,
@@ -97,9 +120,9 @@ kitsune_p2p_types::write_codec_enum! {
             agent.1: Arc<KitsuneAgent>,
         },
 
-        /// Response to a peer get
+        /// Response to a peer get. If the agent isn't known, None will be returned.
         PeerGetResp(0x51) {
-            agent_info_signed.0: AgentInfoSigned,
+            agent_info_signed.0: Option<AgentInfoSigned>,
         },
 
         /// Query a remote node for peers holding
@@ -109,9 +132,22 @@ kitsune_p2p_types::write_codec_enum! {
             basis_loc.1: DhtLocation,
         },
 
-        /// Response to a peer query
+        /// Response to a peer query. May be empty if no matching agents are known.
         PeerQueryResp(0x53) {
             peer_list.0: Vec<AgentInfoSigned>,
+        },
+
+        /// Request the peer send op data.
+        /// This is sent as a fire-and-forget Notify message.
+        /// The "response" is "PushOpData" below.
+        FetchOp(0x60) {
+            fetch_list.0: Vec<(Arc<KitsuneSpace>, Vec<FetchKey>)>,
+        },
+
+        /// This is a fire-and-forget "response" to the
+        /// fire-and-forget "FetchOp" request, also sent via Notify.
+        PushOpData(0x61) {
+            op_data_list.0: Vec<(Arc<KitsuneSpace>, Vec<PushOpItem>)>,
         },
 
         /// MetricsExchangeMessage

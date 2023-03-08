@@ -21,17 +21,17 @@ pub enum EntryTypes {
 
 #[hdk_extern]
 fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
-    match op.to_type::<_, ()>()? {
-        OpType::StoreEntry(e) => match e {
+    match op.flattened::<_, ()>()? {
+        FlatOp::StoreEntry(e) => match e {
             OpEntry::CreateEntry {
-                entry_type: EntryTypes::AgentsChain(AgentsChain(author, filter)),
+                app_entry: EntryTypes::AgentsChain(AgentsChain(author, filter)),
                 ..
             } => {
                 must_get_agent_activity(author, filter)?;
                 return Ok(ValidateCallbackResult::Valid);
             }
             OpEntry::CreateEntry {
-                entry_type: EntryTypes::AgentsChainRec(AgentsChainRec(author, chain_top)),
+                app_entry: EntryTypes::AgentsChainRec(AgentsChainRec(author, chain_top)),
                 ..
             } => {
                 let mut filter = ChainFilter::new(chain_top).take(2);

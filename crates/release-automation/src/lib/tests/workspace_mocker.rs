@@ -3,6 +3,7 @@ use crate::*;
 use anyhow::{bail, Context};
 use cargo_test_support::git::{self, Repository};
 use cargo_test_support::{Project, ProjectBuilder};
+use cargo_test_support::paths::init_root;
 use educe::Educe;
 use log::debug;
 use std::collections::HashMap;
@@ -10,7 +11,7 @@ use std::path::PathBuf;
 
 #[derive(Educe)]
 #[educe(Default)]
-pub(crate) enum MockProjectType {
+pub enum MockProjectType {
     #[educe(Default)]
     Lib,
     Bin,
@@ -18,40 +19,39 @@ pub(crate) enum MockProjectType {
 
 #[derive(Educe)]
 #[educe(Default)]
-pub(crate) struct MockProject {
-    pub(crate) name: String,
-    pub(crate) version: String,
-    pub(crate) dependencies: Vec<String>,
-    pub(crate) dev_dependencies: Vec<String>,
-    pub(crate) excluded: bool,
-    pub(crate) ty: MockProjectType,
-    pub(crate) changelog: Option<String>,
+pub struct MockProject {
+    pub name: String,
+    pub version: String,
+    pub dependencies: Vec<String>,
+    pub dev_dependencies: Vec<String>,
+    pub excluded: bool,
+    pub ty: MockProjectType,
+    pub changelog: Option<String>,
     #[educe(Default(expression = r##"Some(indoc::formatdoc!(
                 r#"
                 # README
                 "#
             ))
     "##))]
-    pub(crate) readme: Option<String>,
+    pub readme: Option<String>,
     #[educe(Default(expression = r##"Some("some crate".to_string())"##))]
-    pub(crate) description: Option<String>,
+    pub description: Option<String>,
     #[educe(Default(expression = r##"Some("Apache-2.0".to_string())"##))]
-    pub(crate) license: Option<String>,
-    pub(crate) keywords: Vec<String>,
+    pub license: Option<String>,
+    pub keywords: Vec<String>,
 }
 
-pub(crate) struct WorkspaceMocker {
-    pub(crate) dir: Option<tempfile::TempDir>,
-    pub(crate) projects: HashMap<String, MockProject>,
-    pub(crate) workspace_project: Project,
-    pub(crate) workspace_repo: git2::Repository,
+pub struct WorkspaceMocker {
+    pub dir: Option<tempfile::TempDir>,
+    pub projects: HashMap<String, MockProject>,
+    pub workspace_project: Project,
+    pub workspace_repo: git2::Repository,
 }
 
 impl WorkspaceMocker {
-    pub(crate) fn try_new(
-        toplevel_changelog: Option<&str>,
-        projects: Vec<MockProject>,
-    ) -> Fallible<Self> {
+    pub fn try_new(toplevel_changelog: Option<&str>, projects: Vec<MockProject>) -> Fallible<Self> {
+        init_root(None);
+
         let (path, dir) = {
             let dir = tempfile::tempdir()?;
             if std::option_env!("KEEP_MOCK_WORKSPACE")
@@ -213,15 +213,15 @@ impl WorkspaceMocker {
         Ok(workspace_mocker)
     }
 
-    pub(crate) fn root(&self) -> std::path::PathBuf {
+    pub fn root(&self) -> std::path::PathBuf {
         self.workspace_project.root()
     }
 
-    pub(crate) fn add_or_replace_file(&self, path: &str, content: &str) {
+    pub fn add_or_replace_file(&self, path: &str, content: &str) {
         self.workspace_project.change_file(path, content);
     }
 
-    pub(crate) fn commit(&self, tag: Option<&str>) -> String {
+    pub fn commit(&self, tag: Option<&str>) -> String {
         git::add(&self.workspace_repo);
         let commit = git::commit(&self.workspace_repo).to_string();
 
@@ -232,11 +232,11 @@ impl WorkspaceMocker {
         commit
     }
 
-    pub(crate) fn tag(&self, tag: &str) {
+    pub fn tag(&self, tag: &str) {
         git::tag(&self.workspace_repo, tag)
     }
 
-    pub(crate) fn head(&self) -> Fallible<String> {
+    pub fn head(&self) -> Fallible<String> {
         self.workspace_repo
             .revparse_single("HEAD")
             .context("revparse HEAD")
@@ -244,7 +244,7 @@ impl WorkspaceMocker {
             .map(|id| id.to_string())
     }
 
-    pub(crate) fn update_lockfile(&self) -> Fallible<()> {
+    pub fn update_lockfile(&self) -> Fallible<()> {
         let mut cmd = std::process::Command::new("cargo");
         cmd.args(
             &[vec![
@@ -270,7 +270,7 @@ impl WorkspaceMocker {
 }
 
 /// Expected changelog after aggregation.
-pub(crate) fn example_workspace_1_aggregated_changelog() -> String {
+pub fn example_workspace_1_aggregated_changelog() -> String {
     crate::changelog::sanitize(indoc::formatdoc!(
         r#"
         # Changelog
@@ -320,7 +320,7 @@ pub(crate) fn example_workspace_1_aggregated_changelog() -> String {
 }
 
 /// A workspace with four crates to test changelogs and change detection.
-pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
+pub fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
     use crate::tests::workspace_mocker::{self, MockProject, WorkspaceMocker};
 
     let members = vec![
@@ -427,7 +427,7 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
         },
         MockProject {
             name: "crate_e".to_string(),
-            version: "0.0.1".to_string(),
+            version: "0.0.1-dev.0".to_string(),
             dependencies: vec![],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Lib,
@@ -557,7 +557,7 @@ pub(crate) fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
 }
 
 /// A workspace to test dependencies and crate sorting.
-pub(crate) fn example_workspace_2<'a>() -> Fallible<WorkspaceMocker> {
+pub fn example_workspace_2<'a>() -> Fallible<WorkspaceMocker> {
     use crate::tests::workspace_mocker::{self, MockProject, WorkspaceMocker};
 
     let members = vec![
@@ -607,7 +607,7 @@ pub(crate) fn example_workspace_2<'a>() -> Fallible<WorkspaceMocker> {
 }
 
 /// A workspace that is blocked by an unreleasable dependency.
-pub(crate) fn example_workspace_3<'a>() -> Fallible<WorkspaceMocker> {
+pub fn example_workspace_3<'a>() -> Fallible<WorkspaceMocker> {
     use crate::tests::workspace_mocker::{self, MockProject, WorkspaceMocker};
 
     let members = vec![
@@ -670,7 +670,7 @@ pub(crate) fn example_workspace_3<'a>() -> Fallible<WorkspaceMocker> {
 }
 
 /// A workspace to test some release blockers
-pub(crate) fn example_workspace_4<'a>() -> Fallible<WorkspaceMocker> {
+pub fn example_workspace_4<'a>() -> Fallible<WorkspaceMocker> {
     use crate::tests::workspace_mocker::{self, MockProject, WorkspaceMocker};
 
     let members = vec![
@@ -765,6 +765,22 @@ pub(crate) fn example_workspace_4<'a>() -> Fallible<WorkspaceMocker> {
                 "five".to_string(),
                 "many".to_string(),
             ],
+            ..Default::default()
+        },
+        MockProject {
+            name: "disallowed_semver_increment_mode".to_string(),
+            version: "0.0.1".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Bin,
+            changelog: Some(indoc::formatdoc!(
+                r#"---
+                default_semver_increment_mode: minor
+                ---
+                # Changelog
+                "#
+            )),
+            keywords: vec![],
             ..Default::default()
         },
     ];
