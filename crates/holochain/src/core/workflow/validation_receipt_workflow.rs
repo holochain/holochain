@@ -117,7 +117,7 @@ pub async fn validation_receipt_workflow(
                 .block(Block::new(
                     BlockTarget::Cell(
                         CellId::new((*dna_hash).clone(), author.clone()),
-                        CellBlockReason::Validation(receipt.dht_op_hash.clone()),
+                        CellBlockReason::InvalidOp(receipt.dht_op_hash.clone()),
                     ),
                     InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX)?,
                 ))
