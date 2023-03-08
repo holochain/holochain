@@ -16,22 +16,22 @@ as an exmaple, here is a _flake.nix_ that references a custom branch.
   description = "Template for Holochain app development";
 
   inputs = {
-    nixpkgs.follows = "holochain/nixpkgs";
+    nixpkgs.follows = "holochain-flake/nixpkgs";
 
-    holochain = {
-      url = "github:holochain/holochain/pr_holonix_on_flakes";
+    holochain-flake = {
+      url = "github:holochain/holochain";
       inputs.versions.url = "github:holochain/holochain/?dir=versions/0_1";
       inputs.versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.3";
     };
   };
 
   outputs = inputs @ { ... }:
-    inputs.holochain.inputs.flake-parts.lib.mkFlake
+    inputs.holochain-flake.inputs.flake-parts.lib.mkFlake
       {
         inherit inputs;
       }
       {
-        systems = builtins.attrNames inputs.holochain.devShells;
+        systems = builtins.attrNames inputs.holochain-flake.devShells;
         perSystem =
           { config
           , pkgs
@@ -39,7 +39,7 @@ as an exmaple, here is a _flake.nix_ that references a custom branch.
           , ...
           }: {
             devShells.default = pkgs.mkShell {
-              inputsFrom = [ inputs.holochain.devShells.${system}.holonix ];
+              inputsFrom = [ inputs.holochain-flake.devShells.${system}.holonix ];
               packages = with pkgs; [
                   # more packages go here
               ];
