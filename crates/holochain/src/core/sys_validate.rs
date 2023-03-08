@@ -8,6 +8,7 @@ use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::space::Space;
 use crate::conductor::Conductor;
+use holochain_cascade::CascadeSource;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pDna;
 use holochain_types::prelude::*;
@@ -709,20 +710,10 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 ) -> SysValidationResult<Source> {
     let hash: AnyDhtHash = hash.clone().into();
     // Create a workspace with just the local stores
-    let mut local_cascade = workspace.local_cascade();
-    if let Some(el) = local_cascade
-        .retrieve(hash.clone(), Default::default())
-        .await?
-    {
-        return Ok(Source::Local(el));
-    }
-    // Create a workspace with just the network
-    let mut network_only_cascade = workspace.full_cascade(network);
-    match network_only_cascade
-        .retrieve(hash.clone(), Default::default())
-        .await?
-    {
-        Some(el) => Ok(Source::Network(el.privatized().0)),
+    let mut cascade = workspace.full_cascade(network);
+    match cascade.retrieve(hash.clone(), Default::default()).await? {
+        Some((el, CascadeSource::Local)) => Ok(Source::Local(el)),
+        Some((el, CascadeSource::Network)) => Ok(Source::Network(el.privatized().0)),
         None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }

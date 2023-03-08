@@ -593,7 +593,7 @@ async fn store_record(
     check_prev_action(action)?;
     if let Some(prev_action_hash) = prev_action_hash {
         let mut cascade = workspace.full_cascade(network);
-        let prev_action = cascade
+        let (prev_action, _) = cascade
             .retrieve_action(prev_action_hash.clone(), Default::default())
             .await?
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
@@ -631,7 +631,7 @@ async fn store_entry(
     if let NewEntryActionRef::Update(entry_update) = action {
         let original_action_address = &entry_update.original_action_address;
         let mut cascade = workspace.full_cascade(network);
-        let original_action = cascade
+        let (original_action, _) = cascade
             .retrieve_action(original_action_address.clone(), Default::default())
             .await?
             .ok_or_else(|| {

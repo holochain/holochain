@@ -364,7 +364,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                         cascade
                             .retrieve_entry(update.entry_hash.clone(), Default::default())
                             .await?
-                            .map(|e| e.into_content())
+                            .map(|(e, _)| e.into_content())
                             .ok_or_else(|| Outcome::awaiting(&update.entry_hash))?,
                     ),
                 },
@@ -375,7 +375,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                     cascade
                         .retrieve_entry(update.original_entry_address.clone(), Default::default())
                         .await?
-                        .map(|e| e.into_content())
+                        .map(|(e, _)| e.into_content())
                         .ok_or_else(|| Outcome::awaiting(&update.original_entry_address))?,
                 )
             } else {
@@ -385,7 +385,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
             let original_action = cascade
                 .retrieve_action(update.original_action_address.clone(), Default::default())
                 .await?
-                .and_then(|sh| {
+                .and_then(|(sh, _)| {
                     NewEntryAction::try_from(sh.hashed.content)
                         .ok()
                         .map(|h| h.into())
@@ -403,7 +403,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
             let original_action: EntryCreationAction = cascade
                 .retrieve_action(delete.deletes_address.clone(), Default::default())
                 .await?
-                .and_then(|sh| {
+                .and_then(|(sh, _)| {
                     NewEntryAction::try_from(sh.hashed.content)
                         .ok()
                         .map(|h| h.into())
@@ -417,7 +417,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
                     cascade
                         .retrieve_entry(delete.deletes_entry_address.clone(), Default::default())
                         .await?
-                        .map(|e| e.into_content())
+                        .map(|(e, _)| e.into_content())
                         .ok_or_else(|| Outcome::awaiting(&delete.deletes_entry_address))?,
                 )
             } else {
@@ -438,7 +438,7 @@ async fn dhtop_to_op(op: DhtOp, cascade: &mut Cascade) -> AppValidationOutcome<O
             let create_link = cascade
                 .retrieve_action(delete_link.link_add_address.clone(), Default::default())
                 .await?
-                .and_then(|sh| CreateLink::try_from(sh.hashed.content).ok())
+                .and_then(|(sh, _)| CreateLink::try_from(sh.hashed.content).ok())
                 .ok_or_else(|| Outcome::awaiting(&delete_link.link_add_address))?;
             Op::RegisterDeleteLink(RegisterDeleteLink {
                 delete_link: SignedHashed::new(delete_link, signature),

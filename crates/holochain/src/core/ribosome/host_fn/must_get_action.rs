@@ -39,7 +39,7 @@ pub fn must_get_action<'a>(
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })? {
-                    Some(action) => Ok(action),
+                    Some((action, _)) => Ok(action),
                     None => match call_context.host_context {
                         HostContext::EntryDefs(_)
                         | HostContext::GenesisSelfCheck(_)
