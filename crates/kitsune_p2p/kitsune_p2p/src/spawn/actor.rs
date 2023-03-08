@@ -5,6 +5,7 @@ use crate::actor::*;
 use crate::event::*;
 use crate::gossip::sharded_gossip::BandwidthThrottles;
 use crate::gossip::sharded_gossip::KitsuneDiagnostics;
+use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::types::gossip::GossipModuleType;
 use crate::types::metrics::KitsuneMetrics;
 use crate::wire::MetricExchangeMsg;
@@ -107,6 +108,7 @@ pub(crate) struct KitsuneP2pActor {
         )>,
     >,
     config: Arc<KitsuneP2pConfig>,
+    bootstrap_net: BootstrapNet,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     fetch_pool: FetchPool,
@@ -142,6 +144,7 @@ impl KitsuneP2pActor {
 
         let mut ep_hnd = None;
         let mut ep_evt = None;
+        let mut bootstrap_net = None;
 
         #[cfg(feature = "tx2")]
         if ep_hnd.is_none() && config.is_tx2() {
@@ -149,6 +152,7 @@ impl KitsuneP2pActor {
             let (h, e) = MetaNet::new_tx2(config.clone(), tls_config, metrics).await?;
             ep_hnd = Some(h);
             ep_evt = Some(e);
+            bootstrap_net = Some(BootstrapNet::Tx2);
         }
 
         #[cfg(feature = "tx5")]
@@ -162,10 +166,11 @@ impl KitsuneP2pActor {
                 MetaNet::new_tx5(config.tuning_params.clone(), host.clone(), signal_url).await?;
             ep_hnd = Some(h);
             ep_evt = Some(e);
+            bootstrap_net = Some(BootstrapNet::Tx5);
         }
 
-        let (ep_hnd, ep_evt) = match (ep_hnd, ep_evt) {
-            (Some(h), Some(e)) => (h, e),
+        let (ep_hnd, ep_evt, bootstrap_net) = match (ep_hnd, ep_evt, bootstrap_net) {
+            (Some(h), Some(e), Some(n)) => (h, e, n),
             _ => return Err("tx2 or tx5 feature must be enabled".into()),
         };
 
@@ -624,6 +629,7 @@ impl KitsuneP2pActor {
             host,
             spaces: HashMap::new(),
             config: Arc::new(config),
+            bootstrap_net,
             bandwidth_throttles,
             parallel_notify_permit,
             fetch_pool,
@@ -944,6 +950,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let ep_hnd = self.ep_hnd.clone();
         let host = self.host.clone();
         let config = Arc::clone(&self.config);
+        let bootstrap_net = self.bootstrap_net;
         let bandwidth_throttles = self.bandwidth_throttles.clone();
         let parallel_notify_permit = self.parallel_notify_permit.clone();
         let fetch_pool = self.fetch_pool.clone();
@@ -956,6 +963,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                     ep_hnd,
                     host,
                     config,
+                    bootstrap_net,
                     bandwidth_throttles,
                     parallel_notify_permit,
                     fetch_pool,
