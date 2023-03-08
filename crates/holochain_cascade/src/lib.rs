@@ -82,6 +82,14 @@ macro_rules! some_or_return {
     };
 }
 
+/// Marks whether data came from a local store or another node on the network
+pub enum CascadeSource {
+    /// Data came from a local store
+    Local,
+    /// Data came from another node on the network
+    Network,
+}
+
 /// The Cascade is a multi-tiered accessor for Holochain DHT data.
 ///
 /// See the module-level docs for more info.
@@ -514,7 +522,7 @@ where
         &mut self,
         hash: EntryHash,
         mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<EntryHashed>> {
+    ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>> {
         let private_data = self.private_data.clone();
         let result = self
             .find_map({
@@ -528,7 +536,7 @@ where
             })
             .await?;
         if result.is_some() {
-            return Ok(result.map(EntryHashed::from_content_sync));
+            return Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Local)));
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
         self.fetch_record(hash.clone().into(), options).await?;
@@ -546,7 +554,7 @@ where
                 }
             })
             .await?;
-        Ok(result.map(EntryHashed::from_content_sync))
+        Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Network)))
     }
 
     /// Retrieve [`SignedActionHashed`] from either locally or from an authority.
@@ -555,7 +563,7 @@ where
         &mut self,
         hash: ActionHash,
         mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<SignedActionHashed>> {
+    ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>> {
         let result = self
             .find_map({
                 let hash = hash.clone();
@@ -563,14 +571,18 @@ where
             })
             .await?;
         if result.is_some() {
-            return Ok(result);
+            return Ok(result.map(|a| (a, CascadeSource::Local)));
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
         self.fetch_record(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
         let result = self
-            .find_map(move |store| Ok(store.get_action(&hash)?))
+            .find_map(move |store| {
+                Ok(store
+                    .get_action(&hash)?
+                    .map(|a| (a, CascadeSource::Network)))
+            })
             .await?;
         Ok(result)
     }
@@ -581,7 +593,7 @@ where
         &mut self,
         hash: AnyDhtHash,
         mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<Record>> {
+    ) -> CascadeResult<Option<(Record, CascadeSource)>> {
         let private_data = self.private_data.clone();
         let result = self
             .find_map({
@@ -595,7 +607,7 @@ where
             })
             .await?;
         if result.is_some() {
-            return Ok(result);
+            return Ok(result.map(|r| (r, CascadeSource::Local)));
         }
         options.request_type = holochain_p2p::event::GetRequest::Pending;
         self.fetch_record(hash.clone(), options).await?;
@@ -610,7 +622,7 @@ where
                 )?)
             })
             .await?;
-        Ok(result)
+        Ok(result.map(|r| (r, CascadeSource::Network)))
     }
 
     /// Get Entry data along with all CRUD actions associated with it.

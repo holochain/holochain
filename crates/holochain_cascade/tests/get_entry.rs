@@ -185,7 +185,7 @@ async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
     options: GetOptions,
 ) {
     // - Retrieve via entry hash
-    let r = cascade
+    let (r, _) = cascade
         .retrieve(td_entry.hash.clone().into(), options.clone().into())
         .await
         .unwrap()
@@ -195,7 +195,7 @@ async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
     assert_eq!(r.action().entry_hash(), Some(&td_entry.hash));
 
     // - Retrieve via action hash
-    let r = cascade
+    let (r, _) = cascade
         .retrieve(td_entry.create_hash.clone().into(), options.clone().into())
         .await
         .unwrap()
@@ -205,7 +205,7 @@ async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
     assert_eq!(r.action().entry_hash(), Some(&td_entry.hash));
 
     // - Retrieve entry
-    let r = cascade
+    let (r, _) = cascade
         .retrieve_entry(td_entry.hash.clone(), options.clone().into())
         .await
         .unwrap()
@@ -214,7 +214,7 @@ async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
     assert_eq!(*r.as_hash(), td_entry.hash);
 
     // - Retrieve action
-    let r = cascade
+    let (r, _) = cascade
         .retrieve_action(td_entry.create_hash.clone(), options.clone().into())
         .await
         .unwrap()
