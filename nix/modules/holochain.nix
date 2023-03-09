@@ -97,7 +97,7 @@
           '';
         in
         (commonArgs // {
-          __noChroot = pkgs.stdenv.isLinux;
+          # __noChroot = pkgs.stdenv.isLinux;
           cargoArtifacts = holochainNextestDeps;
 
           pname = "holochain-tests-nextest";
