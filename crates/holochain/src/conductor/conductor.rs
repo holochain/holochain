@@ -805,12 +805,12 @@ mod network_impls {
 
         /// Block some target.
         pub async fn block(&self, input: Block) -> DatabaseResult<()> {
-            Ok(self.spaces.block(input).await?)
+            self.spaces.block(input).await
         }
 
         /// Unblock some target.
         pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
-            Ok(self.spaces.unblock(input).await?)
+            self.spaces.unblock(input).await
         }
 
         pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {

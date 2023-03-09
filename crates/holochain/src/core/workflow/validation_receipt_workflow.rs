@@ -22,7 +22,7 @@ pub async fn pending_receipts(
     vault: &DbRead<DbKindDht>,
     validators: Vec<AgentPubKey>,
 ) -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey, DhtOpHash)>> {
-    Ok(vault
+    vault
         .async_reader({
             let validators = validators.clone();
             move |txn| {
@@ -62,7 +62,7 @@ pub async fn pending_receipts(
                 StateQueryResult::Ok(ops)
             }
         })
-        .await?)
+        .await
 }
 
 #[instrument(skip(vault, network, keystore, conductor))]
