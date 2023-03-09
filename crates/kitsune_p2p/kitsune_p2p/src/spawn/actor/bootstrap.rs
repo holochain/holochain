@@ -7,6 +7,22 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use url2::Url2;
 
+/// The "net" flag / bucket to use when talking to the bootstrap server.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum BootstrapNet {
+    Tx2,
+    Tx5,
+}
+
+impl BootstrapNet {
+    fn value(&self) -> &'static str {
+        match self {
+            BootstrapNet::Tx2 => "tx2",
+            BootstrapNet::Tx5 => "tx5",
+        }
+    }
+}
+
 /// Reuse a single reqwest Client for efficiency as we likely need several connections.
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
@@ -40,22 +56,13 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
     url: Option<Url2>,
     op: &str,
     input: I,
+    net: BootstrapNet,
 ) -> crate::types::actor::KitsuneP2pResult<Option<O>> {
     let mut body_data = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input)?;
     match url {
         Some(url) => {
-            let url = {
-                #[cfg(feature = "tx5")]
-                {
-                    format!("{}?net=tx5", url.as_str())
-                }
-
-                #[cfg(not(feature = "tx5"))]
-                {
-                    format!("{}?net=tx2", url.as_str())
-                }
-            };
+            let url = format!("{}?net={}", url.as_str(), net.value());
 
             let res = CLIENT
                 .post(url.as_str())
@@ -85,8 +92,9 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
 pub async fn put(
     url: Option<Url2>,
     agent_info_signed: crate::types::agent_store::AgentInfoSigned,
+    net: BootstrapNet,
 ) -> crate::types::actor::KitsuneP2pResult<()> {
-    match do_api(url, OP_PUT, agent_info_signed).await {
+    match do_api(url, OP_PUT, agent_info_signed, net).await {
         Ok(Some(())) => Ok(()),
         Ok(None) => Ok(()),
         Err(e) => Err(e),
@@ -105,8 +113,11 @@ fn local_now() -> crate::types::actor::KitsuneP2pResult<u64> {
 ///
 /// There is no input to the `now` endpoint, just `()` to be encoded as nil in messagepack.
 #[allow(dead_code)]
-pub async fn now(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64> {
-    match do_api(url, OP_NOW, ()).await {
+pub async fn now(
+    url: Option<Url2>,
+    net: BootstrapNet,
+) -> crate::types::actor::KitsuneP2pResult<u64> {
+    match do_api(url, OP_NOW, (), net).await {
         // If the server gives us something useful we use it.
         Ok(Some(v)) => Ok(v),
         // If we don't have a server url we should trust ourselves.
@@ -121,11 +132,14 @@ pub async fn now(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64
 ///
 /// Calculates the offset on the first call and caches it in the cell above.
 /// Only calls `now` once then keeps the offset for the static lifetime.
-pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64> {
+pub async fn now_once(
+    url: Option<Url2>,
+    net: BootstrapNet,
+) -> crate::types::actor::KitsuneP2pResult<u64> {
     match NOW_OFFSET_MILLIS.get() {
         Some(offset) => Ok(u64::try_from(i64::try_from(local_now()?)? + offset)?),
         None => {
-            let offset: i64 = match now(url.clone()).await {
+            let offset: i64 = match now(url.clone(), net).await {
                 Ok(v) => {
                     let offset = v as i64 - local_now()? as i64;
                     match NOW_OFFSET_MILLIS.set(offset) {
@@ -163,8 +177,9 @@ pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResul
 pub async fn random(
     url: Option<Url2>,
     query: RandomQuery,
+    net: BootstrapNet,
 ) -> crate::types::actor::KitsuneP2pResult<Vec<AgentInfoSigned>> {
-    let outer_vec: Vec<serde_bytes::ByteBuf> = match do_api(url, OP_RANDOM, query).await {
+    let outer_vec: Vec<serde_bytes::ByteBuf> = match do_api(url, OP_RANDOM, query, net).await {
         Ok(Some(v)) => v,
         Ok(None) => Vec::new(),
         Err(e) => return Err(e),
@@ -180,8 +195,8 @@ pub async fn random(
 ///
 /// Fetches the list of proxy servers currently stored in the bootstrap service.
 #[allow(dead_code)]
-pub async fn proxy_list(url: Url2) -> KitsuneP2pResult<Vec<Url2>> {
-    Ok(do_api::<_, Vec<String>>(Some(url), OP_PROXY_LIST, ())
+pub async fn proxy_list(url: Url2, net: BootstrapNet) -> KitsuneP2pResult<Vec<Url2>> {
+    Ok(do_api::<_, Vec<String>>(Some(url), OP_PROXY_LIST, (), net)
         .await?
         .unwrap_or_default()
         .into_iter()
@@ -261,6 +276,7 @@ mod tests {
         super::put(
             Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
             agent_info_signed,
+            BootstrapNet::Tx2,
         )
         .await
         .unwrap();
@@ -268,7 +284,8 @@ mod tests {
         // We should get back an error if we don't have a good signature.
         assert!(super::put(
             Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            fixt!(AgentInfoSigned)
+            fixt!(AgentInfoSigned),
+            BootstrapNet::Tx2,
         )
         .await
         .is_err());
@@ -286,10 +303,10 @@ mod tests {
             .unwrap();
 
         // We should be able to get a milliseconds timestamp back.
-        let remote_now: u64 = super::now(Some(url2::url2!(
-            "{}",
-            crate::config::BOOTSTRAP_SERVICE_DEV
-        )))
+        let remote_now: u64 = super::now(
+            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
+            BootstrapNet::Tx2,
+        )
         .await
         .unwrap();
         let threshold = 5000;
@@ -298,10 +315,10 @@ mod tests {
 
         // Now once should return some number and the remote server offset should be set in the
         // NOW_OFFSET_MILLIS once cell.
-        let _: u64 = super::now_once(Some(url2::url2!(
-            "{}",
-            crate::config::BOOTSTRAP_SERVICE_DEV
-        )))
+        let _: u64 = super::now_once(
+            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
+            BootstrapNet::Tx2,
+        )
         .await
         .unwrap();
         assert!(super::NOW_OFFSET_MILLIS.get().is_some());
@@ -313,10 +330,10 @@ mod tests {
     // thread 'spawn::actor::bootstrap::tests::test_random' panicked at 'dispatch dropped without returning error', /rustc/d3fb005a39e62501b8b0b356166e515ae24e2e54/src/libstd/macros.rs:13:23
     async fn test_random() {
         let space = fixt!(KitsuneSpace, Unpredictable);
-        let now = super::now(Some(url2::url2!(
-            "{}",
-            crate::config::BOOTSTRAP_SERVICE_DEV
-        )))
+        let now = super::now(
+            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
+            BootstrapNet::Tx2,
+        )
         .await
         .unwrap();
 
@@ -352,6 +369,7 @@ mod tests {
             super::put(
                 Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
                 agent_info_signed.clone(),
+                BootstrapNet::Tx2,
             )
             .await
             .unwrap();
@@ -365,6 +383,7 @@ mod tests {
                 space: Arc::new(space.clone()),
                 ..Default::default()
             },
+            BootstrapNet::Tx2,
         )
         .await
         .unwrap();
@@ -381,6 +400,7 @@ mod tests {
                 space: Arc::new(space.clone()),
                 limit: 1.into(),
             },
+            BootstrapNet::Tx2,
         )
         .await
         .unwrap();

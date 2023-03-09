@@ -367,8 +367,11 @@ impl MetaNet {
                     };
                     conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
                         Box::pin(async move {
-                            match crate::spawn::actor::bootstrap::proxy_list(bootstrap_url.into())
-                                .await
+                            match crate::spawn::actor::bootstrap::proxy_list(
+                                bootstrap_url.into(),
+                                crate::spawn::actor::bootstrap::BootstrapNet::Tx2,
+                            )
+                            .await
                             {
                                 Ok(mut proxy_list) => {
                                     if proxy_list.is_empty() {
