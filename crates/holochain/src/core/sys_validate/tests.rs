@@ -357,7 +357,7 @@ async fn check_app_entry_def_test() {
     // ## Dna is missing
     let app_entry_def_0 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_0, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_0, &dna_hash, &conductor_handle).await,
         Err(SysValidationError::DnaMissing(_))
     );
 
@@ -368,7 +368,7 @@ async fn check_app_entry_def_test() {
     // ## EntryId is out of range
     let app_entry_def_1 = AppEntryDef::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_1, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_1, &dna_hash, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryDefId(_)
         ))
@@ -376,7 +376,7 @@ async fn check_app_entry_def_test() {
 
     let app_entry_def_2 = AppEntryDef::new(0.into(), 100.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_2, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_2, &dna_hash, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ZomeIndex(_)
         ))
@@ -385,12 +385,12 @@ async fn check_app_entry_def_test() {
     // ## EntryId is in range for dna
     let app_entry_def_3 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_3, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_3, &dna_hash, &conductor_handle).await,
         Ok(_)
     );
     let app_entry_def_4 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_4, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_4, &dna_hash, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryVisibility(_)
         ))
@@ -399,23 +399,8 @@ async fn check_app_entry_def_test() {
     // ## Can get the entry from the entry def
     let app_entry_def_5 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_5, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_5, &dna_hash, &conductor_handle).await,
         Ok(_)
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn check_entry_not_private_test() {
-    let mut ed = fixt!(EntryDef);
-    ed.visibility = EntryVisibility::Public;
-    assert_matches!(check_not_private(&ed), Ok(()));
-
-    ed.visibility = EntryVisibility::Private;
-    assert_matches!(
-        check_not_private(&ed),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrivateEntry
-        ))
     );
 }
 

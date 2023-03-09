@@ -260,6 +260,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::EntryType => Rejected,
         ValidationOutcome::EntryVisibility(_) => Rejected,
         ValidationOutcome::TagTooLarge(_, _) => Rejected,
+        ValidationOutcome::MalformedDhtOp(_, _, _) => Rejected,
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
         ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep),
@@ -267,7 +268,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
             AwaitingOpDep(dep.into())
         }
         ValidationOutcome::PrevActionError(_) => Rejected,
-        ValidationOutcome::PrivateEntry => Rejected,
+        ValidationOutcome::PrivateEntryLeaked => Rejected,
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
         ValidationOutcome::VerifySignature(_, _) => Rejected,
@@ -283,6 +284,7 @@ async fn validate_op_inner(
     dna_def: DnaDefHashed,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
+    check_not_private(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
             store_record(action, cascade).await?;
@@ -792,6 +794,7 @@ impl SysValidationWorkspace {
         };
         Ok(!action_seq_is_not_empty)
     }
+
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> Cascade {
         let cascade = Cascade::empty().with_dht(self.dht_db.clone());
@@ -802,6 +805,8 @@ impl SysValidationWorkspace {
             None => cascade,
         }
     }
+
+    /// Create a cascade with access to local data as well as network data
     pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
         &self,
         network: Network,
@@ -815,10 +820,6 @@ impl SysValidationWorkspace {
                 .with_scratch(scratch.clone()),
             None => cascade,
         }
-    }
-
-    fn _dna_hash(&self) -> &DnaHash {
-        self.dht_db.kind().dna_hash()
     }
 
     /// Get a reference to the sys validation workspace's dna def.

@@ -477,7 +477,9 @@ pub async fn validate_op<R>(
 where
     R: RibosomeT,
 {
-    validate_op_entry_def(op, &network.dna_hash(), conductor_handle).await?;
+    crate::core::check_entry_def(op, &network.dna_hash(), conductor_handle)
+        .await
+        .map_err(AppValidationError::SysValidationError)?;
 
     let zomes_to_invoke = match op {
         Op::RegisterAgentActivity(RegisterAgentActivity { .. }) => ZomesToInvoke::AllIntegrity,
@@ -683,27 +685,6 @@ where
             }
         }
     }
-}
-
-async fn validate_op_entry_def(
-    op: &Op,
-    dna_hash: &DnaHash,
-    conductor_handle: &ConductorHandle,
-) -> AppValidationOutcome<()> {
-    let entry_type = match op {
-        Op::StoreRecord(StoreRecord { record }) => record.action().entry_type().to_owned(),
-        Op::StoreEntry(StoreEntry { action, .. }) => Some(action.hashed.entry_type()),
-        _ => None,
-    };
-
-    if let Some(EntryType::App(app_entry_def)) = entry_type {
-        let entry_def = crate::core::check_app_entry_def(dna_hash, app_entry_def, conductor_handle)
-            .await
-            .map_err(AppValidationError::SysValidationError)?;
-        crate::core::check_not_private(&entry_def)
-            .map_err(AppValidationError::SysValidationError)?;
-    }
-    Ok(())
 }
 
 pub struct AppValidationWorkspace {

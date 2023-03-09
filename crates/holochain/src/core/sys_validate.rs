@@ -316,12 +316,29 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 
 /// Check the AppEntryDef is valid for the zome.
 /// Check the EntryDefId and ZomeIndex are in range.
-// TODO: MD: shouldn't this be part of App validation, since it invokes Wasm?
-pub async fn check_app_entry_def(
+pub async fn check_entry_def(
+    op: &Op,
     dna_hash: &DnaHash,
-    entry_type: &AppEntryDef,
     conductor: &Conductor,
-) -> SysValidationResult<EntryDef> {
+) -> SysValidationResult<()> {
+    if let Some((_, entry_type)) = op.entry_data() {
+        if let EntryType::App(app_entry_def) = entry_type {
+            check_app_entry_def(app_entry_def, dna_hash, conductor).await
+        } else {
+            Ok(())
+        }
+    } else {
+        Ok(())
+    }
+}
+
+/// Check the AppEntryDef is valid for the zome.
+/// Check the EntryDefId and ZomeIndex are in range.
+pub async fn check_app_entry_def(
+    app_entry_def: &AppEntryDef,
+    dna_hash: &DnaHash,
+    conductor: &Conductor,
+) -> SysValidationResult<()> {
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
     let ribosome = conductor
@@ -330,31 +347,48 @@ pub async fn check_app_entry_def(
 
     // Check if the zome is found
     let zome = ribosome
-        .get_integrity_zome(&entry_type.zome_index())
-        .ok_or_else(|| ValidationOutcome::ZomeIndex(entry_type.clone()))?
+        .get_integrity_zome(&app_entry_def.zome_index())
+        .ok_or_else(|| ValidationOutcome::ZomeIndex(app_entry_def.clone()))?
         .into_inner()
         .1;
 
-    let entry_def = get_entry_def(entry_type.entry_index(), zome, dna_hash, conductor).await?;
+    let entry_def = get_entry_def(app_entry_def.entry_index(), zome, dna_hash, conductor).await?;
 
     // Check the visibility and return
     match entry_def {
         Some(entry_def) => {
-            if entry_def.visibility == *entry_type.visibility() {
-                Ok(entry_def)
+            if entry_def.visibility == *app_entry_def.visibility() {
+                Ok(())
             } else {
-                Err(ValidationOutcome::EntryVisibility(entry_type.clone()).into())
+                Err(ValidationOutcome::EntryVisibility(app_entry_def.clone()).into())
             }
         }
-        None => Err(ValidationOutcome::EntryDefId(entry_type.clone()).into()),
+        None => Err(ValidationOutcome::EntryDefId(app_entry_def.clone()).into()),
     }
 }
 
 /// Check the app entry type isn't private for store entry
-pub fn check_not_private(entry_def: &EntryDef) -> SysValidationResult<()> {
-    match entry_def.visibility {
-        EntryVisibility::Public => Ok(()),
-        EntryVisibility::Private => Err(ValidationOutcome::PrivateEntry.into()),
+pub fn check_not_private(op: &DhtOp) -> SysValidationResult<()> {
+    match (
+        op.action().entry_type().map(|t| t.visibility()),
+        op.entry().is_some(),
+    ) {
+        (Some(EntryVisibility::Public), true) => Ok(()),
+        (Some(EntryVisibility::Private), false) => Ok(()),
+        (Some(EntryVisibility::Public), false) => Err(ValidationOutcome::MalformedDhtOp(
+            Box::new(op.action()),
+            op.get_type(),
+            "Op has public entry type but is missing its data".to_string(),
+        )
+        .into()),
+        (Some(EntryVisibility::Private), true) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
+        (None, false) => Ok(()),
+        (None, true) => Err(ValidationOutcome::MalformedDhtOp(
+            Box::new(op.action()),
+            op.get_type(),
+            "Op record has entry data with no entry_type".to_string(),
+        )
+        .into()),
     }
 }
 
