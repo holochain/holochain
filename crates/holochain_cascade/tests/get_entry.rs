@@ -1,7 +1,7 @@
 use ghost_actor::dependencies::observability;
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::*;
-use holochain_cascade::Cascade;
+use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
@@ -20,7 +20,7 @@ use holochain_zome_types::ValidationStatus;
 async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     td_record: &RecordTestData,
-    cascade: &Cascade<N>,
+    cascade: &CascadeImpl<N>,
     options: GetOptions,
 ) {
     // - Get via entry hash
@@ -84,7 +84,7 @@ async fn assert_can_get<N: HolochainP2pDnaT + Clone + Send + 'static>(
 async fn assert_is_none<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     td_record: &RecordTestData,
-    cascade: &Cascade<N>,
+    cascade: &CascadeImpl<N>,
     options: GetOptions,
 ) {
     // - Get via entry hash
@@ -123,7 +123,7 @@ async fn assert_is_none<N: HolochainP2pDnaT + Clone + Send + 'static>(
 async fn assert_rejected<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
     td_record: &RecordTestData,
-    cascade: &Cascade<N>,
+    cascade: &CascadeImpl<N>,
     options: GetOptions,
 ) {
     // - Get via entry hash
@@ -181,7 +181,7 @@ async fn assert_rejected<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
 async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
     td_entry: &EntryTestData,
-    cascade: &Cascade<N>,
+    cascade: &CascadeImpl<N>,
     options: GetOptions,
 ) {
     // - Retrieve via entry hash
@@ -241,7 +241,7 @@ async fn entry_not_authority_or_authoring() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
     assert_can_get(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 }
@@ -277,7 +277,7 @@ async fn entry_authoring() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_scratch(scratch.into_sync())
         .with_network(mock, cache.to_db());
 
@@ -305,7 +305,7 @@ async fn entry_authority() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_authored(vault.to_db().into())
         .with_network(mock, cache.to_db());
 
@@ -333,7 +333,7 @@ async fn content_not_authority_or_authoring() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_authored(vault.to_db().into())
         .with_network(mock, cache.to_db());
 
@@ -371,7 +371,7 @@ async fn content_authoring() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_scratch(scratch.into_sync())
         .with_network(mock, cache.to_db());
 
@@ -397,7 +397,7 @@ async fn content_authority() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_authored(vault.to_db().into())
         .with_network(mock, cache.to_db());
 
@@ -422,7 +422,7 @@ async fn rejected_ops() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
     assert_rejected(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 }
 
@@ -444,7 +444,7 @@ async fn check_can_handle_rejected_ops_in_cache() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
     assert_rejected(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 }
 
@@ -493,7 +493,7 @@ async fn test_pending_data_isnt_returned() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
     assert_is_none(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 
@@ -502,7 +502,7 @@ async fn test_pending_data_isnt_returned() {
     let network = PassThroughNetwork::authority_for_all(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
     assert_is_none(&td_entry, &td_record, &cascade, GetOptions::latest()).await;
 

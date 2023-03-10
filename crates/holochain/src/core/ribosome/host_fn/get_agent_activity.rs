@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -42,7 +42,7 @@ pub fn get_agent_activity(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let cascade = Cascade::from_workspace_and_network(&workspace, network);
+                let cascade = CascadeImpl::from_workspace_and_network(&workspace, network);
                 let activity = cascade
                     .get_agent_activity(agent_pubkey, chain_query_filter, options)
                     .await
