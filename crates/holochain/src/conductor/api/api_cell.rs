@@ -17,6 +17,7 @@ use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::WitnessNonceResult;
+use holochain_state::prelude::DatabaseResult;
 use holochain_types::prelude::*;
 use holochain_zome_types::block::Block;
 use tokio::sync::mpsc::error::SendError;
@@ -208,10 +209,10 @@ pub trait CellConductorReadHandleT: Send + Sync {
     ) -> ConductorResult<Option<CellId>>;
 
     /// Expose block functionality to zomes.
-    async fn block(&self, block: Block) -> ConductorResult<()>;
+    async fn block(&self, block: Block) -> DatabaseResult<()>;
 
     /// Expose unblock functionality to zomes.
-    async fn unblock(&self, block: Block) -> ConductorResult<()>;
+    async fn unblock(&self, block: Block) -> DatabaseResult<()>;
 }
 
 #[async_trait]
@@ -264,11 +265,11 @@ impl CellConductorReadHandleT for CellConductorApi {
             .await
     }
 
-    async fn block(&self, block: Block) -> ConductorResult<()> {
+    async fn block(&self, block: Block) -> DatabaseResult<()> {
         self.conductor_handle.block(block).await
     }
 
-    async fn unblock(&self, block: Block) -> ConductorResult<()> {
+    async fn unblock(&self, block: Block) -> DatabaseResult<()> {
         self.conductor_handle.unblock(block).await
     }
 }

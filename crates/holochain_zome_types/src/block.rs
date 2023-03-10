@@ -1,6 +1,6 @@
 use crate::CellId;
 use holo_hash::AgentPubKey;
-use holo_hash::AnyDhtHash;
+use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holochain_integrity_types::Timestamp;
 use kitsune_p2p_timestamp::InclusiveTimestampInterval;
@@ -27,7 +27,7 @@ pub enum CellBlockReason {
     #[serde(with = "serde_bytes")]
     App(Vec<u8>),
     /// Invalid validation result.
-    InvalidOp(AnyDhtHash),
+    InvalidOp(DhtOpHash),
     /// Some bad cryptography.
     BadCrypto,
 }
