@@ -1,5 +1,6 @@
 use super::*;
 use crate::metrics::*;
+use crate::spawn::actor::bootstrap::BootstrapNet;
 use crate::types::gossip::GossipModule;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_fetch::FetchPool;
@@ -102,11 +103,13 @@ ghost_actor::ghost_chan! {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
     ep_hnd: MetaNet,
     host: HostApi,
     config: Arc<KitsuneP2pConfig>,
+    bootstrap_net: BootstrapNet,
     bandwidth_throttles: BandwidthThrottles,
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     fetch_pool: FetchPool,
@@ -136,6 +139,7 @@ pub(crate) async fn spawn_space(
         host,
         ep_hnd,
         config,
+        bootstrap_net,
         bandwidth_throttles,
         parallel_notify_permit,
         fetch_pool,
@@ -179,6 +183,7 @@ impl SpaceInternalHandler for Space {
             let arc = self.get_agent_arc(&agent);
             agent_list.push((agent, arc));
         }
+        let bootstrap_net = self.ro_inner.bootstrap_net;
         let ep_hnd = self.ro_inner.ep_hnd.clone();
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
@@ -197,6 +202,7 @@ impl SpaceInternalHandler for Space {
                     expires_after,
                     space: space.clone(),
                     agent,
+                    bootstrap_net,
                     arc,
                     urls: &urls,
                     evt_sender: &evt_sender,
@@ -226,6 +232,7 @@ impl SpaceInternalHandler for Space {
         agent: Arc<KitsuneAgent>,
     ) -> SpaceInternalHandlerResult<()> {
         let space = self.space.clone();
+        let bootstrap_net = self.ro_inner.bootstrap_net;
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
         let ep_hnd = self.ro_inner.ep_hnd.clone();
@@ -246,6 +253,7 @@ impl SpaceInternalHandler for Space {
                 expires_after,
                 space: space.clone(),
                 agent,
+                bootstrap_net,
                 arc,
                 urls: &urls,
                 evt_sender: &evt_sender,
@@ -595,6 +603,7 @@ struct UpdateAgentInfoInput<'borrow> {
     expires_after: u64,
     space: Arc<KitsuneSpace>,
     agent: Arc<KitsuneAgent>,
+    bootstrap_net: BootstrapNet,
     arc: DhtArc,
     urls: &'borrow Vec<TxUrl>,
     evt_sender: &'borrow futures::channel::mpsc::Sender<KitsuneP2pEvent>,
@@ -633,6 +642,7 @@ async fn update_single_agent_info(
         expires_after,
         space,
         agent,
+        bootstrap_net,
         mut arc,
         urls,
         evt_sender,
@@ -654,7 +664,7 @@ async fn update_single_agent_info(
     // Update the agents arc through the internal sender.
     internal_sender.update_agent_arc(agent.clone(), arc).await?;
 
-    let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
+    let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None, bootstrap_net).await?;
     let expires_at_ms = signed_at_ms + expires_after;
 
     let agent_info_signed = AgentInfoSigned::sign(
@@ -712,6 +722,7 @@ async fn update_single_agent_info(
             crate::spawn::actor::bootstrap::put(
                 bootstrap_service.clone(),
                 agent_info_signed.clone(),
+                bootstrap_net,
             )
             .await?;
         }
@@ -1239,6 +1250,7 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) ep_hnd: MetaNet,
     #[allow(dead_code)]
     pub(crate) config: Arc<KitsuneP2pConfig>,
+    pub(crate) bootstrap_net: BootstrapNet,
     pub(crate) parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     pub(crate) metrics: MetricsSync,
     pub(crate) metric_exchange: MetricExchangeSync,
@@ -1320,6 +1332,7 @@ impl Space {
         host_api: HostApi,
         ep_hnd: MetaNet,
         config: Arc<KitsuneP2pConfig>,
+        bootstrap_net: BootstrapNet,
         bandwidth_throttles: BandwidthThrottles,
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
         fetch_pool: FetchPool,
@@ -1441,6 +1454,7 @@ impl Space {
                             space: space_c.clone(),
                             limit: 8.into(),
                         },
+                        bootstrap_net,
                     )
                     .await
                     {
@@ -1487,6 +1501,7 @@ impl Space {
             host_api: host_api.clone(),
             ep_hnd,
             config: config.clone(),
+            bootstrap_net,
             parallel_notify_permit,
             metrics,
             metric_exchange,
@@ -1524,13 +1539,15 @@ impl Space {
     ) -> KitsuneP2pHandlerResult<()> {
         let space = self.space.clone();
         let network_type = self.config.network_type.clone();
+        let bootstrap_net = self.ro_inner.bootstrap_net;
         let evt_sender = self.evt_sender.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let host = self.host_api.clone();
 
         Ok(async move {
-            let signed_at_ms = crate::spawn::actor::bootstrap::now_once(None).await?;
+            let signed_at_ms =
+                crate::spawn::actor::bootstrap::now_once(None, bootstrap_net).await?;
             let expires_at_ms = signed_at_ms + expires_after;
             let agent_info_signed = AgentInfoSigned::sign(
                 space.clone(),
@@ -1573,6 +1590,7 @@ impl Space {
                     crate::spawn::actor::bootstrap::put(
                         bootstrap_service.clone(),
                         agent_info_signed,
+                        bootstrap_net,
                     )
                     .await?;
                 }
