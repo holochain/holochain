@@ -94,7 +94,7 @@ pub enum CascadeSource {
 ///
 /// See the module-level docs for more info.
 #[derive(Clone)]
-pub struct Cascade<Network = HolochainP2pDna> {
+pub struct Cascade<Network: Send + Sync = HolochainP2pDna> {
     authored: Option<DbRead<DbKindAuthored>>,
     dht: Option<DbRead<DbKindDht>>,
     cache: Option<DbWrite<DbKindCache>>,
@@ -105,7 +105,7 @@ pub struct Cascade<Network = HolochainP2pDna> {
 
 impl<Network> Cascade<Network>
 where
-    Network: HolochainP2pDnaT + Clone + 'static + Send,
+    Network: HolochainP2pDnaT + Clone + 'static + Send + Sync,
 {
     /// Add the authored env to the cascade.
     pub fn with_authored(self, authored: DbRead<DbKindAuthored>) -> Self {
@@ -282,8 +282,8 @@ where
         Ok(())
     }
 
-    async fn merge_ops_into_cache(&mut self, responses: Vec<WireOps>) -> CascadeResult<()> {
-        let cache = some_or_return!(self.cache.as_mut());
+    async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
+        let cache = some_or_return!(self.cache.as_ref());
         cache
             .async_commit(|txn| {
                 for response in responses {
@@ -297,11 +297,11 @@ where
     }
 
     async fn merge_link_ops_into_cache(
-        &mut self,
+        &self,
         responses: Vec<WireLinkOps>,
         key: WireLinkKey,
     ) -> CascadeResult<()> {
-        let cache = some_or_return!(self.cache.as_mut());
+        let cache = some_or_return!(self.cache.as_ref());
         cache
             .async_commit(move |txn| {
                 for response in responses {
@@ -316,7 +316,7 @@ where
 
     /// Add new activity to the Cache.
     async fn add_activity_into_cache(
-        &mut self,
+        &self,
         responses: Vec<MustGetAgentActivityResponse>,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
         // Choose a response from all the responses.
@@ -339,7 +339,7 @@ where
         };
 
         let cache = some_or_return!(
-            self.cache.as_mut(),
+            self.cache.as_ref(),
             response.unwrap_or(MustGetAgentActivityResponse::IncompleteChain)
         );
 
@@ -367,11 +367,11 @@ where
     /// Fetch a Record from the network, caching and returning the results
     #[instrument(skip(self, options))]
     pub async fn fetch_record(
-        &mut self,
+        &self,
         hash: AnyDhtHash,
         options: NetworkGetOptions,
     ) -> CascadeResult<()> {
-        let network = some_or_return!(self.network.as_mut());
+        let network = some_or_return!(self.network.as_ref());
         let results = network
             .get(hash, options.clone())
             .instrument(debug_span!("fetch_record::network_get"))
@@ -383,11 +383,11 @@ where
 
     #[instrument(skip(self, options))]
     async fn fetch_links(
-        &mut self,
+        &self,
         link_key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<()> {
-        let network = some_or_return!(self.network.as_mut());
+        let network = some_or_return!(self.network.as_ref());
         let results = network.get_links(link_key.clone(), options).await?;
 
         self.merge_link_ops_into_cache(results, link_key.clone())
@@ -397,24 +397,24 @@ where
 
     #[instrument(skip(self, options))]
     async fn fetch_agent_activity(
-        &mut self,
+        &self,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
     ) -> CascadeResult<Vec<AgentActivityResponse<ActionHash>>> {
-        let network = some_or_return!(self.network.as_mut(), Vec::with_capacity(0));
+        let network = some_or_return!(self.network.as_ref(), Vec::with_capacity(0));
         Ok(network.get_agent_activity(agent, query, options).await?)
     }
 
     #[instrument(skip(self))]
     /// Fetch hash bounded agent activity from the network.
     async fn fetch_must_get_agent_activity(
-        &mut self,
+        &self,
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
         let network = some_or_return!(
-            self.network.as_mut(),
+            self.network.as_ref(),
             MustGetAgentActivityResponse::IncompleteChain
         );
         let results = network.must_get_agent_activity(author, filter).await?;
@@ -437,7 +437,7 @@ where
         conns
     }
 
-    async fn cascading<Q>(&mut self, query: Q) -> CascadeResult<Q::Output>
+    async fn cascading<Q>(&self, query: Q) -> CascadeResult<Q::Output>
     where
         Q: Query<Item = Judged<SignedActionHashed>> + Send + 'static,
         <Q as holochain_state::prelude::Query>::Output: Send + 'static,
@@ -467,7 +467,7 @@ where
     }
 
     /// Search through the stores and return the first non-none result.
-    async fn find_map<F, T>(&mut self, mut f: F) -> CascadeResult<Option<T>>
+    async fn find_map<F, T>(&self, mut f: F) -> CascadeResult<Option<T>>
     where
         T: Send + 'static,
         F: FnMut(&dyn Store) -> CascadeResult<Option<T>> + Send + 'static,
@@ -519,7 +519,7 @@ where
     /// Retrieve [`Entry`] from either locally or from an authority.
     /// Data might not have been validated yet by the authority.
     pub async fn retrieve_entry(
-        &mut self,
+        &self,
         hash: EntryHash,
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>> {
@@ -560,7 +560,7 @@ where
     /// Retrieve [`SignedActionHashed`] from either locally or from an authority.
     /// Data might not have been validated yet by the authority.
     pub async fn retrieve_action(
-        &mut self,
+        &self,
         hash: ActionHash,
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>> {
@@ -590,7 +590,7 @@ where
     /// Retrieve data from either locally or from an authority.
     /// Data might not have been validated yet by the authority.
     pub async fn retrieve(
-        &mut self,
+        &self,
         hash: AnyDhtHash,
         mut options: NetworkGetOptions,
     ) -> CascadeResult<Option<(Record, CascadeSource)>> {
@@ -630,7 +630,7 @@ where
     /// Also returns Rejected actions, which may affect the interpreted validity status of this Entry.
     #[instrument(skip(self, options))]
     pub async fn get_entry_details(
-        &mut self,
+        &self,
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
@@ -668,7 +668,7 @@ where
     /// Can return a Rejected Record.
     #[instrument(skip(self, options))]
     pub async fn get_record_details(
-        &mut self,
+        &self,
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<RecordDetails>> {
@@ -713,7 +713,7 @@ where
     /// combined with this agents authored data.
     /// _Note: Deleted actions are a tombstone set_
     pub async fn dht_get_action(
-        &mut self,
+        &self,
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
@@ -755,7 +755,7 @@ where
     /// Returns the oldest live [Record] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
-        &mut self,
+        &self,
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
@@ -792,7 +792,7 @@ where
     /// the resulting list of Records in the order that they come in
     /// (NOT the order in which they were requested!).
     pub async fn get_concurrent<I: IntoIterator<Item = AnyDhtHash>>(
-        &mut self,
+        &self,
         hashes: I,
         options: GetOptions,
     ) -> CascadeResult<Vec<Option<Record>>> {
@@ -801,7 +801,7 @@ where
         let iter = hashes.into_iter().map({
             |hash| {
                 let options = options.clone();
-                let mut cascade = self.clone();
+                let cascade = self.clone();
                 async move { cascade.dht_get(hash, options).await }
             }
         });
@@ -817,7 +817,7 @@ where
     /// This gives you the latest possible picture of the current dht state.
     /// Data from your zome call is also added to the cache.
     pub async fn dht_get(
-        &mut self,
+        &self,
         hash: AnyDhtHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
@@ -830,7 +830,7 @@ where
     /// Get either [`EntryDetails`] or [`RecordDetails`], depending on the hash provided
     #[instrument(skip(self))]
     pub async fn get_details(
-        &mut self,
+        &self,
         hash: AnyDhtHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Details>> {
@@ -850,7 +850,7 @@ where
     /// Gets an links from the cas or cache depending on it's metadata
     // The default behavior is to skip deleted or replaced entries.
     pub async fn dht_get_links(
-        &mut self,
+        &self,
         key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<Link>> {
@@ -867,7 +867,7 @@ where
     /// Return all CreateLink actions
     /// and DeleteLink actions ordered by time.
     pub async fn get_link_details(
-        &mut self,
+        &self,
         key: WireLinkKey,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<(SignedActionHashed, Vec<SignedActionHashed>)>> {
@@ -882,7 +882,7 @@ where
 
     /// Request a hash bounded chain query.
     pub async fn must_get_agent_activity(
-        &mut self,
+        &self,
         author: AgentPubKey,
         filter: ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
@@ -950,7 +950,7 @@ where
     /// - sequence_range will get all the activity in the exclusive range
     /// - action_type and entry_type will filter the activity (requires include_full_actions)
     pub async fn get_agent_activity(
-        &mut self,
+        &self,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
@@ -1064,13 +1064,13 @@ where
         Ok(r)
     }
 
-    fn am_i_authoring(&mut self, hash: &AnyDhtHash) -> CascadeResult<bool> {
+    fn am_i_authoring(&self, hash: &AnyDhtHash) -> CascadeResult<bool> {
         let scratch = some_or_return!(self.scratch.as_ref(), false);
         Ok(scratch.apply_and_then(|scratch| scratch.contains_hash(hash))?)
     }
 
-    async fn am_i_an_authority(&mut self, hash: OpBasis) -> CascadeResult<bool> {
-        let network = some_or_return!(self.network.as_mut(), false);
+    async fn am_i_an_authority(&self, hash: OpBasis) -> CascadeResult<bool> {
+        let network = some_or_return!(self.network.as_ref(), false);
 
         Ok(network.authority_for_hash(hash).await?)
     }

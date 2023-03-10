@@ -33,7 +33,7 @@ use crate::core::workflow::inline_validation;
 use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
 use crate::sweettest::SweetDnaFile;
-use crate::test_utils::fake_genesis;
+use crate::test_utils::fake_genesis_for_agent;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
@@ -124,32 +124,49 @@ async fn check_valid_if_dna_test() {
         Arc::new(dna_def.clone()),
     );
 
+    // Initializing the cache actually matters. TODO: why?
+    cache.get_state().await;
+
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Ok(())
     );
     let mut action = fixt!(Dna);
+    action.hash = DnaHash::with_data_sync(&dna_def);
 
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Ok(())
     );
 
     // - Test that an origin_time in the future leads to invalid Dna action commit
     let dna_def_original = workspace.dna_def();
     dna_def.modifiers.origin_time = Timestamp::MAX;
+    action.hash = DnaHash::with_data_sync(&dna_def);
     workspace.dna_def = Arc::new(dna_def);
+
     assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace).await,
+        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PrevActionError(PrevActionError::InvalidRootOriginTime)
         ))
     );
+
+    action.hash = DnaHash::with_data_sync(&*dna_def_original);
+    action.author = fake_agent_pubkey_1();
     workspace.dna_def = dna_def_original;
 
-    fake_genesis(db.clone().into(), tmp_dht.to_db(), keystore)
-        .await
-        .unwrap();
+    check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()).unwrap();
+
+    fake_genesis_for_agent(
+        db.clone().into(),
+        tmp_dht.to_db(),
+        action.author.clone(),
+        keystore,
+    )
+    .await
+    .unwrap();
+
     tmp_dht
         .to_db()
         .conn()
@@ -157,19 +174,10 @@ async fn check_valid_if_dna_test() {
         .execute("UPDATE DhtOp SET when_integrated = 0", [])
         .unwrap();
 
-    action.author = fake_agent_pubkey_1();
-
     cache
         .set_all_activity_to_integrated(vec![(Arc::new(action.author.clone()), 0..=2)])
         .await
         .unwrap();
-
-    assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace).await,
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::InvalidRoot)
-        ))
-    );
 }
 
 /// Timestamps must increase monotonically
@@ -400,7 +408,7 @@ async fn check_app_entry_def_test() {
     // ## Dna is missing
     let app_entry_def_0 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_0, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_0, &dna_hash, &conductor_handle).await,
         Err(SysValidationError::DnaMissing(_))
     );
 
@@ -411,7 +419,7 @@ async fn check_app_entry_def_test() {
     // ## EntryId is out of range
     let app_entry_def_1 = AppEntryDef::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_1, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_1, &dna_hash, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryDefId(_)
         ))
@@ -419,7 +427,7 @@ async fn check_app_entry_def_test() {
 
     let app_entry_def_2 = AppEntryDef::new(0.into(), 100.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_2, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_2, &dna_hash, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ZomeIndex(_)
         ))
@@ -428,12 +436,12 @@ async fn check_app_entry_def_test() {
     // ## EntryId is in range for dna
     let app_entry_def_3 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_3, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_3, &dna_hash, &conductor_handle).await,
         Ok(_)
     );
     let app_entry_def_4 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_4, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_4, &dna_hash, &conductor_handle).await,
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::EntryVisibility(_)
         ))
@@ -442,28 +450,12 @@ async fn check_app_entry_def_test() {
     // ## Can get the entry from the entry def
     let app_entry_def_5 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
-        check_app_entry_def(&dna_hash, &app_entry_def_5, &conductor_handle).await,
+        check_app_entry_def(&app_entry_def_5, &dna_hash, &conductor_handle).await,
         Ok(_)
     );
 }
 
 /// Check that StoreEntry does not have a private entry type
-#[tokio::test(flavor = "multi_thread")]
-async fn check_entry_not_private_test() {
-    let mut ed = fixt!(EntryDef);
-    ed.visibility = EntryVisibility::Public;
-    assert_matches!(check_not_private(&ed), Ok(()));
-
-    ed.visibility = EntryVisibility::Private;
-    assert_matches!(
-        check_not_private(&ed),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrivateEntry
-        ))
-    );
-}
-
-// TODO: move elsewhere
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_filters_private_entry() {
     let dna = fixt!(DnaHash);

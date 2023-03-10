@@ -2,8 +2,6 @@
 
 use super::*;
 use crate::conductor::space::Space;
-use crate::conductor::Conductor;
-use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::sys_validate::check_and_hold_store_record;
@@ -47,8 +45,7 @@ mod tests;
     space,
     trigger_app_validation,
     sys_validation_trigger,
-    network,
-    conductor_handle
+    network
 ))]
 pub async fn sys_validation_workflow(
     workspace: Arc<SysValidationWorkspace>,
@@ -56,16 +53,9 @@ pub async fn sys_validation_workflow(
     trigger_app_validation: TriggerSender,
     sys_validation_trigger: TriggerSender,
     network: HolochainP2pDna,
-    conductor_handle: ConductorHandle,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = sys_validation_workflow_inner(
-        workspace,
-        space,
-        network,
-        conductor_handle,
-        sys_validation_trigger,
-    )
-    .await?;
+    let complete =
+        sys_validation_workflow_inner(workspace, space, network, sys_validation_trigger).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -79,7 +69,6 @@ async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     space: Arc<Space>,
     network: HolochainP2pDna,
-    conductor_handle: ConductorHandle,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let db = workspace.dht_db.clone();
@@ -88,6 +77,7 @@ async fn sys_validation_workflow_inner(
     tracing::debug!("Validating {} ops", start_len);
     let start = (start_len >= NUM_CONCURRENT_OPS).then(std::time::Instant::now);
     let saturated = start.is_some();
+    let cascade = workspace.full_cascade(network);
 
     // Process each op
     let iter = sorted_ops.into_iter().map({
@@ -98,9 +88,8 @@ async fn sys_validation_workflow_inner(
             // If we are not holding them they will be added to our incoming ops.
             let incoming_dht_ops_sender =
                 IncomingDhtOpSender::new(space.clone(), sys_validation_trigger.clone());
-            let network = network.clone();
             let workspace = workspace.clone();
-            let conductor_handle = conductor_handle.clone();
+            let cascade = cascade.clone();
             async move {
                 let (op, op_hash) = so.into_inner();
                 let op_type = op.get_type();
@@ -108,14 +97,7 @@ async fn sys_validation_workflow_inner(
 
                 let dependency = get_dependency(op_type, &action);
 
-                let r = validate_op(
-                    &op,
-                    &workspace,
-                    network,
-                    conductor_handle.as_ref(),
-                    Some(incoming_dht_ops_sender),
-                )
-                .await;
+                let r = validate_op(&op, &workspace, cascade, Some(incoming_dht_ops_sender)).await;
                 r.map(|o| (op_hash, o, dependency))
             }
         }
@@ -228,27 +210,23 @@ async fn sys_validation_workflow_inner(
     })
 }
 
+/// TODO: Some of these params are unnecessary or soon will be:
+/// - The Workspace is only needed for some checks which are done in sys validation in appropriately, like fork detection.
+/// - The Conductor handle is only needed for another inappropriate check of entry type, which invokes wasm and is not proper sys validation.
+/// These two params can go away soon.
+/// What's important to note is that the cascade must be passed in explicitly so that it can be mocked.
 async fn validate_op(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
-    conductor_handle: &Conductor,
+    cascade: Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> WorkflowResult<Outcome> {
-    match validate_op_inner(
-        op,
-        workspace,
-        network,
-        conductor_handle,
-        incoming_dht_ops_sender,
-    )
-    .await
-    {
+    let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
+    match validate_op_inner(op, &cascade, dna_def, incoming_dht_ops_sender).await {
         Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
             info!(
-                dna = %workspace.dna_hash(),
                 msg = "DhtOp did not pass system validation. (If rejected, a warning will follow.)",
                 ?op,
                 error = ?e,
@@ -256,11 +234,7 @@ async fn validate_op(
             );
             let outcome = handle_failed(e);
             if let Outcome::Rejected = outcome {
-                warn!(
-                    dna = %workspace.dna_hash(),
-                    msg = "DhtOp was rejected during system validation.",
-                    ?op,
-                )
+                warn!(msg = "DhtOp was rejected during system validation.", ?op,)
             }
             Ok(outcome)
         }
@@ -286,6 +260,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::EntryTypeMismatch => Rejected,
         ValidationOutcome::EntryVisibility(_) => Rejected,
         ValidationOutcome::TagTooLarge(_, _) => Rejected,
+        ValidationOutcome::MalformedDhtOp(_, _, _) => Rejected,
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
         ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep),
@@ -293,10 +268,11 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
             AwaitingOpDep(dep.into())
         }
         ValidationOutcome::PrevActionError(_) => Rejected,
-        ValidationOutcome::PrivateEntry => Rejected,
+        ValidationOutcome::PrivateEntryLeaked => Rejected,
         ValidationOutcome::PreflightResponseSignature(_) => Rejected,
         ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
         ValidationOutcome::VerifySignature(_, _) => Rejected,
+        ValidationOutcome::WrongDna(_, _) => Rejected,
         ValidationOutcome::ZomeIndex(_) => Rejected,
         ValidationOutcome::CounterSigningError(_) => Rejected,
     }
@@ -304,14 +280,14 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
 
 async fn validate_op_inner(
     op: &DhtOp,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
-    conductor_handle: &Conductor,
+    cascade: &Cascade,
+    dna_def: DnaDefHashed,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
+    check_not_private(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
-            store_record(action, workspace, network.clone()).await?;
+            store_record(action, cascade).await?;
             if let Some(entry) = entry {
                 // Retrieve for all other actions on countersigned entry.
                 if let Entry::CounterSign(session_data, _) = &**entry {
@@ -321,8 +297,7 @@ async fn validate_op_inner(
                         .ok_or_else(|| SysValidationError::NonEntryAction(action.clone()))?;
                     for action in session_data.build_action_set(entry_hash, weight)? {
                         let hh = ActionHash::with_data_sync(&action);
-                        if workspace
-                            .full_cascade(network.clone())
+                        if cascade
                             .retrieve_action(hh.clone(), Default::default())
                             .await?
                             .is_none()
@@ -338,9 +313,7 @@ async fn validate_op_inner(
                         .try_into()
                         .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
                     entry.as_ref(),
-                    conductor_handle,
-                    workspace,
-                    network,
+                    cascade,
                 )
                 .await?;
             }
@@ -358,8 +331,7 @@ async fn validate_op_inner(
                 for action in session_data.build_action_set(entry_hash, weight)? {
                     check_and_hold_store_record(
                         &ActionHash::with_data_sync(&action),
-                        workspace,
-                        network.clone(),
+                        cascade,
                         incoming_dht_ops_sender.clone(),
                         dependency_check,
                     )
@@ -367,114 +339,76 @@ async fn validate_op_inner(
                 }
             }
 
-            store_entry(
-                (action).into(),
-                entry.as_ref(),
-                conductor_handle,
-                workspace,
-                network.clone(),
-            )
-            .await?;
+            store_entry((action).into(), entry.as_ref(), cascade).await?;
 
             let action = action.clone().into();
-            store_record(&action, workspace, network).await?;
+            store_record(&action, cascade).await?;
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, action) => {
-            register_agent_activity(action, workspace, network.clone(), incoming_dht_ops_sender)
-                .await?;
-            store_record(action, workspace, network).await?;
+            register_agent_activity(action, cascade, &dna_def, incoming_dht_ops_sender).await?;
+            store_record(action, cascade).await?;
             Ok(())
         }
         DhtOp::RegisterUpdatedContent(_, action, entry) => {
-            register_updated_content(action, workspace, network.clone(), incoming_dht_ops_sender)
-                .await?;
+            register_updated_content(action, cascade, incoming_dht_ops_sender).await?;
             if let Some(entry) = entry {
-                store_entry(
-                    NewEntryActionRef::Update(action),
-                    entry.as_ref(),
-                    conductor_handle,
-                    workspace,
-                    network.clone(),
-                )
-                .await?;
+                store_entry(NewEntryActionRef::Update(action), entry.as_ref(), cascade).await?;
             }
 
             Ok(())
         }
         DhtOp::RegisterUpdatedRecord(_, action, entry) => {
-            register_updated_record(action, workspace, network.clone(), incoming_dht_ops_sender)
-                .await?;
+            register_updated_record(action, cascade, incoming_dht_ops_sender).await?;
             if let Some(entry) = entry {
-                store_entry(
-                    NewEntryActionRef::Update(action),
-                    entry.as_ref(),
-                    conductor_handle,
-                    workspace,
-                    network.clone(),
-                )
-                .await?;
+                store_entry(NewEntryActionRef::Update(action), entry.as_ref(), cascade).await?;
             }
 
             Ok(())
         }
         DhtOp::RegisterDeletedBy(_, action) => {
-            register_deleted_by(action, workspace, network, incoming_dht_ops_sender).await?;
+            register_deleted_by(action, cascade, incoming_dht_ops_sender).await?;
             Ok(())
         }
         DhtOp::RegisterDeletedEntryAction(_, action) => {
-            register_deleted_entry_action(action, workspace, network, incoming_dht_ops_sender)
-                .await?;
+            register_deleted_entry_action(action, cascade, incoming_dht_ops_sender).await?;
             Ok(())
         }
         DhtOp::RegisterAddLink(_, action) => {
-            register_add_link(action, workspace, network, incoming_dht_ops_sender).await?;
+            register_add_link(action, cascade, incoming_dht_ops_sender).await?;
             Ok(())
         }
         DhtOp::RegisterRemoveLink(_, action) => {
-            register_delete_link(action, workspace, network, incoming_dht_ops_sender).await?;
+            register_delete_link(action, cascade, incoming_dht_ops_sender).await?;
             Ok(())
         }
     }
 }
 
-// #[instrument(skip(record, call_zome_workspace, network, conductor_handle))]
+// #[instrument(skip(record, call_zome_workspace, network))]
 /// Direct system validation call that takes
 /// a Record instead of an op.
 /// Does not require holding dependencies.
 /// Will not await dependencies and instead returns
 /// that outcome immediately.
-pub async fn sys_validate_record(
-    record: &Record,
-    call_zome_workspace: &HostFnWorkspace,
-    network: HolochainP2pDna,
-    conductor_handle: &Conductor,
-) -> SysValidationOutcome<()> {
+pub async fn sys_validate_record(record: &Record, cascade: &Cascade) -> SysValidationOutcome<()> {
     trace!(?record);
-    // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
-    let workspace = SysValidationWorkspace::from(call_zome_workspace);
-    let result =
-        match sys_validate_record_inner(record, &workspace, network, conductor_handle).await {
-            // Validation succeeded
-            Ok(_) => Ok(()),
-            // Validation failed so exit with that outcome
-            Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
-                error!(msg = "Direct validation failed", ?record);
-                validation_outcome.into_outcome()
-            }
-            // An error occurred so return it
-            Err(e) => Err(OutcomeOrError::Err(e)),
-        };
+    let result = match sys_validate_record_inner(record, cascade).await {
+        // Validation succeeded
+        Ok(_) => Ok(()),
+        // Validation failed so exit with that outcome
+        Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
+            error!(msg = "Direct validation failed", ?record);
+            validation_outcome.into_outcome()
+        }
+        // An error occurred so return it
+        Err(e) => Err(OutcomeOrError::Err(e)),
+    };
 
     result
 }
 
-async fn sys_validate_record_inner(
-    record: &Record,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
-    conductor_handle: &Conductor,
-) -> SysValidationResult<()> {
+async fn sys_validate_record_inner(record: &Record, cascade: &Cascade) -> SysValidationResult<()> {
     let signature = record.signature();
     let action = record.action();
     let maybe_entry = record.entry().as_option();
@@ -483,12 +417,10 @@ async fn sys_validate_record_inner(
     async fn validate(
         action: &Action,
         maybe_entry: Option<&Entry>,
-        workspace: &SysValidationWorkspace,
-        network: HolochainP2pDna,
-        conductor_handle: &Conductor,
+        cascade: &Cascade,
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
-        store_record(action, workspace, network.clone()).await?;
+        store_record(action, cascade).await?;
         if let Some((maybe_entry, EntryVisibility::Public)) =
             &maybe_entry.and_then(|e| action.entry_type().map(|et| (e, et.visibility())))
         {
@@ -497,26 +429,22 @@ async fn sys_validate_record_inner(
                     .try_into()
                     .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
                 maybe_entry,
-                conductor_handle,
-                workspace,
-                network.clone(),
+                cascade,
             )
             .await?;
         }
         match action {
             Action::Update(action) => {
-                register_updated_content(action, workspace, network, incoming_dht_ops_sender)
-                    .await?;
+                register_updated_content(action, cascade, incoming_dht_ops_sender).await?;
             }
             Action::Delete(action) => {
-                register_deleted_entry_action(action, workspace, network, incoming_dht_ops_sender)
-                    .await?;
+                register_deleted_entry_action(action, cascade, incoming_dht_ops_sender).await?;
             }
             Action::CreateLink(action) => {
-                register_add_link(action, workspace, network, incoming_dht_ops_sender).await?;
+                register_add_link(action, cascade, incoming_dht_ops_sender).await?;
             }
             Action::DeleteLink(action) => {
-                register_delete_link(action, workspace, network, incoming_dht_ops_sender).await?;
+                register_delete_link(action, cascade, incoming_dht_ops_sender).await?;
             }
             _ => {}
         }
@@ -528,22 +456,15 @@ async fn sys_validate_record_inner(
             if let Some(weight) = action.entry_rate_data() {
                 let entry_hash = EntryHash::with_data_sync(maybe_entry.unwrap());
                 for action in session.build_action_set(entry_hash, weight)? {
-                    validate(
-                        &action,
-                        maybe_entry,
-                        workspace,
-                        network.clone(),
-                        conductor_handle,
-                    )
-                    .await?;
+                    validate(&action, maybe_entry, cascade).await?;
                 }
                 Ok(())
             } else {
                 tracing::error!("Got countersigning entry without rate assigned. This should be impossible. But, let's see what happens.");
-                validate(action, maybe_entry, workspace, network, conductor_handle).await
+                validate(action, maybe_entry, cascade).await
             }
         }
-        _ => validate(action, maybe_entry, workspace, network, conductor_handle).await,
+        _ => validate(action, maybe_entry, cascade).await,
     }
 }
 
@@ -557,8 +478,8 @@ pub async fn counterfeit_check(signature: &Signature, action: &Action) -> SysVal
 
 async fn register_agent_activity(
     action: &Action,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
+    dna_def: &DnaDefHashed,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -566,33 +487,28 @@ async fn register_agent_activity(
 
     // Checks
     check_prev_action(action)?;
-    check_valid_if_dna(action, workspace).await?;
+    check_valid_if_dna(action, dna_def)?;
     if let Some(prev_action_hash) = prev_action_hash {
         check_and_hold_register_agent_activity(
             prev_action_hash,
-            workspace,
-            network,
+            cascade,
             incoming_dht_ops_sender,
             |_| Ok(()),
         )
         .await?;
     }
-    check_chain_rollback(action, workspace).await?;
+    // not appropriate for sys validation
+    // check_chain_rollback(action, workspace).await?;
     Ok(())
 }
 
-async fn store_record(
-    action: &Action,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
-) -> SysValidationResult<()> {
+async fn store_record(action: &Action, cascade: &Cascade) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_action_hash = action.prev_action();
 
     // Checks
     check_prev_action(action)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        let mut cascade = workspace.full_cascade(network);
         let (prev_action, _) = cascade
             .retrieve_action(prev_action_hash.clone(), Default::default())
             .await?
@@ -607,9 +523,7 @@ async fn store_record(
 async fn store_entry(
     action: NewEntryActionRef<'_>,
     entry: &Entry,
-    conductor_handle: &Conductor,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = action.entry_type();
@@ -617,20 +531,12 @@ async fn store_entry(
 
     // Checks
     check_entry_type(entry_type, entry)?;
-    if let EntryType::App(app_entry_def) = entry_type {
-        let entry_def =
-            check_app_entry_def(workspace.dna_hash(), app_entry_def, conductor_handle).await?;
-        // TODO: MD: this doesn't seem right. A private StoreEntry can be validated. Not a private StoreRecord though.
-        check_not_private(&entry_def)?;
-    }
-
     check_entry_hash(entry_hash, entry).await?;
     check_entry_size(entry)?;
 
     // Additional checks if this is an Update
     if let NewEntryActionRef::Update(entry_update) = action {
         let original_action_address = &entry_update.original_action_address;
-        let mut cascade = workspace.full_cascade(network);
         let (original_action, _) = cascade
             .retrieve_action(original_action_address.clone(), Default::default())
             .await?
@@ -650,8 +556,7 @@ async fn store_entry(
 
 async fn register_updated_content(
     entry_update: &Update,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -661,8 +566,7 @@ async fn register_updated_content(
         |original_record: &Record| update_check(entry_update, original_record.action());
     check_and_hold_store_entry(
         original_action_address,
-        workspace,
-        network,
+        cascade,
         incoming_dht_ops_sender,
         dependency_check,
     )
@@ -672,8 +576,7 @@ async fn register_updated_content(
 
 async fn register_updated_record(
     entry_update: &Update,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -684,8 +587,7 @@ async fn register_updated_record(
 
     check_and_hold_store_record(
         original_action_address,
-        workspace,
-        network,
+        cascade,
         incoming_dht_ops_sender,
         dependency_check,
     )
@@ -695,8 +597,7 @@ async fn register_updated_record(
 
 async fn register_deleted_by(
     record_delete: &Delete,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -708,8 +609,7 @@ async fn register_deleted_by(
 
     check_and_hold_store_record(
         removed_action_address,
-        workspace,
-        network,
+        cascade,
         incoming_dht_ops_sender,
         dependency_check,
     )
@@ -719,8 +619,7 @@ async fn register_deleted_by(
 
 async fn register_deleted_entry_action(
     record_delete: &Delete,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -732,8 +631,7 @@ async fn register_deleted_entry_action(
 
     check_and_hold_store_entry(
         removed_action_address,
-        workspace,
-        network,
+        cascade,
         incoming_dht_ops_sender,
         dependency_check,
     )
@@ -743,8 +641,7 @@ async fn register_deleted_entry_action(
 
 async fn register_add_link(
     link_add: &CreateLink,
-    _workspace: &SysValidationWorkspace,
-    _network: HolochainP2pDna,
+    _cascade: &Cascade,
     _incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     check_tag_size(&link_add.tag)?;
@@ -753,21 +650,16 @@ async fn register_add_link(
 
 async fn register_delete_link(
     link_remove: &DeleteLink,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let link_add_address = &link_remove.link_add_address;
 
     // Checks
-    check_and_hold_register_add_link(
-        link_add_address,
-        workspace,
-        network,
-        incoming_dht_ops_sender,
-        |_| Ok(()),
-    )
+    check_and_hold_register_add_link(link_add_address, cascade, incoming_dht_ops_sender, |_| {
+        Ok(())
+    })
     .await?;
     Ok(())
 }
@@ -902,6 +794,7 @@ impl SysValidationWorkspace {
         };
         Ok(!action_seq_is_not_empty)
     }
+
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> Cascade {
         let cascade = Cascade::empty().with_dht(self.dht_db.clone());
@@ -912,6 +805,8 @@ impl SysValidationWorkspace {
             None => cascade,
         }
     }
+
+    /// Create a cascade with access to local data as well as network data
     pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
         &self,
         network: Network,
@@ -927,13 +822,14 @@ impl SysValidationWorkspace {
         }
     }
 
-    fn dna_hash(&self) -> &DnaHash {
-        self.dht_db.kind().dna_hash()
-    }
-
     /// Get a reference to the sys validation workspace's dna def.
     pub fn dna_def(&self) -> Arc<DnaDef> {
         self.dna_def.clone()
+    }
+
+    /// Get a reference to the sys validation workspace's dna def.
+    pub fn dna_def_hashed(&self) -> DnaDefHashed {
+        DnaDefHashed::from_content_sync((*self.dna_def).clone())
     }
 }
 

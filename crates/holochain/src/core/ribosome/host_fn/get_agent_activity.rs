@@ -42,7 +42,7 @@ pub fn get_agent_activity(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = Cascade::from_workspace_and_network(&workspace, network);
+                let cascade = Cascade::from_workspace_and_network(&workspace, network);
                 let activity = cascade
                     .get_agent_activity(agent_pubkey, chain_query_filter, options)
                     .await

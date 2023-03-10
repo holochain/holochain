@@ -28,7 +28,7 @@ pub use kitsune_p2p;
 #[async_trait::async_trait]
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
-pub trait HolochainP2pDnaT {
+pub trait HolochainP2pDnaT: Send + Sync {
     /// owned getter
     fn dna_hash(&self) -> DnaHash;
 
