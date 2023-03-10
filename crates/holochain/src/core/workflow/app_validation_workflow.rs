@@ -17,7 +17,7 @@ use error::AppValidationResult;
 pub use error::*;
 use futures::stream::StreamExt;
 use holo_hash::DhtOpHash;
-use holochain_cascade::Cascade;
+use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::HolochainP2pDna;
@@ -269,7 +269,7 @@ async fn app_validation_workflow_inner(
 pub async fn record_to_op(
     record: Record,
     op_type: DhtOpType,
-    cascade: &Cascade,
+    cascade: &CascadeImpl,
 ) -> AppValidationOutcome<(Op, Option<Entry>)> {
     use DhtOpType::*;
 
@@ -331,7 +331,7 @@ pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     }
 }
 
-async fn dhtop_to_op(op: DhtOp, cascade: &Cascade) -> AppValidationOutcome<Op> {
+async fn dhtop_to_op(op: DhtOp, cascade: &CascadeImpl) -> AppValidationOutcome<Op> {
     let op = match op {
         DhtOp::StoreRecord(signature, action, entry) => Op::StoreRecord(StoreRecord {
             record: Record::new(
@@ -632,8 +632,10 @@ where
             } else {
                 let in_flight = hashes.into_iter().map(|hash| async {
                     let cascade_workspace = workspace_read.clone();
-                    let cascade =
-                        Cascade::from_workspace_and_network(&cascade_workspace, network.clone());
+                    let cascade = CascadeImpl::from_workspace_and_network(
+                        &cascade_workspace,
+                        network.clone(),
+                    );
                     cascade
                         .fetch_record(hash.clone(), NetworkGetOptions::must_get_options())
                         .await?;
@@ -668,7 +670,7 @@ where
             } else {
                 let cascade_workspace = workspace_read.clone();
                 let cascade =
-                    Cascade::from_workspace_and_network(&cascade_workspace, network.clone());
+                    CascadeImpl::from_workspace_and_network(&cascade_workspace, network.clone());
                 cascade
                     .must_get_agent_activity(author.clone(), filter.clone())
                     .await?;
@@ -731,8 +733,8 @@ impl AppValidationWorkspace {
     pub fn full_cascade<Network: HolochainP2pDnaT + Clone + 'static + Send>(
         &self,
         network: Network,
-    ) -> Cascade<Network> {
-        Cascade::empty()
+    ) -> CascadeImpl<Network> {
+        CascadeImpl::empty()
             .with_authored(self.authored_db.clone())
             .with_dht(self.dht_db.clone().into())
             .with_network(network, self.cache.clone())

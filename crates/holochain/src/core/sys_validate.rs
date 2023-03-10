@@ -521,7 +521,7 @@ fn check_prev_action_chain<A: ChainItem>(
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_add_link<F>(
     hash: &ActionHash,
-    cascade: &Cascade,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -550,7 +550,7 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_agent_activity<F>(
     hash: &ActionHash,
-    cascade: &Cascade,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -579,7 +579,7 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_entry<F>(
     hash: &ActionHash,
-    cascade: &Cascade,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -611,7 +611,7 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_any_store_entry<F>(
     hash: &EntryHash,
-    cascade: &Cascade,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -638,7 +638,7 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_record<F>(
     hash: &ActionHash,
-    cascade: &Cascade,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
@@ -732,7 +732,7 @@ impl AsRef<Record> for Source {
 /// it to the incoming ops.
 async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     hash: &I,
-    cascade: &Cascade,
+    cascade: &impl Cascade,
 ) -> SysValidationResult<Source> {
     let hash: AnyDhtHash = hash.clone().into();
     match cascade.retrieve(hash.clone(), Default::default()).await? {
