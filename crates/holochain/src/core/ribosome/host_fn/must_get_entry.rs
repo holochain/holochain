@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::CascadeImpl;
+use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
