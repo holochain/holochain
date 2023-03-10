@@ -54,6 +54,61 @@ use matches::assert_matches;
 use observability;
 use std::convert::TryFrom;
 
+async fn add_chain_to_db(size: usize) {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = SweetDnaFile::unique_empty().await;
+    let dna_hash = dna.dna_hash().clone();
+    // let cell = conductor
+    //     .setup_app("app", [&dna])
+    //     .await
+    //     .unwrap()
+    //     .into_cells()[0];
+    // let space = conductor.spaces.get_or_create_space(&dna_hash).unwrap();
+    // space.authored_db
+    let keystore = conductor.keystore();
+    let author = SweetAgents::one(keystore.clone()).await;
+
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let chain: Vec<_> = futures::future::join_all(
+        contrafact::build_seq(
+            &mut u,
+            size,
+            holochain_zome_types::action::facts::valid_chain(author),
+        )
+        .into_iter()
+        .map(|a| {
+            SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
+                .map(|r| r.unwrap())
+        }),
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+/// Test that the valid_chain contrafact matches our chain validation function,
+/// since many other tests will depend on this constraint
+async fn valid_chain_fact_test() {
+    let keystore = SweetConductor::from_standard_config().await.keystore();
+    let author = SweetAgents::one(keystore.clone()).await;
+
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let chain: Vec<_> = futures::future::join_all(
+        contrafact::build_seq(
+            &mut u,
+            100,
+            holochain_zome_types::action::facts::valid_chain(author),
+        )
+        .into_iter()
+        .map(|a| {
+            SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
+                .map(|r| r.unwrap())
+        }),
+    )
+    .await;
+
+    validate_chain(chain.iter(), &None).unwrap();
+}
+
 /// Mismatched signatures are rejected
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_action_signature_test() {
@@ -610,28 +665,6 @@ fn valid_chain_test() {
             ))
         );
     });
-}
-
-#[tokio::test(flavor = "multi_thread")]
-/// Test that the valid_chain contrafact matches our chain validation function
-async fn valid_chain_fact_test() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let keystore = SweetConductor::from_standard_config().await.keystore();
-    let author = SweetAgents::one(keystore.clone()).await;
-    let chain: Vec<_> = futures::future::join_all(
-        contrafact::build_seq(
-            &mut u,
-            100,
-            holochain_zome_types::action::facts::valid_chain(author),
-        )
-        .into_iter()
-        .map(|a| {
-            SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
-                .map(|r| r.unwrap())
-        }),
-    )
-    .await;
-    validate_chain(chain.iter(), &None).unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
