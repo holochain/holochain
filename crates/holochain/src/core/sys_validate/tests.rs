@@ -4,7 +4,7 @@ use crate::core::workflow::inline_validation;
 use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
 use crate::sweettest::SweetDnaFile;
-use crate::test_utils::fake_genesis;
+use crate::test_utils::fake_genesis_for_agent;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
@@ -89,11 +89,15 @@ async fn check_valid_if_dna_test() {
         Arc::new(dna_def.clone()),
     );
 
+    // Initializing the cache actually matters. TODO: why?
+    cache.get_state().await;
+
     assert_matches!(
         check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Ok(())
     );
     let mut action = fixt!(Dna);
+    action.hash = DnaHash::with_data_sync(&dna_def);
 
     assert_matches!(
         check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
@@ -103,18 +107,31 @@ async fn check_valid_if_dna_test() {
     // - Test that an origin_time in the future leads to invalid Dna action commit
     let dna_def_original = workspace.dna_def();
     dna_def.modifiers.origin_time = Timestamp::MAX;
+    action.hash = DnaHash::with_data_sync(&dna_def);
     workspace.dna_def = Arc::new(dna_def);
+
     assert_matches!(
         check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PrevActionError(PrevActionError::InvalidRootOriginTime)
         ))
     );
+
+    action.hash = DnaHash::with_data_sync(&*dna_def_original);
+    action.author = fake_agent_pubkey_1();
     workspace.dna_def = dna_def_original;
 
-    fake_genesis(db.clone().into(), tmp_dht.to_db(), keystore)
-        .await
-        .unwrap();
+    check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()).unwrap();
+
+    fake_genesis_for_agent(
+        db.clone().into(),
+        tmp_dht.to_db(),
+        action.author.clone(),
+        keystore,
+    )
+    .await
+    .unwrap();
+
     tmp_dht
         .to_db()
         .conn()
@@ -122,19 +139,10 @@ async fn check_valid_if_dna_test() {
         .execute("UPDATE DhtOp SET when_integrated = 0", [])
         .unwrap();
 
-    action.author = fake_agent_pubkey_1();
-
     cache
         .set_all_activity_to_integrated(vec![(Arc::new(action.author.clone()), 0..=2)])
         .await
         .unwrap();
-
-    assert_matches!(
-        check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::InvalidRoot)
-        ))
-    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

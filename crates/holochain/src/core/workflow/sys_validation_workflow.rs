@@ -573,7 +573,7 @@ async fn store_record(action: &Action, cascade: &Cascade) -> SysValidationResult
 async fn store_entry(
     action: NewEntryActionRef<'_>,
     entry: &Entry,
-    conductor_handle: &Conductor,
+    _conductor_handle: &Conductor,
     cascade: &Cascade,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -582,7 +582,7 @@ async fn store_entry(
 
     // Checks
     check_entry_type(entry_type, entry)?;
-    if let EntryType::App(app_entry_def) = entry_type {
+    if let EntryType::App(_app_entry_def) = entry_type {
         // TODO: move this to app validation
         // let entry_def = check_app_entry_def(
         //     ,
@@ -882,7 +882,7 @@ impl SysValidationWorkspace {
         }
     }
 
-    fn dna_hash(&self) -> &DnaHash {
+    pub fn dna_hash(&self) -> &DnaHash {
         self.dht_db.kind().dna_hash()
     }
 
