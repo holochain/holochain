@@ -18,15 +18,11 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 
 #[hdk_extern]
 pub fn create_file(file: File) -> ExternResult<Record> {
-    let file_hash = create_entry(&EntryTypes::File(file.clone()))?;
-    let record = get(file_hash.clone(), GetOptions::default())?
-        .ok_or(
-            wasm_error!(
-                WasmErrorInner::Guest(String::from("Could not find the newly created File"))
-            ),
-        )?;
+    let file_hash = create_entry(&EntryTypes::File(file))?;
+    let record = get(file_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest(String::from("Could not find the newly created File"))
+    ))?;
     let path = Path::from("all_files");
-    create_link(path.path_entry_hash()?, file_hash.clone(), LinkTypes::AllFiles, ())?;
+    create_link(path.path_entry_hash()?, file_hash, LinkTypes::AllFiles, ())?;
     Ok(record)
 }
-

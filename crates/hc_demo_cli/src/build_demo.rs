@@ -8,56 +8,57 @@ compile_error!("feature build_coordinator_wasm is incompatible with build_demo")
 pub const BUILD_MODE: &str = "build_demo";
 
 /// hc_demo_cli integrity wasm bytes
-pub const INTEGRITY_WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/integrity/wasm32-unknown-unknown/release/hc_demo_cli.wasm"));
+pub const INTEGRITY_WASM: &[u8] = include_bytes!(concat!(
+    env!("OUT_DIR"),
+    "/integrity/wasm32-unknown-unknown/release/hc_demo_cli.wasm"
+));
 
 /// hc_demo_cli coordinator wasm bytes
-pub const COORDINATOR_WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/coordinator/wasm32-unknown-unknown/release/hc_demo_cli.wasm"));
+pub const COORDINATOR_WASM: &[u8] = include_bytes!(concat!(
+    env!("OUT_DIR"),
+    "/coordinator/wasm32-unknown-unknown/release/hc_demo_cli.wasm"
+));
+
+use std::sync::Arc;
+
+fn init_tracing() {
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_env_filter(
+            tracing_subscriber::filter::EnvFilter::from_default_env(),
+        )
+        .with_file(true)
+        .with_line_number(true)
+        .finish();
+    let _ = tracing::subscriber::set_global_default(subscriber);
+}
 
 /// Execute the demo
 pub async fn run_demo() {
-    let mut bs_addr = None;
+    init_tracing();
 
-    for addr in tokio::net::lookup_host("bootstrap.holo.host:443").await.unwrap() {
-        if addr.ip().is_ipv4() {
-            bs_addr = Some(addr);
-            break;
-        }
-    }
-
-    let mut sig_addr = None;
-
-    for addr in tokio::net::lookup_host("holotest.net:443").await.unwrap() {
-        if addr.ip().is_ipv4() {
-            sig_addr = Some(addr);
-            break;
-        }
-    }
-
-    println!("{bs_addr:?} {sig_addr:?}");
-
-    struct PubRendezvous {
-        bs_addr: std::net::SocketAddr,
-        sig_addr: std::net::SocketAddr,
-    }
+    struct PubRendezvous;
 
     impl holochain::sweettest::SweetRendezvous for PubRendezvous {
-        fn bootstrap_addr(&self) -> std::net::SocketAddr {
-            self.bs_addr
+        fn bootstrap_addr(&self) -> &str {
+            "https://bootstrap.holo.host"
         }
 
-        fn turn_addr(&self) -> &str {
-            ""
-        }
-
-        fn sig_addr(&self) -> std::net::SocketAddr {
-            self.sig_addr
+        fn sig_addr(&self) -> &str {
+            "wss://holotest.net"
         }
     }
 
-    let _r = PubRendezvous {
-        bs_addr: bs_addr.unwrap(),
-        sig_addr: sig_addr.unwrap(),
-    };
+    let rendezvous: holochain::sweettest::DynSweetRendezvous = Arc::new(PubRendezvous);
 
-    let _c = holochain::sweettest::SweetConductorConfig::standard();
+    let config = holochain::sweettest::SweetConductorConfig::standard();
+
+    let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
+
+    let mut conductor = holochain::sweettest::SweetConductor::from_config_rendezvous_keystore(
+        config,
+        rendezvous,
+        keystore,
+    ).await;
+
+    conductor.shutdown().await;
 }

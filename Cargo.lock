@@ -2191,8 +2191,11 @@ dependencies = [
  "hdi",
  "hdk",
  "holochain",
+ "holochain_keystore",
  "serde",
  "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.16",
 ]
 
 [[package]]
