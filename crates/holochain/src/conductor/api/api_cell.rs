@@ -22,6 +22,8 @@ use holochain_types::prelude::*;
 use holochain_zome_types::block::Block;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
+use holochain_zome_types::block::BlockTargetId;
+use holochain_state::query::StateQueryResult;
 
 /// The concrete implementation of [`CellConductorApiT`], which is used to give
 /// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).
