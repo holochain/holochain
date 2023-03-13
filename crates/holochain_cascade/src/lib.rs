@@ -23,6 +23,7 @@
 //!
 #![warn(missing_docs)]
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use error::CascadeResult;
@@ -52,6 +53,8 @@ use holochain_state::query::PrivateDataQuery;
 use holochain_state::query::StateQueryError;
 use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_types::box_fut_plain;
+use kitsune_p2p::dependencies::kitsune_p2p_types::tx2::tx2_utils::ShareOpen;
 use mutations::insert_action;
 use mutations::insert_entry;
 use mutations::insert_op_lite;
@@ -225,6 +228,7 @@ impl CascadeImpl<HolochainP2pDna> {
 
 /// TODO
 #[async_trait::async_trait]
+#[mockall::automock]
 pub trait Cascade {
     /// Retrieve [`Entry`] from either locally or from an authority.
     /// Data might not have been validated yet by the authority.
@@ -1111,4 +1115,77 @@ where
             None => Q::without_private_data_access(hash),
         }
     }
+}
+
+impl MockCascade {
+    /// Construct a mock which acts as if the given records were part of local storage
+    pub fn with_records(records: Vec<Record>) -> Self {
+        let mut cascade = Self::default();
+
+        let map: HashMap<AnyDhtHash, Record> = records
+            .into_iter()
+            .flat_map(|r| {
+                let mut items = vec![(r.action_address().clone().into(), r.clone())];
+                if let Some(eh) = r.action().entry_hash() {
+                    items.push((eh.clone().into(), r))
+                }
+                items
+            })
+            .collect();
+
+        let map0 = ShareOpen::new(map);
+
+        let map = map0.clone();
+        cascade.expect_retrieve().returning(move |hash, _| {
+            box_fut_plain(Ok(map.share_ref(|m| {
+                m.get(&hash).map(|r| (r.clone(), CascadeSource::Local))
+            })))
+        });
+
+        let map = map0.clone();
+        cascade.expect_retrieve_action().returning(move |hash, _| {
+            box_fut_plain(Ok(map.share_ref(|m| {
+                m.get(&hash.into())
+                    .map(|r| (r.signed_action().clone(), CascadeSource::Local))
+            })))
+        });
+
+        let map = map0.clone();
+        cascade.expect_retrieve_entry().returning(move |hash, _| {
+            box_fut_plain(Ok(map.share_ref(|m| {
+                m.get(&hash.into()).map(|r| {
+                    (
+                        EntryHashed::from_content_sync(r.entry().as_option().unwrap().clone()),
+                        CascadeSource::Local,
+                    )
+                })
+            })))
+        });
+
+        cascade
+    }
+}
+
+#[tokio::test]
+async fn test_mock_cascade_with_records() {
+    use ::fixt::fixt;
+    let records = vec![fixt!(Record), fixt!(Record), fixt!(Record)];
+    let cascade = MockCascade::with_records(records.clone());
+    let opts = NetworkGetOptions::default();
+    let (r0, _) = cascade
+        .retrieve(records[0].action_address().clone().into(), opts.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    let (r1, _) = cascade
+        .retrieve(records[1].action_address().clone().into(), opts.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    let (r2, _) = cascade
+        .retrieve(records[2].action_address().clone().into(), opts)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(records, vec![r0, r1, r2]);
 }
