@@ -97,8 +97,9 @@ async fn sys_validation_workflow_inner(
                 let action = op.action();
 
                 let dependency = get_dependency(op_type, &action);
+                let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
-                let r = validate_op(&op, &workspace, cascade, Some(incoming_dht_ops_sender)).await;
+                let r = validate_op(&op, &dna_def, &cascade, Some(incoming_dht_ops_sender)).await;
                 r.map(|o| (op_hash, o, dependency))
             }
         }
@@ -216,14 +217,13 @@ async fn sys_validation_workflow_inner(
 /// - The Conductor handle is only needed for another inappropriate check of entry type, which invokes wasm and is not proper sys validation.
 /// These two params can go away soon.
 /// What's important to note is that the cascade must be passed in explicitly so that it can be mocked.
-async fn validate_op(
+pub(crate) async fn validate_op(
     op: &DhtOp,
-    workspace: &SysValidationWorkspace,
-    cascade: impl Cascade,
+    dna_def: &DnaDefHashed,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> WorkflowResult<Outcome> {
-    let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
-    match validate_op_inner(op, &cascade, dna_def, incoming_dht_ops_sender).await {
+    match validate_op_inner(op, cascade, dna_def, incoming_dht_ops_sender).await {
         Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
@@ -282,7 +282,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
 async fn validate_op_inner(
     op: &DhtOp,
     cascade: &impl Cascade,
-    dna_def: DnaDefHashed,
+    dna_def: &DnaDefHashed,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     check_not_private(op)?;

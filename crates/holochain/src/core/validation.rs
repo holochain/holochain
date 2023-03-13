@@ -10,6 +10,7 @@ use super::SysValidationError;
 use super::ValidationOutcome;
 
 /// Exit early with either an outcome or an error
+#[derive(Debug)]
 pub enum OutcomeOrError<T, E> {
     Outcome(T),
     Err(E),

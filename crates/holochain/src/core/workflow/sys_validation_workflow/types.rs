@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug)]
 /// The outcome of sys validation
-pub(super) enum Outcome {
+pub(crate) enum Outcome {
     /// Moves to app validation
     Accepted,
     /// Stays in limbo because another DhtOp

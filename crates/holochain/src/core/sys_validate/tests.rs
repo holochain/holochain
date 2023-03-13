@@ -30,6 +30,7 @@
 use super::*;
 use crate::conductor::space::TestSpaces;
 use crate::core::workflow::inline_validation;
+use crate::core::workflow::sys_validation_workflow::sys_validate_record;
 use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
 use crate::sweettest::SweetDnaFile;
@@ -38,6 +39,7 @@ use ::fixt::prelude::*;
 use error::SysValidationError;
 
 use futures::FutureExt;
+use holochain_cascade::MockCascade;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_serialized_bytes::SerializedBytes;
@@ -53,36 +55,54 @@ use holochain_zome_types::Action;
 use matches::assert_matches;
 use observability;
 use std::convert::TryFrom;
+use std::time::Duration;
 
-async fn add_chain_to_db(size: usize) {
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let dna = SweetDnaFile::unique_empty().await;
-    let dna_hash = dna.dna_hash().clone();
-    // let cell = conductor
-    //     .setup_app("app", [&dna])
-    //     .await
-    //     .unwrap()
-    //     .into_cells()[0];
-    // let space = conductor.spaces.get_or_create_space(&dna_hash).unwrap();
-    // space.authored_db
-    let keystore = conductor.keystore();
-    let author = SweetAgents::one(keystore.clone()).await;
+/// Creates a MockCascade with the minimal set of actions to make the given
+/// Action valid. Updates the input action's backlinks to point to these other
+/// injected actions, and returns it along with the created MockCascade.
+fn action_with_mock_cascade(mut action: Action) -> (Action, MockCascade) {
+    assert!(action.action_seq() > 0);
 
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let chain: Vec<_> = futures::future::join_all(
-        contrafact::build_seq(
-            &mut u,
-            size,
-            holochain_zome_types::action::facts::valid_chain(author),
-        )
-        .into_iter()
-        .map(|a| {
-            SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
-                .map(|r| r.unwrap())
-        }),
-    )
-    .await;
+    let non_dna_record = || {
+        // get anything but a Dna
+        let mut dep = fixt!(Record);
+        while let Action::Dna(_) = dep.action() {
+            dep = fixt!(Record);
+        }
+        dep
+    };
+
+    let (action, deps) = match action {
+        Action::Dna(_) => (action, vec![]),
+        mut action => {
+            let mut deps = vec![];
+            let mut prev = non_dna_record();
+            *prev.as_action_mut().action_seq_mut().unwrap() = action.action_seq() - 1;
+            let prev_hash = ActionHash::with_data_sync(prev.as_action_mut());
+            *action.prev_action_mut().unwrap() = prev_hash;
+            deps.push(prev);
+
+            let entry = action.entry_data_mut().map(|(entry_hash, _)| {
+                let entry = fixt!(Entry);
+                *entry_hash = EntryHash::with_data_sync(&entry);
+                entry
+            });
+
+            match action {
+                Action::Create(create) => {}
+                Action::Dna(_) => unreachable!(),
+            }
+            (action, deps)
+        }
+    };
+
+    (action, MockCascade::with_records(vec![]))
 }
+
+// async fn check_sys_val(action: Action) -> anyhow::Result<()> {
+//     let (action, cascade)  =action_with_mock_cascade(action);
+
+// }
 
 #[tokio::test(flavor = "multi_thread")]
 /// Test that the valid_chain contrafact matches our chain validation function,
@@ -92,21 +112,49 @@ async fn valid_chain_fact_test() {
     let author = SweetAgents::one(keystore.clone()).await;
 
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let chain: Vec<_> = futures::future::join_all(
-        contrafact::build_seq(
-            &mut u,
-            100,
+    let fact = contrafact::facts![
+        record::facts::action_and_entry_match(),
+        contrafact::lens(
+            "action is valid",
+            |(a, _)| a,
             holochain_zome_types::action::facts::valid_chain(author),
-        )
-        .into_iter()
-        .map(|a| {
-            SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
-                .map(|r| r.unwrap())
-        }),
-    )
-    .await;
+        ),
+    ];
+    let mut chain: Vec<Record> =
+        futures::future::join_all(contrafact::build_seq(&mut u, 100, fact).into_iter().map(
+            |(a, entry)| {
+                let keystore = keystore.clone();
+                async move {
+                    Record::new(
+                        SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
+                            .await
+                            .unwrap(),
+                        entry,
+                    )
+                }
+            },
+        ))
+        .await;
 
-    validate_chain(chain.iter(), &None).unwrap();
+    validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
+
+    let mut last = chain.pop().unwrap();
+    let penult = chain.last().unwrap();
+
+    // clean up this record so it's valid
+    *last.as_action_mut().timestamp_mut() =
+        (penult.action().timestamp() + Duration::from_secs(1)).unwrap();
+    // re-sign it
+    last.signed_action = SignedActionHashed::sign(
+        &keystore,
+        ActionHashed::from_content_sync(last.action().clone()),
+    )
+    .await
+    .unwrap();
+
+    let cascade = MockCascade::with_records(chain);
+
+    sys_validate_record(&last, &cascade).await.unwrap();
 }
 
 /// Mismatched signatures are rejected
@@ -116,21 +164,19 @@ async fn verify_action_signature_test() {
     let author = fake_agent_pubkey_1();
     let mut action = fixt!(CreateLink);
     action.author = author.clone();
-    let action = Action::CreateLink(action);
+    let (action, cascade) = action_with_mock_cascade(Action::CreateLink(action));
     let real_signature = author.sign(&keystore, &action).await.unwrap();
+    let action_valid = SignedActionHashed::new(action.clone(), real_signature);
+    let record_valid = Record::new(action_valid, None);
+
     let wrong_signature = Signature([1_u8; 64]);
+    let action_invalid = SignedActionHashed::new(action.clone(), wrong_signature);
+    let record_invalid = Record::new(action_invalid, None);
 
-    assert_matches!(
-        verify_action_signature(&wrong_signature, &action).await,
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::Counterfeit(_, _)
-        ))
-    );
-
-    assert_matches!(
-        verify_action_signature(&real_signature, &action).await,
-        Ok(())
-    );
+    sys_validate_record(&record_valid, &cascade).await.unwrap();
+    sys_validate_record(&record_invalid, &cascade)
+        .await
+        .unwrap_err();
 }
 
 /// Any action other than DNA cannot be at seq 0
