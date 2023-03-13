@@ -100,7 +100,7 @@
           __noChroot = pkgs.stdenv.isLinux;
           cargoArtifacts = holochainNextestDeps;
 
-          pname = "holochain-tests-nextest";
+          pname = "holochain-tests";
 
           preCheck = ''
             export DYLD_FALLBACK_LIBRARY_PATH=$(rustc --print sysroot)/lib
@@ -117,14 +117,40 @@
           dontPatchELF = true;
           dontFixup = true;
 
-          installPhase = ''
+          postInstall = ''
             mkdir -p $out
             cp -vL target/.rustc_info.json $out/
             find target -name "junit.xml" -exec cp -vLb {} $out/ \;
           '';
         });
 
-      build-holochain-tests-unit = craneLib.cargoNextest holochainTestsNextestArgs;
+      holochain-tests-unit-deps = craneLib.cargoNextest (holochainTestsNextestArgs // {
+        pname = "holochain-tests-deps";
+        doInstallCargoArtifacts = true;
+        cargoExtraArgs = ''
+          --profile ci \
+          --config-file ${../../.config/nextest.toml} \
+          ${import ../../.config/test-args.nix} \
+          ${import ../../.config/nextest-args.nix} \
+          -E 'not test(/.*/)'
+        '';
+        # Crane's dependency export mechanism doesn't handle child workspaces.
+        # This works around the issue
+        postInstall = holochainTestsNextestArgs.postInstall + ''
+          cp -r crates/test_utils/wasm/wasm_workspace $out/wasm_workspace
+        '';
+
+      });
+
+      build-holochain-tests-unit = craneLib.cargoNextest (holochainTestsNextestArgs // {
+        cargoArtifacts = holochain-tests-unit-deps;
+        preBuild = ''
+          rm -rf crates/test_utils/wasm/wasm_workspace
+          cp -r ${holochain-tests-unit-deps}/wasm_workspace crates/test_utils/wasm/wasm_workspace
+          chmod -R +w crates/test_utils/wasm/wasm_workspace
+          find . -name "invoked.timestamp" | xargs rm
+        '';
+      });
 
       build-holochain-tests-static-fmt = craneLib.cargoFmt (commonArgs // {
         src = flake.config.srcCleanedHolochain;
@@ -146,7 +172,7 @@
         dontPatchELF = true;
         dontFixup = true;
 
-        installPhase = ''
+        postInstall = ''
           mkdir -p $out
           cp -vL target/.rustc_info.json  $out/
         '';
@@ -175,7 +201,7 @@
         dontPatchELF = true;
         dontFixup = true;
 
-        installPhase = ''
+        postInstall = ''
           mkdir -p $out
           cp -vL target/.rustc_info.json  $out/
         '';
