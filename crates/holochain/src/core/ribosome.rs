@@ -377,15 +377,18 @@ impl ZomeCallInvocation {
     ) -> RibosomeResult<ZomeCallAuthorization> {
         if host_access
             .call_zome_handle
-            .is_blocked(BlockTargetId::Cell(CellId::new(
-                (*self.cell_id.dna_hash()).clone(),
-                self.provenance.clone(),
-            )), Timestamp::now())
+            .is_blocked(
+                BlockTargetId::Cell(CellId::new(
+                    (*self.cell_id.dna_hash()).clone(),
+                    self.provenance.clone(),
+                )),
+                Timestamp::now(),
+            )
             .await?
         {
-            Ok(ZomeCallAuthorization::Authorized)
-        } else {
             Ok(ZomeCallAuthorization::BlockedProvenance)
+        } else {
+            Ok(ZomeCallAuthorization::Authorized)
         }
     }
 

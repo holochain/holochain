@@ -18,12 +18,12 @@ use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::DatabaseResult;
+use holochain_state::query::StateQueryResult;
 use holochain_types::prelude::*;
 use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTargetId;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
-use holochain_zome_types::block::BlockTargetId;
-use holochain_state::query::StateQueryResult;
 
 /// The concrete implementation of [`CellConductorApiT`], which is used to give
 /// Cells an API for calling back to their [`Conductor`](crate::conductor::Conductor).
@@ -217,7 +217,11 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn unblock(&self, input: Block) -> DatabaseResult<()>;
 
     /// Expose is_blocked functionality to zomes.
-    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> StateQueryResult<bool>;
+    async fn is_blocked(
+        &self,
+        input: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> StateQueryResult<bool>;
 }
 
 #[async_trait]
@@ -278,7 +282,11 @@ impl CellConductorReadHandleT for CellConductorApi {
         self.conductor_handle.unblock(input).await
     }
 
-    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> StateQueryResult<bool> {
+    async fn is_blocked(
+        &self,
+        input: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> StateQueryResult<bool> {
         self.conductor_handle.is_blocked(input, timestamp).await
     }
 }

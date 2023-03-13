@@ -815,7 +815,11 @@ mod network_impls {
         }
 
         /// Check if some target is blocked.
-        pub async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> StateQueryResult<bool> {
+        pub async fn is_blocked(
+            &self,
+            input: BlockTargetId,
+            timestamp: Timestamp,
+        ) -> StateQueryResult<bool> {
             self.spaces.is_blocked(input, timestamp).await
         }
 
