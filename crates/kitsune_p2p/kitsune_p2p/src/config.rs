@@ -228,6 +228,7 @@ pub enum TransportConfig {
     },
     #[cfg(feature = "tx5")]
     /// Configure to use Tx5 WebRTC for kitsune networking.
+    #[serde(rename = "webrtc", alias = "web_r_t_c", alias = "web_rtc")]
     WebRTC {
         /// The url of the signal server to connect to for addressability.
         signal_url: String,
