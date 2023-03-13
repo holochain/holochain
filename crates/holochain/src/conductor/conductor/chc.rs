@@ -26,9 +26,7 @@ impl Conductor {
             let author = cell_id.agent_pubkey().clone();
             let top_hash = db
                 .async_reader(move |txn| {
-                    SourceChainResult::Ok(
-                        chain_head_db(&txn, Arc::new(author))?.map(|(top_hash, _, _)| top_hash),
-                    )
+                    SourceChainResult::Ok(chain_head_db(&txn, Arc::new(author))?.map(|h| h.action))
                 })
                 .await?;
             let actions = chc.get_actions_since_hash(top_hash).await?;

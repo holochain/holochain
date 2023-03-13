@@ -28,18 +28,18 @@
             #!${pkgs.bash}/bin/bash
             set -Eeuo pipefail
 
-                export PATH="${lib.makeBinPath PATH}"
-                export NIX_PATH=nixpkgs=${pkgs.path}
+            export PATH="${lib.makeBinPath PATH}"
+            export NIX_PATH=nixpkgs=${pkgs.path}
 
-            export TMPDIR=''${TMPDIR:-$(${pkgs.coreutils}/bin/mktemp -d)}
+            export TMPDIR=$(${pkgs.coreutils}/bin/mktemp -d)
 
-            trap 'if [[ -d ''${TMPDIR:-/dev/null} ]]; then ${pkgs.coreutils}/bin/chmod -R +w $TMPDIR; ${pkgs.coreutils}/bin/rm -rf "$TMPDIR"; fi' EXIT
+            trap "${pkgs.coreutils}/bin/chmod -R +w '$TMPDIR'; ${pkgs.coreutils}/bin/rm -rf '$TMPDIR'" EXIT
 
-                if [ -z "''${IMPURE:-}" ]; then
-                  ${cleanEnv}
-                fi
+            if [ -z "''${IMPURE:-}" ]; then
+              ${cleanEnv}
+            fi
 
-                ${script}
+            ${script}
           '';
 
           # list taken from nix source: src/nix-build/nix-build.cc
@@ -69,6 +69,7 @@
             "IMPURE"
             "KEEP_VARS"
             "NIX_PATH"
+            "TMPDIR"
           ];
 
           cleanEnv = ''
@@ -76,15 +77,13 @@
         KEEP_VARS="''${KEEP_VARS:-}"
 
         unsetVars=$(
-          PATH=${pkgs.coreutils}/bin:${pkgs.findutils}/bin \
-            comm \
-              <(env | cut -d = -f 1 | sort) \
-              <(echo "${keepVars} $KEEP_VARS" | tr " " "\n" | sort) \
-              -2 \
-              -3
+          ${pkgs.coreutils}/bin/comm \
+            <(${pkgs.gawk}/bin/awk 'BEGIN{for(v in ENVIRON) print v}' | ${pkgs.coreutils}/bin/cut -d = -f 1 | ${pkgs.coreutils}/bin/sort) \
+            <(echo "${keepVars} $KEEP_VARS" | ${pkgs.coreutils}/bin/tr " " "\n" | ${pkgs.coreutils}/bin/sort) \
+            -2 \
+            -3
         )
 
-        echo -e "unsetting ENV variables:\n$(echo $unsetVars | tr "\n" " ")"
         unset $unsetVars
       '';
         in

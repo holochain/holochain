@@ -1,3 +1,22 @@
+# Loaded as part for `release.yml`
+# Contains a single job called `prepare`.
+#
+# As input it receives a branch to be released (aka. source branch).
+# It then merges the source branch into the release branch (usually `release`).
+#
+# The merged state of the repo is then serialized and cached to use in the subsequent `release.yml` workflow.
+#
+# This workflow also caches cargo related state and build files between runs.
+#
+#
+# Relevant Steps:
+# - Merge the source branch into the release branch
+# - Restore holochain cargo related state and build files
+# - (Checks files) Detect missing release headings
+# - (Changes files) Generate crate READMEs from doc comments
+# - (Changes files) Bump the crate versions for the release
+# - Cache the repo and set outputs
+
 on:
   workflow_call:
     inputs:
@@ -21,20 +40,10 @@ on:
         type: string
         required: false
         default: "https://github.com/holochain/holochain"
-      HOLOCHAIN_NIXPKGS_URL:
-        type: string
-        required: false
-        default: "https://github.com/holochain/holochain-nixkpgs.git"
-      HOLONIX_URL:
-        type: string
-        required: false
-        default: "https://github.com/holochain/holonix.git"
       HOLOCHAIN_REPO:
         type: string
-        required: true
-      HOLOCHAIN_RELEASE_SH:
-        type: string
-        required: true
+        required: false
+        default: "/var/tmp/holochain_repo"
       CACHIX_REV:
         type: string
         required: true
@@ -47,42 +56,42 @@ on:
         required: true
 
     outputs:
-      releasable_crates:
-        description: "whether there are any releaseable crates"
-        value: ${{ jobs.prepare.outputs.releasable_crates }}
-      version:
-        description: "which holochain version, if one, will be released"
-        value: ${{ jobs.prepare.outputs.version }}
       tag:
         description: "which holochain tag, if one, will be released"
         value: ${{ jobs.prepare.outputs.tag }}
+      version:
+        description: "which holochain version, if one, will be released"
+        value: ${{ jobs.prepare.outputs.version }}
+      release_branch:
+        description: "the branch that contains the changes made during this action"
+        value: ${{ jobs.prepare.outputs.release_branch }}
+      repo_nix_store_path:
+        description: "the nix-store path for the release repo that is a result of the preparation"
+        value: ${{ jobs.prepare.outputs.repo_nix_store_path }}
+      releasable_crates:
+        description: "whether there are any releaseable crates"
+        value: ${{ jobs.prepare.outputs.releasable_crates }}
 
 jobs:
   prepare:
     env:
       HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
-      HOLOCHAIN_RELEASE_SH: ${{ inputs.HOLOCHAIN_RELEASE_SH }}
       CACHIX_REV: ${{ inputs.CACHIX_REV }}
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.write-env-and-tag.outputs.tag }}
       version: ${{ steps.write-env-and-tag.outputs.version }}
-      version_compat: ${{ steps.write-env-and-tag.outputs.version_compat }}
       release_branch: ${{ steps.write-env-and-tag.outputs.release_branch }}
+      repo_nix_store_path: ${{ steps.write-env-and-tag.outputs.repo_nix_store_path }}
       releasable_crates: ${{ steps.bump-versions.outputs.releasable_crates }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Extend space
-        uses: ./.github/actions/extend-space
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-
       - name: Install nix
-        uses: cachix/install-nix-action@v17
+        uses: cachix/install-nix-action@v20
       - name: Setup cachix
-        uses: cachix/cachix-action@v11
-        continue-on-error: ${{ github.event_name != 'pull_request' }}
+        uses: cachix/cachix-action@v12
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
@@ -93,19 +102,54 @@ jobs:
       # - name: Set NIX_PATH (FIXME)
       #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
-      - name: Restore the holochain release repository
-        uses: steveeJ-forks/actions-cache/restore@retry
-        with:
-          path: |
-            /var/tmp/holochain_release.sh
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-finalize-release-
-          restore-keys: |
-            holochain-repo-
-          required: false
+      - name: Merge ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }} into ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
+        env:
+          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
+          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
+          HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
+          HOLOCHAIN_TARGET_BRANCH: ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
+          HOLOCHAIN_URL: ${{ inputs.HOLOCHAIN_URL }}
+        run: |
+          set -exuE -o pipefail
+
+          if [[ -d "${HOLOCHAIN_REPO}" ]]; then
+            echo repository at ${HOLOCHAIN_REPO} unexpectedly exists
+            exit 1
+          fi
+          mkdir -p "${HOLOCHAIN_REPO}"
+
+          cd "${HOLOCHAIN_REPO}"
+
+          if ! git status; then
+            git init
+            git remote add origin "${HOLOCHAIN_URL}"
+          else
+            echo unexpectedly got a git repo at $PWD
+            exit 1
+          fi
+
+          cp -v $HOME/work/holochain/holochain/.git/config .git/config
+
+          git fetch --all --tags --prune --prune-tags --force
+          git branch --list --all
+          git checkout --force -B ${HOLOCHAIN_SOURCE_BRANCH} remotes/origin/${HOLOCHAIN_SOURCE_BRANCH}
+
+          # .gitignore might've changed
+          git reset --hard
+          git clean -fd
+
+          obsolete_branches="$(git branch --list | sed -E 's/^ +//' | (grep -oE '^release-[0-9\.]+' || :))"
+          if [[ -n "${obsolete_branches}" ]]; then
+            git branch -D ${obsolete_branches}
+          fi
+
+          # Merge source branch into the release branch
+          if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
+            git checkout -B ${HOLOCHAIN_TARGET_BRANCH}
+          else
+            git checkout --force -B ${HOLOCHAIN_TARGET_BRANCH} origin/${HOLOCHAIN_TARGET_BRANCH}
+            git merge --ff-only "${HOLOCHAIN_SOURCE_BRANCH}"
+          fi
 
       - name: Restore holochain cargo related state and build files
         if: ${{ inputs.skip_prepare_logic != 'true' }}
@@ -125,181 +169,74 @@ jobs:
             ${{ runner.os }}
           required: false
 
-      - name: Prepare the environment file
-        env:
-          HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
-          HOLOCHAIN_TARGET_BRANCH: ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
-          HOLOCHAIN_URL: ${{ inputs.HOLOCHAIN_URL }}
-          HOLOCHAIN_NIXPKGS_URL: ${{ inputs.HOLOCHAIN_NIXPKGS_URL }}
-          HOLONIX_URL: "https://github.com/holochain/holonix.git"
-        run: |
-          cat <<EOF > "${HOLOCHAIN_RELEASE_SH}"
-          export PATH="~/.cargo/bin:\$PATH"
-
-          export HOLOCHAIN_URL=${HOLOCHAIN_URL:?}
-          export HOLOCHAIN_NIXPKGS_URL=${HOLOCHAIN_NIXPKGS_URL:?}
-          export HOLONIX_URL=${HOLONIX_URL:?}
-
-          export HOLOCHAIN_SOURCE_BRANCH="${HOLOCHAIN_SOURCE_BRANCH:?}"
-          export HOLOCHAIN_TARGET_BRANCH="${HOLOCHAIN_TARGET_BRANCH:?}"
-
-          export HOLOCHAIN_NIXPKGS_REPO=$(mktemp -d)
-          export HOLONIX_REPO=$(mktemp -d)
-          EOF
-
-          cat ${HOLOCHAIN_RELEASE_SH}
-
-      - name: Prepare the holochain repository
-        env:
-          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
-        run: |
-          set -exE -o pipefail
-          source "${HOLOCHAIN_RELEASE_SH}"
-
-          if [[ ! -d "${HOLOCHAIN_REPO}" ]]; then
-            rm -rf "${HOLOCHAIN_REPO}"
-            mkdir -p "${HOLOCHAIN_REPO}"
-          fi
-
-          cd "${HOLOCHAIN_REPO}"
-
-          if ! git status; then
-            git init
-            git remote add origin "${HOLOCHAIN_URL}"
-          fi
-
-          cp -v $HOME/work/holochain/holochain/.git/config .git/config
-
-          # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
-          git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
-
-          git fetch --all --tags --prune --prune-tags --force
-          git branch --list --all
-          git checkout --force -B ${HOLOCHAIN_SOURCE_BRANCH} remotes/origin/${HOLOCHAIN_SOURCE_BRANCH}
-
-          # .gitignore might've changed
-          git reset --hard
-          git clean -fd
-
-          obsolete_branches="$(git branch --list | sed -E 's/^ +//' | (grep -oE '^release-[0-9\.]+' || :))"
-          if [[ -n "${obsolete_branches}" ]]; then
-            git branch -D ${obsolete_branches}
-          fi
-
       - name: Detect missing release headings
         if: ${{ inputs.skip_prepare_logic != 'true' }}
+        env:
+          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
         run: |
-          set -ex
-          source "${HOLOCHAIN_RELEASE_SH}"
+          set -exu
           cd "${HOLOCHAIN_REPO}"
 
-          nix-shell --argstr devShellId release --pure --run '
-            set -e
-
-            release-automation \
+          nix develop .#release --ignore-environment --command release-automation \
               --workspace-path=$PWD \
               --log-level=debug \
               crate detect-missing-releaseheadings
-            '
 
       - name: Generate crate READMEs from doc comments
         if: ${{ inputs.skip_prepare_logic != 'true' }}
+        env:
+          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
         run: |
-          source "${HOLOCHAIN_RELEASE_SH}"
           cd "${HOLOCHAIN_REPO}"
-          nix-shell --pure --argstr devShellId release --run "./scripts/generate_readmes.sh"
+          nix develop .#release --ignore-environment --command bash ./scripts/generate_readmes.sh
 
       - name: Bump the crate versions for the release
         id: bump-versions
         if: ${{ inputs.skip_prepare_logic != 'true' }}
+        env:
+          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
+          HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
         run: |
           set -exu
-          source "${HOLOCHAIN_RELEASE_SH}"
-          cd "${HOLOCHAIN_REPO}"
 
-          nix-shell --argstr devShellId release --pure --run '
+          cd ${HOLOCHAIN_REPO}
 
+          nix develop .#release --ignore-environment --command bash -c '
             set -e
             cargo sweep -s
 
             release-automation \
               --workspace-path=$PWD \
               --log-level=debug \
-              release \
-                --force-branch-creation \
-                --steps=CreateReleaseBranch
-
-            release-automation \
-              --workspace-path=$PWD \
-              crate apply-dev-versions --commit --no-verify
-
-            release-automation \
-              --workspace-path=$PWD \
-              --log-level=debug \
               --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
               release \
-                --no-verify-pre \
+                --no-verify \
                 --force-tag-creation \
+                --force-branch-creation \
                 --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-                --disallowed-version-reqs=">=0.3" \
-                --steps=BumpReleaseVersions
+                --allowed-semver-increment-modes="!pre_minor alpha" \
+                --steps=CreateReleaseBranch,BumpReleaseVersions
+
+            release-automation \
+                --workspace-path=$PWD \
+                --log-level=debug \
+                release \
+                  --dry-run \
+                  --no-verify \
+                  --steps=PublishToCratesIo
 
             cargo sweep -f
             '
 
           if ! git diff --exit-code --quiet ${HOLOCHAIN_SOURCE_BRANCH}; then
-            echo "::set-output name=releasable_crates::true"
+            echo "releasable_crates=true" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=releasable_crates::false"
+            echo "releasable_crates=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Run dmesg on error
         if: ${{ failure() }}
         run: sudo dmesg
-
-      - name: Append to the environment file and set outputs
-        id: write-env-and-tag
-        run: |
-          source "${HOLOCHAIN_RELEASE_SH}"
-          cd "${HOLOCHAIN_REPO}"
-
-          cat <<EOF >> "${HOLOCHAIN_RELEASE_SH}"
-          export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
-          export VERSION=\${TAG/holochain-/}
-          export VERSION_COMPAT="v\${VERSION//./_}"
-          export RELEASE_BRANCH=$(git branch --show-current)
-          EOF
-
-          source "${HOLOCHAIN_RELEASE_SH}"
-
-          echo "::set-output name=tag::${TAG}"
-          echo "::set-output name=version::${VERSION}"
-          echo "::set-output name=version_compat::${VERSION_COMPAT}"
-          echo "::set-output name=release_branch::${RELEASE_BRANCH}"
-
-      - name: Merge release branch to the target branch
-        run: |
-          set -exu
-          source "${HOLOCHAIN_RELEASE_SH}"
-          cd "${HOLOCHAIN_REPO}"
-
-          if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
-            git checkout -B ${HOLOCHAIN_TARGET_BRANCH} "${RELEASE_BRANCH}"
-          else
-            git checkout --force -B ${HOLOCHAIN_TARGET_BRANCH} origin/${HOLOCHAIN_TARGET_BRANCH}
-            git merge --ff-only "${RELEASE_BRANCH}"
-          fi
-
-      - name: Cache the holochain release repository
-        uses: steveeJ-forks/actions-cache/save@main
-        with:
-          path: |
-            /var/tmp/holochain_release.sh
-            # asterisk is a workaround for https://github.com/actions/cache/issues/494
-            /var/tmp/holochain_repo/*
-            !/var/tmp/holochain_repo/.cargo/
-            !/var/tmp/holochain_repo/target/
-          key: holochain-repo-${{ github.run_id }}-${{ github.run_number }}
 
       - name: Cache cargo related build files
         uses: steveeJ-forks/actions-cache/save@main
@@ -312,6 +249,30 @@ jobs:
             /var/tmp/holochain_repo/.cargo/git/db/
             /var/tmp/holochain_repo/target/
           key: ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
+
+      - name: cache the repo and set outputs
+        id: write-env-and-tag
+        env:
+          HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
+        run: |
+          set -exu
+
+          cd "${HOLOCHAIN_REPO}"
+
+          git tag --sort=-taggerdate | grep holochain-
+
+          export TAG=$(git tag --sort=-taggerdate | grep holochain- | head -n1)
+          export VERSION=${TAG/holochain-/}
+          export RELEASE_BRANCH=$(git branch --show-current)
+
+          # clean the repo before adding it to the store
+          git clean -ffdx
+          export STORE_PATH=$(nix store add-path --name holochain_repo .)
+
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "release_branch=${RELEASE_BRANCH}" >> $GITHUB_OUTPUT
+          echo "repo_nix_store_path=${STORE_PATH}" >> $GITHUB_OUTPUT
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main

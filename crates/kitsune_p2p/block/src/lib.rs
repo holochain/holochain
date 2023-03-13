@@ -26,8 +26,8 @@ pub type NodeId = Arc<[u8; 32]>;
 #[derive(Clone)]
 pub enum BlockTarget {
     AgentSpace(
-        Arc<kitsune_p2p_types::bin_types::KitsuneAgent>,
-        Arc<kitsune_p2p_types::bin_types::KitsuneSpace>,
+        Arc<kitsune_p2p_bin_data::KitsuneAgent>,
+        Arc<kitsune_p2p_bin_data::KitsuneSpace>,
         AgentSpaceBlockReason,
     ),
     Node(NodeId, NodeBlockReason),
@@ -36,8 +36,8 @@ pub enum BlockTarget {
 
 pub enum BlockTargetId {
     AgentSpace(
-        Arc<kitsune_p2p_types::bin_types::KitsuneAgent>,
-        Arc<kitsune_p2p_types::bin_types::KitsuneSpace>,
+        Arc<kitsune_p2p_bin_data::KitsuneAgent>,
+        Arc<kitsune_p2p_bin_data::KitsuneSpace>,
     ),
     Node(NodeId),
     Ip(std::net::Ipv4Addr),
@@ -76,11 +76,11 @@ impl Block {
         self.interval
     }
 
-    pub fn start(&self) -> &Timestamp {
-        &self.interval.start()
+    pub fn start(&self) -> Timestamp {
+        self.interval.start()
     }
 
-    pub fn end(&self) -> &Timestamp {
-        &self.interval.end()
+    pub fn end(&self) -> Timestamp {
+        self.interval.end()
     }
 }

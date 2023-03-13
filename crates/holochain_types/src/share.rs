@@ -41,7 +41,7 @@ impl<T> RwShare<T> {
             // The lock is taking a little longer then we'd like so print an info
             // and try for a further 30 seconds.
             .or_else(|| {
-                tracing::info!(
+                tracing::warn!(
                     "Took over 100ms to get a RwShare reader. Conductor might be over utilized"
                 );
                 self.0.try_read_for(std::time::Duration::from_secs(30))
@@ -78,7 +78,7 @@ impl<T> RwShare<T> {
             .try_write_for(std::time::Duration::from_millis(100))
             // If that fails try print an info and try for a further 120 seconds.
             .or_else(|| {
-                tracing::info!(
+                tracing::warn!(
                     "Took over 100ms to get a RwShare writer. Conductor might be over utilized"
                 );
                 self.0.try_write_for(std::time::Duration::from_secs(120))

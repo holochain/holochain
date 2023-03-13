@@ -331,12 +331,12 @@ pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
             block.target().clone(),
             InclusiveTimestampInterval::try_new(
                 match maybe_min_maybe_max.0 {
-                    Some(min) => std::cmp::min(Timestamp(min), *block.start()),
-                    None => *block.start(),
+                    Some(min) => std::cmp::min(Timestamp(min), block.start()),
+                    None => block.start(),
                 },
                 match maybe_min_maybe_max.1 {
-                    Some(max) => std::cmp::max(Timestamp(max), *block.end()),
-                    None => *block.end(),
+                    Some(max) => std::cmp::max(Timestamp(max), block.end()),
+                    None => block.end(),
                 },
             )?,
         ),
