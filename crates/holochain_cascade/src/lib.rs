@@ -1119,10 +1119,10 @@ where
 
 impl MockCascade {
     /// Construct a mock which acts as if the given records were part of local storage
-    pub fn with_records(actions: Vec<Record>) -> Self {
+    pub fn with_records(records: Vec<Record>) -> Self {
         let mut cascade = Self::default();
 
-        let map: HashMap<AnyDhtHash, Record> = actions
+        let map: HashMap<AnyDhtHash, Record> = records
             .into_iter()
             .flat_map(|r| {
                 let mut items = vec![(r.action_address().clone().into(), r.clone())];
@@ -1164,4 +1164,28 @@ impl MockCascade {
 
         cascade
     }
+}
+
+#[tokio::test]
+async fn test_mock_cascade_with_records() {
+    use ::fixt::fixt;
+    let records = vec![fixt!(Record), fixt!(Record), fixt!(Record)];
+    let cascade = MockCascade::with_records(records.clone());
+    let opts = NetworkGetOptions::default();
+    let (r0, _) = cascade
+        .retrieve(records[0].action_address().clone().into(), opts.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    let (r1, _) = cascade
+        .retrieve(records[1].action_address().clone().into(), opts.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    let (r2, _) = cascade
+        .retrieve(records[2].action_address().clone().into(), opts)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(records, vec![r0, r1, r2]);
 }
