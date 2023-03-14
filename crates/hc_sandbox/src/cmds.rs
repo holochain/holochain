@@ -69,7 +69,8 @@ pub enum NetworkType {
     /// A transport that uses the MDNS protocol.
     Mdns,
     /// A transport that uses the WebRTC protocol.
-    WebRtc {
+    #[structopt(name = "webrtc")]
+    WebRTC {
         /// URL to a holochain tx5 WebRTC signal server.
         signal_url: String,
     },
@@ -220,7 +221,7 @@ impl From<Network> for KitsuneP2pConfig {
                     },
                 }];
             }
-            NetworkType::WebRtc { signal_url } => {
+            NetworkType::WebRTC { signal_url } => {
                 let transport = TransportConfig::WebRTC { signal_url };
                 kit.transport_pool = vec![transport];
             }
