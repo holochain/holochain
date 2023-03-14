@@ -169,15 +169,15 @@ pub mod tests {
     use crate::core::ribosome::MockRibosomeT;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
+    use holochain_trace;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Action;
     use matches::assert_matches;
-    use observability;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
-        observability::test_run().unwrap();
+        holochain_trace::test_run().unwrap();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());

@@ -24,7 +24,7 @@ async fn test_publish() -> anyhow::Result<()> {
     use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
     use kitsune_p2p::KitsuneP2pConfig;
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut tuning =
@@ -74,7 +74,7 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
     let config = SweetConductorConfig::standard();
@@ -131,7 +131,7 @@ async fn sharded_consistency() {
     };
     use kitsune_p2p::KitsuneP2pConfig;
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
     const NUM_CELLS: usize = 5;
 
@@ -195,7 +195,7 @@ async fn private_entries_dont_leak() {
     use holochain::test_utils::consistency_10s;
     use holochain_types::inline_zome::InlineZomeSet;
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     let mut entry_def = EntryDef::from_id("entrydef");
     entry_def.visibility = EntryVisibility::Private;
 

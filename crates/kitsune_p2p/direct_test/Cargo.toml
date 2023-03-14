@@ -17,4 +17,4 @@ kitsune_p2p_proxy = { version = "^0.1.0", path = "../proxy" }
 rand = "0.8.5"
 structopt = "0.3.21"
 tokio = { version = "1.11", features = ["full"] }
-tracing-subscriber = "0.2.19"
+tracing-subscriber = "0.3.16"

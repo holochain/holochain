@@ -698,7 +698,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn verify_zome_call_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

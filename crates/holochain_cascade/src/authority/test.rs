@@ -1,7 +1,7 @@
 use super::*;
 use crate::authority::handle_get_agent_activity;
 use crate::test_utils::*;
-use ghost_actor::dependencies::observability;
+use ghost_actor::dependencies::holochain_trace;
 use holochain_p2p::actor;
 use holochain_p2p::event::GetRequest;
 use holochain_state::prelude::test_dht_db;
@@ -17,7 +17,7 @@ fn options() -> holochain_p2p::event::GetOptions {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = EntryTestData::create();
@@ -65,7 +65,7 @@ async fn get_entry() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_record() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = RecordTestData::create();
@@ -131,7 +131,7 @@ async fn get_record() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn retrieve_record() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = RecordTestData::create();
@@ -155,7 +155,7 @@ async fn retrieve_record() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = EntryTestData::create();
@@ -191,7 +191,7 @@ async fn get_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
 
     let td = ActivityTestData::valid_chain_scenario();

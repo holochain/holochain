@@ -30,7 +30,7 @@ human-repr = { version = "1", optional = true}
 [dev-dependencies]
 kitsune_p2p_fetch = { path = ".", features = ["test_utils"]}
 holochain_serialized_bytes = "0.0.51"
-observability = "0.1"
+holochain_trace = { version = "^0.1.0", path = "../../holochain_trace" }
 pretty_assertions = "0.7.2"
 test-case = "1.2"
 tokio = { version = "1.11", features = [ "full", "test-util" ] }
