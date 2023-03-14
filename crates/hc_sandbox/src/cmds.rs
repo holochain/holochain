@@ -24,7 +24,7 @@ pub struct Create {
     /// This directory must already exist.
     #[structopt(long)]
     pub root: Option<PathBuf>,
-    #[structopt(short, long)]
+    #[structopt(short, long, value_delimiter = ",")]
     /// Specify the directory name for each sandbox that is created.
     /// By default, new sandbox directories get a random name
     /// like "kAOXQlilEtJKlTM_W403b".
