@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ghost_actor::dependencies::holochain_trace;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_cascade::test_utils::*;

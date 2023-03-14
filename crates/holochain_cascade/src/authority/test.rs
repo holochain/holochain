@@ -1,7 +1,6 @@
 use super::*;
 use crate::authority::handle_get_agent_activity;
 use crate::test_utils::*;
-use ghost_actor::dependencies::holochain_trace;
 use holochain_p2p::actor;
 use holochain_p2p::event::GetRequest;
 use holochain_state::prelude::test_dht_db;

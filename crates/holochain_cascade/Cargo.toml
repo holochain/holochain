@@ -23,8 +23,8 @@ holochain_p2p = { version = "^0.1.0", path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.51"
 holochain_state = { version = "^0.1.0", path = "../holochain_state" }
 holochain_types = { version = "^0.1.0", path = "../holochain_types" }
-holochain_zome_types = { version = "^0.1.0", path = "../holochain_zome_types" }
 holochain_trace = { version = "^0.1.0", path = "../holochain_trace" }
+holochain_zome_types = { version = "^0.1.0", path = "../holochain_zome_types" }
 kitsune_p2p = { version = "^0.1.0", path = "../kitsune_p2p/kitsune_p2p" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_derive = "1.0"

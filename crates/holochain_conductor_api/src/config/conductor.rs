@@ -131,6 +131,7 @@ pub mod tests {
         assert_eq!(
             result,
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
@@ -217,6 +218,7 @@ pub mod tests {
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
@@ -247,6 +249,7 @@ pub mod tests {
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,

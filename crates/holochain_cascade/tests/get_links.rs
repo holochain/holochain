@@ -1,4 +1,3 @@
-use ghost_actor::dependencies::holochain_trace;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
 use holochain_p2p::MockHolochainP2pDnaT;

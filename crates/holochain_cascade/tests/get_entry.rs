@@ -1,4 +1,3 @@
-use ghost_actor::dependencies::holochain_trace;
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
