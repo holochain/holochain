@@ -481,7 +481,7 @@ impl SweetConductor {
             let iter = handle.running_cell_ids(None).into_iter().map(|id| async {
                 let id = id;
                 let db = self.get_authored_db(id.dna_hash()).unwrap();
-                let trigger = self.get_cell_triggers(&id).unwrap();
+                let trigger = self.get_cell_triggers(&id).await.unwrap();
                 (db, trigger)
             });
             futures::stream::iter(iter)

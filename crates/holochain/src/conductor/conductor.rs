@@ -974,7 +974,7 @@ mod network_impls {
                 | ValidationReceiptReceived { .. } => {
                     let cell_id =
                         CellId::new(event.dna_hash().clone(), event.target_agents().clone());
-                    let cell = self.cell_by_id(&cell_id)?;
+                    let cell = self.cell_by_id(&cell_id).await?;
                     cell.handle_holochain_p2p_event(event).await?;
                 }
                 Publish {
@@ -1042,7 +1042,7 @@ mod network_impls {
 
         /// Invoke a zome function on a Cell
         pub async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-            let cell = self.cell_by_id(&call.cell_id)?;
+            let cell = self.cell_by_id(&call.cell_id).await?;
             Ok(cell.call_zome(call, None).await?)
         }
 
@@ -1052,7 +1052,7 @@ mod network_impls {
             workspace_lock: SourceChainWorkspace,
         ) -> ConductorApiResult<ZomeCallResult> {
             debug!(cell_id = ?call.cell_id);
-            let cell = self.cell_by_id(&call.cell_id)?;
+            let cell = self.cell_by_id(&call.cell_id).await?;
             Ok(cell.call_zome(call, Some(workspace_lock)).await?)
         }
 
@@ -1320,12 +1320,29 @@ mod app_impls {
 mod cell_impls {
     use super::*;
     impl Conductor {
-        pub(crate) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
-            let cell = self
+        pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
+            // Can only get a cell from the running_cells list
+            if let Some(cell) = self
                 .running_cells
                 .share_ref(|c| c.get(cell_id).map(|i| i.cell.clone()))
-                .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-            Ok(cell)
+            {
+                Ok(cell)
+            } else {
+                // If not in running_cells list, check if the cell id is registered at all,
+                // to give a different error message for disabled vs missing.
+                let present = self
+                    .get_state()
+                    .await?
+                    .installed_apps()
+                    .values()
+                    .flat_map(|app| app.all_cells())
+                    .any(|id| id == cell_id);
+                if present {
+                    Err(ConductorError::CellDisabled(cell_id.clone()))
+                } else {
+                    Err(ConductorError::CellMissing(cell_id.clone()))
+                }
+            }
         }
 
         /// Iterator over only the cells which are fully "live", meaning they have been
@@ -1879,7 +1896,7 @@ mod scheduler_impls {
             let cell_arcs = {
                 let mut cell_arcs = vec![];
                 for cell_id in self.live_cell_ids() {
-                    if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
+                    if let Ok(cell_arc) = self.cell_by_id(&cell_id).await {
                         cell_arcs.push(cell_arc);
                     }
                 }
@@ -1932,7 +1949,7 @@ mod misc_impls {
                 )
                 .await?;
 
-            let cell = self.cell_by_id(&cell_id)?;
+            let cell = self.cell_by_id(&cell_id).await?;
             source_chain.flush(cell.holochain_p2p_dna()).await?;
 
             Ok(())
@@ -1940,7 +1957,7 @@ mod misc_impls {
 
         /// Create a JSON dump of the cell's state
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
-            let cell = self.cell_by_id(cell_id)?;
+            let cell = self.cell_by_id(cell_id).await?;
             let authored_db = cell.authored_db();
             let dht_db = cell.dht_db();
             let space = cell_id.dna_hash();
@@ -2567,8 +2584,11 @@ mod test_utils_impls {
             Ok(self.get_or_create_space(dna_hash)?.dht_query_cache)
         }
 
-        pub fn get_cache_db(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite<DbKindCache>> {
-            let cell = self.cell_by_id(cell_id)?;
+        pub async fn get_cache_db(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<DbWrite<DbKindCache>> {
+            let cell = self.cell_by_id(cell_id).await?;
             Ok(cell.cache().clone())
         }
 
@@ -2584,8 +2604,11 @@ mod test_utils_impls {
             self.spaces.clone()
         }
 
-        pub fn get_cell_triggers(&self, cell_id: &CellId) -> ConductorApiResult<QueueTriggers> {
-            let cell = self.cell_by_id(cell_id)?;
+        pub async fn get_cell_triggers(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<QueueTriggers> {
+            let cell = self.cell_by_id(cell_id).await?;
             Ok(cell.triggers().clone())
         }
     }
