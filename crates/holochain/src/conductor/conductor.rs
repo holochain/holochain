@@ -175,7 +175,7 @@ struct CellItem {
 }
 
 impl CellItem {
-    pub fn is_running(&self) -> bool {
+    pub fn is_joined(&self) -> bool {
         self.status == CellStatus::Joined
     }
 
@@ -1338,24 +1338,15 @@ mod cell_impls {
             Ok(cell)
         }
 
-        /// Iterator over only the cells which are fully running. Generally used
-        /// to handle conductor interface requests
-        pub fn running_cell_ids(&self) -> HashSet<CellId> {
-            self.running_cells.share_ref(|c| {
-                c.iter()
-                    .filter_map(|(id, item)| {
-                        if item.is_running() {
-                            Some(id.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            })
+        /// Iterator over only the cells which are fully "live", meaning they have been
+        /// fully initialized and are registered with the kitsune network layer.
+        /// Generally used to handle conductor interface requests.
+        pub fn live_cell_ids(&self) -> HashSet<CellId> {
+            self.running_cell_ids(Some(CellStatusFilter::Joined))
         }
 
         /// List CellIds for Cells which match a status filter
-        pub fn list_cell_ids(&self, filter: Option<CellStatusFilter>) -> Vec<CellId> {
+        pub fn running_cell_ids(&self, filter: Option<CellStatusFilter>) -> HashSet<CellId> {
             self.running_cells.share_ref(|cells| {
                 cells
                     .iter()
@@ -1751,7 +1742,7 @@ mod app_status_impls {
             use AppStatus::*;
             use AppStatusTransition::*;
 
-            let running_cells: HashSet<CellId> = self.running_cell_ids();
+            let running_cells: HashSet<CellId> = self.running_cell_ids(None);
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -1872,7 +1863,17 @@ mod scheduler_impls {
             // Clear all ephemeral cruft in all cells before starting a scheduler.
             let cell_arcs = {
                 let mut cell_arcs = vec![];
-                for cell_id in self.running_cell_ids() {
+                // TODO: should we just delete ephemeral scheduled functions for ALL cells
+                // regardless of them running or not?
+                // A: yes, we should.
+                // let all_cells = self
+                //     .get_state()
+                //     .await?
+                //     .installed_apps()
+                //     .values()
+                //     .flat_map(|app| app.all_cells())
+                //     .cloned();
+                for cell_id in self.running_cell_ids(None) {
                     if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
                         cell_arcs.push(cell_arc);
                     }
@@ -1901,7 +1902,7 @@ mod scheduler_impls {
         pub(crate) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
             let cell_arcs = {
                 let mut cell_arcs = vec![];
-                for cell_id in self.running_cell_ids() {
+                for cell_id in self.live_cell_ids() {
                     if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
                         cell_arcs.push(cell_arc);
                     }
