@@ -1881,10 +1881,7 @@ mod scheduler_impls {
             // Clear all ephemeral cruft in all cells before starting a scheduler.
             let tasks = self.spaces.get_from_spaces(|space| {
                 let db = space.authored_db.clone();
-                async move {
-                    db.async_commit(|txn: &mut Transaction| delete_all_ephemeral_scheduled_fns(txn))
-                        .await
-                }
+                async move { db.async_commit(delete_all_ephemeral_scheduled_fns).await }
             });
 
             futures::future::join_all(tasks).await;
