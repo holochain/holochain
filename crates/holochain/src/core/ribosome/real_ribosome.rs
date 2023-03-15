@@ -529,6 +529,7 @@ impl RealRibosome {
             )
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             .with_host_function(&mut ns, "__hc__trace_1", trace)
             .with_host_function(&mut ns, "__hc__hash_1", hash)
             .with_host_function(&mut ns, "__hc__version_1", version)
@@ -1060,6 +1061,8 @@ pub mod wasm_test {
                 "__hc__delete_link_1",
                 "__hc__get_links_1",
                 "__hc__get_link_details_1",
+                "__hc__block_agent_1",
+                "__hc__unblock_agent_1",
                 "__hc__call_1",
                 "__hc__emit_signal_1",
                 "__hc__remote_signal_1",
