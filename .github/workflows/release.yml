@@ -355,37 +355,17 @@ jobs:
           echo "pull-request-number=${pull_request_number}" >> $GITHUB_OUTPUT
 
       - name: Create a github release
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
           RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
-          TAG: ${{ needs.prepare.outputs.tag }}
+          LATEST_HOLOCHAIN_TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
+          LATEST_HOLOCHAIN_VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
+          DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
         run: |
-          set -eu
-          cd "${HOLOCHAIN_REPO}"
-
-          # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
-          if gh release view ${TAG}; then
-            export RELEASE_TAG=${RELEASE_BRANCH}
-            export IS_HOLOCHAIN_RELEASE="false"
-          else
-            export RELEASE_TAG=${TAG}
-            export IS_HOLOCHAIN_RELEASE="true"
-          fi
-
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/holochain/holochain/releases \
-            -f tag_name="${RELEASE_TAG}" \
-            -f target_commitish="${HOLOCHAIN_TARGET_BRANCH}" \
-            -f name="holochain ${VERSION} (${RELEASE_BRANCH#*-})" \
-            -f body="***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***" \
-            -F draft=false \
-            -F prerelease=false \
-            -F generate_release_notes=false \
-            -f make_latest="${IS_HOLOCHAIN_RELEASE}"
+          set -eux
+          cd "${GITHUB_WORKSPACE}"
+          ./scripts/ci-gh-release.sh
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
@@ -421,8 +401,8 @@ jobs:
         continue-on-error: true
         env:
           STATUS: ${{ steps.check-status.outcome }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
+          TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
 
@@ -494,8 +474,8 @@ jobs:
         continue-on-error: true
         env:
           STATUS: ${{ steps.check-status.outcome }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
+          TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
           WORKFLOW_RUN_URL: "https://github.com/holochain/holochain/actions/runs/${{ github.run_id }}"
           HRA_MATTERMOST_TOKEN: ${{ secrets.HRA_MATTERMOST_TOKEN }}
           DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
