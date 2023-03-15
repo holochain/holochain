@@ -29,4 +29,4 @@ holochain_keystore = { version = "^0.1.0", path = "../holochain_keystore" }
 
 [dev-dependencies]
 matches = {version = "0.1.8"}
-observability = "0.1.3"
+holochain_trace = { version = "^0.1.0", path = "../holochain_trace" }

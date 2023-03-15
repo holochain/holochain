@@ -21,7 +21,7 @@ rusqlite = { version = "0.28", optional = true }
 
 [dev-dependencies]
 maplit = "1"
-observability = "0.1"
+holochain_trace = { version = "^0.1.0", path = "../../holochain_trace" }
 pretty_assertions = "0.7.2"
 rand = "0.8.5"
 statrs = "0.15"

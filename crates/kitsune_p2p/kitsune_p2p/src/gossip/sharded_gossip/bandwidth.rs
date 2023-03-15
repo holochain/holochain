@@ -249,7 +249,7 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread", start_paused = true)]
     async fn test_limiter() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let clock = governor::clock::FakeRelativeClock::default();
         // max * 2 * 8 = 0.1 * 1_000_000 * burst_ratio => burst_ratio = max * 2 * 8 / 0.1 / 1_000_000
         let burst_ratio = MAX_SEND_BUF_BYTES as f64 * 2.0 * 8.0 / 1_000_000.0 / 0.1;
