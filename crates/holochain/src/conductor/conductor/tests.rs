@@ -666,7 +666,7 @@ async fn test_enable_disable_enable_clone_cell() {
     assert!(matches!(
         result,
         Err(ConductorApiError::ConductorError(
-            ConductorError::CellMissing(_)
+            ConductorError::CellDisabled(_)
         ))
     ));
 
@@ -686,7 +686,7 @@ async fn test_enable_disable_enable_clone_cell() {
         assert!(matches!(
             result,
             Err(ConductorApiError::ConductorError(
-                ConductorError::CellMissing(_)
+                ConductorError::CellDisabled(_)
             ))
         ));
     }
