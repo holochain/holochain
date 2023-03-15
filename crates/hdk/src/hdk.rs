@@ -125,6 +125,8 @@ mockall::mock! {
             get_links_input: Vec<GetLinksInput>,
         ) -> ExternResult<Vec<LinkDetails>>;
         // P2P
+        fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()>;
+        fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
         fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
         fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
         fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
