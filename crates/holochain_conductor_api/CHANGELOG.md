@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Enabling a clone cell that's already enabled or disabling a clone cell that's already disabled would previously return a `CloneCellNotFound` error. Now, in those cases, nothing happens and a successful result is returned. [\#2093](https://github.com/holochain/holochain/pull/2093)
+
 ## 0.1.3
 
 ## 0.1.2
