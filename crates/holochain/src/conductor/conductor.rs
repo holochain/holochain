@@ -1703,11 +1703,11 @@ mod app_status_impls {
                 let network = cell.holochain_p2p_dna().clone();
                 match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_initial_arc)).await {
                     Ok(Err(e)) => {
-                        tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
+                        tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
                         Err(cell_id)
                     }
                     Err(_) => {
-                        tracing::info!(cell_id = ?cell_id, "Timed out trying to join the network");
+                        tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
                         Err(cell_id)
                     }
                     Ok(Ok(_)) => Ok(cell_id),
@@ -1749,7 +1749,18 @@ mod app_status_impls {
             use AppStatus::*;
             use AppStatusTransition::*;
 
-            let running_cells: HashSet<CellId> = self.running_cell_ids(None);
+            // NOTE: this is checking all *live* cells, meaning all cells
+            // which have fully joined the network. This could lead to a race condition
+            // when an app is first starting up, it checks its cell status, and if
+            // all cells haven't joined the network yet, the app will get disabled again.
+            //
+            // How this *should* be handled is that join retrying should be more frequent,
+            // and should be sure to update app state on every newly joined cell, so that
+            // the app will be enabled as soon as all cells are fully live. For now though,
+            // we might consider relaxing this check so that this race condition isn't
+            // possible, and let ourselves be optimistic that all cells will join soon after
+            // the app starts.
+            let cell_ids: HashSet<CellId> = self.live_cell_ids();
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -1767,7 +1778,7 @@ mod app_status_impls {
                                     // If not all required cells are running, pause the app
                                     let missing: Vec<_> = app
                                         .required_cells()
-                                        .filter(|id| !running_cells.contains(id))
+                                        .filter(|id| !cell_ids.contains(id))
                                         .collect();
                                     if !missing.is_empty() {
                                         let reason = PausedAppReason::Error(format!(
@@ -1781,7 +1792,7 @@ mod app_status_impls {
                                 }
                                 Paused(_) => {
                                     // If all required cells are now running, restart the app
-                                    if app.required_cells().all(|id| running_cells.contains(id)) {
+                                    if app.required_cells().all(|id| cell_ids.contains(id)) {
                                         app.status.transition(Start)
                                     } else {
                                         AppStatusFx::NoChange
