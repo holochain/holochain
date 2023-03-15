@@ -14,6 +14,9 @@ pub enum AppError {
     #[error("Could not find clone cell with id '{0}'")]
     CloneCellNotFound(CloneCellId),
 
+    #[error("Tried to delete a clone cell which was not already disabled: '{0}'")]
+    CloneCellMustBeDisabledBeforeDeleting(CloneCellId),
+
     #[error("Illegal character '{CLONE_ID_DELIMITER}' used in role name: {0}")]
     IllegalRoleName(RoleName),
 
