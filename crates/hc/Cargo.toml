@@ -25,4 +25,4 @@ holochain_cli_bundle = { path = "../hc_bundle", version = "^0.1.0"}
 holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.1.0"}
 holochain_trace = { version = "^0.1.0", path = "../holochain_trace" }
 structopt = "0.3"
-tokio = { version = "1.11", features = [ "full" ] }
+tokio = { version = "1.26", features = [ "full" ] }

@@ -47,7 +47,7 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
 tempfile = "3.3"
 thiserror = "1.0.22"
-tokio = { version = "1.11", features = [ "macros", "rt-multi-thread", "io-util", "sync" ] }
+tokio = { version = "1.26", features = [ "macros", "rt-multi-thread", "io-util", "sync" ] }
 tracing = "0.1.18"
 tracing-futures = "0.2"
 getrandom = "0.2.7"

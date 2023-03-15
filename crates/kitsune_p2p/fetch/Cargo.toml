@@ -21,7 +21,7 @@ num-traits = "0.2.14"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 thiserror = "1.0"
-tokio = { version = "1.11", features = [ "full" ] }
+tokio = { version = "1.26", features = [ "full" ] }
 tracing = "0.1.29"
 linked-hash-map = "0.5.6"
 
@@ -33,7 +33,7 @@ holochain_serialized_bytes = "0.0.51"
 holochain_trace = { version = "^0.1.0", path = "../../holochain_trace" }
 pretty_assertions = "0.7.2"
 test-case = "1.2"
-tokio = { version = "1.11", features = [ "full", "test-util" ] }
+tokio = { version = "1.26", features = [ "full", "test-util" ] }
 
 [features]
 test_utils = ["human-repr"]

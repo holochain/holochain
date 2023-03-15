@@ -9,7 +9,7 @@ colored = "2"
 futures = "*"
 holochain_diagnostics = { path = "../holochain_diagnostics" }
 holochain_trace = { version = "^0.1.0", path = "../holochain_trace" }
-tokio = { version = "1.11", features = ["full"] }
+tokio = { version = "1.26", features = ["full"] }
 tokio-stream = "*"
 
 crossterm = "*"
