@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Reject creation of duplicate clone cells. It was possible to create a clone cell with a DNA hash identical to an already existing DNA. [\#1997](https://github.com/holochain/holochain/pull/1997)
 - Adds doc comments for `StemCell`, `ProvisionedCell` and `CloneCell` structs
+- Various methods may return a `CellMissing` error if an operation is performed on a disabled cell. Now such calls will return `CellDisabled` to differentiate between a truly missing cell and one that's just disabled. [\#2092](https://github.com/holochain/holochain/pull/2092)
 
 ## 0.1.0
 
