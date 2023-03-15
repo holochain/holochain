@@ -6,6 +6,94 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230315.151704
+
+## [holochain\_cli-0.2.0-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_cli\_sandbox-0.2.0-beta-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_cli\_bundle-0.2.0-beta-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain-0.2.0-beta-rc.0](crates/holochain/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- When uninstalling an app, local data is now cleaned up where appropriate. [\#1805](https://github.com/holochain/holochain/pull/1805)
+  - Detail: any time an app is uninstalled, if the removal of that app’s cells would cause there to be no cell installed which uses a given DNA, the databases for that DNA space are deleted. So, if you have an app installed twice under two different agents and uninstall one of them, no data will be removed, but if you uninstall both, then all local data will be cleaned up. If any of your data was gossiped to other peers though, it will live on in the DHT, and even be gossiped back to you if you reinstall that same app with a new agent.
+- Renames `OpType` to `FlatOp`, and `Op::to_type()` to `Op::flattened()`. Aliases for the old names still exist, so this is not a breaking change. [\#1909](https://github.com/holochain/holochain/pull/1909)
+- Fixed a [problem with validation of Ops with private entry data](https://github.com/holochain/holochain/issues/1861), where  `Op::to_type()` would fail for private `StoreEntry` ops. [\#1910](https://github.com/holochain/holochain/pull/1910)
+
+## [holochain\_websocket-0.2.0-beta-rc.0](crates/holochain_websocket/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_test\_wasm\_common-0.2.0-beta-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_conductor\_api-0.2.0-beta-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Reject creation of duplicate clone cells. It was possible to create a clone cell with a DNA hash identical to an already existing DNA. [\#1997](https://github.com/holochain/holochain/pull/1997)
+- Adds doc comments for `StemCell`, `ProvisionedCell` and `CloneCell` structs
+
+## [holochain\_wasm\_test\_utils-0.2.0-beta-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_cascade-0.2.0-beta-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_state-0.2.0-beta-rc.0](crates/holochain_state/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_p2p-0.2.0-beta-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_bootstrap-0.0.12-dev.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.12-dev.0)
+
+## [holochain\_types-0.2.0-beta-rc.0](crates/holochain_types/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_keystore-0.2.0-beta-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_sqlite-0.2.0-beta-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p-0.2.0-beta-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Adds feature flipper `tx5` which enables experimental integration with holochains WebRTC networking backend. This is not enabled by default. [\#1741](https://github.com/holochain/holochain/pull/1741)
+
+## [kitsune\_p2p\_proxy-0.2.0-beta-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.0-beta-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_mdns-0.2.0-beta-rc.0](crates/kitsune_p2p_mdns/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_fetch-0.2.0-beta-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_types-0.2.0-beta-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [mr\_bundle-0.2.0-beta-rc.0](crates/mr_bundle/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_util-0.2.0-beta-rc.0](crates/holochain_util/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [hdk-0.2.0-beta-rc.0](crates/hdk/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Add block/unblock agent functions to HDK [\#1828](https://github.com/holochain/holochain/pull/1828)
+
+## [holochain\_zome\_types-0.2.0-beta-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_dht-0.2.0-beta-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_block-0.2.0-beta-rc.0](crates/kitsune_p2p_block/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Crate now exists
+
+## [kitsune\_p2p\_bin\_data-0.2.0-beta-rc.0](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Crate now exists
+
+## [hdi-0.3.0-beta-rc.0](crates/hdi/CHANGELOG.md#0.3.0-beta-rc.0)
+
+## [hdk\_derive-0.2.0-beta-rc.0](crates/hdk_derive/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_integrity\_types-0.2.0-beta-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_timestamp-0.2.0-beta-rc.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holo\_hash-0.2.0-beta-rc.0](crates/holo_hash/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_dht\_arc-0.2.0-beta-rc.0](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [fixt-0.2.0-beta-rc.0](crates/fixt/CHANGELOG.md#0.2.0-beta-rc.0)
+
 # 20230126.223635
 
 - First beta release
