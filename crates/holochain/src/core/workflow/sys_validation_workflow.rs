@@ -229,11 +229,11 @@ async fn sys_validation_workflow_inner(
     })
 }
 
-/// TODO: Some of these params are unnecessary or soon will be:
-/// - The Workspace is only needed for some checks which are done in sys validation in appropriately, like fork detection.
-/// - The Conductor handle is only needed for another inappropriate check of entry type, which invokes wasm and is not proper sys validation.
-/// These two params can go away soon.
-/// What's important to note is that the cascade must be passed in explicitly so that it can be mocked.
+// TODO: Some of these params are unnecessary or soon will be:
+// - The Workspace is only needed for some checks which are done in sys validation inappropriately, like fork detection.
+// - The Conductor handle is only needed for another inappropriate check of entry type, which invokes wasm and is not proper sys validation.
+// These two params can go away soon.
+// What's important to note is that the cascade must be passed in explicitly so that it can be mocked.
 async fn validate_op(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
