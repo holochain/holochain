@@ -354,70 +354,18 @@ jobs:
           pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
           echo "pull-request-number=${pull_request_number}" >> $GITHUB_OUTPUT
 
-      - name: Eval variables for the github release
-        id: eval-vars-gh-release
+      - name: Create a github release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
           RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
           LATEST_HOLOCHAIN_TAG: ${{ needs.prepare.outputs.latest_holochain_tag }}
           LATEST_HOLOCHAIN_VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
+          DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
         run: |
           set -eux
-
-          # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
-          if gh release view ${LATEST_HOLOCHAIN_TAG}; then
-            export RELEASE_TAG=${RELEASE_BRANCH}
-            export IS_HOLOCHAIN_RELEASE="false"
-          else
-            export RELEASE_TAG=${LATEST_HOLOCHAIN_TAG}
-            export IS_HOLOCHAIN_RELEASE="true"
-          fi
-
-          # this configuers a single, hardcoded branch to publish "latest" release's
-          # this makes the release stand out on the right side in the github repository landing page
-          if [[ "${HOLOCHAIN_TARGET_BRANCH}" == "main-0.1" && "${IS_HOLOCHAIN_RELEASE}" == "true" ]]; then
-            export IS_LATEST="true"
-          else
-            export IS_LATEST="false"
-          fi
-
-          # simply check for the delimeter between the version number and a pre-release suffix
-          if [[ "${LATEST_HOLOCHAIN_VERSION}" == *"-"* ]]; then
-            export IS_PRE_RELEASE="true"
-          else
-            export IS_PRE_RELEASE="false"
-          fi
-
-          echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
-          echo "is_latest=${IS_LATEST}" >> $GITHUB_OUTPUT
-          echo "is_pre_release=${IS_PRE_RELEASE}" >> $GITHUB_OUTPUT
-
-      - name: Create a github release
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
-          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
-          RELEASE_TAG: ${{ steps.eval-vars-gh-release.outputs.release_tag }}
-          IS_LATEST: ${{ steps.eval-vars-gh-release.is_latest }}
-          IS_PRE_RELEASE: ${{ steps.eval-vars-gh-release.is_pre_release }}
-        run: |
-          set -eux
-          cd "${HOLOCHAIN_REPO}"
-
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/holochain/holochain/releases \
-            -f tag_name="${RELEASE_TAG}" \
-            -f target_commitish="${HOLOCHAIN_TARGET_BRANCH}" \
-            -f name="holochain ${VERSION} (${RELEASE_BRANCH#*-})" \
-            -f body="***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***" \
-            -F draft=false \
-            -F generate_release_notes=false \
-            -F prerelease=${IS_PRE_RELEASE} \
-            -f make_latest="${IS_LATEST}"
+          cd "${GITHUB_WORKSPACE}"
+          ./scripts/ci-gh-release.sh
 
       - name: Setup SSH session
         uses: steveeJ-forks/action-upterm@main
