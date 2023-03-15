@@ -354,8 +354,8 @@ jobs:
           pull_request_number="$(tail -n1 gh-pr-create.log | grep -oE '[0-9]+$')"
           echo "pull-request-number=${pull_request_number}" >> $GITHUB_OUTPUT
 
-      - name: Create a github release
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+      - name: Eval variables for the github release
+        id: eval-vars-gh-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
@@ -364,7 +364,6 @@ jobs:
           LATEST_HOLOCHAIN_VERSION: ${{ needs.prepare.outputs.latest_holochain_version }}
         run: |
           set -eux
-          cd "${HOLOCHAIN_REPO}"
 
           # a positive condition means the current holochain version has already been released, hence this release doesn't contain holochain
           if gh release view ${LATEST_HOLOCHAIN_TAG}; then
@@ -389,6 +388,23 @@ jobs:
           else
             export IS_PRE_RELEASE="false"
           fi
+
+          echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "is_latest=${IS_LATEST}" >> $GITHUB_OUTPUT
+          echo "is_pre_release=${IS_PRE_RELEASE}" >> $GITHUB_OUTPUT
+
+      - name: Create a github release
+        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
+          RELEASE_TAG: ${{ steps.eval-vars-gh-release.outputs.release_tag }}
+          IS_LATEST: ${{ steps.eval-vars-gh-release.is_latest }}
+          IS_PRE_RELEASE: ${{ steps.eval-vars-gh-release.is_pre_release }}
+        run: |
+          set -eux
+          cd "${HOLOCHAIN_REPO}"
 
           gh api \
             --method POST \
