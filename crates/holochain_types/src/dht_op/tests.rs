@@ -14,9 +14,9 @@ use crate::prelude::*;
 use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::*;
+use holochain_trace;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::Entry;
-use observability;
 use tracing::*;
 
 use super::OpBasis;
@@ -212,7 +212,7 @@ impl RecordTest {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_all_ops() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut builder = RecordTest::new();
     let (record, expected) = builder.entry_create();
     let result = produce_ops_from_record(&record).unwrap();

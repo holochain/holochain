@@ -12,7 +12,7 @@ use rusqlite::Transaction;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn test_validation_receipt() {
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;

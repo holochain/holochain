@@ -10,8 +10,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_transport_coms() {
-        observability::test_run().ok();
-        observability::metrics::init();
+        holochain_trace::test_run().ok();
+        holochain_trace::metrics::init();
         let (harness, _evt) = spawn_test_harness_mem().await.unwrap();
 
         let space = harness.add_space().await.unwrap();
@@ -44,7 +44,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, evt) = spawn_test_harness_mem().await?;
         let mut recv = evt.receive();
@@ -74,7 +74,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -103,7 +103,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_request_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
         let space = harness.add_space().await?;
@@ -123,7 +123,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_multi_request_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -161,7 +161,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_single_agent_multi_request_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -192,7 +192,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_gossip_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -232,7 +232,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_peer_data_workflow() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -265,7 +265,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "(david.b) these tests are becoming irrelevant, worth it to maintain?"]
     async fn test_gossip_transport() -> Result<(), KitsuneP2pError> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;
 
         harness.add_space().await?;
@@ -334,7 +334,7 @@ mod tests {
     // @freesig Can anyone think of a better way to do this?
     #[ignore = "Need a better way then waiting 6 minutes to test this"]
     async fn test_publish_agent_info() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_mem().await.unwrap();
 

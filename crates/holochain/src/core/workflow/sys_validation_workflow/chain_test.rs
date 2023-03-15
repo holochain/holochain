@@ -10,7 +10,7 @@ use crate::test_utils::inline_zomes::simple_create_read_zome;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "TODO: complete when chain validation returns actual error"]
 async fn sys_validation_agent_activity_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
 

@@ -25,7 +25,7 @@ use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_workflow_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 

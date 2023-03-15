@@ -16,7 +16,7 @@ use pretty_assertions::assert_eq;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "(david.b) ignore until we write a switchboard fetch-queue impl"]
 async fn fullsync_3way_recent() {
-    // observability::test_run().ok();
+    // holochain_trace::test_run().ok();
     let topo = Topology::standard_epoch_full();
     let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
@@ -64,7 +64,7 @@ async fn fullsync_3way_recent() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "(david.b) ignore until we write a switchboard fetch-queue impl"]
 async fn sharded_3way_recent() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let topo = Topology::standard_epoch_full();
     let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
@@ -110,7 +110,7 @@ async fn sharded_3way_recent() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn transitive_peer_gossip() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let topo = Topology::standard_epoch_full();
     let sb = Switchboard::new(topo.clone(), GossipType::Recent);
 
@@ -179,7 +179,7 @@ async fn transitive_peer_gossip() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "(david.b) ignore until we write a switchboard fetch-queue impl"]
 async fn sharded_4way_recent() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let topo = Topology::standard_epoch_full();
     let sb = Switchboard::new(topo.clone(), GossipType::Recent);
@@ -266,7 +266,7 @@ async fn sharded_4way_recent() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "(david.b) ignore until we write a switchboard fetch-queue impl"]
 async fn sharded_4way_historical() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let now = Timestamp::now().as_micros();
     // 1 year ago

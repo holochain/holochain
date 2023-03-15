@@ -30,7 +30,7 @@ use super::Spaces;
 async fn test_region_queries() {
     const NUM_OPS: usize = 100;
 
-    // let _g = observability::test_run().ok();
+    // let _g = holochain_trace::test_run().ok();
 
     let mut u = Unstructured::new(&NOISE);
     let temp_dir = tempfile::TempDir::new().unwrap();

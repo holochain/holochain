@@ -57,7 +57,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn schedule_test_low_level() -> anyhow::Result<()> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             alice_pubkey,
             alice_host_fn_caller,
@@ -197,7 +197,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn schedule_test_wasm() -> anyhow::Result<()> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

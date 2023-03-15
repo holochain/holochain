@@ -21,7 +21,7 @@ criterion_main!(benches);
 struct TestMessage(pub String);
 
 fn simple_bench(bench: &mut Criterion) {
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
 
     let runtime = rt();
 

@@ -31,7 +31,7 @@ use std::time::Duration;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky on darwin test runners")]
 async fn app_validation_workflow_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
         TestWasm::Validate,
@@ -70,7 +70,7 @@ async fn app_validation_workflow_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_private_entries_are_passed_to_validation_only_when_authored_with_full_entry() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     #[hdk_entry_helper]
     pub struct Post(String);
