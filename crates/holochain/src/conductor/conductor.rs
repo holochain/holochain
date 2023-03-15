@@ -174,16 +174,6 @@ struct CellItem {
     status: CellStatus,
 }
 
-impl CellItem {
-    pub fn is_joined(&self) -> bool {
-        self.status == CellStatus::Joined
-    }
-
-    pub fn is_pending(&self) -> bool {
-        self.status == CellStatus::PendingJoin
-    }
-}
-
 #[allow(dead_code)]
 pub(crate) type StopBroadcaster = task_motel::StopBroadcaster;
 pub(crate) type StopReceiver = task_motel::StopListener;
@@ -1861,28 +1851,14 @@ mod scheduler_impls {
         /// So ideally this would be called ONCE per conductor lifecyle ONLY.
         pub(crate) async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
             // Clear all ephemeral cruft in all cells before starting a scheduler.
-            let cell_arcs = {
-                let mut cell_arcs = vec![];
-                // TODO: should we just delete ephemeral scheduled functions for ALL cells
-                // regardless of them running or not?
-                // A: yes, we should.
-                // let all_cells = self
-                //     .get_state()
-                //     .await?
-                //     .installed_apps()
-                //     .values()
-                //     .flat_map(|app| app.all_cells())
-                //     .cloned();
-                for cell_id in self.running_cell_ids(None) {
-                    if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
-                        cell_arcs.push(cell_arc);
-                    }
+            let tasks = self.spaces.get_from_spaces(|space| {
+                let db = space.authored_db.clone();
+                async move {
+                    db.async_commit(|txn: &mut Transaction| delete_all_ephemeral_scheduled_fns(txn))
+                        .await
                 }
-                cell_arcs
-            };
-            let tasks = cell_arcs
-                .into_iter()
-                .map(|cell_arc| cell_arc.delete_all_ephemeral_scheduled_fns());
+            });
+
             futures::future::join_all(tasks).await;
 
             let scheduler_handle = self.clone();
@@ -2227,7 +2203,7 @@ impl Conductor {
             cells
                 .iter_mut()
                 .filter_map(|(id, item)| {
-                    if item.is_pending() {
+                    if item.status == CellStatus::PendingJoin {
                         item.status = CellStatus::Joining;
                         Some((id.clone(), item.cell.clone()))
                     } else {

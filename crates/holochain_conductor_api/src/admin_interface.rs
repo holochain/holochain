@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
@@ -379,7 +377,7 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::ListCellIds`].
     ///
     /// Contains a list of all the cell IDs in the conductor.
-    CellIdsListed(HashSet<CellId>),
+    CellIdsListed(Vec<CellId>),
 
     /// The successful response to an [`AdminRequest::ListApps`].
     ///
