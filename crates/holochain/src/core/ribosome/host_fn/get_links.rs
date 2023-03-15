@@ -91,7 +91,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::HashPath).await;
@@ -130,7 +130,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn hash_path_anchor_list_anchors() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Anchor).await;
@@ -215,7 +215,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn baseless_get_links() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -232,7 +232,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn external_get_links() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -247,7 +247,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_get_links() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
@@ -275,7 +275,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dup_path_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;

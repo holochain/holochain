@@ -753,6 +753,7 @@ mod network_impls {
     use holochain_conductor_api::NetworkInfo;
     use holochain_p2p::HolochainP2pSender;
     use holochain_zome_types::block::Block;
+    use holochain_zome_types::block::BlockTargetId;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -811,6 +812,15 @@ mod network_impls {
         /// Unblock some target.
         pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
             self.spaces.unblock(input).await
+        }
+
+        /// Check if some target is blocked.
+        pub async fn is_blocked(
+            &self,
+            input: BlockTargetId,
+            timestamp: Timestamp,
+        ) -> StateQueryResult<bool> {
+            self.spaces.is_blocked(input, timestamp).await
         }
 
         pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {

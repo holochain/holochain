@@ -135,7 +135,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn sys_validation_query() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let db = test_dht_db();
         let expected = test_data(&db.to_db().into());
         let r = get_ops_to_validate(&db.to_db().into(), true).await.unwrap();
@@ -222,7 +222,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     /// Make sure both workflows can't pull in the same ops.
     async fn workflows_are_exclusive() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let mut u = Unstructured::new(&NOISE);
 
         let db = test_dht_db();

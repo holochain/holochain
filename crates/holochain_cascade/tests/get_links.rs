@@ -1,4 +1,3 @@
-use ghost_actor::dependencies::observability;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::Cascade;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -12,7 +11,7 @@ use holochain_zome_types::ChainTopOrdering;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_not_authority() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -68,7 +67,7 @@ async fn links_not_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_authority() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -109,7 +108,7 @@ async fn links_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_authoring() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
