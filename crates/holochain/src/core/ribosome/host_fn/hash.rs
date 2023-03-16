@@ -173,7 +173,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_hash_entry_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::HashEntry).await;

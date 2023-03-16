@@ -207,7 +207,7 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_index_lookup() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;

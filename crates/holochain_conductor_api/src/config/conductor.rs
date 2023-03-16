@@ -28,6 +28,10 @@ use std::path::Path;
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
+    /// Override the environment specified tracing config.
+    #[serde(default)]
+    pub tracing_override: Option<String>,
+
     /// The path to the database for this conductor;
     /// if omitted, chooses a default path.
     pub environment_path: DatabaseRootPath,
@@ -127,6 +131,7 @@ pub mod tests {
         assert_eq!(
             result,
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
@@ -140,7 +145,7 @@ pub mod tests {
 
     #[test]
     fn test_config_complete_config() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let yaml = r#"---
     environment_path: /path/to/env
@@ -213,6 +218,7 @@ pub mod tests {
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
@@ -243,6 +249,7 @@ pub mod tests {
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,

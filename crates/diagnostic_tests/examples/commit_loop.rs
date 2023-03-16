@@ -17,7 +17,7 @@ use holochain_diagnostics::*;
 
 #[tokio::main]
 async fn main() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let start = Instant::now();
 
     // let config = config_no_networking();

@@ -315,16 +315,16 @@ mod test {
     use crate::conductor::Conductor;
     use anyhow::Result;
     use holochain_state::prelude::*;
+    use holochain_trace;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_types::test_utils::write_fake_dna_file;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
-    use observability;
     use uuid::Uuid;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_list_dna_app() -> Result<()> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let env_dir = test_db_dir();
         let handle = Conductor::builder().test(env_dir.path(), &[]).await?;
 
@@ -451,7 +451,7 @@ mod test {
     // @todo fix test by using new InstallApp call
     // #[tokio::test(flavor = "multi_thread")]
     // async fn install_list_dna_app() {
-    // observability::test_run().ok();
+    // holochain_trace::test_run().ok();
     // let db_dir = test_db_dir();
     // let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
     // let shutdown = handle.take_shutdown_handle().unwrap();

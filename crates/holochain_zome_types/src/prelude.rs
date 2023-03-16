@@ -3,6 +3,7 @@
 pub use crate::action::conversions::*;
 pub use crate::action::*;
 pub use crate::agent_activity::*;
+pub use crate::block::*;
 pub use crate::bytes::*;
 pub use crate::call::*;
 pub use crate::capability::*;
