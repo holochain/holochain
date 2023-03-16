@@ -1625,6 +1625,8 @@ pub mod tests {
             alice.clone(),
         )
         .await?;
+        // alice as chain author always has a valid cap grant; provided secrets
+        // are ignored
         assert_eq!(
             chain
                 .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
