@@ -339,7 +339,7 @@ jobs:
           HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
           GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
-          set -euE -o pipefail
+          set -xeuE -o pipefail
 
           cd "${HOLOCHAIN_REPO}"
 
