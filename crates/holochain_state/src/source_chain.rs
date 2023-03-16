@@ -697,7 +697,6 @@ where
                     let maybe_entry = match maybe_row {
                         None => None,
                         Some(row) => {
-                            // let entry: Entry = from_blob(row.get("blob")?)?;
                             let entry = from_blob::<Entry>(row.get("blob")?).map_err(|err| {
                                 holochain_sqlite::rusqlite::Error::InvalidColumnType(
                                     0,
@@ -727,11 +726,7 @@ where
                             // transferable and assigned cap grant when cap secret provided
                             CapAccess::Transferable { .. } => Some(cap_grant),
                             CapAccess::Assigned { assignees, .. } => {
-                                if assignees.contains(&check_agent) {
-                                    Some(cap_grant)
-                                } else {
-                                    None
-                                }
+                                assignees.contains(&check_agent).then_some(cap_grant)
                             }
                             // unrestricted cap grant only possible without cap secret
                             CapAccess::Unrestricted => Some(cap_grant),
