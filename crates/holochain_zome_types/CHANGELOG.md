@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- A change to `name` in a DnaDef no longer has an effect on the DNA hash [\#2099](https://github.com/holochain/holochain/pull/2099)
+
 ## 0.2.0-beta-rc.0
 
 ## 0.1.0
