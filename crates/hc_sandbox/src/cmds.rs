@@ -30,7 +30,7 @@ pub struct Create {
     /// like "kAOXQlilEtJKlTM_W403b".
     /// Use this option to override those names with something explicit.
     ///
-    /// For example `hc gen -r path/to/my/chains -n 3 -d=first,second,third`
+    /// For example `hc s generate path/to/my/chains -r -n 3 -d=first,second,third`
     /// will create three sandboxes with directories named "first", "second", and "third".
     pub directories: Vec<PathBuf>,
 }
