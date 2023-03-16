@@ -10,6 +10,7 @@ use holochain_types::prelude::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CellId, DnaModifiersOpt};
 use matches::assert_matches;
+use tempfile::tempdir;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_duplicate_app_for_same_agent() {
@@ -133,7 +134,7 @@ async fn reject_duplicate_app_for_same_agent() {
 #[tokio::test(flavor = "multi_thread")]
 async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     let conductor = SweetConductor::from_standard_config().await;
-    let agents = SweetAgents::get(conductor.keystore(), 4).await;
+    let agents = SweetAgents::get(conductor.keystore(), 6).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = PathBuf::from(format!("{}", dna.dna_hash()));
@@ -175,6 +176,10 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
             .unwrap()
     };
 
+    let bundle_dir = tempdir().unwrap();
+    let bundle_path = bundle_dir.as_ref().join("bundle.happ");
+    bundle().await.write_to_file(&bundle_path).await.unwrap();
+
     let app0 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -193,7 +198,7 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
             agent_key: agents[1].clone(),
             source: AppBundleSource::Bundle(bundle().await),
             installed_app_id: Some("app_1".into()),
-            network_seed: Some("same-seed".to_string()),
+            network_seed: Some("harlequin chestnut mango zither".to_string()),
             membrane_proofs: HashMap::new(),
         })
         .await
@@ -205,7 +210,7 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
             agent_key: agents[2].clone(),
             source: AppBundleSource::Bundle(bundle().await),
             installed_app_id: Some("app_2".into()),
-            network_seed: Some("same-seed".to_string()),
+            network_seed: Some("harlequin chestnut mango zither".to_string()),
             membrane_proofs: HashMap::new(),
         })
         .await
@@ -217,7 +222,31 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
             agent_key: agents[3].clone(),
             source: AppBundleSource::Bundle(bundle().await),
             installed_app_id: Some("app_3".into()),
-            network_seed: Some("different-seed".to_string()),
+            network_seed: Some("stromboli ziggurat mongoose liberation".to_string()),
+            membrane_proofs: HashMap::new(),
+        })
+        .await
+        .unwrap();
+
+    let app4 = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: agents[4].clone(),
+            source: AppBundleSource::Path(bundle_path.clone()),
+            installed_app_id: Some("app_4".into()),
+            network_seed: Some("harlequin chestnut mango zither".to_string()),
+            membrane_proofs: HashMap::new(),
+        })
+        .await
+        .unwrap();
+
+    let app5 = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: agents[5].clone(),
+            source: AppBundleSource::Path(bundle_path.clone()),
+            installed_app_id: Some("app_5".into()),
+            network_seed: Some("stromboli ziggurat mongoose liberation".to_string()),
             membrane_proofs: HashMap::new(),
         })
         .await
@@ -234,5 +263,13 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     assert_ne!(
         app2.all_cells().next().unwrap().dna_hash(),
         app3.all_cells().next().unwrap().dna_hash()
+    );
+    assert_eq!(
+        app2.all_cells().next().unwrap().dna_hash(),
+        app4.all_cells().next().unwrap().dna_hash()
+    );
+    assert_eq!(
+        app3.all_cells().next().unwrap().dna_hash(),
+        app5.all_cells().next().unwrap().dna_hash()
     );
 }
