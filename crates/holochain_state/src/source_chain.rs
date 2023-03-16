@@ -632,6 +632,7 @@ where
         }
         let author = self.author.clone();
         // TODO: SQL_PERF: This query could have a fast upper bound if we add indexes.
+        //
         let valid_cap_grant = self
             .vault
             .async_reader(move |txn| {
