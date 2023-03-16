@@ -15,8 +15,6 @@ use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::rusqlite::params;
-use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::chc::ChcError;
 use holochain_types::db::DbRead;
@@ -631,138 +629,120 @@ where
             // caller is source chain author
             return Ok(Some(author_grant));
         }
+
         // remote caller
-        if let Some(cap_secret) = check_secret {
-            // valid cap grant for cap secret must exist for call to be
-            // authorized
-            let maybe_cap_grant: Option<CapGrant> = self
-                .vault
-                .async_reader({
-                    let agent_pubkey = self.agent_pubkey().clone();
-                    move |txn| {
-                        let sql = "
-                            SELECT Entry.blob
-                            FROM Entry
-                            WHERE Entry.cap_secret = ?1
-                            AND (
-                                SELECT COUNT(Action.hash)
-                                FROM Action
-                                WHERE Action.author = ?2
+        let maybe_cap_grant: Option<CapGrant> = self
+            .vault
+            .async_reader({
+                let agent_pubkey = self.agent_pubkey().clone();
+                move |txn| -> Result<_, DatabaseError> {
+                    // prepare sql statement depending on provided cap secret
+                    let mut statement = match &check_secret {
+                        Some(cap_secret) => {
+                            // cap grant for cap secret must exist
+                            // that has not been updated or deleted
+                            let sql = "
+                                SELECT Entry.blob
+                                FROM Entry
+                                WHERE Entry.cap_secret = ?1
                                 AND (
-                                    Action.original_entry_hash = Entry.hash
-                                    OR Action.deletes_entry_hash = Entry.hash
-                                )
-                            ) = 0
-                        "
-                        .trim();
-                        let cap_secret_blob = to_blob(&cap_secret).map_err(|err| {
-                            holochain_sqlite::rusqlite::Error::ToSqlConversionFailure(Box::new(err))
-                        })?;
-                        txn.query_row(sql, params![cap_secret_blob, agent_pubkey], |row| {
-                            let blob = from_blob::<Entry>(row.get("blob")?).map_err(|err| {
+                                    SELECT COUNT(Action.hash)
+                                    FROM Action
+                                    WHERE Action.author = ?2
+                                    AND (
+                                        Action.original_entry_hash = Entry.hash
+                                        OR Action.deletes_entry_hash = Entry.hash
+                                    )
+                                ) = 0
+                            "
+                            .trim();
+                            let mut statement = txn.prepare(sql)?;
+                            let cap_secret_blob = to_blob(cap_secret).map_err(|err| {
+                                DatabaseError::SerializedBytes(SerializedBytesError::Serialize(
+                                    err.to_string(),
+                                ))
+                            })?;
+                            statement.raw_bind_parameter(1, cap_secret_blob)?;
+                            statement.raw_bind_parameter(2, agent_pubkey.clone())?;
+                            statement
+                        }
+                        None => {
+                            // unrestricted cap grant must exist
+                            // that has not been updated or deleted
+                            let sql = "
+                                SELECT blob
+                                FROM Entry
+                                WHERE access_type = ?1
+                                AND (
+                                    SELECT COUNT(Action.hash)
+                                    FROM Action
+                                    WHERE Action.author = ?2
+                                    AND (
+                                        Action.original_entry_hash = Entry.hash
+                                        OR Action.deletes_entry_hash = Entry.hash
+                                    )
+                                ) = 0;
+                            "
+                            .trim();
+                            let mut statement = txn.prepare(sql)?;
+                            statement.raw_bind_parameter(1, "unrestricted")?;
+                            statement.raw_bind_parameter(2, agent_pubkey.clone())?;
+                            statement
+                        }
+                    };
+
+                    // query for one specific cap grant
+                    let mut rows = statement.raw_query();
+                    let maybe_row = rows.next()?;
+                    let maybe_entry = match maybe_row {
+                        None => None,
+                        Some(row) => {
+                            // let entry: Entry = from_blob(row.get("blob")?)?;
+                            let entry = from_blob::<Entry>(row.get("blob")?).map_err(|err| {
                                 holochain_sqlite::rusqlite::Error::InvalidColumnType(
                                     0,
                                     err.to_string(),
                                     holochain_sqlite::rusqlite::types::Type::Blob,
                                 )
                             })?;
-                            Ok(blob)
-                        })
-                        .optional()
-                        .map_err(|err| DatabaseError::SqliteError(err))
-                    }
-                })
-                .await?
-                .and_then(|entry| entry.as_cap_grant());
+                            Some(entry)
+                        }
+                    };
+                    Ok(maybe_entry)
+                }
+            })
+            .await?
+            .and_then(|entry| entry.as_cap_grant());
 
-            let valid_cap_grant = match maybe_cap_grant {
-                None => None,
-                Some(cap_grant) => {
-                    // validate cap grant in itself, especially if granted functions are valid
-                    if !cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
-                        return Ok(None);
-                    }
-                    match &cap_grant {
-                        CapGrant::RemoteAgent(zome_call_cap_grant) => {
-                            match &zome_call_cap_grant.access {
-                                CapAccess::Transferable { .. } => Some(cap_grant),
-                                CapAccess::Assigned { assignees, .. } => {
-                                    if assignees.contains(&check_agent) {
-                                        Some(cap_grant)
-                                    } else {
-                                        None
-                                    }
+        let valid_cap_grant = match maybe_cap_grant {
+            None => None,
+            Some(cap_grant) => {
+                // validate cap grant in itself, especially check if functions are authorized
+                if !cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
+                    return Ok(None);
+                }
+                match &cap_grant {
+                    CapGrant::RemoteAgent(zome_call_cap_grant) => {
+                        match &zome_call_cap_grant.access {
+                            // transferable and assigned cap grant when cap secret provided
+                            CapAccess::Transferable { .. } => Some(cap_grant),
+                            CapAccess::Assigned { assignees, .. } => {
+                                if assignees.contains(&check_agent) {
+                                    Some(cap_grant)
+                                } else {
+                                    None
                                 }
-                                // unrestricted cap grant must not exist for given cap secret
-                                CapAccess::Unrestricted => unreachable!(),
                             }
+                            // unrestricted cap grant only possible without cap secret
+                            CapAccess::Unrestricted => Some(cap_grant),
                         }
-                        // chain author cap grant must have been handled first
-                        CapGrant::ChainAuthor(_) => unreachable!(),
                     }
+                    // chain author cap grant has been handled at the beginning
+                    CapGrant::ChainAuthor(_) => unreachable!(),
                 }
-            };
-            Ok(valid_cap_grant)
-        } else {
-            // valid unrestricted cap grant must exist for call to be authorized
-            let maybe_unrestricted_grant = self
-                .vault
-                .async_reader({
-                    let agent_pubkey = self.agent_pubkey().clone();
-                    move |txn| {
-                        let sql = "
-                            SELECT blob
-                            FROM Entry
-                            WHERE access_type = 'unrestricted'
-                            AND (
-                                SELECT COUNT(Action.hash)
-                                FROM Action
-                                WHERE Action.author = ?1
-                                AND (
-                                    Action.original_entry_hash = Entry.hash
-                                    OR Action.deletes_entry_hash = Entry.hash
-                                )
-                            ) = 0;
-                        "
-                        .trim();
-                        txn.query_row(sql, params![agent_pubkey], |row| {
-                            let blob = from_blob::<Entry>(row.get("blob")?).map_err(|err| {
-                                holochain_sqlite::rusqlite::Error::InvalidColumnType(
-                                    0,
-                                    err.to_string(),
-                                    holochain_sqlite::rusqlite::types::Type::Blob,
-                                )
-                            })?;
-                            Ok(blob)
-                        })
-                        .optional()
-                        .map_err(|err| DatabaseError::SqliteError(err))
-                    }
-                })
-                .await?
-                .and_then(|entry| entry.as_cap_grant());
-
-            let valid_unrestricted_grant = match maybe_unrestricted_grant {
-                None => None,
-                Some(cap_grant) => {
-                    // validate cap grant in itself, especially if granted functions are valid
-                    if !cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
-                        return Ok(None);
-                    }
-                    match &cap_grant {
-                        CapGrant::RemoteAgent(zome_call_cap_grant) => {
-                            match &zome_call_cap_grant.access {
-                                CapAccess::Unrestricted => Some(cap_grant),
-                                CapAccess::Transferable { .. } => unreachable!(),
-                                CapAccess::Assigned { .. } => unreachable!(),
-                            }
-                        }
-                        CapGrant::ChainAuthor(_) => unreachable!(),
-                    }
-                }
-            };
-            Ok(valid_unrestricted_grant)
-        }
+            }
+        };
+        Ok(valid_cap_grant)
     }
 
     /// Query Actions in the source chain.
