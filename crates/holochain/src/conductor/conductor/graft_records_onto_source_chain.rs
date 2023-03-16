@@ -101,7 +101,7 @@ pub(crate) async fn graft_records_onto_source_chain(
     // Check which ops need to be integrated.
     // Only integrated if a cell is installed.
     if handle
-        .list_cell_ids(Some(CellStatus::Joined))
+        .running_cell_ids(Some(CellStatus::Joined))
         .contains(&cell_id)
     {
         holochain_state::integrate::authored_ops_to_dht_db(
