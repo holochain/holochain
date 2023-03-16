@@ -8,7 +8,7 @@ chashmap = "2.2"
 colored = "2"
 futures = "*"
 holochain_diagnostics = { path = "../holochain_diagnostics" }
-holochain_trace = { version = "^0.1.0", path = "../holochain_trace" }
+holochain_trace = { version = "^0.2.0-beta-rc.0", path = "../holochain_trace" }
 tokio = { version = "1.11", features = ["full"] }
 tokio-stream = "*"
 
