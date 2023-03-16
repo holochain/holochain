@@ -1,7 +1,7 @@
-//! Helpers for making [`AdminRequest`]s to the admin api.
+//! Helpers for making [`AdminRequest`]s to the admin API.
 //!
 //! This module is designed for use in a CLI so it is more simplified
-//! then calling the [`CmdRunner`] directly.
+//! than calling the [`CmdRunner`] directly.
 //! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
 //! but if you want more control use [`CmdRunner::command`].
 use std::path::Path;
@@ -97,22 +97,22 @@ pub struct AddAppWs {
 
 #[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::RegisterDna
-/// and registers a Dna. You can only use a path or a hash not both.
+/// and registers a DNA. You can only use a path or a hash, not both.
 pub struct RegisterDna {
     #[structopt(short, long)]
-    /// Network seed to override when installing this Dna
+    /// Network seed to override when installing this DNA
     pub network_seed: Option<String>,
     #[structopt(long)]
-    /// Properties to override when installing this Dna
+    /// Properties to override when installing this DNA
     pub properties: Option<PathBuf>,
     #[structopt(long)]
-    /// Origin time to override when installing this Dna
+    /// Origin time to override when installing this DNA
     pub origin_time: Option<Timestamp>,
     #[structopt(long, conflicts_with = "hash", required_unless = "hash")]
     /// Path to a DnaBundle file.
     pub path: Option<PathBuf>,
     #[structopt(short, long, parse(try_from_str = parse_dna_hash), required_unless = "path")]
-    /// Hash of an existing dna you want to register.
+    /// Hash of an existing DNA you want to register.
     pub hash: Option<DnaHash>,
 }
 
@@ -173,10 +173,10 @@ pub struct DisableApp {
 /// TODO: Default to dumping all cell state.
 pub struct DumpState {
     #[structopt(parse(try_from_str = parse_dna_hash))]
-    /// The dna hash half of the cell id to dump.
+    /// The DNA hash half of the cell ID to dump.
     pub dna: DnaHash,
     #[structopt(parse(try_from_str = parse_agent_key))]
-    /// The agent half of the cell id to dump.
+    /// The agent half of the cell ID to dump.
     pub agent_key: AgentPubKey,
 }
 
@@ -186,10 +186,10 @@ pub struct DumpState {
 /// this conductor.
 pub struct ListAgents {
     #[structopt(short, long, parse(try_from_str = parse_agent_key), requires = "dna")]
-    /// Optionally request agent info for a particular cell id.
+    /// Optionally request agent info for a particular cell ID.
     pub agent_key: Option<AgentPubKey>,
     #[structopt(short, long, parse(try_from_str = parse_dna_hash), requires = "agent_key")]
-    /// Optionally request agent info for a particular cell id.
+    /// Optionally request agent info for a particular cell ID.
     pub dna: Option<DnaHash>,
 }
 
@@ -199,7 +199,7 @@ pub struct ListAgents {
 /// installed in this conductor.
 pub struct ListApps {
     #[structopt(short, long, parse(try_from_str = parse_status_filter))]
-    /// Optionally request agent info for a particular cell id.
+    /// Optionally request agent info for a particular cell ID.
     pub status: Option<AppStatusFilter>,
 }
 
@@ -257,32 +257,32 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
     match call {
         AdminRequestCli::AddAdminWs(args) => {
             let port = add_admin_interface(cmd, args).await?;
-            msg!("Added Admin port {}", port);
+            msg!("Added admin port {}", port);
         }
         AdminRequestCli::AddAppWs(args) => {
             let port = attach_app_interface(cmd, args).await?;
-            msg!("Added App port {}", port);
+            msg!("Added app port {}", port);
         }
         AdminRequestCli::ListAppWs => {
             let ports = list_app_ws(cmd).await?;
-            msg!("Attached App Interfaces {:?}", ports);
+            msg!("Attached app interfaces {:?}", ports);
         }
         AdminRequestCli::RegisterDna(args) => {
             let dnas = register_dna(cmd, args).await?;
-            msg!("Registered Dna: {:?}", dnas);
+            msg!("Registered DNA: {:?}", dnas);
         }
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(cmd, args).await?;
-            msg!("Installed App: {}", app.installed_app_id,);
+            msg!("Installed app: {}", app.installed_app_id,);
         }
         AdminRequestCli::UninstallApp(args) => {
             let app_id = args.app_id.clone();
             uninstall_app(cmd, args).await?;
-            msg!("Uninstalled App: {}", app_id,);
+            msg!("Uninstalled app: {}", app_id,);
         }
         AdminRequestCli::ListDnas => {
             let dnas = list_dnas(cmd).await?;
-            msg!("Dnas: {:?}", dnas);
+            msg!("DNAs: {:?}", dnas);
         }
         AdminRequestCli::NewAgent => {
             let agent = generate_agent_pub_key(cmd).await?;
@@ -290,11 +290,11 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         }
         AdminRequestCli::ListCells => {
             let cells = list_cell_ids(cmd).await?;
-            msg!("Cell Ids: {:?}", cells);
+            msg!("Cell IDs: {:?}", cells);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = list_apps(cmd, args).await?;
-            msg!("List Apps: {:?}", apps);
+            msg!("List apps: {:?}", apps);
         }
         AdminRequestCli::EnableApp(args) => {
             let app_id = args.app_id.clone();
@@ -310,7 +310,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let state = dump_state(cmd, args).await?;
             msg!("DUMP STATE \n{}", state);
         }
-        AdminRequestCli::AddAgents => todo!("Adding agent info via cli is coming soon"),
+        AdminRequestCli::AddAgents => todo!("Adding agent info via CLI is coming soon"),
         AdminRequestCli::ListAgents(args) => {
             use std::fmt::Write;
             let agent_infos = request_agent_info(cmd, args).await?;
@@ -332,7 +332,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                 let this_agent = agents.iter().find(|a| *info.agent == a.1);
                 let this_dna = dnas.iter().find(|d| *info.space == d.1).unwrap();
                 if let Some(this_agent) = this_agent {
-                    writeln!(out, "This Agent {:?} is {:?}", this_agent.0, this_agent.1)?;
+                    writeln!(out, "This agent {:?} is {:?}", this_agent.0, this_agent.1)?;
                 }
                 writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
 
@@ -360,7 +360,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                 )?;
                 writeln!(out, "space: {:?}", info.space)?;
                 writeln!(out, "agent: {:?}", info.agent)?;
-                writeln!(out, "urls: {:?}", info.url_list)?;
+                writeln!(out, "URLs: {:?}", info.url_list)?;
                 msg!("{}\n", out);
             }
         }
@@ -405,7 +405,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
     let source = match (path, hash) {
         (None, Some(hash)) => DnaSource::Hash(hash),
         (Some(path), None) => DnaSource::Path(path),
-        _ => unreachable!("Can't have hash and path for dna source"),
+        _ => unreachable!("Can't have hash and path for DNA source"),
     };
     let dna = RegisterDnaPayload {
         modifiers: DnaModifiersOpt {
@@ -420,7 +420,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
     let r = AdminRequest::RegisterDna(Box::new(dna));
     let registered_dna = cmd.command(r).await?;
     let hash =
-        expect_match!(registered_dna => AdminResponse::DnaRegistered, "Failed to register dna");
+        expect_match!(registered_dna => AdminResponse::DnaRegistered, "Failed to register DNA");
     Ok(hash)
 }
 
@@ -484,7 +484,7 @@ pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<u16>> {
 /// Calls [`AdminRequest::ListCellIds`].
 pub async fn list_dnas(cmd: &mut CmdRunner) -> anyhow::Result<Vec<DnaHash>> {
     let resp = cmd.command(AdminRequest::ListDnas).await?;
-    Ok(expect_match!(resp => AdminResponse::DnasListed, "Failed to list dnas"))
+    Ok(expect_match!(resp => AdminResponse::DnasListed, "Failed to list DNAs"))
 }
 
 /// Calls [`AdminRequest::GenerateAgentPubKey`].
@@ -498,7 +498,7 @@ pub async fn generate_agent_pub_key(cmd: &mut CmdRunner) -> anyhow::Result<Agent
 /// Calls [`AdminRequest::ListCellIds`].
 pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
     let resp = cmd.command(AdminRequest::ListCellIds).await?;
-    Ok(expect_match!(resp => AdminResponse::CellIdsListed, "Failed to list cell ids"))
+    Ok(expect_match!(resp => AdminResponse::CellIdsListed, "Failed to list cell IDs"))
 }
 
 /// Calls [`AdminRequest::ListApps`].

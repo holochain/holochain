@@ -1,6 +1,6 @@
 //! # Manage persistence of sandboxes
 //! This module gives basic helpers to save / load your sandboxes
-//! in a `.hc` file.
+//! to /from a `.hc` file.
 //! This is very much WIP and subject to change.
 use std::path::Path;
 use std::path::PathBuf;
@@ -164,7 +164,7 @@ pub fn load_ports(hc_dir: PathBuf) -> anyhow::Result<Vec<Option<u16>>> {
     Ok(ports)
 }
 
-/// Same as load ports but only returns ports for paths passed in.
+/// Same as load_ports but only returns ports for paths passed in.
 pub fn find_ports(hc_dir: PathBuf, paths: &[PathBuf]) -> anyhow::Result<Vec<Option<u16>>> {
     let mut ports = Vec::new();
     let all_paths = load(hc_dir.clone())?;
@@ -188,7 +188,7 @@ pub fn find_ports(hc_dir: PathBuf, paths: &[PathBuf]) -> anyhow::Result<Vec<Opti
     Ok(ports)
 }
 
-/// Remove all lockfiles, releasing all locked ports
+/// Remove all lockfiles, releasing all locked ports.
 pub async fn release_ports(hc_dir: PathBuf) -> anyhow::Result<()> {
     let files = FILE_LOCKS.lock().await;
     for file in files.iter() {

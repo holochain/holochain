@@ -20,7 +20,7 @@ pub const APP_BUNDLE_EXT: &str = "happ";
 /// The file extension to use for Web-hApp bundles
 pub const WEB_APP_BUNDLE_EXT: &str = "webhapp";
 
-/// Work with Holochain DNA bundles
+/// Work with Holochain DNA bundles.
 #[derive(Debug, StructOpt)]
 pub enum HcDnaBundle {
     /// Create a new, empty Holochain DNA bundle working directory and create a new
@@ -40,12 +40,12 @@ pub enum HcDnaBundle {
     /// $ hc dna pack ./some/directory/foo
     ///
     /// creates a file `./some/directory/foo/[name].dna`, based on
-    /// `./some/directory/foo/dna.yaml`
+    /// `./some/directory/foo/dna.yaml`.
     Pack {
         /// The path to the working directory containing a `dna.yaml` manifest
         path: std::path::PathBuf,
 
-        /// Specify the output path for the packed bundle file
+        /// Specify the output path for the packed bundle file.
         ///
         /// If not specified, the `[name].dna` bundle will be placed inside the
         /// provided working directory.
@@ -60,13 +60,13 @@ pub enum HcDnaBundle {
     /// $ hc dna unpack ./some/dir/my-dna.dna
     ///
     /// creates a new directory `./some/dir/my-dna`, containining a new `dna.yaml`
-    /// manifest
+    /// manifest.
     // #[structopt(short = "u", long)]
     Unpack {
         /// The path to the bundle to unpack
         path: std::path::PathBuf,
 
-        /// Specify the directory for the unpacked content
+        /// Specify the directory for the unpacked content.
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
@@ -79,19 +79,19 @@ pub enum HcDnaBundle {
         #[structopt(short = "r", long)]
         raw: bool,
 
-        /// Overwrite an existing directory, if one exists
+        /// Overwrite an existing directory, if one exists.
         #[structopt(short = "f", long)]
         force: bool,
     },
 }
 
-/// Work with Holochain hApp bundles
+/// Work with Holochain hApp bundles.
 #[derive(Debug, StructOpt)]
 pub enum HcAppBundle {
     /// Create a new, empty Holochain app (hApp) working directory and create a new
     /// sample `happ.yaml` manifest inside.
     Init {
-        /// The path to create the working directory
+        /// The path to create the working directory.
         path: PathBuf,
     },
 
@@ -104,12 +104,12 @@ pub enum HcAppBundle {
     /// $ hc app pack ./some/directory/foo
     ///
     /// creates a file `./some/directory/foo/[name].happ`, based on
-    /// `./some/directory/foo/happ.yaml`
+    /// `./some/directory/foo/happ.yaml`.
     Pack {
-        /// The path to the working directory containing a `happ.yaml` manifest
+        /// The path to the working directory containing a `happ.yaml` manifest.
         path: std::path::PathBuf,
 
-        /// Specify the output path for the packed bundle file
+        /// Specify the output path for the packed bundle file.
         ///
         /// If not specified, the `[name].happ` bundle will be placed inside the
         /// provided working directory.
@@ -117,7 +117,7 @@ pub enum HcAppBundle {
         output: Option<PathBuf>,
 
         /// Also run `dna pack` on all DNAs manifests
-        /// that have their location bundled
+        /// that have their location bundled.
         #[structopt(short, long)]
         recursive: bool,
     },
@@ -129,13 +129,13 @@ pub enum HcAppBundle {
     /// $ hc app unpack ./some/dir/my-app.happ
     ///
     /// creates a new directory `./some/dir/my-app`, containining a new `happ.yaml`
-    /// manifest
+    /// manifest.
     // #[structopt(short = "u", long)]
     Unpack {
-        /// The path to the bundle to unpack
+        /// The path to the bundle to unpack.
         path: std::path::PathBuf,
 
-        /// Specify the directory for the unpacked content
+        /// Specify the directory for the unpacked content.
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
@@ -148,19 +148,19 @@ pub enum HcAppBundle {
         #[structopt(short = "r", long)]
         raw: bool,
 
-        /// Overwrite an existing directory, if one exists
+        /// Overwrite an existing directory, if one exists.
         #[structopt(short = "f", long)]
         force: bool,
     },
 }
 
-/// Work with Holochain Web-hApp bundles
+/// Work with Holochain web-hApp bundles.
 #[derive(Debug, StructOpt)]
 pub enum HcWebAppBundle {
     /// Create a new, empty Holochain web app working directory and create a new
     /// sample `web-happ.yaml` manifest inside.
     Init {
-        /// The path to create the working directory
+        /// The path to create the working directory.
         path: PathBuf,
     },
 
@@ -173,20 +173,20 @@ pub enum HcWebAppBundle {
     /// $ hc web-app pack ./some/directory/foo
     ///
     /// creates a file `./some/directory/foo/[name].webhapp`, based on
-    /// `./some/directory/foo/web-happ.yaml`
+    /// `./some/directory/foo/web-happ.yaml`.
     Pack {
-        /// The path to the working directory containing a `web-happ.yaml` manifest
+        /// The path to the working directory containing a `web-happ.yaml` manifest.
         path: std::path::PathBuf,
 
-        /// Specify the output path for the packed bundle file
+        /// Specify the output path for the packed bundle file.
         ///
         /// If not specified, the `[name].webhapp` bundle will be placed inside the
         /// provided working directory.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
-        /// Also run `app pack` and `dna pack` on all App and DNAs manifests
-        /// that have their location bundled
+        /// Also run `app pack` and `dna pack` on all app and DNAs manifests
+        /// that have their location bundled.
         #[structopt(short, long)]
         recursive: bool,
     },
@@ -198,13 +198,13 @@ pub enum HcWebAppBundle {
     /// $ hc web-app unpack ./some/dir/my-app.webhapp
     ///
     /// creates a new directory `./some/dir/my-app`, containining a new `web-happ.yaml`
-    /// manifest
+    /// manifest.
     // #[structopt(short = "u", long)]
     Unpack {
         /// The path to the bundle to unpack
         path: std::path::PathBuf,
 
-        /// Specify the directory for the unpacked content
+        /// Specify the directory for the unpacked content.
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
@@ -217,7 +217,7 @@ pub enum HcWebAppBundle {
         #[structopt(short = "r", long)]
         raw: bool,
 
-        /// Overwrite an existing directory, if one exists
+        /// Overwrite an existing directory, if one exists.
         #[structopt(short = "f", long)]
         force: bool,
     },

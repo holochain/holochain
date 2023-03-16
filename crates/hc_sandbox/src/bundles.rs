@@ -6,7 +6,7 @@ use anyhow::bail;
 use anyhow::ensure;
 use walkdir::WalkDir;
 
-/// Parse a list of dnas.
+/// Parse a list of DNAs.
 /// If paths are directories then each directory
 /// will be searched for the first file that matches
 /// `*.dna`.
@@ -30,7 +30,7 @@ pub fn parse_dnas(mut dnas: Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
     Ok(dnas)
 }
 
-/// Parse a happ bundle.
+/// Parse a hApp bundle.
 /// If paths are directories then each directory
 /// will be searched for the first file that matches
 /// `*.dna`.

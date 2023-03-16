@@ -13,37 +13,39 @@ const DEFAULT_APP_ID: &str = "test-app";
 ///
 /// A sandbox is a directory containing a conductor config, databases, and keystore,
 /// with a single Holochain app installed in the conductor:
-/// Everything you need to quickly run your app in holochain,
-/// or create complex multi-conductor sandboxes for testing.
+/// Everything you need to quickly run your app in Holochain,
+/// or create complex multi-conductor setups for testing.
 pub struct HcSandbox {
     #[structopt(subcommand)]
     command: HcSandboxSubcommand,
+
     /// Instead of the normal "interactive" passphrase mode,
     /// collect the passphrase by reading stdin to the end.
     #[structopt(long)]
     piped: bool,
-    /// Force the admin port that hc uses to talk to holochain to a specific value.
+
+    /// Force the admin port that hc uses to talk to Holochain to a specific value.
     /// For example `hc -f=9000,9001 run`
     /// This must be set on each run or the port will change if it's in use.
     #[structopt(short, long, value_delimiter = ",")]
     force_admin_ports: Vec<u16>,
+
     /// Set the path to the holochain binary.
     #[structopt(short, long, env = "HC_HOLOCHAIN_PATH", default_value = "holochain")]
     holochain_path: PathBuf,
 }
 
-/// The list of subcommands for `hc sandbox`
+/// The list of subcommands for `hc sandbox`.
 #[derive(Debug, StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
 pub enum HcSandboxSubcommand {
     /// Generate one or more new Holochain Conductor sandbox(es) for later use.
     ///
     /// A single app will be installed as part of this sandbox.
-    /// See the help for the `<dnas>` argument below to learn how to define the app to be installed.
     Generate {
         #[structopt(short, long, default_value = DEFAULT_APP_ID)]
         /// ID for the installed app.
-        /// This is just a String to identify the app by.
+        /// This is just a string to identify the app by.
         app_id: InstalledAppId,
 
         /// (flattened)
@@ -51,15 +53,12 @@ pub enum HcSandboxSubcommand {
         create: Create,
 
         /// Automatically run the sandbox(es) that were created.
-        /// This is effectively a combination of `hc generate` and `hc run`
-        ///
+        /// This is effectively a combination of `hc sandbox generate` and `hc sandbox run`.
         /// You may optionally specify app interface ports to bind when running.
         /// This allows your UI to talk to the conductor.
-        ///
-        /// For example, `hc generate -r=0,9000,0` will create three app interfaces.
-        /// Or, use `hc generate -r` to run without attaching any app interfaces.
-        ///
-        /// This follows the same structure as `hc run --ports`
+        /// For example, `hc sandbox generate -r=0,9000,0` will create three app interfaces.
+        /// Or, use `hc sandbox generate -r` to run without attaching any app interfaces.
+        /// This follows the same structure as `hc sandbox run --ports`.
         #[structopt(short, long, value_delimiter = ",")]
         run: Option<Vec<u16>>,
 

@@ -11,7 +11,7 @@ use crate::CmdRunner;
 
 /// Generates a new sandbox with a default [`ConductorConfig`](holochain_conductor_api::config::conductor::ConductorConfig)
 /// and optional network.
-/// Then installs the dnas with a new app per dna.
+/// Then installs the specified hApp.
 pub async fn default_with_network(
     holochain_path: &Path,
     create: Create,
@@ -33,8 +33,8 @@ pub async fn default_with_network(
     Ok(path)
 }
 
-/// Same as [`default_with_network`] but creates n copies
-/// of this sandbox in their own directories.
+/// Same as [`default_with_network`] but creates _n_ copies
+/// of this sandbox in separate directories.
 pub async fn default_n(
     holochain_path: &Path,
     create: Create,

@@ -22,10 +22,10 @@ const HC_START_2: &str = "HOLOCHAIN_SANDBOX_END";
 
 /// Run a conductor and wait for it to finish.
 /// Use [`run_async`] to run in the background.
-/// Requires the holochain binary is available
+/// Requires the holochain binary to be available
 /// on the `holochain_path`.
 /// Uses the sandbox provided by the `sandbox_path`.
-/// Adds an app interface in the `app_ports`.
+/// Adds an app interface specified in the `app_ports`.
 /// Can optionally force the admin port used. Otherwise
 /// the port in the config will be used if it's free or
 /// a random free port will be chosen.
@@ -62,7 +62,7 @@ pub async fn run(
 }
 
 /// Run a conductor in the background.
-/// Requires the holochain binary is available
+/// Requires the holochain binary to be available
 /// on the `holochain_path`.
 /// Uses the sandbox provided by the `sandbox_path`.
 /// Can optionally force the admin port used. Otherwise

@@ -11,8 +11,8 @@ use crate::config::write_config;
 use crate::ports::random_admin_port;
 
 /// Generate a new sandbox.
-/// This creates a directory and a [`ConductorConfig`]
-/// from an optional network.
+/// This creates a directory containing a [`ConductorConfig`],
+/// a keystore, and a database.
 /// The root directory and inner directory
 /// (where this sandbox will be created) can be overridden.
 /// For example `my_root_dir/this_sandbox_dir/`
@@ -29,7 +29,7 @@ pub fn generate(
     let path = write_config(dir.clone(), &config);
     msg!("Config {:?}", config);
     msg!(
-        "Created directory at: {} {}",
+        "Created directory at: {} {} It has also been saved to a file called `.hc` in your current working directory.",
         ansi_term::Style::new()
             .bold()
             .underline()
@@ -38,7 +38,7 @@ pub fn generate(
             .paint(dir.display().to_string()),
         ansi_term::Style::new()
             .bold()
-            .paint("Keep this path to rerun the same sandbox")
+            .paint("Keep this path to rerun the same sandbox.")
     );
     msg!("Created config at {}", path.display());
     Ok(dir)
