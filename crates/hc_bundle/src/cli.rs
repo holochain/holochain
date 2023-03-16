@@ -116,8 +116,10 @@ pub enum HcAppBundle {
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
-        /// Also run `dna pack` on all DNAs manifests
-        /// that have their location bundled.
+        /// Also run `dna pack` on all DNA manifests
+        /// to be bundled into this hApp.
+        /// There must exist a `dna.yaml` file in the same directory
+        /// as each of the DNA files specified in the manifest.
         #[structopt(short, long)]
         recursive: bool,
     },
@@ -185,8 +187,12 @@ pub enum HcWebAppBundle {
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
 
-        /// Also run `app pack` and `dna pack` on all app and DNAs manifests
-        /// that have their location bundled.
+        /// Also run `app pack` and `dna pack` on all app and DNA manifests
+        /// to be bundled into this hApp.
+        /// There must exist a `happ.yaml` file file in the same directory
+        /// as the hApp file specified in the manifest,
+        /// as well as `dna.yaml` files in the same directories
+        /// as each of the DNA files specified in the hApps' manifests.
         #[structopt(short, long)]
         recursive: bool,
     },
