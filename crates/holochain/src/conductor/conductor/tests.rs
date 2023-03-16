@@ -715,6 +715,47 @@ async fn test_enable_disable_enable_clone_cell() {
     }
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn name_has_no_effect_on_dna_hash() {
+    holochain_trace::test_run().ok();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let (agent1, agent2) = SweetAgents::two(conductor.keystore()).await;
+    let dna = SweetDnaFile::unique_empty().await;
+    let apps = conductor
+        .setup_app_for_agents("app", [&agent1, &agent2], [&dna])
+        .await
+        .unwrap();
+    let app_id1 = apps[0].installed_app_id().clone();
+    let app_id2 = apps[1].installed_app_id().clone();
+    let ((cell1,), (cell2,)) = apps.into_tuples();
+    let role_name1 = cell1.cell_id().dna_hash().to_string();
+    let role_name2 = cell2.cell_id().dna_hash().to_string();
+
+    let clone1 = conductor
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: app_id1.clone(),
+            role_name: role_name1.clone(),
+            modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
+            membrane_proof: None,
+            name: Some("name1".to_string()),
+        })
+        .await
+        .unwrap();
+
+    let clone2 = conductor
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: app_id2.clone(),
+            role_name: role_name2.clone(),
+            modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
+            membrane_proof: None,
+            name: Some("name2".to_string()),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(clone1.cell_id.dna_hash(), clone2.cell_id.dna_hash());
+}
+
 fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_conductor_api::ClonedCell {
     match cell_info {
         CellInfo::Cloned(cell) => cell,
