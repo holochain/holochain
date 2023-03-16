@@ -4,6 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Various methods may return a `CellMissing` error if an operation is performed on a disabled cell. Now such calls will return `CellDisabled` to differentiate between a truly missing cell and one that's just disabled. [\#2092](https://github.com/holochain/holochain/pull/2092)
 - Enabling a clone cell that's already enabled or disabling a clone cell that's already disabled would previously return a `CloneCellNotFound` error. Now, in those cases, nothing happens and a successful result is returned. [\#2093](https://github.com/holochain/holochain/pull/2093)
 
 ## 0.1.3

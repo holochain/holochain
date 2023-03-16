@@ -665,7 +665,7 @@ async fn test_enable_disable_enable_clone_cell() {
     assert!(matches!(
         result,
         Err(ConductorApiError::ConductorError(
-            ConductorError::CellMissing(_)
+            ConductorError::CellDisabled(_)
         ))
     ));
 
@@ -685,7 +685,7 @@ async fn test_enable_disable_enable_clone_cell() {
         assert!(matches!(
             result,
             Err(ConductorApiError::ConductorError(
-                ConductorError::CellMissing(_)
+                ConductorError::CellDisabled(_)
             ))
         ));
     }
@@ -947,7 +947,7 @@ async fn test_cell_and_app_status_reconciliation() {
     let mut conductor = SweetConductor::from_standard_config().await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
-    let cell_ids = conductor.list_cell_ids(None);
+    let cell_ids: Vec<_> = conductor.running_cell_ids(None).into_iter().collect();
     let cell1 = &cell_ids[0..1];
 
     let check = || async {
@@ -955,8 +955,8 @@ async fn test_cell_and_app_status_reconciliation() {
             AppStatusKind::from(AppStatus::from(
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
-            conductor.list_cell_ids(Some(Joined)).len(),
-            conductor.list_cell_ids(Some(PendingJoin)).len(),
+            conductor.running_cell_ids(Some(Joined)).len(),
+            conductor.running_cell_ids(Some(PendingJoin)).len(),
         )
     };
 
