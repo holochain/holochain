@@ -1666,10 +1666,17 @@ pub mod tests {
             Some(CapGrant::ChainAuthor(alice.clone())),
         );
 
-        // bob should be authorized with transferable cap grant when passing in the secret
+        // bob and carol (and everyone else) should be authorized with transferable cap grant 
+        // when passing in the secret
         assert_eq!(
             chain
                 .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .await?,
+            Some(grant.clone().into())
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), carol.clone(), secret.clone())
                 .await?,
             Some(grant.clone().into())
         );
@@ -1746,8 +1753,14 @@ pub mod tests {
             Some(updated_grant.clone().into())
         );
 
-        // carol must not get a valid cap grant even with the updated secret,
-        // as carol is not an assignee
+        // carol must not get a valid cap grant with either the original secret (because it was replaced)
+        // or the updated secret (because she is not an assignee)
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), carol.clone(), secret.clone())
+                .await?,
+            None
+        );
         assert_eq!(
             chain
                 .valid_cap_grant(function.clone(), carol.clone(), updated_secret.clone())
