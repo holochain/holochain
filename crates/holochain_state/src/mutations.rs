@@ -727,15 +727,10 @@ pub fn unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutatio
     Ok(())
 }
 
-pub fn delete_all_ephemeral_scheduled_fns(
-    txn: &mut Transaction,
-    author: &AgentPubKey,
-) -> StateMutationResult<()> {
+pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute(
         holochain_sqlite::sql::sql_cell::schedule::DELETE_ALL_EPHEMERAL,
-        named_params! {
-            ":author" : author,
-        },
+        named_params! {},
     )?;
     Ok(())
 }
