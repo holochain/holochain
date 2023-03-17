@@ -127,7 +127,9 @@
 //! ## Internal callbacks
 //!
 //! Some externs act as callbacks the host will call at key points in Holochain internal system workflows.
-//! These callbacks allow the guest to define how the host proceeds at those decision points.
+//! These callbacks allow the guest to define how the host proceeds at those decision points. They are defined in zomes like
+//! extern callbacks above, but have reserved names listed below.
+//!
 //! Callbacks are simply called by name and they are "sparse" in that they are matched incrementally from the most specific
 //! name to the least specific name. For example, the `validate_{{ create|update|delete }}_{{ agent|entry }}` callbacks will
 //! all match and all run during validation. All function components with multiple options are optional, e.g. `validate` will execute and so will `validate_create`.
