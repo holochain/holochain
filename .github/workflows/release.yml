@@ -16,8 +16,8 @@
 name: release holochain
 
 on:
-  # schedule:
-  #   - cron: "0 0 * * 3" # at 0 AM on wednesday
+  schedule:
+    - cron: "0 0 * * 3" # at 0 AM on wednesday
   workflow_dispatch:
     inputs:
       # holochain_url:
