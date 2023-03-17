@@ -11,13 +11,13 @@ use structopt::StructOpt;
 
 use crate::error::HcBundleResult;
 
-/// The file extension to use for DNA bundles
+/// The file extension to use for DNA bundles.
 pub const DNA_BUNDLE_EXT: &str = "dna";
 
-/// The file extension to use for hApp bundles
+/// The file extension to use for hApp bundles.
 pub const APP_BUNDLE_EXT: &str = "happ";
 
-/// The file extension to use for Web-hApp bundles
+/// The file extension to use for Web-hApp bundles.
 pub const WEB_APP_BUNDLE_EXT: &str = "webhapp";
 
 /// Work with Holochain DNA bundles.
@@ -25,9 +25,8 @@ pub const WEB_APP_BUNDLE_EXT: &str = "webhapp";
 pub enum HcDnaBundle {
     /// Create a new, empty Holochain DNA bundle working directory and create a new
     /// sample `dna.yaml` manifest inside.
-    /// .
     Init {
-        /// The path to create the working directory
+        /// The path to create the working directory.
         path: PathBuf,
     },
 
@@ -42,7 +41,7 @@ pub enum HcDnaBundle {
     /// creates a file `./some/directory/foo/[name].dna`, based on
     /// `./some/directory/foo/dna.yaml`.
     Pack {
-        /// The path to the working directory containing a `dna.yaml` manifest
+        /// The path to the working directory containing a `dna.yaml` manifest.
         path: std::path::PathBuf,
 
         /// Specify the output path for the packed bundle file.
@@ -63,7 +62,7 @@ pub enum HcDnaBundle {
     /// manifest.
     // #[structopt(short = "u", long)]
     Unpack {
-        /// The path to the bundle to unpack
+        /// The path to the bundle to unpack.
         path: std::path::PathBuf,
 
         /// Specify the directory for the unpacked content.
@@ -207,7 +206,7 @@ pub enum HcWebAppBundle {
     /// manifest.
     // #[structopt(short = "u", long)]
     Unpack {
-        /// The path to the bundle to unpack
+        /// The path to the bundle to unpack.
         path: std::path::PathBuf,
 
         /// Specify the directory for the unpacked content.

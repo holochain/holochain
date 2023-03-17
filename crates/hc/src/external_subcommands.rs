@@ -5,7 +5,7 @@ use std::{
 
 use crate::builtin_commands;
 
-/// List all runnable commands
+/// List all runnable commands.
 pub fn list_external_subcommands() -> Vec<String> {
     let prefix = "hc-";
     let suffix = env::consts::EXE_SUFFIX;

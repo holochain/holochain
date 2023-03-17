@@ -5,19 +5,19 @@ use holochain_p2p::kitsune_p2p::TransportConfig;
 use structopt::StructOpt;
 use url2::Url2;
 
-#[derive(Debug, StructOpt, Clone)]
 // This creates a new Holochain sandbox
 // which is a
 // - conductor config
-// - databases
+// - collection of databases
 // - keystore
+#[derive(Debug, StructOpt, Clone)]
 pub struct Create {
     /// Number of conductor sandboxes to create.
     #[structopt(short, long, default_value = "1")]
     pub num_sandboxes: usize,
 
-    #[structopt(subcommand)]
     /// Add an optional network config.
+    #[structopt(subcommand)]
     pub network: Option<NetworkCmd>,
 
     /// Set a root directory for conductor sandboxes to be placed into.
@@ -106,7 +106,7 @@ pub struct Quic {
 #[derive(Debug, StructOpt, Clone)]
 pub struct Existing {
     /// Paths to existing sandbox directories.
-    /// For example `andbox run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
+    /// For example `hc sandbox run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
     #[structopt(short, long, value_delimiter = ",")]
     pub existing_paths: Vec<PathBuf>,
 

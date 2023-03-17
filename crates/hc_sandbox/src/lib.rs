@@ -28,8 +28,8 @@ use ports::get_admin_api;
 
 pub use ports::force_admin_port;
 
-/// Print a msg with `hc-sandbox: ` pre-pended
-/// and ansi colors.
+/// Print a message with `hc-sandbox: ` prepended
+/// and ANSI colors.
 macro_rules! msg {
     ($($arg:tt)*) => ({
         use ansi_term::Color::*;

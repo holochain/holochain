@@ -8,13 +8,13 @@ use structopt::StructOpt;
 
 const DEFAULT_APP_ID: &str = "test-app";
 
-#[derive(Debug, StructOpt)]
 /// Helper for generating, running, and interacting with Holochain Conductor "sandboxes".
 ///
 /// A sandbox is a directory containing a conductor config, databases, and keystore,
 /// with a single Holochain app installed in the conductor:
 /// Everything you need to quickly run your app in Holochain,
 /// or create complex multi-conductor setups for testing.
+#[derive(Debug, StructOpt)]
 pub struct HcSandbox {
     #[structopt(subcommand)]
     command: HcSandboxSubcommand,
@@ -43,9 +43,9 @@ pub enum HcSandboxSubcommand {
     ///
     /// A single app will be installed as part of this sandbox.
     Generate {
-        #[structopt(short, long, default_value = DEFAULT_APP_ID)]
         /// ID for the installed app.
         /// This is just a string to identify the app by.
+        #[structopt(short, long, default_value = DEFAULT_APP_ID)]
         app_id: InstalledAppId,
 
         /// (flattened)
@@ -65,6 +65,7 @@ pub enum HcSandboxSubcommand {
         /// A hApp bundle to install.
         happ: Option<PathBuf>,
     },
+
     /// Run conductor(s) from existing sandbox(es).
     Run(Run),
 

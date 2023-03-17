@@ -59,27 +59,27 @@ fn builtin_commands() -> Vec<String> {
         .collect()
 }
 
-/// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`
+/// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
 #[structopt(long_about = *HELP)]
 pub enum Opt {
-    /// Work with DNA bundles
+    /// Work with DNA bundles.
     Dna(hc_bundle::HcDnaBundle),
-    /// Work with hApp bundles
+    /// Work with hApp bundles.
     App(hc_bundle::HcAppBundle),
-    /// Work with web-hApp bundles
+    /// Work with web-hApp bundles.
     WebApp(hc_bundle::HcWebAppBundle),
-    /// Work with sandboxed environments for testing and development
+    /// Work with sandboxed environments for testing and development.
     Sandbox(hc_sandbox::HcSandbox),
-    /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`)
+    /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`).
     #[structopt(external_subcommand)]
     External(Vec<String>),
 }
 
 impl Opt {
-    /// Run this command
+    /// Run this command.
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
             Self::Dna(cmd) => cmd.run().await?,

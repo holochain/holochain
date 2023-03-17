@@ -4,6 +4,7 @@
 //! than calling the [`CmdRunner`] directly.
 //! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
 //! but if you want more control use [`CmdRunner::command`].
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -36,15 +37,17 @@ use structopt::StructOpt;
 #[doc(hidden)]
 #[derive(Debug, StructOpt)]
 pub struct Call {
-    #[structopt(short, long, conflicts_with_all = &["existing_paths", "indices"], value_delimiter = ",")]
     /// Ports to running conductor admin interfaces.
     /// If this is empty existing sandboxes will be used.
     /// Cannot be combined with existing sandboxes.
+    #[structopt(short, long, conflicts_with_all = &["existing_paths", "indices"], value_delimiter = ",")]
     pub running: Vec<u16>,
+
     #[structopt(flatten)]
     pub existing: Existing,
-    #[structopt(subcommand)]
+
     /// The admin request you want to make.
+    #[structopt(subcommand)]
     pub call: AdminRequestCli,
 }
 
@@ -77,27 +80,28 @@ pub enum AdminRequestCli {
     AddAgents,
     ListAgents(ListAgents),
 }
-#[derive(Debug, StructOpt, Clone)]
+
 /// Calls AdminRequest::AddAdminInterfaces
 /// and adds another admin interface.
+#[derive(Debug, StructOpt, Clone)]
 pub struct AddAdminWs {
     /// Optional port number.
     /// Defaults to assigned by OS.
     pub port: Option<u16>,
 }
 
-#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::AttachAppInterface
 /// and adds another app interface.
+#[derive(Debug, StructOpt, Clone)]
 pub struct AddAppWs {
     /// Optional port number.
     /// Defaults to assigned by OS.
     pub port: Option<u16>,
 }
 
-#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::RegisterDna
 /// and registers a DNA. You can only use a path or a hash, not both.
+#[derive(Debug, StructOpt, Clone)]
 pub struct RegisterDna {
     #[structopt(short, long)]
     /// Network seed to override when installing this DNA
@@ -116,90 +120,92 @@ pub struct RegisterDna {
     pub hash: Option<DnaHash>,
 }
 
-#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::InstallApp
 /// and installs a new app.
 ///
 /// Setting properties and membrane proofs is not
 /// yet supported.
 /// RoleNames are set to `my-app-0`, `my-app-1` etc.
+#[derive(Debug, StructOpt, Clone)]
 pub struct InstallApp {
-    #[structopt(long)]
     /// Sets the InstalledAppId.
+    #[structopt(long)]
     pub app_id: Option<String>,
 
-    #[structopt(long, parse(try_from_str = parse_agent_key))]
     /// If not set then a key will be generated.
     /// Agent key is Base64 (same format that is used in logs).
     /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
+    #[structopt(long, parse(try_from_str = parse_agent_key))]
     pub agent_key: Option<AgentPubKey>,
 
-    #[structopt(required = true)]
     /// Location of the *.happ bundle file to install.
+    #[structopt(required = true)]
     pub path: PathBuf,
 
     /// Optional network seed override for every DNA in this app
     pub network_seed: Option<NetworkSeed>,
 }
 
-#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::UninstallApp
 /// and uninstalls the specified app.
+#[derive(Debug, StructOpt, Clone)]
 pub struct UninstallApp {
     /// The InstalledAppId to uninstall.
     pub app_id: String,
 }
 
-#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::EnableApp
 /// and activates the installed app.
+#[derive(Debug, StructOpt, Clone)]
 pub struct EnableApp {
     /// The InstalledAppId to activate.
     pub app_id: String,
 }
 
-#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::DisableApp
 /// and disables the installed app.
+#[derive(Debug, StructOpt, Clone)]
 pub struct DisableApp {
     /// The InstalledAppId to disable.
     pub app_id: String,
 }
 
-#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::DumpState
 /// and dumps the current cell's state.
-/// TODO: Add pretty print.
-/// TODO: Default to dumping all cell state.
+// TODO: Add pretty print.
+// TODO: Default to dumping all cell state.
+#[derive(Debug, StructOpt, Clone)]
 pub struct DumpState {
-    #[structopt(parse(try_from_str = parse_dna_hash))]
     /// The DNA hash half of the cell ID to dump.
+    #[structopt(parse(try_from_str = parse_dna_hash))]
     pub dna: DnaHash,
-    #[structopt(parse(try_from_str = parse_agent_key))]
+
     /// The agent half of the cell ID to dump.
+    #[structopt(parse(try_from_str = parse_agent_key))]
     pub agent_key: AgentPubKey,
 }
 
-#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::RequestAgentInfo
 /// and pretty prints the agent info on
 /// this conductor.
+#[derive(Debug, StructOpt, Clone)]
 pub struct ListAgents {
+    /// Optionally request agent info for a particular cell ID.
     #[structopt(short, long, parse(try_from_str = parse_agent_key), requires = "dna")]
-    /// Optionally request agent info for a particular cell ID.
     pub agent_key: Option<AgentPubKey>,
-    #[structopt(short, long, parse(try_from_str = parse_dna_hash), requires = "agent_key")]
+
     /// Optionally request agent info for a particular cell ID.
+    #[structopt(short, long, parse(try_from_str = parse_dna_hash), requires = "agent_key")]
     pub dna: Option<DnaHash>,
 }
 
-#[derive(Debug, StructOpt, Clone)]
 /// Calls AdminRequest::ListApps
 /// and pretty prints the list of apps
 /// installed in this conductor.
+#[derive(Debug, StructOpt, Clone)]
 pub struct ListApps {
-    #[structopt(short, long, parse(try_from_str = parse_status_filter))]
     /// Optionally request agent info for a particular cell ID.
+    #[structopt(short, long, parse(try_from_str = parse_status_filter))]
     pub status: Option<AppStatusFilter>,
 }
 
@@ -387,7 +393,7 @@ pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyho
     Ok(port)
 }
 
-/// Calls [`AdminRequest::RegisterDna`] and registers dna.
+/// Calls [`AdminRequest::RegisterDna`] and registers DNA.
 pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Result<DnaHash> {
     let RegisterDna {
         network_seed,
