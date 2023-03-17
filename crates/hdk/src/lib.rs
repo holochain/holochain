@@ -3,6 +3,9 @@
 //! Holochain is built as a client-server architecture. The Conductor, Holochain's runtime, acts as the server.
 //! Its [Conductor API](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api) can be queried
 //! by a client to manage hApps and send requests to hApp functions.
+//! A hApp is a bundle of WebAssembly modules that are hosted in the Conductor's
+//! WebAssembly VM. They define callbacks and API functions that the Conductor can
+//! access, and they can access functionality that the Conductor exposes to them.
 //! [Read more on Holochain's architecture.](https://developer.holochain.org/concepts/2_application_architecture)
 //!
 //! hApps can be developed using the HDK. See the [Holochain Quick Start Guide](https://developer.holochain.org/quick-start)
