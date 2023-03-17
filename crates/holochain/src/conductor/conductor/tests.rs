@@ -719,17 +719,19 @@ async fn test_enable_disable_enable_clone_cell() {
 async fn name_has_no_effect_on_dna_hash() {
     holochain_trace::test_run().ok();
     let mut conductor = SweetConductor::from_standard_config().await;
-    let (agent1, agent2) = SweetAgents::two(conductor.keystore()).await;
+    let (agent1, agent2, agent3) = SweetAgents::three(conductor.keystore()).await;
     let dna = SweetDnaFile::unique_empty().await;
     let apps = conductor
-        .setup_app_for_agents("app", [&agent1, &agent2], [&dna])
+        .setup_app_for_agents("app", [&agent1, &agent2, &agent3], [&dna])
         .await
         .unwrap();
     let app_id1 = apps[0].installed_app_id().clone();
     let app_id2 = apps[1].installed_app_id().clone();
-    let ((cell1,), (cell2,)) = apps.into_tuples();
+    let app_id3 = apps[2].installed_app_id().clone();
+    let ((cell1,), (cell2,), (cell3,)) = apps.into_tuples();
     let role_name1 = cell1.cell_id().dna_hash().to_string();
     let role_name2 = cell2.cell_id().dna_hash().to_string();
+    let role_name3 = cell3.cell_id().dna_hash().to_string();
 
     let clone1 = conductor
         .create_clone_cell(CreateCloneCellPayload {
@@ -737,7 +739,7 @@ async fn name_has_no_effect_on_dna_hash() {
             role_name: role_name1.clone(),
             modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
             membrane_proof: None,
-            name: Some("name1".to_string()),
+            name: None,
         })
         .await
         .unwrap();
@@ -748,12 +750,24 @@ async fn name_has_no_effect_on_dna_hash() {
             role_name: role_name2.clone(),
             modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
             membrane_proof: None,
-            name: Some("name2".to_string()),
+            name: Some("Rumpelstiltskin".to_string()),
+        })
+        .await
+        .unwrap();
+
+    let clone3 = conductor
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: app_id3.clone(),
+            role_name: role_name3.clone(),
+            modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
+            membrane_proof: None,
+            name: Some("Chara".to_string()),
         })
         .await
         .unwrap();
 
     assert_eq!(clone1.cell_id.dna_hash(), clone2.cell_id.dna_hash());
+    assert_eq!(clone2.cell_id.dna_hash(), clone3.cell_id.dna_hash());
 }
 
 fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_conductor_api::ClonedCell {
