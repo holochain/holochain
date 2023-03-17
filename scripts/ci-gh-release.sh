@@ -25,24 +25,23 @@ else
   export IS_PRE_RELEASE="false"
 fi
 
-cmd=$(cat <<EOF
-gh api \
-    --method POST \
-    -H "Accept: application/vnd.github+json" \
-    /repos/holochain/holochain/releases \
-    -f tag_name="${RELEASE_TAG}" \
-    -f target_commitish="${HOLOCHAIN_TARGET_BRANCH}" \
-    -f name="holochain ${LATEST_HOLOCHAIN_VERSION} (${RELEASE_BRANCH#*-})" \
-    -f body="***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***" \
-    -F draft=false \
-    -F generate_release_notes=false \
-    -F prerelease=${IS_PRE_RELEASE} \
-    -f make_latest="${IS_LATEST}"
-EOF
+cmd=(
+   gh api
+   --method POST
+   /repos/holochain/holochain/releases
+   -H "Accept: application/vnd.github+json"
+   -f tag_name="${RELEASE_TAG}"
+   -f target_commitish="${HOLOCHAIN_TARGET_BRANCH}"
+   -f name="holochain ${LATEST_HOLOCHAIN_VERSION} (${RELEASE_BRANCH#*-})"
+   -f body="***Please read [this release's top-level CHANGELOG](https://github.com/holochain/holochain/blob/${HOLOCHAIN_TARGET_BRANCH}/CHANGELOG.md#$(sed -E 's/(release-|\.)//g' <<<"${RELEASE_BRANCH}")) to see the full list of crates that were released together.***" \
+   -F draft=false
+   -F generate_release_notes=false
+   -F prerelease="${IS_PRE_RELEASE}"
+   -f make_latest="${IS_LATEST}"
 )
 
 if [[ "${DRY_RUN:-true}" == "false" ]]; then
-    $cmd
+    "${cmd[@]}"
 else
-    echo "$cmd"
+    echo "${cmd[@]}"
 fi
