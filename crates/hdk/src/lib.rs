@@ -3,6 +3,9 @@
 //! Holochain is built as a client-server architecture. The Conductor, Holochain's runtime, acts as the server.
 //! Its [Conductor API](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api) can be queried
 //! by a client to manage hApps and send requests to hApp functions.
+//! A hApp is a bundle of WebAssembly modules that are hosted in the Conductor's
+//! WebAssembly VM. They define callbacks and API functions that the Conductor can
+//! access, and they can access functionality that the Conductor exposes to them.
 //! [Read more on Holochain's architecture.](https://developer.holochain.org/concepts/2_application_architecture)
 //!
 //! hApps can be developed using the HDK. See the [Holochain Quick Start Guide](https://developer.holochain.org/quick-start)
@@ -29,6 +32,8 @@
 //!
 //! Integrity zomes describe a hApp's domain model by defining a set of entry and link types and providing a validation callback
 //! function that checks the integrity of any operations that manipulate data of those types.
+//! Additionally, a genesis self-check callback can also be provided to give basic verifiation
+//! of the data that! allows an agent to join a network before they attempt to join it.
 //!
 //! The wasm workspace contains examples of integrity zomes like this:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
@@ -88,7 +93,7 @@
 //!
 //! And every host function defined by Holochain has a convenience wrapper in HDK that does the type juggling for you.
 //!
-//! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
+//! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is abstracted by the HDK.
 //! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
 //!
 //! ## Zome functions = extern callbacks

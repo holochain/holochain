@@ -1,6 +1,6 @@
 //! Interfaces to manage Holochain applications (hApps) and call their functions.
 //!
-//! The Conductor is the central component of Holochain. It exposes web sockets for clients to
+//! The Conductor is the central component of Holochain. It exposes WebSockets for clients to
 //! connect to, processes incoming requests and orchestrates data flow and persistence.
 //!
 //! Refer to [Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture)
