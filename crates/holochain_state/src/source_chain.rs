@@ -697,8 +697,12 @@ where
                             ) = 0;
                             "
                         .trim();
-                        txn.query_row(sql, params!["unrestricted", agent_pubkey], query_row_fn)
-                            .optional()?
+                        txn.query_row(
+                            sql,
+                            params![CapAccess::Unrestricted.as_sql(), agent_pubkey],
+                            query_row_fn,
+                        )
+                        .optional()?
                     };
 
                     Ok(maybe_entry)
