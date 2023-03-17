@@ -36,7 +36,7 @@ SUBCOMMANDS:
 ```
 
 `hc app` and `hc web-app` are very similar, only differing by the addition of a `--recursive` flag.
-If used, this flag attempt to first pack all the assets to be included in the bundle being packed.
+If used, this flag attempts to first pack all the assets to be included in the bundle being packed.
 If it doesn't find the bundled DNA or hApp asset specified, it will by convention look for a
 DNA or hApp manifest file in the same directory and attempt to pack it using the specified name.
 
