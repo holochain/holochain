@@ -29,6 +29,8 @@
 //!
 //! Integrity zomes describe a hApp's domain model by defining a set of entry and link types and providing a validation callback
 //! function that checks the integrity of any operations that manipulate data of those types.
+//! Additionally, a genesis self-check callback can also be provided to give basic verifiation
+//! of the data that! allows an agent to join a network before they attempt to join it.
 //!
 //! The wasm workspace contains examples of integrity zomes like this:
 //! <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
