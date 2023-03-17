@@ -297,9 +297,10 @@ jobs:
       - name: Push the tags
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         id: push-tags
+        env:
+          HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
         run: |
           set -eu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git status
@@ -327,7 +328,6 @@ jobs:
           HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
         run: |
           set -xeu
-          cd "${HOLOCHAIN_REPO}"
           git push origin ${HOLOCHAIN_SOURCE_BRANCH}
 
       - name: Create a pull-request towards the source branch
@@ -339,7 +339,7 @@ jobs:
           HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
           GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
-          set -euE -o pipefail
+          set -xeuE -o pipefail
 
           cd "${HOLOCHAIN_REPO}"
 
