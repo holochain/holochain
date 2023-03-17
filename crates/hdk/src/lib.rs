@@ -88,7 +88,7 @@
 //!
 //! And every host function defined by Holochain has a convenience wrapper in HDK that does the type juggling for you.
 //!
-//! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
+//! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is abstracted by the HDK.
 //! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
 //!
 //! ## Zome functions = extern callbacks
