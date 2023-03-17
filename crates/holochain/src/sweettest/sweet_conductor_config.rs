@@ -46,7 +46,7 @@ impl SweetConductorConfig {
                 for t in n.transport_pool.iter_mut() {
                     if let kitsune_p2p::TransportConfig::WebRTC { signal_url } = t {
                         if signal_url == "rendezvous:" {
-                            *signal_url = format!("{}", rendezvous.sig_addr());
+                            *signal_url = rendezvous.sig_addr().to_string();
                         }
                     }
                 }

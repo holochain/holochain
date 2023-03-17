@@ -23,9 +23,7 @@ use std::sync::Arc;
 
 fn init_tracing() {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_env_filter(
-            tracing_subscriber::filter::EnvFilter::from_default_env(),
-        )
+        .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
         .with_file(true)
         .with_line_number(true)
         .finish();
@@ -55,10 +53,9 @@ pub async fn run_demo() {
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 
     let mut conductor = holochain::sweettest::SweetConductor::from_config_rendezvous_keystore(
-        config,
-        rendezvous,
-        keystore,
-    ).await;
+        config, rendezvous, keystore,
+    )
+    .await;
 
     conductor.shutdown().await;
 }

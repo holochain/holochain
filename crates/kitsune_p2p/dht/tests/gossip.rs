@@ -156,7 +156,7 @@ fn test_mismatched_powers() {
 /// of the nodes after enough gossip rounds
 #[test]
 fn gossip_scenario_full_sync() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let topo = Topology::standard_zero();
     let gopa = GossipParams::new(1.into(), 0);
 

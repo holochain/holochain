@@ -53,7 +53,7 @@ async fn check_timeout<T>(response: impl Future<Output = Result<T, ws::Websocket
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Figure out how to get holochain bin in CI"]
 async fn run_holochain() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let port: u16 = pick_unused_port().expect("No ports free");
     let cmd = std::process::Command::cargo_bin("hc").unwrap();
     let mut cmd = Command::from(cmd);
@@ -70,7 +70,7 @@ async fn run_holochain() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Figure out how to get holochain bin in CI"]
 async fn run_multiple_on_same_port() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let port: u16 = pick_unused_port().expect("No ports free");
     let app_port: u16 = pick_unused_port().expect("No ports free");
     let cmd = std::process::Command::cargo_bin("hc").unwrap();

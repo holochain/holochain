@@ -158,7 +158,7 @@ fn test_grow_by_multiple_chunks() {
 ///
 /// (not a very good test, probably)
 fn test_degenerate_asymmetrical_coverage() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let topo = Topology::unit_zero();
     let other = ArqBounds::from_interval(&topo, 4, DhtArcRange::from_bounds(0x0u32, 0x80))
         .unwrap()
