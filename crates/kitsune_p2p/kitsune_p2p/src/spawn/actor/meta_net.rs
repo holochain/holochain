@@ -40,7 +40,8 @@ kitsune_p2p_types::write_codec_enum! {
     codec WireWrap {
         /// Notification not needing a response.
         Notify(0x00) {
-            data.0: WireData,
+            msg_id.0: u64,
+            data.1: WireData,
         },
 
         /// Request that expects a response.
@@ -55,6 +56,13 @@ kitsune_p2p_types::write_codec_enum! {
             data.1: WireData,
         },
     }
+}
+
+fn next_msg_id() -> u64 {
+    static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    // MAYBE - track these message ids at the connection level
+    // to prevent mismatches
+    MSG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 pub type RespondFut = std::pin::Pin<Box<dyn std::future::Future<Output = ()> + 'static + Send>>;
@@ -168,30 +176,40 @@ impl MetaNetCon {
     }
 
     pub async fn notify(&self, payload: &wire::Wire, timeout: KitsuneTimeout) -> KitsuneResult<()> {
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNetCon::Tx2(con) = self {
-                return con.notify(payload, timeout).await;
+        let start = std::time::Instant::now();
+        let msg_id = next_msg_id();
+
+        let result = (move || async move {
+            #[cfg(feature = "tx2")]
+            {
+                if let MetaNetCon::Tx2(con) = self {
+                    return con.notify(payload, timeout).await;
+                }
             }
-        }
 
-        #[cfg(feature = "tx5")]
-        {
-            if let MetaNetCon::Tx5(ep, rem_url, _res_store) = self {
-                let wire = payload.encode_vec().map_err(KitsuneError::other)?;
-                let wrap = WireWrap::notify(WireData(wire));
+            #[cfg(feature = "tx5")]
+            {
+                if let MetaNetCon::Tx5(ep, rem_url, _res_store) = self {
+                    let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                    let wrap = WireWrap::notify(msg_id, WireData(wire));
 
-                let mut writer = tx5::Buf::from_writer().map_err(KitsuneError::other)?;
-                wrap.encode(&mut writer).map_err(KitsuneError::other)?;
-                let data = writer.finish();
-                ep.send(rem_url.clone(), data)
-                    .await
-                    .map_err(KitsuneError::other)?;
-                return Ok(());
+                    let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+                    ep.send(rem_url.clone(), data.as_slice())
+                        .await
+                        .map_err(KitsuneError::other)?;
+                    return Ok(());
+                }
             }
-        }
 
-        Err("invalid features".into())
+            Err("invalid features".into())
+        })()
+        .await;
+
+        let elapsed_s = start.elapsed().as_secs_f64();
+
+        tracing::trace!(%elapsed_s, %msg_id, ?payload, ?result, "sent notify");
+
+        result
     }
 
     pub async fn request(
@@ -199,42 +217,51 @@ impl MetaNetCon {
         payload: &wire::Wire,
         timeout: KitsuneTimeout,
     ) -> KitsuneResult<wire::Wire> {
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNetCon::Tx2(con) = self {
-                return con.request(payload, timeout).await;
+        let start = std::time::Instant::now();
+        let msg_id = next_msg_id();
+
+        tracing::trace!(?payload, "initiating request");
+
+        let result = (move || async move {
+            #[cfg(feature = "tx2")]
+            {
+                if let MetaNetCon::Tx2(con) = self {
+                    return con.request(payload, timeout).await;
+                }
             }
-        }
 
-        #[cfg(feature = "tx5")]
-        {
-            if let MetaNetCon::Tx5(ep, rem_url, res_store) = self {
-                static MSG_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-                let msg_id = MSG_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                let (s, r) = tokio::sync::oneshot::channel();
-                res_store.lock().insert(msg_id, s);
+            #[cfg(feature = "tx5")]
+            {
+                if let MetaNetCon::Tx5(ep, rem_url, res_store) = self {
+                    let (s, r) = tokio::sync::oneshot::channel();
+                    res_store.lock().insert(msg_id, s);
 
-                let res_store = res_store.clone();
-                tokio::task::spawn(async move {
-                    // TODO - use tuning_params.implicit_timeout
-                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                    res_store.lock().remove(&msg_id);
-                });
+                    let res_store = res_store.clone();
+                    tokio::task::spawn(async move {
+                        tokio::time::sleep(timeout.time_remaining()).await;
+                        res_store.lock().remove(&msg_id);
+                    });
 
-                let wire = payload.encode_vec().map_err(KitsuneError::other)?;
-                let wrap = WireWrap::request(msg_id, WireData(wire));
+                    let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                    let wrap = WireWrap::request(msg_id, WireData(wire));
+                    let data = wrap.encode_vec().map_err(KitsuneError::other)?;
 
-                let mut writer = tx5::Buf::from_writer().map_err(KitsuneError::other)?;
-                wrap.encode(&mut writer).map_err(KitsuneError::other)?;
-                let data = writer.finish();
-                ep.send(rem_url.clone(), data)
-                    .await
-                    .map_err(KitsuneError::other)?;
-                return Ok(r.await.map_err(|_| KitsuneError::other("timeout"))?);
+                    ep.send(rem_url.clone(), data.as_slice())
+                        .await
+                        .map_err(KitsuneError::other)?;
+                    return r.await.map_err(|_| KitsuneError::other("timeout"));
+                }
             }
-        }
 
-        Err("invalid features".into())
+            Err("invalid features".into())
+        })()
+        .await;
+
+        let elapsed_s = start.elapsed().as_secs_f64();
+
+        tracing::trace!(%elapsed_s, %msg_id, ?payload, ?result, "sent request");
+
+        result
     }
 
     pub fn peer_id(&self) -> Arc<[u8; 32]> {
@@ -340,8 +367,11 @@ impl MetaNet {
                     };
                     conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
                         Box::pin(async move {
-                            match crate::spawn::actor::bootstrap::proxy_list(bootstrap_url.into())
-                                .await
+                            match crate::spawn::actor::bootstrap::proxy_list(
+                                bootstrap_url.into(),
+                                crate::spawn::actor::bootstrap::BootstrapNet::Tx2,
+                            )
+                            .await
                             {
                                 Ok(mut proxy_list) => {
                                     if proxy_list.is_empty() {
@@ -544,13 +574,15 @@ impl MetaNet {
                     }
                     tx5::EpEvt::Data {
                         rem_cli_url,
-                        mut data,
+                        data,
                         permit,
                     } => {
-                        let data = match WireWrap::decode(&mut data) {
-                            Ok(WireWrap::Notify(Notify { data })) => {
+                        tracing::trace!(%rem_cli_url, byte_count=?data.remaining(), "received bytes");
+                        match WireWrap::decode(&mut bytes::Buf::reader(data)) {
+                            Ok(WireWrap::Notify(Notify { msg_id, data })) => {
                                 match wire::Wire::decode_ref(&data) {
                                     Ok((_, data)) => {
+                                        tracing::trace!(%msg_id, ?data, "received notify");
                                         if evt_send
                                             .send(MetaNetEvt::Notify {
                                                 remote_url: rem_cli_url.to_string(),
@@ -586,15 +618,13 @@ impl MetaNet {
                                                 };
                                                 let wrap =
                                                     WireWrap::response(msg_id, WireData(wire));
-                                                let mut writer = match tx5::Buf::from_writer() {
-                                                    Ok(writer) => writer,
+                                                let data = match wrap.encode_vec() {
+                                                    Ok(data) => data,
                                                     Err(_) => return,
                                                 };
-                                                if wrap.encode(&mut writer).is_err() {
-                                                    return;
-                                                }
-                                                let data = writer.finish();
-                                                let _ = ep_hnd.send(rem_cli_url2, data).await;
+                                                let _ = ep_hnd
+                                                    .send(rem_cli_url2, data.as_slice())
+                                                    .await;
                                             });
                                             out
                                         });
@@ -641,7 +671,7 @@ impl MetaNet {
                                 // TODO - drop connection??
                                 continue;
                             }
-                        };
+                        }
                     }
                     tx5::EpEvt::Demo { rem_cli_url: _ } => (),
                 }

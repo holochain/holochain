@@ -244,6 +244,7 @@ pub mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::prelude::*;
     use holochain_state::prelude::test_db_dir;
+    use holochain_trace;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_zomes;
@@ -258,7 +259,6 @@ pub mod test {
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
-    use observability;
     use pretty_assertions::assert_eq;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
@@ -381,7 +381,7 @@ pub mod test {
     #[ignore]
     #[allow(unreachable_code, unused_variables)]
     async fn invalid_request() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
@@ -410,7 +410,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn websocket_call_zome_function() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -449,7 +449,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn gossip_info_request() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -498,7 +498,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn enable_disable_enable_app() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let agent_key = fake_agent_pubkey_1();
         let mut dnas = Vec::new();
         for _i in 0..2 as u32 {
@@ -684,7 +684,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn attach_app_interface() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
@@ -702,7 +702,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dump_state() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -768,7 +768,7 @@ pub mod test {
     /// across the admin websocket.
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let test_db_dir = test_db_dir();
         let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![

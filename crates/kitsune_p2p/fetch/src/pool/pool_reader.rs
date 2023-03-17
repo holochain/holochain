@@ -5,7 +5,7 @@ use kitsune_p2p_types::KSpace;
 use crate::FetchPool;
 
 /// Read-only access to the queue
-#[derive(Clone, derive_more::From)]
+#[derive(Debug, Clone, derive_more::From)]
 pub struct FetchPoolReader(FetchPool);
 
 impl FetchPoolReader {

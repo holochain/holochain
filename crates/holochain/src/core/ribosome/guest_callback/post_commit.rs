@@ -229,7 +229,7 @@ mod slow_tests {
     #[ignore = "flakey. Sometimes fails the second last assert with 3 instead of 5"]
     #[cfg(feature = "test_utils")]
     async fn post_commit_test_volley() -> anyhow::Result<()> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

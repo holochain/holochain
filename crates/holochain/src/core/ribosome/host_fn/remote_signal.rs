@@ -157,7 +157,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn remote_signal_test() -> anyhow::Result<()> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         const NUM_CONDUCTORS: usize = 5;
 
         let num_signals = Arc::new(AtomicUsize::new(0));

@@ -183,7 +183,6 @@ async fn app_validation_workflow_inner(
                         }
                     }
 
-
                     if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
                         warn!(
                             msg = "DhtOp has failed app validation",
@@ -206,7 +205,10 @@ async fn app_validation_workflow_inner(
                         }
                         Outcome::Rejected(_) => {
                             rejected += 1;
-                            tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
+                            tracing::info!(
+                                "Received invalid op. The op author will be blocked.\nOp: {:?}",
+                                op_light
+                            );
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
@@ -218,6 +220,7 @@ async fn app_validation_workflow_inner(
                 WorkflowResult::Ok((total, awaiting, rejected, agent_activity))
             })
             .await?;
+
         // Once the database transaction is committed, add agent activity to the cache
         // that is ready for integration.
         for (author, seq, has_no_dependency) in activity {
@@ -760,5 +763,12 @@ pub fn put_integrated(
     // it's integrated.
     set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
+
+    // If the op is rejected then force a receipt to be processed because the
+    // receipt is a warrant, so of course the author won't want it to be
+    // produced.
+    if matches!(status, ValidationStatus::Rejected) {
+        set_require_receipt(txn, hash, true)?;
+    }
     Ok(())
 }

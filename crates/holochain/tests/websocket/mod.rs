@@ -14,6 +14,7 @@ use holochain::{
     },
     fixt::*,
 };
+use holochain_trace;
 use holochain_types::{
     prelude::*,
     test_utils::{fake_dna_zomes, write_fake_dna_file},
@@ -21,7 +22,6 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
-use observability;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -34,7 +34,7 @@ use crate::test_utils::*;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "glacial_tests")]
 async fn call_admin() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -104,7 +104,7 @@ how_many: 42
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "glacial_tests")]
 async fn call_zome() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -246,7 +246,7 @@ async fn call_zome() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn remote_signals() -> anyhow::Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -254,6 +254,16 @@ async fn remote_signals() -> anyhow::Result<()> {
     // MAYBE: write helper for agents across conductors
     let all_agents: Vec<HoloHash<hash_type::Agent>> =
         future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;
+
+    // Check that there are no duplicate agents
+    assert_eq!(
+        all_agents.len(),
+        all_agents
+            .clone()
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    );
 
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
         .await
@@ -302,7 +312,7 @@ async fn remote_signals() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 async fn emit_signals() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -416,7 +426,7 @@ async fn emit_signals() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn conductor_admin_interface_runs_from_config() -> Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
@@ -443,7 +453,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn list_app_interfaces_succeeds() -> Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -482,7 +492,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
 }
 
 async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -541,7 +551,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn too_many_open() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
@@ -574,7 +584,7 @@ async fn concurrent_install_dna() {
     static NUM_CONCURRENT_INSTALLS: u8 = 10;
     static REQ_TIMEOUT_MS: u64 = 15000;
 
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
@@ -641,7 +651,7 @@ async fn concurrent_install_dna() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn full_state_dump_cursor_works() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let mut conductor = SweetConductor::from_standard_config().await;
 

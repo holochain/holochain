@@ -86,7 +86,7 @@ pub mod wasm_test {
     async fn wasm_trace_test() {
         use holochain_types::prelude::Level::*;
         CAPTURE.store(true, std::sync::atomic::Ordering::SeqCst);
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Debug).await;

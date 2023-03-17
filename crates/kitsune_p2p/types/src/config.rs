@@ -219,12 +219,12 @@ pub mod tuning_params_struct {
         tx5_max_recv_bytes: u32 = 16 * 1024 * 1024,
 
         /// Tx5 max concurrent connection limit.
-        /// [Default: 40]
-        tx5_max_conn_count: u32 = 40,
+        /// [Default: 255]
+        tx5_max_conn_count: u32 = 255,
 
         /// Tx5 max init (connect) time for a connection in seconds.
-        /// [Default: 20]
-        tx5_max_conn_init_s: u32 = 20,
+        /// [Default: 60]
+        tx5_max_conn_init_s: u32 = 60,
 
         /// if you would like to be able to use an external tool
         /// to debug the QUIC messages sent and received by kitsune

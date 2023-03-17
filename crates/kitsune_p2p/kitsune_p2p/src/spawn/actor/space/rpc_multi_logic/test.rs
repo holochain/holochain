@@ -77,7 +77,7 @@ async fn build_ep_hnd(config: Arc<KitsuneP2pConfig>, m: MockBindAdapt) -> Tx2EpH
 
 #[tokio::test]
 async fn test_rpc_multi_logic_mocked() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // allow fake timing during test
     tokio::time::pause();

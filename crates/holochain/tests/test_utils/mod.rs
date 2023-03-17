@@ -341,11 +341,8 @@ pub fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
             driver: InterfaceDriver::Websocket { port },
         }]),
         environment_path: environment_path.into(),
-        network: None,
-        dpki: None,
         keystore: KeystoreConfig::DangerTestKeystore,
-        db_sync_strategy: DbSyncStrategy::default(),
-        chc_namespace: None,
+        ..Default::default()
     }
 }
 

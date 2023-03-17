@@ -68,6 +68,12 @@ pub enum NetworkType {
     Quic(Quic),
     /// A transport that uses the MDNS protocol.
     Mdns,
+    /// A transport that uses the WebRTC protocol.
+    #[structopt(name = "webrtc")]
+    WebRTC {
+        /// URL to a holochain tx5 WebRTC signal server.
+        signal_url: String,
+    },
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -213,7 +219,11 @@ impl From<Network> for KitsuneP2pConfig {
                     proxy_config: holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient {
                         proxy_url,
                     },
-                }]
+                }];
+            }
+            NetworkType::WebRTC { signal_url } => {
+                let transport = TransportConfig::WebRTC { signal_url };
+                kit.transport_pool = vec![transport];
             }
         }
         kit

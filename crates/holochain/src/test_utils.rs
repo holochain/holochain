@@ -820,7 +820,7 @@ async fn display_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor.list_cell_ids(Some(CellStatus::Joined)) {
+    for cell_id in conductor.running_cell_ids(Some(CellStatus::Joined)) {
         let space = cell_id.dna_hash();
         let db = conductor.get_p2p_db(space);
         let info = p2p_agent_store::dump_state(db.into(), Some(cell_id))

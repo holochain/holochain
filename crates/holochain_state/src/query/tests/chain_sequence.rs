@@ -1,12 +1,12 @@
 use crate::{source_chain::SourceChainResult, test_utils::test_cell_db};
 use holo_hash::ActionHash;
 use holochain_sqlite::prelude::*;
+use holochain_trace;
 use matches::assert_matches;
-use observability;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_cell_db();
     let arc = test_db.env();
     {

@@ -10,13 +10,13 @@ use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 
-pub async fn block(db: &DbWrite<DbKindConductor>, block: Block) -> DatabaseResult<()> {
-    db.async_commit(move |txn| mutations::insert_block(txn, block))
+pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
+    db.async_commit(move |txn| mutations::insert_block(txn, input))
         .await
 }
 
-pub async fn unblock(db: &DbWrite<DbKindConductor>, block: Block) -> DatabaseResult<()> {
-    db.async_commit(move |txn| mutations::insert_unblock(txn, block))
+pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
+    db.async_commit(move |txn| mutations::insert_unblock(txn, input))
         .await
 }
 
@@ -53,6 +53,7 @@ mod test {
     use holochain_zome_types::block::BlockTarget;
     use holochain_zome_types::block::BlockTargetId;
     use holochain_zome_types::block::CellBlockReason;
+    use holochain_zome_types::InclusiveTimestampInterval;
     use holochain_zome_types::TimestampFixturator;
 
     // More complex setups.
@@ -131,8 +132,11 @@ mod test {
             let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
             for (start, end, op) in &setup {
-                let block =
-                    Block::try_new(target.clone(), Timestamp(*start), Timestamp(*end)).unwrap();
+                let block = Block::new(
+                    target.clone(),
+                    InclusiveTimestampInterval::try_new(Timestamp(*start), Timestamp(*end))
+                        .unwrap(),
+                );
                 if *op {
                     super::block(&db, block).await.unwrap()
                 } else {
@@ -171,7 +175,10 @@ mod test {
 
         super::block(
             &db,
-            Block::try_new(target0.clone(), Timestamp::MIN, Timestamp::MAX).unwrap(),
+            Block::new(
+                target0.clone(),
+                InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX).unwrap(),
+            ),
         )
         .await
         .unwrap();
@@ -182,7 +189,10 @@ mod test {
 
         super::block(
             &db,
-            Block::try_new(target1.clone(), Timestamp::MIN, Timestamp::MAX).unwrap(),
+            Block::new(
+                target1.clone(),
+                InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX).unwrap(),
+            ),
         )
         .await
         .unwrap();
@@ -194,7 +204,10 @@ mod test {
         // Unblock the app block.
         super::unblock(
             &db,
-            Block::try_new(target1.clone(), Timestamp::MIN, Timestamp::MAX).unwrap(),
+            Block::new(
+                target1.clone(),
+                InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX).unwrap(),
+            ),
         )
         .await
         .unwrap();
@@ -236,20 +249,28 @@ mod test {
 
             super::block(
                 &db,
-                Block::try_new(target.clone(), Timestamp(block_start), Timestamp(block_end))
+                Block::new(
+                    target.clone(),
+                    InclusiveTimestampInterval::try_new(
+                        Timestamp(block_start),
+                        Timestamp(block_end),
+                    )
                     .unwrap(),
+                ),
             )
             .await
             .unwrap();
 
             super::unblock(
                 &db,
-                Block::try_new(
+                Block::new(
                     target.clone(),
-                    Timestamp(unblock_start),
-                    Timestamp(unblock_end),
-                )
-                .unwrap(),
+                    InclusiveTimestampInterval::try_new(
+                        Timestamp(unblock_start),
+                        Timestamp(unblock_end),
+                    )
+                    .unwrap(),
+                ),
             )
             .await
             .unwrap();
@@ -313,20 +334,28 @@ mod test {
 
             super::block(
                 &db,
-                Block::try_new(target.clone(), Timestamp(block_start), Timestamp(block_end))
+                Block::new(
+                    target.clone(),
+                    InclusiveTimestampInterval::try_new(
+                        Timestamp(block_start),
+                        Timestamp(block_end),
+                    )
                     .unwrap(),
+                ),
             )
             .await
             .unwrap();
 
             super::unblock(
                 &db,
-                Block::try_new(
+                Block::new(
                     target.clone(),
-                    Timestamp(unblock_start),
-                    Timestamp(unblock_end),
-                )
-                .unwrap(),
+                    InclusiveTimestampInterval::try_new(
+                        Timestamp(unblock_start),
+                        Timestamp(unblock_end),
+                    )
+                    .unwrap(),
+                ),
             )
             .await
             .unwrap();
@@ -389,7 +418,10 @@ mod test {
 
             super::block(
                 &db,
-                Block::try_new(target.clone(), Timestamp(start), Timestamp(end)).unwrap(),
+                Block::new(
+                    target.clone(),
+                    InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end)).unwrap(),
+                ),
             )
             .await
             .unwrap();
@@ -441,7 +473,10 @@ mod test {
 
             super::block(
                 &db,
-                Block::try_new(target1.clone(), Timestamp(start), Timestamp(end)).unwrap(),
+                Block::new(
+                    target1.clone(),
+                    InclusiveTimestampInterval::try_new(Timestamp(start), Timestamp(end)).unwrap(),
+                ),
             )
             .await
             .unwrap();

@@ -529,6 +529,7 @@ impl RealRibosome {
             )
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             .with_host_function(&mut ns, "__hc__trace_1", trace)
             .with_host_function(&mut ns, "__hc__hash_1", hash)
             .with_host_function(&mut ns, "__hc__version_1", version)
@@ -975,7 +976,7 @@ pub mod wasm_test {
     /// Basic checks that we can call externs internally and externally the way we want using the
     /// hdk macros rather than low level rust extern syntax.
     async fn ribosome_extern_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::HdkExtern]).await;
@@ -1035,7 +1036,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_tooling_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crud]).await;
         let ribosome = super::RealRibosome::new(dna_file).unwrap();
@@ -1060,6 +1061,8 @@ pub mod wasm_test {
                 "__hc__delete_link_1",
                 "__hc__get_links_1",
                 "__hc__get_link_details_1",
+                "__hc__block_agent_1",
+                "__hc__unblock_agent_1",
                 "__hc__call_1",
                 "__hc__emit_signal_1",
                 "__hc__remote_signal_1",
@@ -1097,7 +1100,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn the_incredible_halt_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::TheIncredibleHalt).await;
