@@ -190,7 +190,6 @@ pub struct DnaDef {
 #[derive(Serialize, Debug, PartialEq, Eq)]
 /// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
-    name: &'a String,
     modifiers: &'a DnaModifiers,
     integrity_zomes: &'a IntegrityZomes,
 }
@@ -363,7 +362,6 @@ impl HashableContent for DnaDef {
 
     fn hashable_content(&self) -> HashableContentBytes {
         let hash = DnaDefHash {
-            name: &self.name,
             modifiers: &self.modifiers,
             integrity_zomes: &self.integrity_zomes,
         };
