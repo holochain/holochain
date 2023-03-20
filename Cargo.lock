@@ -3415,6 +3415,8 @@ dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
  "serde",
+ "serde_bytes",
+ "tx5",
 ]
 
 [[package]]

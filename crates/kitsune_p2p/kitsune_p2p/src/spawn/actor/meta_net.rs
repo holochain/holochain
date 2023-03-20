@@ -34,6 +34,8 @@ use kitsune_p2p_types::*;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
+use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_block::BlockTargetId;
 
 kitsune_p2p_types::write_codec_enum! {
     /// KitsuneP2p WebRTC wrapper enum.
@@ -541,17 +543,18 @@ impl MetaNet {
 
                 match evt {
                     tx5::EpEvt::Connected { rem_cli_url } => {
-                        if evt_send
-                            .send(MetaNetEvt::Connected {
-                                remote_url: rem_cli_url.to_string(),
-                                con: MetaNetCon::Tx5(
-                                    ep_hnd2.clone(),
-                                    rem_cli_url,
-                                    res_store2.clone(),
-                                ),
-                            })
-                            .await
-                            .is_err()
+                        if !matches!(host.is_blocked(rem_cli_url.clone().into(), Timestamp::now()).await, Ok(false))
+                            || evt_send
+                                .send(MetaNetEvt::Connected {
+                                    remote_url: rem_cli_url.to_string(),
+                                    con: MetaNetCon::Tx5(
+                                        ep_hnd2.clone(),
+                                        rem_cli_url,
+                                        res_store2.clone(),
+                                    ),
+                                })
+                                .await
+                                .is_err()
                         {
                             break;
                         }
