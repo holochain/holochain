@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_block"
-version = "0.1.0"
+version = "0.2.0-beta-rc.0"
 description = "(un)Block datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -11,8 +11,8 @@ categories = [ "network-programming" ]
 edition = "2021"
 
 [dependencies]
-kitsune_p2p_timestamp = { version = "^0.1.0", path = "../timestamp", features = ["now"] }
-kitsune_p2p_bin_data = { version = "^0.1.0", path = "../bin_data" }
+kitsune_p2p_timestamp = { version = "^0.2.0-beta-rc.0", path = "../timestamp", features = ["now"] }
+kitsune_p2p_bin_data = { version = "^0.2.0-beta-rc.0", path = "../bin_data" }
 serde = { version = "1.0", features = ["derive"] }
 tx5 = { version = "0.0.1-alpha.5" }
 serde_bytes = "0.11"

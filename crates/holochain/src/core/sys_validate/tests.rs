@@ -16,12 +16,12 @@ use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_state::test_utils::test_db_dir;
+use holochain_trace;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
 use holochain_wasm_test_utils::*;
 use holochain_zome_types::Action;
 use matches::assert_matches;
-use observability;
 use std::convert::TryFrom;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -324,7 +324,7 @@ async fn check_link_tag_size_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_app_entry_def_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let TestWasmPair::<DnaWasm> {
         integrity,
         coordinator,

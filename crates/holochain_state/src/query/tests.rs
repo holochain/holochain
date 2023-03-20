@@ -30,7 +30,7 @@ mod sys_meta;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_links() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
@@ -111,7 +111,7 @@ async fn get_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
@@ -177,7 +177,7 @@ async fn get_entry() {
 /// Test that `insert_op` also inserts an action and potentially an entry
 #[tokio::test(flavor = "multi_thread")]
 async fn insert_op_equivalence() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut conn1 = Connection::open_in_memory().unwrap();
     let mut conn2 = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn1, None).unwrap();

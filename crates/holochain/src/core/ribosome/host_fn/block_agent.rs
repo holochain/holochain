@@ -41,7 +41,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_call_verify_block() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, alice_pubkey, bob, bob_pubkey, ..
         } = RibosomeTestFixture::new(TestWasm::Capability).await;

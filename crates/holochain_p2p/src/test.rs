@@ -241,7 +241,7 @@ mod tests {
         holo_hash::AgentPubKey,
         holo_hash::AgentPubKey,
     ) {
-        observability::test_run().unwrap();
+        holochain_trace::test_run().unwrap();
         (
             newhash!(DnaHash, 's'),
             fixt!(AgentPubKey, Predictable, 0),
@@ -480,7 +480,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (dna, a1, a2, _a3) = test_setup();
 

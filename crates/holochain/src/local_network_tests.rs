@@ -33,7 +33,7 @@ use tracing::debug_span;
 #[test_case(4)]
 #[tokio::test(flavor = "multi_thread")]
 async fn conductors_call_remote(num_conductors: usize) {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
@@ -252,7 +252,7 @@ async fn conductors_gossip_inner(
     network: KitsuneP2pConfig,
     share_peers: bool,
 ) {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let network_seed = nanoid::nanoid!().to_string();
 
     let zomes = vec![TestWasm::Create];
