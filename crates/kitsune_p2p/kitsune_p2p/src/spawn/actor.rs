@@ -149,7 +149,8 @@ impl KitsuneP2pActor {
         #[cfg(feature = "tx2")]
         if ep_hnd.is_none() && config.is_tx2() {
             tracing::trace!("tx2");
-            let (h, e) = MetaNet::new_tx2(host.clone(), config.clone(), tls_config, metrics).await?;
+            let (h, e) =
+                MetaNet::new_tx2(host.clone(), config.clone(), tls_config, metrics).await?;
             ep_hnd = Some(h);
             ep_evt = Some(e);
             bootstrap_net = Some(BootstrapNet::Tx2);

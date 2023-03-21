@@ -44,7 +44,7 @@ pub enum BlockTargetId {
     Node(NodeId),
     Ip(std::net::Ipv4Addr),
     // Don't have an ID for the remote.
-    Anon
+    Anon,
 }
 
 impl From<BlockTarget> for BlockTargetId {
@@ -62,8 +62,7 @@ impl From<Tx5Url> for BlockTargetId {
     fn from(tx5_url: Tx5Url) -> Self {
         if let Some(id) = tx5_url.id() {
             BlockTargetId::Node(Arc::new(id.0))
-        }
-        else {
+        } else {
             BlockTargetId::Anon
         }
     }

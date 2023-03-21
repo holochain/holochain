@@ -31,11 +31,11 @@ use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
 
+use kitsune_p2p_block::BlockTargetId;
+use kitsune_p2p_timestamp::Timestamp;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_block::BlockTargetId;
 
 kitsune_p2p_types::write_codec_enum! {
     /// KitsuneP2p WebRTC wrapper enum.
@@ -418,7 +418,10 @@ impl MetaNet {
             while let Some(evt) = ep.next().await {
                 match evt {
                     Tx2EpEvent::OutgoingConnection(Tx2EpConnection { con, url }) => {
-                        if !matches!(host.is_blocked(con.clone().into(), Timestamp::now()).await, Ok(false)) || evt_send
+                        if !matches!(
+                            host.is_blocked(con.clone().into(), Timestamp::now()).await,
+                            Ok(false)
+                        ) || evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con),
@@ -430,7 +433,10 @@ impl MetaNet {
                         }
                     }
                     Tx2EpEvent::IncomingConnection(Tx2EpConnection { con, url }) => {
-                        if !matches!(host.is_blocked(con.clone().into(), Timestamp::now()).await, Ok(false)) || evt_send
+                        if !matches!(
+                            host.is_blocked(con.clone().into(), Timestamp::now()).await,
+                            Ok(false)
+                        ) || evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con),
@@ -460,7 +466,10 @@ impl MetaNet {
                         respond,
                     }) => {
                         let timeout = tuning_params.implicit_timeout();
-                        if !matches!(host.is_blocked(con.clone().into(), Timestamp::now()).await, Ok(false)) || evt_send
+                        if !matches!(
+                            host.is_blocked(con.clone().into(), Timestamp::now()).await,
+                            Ok(false)
+                        ) || evt_send
                             .send(MetaNetEvt::Request {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con),
@@ -479,7 +488,10 @@ impl MetaNet {
                         }
                     }
                     Tx2EpEvent::IncomingNotify(Tx2EpIncomingNotify { con, url, data, .. }) => {
-                        if !matches!(host.is_blocked(con.clone().into(), Timestamp::now()).await, Ok(false)) || evt_send
+                        if !matches!(
+                            host.is_blocked(con.clone().into(), Timestamp::now()).await,
+                            Ok(false)
+                        ) || evt_send
                             .send(MetaNetEvt::Notify {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con),
@@ -544,18 +556,21 @@ impl MetaNet {
 
                 match evt {
                     tx5::EpEvt::Connected { rem_cli_url } => {
-                        if !matches!(host.is_blocked(rem_cli_url.clone().into(), Timestamp::now()).await, Ok(false))
-                            || evt_send
-                                .send(MetaNetEvt::Connected {
-                                    remote_url: rem_cli_url.to_string(),
-                                    con: MetaNetCon::Tx5(
-                                        ep_hnd2.clone(),
-                                        rem_cli_url,
-                                        res_store2.clone(),
-                                    ),
-                                })
-                                .await
-                                .is_err()
+                        if !matches!(
+                            host.is_blocked(rem_cli_url.clone().into(), Timestamp::now())
+                                .await,
+                            Ok(false)
+                        ) || evt_send
+                            .send(MetaNetEvt::Connected {
+                                remote_url: rem_cli_url.to_string(),
+                                con: MetaNetCon::Tx5(
+                                    ep_hnd2.clone(),
+                                    rem_cli_url,
+                                    res_store2.clone(),
+                                ),
+                            })
+                            .await
+                            .is_err()
                         {
                             break;
                         }
@@ -583,7 +598,11 @@ impl MetaNet {
                     } => {
                         tracing::trace!(%rem_cli_url, byte_count=?data.remaining(), "received bytes");
 
-                        if !matches!(host.is_blocked(rem_cli_url.clone().into(), Timestamp::now()).await, Ok(false)) {
+                        if !matches!(
+                            host.is_blocked(rem_cli_url.clone().into(), Timestamp::now())
+                                .await,
+                            Ok(false)
+                        ) {
                             break;
                         }
 
