@@ -13,7 +13,6 @@ mod build_coordinator_wasm;
 #[cfg(feature = "build_coordinator_wasm")]
 pub use build_coordinator_wasm::*;
 
-#[cfg(any(feature = "build_integrity_wasm", feature = "build_coordinator_wasm"))]
 macro_rules! wasm_common {
     () => {
         #[hdk_entry_helper]
@@ -35,5 +34,4 @@ macro_rules! wasm_common {
         }
     };
 }
-#[cfg(any(feature = "build_integrity_wasm", feature = "build_coordinator_wasm"))]
 pub(crate) use wasm_common;

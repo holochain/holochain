@@ -2242,6 +2242,7 @@ dependencies = [
  "hdk",
  "holochain",
  "holochain_keystore",
+ "holochain_types",
  "serde",
  "tokio",
  "tracing",

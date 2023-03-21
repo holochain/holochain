@@ -50,6 +50,7 @@ pub fn standard_config() -> SweetConductorConfig {
 }
 
 /// A DnaFile with a role name assigned
+#[derive(Clone)]
 pub struct DnaWithRole {
     role: RoleName,
     dna: DnaFile,
