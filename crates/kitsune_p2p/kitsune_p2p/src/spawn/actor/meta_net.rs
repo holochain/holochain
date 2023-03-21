@@ -460,7 +460,7 @@ impl MetaNet {
                         respond,
                     }) => {
                         let timeout = tuning_params.implicit_timeout();
-                        if evt_send
+                        if !matches!(host.is_blocked(con.clone().into(), Timestamp::now()).await, Ok(false)) || evt_send
                             .send(MetaNetEvt::Request {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con),
@@ -479,7 +479,7 @@ impl MetaNet {
                         }
                     }
                     Tx2EpEvent::IncomingNotify(Tx2EpIncomingNotify { con, url, data, .. }) => {
-                        if evt_send
+                        if !matches!(host.is_blocked(con.clone().into(), Timestamp::now()).await, Ok(false)) || evt_send
                             .send(MetaNetEvt::Notify {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con),
@@ -582,6 +582,11 @@ impl MetaNet {
                         permit,
                     } => {
                         tracing::trace!(%rem_cli_url, byte_count=?data.remaining(), "received bytes");
+
+                        if !matches!(host.is_blocked(rem_cli_url.clone().into(), Timestamp::now()).await, Ok(false)) {
+                            break;
+                        }
+
                         match WireWrap::decode(&mut bytes::Buf::reader(data)) {
                             Ok(WireWrap::Notify(Notify { msg_id, data })) => {
                                 match wire::Wire::decode_ref(&data) {
