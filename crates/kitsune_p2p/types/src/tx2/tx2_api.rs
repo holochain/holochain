@@ -11,6 +11,7 @@ use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::Stream;
 use std::collections::HashMap;
 use std::sync::atomic;
+use kitsune_p2p_block::BlockTargetId;
 
 static MSG_ID: atomic::AtomicU64 = atomic::AtomicU64::new(1);
 
@@ -249,6 +250,12 @@ impl<C: Codec + 'static + Send + Unpin> Eq for Tx2ConHnd<C> {}
 impl<C: Codec + 'static + Send + Unpin> std::hash::Hash for Tx2ConHnd<C> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.con.uniq().hash(state)
+    }
+}
+
+impl<C: Codec + 'static + Send + Unpin> From<Tx2ConHnd<C>> for BlockTargetId {
+    fn from(con: Tx2ConHnd<C>) -> Self {
+        BlockTargetId::Node(con.peer_cert().into())
     }
 }
 

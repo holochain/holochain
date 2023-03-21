@@ -302,6 +302,7 @@ impl MetaNet {
     /// Construct abstraction with tx2 backend.
     #[cfg(feature = "tx2")]
     pub async fn new_tx2(
+        host: HostApi,
         config: KitsuneP2pConfig,
         tls_config: kitsune_p2p_types::tls::TlsConfig,
         metrics: Tx2ApiMetrics,
@@ -417,7 +418,7 @@ impl MetaNet {
             while let Some(evt) = ep.next().await {
                 match evt {
                     Tx2EpEvent::OutgoingConnection(Tx2EpConnection { con, url }) => {
-                        if evt_send
+                        if !matches!(host.is_blocked(con.clone().into(), Timestamp::now()).await, Ok(false)) || evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con),
@@ -429,7 +430,7 @@ impl MetaNet {
                         }
                     }
                     Tx2EpEvent::IncomingConnection(Tx2EpConnection { con, url }) => {
-                        if evt_send
+                        if !matches!(host.is_blocked(con.clone().into(), Timestamp::now()).await, Ok(false)) || evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con),
