@@ -1,6 +1,7 @@
 use kitsune_p2p_timestamp::InclusiveTimestampInterval;
 use kitsune_p2p_timestamp::Timestamp;
 use std::sync::Arc;
+#[cfg(feature = "tx5")]
 use tx5::Tx5Url;
 
 #[derive(Clone)]
@@ -56,6 +57,7 @@ impl From<BlockTarget> for BlockTargetId {
     }
 }
 
+#[cfg(feature = "tx5")]
 impl From<Tx5Url> for BlockTargetId {
     fn from(tx5_url: Tx5Url) -> Self {
         if let Some(id) = tx5_url.id() {
