@@ -719,6 +719,10 @@ where
             // so if we have it locally then we can avoid the network.
             GetStrategy::Content => match self.cascading(query.clone()).await? {
                 Resolved::Exists(results) => return Ok(Some(results)),
+                // If the action is tombstoned, this is definitive and will never change,
+                // so we can short-circuit.
+                // TODO: this query should not even be returning
+                // a tombstoned result for "Content" mode, this needs to be fixed.
                 Resolved::Tombstoned => return Ok(None),
                 Resolved::Indeterminate => {
                     if !authority {
@@ -746,33 +750,29 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
+        let authority = self.am_i_authoring(&entry_hash.clone().into())?
+            || self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
+        match options.strategy {
+            // We don't need metadata and only need the content
+            // so if we have it locally then we can avoid the network.
+            GetStrategy::Content => match self.cascading(query.clone()).await? {
+                Some(results) => return Ok(Some(results)),
+                None => {
+                    if !authority {
+                        self.fetch_record(entry_hash.into(), options.into()).await?;
+                    }
+                }
+            },
+            // Otherwise, always try to get the latest data
+            GetStrategy::Latest => {
+                self.fetch_record(entry_hash.into(), options.into()).await?;
             }
-        }
-
-        // If we are not in the process of authoring this hash or its
-        // authority we need a network call.
-        if !(authoring || authority) {
-            self.fetch_record(entry_hash.into(), options.into()).await?;
-        }
+        };
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        Ok(self.cascading(query).await?)
     }
 
     /// Perform a concurrent `get` on multiple hashes simultaneously, returning

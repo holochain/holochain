@@ -129,21 +129,32 @@ impl Query for GetLiveEntryQuery {
             let _ = &state;
             state.creates.into_values().next()
         });
-        match action {
+        Ok(match action {
             Some(action) => {
                 let entry_hash = action
                     .action()
                     .entry_hash()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.action().clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.action().clone()))?
+                    .clone();
                 // If this action is authored then we can get an authored entry.
                 let author = is_authored.then(|| action.action().author());
                 let record = stores
-                    .get_public_or_authored_entry(entry_hash, author)?
+                    .get_public_or_authored_entry(&entry_hash, author)?
                     .map(|entry| Record::new(action, Some(entry)));
-                Ok(record)
+                if record.is_none() {
+                    tracing::error!(
+                        "Entry not found for apparently live action. Entry hash: {:?}",
+                        entry_hash
+                    );
+                }
+                record
             }
-            None => Ok(None),
-        }
+            None => {
+                // We can never say for sure that an Entry has been tombstoned, since another Create
+                // action could be created at any time.
+                None
+            }
+        })
     }
 }
 

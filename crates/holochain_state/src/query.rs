@@ -81,7 +81,7 @@ impl<T> Maps<T> {
     }
 }
 
-/// Differentiates between reasons for data not being found
+/// Contains either the extant data, or a contextual reason why it doesn't exist.
 pub enum Resolved<T> {
     /// The value is definitely available
     Exists(T),
