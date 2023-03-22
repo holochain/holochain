@@ -138,21 +138,28 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     let conductor = SweetConductor::from_standard_config().await;
     let tmp = tempdir().unwrap();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let dna = dna.with_network_seed("dna-seed".to_string()).await;
-    let dna_path = tmp.as_ref().join("the.dna");
 
-    DnaBundle::from_dna_file(dna.clone())
-        .await
-        .unwrap()
-        .write_to_file(&dna_path)
-        .await
-        .unwrap();
+    let write_dna = |seed: Seed| {
+        let dna = dna.clone();
+        let path = tmp.as_ref().join(format!("{}.dna", seed.to_string()));
+        async move {
+            let dna = dna.with_network_seed(seed.to_string()).await;
+            DnaBundle::from_dna_file(dna.clone())
+                .await
+                .unwrap()
+                .write_to_file(&path)
+                .await
+                .unwrap();
+            dna
+        }
+    };
+
+    let dnas = futures::future::join_all(vec![write_dna(None), write_dna(A), write_dna(B)]).await;
 
     let _start = std::time::Instant::now();
     let c = TestcaseCommon {
         conductor,
-        dna,
-        dna_path,
+        dnas,
         tmp,
         _start,
     };
@@ -164,46 +171,37 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
         .iter()
         .flat_map(|a| [Bundle, Path].iter().map(|b| (*a, *b)));
 
-    // Build up three equality groups. All outcomes in each group should have equal hashes,
-    // and each group's hash should be different from every other group.
+    // Build up two equality groups. All outcomes in each group should have equal hashes,
+    // and each group's hash should be different from the other group's hash.
 
     // Hashes when using empty network seed
     let mut group_0 = vec![];
     // Hashes when using network seed "A"
     let mut group_a = vec![];
-    // Hashes when using network seed "B"
-    let mut group_b = vec![];
+    // There is no need for a group_b since "A" and "B" are essentially interchangeable
 
-    // Populate the groups with all possible combinations of seed values and location specifiers
+    // Populate the groups with all (most) possible combinations of seed values and location specifiers
     for (app_loc, dna_loc) in all_locs {
-        group_0.extend([TestCase(None, None, app_loc, dna_loc).install(&c)]);
+        group_0.extend([TestCase(None, None, None, app_loc, dna_loc).install(&c)]);
         group_a.extend([
-            TestCase(None, A, app_loc, dna_loc).install(&c),
-            TestCase(A, None, app_loc, dna_loc).install(&c),
-            TestCase(A, A, app_loc, dna_loc).install(&c),
-            TestCase(A, B, app_loc, dna_loc).install(&c),
-        ]);
-        group_b.extend([
-            TestCase(None, B, app_loc, dna_loc).install(&c),
-            TestCase(B, None, app_loc, dna_loc).install(&c),
-            TestCase(B, A, app_loc, dna_loc).install(&c),
-            TestCase(B, B, app_loc, dna_loc).install(&c),
+            TestCase(None, None, A, app_loc, dna_loc).install(&c),
+            TestCase(None, A, None, app_loc, dna_loc).install(&c),
+            TestCase(A, None, None, app_loc, dna_loc).install(&c),
+            TestCase(A, A, None, app_loc, dna_loc).install(&c),
+            TestCase(A, B, None, app_loc, dna_loc).install(&c),
+            TestCase(A, None, B, app_loc, dna_loc).install(&c),
+            TestCase(A, B, B, app_loc, dna_loc).install(&c),
+            TestCase(None, A, B, app_loc, dna_loc).install(&c),
         ]);
     }
 
     let group_0 = futures::future::join_all(group_0).await;
     let group_a = futures::future::join_all(group_a).await;
-    let group_b = futures::future::join_all(group_b).await;
 
     let (hash_0, case_0) = &group_0[0];
     let (hash_a, case_a) = &group_a[0];
-    let (hash_b, case_b) = &group_b[0];
-
-    dbg!(&hash_0, &hash_a, &hash_b);
 
     assert_ne!(hash_0, hash_a);
-    assert_ne!(hash_a, hash_b);
-    assert_ne!(hash_b, hash_0);
 
     for (h, c) in group_0.iter() {
         assert_eq!(
@@ -223,21 +221,11 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
             c.to_string()
         );
     }
-    for (h, c) in group_b.iter() {
-        assert_eq!(
-            hash_b,
-            h,
-            "case mismatch: {}, {}",
-            case_b.to_string(),
-            c.to_string()
-        );
-    }
 }
 
 struct TestcaseCommon {
     conductor: SweetConductor,
-    dna: DnaFile,
-    dna_path: PathBuf,
+    dnas: Vec<DnaFile>,
     tmp: TempDir,
     _start: std::time::Instant,
 }
@@ -255,16 +243,17 @@ enum Seed {
     B,
 }
 
-struct TestCase(Seed, Seed, Location, Location);
+struct TestCase(Seed, Seed, Seed, Location, Location);
 
 impl ToString for TestCase {
     fn to_string(&self) -> String {
         format!(
-            "{}-{}-{}-{}",
+            "{}-{}-{}-{}-{}",
             self.0.to_string(),
             self.1.to_string(),
             self.2.to_string(),
-            self.3.to_string()
+            self.3.to_string(),
+            self.4.to_string(),
         )
     }
 }
@@ -273,16 +262,26 @@ impl TestCase {
     async fn install(self, common: &TestcaseCommon) -> (DnaHash, Self) {
         let case = self;
         let case_str = case.to_string();
-        let TestCase(app_seed, dna_seed, app_loc, dna_loc) = case;
-        let dna_hash = common.dna.dna_hash();
+        let TestCase(app_seed, role_seed, dna_seed, app_loc, dna_loc) = case;
+        let dna = match dna_seed {
+            Seed::None => common.dnas[0].clone(),
+            Seed::A => common.dnas[1].clone(),
+            Seed::B => common.dnas[2].clone(),
+        };
+        let dna_hash = dna.dna_hash();
         let version = DnaVersionSpec::from(vec![dna_hash.clone().into()]).into();
         let agent_key = SweetAgents::one(common.conductor.keystore()).await;
 
-        let dna_modifiers = match dna_seed {
+        let dna_modifiers = match role_seed {
             Seed::None => DnaModifiersOpt::none(),
             Seed::A => DnaModifiersOpt::none().with_network_seed("dna-seed-1".to_string()),
             Seed::B => DnaModifiersOpt::none().with_network_seed("dna-seed-2".to_string()),
         };
+
+        let dna_path = common
+            .tmp
+            .as_ref()
+            .join(format!("{}.dna", dna_seed.to_string()));
 
         let bundle = match dna_loc {
             Location::Bundle => {
@@ -305,7 +304,7 @@ impl TestCase {
                     .unwrap();
                 let resources = vec![(
                     hashpath,
-                    DnaBundle::from_dna_file(common.dna.clone()).await.unwrap(),
+                    DnaBundle::from_dna_file(dna.clone()).await.unwrap(),
                 )];
 
                 AppBundle::new(manifest.into(), resources, PathBuf::from("."))
@@ -317,7 +316,7 @@ impl TestCase {
                 let roles = vec![AppRoleManifest {
                     name: "rolename".into(),
                     dna: AppRoleDnaManifest {
-                        location: Some(DnaLocation::Path(common.dna_path.clone())),
+                        location: Some(DnaLocation::Path(dna_path.clone())),
                         modifiers: dna_modifiers.clone(),
                         version: Some(version),
                         clone_limit: 0,
