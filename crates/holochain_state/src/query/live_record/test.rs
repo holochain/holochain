@@ -30,6 +30,7 @@ async fn can_handle_update_in_scratch() {
     let r = query
         .run(Txn::from(&txn))
         .unwrap()
+        .into_option()
         .expect("Record not found");
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
     assert_eq!(*r.action(), *td.update_action.action());
@@ -44,6 +45,7 @@ async fn can_handle_update_in_scratch() {
     let r = query
         .run(scratch.clone())
         .unwrap()
+        .into_option()
         .expect("Record not found");
     assert_eq!(*r.entry().as_option().unwrap(), td.entry);
     assert_eq!(*r.action(), *td.update_action.action());

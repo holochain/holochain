@@ -96,13 +96,15 @@ impl Default for GetOptions {
 /// the caller is concerned about.
 /// This helps the subconscious avoid unnecessary network calls.
 pub enum GetStrategy {
-    /// Will try to get the latest metadata but fallback
-    /// to the cache if none is found.
-    /// Does not go to the network if you are an authority for the data.
+    /// Will try to get the latest metadata but fallback to the cache if not found.
+    /// Will always go to the network, even if you are an authority for the data.
     Latest,
-    /// Will try to get the content locally but go
-    /// to the network if it is not found.
-    /// Does not go to the network if you are an authority for the data.
+    /// Will try to definitively get the content locally and fallback to the network
+    /// if you're not an authority. Does *not* go to the network if you are an authority
+    /// for the data.
+    ///
+    /// NOTE: if the content has been tombstoned (deleted), it will not be returned.
+    ///       This needs to be fixed. TODO.
     Content,
 }
 

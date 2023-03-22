@@ -20,8 +20,8 @@ impl GetLiveRecordQuery {
 
 impl Query for GetLiveRecordQuery {
     type Item = Judged<SignedActionHashed>;
-    type State = (Option<SignedActionHashed>, HashSet<ActionHash>);
-    type Output = Option<Record>;
+    type State = (Resolved<SignedActionHashed>, HashSet<ActionHash>);
+    type Output = Resolved<Record>;
 
     fn query(&self) -> String {
         "
@@ -70,21 +70,21 @@ impl Query for GetLiveRecordQuery {
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
-        Ok((None, HashSet::new()))
+        Ok((Resolved::Indeterminate, HashSet::new()))
     }
 
     fn fold(&self, mut state: Self::State, data: Self::Item) -> StateQueryResult<Self::State> {
         let shh = data.data;
         let hash = shh.as_hash();
-        if *hash == self.0 && state.0.is_none() {
+        if *hash == self.0 && !state.0.exists() {
             if !state.1.contains(hash) {
-                state.0 = Some(shh);
+                state.0 = Resolved::Exists(shh);
             }
         } else if let Action::Delete(delete) = shh.action() {
-            let action = state.0.take();
+            let action = state.0.tombstone_if_exists();
             if let Some(h) = action {
                 if *h.as_hash() != delete.deletes_address {
-                    state.0 = Some(h);
+                    state.0 = Resolved::Exists(h);
                 }
             }
             state.1.insert(delete.deletes_address.clone());
@@ -96,8 +96,8 @@ impl Query for GetLiveRecordQuery {
     where
         S: Store,
     {
-        match state.0 {
-            Some(action) => {
+        state.0.map_fallible(|action| {
+            Ok({
                 let mut entry = None;
                 if let Some(entry_hash) = action.action().entry_hash() {
                     let author = self
@@ -107,10 +107,9 @@ impl Query for GetLiveRecordQuery {
                         .filter(|a| *a == action.action().author());
                     entry = stores.get_public_or_authored_entry(entry_hash, author)?;
                 }
-                Ok(Some(Record::new(action, entry)))
-            }
-            None => Ok(None),
-        }
+                Record::new(action, entry)
+            })
+        })
     }
 }
 

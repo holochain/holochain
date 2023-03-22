@@ -49,6 +49,7 @@ use holochain_state::query::live_record::GetLiveRecordQuery;
 use holochain_state::query::record_details::GetRecordDetailsQuery;
 use holochain_state::query::DbScratch;
 use holochain_state::query::PrivateDataQuery;
+use holochain_state::query::Resolved;
 use holochain_state::query::StateQueryError;
 use holochain_state::scratch::SyncScratch;
 use holochain_types::prelude::*;
@@ -705,38 +706,36 @@ where
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
-        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
+        let authority = self.am_i_authoring(&action_hash.clone().into())?
+            || self.am_i_an_authority(action_hash.clone().into()).await?;
         let query: GetLiveRecordQuery = self.construct_query_with_data_access(action_hash.clone());
 
         // DESIGN: we can short circuit if we have any local deletes on an action.
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        // We don't need metadata and only need the content
-        // so if we have it locally then we can avoid the network.
-        if let GetStrategy::Content = options.strategy {
-            let results = self.cascading(query.clone()).await?;
-            // We got a result so can short circuit.
-            if results.is_some() {
-                return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
-            } else if authoring || authority {
-                return Ok(None);
+        match options.strategy {
+            // We don't need metadata and only need the content
+            // so if we have it locally then we can avoid the network.
+            GetStrategy::Content => match self.cascading(query.clone()).await? {
+                Resolved::Exists(results) => return Ok(Some(results)),
+                Resolved::Tombstoned => return Ok(None),
+                Resolved::Indeterminate => {
+                    if !authority {
+                        self.fetch_record(action_hash.into(), options.into())
+                            .await?;
+                    }
+                }
+            },
+            // Otherwise, always try to get the latest data
+            GetStrategy::Latest => {
+                self.fetch_record(action_hash.into(), options.into())
+                    .await?;
             }
-        }
-
-        // If we are not in the process of authoring this hash or its
-        // authority we need a network call.
-        if !(authoring || authority) {
-            self.fetch_record(action_hash.into(), options.into())
-                .await?;
-        }
+        };
 
         // Check if we have the data now after the network call.
-        let results = self.cascading(query).await?;
-        Ok(results)
+        Ok(self.cascading(query).await?.into_option())
     }
 
     #[instrument(skip(self, options))]

@@ -81,6 +81,63 @@ impl<T> Maps<T> {
     }
 }
 
+/// Differentiates between reasons for data not being found
+pub enum Resolved<T> {
+    /// The value is definitely available
+    Exists(T),
+    /// The value definitely does not exist (provable by existence of a tombstone)
+    Tombstoned,
+    /// The value is not accessible, but might exist somewhere on the network
+    /// (no value or tombstone found)
+    Indeterminate,
+}
+
+impl<T> Resolved<T> {
+    /// True if the data exists, false if not, regardless of reason.
+    pub fn exists(&self) -> bool {
+        matches!(self, Self::Exists(_))
+    }
+
+    /// Set the data to tombstoned if it exists.
+    /// If indeterminate, there is no change.
+    pub fn tombstone_if_exists(&mut self) -> Option<T> {
+        if self.exists() {
+            if let Self::Exists(t) = std::mem::replace(self, Self::Tombstoned) {
+                Some(t)
+            } else {
+                unreachable!()
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Just return the data as Some if it exists
+    pub fn into_option(self) -> Option<T> {
+        match self {
+            Self::Exists(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    /// Map the existing data to a new type if it exists
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Resolved<U> {
+        match self {
+            Resolved::Exists(x) => Resolved::Exists(f(x)),
+            Resolved::Tombstoned => Resolved::Tombstoned,
+            Resolved::Indeterminate => Resolved::Indeterminate,
+        }
+    }
+    /// Map the existing data to a new Result type, if it exists
+    pub fn map_fallible<U, E>(self, f: impl FnOnce(T) -> Result<U, E>) -> Result<Resolved<U>, E> {
+        Ok(match self {
+            Resolved::Exists(x) => Resolved::Exists(f(x)?),
+            Resolved::Tombstoned => Resolved::Tombstoned,
+            Resolved::Indeterminate => Resolved::Indeterminate,
+        })
+    }
+}
+
 /// Helper for getting to the inner Data type of the Item of a Query
 pub type QueryData<Q> = <<Q as Query>::Item as HasValidationStatus>::Data;
 
