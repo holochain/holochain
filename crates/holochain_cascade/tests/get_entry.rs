@@ -298,9 +298,9 @@ async fn entry_authority() {
     fill_db(&vault.to_db(), td_record.any_store_record_op.clone());
 
     // Network
-    // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(true));
+    mock.expect_get().returning(|_, _| Ok(vec![]));
     let mock = MockNetwork::new(mock);
 
     // Cascade
