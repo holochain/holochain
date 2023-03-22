@@ -777,7 +777,7 @@ where
         };
 
         // Check if we have the data now after the network call.
-        Ok(self.cascading(query).await?)
+        self.cascading(query).await
     }
 
     /// Perform a concurrent `get` on multiple hashes simultaneously, returning
