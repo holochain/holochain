@@ -208,8 +208,8 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     let (hash_a, case_a) = &group_a[0];
 
     dbg!(mapvec(dnas.iter(), |d| d.dna_hash()));
-    dbg!(&hash_0, mapvec(group_0.iter(), first_ref));
-    dbg!(&hash_a, mapvec(group_a.iter(), first_ref));
+    dbg!(&hash_0, mapvec(group_0.iter(), |(h, c)| (h, c.to_string())));
+    dbg!(&hash_a, mapvec(group_a.iter(), |(h, c)| (h, c.to_string())));
 
     assert_eq!(hash_0, dnas[0].dna_hash());
     assert_eq!(hash_a, dnas[1].dna_hash());
