@@ -706,8 +706,8 @@ where
         action_hash: ActionHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authority = self.am_i_authoring(&action_hash.clone().into())?
-            || self.am_i_an_authority(action_hash.clone().into()).await?;
+        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
+        let authority = authoring || self.am_i_an_authority(action_hash.clone().into()).await?;
         let query: GetLiveRecordQuery = self.construct_query_with_data_access(action_hash.clone());
 
         // DESIGN: we can short circuit if we have any local deletes on an action.
@@ -721,8 +721,8 @@ where
                 Resolved::Exists(results) => return Ok(Some(results)),
                 // If the action is tombstoned, this is definitive and will never change,
                 // so we can short-circuit.
-                // TODO: this query should not even be returning
-                // a tombstoned result for "Content" mode, this needs to be fixed.
+                // TODO: this query should not even be returning a tombstoned result for
+                //       the "Content" strategy; this needs to be fixed.
                 Resolved::Tombstoned => return Ok(None),
                 Resolved::Indeterminate => {
                     if !authority {
@@ -733,8 +733,12 @@ where
             },
             // Otherwise, always try to get the latest data
             GetStrategy::Latest => {
-                self.fetch_record(action_hash.into(), options.into())
-                    .await?;
+                // It's impossible for someone to create metadata on the thing I haven't
+                // yet authored (without some elaborate side-channel coordination)
+                if !authoring {
+                    self.fetch_record(action_hash.into(), options.into())
+                        .await?;
+                }
             }
         };
 
@@ -750,8 +754,8 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        let authority = self.am_i_authoring(&entry_hash.clone().into())?
-            || self.am_i_an_authority(entry_hash.clone().into()).await?;
+        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
+        let authority = authoring || self.am_i_an_authority(entry_hash.clone().into()).await?;
         let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
 
         match options.strategy {
@@ -767,7 +771,11 @@ where
             },
             // Otherwise, always try to get the latest data
             GetStrategy::Latest => {
-                self.fetch_record(entry_hash.into(), options.into()).await?;
+                // It's impossible for someone to create metadata on the thing I haven't
+                // yet authored (without some elaborate side-channel coordination)
+                if !authoring {
+                    self.fetch_record(entry_hash.into(), options.into()).await?;
+                }
             }
         };
 
