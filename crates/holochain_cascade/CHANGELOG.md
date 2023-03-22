@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Updated the meaning of `GetOptions` to produce slightly different behaviors for all cascade queries [\#2119](https://github.com/holochain/holochain/pull/2119)
+    - `GetOptions::Latest` always causes the query to go to the network for the latest data
+    - `GetOptions::Content` will only go to the network if you are not an authority and no data could be found
+
 ## 0.2.0-beta-rc.0
 
 ## 0.1.0
