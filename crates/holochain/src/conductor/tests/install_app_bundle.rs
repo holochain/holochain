@@ -156,12 +156,11 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
 
     let dnas = futures::future::join_all(vec![write_dna(None), write_dna(A), write_dna(B)]).await;
 
-    let _start = std::time::Instant::now();
     let c = TestcaseCommon {
         conductor,
-        dnas,
+        dnas: dnas.clone(),
         tmp,
-        _start,
+        _start: std::time::Instant::now(),
     };
 
     use Location::*;
@@ -170,6 +169,8 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     let all_locs = [Bundle, Path]
         .iter()
         .flat_map(|a| [Bundle, Path].iter().map(|b| (*a, *b)));
+
+    dbg!(&all_locs);
 
     // Build up two equality groups. All outcomes in each group should have equal hashes,
     // and each group's hash should be different from the other group's hash.
@@ -201,6 +202,8 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     let (hash_0, case_0) = &group_0[0];
     let (hash_a, case_a) = &group_a[0];
 
+    assert_eq!(hash_0, dnas[0].dna_hash());
+    assert_eq!(hash_a, dnas[1].dna_hash());
     assert_ne!(hash_0, hash_a);
 
     for (h, c) in group_0.iter() {
@@ -230,13 +233,13 @@ struct TestcaseCommon {
     _start: std::time::Instant,
 }
 
-#[derive(Clone, Copy, strum_macros::ToString)]
+#[derive(Clone, Copy, Debug, strum_macros::ToString)]
 enum Location {
     Path,
     Bundle,
 }
 
-#[derive(Clone, Copy, strum_macros::ToString)]
+#[derive(Clone, Copy, Debug, strum_macros::ToString)]
 enum Seed {
     None,
     A,
