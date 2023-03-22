@@ -5,8 +5,9 @@ use fixt::prelude::strum_macros;
 use futures::future::join_all;
 use holo_hash::DnaHash;
 use holochain_types::prelude::{
-    AppBundle, AppBundleSource, AppManifestCurrentBuilder, AppRoleDnaManifest, AppRoleManifest,
-    CellProvisioning, DnaBundle, DnaFile, DnaLocation, DnaVersionSpec, InstallAppPayload,
+    first_ref, mapvec, AppBundle, AppBundleSource, AppManifestCurrentBuilder, AppRoleDnaManifest,
+    AppRoleManifest, CellProvisioning, DnaBundle, DnaFile, DnaLocation, DnaVersionSpec,
+    InstallAppPayload,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CellId, DnaModifiersOpt};
@@ -134,6 +135,7 @@ async fn reject_duplicate_app_for_same_agent() {
 
 /// Test all possible combinations of Locations and network seeds:
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "glacial_tests")]
 async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     let conductor = SweetConductor::from_standard_config().await;
     let tmp = tempdir().unwrap();
@@ -166,11 +168,9 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     use Location::*;
     use Seed::*;
 
-    let all_locs = [Bundle, Path]
-        .iter()
-        .flat_map(|a| [Bundle, Path].iter().map(|b| (*a, *b)));
+    let both = [Bundle, Path];
 
-    dbg!(&all_locs);
+    let all_locs = both.iter().flat_map(|a| both.iter().map(|b| (*a, *b)));
 
     // Build up two equality groups. All outcomes in each group should have equal hashes,
     // and each group's hash should be different from the other group's hash.
@@ -185,14 +185,19 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     for (app_loc, dna_loc) in all_locs {
         group_0.extend([TestCase(None, None, None, app_loc, dna_loc).install(&c)]);
         group_a.extend([
-            TestCase(None, None, A, app_loc, dna_loc).install(&c),
-            TestCase(None, A, None, app_loc, dna_loc).install(&c),
             TestCase(A, None, None, app_loc, dna_loc).install(&c),
+            TestCase(None, A, None, app_loc, dna_loc).install(&c),
+            TestCase(None, None, A, app_loc, dna_loc).install(&c),
+            //
             TestCase(A, A, None, app_loc, dna_loc).install(&c),
+            TestCase(A, None, A, app_loc, dna_loc).install(&c),
+            TestCase(None, A, A, app_loc, dna_loc).install(&c),
+            //
             TestCase(A, B, None, app_loc, dna_loc).install(&c),
             TestCase(A, None, B, app_loc, dna_loc).install(&c),
-            TestCase(A, B, B, app_loc, dna_loc).install(&c),
             TestCase(None, A, B, app_loc, dna_loc).install(&c),
+            //
+            TestCase(A, B, B, app_loc, dna_loc).install(&c),
         ]);
     }
 
@@ -201,6 +206,10 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
 
     let (hash_0, case_0) = &group_0[0];
     let (hash_a, case_a) = &group_a[0];
+
+    dbg!(mapvec(dnas.iter(), |d| d.dna_hash()));
+    dbg!(&hash_0, mapvec(group_0.iter(), first_ref));
+    dbg!(&hash_a, mapvec(group_a.iter(), first_ref));
 
     assert_eq!(hash_0, dnas[0].dna_hash());
     assert_eq!(hash_a, dnas[1].dna_hash());
@@ -246,6 +255,7 @@ enum Seed {
     B,
 }
 
+#[derive(Debug)]
 struct TestCase(Seed, Seed, Seed, Location, Location);
 
 impl ToString for TestCase {
@@ -277,8 +287,8 @@ impl TestCase {
 
         let dna_modifiers = match role_seed {
             Seed::None => DnaModifiersOpt::none(),
-            Seed::A => DnaModifiersOpt::none().with_network_seed("dna-seed-1".to_string()),
-            Seed::B => DnaModifiersOpt::none().with_network_seed("dna-seed-2".to_string()),
+            Seed::A => DnaModifiersOpt::none().with_network_seed(Seed::A.to_string()),
+            Seed::B => DnaModifiersOpt::none().with_network_seed(Seed::B.to_string()),
         };
 
         let dna_path = common
@@ -341,8 +351,8 @@ impl TestCase {
 
         let network_seed = match app_seed {
             Seed::None => None,
-            Seed::A => Some("dna-seed-1".to_string()),
-            Seed::B => Some("dna-seed-2".to_string()),
+            Seed::A => Some(Seed::A.to_string()),
+            Seed::B => Some(Seed::B.to_string()),
         };
 
         let source = match app_loc {
