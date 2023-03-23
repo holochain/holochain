@@ -253,12 +253,6 @@ impl<C: Codec + 'static + Send + Unpin> std::hash::Hash for Tx2ConHnd<C> {
     }
 }
 
-impl<C: Codec + 'static + Send + Unpin> From<Tx2ConHnd<C>> for BlockTargetId {
-    fn from(con: Tx2ConHnd<C>) -> Self {
-        BlockTargetId::Node(con.peer_cert().into())
-    }
-}
-
 impl<C: Codec + 'static + Send + Unpin> Tx2ConHnd<C> {
     /// Get the opaque Uniq identifier for this connection.
     pub fn uniq(&self) -> Uniq {
