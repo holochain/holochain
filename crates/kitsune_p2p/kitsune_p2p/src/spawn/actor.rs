@@ -13,13 +13,13 @@ use crate::*;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use kitsune_p2p_fetch::*;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
-use kitsune_p2p_timestamp::Timestamp;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// See <https://github.com/holochain/bootstrap>
@@ -266,8 +266,25 @@ impl KitsuneP2pActor {
                         let evt_sender = evt_sender.clone();
                         let host = host.clone();
                         let i_s = i_s.clone();
+
+                        let peer_id = event.con().peer_id();
+                        let space = event.maybe_space();
+                        let remote_url = event.remote_url().clone();
+
                         async move {
                             let evt_sender = &evt_sender;
+
+                            match is_authorized(&host, peer_id, space).await {
+                                MetaNetEvtAuth::Authorized => {}
+                                MetaNetEvtAuth::UnauthorizedIgnore => {
+                                    return;
+                                }
+                                MetaNetEvtAuth::UnauthorizedDisconnect => {
+                                    let _ = i_s.del_con(remote_url).await;
+                                    return;
+                                }
+                            }
+
                             match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     if matches!(
@@ -276,8 +293,7 @@ impl KitsuneP2pActor {
                                     ) {
                                         // Con is definitely not blocked.
                                         let _ = i_s.new_con(remote_url, con).await;
-                                    }
-                                    else {
+                                    } else {
                                         // Con is either definitely blocked or
                                         // we don't know, so drop it.
                                         let _ = i_s.del_con(remote_url).await;

@@ -119,6 +119,77 @@ pub enum MetaNetEvt {
     },
 }
 
+pub enum MetaNetEvtAuth {
+    Authorized,
+    UnauthorizedIgnore,
+    UnauthorizedDisconnect,
+}
+
+impl MetaNetEvt {
+    pub fn remote_url(&self) -> &String {
+        match self {
+            MetaNetEvt::Connected { remote_url, .. }
+            | MetaNetEvt::Disconnected { remote_url, .. }
+            | MetaNetEvt::Request { remote_url, .. }
+            | MetaNetEvt::Notify { remote_url, .. } => remote_url,
+        }
+    }
+
+    pub fn con(&self) -> &MetaNetCon {
+        match self {
+            MetaNetEvt::Connected { con, .. }
+            | MetaNetEvt::Disconnected { con, .. }
+            | MetaNetEvt::Request { con, .. }
+            | MetaNetEvt::Notify { con, .. } => con,
+        }
+    }
+
+    pub fn maybe_space(&self) -> Option<Arc<KitsuneSpace>> {
+        match self {
+            MetaNetEvt::Request { data, .. } | MetaNetEvt::Notify { data, .. } => {
+                data.maybe_space()
+            }
+            MetaNetEvt::Connected { .. } | MetaNetEvt::Disconnected { .. } => None,
+        }
+    }
+}
+
+pub async fn node_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>) -> MetaNetEvtAuth {
+    match host
+        .is_blocked(BlockTargetId::Node(node_id), Timestamp::now())
+        .await
+    {
+        Ok(true) => MetaNetEvtAuth::UnauthorizedDisconnect,
+        Ok(false) => MetaNetEvtAuth::Authorized,
+        Err(_) => MetaNetEvtAuth::UnauthorizedIgnore,
+    }
+}
+
+pub async fn nodespace_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>, maybe_space: Option<Arc<KitsuneSpace>>) -> MetaNetEvtAuth {
+    if let Some(space) = maybe_space {
+        match host
+        .is_blocked(BlockTargetId::NodeSpace(node_id, space), Timestamp::now())
+        .await
+    {
+        Ok(true) => MetaNetEvtAuth::UnauthorizedIgnore,
+        Ok(false) => MetaNetEvtAuth::Authorized,
+        Err(_) => MetaNetEvtAuth::UnauthorizedIgnore,
+    }} else {
+        MetaNetEvtAuth::Authorized
+    }
+}
+
+pub async fn is_authorized(
+    host: &HostApi,
+    node_id: Arc<[u8; 32]>,
+    maybe_space: Option<Arc<KitsuneSpace>>,
+) -> MetaNetEvtAuth {
+    match node_is_authorized(host, node_id.clone()).await {
+        MetaNetEvtAuth::Authorized => nodespace_is_authorized(host, node_id, maybe_space).await,
+        auth => auth,
+    }
+}
+
 pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
 
 type ResStore = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<wire::Wire>>>>;

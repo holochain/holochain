@@ -18,6 +18,11 @@ pub enum NodeBlockReason {
 }
 
 #[derive(Clone, serde::Serialize, Debug)]
+pub enum NodeSpaceBlockReason {
+    BadWire,
+}
+
+#[derive(Clone, serde::Serialize, Debug)]
 pub enum IpBlockReason {
     /// Classic DOS.
     DOS,
@@ -27,21 +32,18 @@ pub type NodeId = Arc<[u8; 32]>;
 
 #[derive(Clone)]
 pub enum BlockTarget {
-    AgentSpace(
-        Arc<kitsune_p2p_bin_data::KitsuneAgent>,
-        Arc<kitsune_p2p_bin_data::KitsuneSpace>,
-        AgentSpaceBlockReason,
-    ),
     Node(NodeId, NodeBlockReason),
+    NodeSpace(
+        NodeId,
+        Arc<kitsune_p2p_bin_data::KitsuneSpace>,
+        NodeSpaceBlockReason,
+    ),
     Ip(std::net::Ipv4Addr, IpBlockReason),
 }
 
 pub enum BlockTargetId {
-    AgentSpace(
-        Arc<kitsune_p2p_bin_data::KitsuneAgent>,
-        Arc<kitsune_p2p_bin_data::KitsuneSpace>,
-    ),
     Node(NodeId),
+    NodeSpace(NodeId, Arc<kitsune_p2p_bin_data::KitsuneSpace>),
     Ip(std::net::Ipv4Addr),
     // Don't have an ID for the remote.
     Anon,
@@ -50,7 +52,7 @@ pub enum BlockTargetId {
 impl From<BlockTarget> for BlockTargetId {
     fn from(block_target: BlockTarget) -> Self {
         match block_target {
-            BlockTarget::AgentSpace(agent, space, _) => Self::AgentSpace(agent, space),
+            BlockTarget::NodeSpace(node_id, space, _) => Self::NodeSpace(node_id, space),
             BlockTarget::Node(node_id, _) => Self::Node(node_id),
             BlockTarget::Ip(ip_addr, _) => Self::Ip(ip_addr),
         }
