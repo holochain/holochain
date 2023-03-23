@@ -9,7 +9,6 @@ use crate::tx2::*;
 use crate::*;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::Stream;
-use kitsune_p2p_block::BlockTargetId;
 use std::collections::HashMap;
 use std::sync::atomic;
 

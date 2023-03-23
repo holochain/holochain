@@ -1,8 +1,6 @@
 use kitsune_p2p_timestamp::InclusiveTimestampInterval;
 use kitsune_p2p_timestamp::Timestamp;
 use std::sync::Arc;
-#[cfg(feature = "tx5")]
-use tx5::Tx5Url;
 
 #[derive(Clone)]
 pub enum AgentSpaceBlockReason {
@@ -45,8 +43,6 @@ pub enum BlockTargetId {
     Node(NodeId),
     NodeSpace(NodeId, Arc<kitsune_p2p_bin_data::KitsuneSpace>),
     Ip(std::net::Ipv4Addr),
-    // Don't have an ID for the remote.
-    Anon,
 }
 
 impl From<BlockTarget> for BlockTargetId {

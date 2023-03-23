@@ -103,8 +103,6 @@ pub enum BlockTargetId {
     NodeDna(kitsune_p2p_block::NodeId, DnaHash),
     Node(kitsune_p2p_block::NodeId),
     Ip(IpV4),
-    // We don't have an ID for the remote.
-    Anon,
 }
 
 impl From<kitsune_p2p_block::BlockTargetId> for BlockTargetId {
@@ -115,7 +113,6 @@ impl From<kitsune_p2p_block::BlockTargetId> for BlockTargetId {
             }
             kitsune_p2p_block::BlockTargetId::Node(node_id) => Self::Node(node_id),
             kitsune_p2p_block::BlockTargetId::Ip(ip_addr) => Self::Ip(ip_addr),
-            kitsune_p2p_block::BlockTargetId::Anon => Self::Anon,
         }
     }
 }

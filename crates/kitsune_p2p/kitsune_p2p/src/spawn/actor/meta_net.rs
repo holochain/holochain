@@ -126,15 +126,6 @@ pub enum MetaNetEvtAuth {
 }
 
 impl MetaNetEvt {
-    pub fn remote_url(&self) -> &String {
-        match self {
-            MetaNetEvt::Connected { remote_url, .. }
-            | MetaNetEvt::Disconnected { remote_url, .. }
-            | MetaNetEvt::Request { remote_url, .. }
-            | MetaNetEvt::Notify { remote_url, .. } => remote_url,
-        }
-    }
-
     pub fn con(&self) -> &MetaNetCon {
         match self {
             MetaNetEvt::Connected { con, .. }
@@ -355,12 +346,6 @@ impl MetaNetCon {
         }
 
         panic!("invalid features");
-    }
-}
-
-impl From<MetaNetCon> for BlockTargetId {
-    fn from(con: MetaNetCon) -> Self {
-        Self::Node(con.peer_id().into())
     }
 }
 
