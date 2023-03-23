@@ -154,39 +154,40 @@ impl MetaNetEvt {
     }
 }
 
-pub async fn node_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>) -> MetaNetEvtAuth {
-    match host
-        .is_blocked(BlockTargetId::Node(node_id), Timestamp::now())
-        .await
-    {
+pub async fn node_is_authorized(
+    host: &HostApi,
+    node_id: Arc<[u8; 32]>,
+    now: Timestamp,
+) -> MetaNetEvtAuth {
+    match host.is_blocked(BlockTargetId::Node(node_id), now).await {
         Ok(true) => MetaNetEvtAuth::UnauthorizedDisconnect,
         Ok(false) => MetaNetEvtAuth::Authorized,
         Err(_) => MetaNetEvtAuth::UnauthorizedIgnore,
     }
 }
 
-pub async fn nodespace_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>, maybe_space: Option<Arc<KitsuneSpace>>) -> MetaNetEvtAuth {
-    if let Some(space) = maybe_space {
-        match host
-        .is_blocked(BlockTargetId::NodeSpace(node_id, space), Timestamp::now())
-        .await
-    {
-        Ok(true) => MetaNetEvtAuth::UnauthorizedIgnore,
-        Ok(false) => MetaNetEvtAuth::Authorized,
-        Err(_) => MetaNetEvtAuth::UnauthorizedIgnore,
-    }} else {
-        MetaNetEvtAuth::Authorized
-    }
-}
-
-pub async fn is_authorized(
+pub async fn nodespace_is_authorized(
     host: &HostApi,
     node_id: Arc<[u8; 32]>,
     maybe_space: Option<Arc<KitsuneSpace>>,
+    now: Timestamp,
 ) -> MetaNetEvtAuth {
-    match node_is_authorized(host, node_id.clone()).await {
-        MetaNetEvtAuth::Authorized => nodespace_is_authorized(host, node_id, maybe_space).await,
-        auth => auth,
+    if let Some(space) = maybe_space {
+        match node_is_authorized(host, node_id.clone(), now).await {
+            MetaNetEvtAuth::Authorized => {
+                match host
+                    .is_blocked(BlockTargetId::NodeSpace(node_id, space), now)
+                    .await
+                {
+                    Ok(true) => MetaNetEvtAuth::UnauthorizedIgnore,
+                    Ok(false) => MetaNetEvtAuth::Authorized,
+                    Err(_) => MetaNetEvtAuth::UnauthorizedIgnore,
+                }
+            }
+            unauthorized => unauthorized,
+        }
+    } else {
+        MetaNetEvtAuth::Authorized
     }
 }
 

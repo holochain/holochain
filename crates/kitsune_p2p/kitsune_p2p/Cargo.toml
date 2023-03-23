@@ -70,7 +70,7 @@ tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"
 
 [features]
-default = [ "tx2", "tx5", "kitsune_p2p_block/tx5" ]
+default = [ "tx2", "tx5" ]
 
 test_utils = [
   "blake2b_simd",
