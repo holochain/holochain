@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+clap = { version = "4.1.11", features = [ "derive", "wrap_help" ], optional = true }
 hdi = { path = "../hdi", version = "0.3.0-beta-rc.0", optional = true }
 hdk = { path = "../hdk", version = "0.2.0-beta-rc.0", optional = true }
 holochain = { path = "../holochain", version = "0.2.0-beta-rc.0", optional = true }
@@ -20,7 +21,7 @@ tracing-subscriber = { version = "0.3.16", optional = true }
 [features]
 default = [ "build_demo" ]
 
-build_demo = [ "hdi", "hdk", "serde", "tokio", "holochain", "holochain_types", "holochain/test_utils", "holochain/tx5", "holochain_keystore", "tracing", "tracing-subscriber" ]
+build_demo = [ "clap", "hdi", "hdk", "serde", "tokio", "holochain", "holochain_types", "holochain/test_utils", "holochain/tx5", "holochain_keystore", "tracing", "tracing-subscriber" ]
 
 build_integrity_wasm = [ "hdi", "serde" ]
 build_coordinator_wasm = [ "hdi", "hdk", "serde" ]

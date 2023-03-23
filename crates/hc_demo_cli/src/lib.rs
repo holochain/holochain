@@ -1,17 +1,17 @@
 #[cfg(feature = "build_demo")]
-mod build_demo;
+mod demo;
 #[cfg(feature = "build_demo")]
-pub use build_demo::*;
+pub use demo::*;
 
 #[cfg(feature = "build_integrity_wasm")]
-mod build_integrity_wasm;
+mod integrity_wasm;
 #[cfg(feature = "build_integrity_wasm")]
-pub use build_integrity_wasm::*;
+pub use integrity_wasm::*;
 
 #[cfg(feature = "build_coordinator_wasm")]
-mod build_coordinator_wasm;
+mod coordinator_wasm;
 #[cfg(feature = "build_coordinator_wasm")]
-pub use build_coordinator_wasm::*;
+pub use coordinator_wasm::*;
 
 macro_rules! wasm_common {
     () => {

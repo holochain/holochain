@@ -25,19 +25,100 @@ pub const COORDINATOR_WASM: &[u8] = include_bytes!(concat!(
 use std::sync::Arc;
 use holochain_types::prelude::*;
 
-fn init_tracing() {
-    let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
-        .with_file(true)
-        .with_line_number(true)
-        .finish();
-    let _ = tracing::subscriber::set_global_default(subscriber);
+/// hc_demo_cli run options.
+#[derive(Debug, clap::Parser, serde::Serialize, serde::Deserialize)]
+pub struct RunOpts {
+    /// The subcommand to run.
+    #[command(subcommand)]
+    command: Option<RunCmd>,
+}
+
+impl RunOpts {
+    /// Parse command-line arguments into a RunOpts instance.
+    pub fn parse() -> Self {
+        clap::Parser::parse()
+    }
+}
+
+/// hc_demo_cli run command.
+#[derive(Debug, clap::Subcommand, serde::Serialize, serde::Deserialize)]
+pub enum RunCmd {
+    /// Run the hc_demo_cli.
+    Run {
+    },
+
+    /// Generate a dna file that can be used with hc_demo_cli.
+    GenDnaFile {
+        /// The network seed to be used in the generated dna file.
+        #[arg(long, default_value = "")]
+        network_seed: String,
+
+        /// Filename path to write the dna file. Default "-" for stdout.
+        #[arg(long, default_value = "-")]
+        output_path: std::path::PathBuf,
+    },
 }
 
 /// Execute the demo
-pub async fn run_demo() {
-    init_tracing();
+pub async fn run_demo(opts: RunOpts) {
+    tracing::info!(?opts);
+    match opts.command {
+        Some(RunCmd::Run {
+        }) => {
+        }
+        Some(RunCmd::GenDnaFile {
+            network_seed,
+            output_path,
+        }) => {
+            gen_dna_file(network_seed, output_path).await;
+        }
+        _ => unreachable!(),
+    }
+}
 
+async fn gen_dna_file(network_seed: String, output_path: std::path::PathBuf) {
+    let i_wasm = DnaWasmHashed::from_content(DnaWasm {
+        code: Arc::new(INTEGRITY_WASM.to_vec().into_boxed_slice()),
+    }).await;
+    let i_zome = IntegrityZomeDef::from(ZomeDef::Wasm(WasmZome::new(i_wasm.hash.clone())));
+
+    let c_wasm = DnaWasmHashed::from_content(DnaWasm {
+        code: Arc::new(COORDINATOR_WASM.to_vec().into_boxed_slice()),
+    }).await;
+    let c_zome = CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome::new(c_wasm.hash.clone())));
+
+    let dna_def = DnaDefBuilder::default()
+        .name("hc_demo_cli".to_string())
+        .modifiers(
+            DnaModifiersBuilder::default()
+                .network_seed(network_seed)
+                .origin_time(Timestamp::HOLOCHAIN_EPOCH)
+                .build()
+                .unwrap()
+        )
+        .integrity_zomes(vec![("integrity".into(), i_zome)])
+        .coordinator_zomes(vec![("coordinator".into(), c_zome)])
+        .build()
+        .unwrap();
+
+    let dna_file = DnaFile::new(
+        dna_def,
+        vec![i_wasm.into_content(), c_wasm.into_content()],
+    ).await;
+
+    let dna_file: SerializedBytes = dna_file.try_into().unwrap();
+    let dna_file: UnsafeBytes = dna_file.try_into().unwrap();
+    let dna_file: Vec<u8> = dna_file.into();
+
+    if output_path == std::path::PathBuf::from("-") {
+        tokio::io::AsyncWriteExt::write_all(&mut tokio::io::stdout(), &dna_file).await.unwrap();
+    } else {
+        tokio::fs::write(output_path, &dna_file).await.unwrap();
+    }
+}
+
+/*
+async fn test() {
     struct PubRendezvous;
 
     impl holochain::sweettest::SweetRendezvous for PubRendezvous {
@@ -61,38 +142,6 @@ pub async fn run_demo() {
     )
     .await;
 
-    let i_wasm = DnaWasmHashed::from_content(DnaWasm {
-        code: Arc::new(INTEGRITY_WASM.to_vec().into_boxed_slice()),
-    }).await;
-    println!("{i_wasm:#?}");
-    let i_zome = IntegrityZomeDef::from(ZomeDef::Wasm(WasmZome::new(i_wasm.hash.clone())));
-
-    let c_wasm = DnaWasmHashed::from_content(DnaWasm {
-        code: Arc::new(COORDINATOR_WASM.to_vec().into_boxed_slice()),
-    }).await;
-    println!("{c_wasm:#?}");
-    let c_zome = CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome::new(c_wasm.hash.clone())));
-
-    let dna_def = DnaDefBuilder::default()
-        .name("hc_demo_cli".to_string())
-        .modifiers(
-            DnaModifiersBuilder::default()
-                .network_seed("".to_string())
-                .origin_time(Timestamp::HOLOCHAIN_EPOCH)
-                .build()
-                .unwrap()
-        )
-        .integrity_zomes(vec![("integrity".into(), i_zome)])
-        .coordinator_zomes(vec![("coordinator".into(), c_zome)])
-        .build()
-        .unwrap();
-    println!("{dna_def:#?}");
-
-    let dna_file = DnaFile::new(
-        dna_def,
-        vec![i_wasm.into_content(), c_wasm.into_content()],
-    ).await;
-    println!("{dna_file:#?}");
 
     let dna_with_role = holochain::sweettest::DnaWithRole::from((
         "hc_demo_cli".into(),
@@ -121,3 +170,4 @@ pub async fn run_demo() {
 
     conductor.shutdown().await;
 }
+*/
