@@ -22,6 +22,7 @@ path = "src/lib.rs"
 anyhow = "1.0"
 clap = { version = "3.0", features = [ "derive" ] }
 futures = "0.3"
+lazy_static = "1.4"
 holochain_cli_bundle = { path = "../hc_bundle", version = "^0.2.0-beta-rc.0"}
 holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.2.0-beta-rc.0"}
 holochain_trace = { version = "^0.2.0-beta-rc.0", path = "../holochain_trace" }

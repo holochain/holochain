@@ -1,8 +1,8 @@
 use holochain_cli_bundle::HcWebAppBundle;
-use structopt::StructOpt;
+use clap::Parser;
 
 /// Main `hc-web-app` executable entrypoint.
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
-    HcWebAppBundle::from_args().run().await
+    HcWebAppBundle::parse().run().await
 }

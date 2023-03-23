@@ -32,29 +32,29 @@ use crate::expect_match;
 use crate::ports::get_admin_ports;
 use crate::run::run_async;
 use crate::CmdRunner;
-use structopt::StructOpt;
+use clap::Parser;
 
 #[doc(hidden)]
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct Call {
     /// Ports to running conductor admin interfaces.
     /// If this is empty existing sandboxes will be used.
     /// Cannot be combined with existing sandboxes.
-    #[structopt(short, long, conflicts_with_all = &["existing_paths", "indices"], value_delimiter = ",")]
+    #[clap(short, long, conflicts_with_all = &["existing-paths", "indices"], value_delimiter = ',')]
     pub running: Vec<u16>,
 
-    #[structopt(flatten)]
+    #[clap(flatten)]
     pub existing: Existing,
 
     /// The admin request you want to make.
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub call: AdminRequestCli,
 }
 
-// Docs have different use for structopt
+// Docs have different use for clap
 // so documenting everything doesn't make sense.
 #[allow(missing_docs)]
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub enum AdminRequestCli {
     AddAdminWs(AddAdminWs),
     AddAppWs(AddAppWs),
@@ -83,7 +83,7 @@ pub enum AdminRequestCli {
 
 /// Calls AdminRequest::AddAdminInterfaces
 /// and adds another admin interface.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct AddAdminWs {
     /// Optional port number.
     /// Defaults to assigned by OS.
@@ -92,7 +92,7 @@ pub struct AddAdminWs {
 
 /// Calls AdminRequest::AttachAppInterface
 /// and adds another app interface.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct AddAppWs {
     /// Optional port number.
     /// Defaults to assigned by OS.
@@ -101,21 +101,21 @@ pub struct AddAppWs {
 
 /// Calls AdminRequest::RegisterDna
 /// and registers a DNA. You can only use a path or a hash, not both.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct RegisterDna {
-    #[structopt(short, long)]
+    #[clap(short, long)]
     /// Network seed to override when installing this DNA
     pub network_seed: Option<String>,
-    #[structopt(long)]
+    #[clap(long)]
     /// Properties to override when installing this DNA
     pub properties: Option<PathBuf>,
-    #[structopt(long)]
+    #[clap(long)]
     /// Origin time to override when installing this DNA
     pub origin_time: Option<Timestamp>,
-    #[structopt(long, conflicts_with = "hash", required_unless = "hash")]
+    #[clap(long, conflicts_with = "hash", required_unless = "hash")]
     /// Path to a DnaBundle file.
     pub path: Option<PathBuf>,
-    #[structopt(short, long, parse(try_from_str = parse_dna_hash), required_unless = "path")]
+    #[clap(short, long, parse(try_from_str = parse_dna_hash), required_unless = "path")]
     /// Hash of an existing DNA you want to register.
     pub hash: Option<DnaHash>,
 }
@@ -126,20 +126,20 @@ pub struct RegisterDna {
 /// Setting properties and membrane proofs is not
 /// yet supported.
 /// RoleNames are set to `my-app-0`, `my-app-1` etc.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct InstallApp {
     /// Sets the InstalledAppId.
-    #[structopt(long)]
+    #[clap(long)]
     pub app_id: Option<String>,
 
     /// If not set then a key will be generated.
     /// Agent key is Base64 (same format that is used in logs).
     /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
-    #[structopt(long, parse(try_from_str = parse_agent_key))]
+    #[clap(long, parse(try_from_str = parse_agent_key))]
     pub agent_key: Option<AgentPubKey>,
 
     /// Location of the *.happ bundle file to install.
-    #[structopt(required = true)]
+    #[clap(required = true)]
     pub path: PathBuf,
 
     /// Optional network seed override for every DNA in this app
@@ -148,7 +148,7 @@ pub struct InstallApp {
 
 /// Calls AdminRequest::UninstallApp
 /// and uninstalls the specified app.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct UninstallApp {
     /// The InstalledAppId to uninstall.
     pub app_id: String,
@@ -156,7 +156,7 @@ pub struct UninstallApp {
 
 /// Calls AdminRequest::EnableApp
 /// and activates the installed app.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct EnableApp {
     /// The InstalledAppId to activate.
     pub app_id: String,
@@ -164,7 +164,7 @@ pub struct EnableApp {
 
 /// Calls AdminRequest::DisableApp
 /// and disables the installed app.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct DisableApp {
     /// The InstalledAppId to disable.
     pub app_id: String,
@@ -174,38 +174,38 @@ pub struct DisableApp {
 /// and dumps the current cell's state.
 // TODO: Add pretty print.
 // TODO: Default to dumping all cell state.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct DumpState {
     /// The DNA hash half of the cell ID to dump.
-    #[structopt(parse(try_from_str = parse_dna_hash))]
+    #[clap(parse(try_from_str = parse_dna_hash))]
     pub dna: DnaHash,
 
     /// The agent half of the cell ID to dump.
-    #[structopt(parse(try_from_str = parse_agent_key))]
+    #[clap(parse(try_from_str = parse_agent_key))]
     pub agent_key: AgentPubKey,
 }
 
 /// Calls AdminRequest::RequestAgentInfo
 /// and pretty prints the agent info on
 /// this conductor.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct ListAgents {
     /// Optionally request agent info for a particular cell ID.
-    #[structopt(short, long, parse(try_from_str = parse_agent_key), requires = "dna")]
+    #[clap(short, long, parse(try_from_str = parse_agent_key), requires = "dna")]
     pub agent_key: Option<AgentPubKey>,
 
     /// Optionally request agent info for a particular cell ID.
-    #[structopt(short, long, parse(try_from_str = parse_dna_hash), requires = "agent_key")]
+    #[clap(short, long, parse(try_from_str = parse_dna_hash), requires = "agent_key")]
     pub dna: Option<DnaHash>,
 }
 
 /// Calls AdminRequest::ListApps
 /// and pretty prints the list of apps
 /// installed in this conductor.
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct ListApps {
     /// Optionally request agent info for a particular cell ID.
-    #[structopt(short, long, parse(try_from_str = parse_status_filter))]
+    #[clap(short, long, parse(try_from_str = parse_status_filter))]
     pub status: Option<AppStatusFilter>,
 }
 

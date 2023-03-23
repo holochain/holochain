@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use holochain_p2p::kitsune_p2p::TransportConfig;
-use structopt::StructOpt;
+use clap::Parser;
 use url2::Url2;
 
 // This creates a new Holochain sandbox
@@ -10,20 +10,20 @@ use url2::Url2;
 // - conductor config
 // - collection of databases
 // - keystore
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct Create {
     /// Number of conductor sandboxes to create.
-    #[structopt(short, long, default_value = "1")]
+    #[clap(short, long, default_value = "1")]
     pub num_sandboxes: usize,
 
     /// Add an optional network config.
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub network: Option<NetworkCmd>,
 
     /// Set a root directory for conductor sandboxes to be placed into.
     /// Defaults to the system's temp directory.
     /// This directory must already exist.
-    #[structopt(long)]
+    #[clap(long)]
     pub root: Option<PathBuf>,
 
     /// Specify the directory name for each sandbox that is created.
@@ -32,11 +32,11 @@ pub struct Create {
     /// Use this option to override those names with something explicit.
     /// For example `hc sandbox -r path/to/my/chains -n 3 -d=first,second,third`
     /// will create three sandboxes with directories named "first", "second", and "third".
-    #[structopt(short, long, value_delimiter = ",")]
+    #[clap(short, long, value_delimiter = ',')]
     pub directories: Vec<PathBuf>,
 }
 
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub enum NetworkCmd {
     Network(Network),
 }
@@ -49,20 +49,20 @@ impl NetworkCmd {
     }
 }
 
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct Network {
     /// Set the type of network.
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub transport: NetworkType,
 
     /// Optionally set a bootstrap service URL.
     /// A bootstrap service can used for peers to discover each other without
     /// prior knowledge of each other.
-    #[structopt(short, long, parse(from_str = Url2::parse))]
+    #[clap(short, long, parse(from_str = Url2::parse))]
     pub bootstrap: Option<Url2>,
 }
 
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub enum NetworkType {
     /// A transport that uses the local memory transport protocol.
     Mem,
@@ -71,52 +71,52 @@ pub enum NetworkType {
     /// A transport that uses the MDNS protocol.
     Mdns,
     /// A transport that uses the WebRTC protocol.
-    #[structopt(name = "webrtc")]
+    #[clap(name = "webrtc")]
     WebRTC {
         /// URL to a holochain tx5 WebRTC signal server.
         signal_url: String,
     },
 }
 
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct Quic {
     /// The network interface and port to bind to.
     /// Default: "kitsune-quic://0.0.0.0:0".
-    #[structopt(short, long, parse(from_str = Url2::parse))]
+    #[clap(short, long, parse(from_str = Url2::parse))]
     pub bind_to: Option<Url2>,
 
     /// If you have port-forwarding set up,
     /// or wish to apply a vanity domain name,
     /// you may need to override the local NIC IP.
     /// Default: None = use NIC IP.
-    #[structopt(long)]
+    #[clap(long)]
     pub override_host: Option<String>,
 
     /// If you have port-forwarding set up,
     /// you may need to override the local NIC port.
     /// Default: None = use NIC port.
-    #[structopt(long)]
+    #[clap(long)]
     pub override_port: Option<u16>,
 
     /// Run through an external proxy at this URL.
-    #[structopt(short, parse(from_str = Url2::parse))]
+    #[clap(short, parse(from_str = Url2::parse))]
     pub proxy: Option<Url2>,
 }
 
-#[derive(Debug, StructOpt, Clone)]
+#[derive(Debug, Parser, Clone)]
 pub struct Existing {
     /// Paths to existing sandbox directories.
     /// For example `hc sandbox run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
-    #[structopt(short, long, value_delimiter = ",")]
+    #[clap(short, long, value_delimiter = ',')]
     pub existing_paths: Vec<PathBuf>,
 
     /// Run all the existing conductor sandboxes specified in `$(pwd)/.hc`.
-    #[structopt(short, long, conflicts_with_all = &["last", "indices"])]
+    #[clap(short, long, conflicts_with_all = &["last", "indices"])]
     pub all: bool,
 
     /// Run the last created conductor sandbox --
     /// that is, the last line in `$(pwd)/.hc`.
-    #[structopt(short, long, conflicts_with_all = &["all", "indices"])]
+    #[clap(short, long, conflicts_with_all = &["all", "indices"])]
     pub last: bool,
 
     /// Run a selection of existing conductor sandboxes
@@ -124,7 +124,7 @@ pub struct Existing {
     /// Existing sandboxes and their indices are visible via `hc list`.
     /// Use the zero-based index to choose which sandboxes to use.
     /// For example `hc sandbox run 1 3 5` or `hc sandbox run 1`
-    #[structopt(conflicts_with_all = &["all", "last"])]
+    #[clap(conflicts_with_all = &["all", "last"])]
     pub indices: Vec<usize>,
 }
 

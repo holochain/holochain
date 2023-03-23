@@ -21,7 +21,8 @@ use std::process::Command;
 // Useful to have this public when using this as a library.
 pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
-use structopt::{lazy_static::lazy_static, StructOpt};
+use lazy_static::lazy_static;
+use clap::{Parser, Subcommand};
 
 mod external_subcommands;
 
@@ -59,12 +60,21 @@ fn builtin_commands() -> Vec<String> {
         .collect()
 }
 
-/// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`.
+/// The main entry-point for the command.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, StructOpt)]
-#[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
-#[structopt(long_about = *HELP)]
-pub enum Opt {
+#[derive(Debug, Parser)]
+#[clap(about = *HELP)]
+#[clap(setting = clap::AppSettings::InferSubcommands)]
+#[clap(setting = clap::AppSettings::AllowExternalSubcommands)]
+pub struct Cli {
+    /// The `hc` subcommand to run.
+    #[clap(subcommand)]
+    command: CliCommand,
+}
+
+/// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`.
+#[derive(Debug, Subcommand)]
+pub enum CliCommand {
     /// Work with DNA bundles.
     Dna(hc_bundle::HcDnaBundle),
     /// Work with hApp bundles.
@@ -74,19 +84,19 @@ pub enum Opt {
     /// Work with sandboxed environments for testing and development.
     Sandbox(hc_sandbox::HcSandbox),
     /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`).
-    #[structopt(external_subcommand)]
+    #[clap(external_subcommand)]
     External(Vec<String>),
 }
 
-impl Opt {
+impl Cli {
     /// Run this command.
     pub async fn run(self) -> anyhow::Result<()> {
-        match self {
-            Self::Dna(cmd) => cmd.run().await?,
-            Self::App(cmd) => cmd.run().await?,
-            Self::WebApp(cmd) => cmd.run().await?,
-            Self::Sandbox(cmd) => cmd.run().await?,
-            Self::External(args) => {
+        match self.command {
+            CliCommand::App(cmd) => cmd.command.run().await?,
+            CliCommand::Dna(cmd) => cmd.command.run().await?,
+            CliCommand::WebApp(cmd) => cmd.command.run().await?,
+            CliCommand::Sandbox(cmd) => cmd.run().await?,
+            CliCommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
                 Command::new(format!("hc-{}", command_suffix))
                     .args(&args[1..])
