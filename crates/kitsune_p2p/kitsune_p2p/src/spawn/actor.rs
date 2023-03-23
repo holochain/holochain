@@ -19,6 +19,7 @@ use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
+use kitsune_p2p_timestamp::Timestamp;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// See <https://github.com/holochain/bootstrap>
@@ -269,7 +270,18 @@ impl KitsuneP2pActor {
                             let evt_sender = &evt_sender;
                             match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
-                                    let _ = i_s.new_con(remote_url, con).await;
+                                    if matches!(
+                                        host.is_blocked(con.clone().into(), Timestamp::now()).await,
+                                        Ok(false)
+                                    ) {
+                                        // Con is definitely not blocked.
+                                        let _ = i_s.new_con(remote_url, con).await;
+                                    }
+                                    else {
+                                        // Con is either definitely blocked or
+                                        // we don't know, so drop it.
+                                        let _ = i_s.del_con(remote_url).await;
+                                    }
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     let _ = i_s.del_con(remote_url).await;
