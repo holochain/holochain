@@ -25,7 +25,20 @@ pub const COORDINATOR_WASM: &[u8] = include_bytes!(concat!(
 use std::sync::Arc;
 use holochain_types::prelude::*;
 
-/// hc_demo_cli run options.
+/// hc_demo_cli - Self-contained demo for holochain functionality.
+///
+/// First, you need to save a dna file to use with the demo:
+///
+/// `hc demo-cli gen-dna-file --network-seed 'my network seed' --output my.dna`
+///
+/// Then, distribute that dna file to other systems, and run:
+///
+/// `hc demo-cli run --dna my.dna`
+///
+/// The demo will create two directories: `hc-demo-cli-inbox` and
+/// `hc-demo-cli-outbox`. Put files into the inbox, and they will
+/// be published to the network. All files discovered on the network
+/// will be written to the outbox.
 #[derive(Debug, clap::Parser, serde::Serialize, serde::Deserialize)]
 pub struct RunOpts {
     /// The subcommand to run.
@@ -45,6 +58,17 @@ impl RunOpts {
 pub enum RunCmd {
     /// Run the hc_demo_cli.
     Run {
+        /// The dna file path. Default "-" for stdin.
+        #[arg(long, default_value = "-")]
+        dna: std::path::PathBuf,
+
+        /// The inbox path.
+        #[arg(long, default_value = "hc-demo-cli-inbox")]
+        inbox: std::path::PathBuf,
+
+        /// the outbox path.
+        #[arg(long, default_value = "hc-demo-cli-outbox")]
+        outbox: std::path::PathBuf,
     },
 
     /// Generate a dna file that can be used with hc_demo_cli.
@@ -55,7 +79,7 @@ pub enum RunCmd {
 
         /// Filename path to write the dna file. Default "-" for stdout.
         #[arg(long, default_value = "-")]
-        output_path: std::path::PathBuf,
+        output: std::path::PathBuf,
     },
 }
 
@@ -64,19 +88,23 @@ pub async fn run_demo(opts: RunOpts) {
     tracing::info!(?opts);
     match opts.command {
         Some(RunCmd::Run {
+            dna,
+            inbox,
+            outbox,
         }) => {
+            run(dna, inbox, outbox).await;
         }
         Some(RunCmd::GenDnaFile {
             network_seed,
-            output_path,
+            output,
         }) => {
-            gen_dna_file(network_seed, output_path).await;
+            gen_dna_file(network_seed, output).await;
         }
         _ => unreachable!(),
     }
 }
 
-async fn gen_dna_file(network_seed: String, output_path: std::path::PathBuf) {
+async fn gen_dna_file(network_seed: String, output: std::path::PathBuf) {
     let i_wasm = DnaWasmHashed::from_content(DnaWasm {
         code: Arc::new(INTEGRITY_WASM.to_vec().into_boxed_slice()),
     }).await;
@@ -110,15 +138,21 @@ async fn gen_dna_file(network_seed: String, output_path: std::path::PathBuf) {
     let dna_file: UnsafeBytes = dna_file.try_into().unwrap();
     let dna_file: Vec<u8> = dna_file.into();
 
-    if output_path == std::path::PathBuf::from("-") {
+    if output == std::path::PathBuf::from("-") {
         tokio::io::AsyncWriteExt::write_all(&mut tokio::io::stdout(), &dna_file).await.unwrap();
     } else {
-        tokio::fs::write(output_path, &dna_file).await.unwrap();
+        tokio::fs::write(output, &dna_file).await.unwrap();
     }
 }
 
-/*
-async fn test() {
+async fn run(dna: std::path::PathBuf, inbox: std::path::PathBuf, outbox: std::path::PathBuf) {
+    let _ = tokio::fs::create_dir_all(&inbox).await;
+    let _ = tokio::fs::create_dir_all(&outbox).await;
+
+    let dna: UnsafeBytes = tokio::fs::read(dna).await.unwrap().into();
+    let dna: SerializedBytes = dna.try_into().unwrap();
+    let dna: DnaFile = dna.try_into().unwrap();
+
     struct PubRendezvous;
 
     impl holochain::sweettest::SweetRendezvous for PubRendezvous {
@@ -142,10 +176,9 @@ async fn test() {
     )
     .await;
 
-
     let dna_with_role = holochain::sweettest::DnaWithRole::from((
         "hc_demo_cli".into(),
-        dna_file,
+        dna,
     ));
 
     let app = conductor.setup_app(
@@ -154,20 +187,19 @@ async fn test() {
     ).await.unwrap();
 
     let cell = app.cells().get(0).unwrap().clone();
-    println!("{:#?}", cell);
+    tracing::info!(?cell);
 
     let i_zome = cell.zome("integrity");
-    println!("{i_zome:?}");
+    tracing::info!(?i_zome);
     let c_zome = cell.zome("coordinator");
-    println!("{c_zome:?}");
+    tracing::info!(?c_zome);
 
     let handle = conductor.sweet_handle();
-    let res: Record = handle.call(&c_zome, "create_file", File {
+    let create_file: Record = handle.call(&c_zome, "create_file", File {
         desc: "yo".to_string(),
         data: UnsafeBytes::from(vec![0_u8, 1, 2, 3]).try_into().unwrap(),
     }).await;
-    println!("{res:?}");
+    tracing::info!(?create_file);
 
     conductor.shutdown().await;
 }
-*/
