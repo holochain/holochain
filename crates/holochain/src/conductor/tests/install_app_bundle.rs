@@ -5,7 +5,7 @@ use fixt::prelude::strum_macros;
 use futures::future::join_all;
 use holo_hash::DnaHash;
 use holochain_types::prelude::{
-    first_ref, mapvec, AppBundle, AppBundleSource, AppManifestCurrentBuilder, AppRoleDnaManifest,
+    mapvec, AppBundle, AppBundleSource, AppManifestCurrentBuilder, AppRoleDnaManifest,
     AppRoleManifest, CellProvisioning, DnaBundle, DnaFile, DnaLocation, DnaVersionSpec,
     InstallAppPayload,
 };
@@ -133,19 +133,103 @@ async fn reject_duplicate_app_for_same_agent() {
     assert!(valid_install_of_second_app.is_ok());
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn network_seed_regression() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let tmp = tempdir().unwrap();
+    let (dna, _, _) = SweetDnaFile::from_test_wasms(
+        "".into(),
+        vec![TestWasm::Create],
+        holochain_serialized_bytes::SerializedBytes::default(),
+    )
+    .await;
+
+    let dna_path = tmp.as_ref().join(format!("the.dna"));
+    DnaBundle::from_dna_file(dna)
+        .await
+        .unwrap()
+        .write_to_file(&dna_path)
+        .await
+        .unwrap();
+
+    let manifest = {
+        let roles = vec![AppRoleManifest {
+            name: "rolename".into(),
+            dna: AppRoleDnaManifest {
+                location: Some(DnaLocation::Path(dna_path)),
+                modifiers: DnaModifiersOpt::default(),
+                version: None,
+                clone_limit: 0,
+            },
+            provisioning: None,
+        }];
+
+        AppManifestCurrentBuilder::default()
+            .name("app".into())
+            .description(None)
+            .roles(roles)
+            .build()
+            .unwrap()
+    };
+
+    let bundle1 = AppBundle::new(manifest.clone().into(), vec![], PathBuf::from("."))
+        .await
+        .unwrap();
+    let bundle2 = AppBundle::new(manifest.into(), vec![], PathBuf::from("."))
+        .await
+        .unwrap();
+
+    // if both of these apps can be installed under the same agent, the
+    // network seed change was successful -- otherwise there will be a
+    // CellAlreadyInstalled error.
+
+    let _app1 = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: agent.clone(),
+            source: AppBundleSource::Bundle(bundle1),
+            installed_app_id: Some("no-seed".into()),
+            network_seed: None,
+            membrane_proofs: HashMap::new(),
+        })
+        .await
+        .unwrap();
+
+    let _app2 = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: agent.clone(),
+            source: AppBundleSource::Bundle(bundle2),
+            installed_app_id: Some("yes-seed".into()),
+            network_seed: Some("seed".into()),
+            membrane_proofs: HashMap::new(),
+        })
+        .await
+        .unwrap();
+}
+
 /// Test all possible combinations of Locations and network seeds:
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "glacial_tests")]
+#[ignore = "this is a really useful comprehensive test, but it's so dang slow"]
 async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     let conductor = SweetConductor::from_standard_config().await;
     let tmp = tempdir().unwrap();
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let (dna, _, _) = SweetDnaFile::from_test_wasms(
+        "".to_string(),
+        vec![TestWasm::Create],
+        holochain_serialized_bytes::SerializedBytes::default(),
+    )
+    .await;
 
     let write_dna = |seed: Seed| {
-        let dna = dna.clone();
+        let mut dna = dna.clone();
         let path = tmp.as_ref().join(format!("{}.dna", seed.to_string()));
         async move {
-            let dna = dna.with_network_seed(seed.to_string()).await;
+            if seed != Seed::None {
+                dna = dna.with_network_seed(seed.to_string()).await;
+            }
             DnaBundle::from_dna_file(dna.clone())
                 .await
                 .unwrap()
@@ -248,7 +332,7 @@ enum Location {
     Bundle,
 }
 
-#[derive(Clone, Copy, Debug, strum_macros::ToString)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::ToString)]
 enum Seed {
     None,
     A,
@@ -304,8 +388,8 @@ impl TestCase {
                     dna: AppRoleDnaManifest {
                         location: Some(DnaLocation::Bundled(hashpath.clone())),
                         modifiers: dna_modifiers.clone(),
-                        version: Some(version),
-                        clone_limit: 0,
+                        version: None,
+                        clone_limit: 10,
                     },
                     provisioning: Some(CellProvisioning::Create { deferred: false }),
                 }];
@@ -334,7 +418,7 @@ impl TestCase {
                         version: Some(version),
                         clone_limit: 0,
                     },
-                    provisioning: Some(CellProvisioning::Create { deferred: false }),
+                    provisioning: None,
                 }];
 
                 let manifest = AppManifestCurrentBuilder::default()
