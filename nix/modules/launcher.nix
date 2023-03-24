@@ -67,11 +67,6 @@
 
         nativeBuildInputs = commonArgs.nativeBuildInputs ++ [
           pkgs.makeBinaryWrapper
-          pkgs.shared-mime-info
-        ];
-
-        buildInputs = commonArgs.buildInputs ++ [
-          pkgs.shared-mime-info
         ];
 
         preFixup = ''
