@@ -77,7 +77,6 @@
         preFixup = ''
           gappsWrapperArgs+=(
             --set WEBKIT_DISABLE_COMPOSITING_MODE 1
-            --prefix GIO_EXTRA_MODULES : ${pkgs.glib-networking}/lib/gio/modules
           )
 
           # without this the DevTools will just display an unparsed HTML file (see https://github.com/tauri-apps/tauri/issues/5711#issuecomment-1336409601)
