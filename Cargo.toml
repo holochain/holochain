@@ -67,6 +67,7 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
+# tx5 = { path = "../tx5/crates/tx5" }
 # tx5 = { git = "https://github.com/holochain/tx5.git", rev = "da4cc7ea3cbb53b12e15ab0932a0ad14fdd41659" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "da4cc7ea3cbb53b12e15ab0932a0ad14fdd41659" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
