@@ -77,24 +77,14 @@
         preFixup = ''
           gappsWrapperArgs+=(
             --set WEBKIT_DISABLE_COMPOSITING_MODE 1
-            --prefix XDG_DATA_DIRS : "${pkgs.shared-mime-info}/share"
             --prefix GIO_EXTRA_MODULES : ${pkgs.glib-networking}/lib/gio/modules
           )
+
+          # without this the DevTools will just display an unparsed HTML file (see https://github.com/tauri-apps/tauri/issues/5711#issuecomment-1336409601)
+          gappsWrapperArgs+=(
+            --prefix XDG_DATA_DIRS : "${pkgs.shared-mime-info}/share"
+          )
         '';
-
-
-        # --prefix XDG_DATA_DIRS : ${pkgs.lib.concatMapStringsSep ":" (x: "${x}/share") [
-        #   # pkgs.gnome.adwaita-icon-theme
-        #   pkgs.shared-mime-info
-        # ]}
-
-        # --prefix XDG_DATA_DIRS : ${pkgs.lib.concatMapStringsSep ":" (x: "${x}/share/gsettings-schemas/${x.name}") [
-        #   pkgs.glib
-        #   pkgs.gsettings-desktop-schemas
-        #   pkgs.gtk3
-        # ]}
-
-
       });
 
     in
