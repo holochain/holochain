@@ -112,10 +112,10 @@ pub struct RegisterDna {
     #[clap(long)]
     /// Origin time to override when installing this DNA
     pub origin_time: Option<Timestamp>,
-    #[clap(long, conflicts_with = "hash", required_unless = "hash")]
+    #[clap(long, conflicts_with = "hash", required_unless_present = "hash")]
     /// Path to a DnaBundle file.
     pub path: Option<PathBuf>,
-    #[clap(short, long, parse(try_from_str = parse_dna_hash), required_unless = "path")]
+    #[clap(short, long, value_parser = parse_dna_hash, required_unless_present = "path")]
     /// Hash of an existing DNA you want to register.
     pub hash: Option<DnaHash>,
 }
@@ -135,7 +135,7 @@ pub struct InstallApp {
     /// If not set then a key will be generated.
     /// Agent key is Base64 (same format that is used in logs).
     /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
-    #[clap(long, parse(try_from_str = parse_agent_key))]
+    #[clap(long, value_parser = parse_agent_key)]
     pub agent_key: Option<AgentPubKey>,
 
     /// Location of the *.happ bundle file to install.
@@ -177,11 +177,11 @@ pub struct DisableApp {
 #[derive(Debug, Parser, Clone)]
 pub struct DumpState {
     /// The DNA hash half of the cell ID to dump.
-    #[clap(parse(try_from_str = parse_dna_hash))]
+    #[clap(value_parser = parse_dna_hash)]
     pub dna: DnaHash,
 
     /// The agent half of the cell ID to dump.
-    #[clap(parse(try_from_str = parse_agent_key))]
+    #[clap(value_parser = parse_agent_key)]
     pub agent_key: AgentPubKey,
 }
 
@@ -191,11 +191,11 @@ pub struct DumpState {
 #[derive(Debug, Parser, Clone)]
 pub struct ListAgents {
     /// Optionally request agent info for a particular cell ID.
-    #[clap(short, long, parse(try_from_str = parse_agent_key), requires = "dna")]
+    #[clap(short, long, value_parser = parse_agent_key, requires = "dna")]
     pub agent_key: Option<AgentPubKey>,
 
     /// Optionally request agent info for a particular cell ID.
-    #[clap(short, long, parse(try_from_str = parse_dna_hash), requires = "agent_key")]
+    #[clap(short, long, value_parser = parse_dna_hash, requires = "agent_key")]
     pub dna: Option<DnaHash>,
 }
 
@@ -205,7 +205,7 @@ pub struct ListAgents {
 #[derive(Debug, Parser, Clone)]
 pub struct ListApps {
     /// Optionally request agent info for a particular cell ID.
-    #[clap(short, long, parse(try_from_str = parse_status_filter))]
+    #[clap(short, long, value_parser = parse_status_filter)]
     pub status: Option<AppStatusFilter>,
 }
 

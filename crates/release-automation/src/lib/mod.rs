@@ -113,13 +113,13 @@ pub mod cli {
         /// Allow these blocking states for dev dependency crates.
         /// Comma separated.
         /// Valid values are: MissingReadme, UnreleasableViaChangelogFrontmatter, DisallowedVersionReqViolated, EnforcedVersionReqViolated
-        #[structopt(long, default_value = "", parse(try_from_str = parse_cratestateflags))]
+        #[structopt(long, default_value = "", value_parser = parse_cratestateflags)]
         pub allowed_dev_dependency_blockers: BitFlags<CrateStateFlags>,
 
         /// Allow these blocking states for crates via the packages filter.
         /// Comma separated.
         /// Valid values are: MissingReadme, UnreleasableViaChangelogFrontmatter, DisallowedVersionReqViolated, EnforcedVersionReqViolated
-        #[structopt(long, default_value = "", parse(try_from_str = parse_cratestateflags))]
+        #[structopt(long, default_value = "", value_parser = parse_cratestateflags)]
         pub allowed_matched_blockers: BitFlags<CrateStateFlags>,
 
         /// Exclude optional dependencies.
@@ -130,7 +130,7 @@ pub mod cli {
         /// Comma separated.
         /// The values shall be given as YAML strings, matching the way they are configured in the CHANGELOG.md front matters.
         /// For a list of values and examples please see [this document](https://github.com/holochain/holochain/blob/develop/docs/release/release.md#permanently-marking-a-crate-for-majorminorpatchpre-version-bumps).
-        #[structopt(long, parse(try_from_str = parse_semverincrementmode))]
+        #[structopt(long, value_parser = parse_semverincrementmode)]
         allowed_semver_increment_modes: Option<HashSet<SemverIncrementMode>>,
     }
 
@@ -222,7 +222,7 @@ pub mod cli {
         /// These will be reordered to their defined ordering.
         ///
         /// See `ReleaseSteps` for the list of steps.
-        #[structopt(long, default_value="", parse(try_from_str = parse_releasesteps))]
+        #[structopt(long, default_value="", value_parser = parse_releasesteps)]
         pub steps: BTreeSet<ReleaseSteps>,
 
         /// Force creation of the branch regardless of source branch.

@@ -63,9 +63,7 @@ fn builtin_commands() -> Vec<String> {
 /// The main entry-point for the command.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Parser)]
-#[clap(about = *HELP)]
-#[clap(setting = clap::AppSettings::InferSubcommands)]
-#[clap(setting = clap::AppSettings::AllowExternalSubcommands)]
+#[clap(about = *HELP, infer_subcommands = true, allow_external_subcommands = true)]
 pub struct Cli {
     /// The `hc` subcommand to run.
     #[clap(subcommand)]

@@ -4,7 +4,7 @@ use crate::cmds::*;
 use holochain_types::prelude::InstalledAppId;
 use std::path::Path;
 use std::path::PathBuf;
-use clap::Parser;
+use clap::{ArgAction, Parser};
 
 const DEFAULT_APP_ID: &str = "test-app";
 
@@ -37,7 +37,7 @@ pub struct HcSandbox {
 
 /// The list of subcommands for `hc sandbox`.
 #[derive(Debug, Parser)]
-#[clap(setting = clap::AppSettings::InferSubcommands)]
+#[clap(infer_subcommands = true)]
 pub enum HcSandboxSubcommand {
     /// Generate one or more new Holochain Conductor sandbox(es) for later use.
     ///
@@ -75,7 +75,7 @@ pub enum HcSandboxSubcommand {
     /// List sandboxes found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
-        #[clap(short, long, parse(from_occurrences))]
+        #[clap(short, long, action = ArgAction::Count)]
         verbose: usize,
     },
 

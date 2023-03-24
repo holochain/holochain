@@ -58,7 +58,7 @@ pub struct Network {
     /// Optionally set a bootstrap service URL.
     /// A bootstrap service can used for peers to discover each other without
     /// prior knowledge of each other.
-    #[clap(short, long, parse(from_str = Url2::parse))]
+    #[clap(short, long, value_parser = try_parse_url2)]
     pub bootstrap: Option<Url2>,
 }
 
@@ -82,7 +82,7 @@ pub enum NetworkType {
 pub struct Quic {
     /// The network interface and port to bind to.
     /// Default: "kitsune-quic://0.0.0.0:0".
-    #[clap(short, long, parse(from_str = Url2::parse))]
+    #[clap(short, long, value_parser = try_parse_url2)]
     pub bind_to: Option<Url2>,
 
     /// If you have port-forwarding set up,
@@ -99,7 +99,7 @@ pub struct Quic {
     pub override_port: Option<u16>,
 
     /// Run through an external proxy at this URL.
-    #[clap(short, parse(from_str = Url2::parse))]
+    #[clap(short, value_parser = try_parse_url2)]
     pub proxy: Option<Url2>,
 }
 
@@ -249,4 +249,11 @@ impl Default for Create {
             directories: Vec::with_capacity(0),
         }
     }
+}
+
+// The only purpose for this wrapper function is to get around a type inference failure.
+// Plenty of search hits out there for "implementation of `FnOnce` is not general enough"
+// e.g., https://users.rust-lang.org/t/implementation-of-fnonce-is-not-general-enough/68294
+fn try_parse_url2(arg: &str) -> url2::Url2Result<Url2> {
+    Url2::try_parse(arg)
 }
