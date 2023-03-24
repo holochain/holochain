@@ -18,7 +18,7 @@ path = "src/bin/hc-sandbox.rs"
 anyhow = "1.0"
 ansi_term = "0.12"
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
-clap = { version = "3.0", features = [ "derive", "env" ] }
+clap = { version = "4.0", features = [ "derive", "env" ] }
 futures = "0.3"
 holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.2.0-beta-rc.0"}
 holochain_types = { path = "../holochain_types", version = "^0.2.0-beta-rc.0"}

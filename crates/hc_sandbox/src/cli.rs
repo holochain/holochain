@@ -16,28 +16,28 @@ const DEFAULT_APP_ID: &str = "test-app";
 /// or create complex multi-conductor setups for testing.
 #[derive(Debug, Parser)]
 pub struct HcSandbox {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     command: HcSandboxSubcommand,
 
     /// Instead of the normal "interactive" passphrase mode,
     /// collect the passphrase by reading stdin to the end.
-    #[clap(long)]
+    #[arg(long)]
     piped: bool,
 
     /// Force the admin port that hc uses to talk to Holochain to a specific value.
     /// For example `hc -f=9000,9001 run`
     /// This must be set on each run or the port will change if it's in use.
-    #[clap(short, long, value_delimiter = ',')]
+    #[arg(short, long, value_delimiter = ',')]
     force_admin_ports: Vec<u16>,
 
     /// Set the path to the holochain binary.
-    #[clap(short = 'H', long, env = "HC_HOLOCHAIN_PATH", default_value = "holochain")]
+    #[arg(short = 'H', long, env = "HC_HOLOCHAIN_PATH", default_value = "holochain")]
     holochain_path: PathBuf,
 }
 
 /// The list of subcommands for `hc sandbox`.
 #[derive(Debug, Parser)]
-#[clap(infer_subcommands = true)]
+#[command(infer_subcommands = true)]
 pub enum HcSandboxSubcommand {
     /// Generate one or more new Holochain Conductor sandbox(es) for later use.
     ///
@@ -45,11 +45,11 @@ pub enum HcSandboxSubcommand {
     Generate {
         /// ID for the installed app.
         /// This is just a string to identify the app by.
-        #[clap(short, long, default_value = DEFAULT_APP_ID)]
+        #[arg(short, long, default_value = DEFAULT_APP_ID)]
         app_id: InstalledAppId,
 
         /// (flattened)
-        #[clap(flatten)]
+        #[command(flatten)]
         create: Create,
 
         /// Automatically run the sandbox(es) that were created.
@@ -59,7 +59,7 @@ pub enum HcSandboxSubcommand {
         /// For example, `hc sandbox generate -r=0,9000,0` will create three app interfaces.
         /// Or, use `hc sandbox generate -r` to run without attaching any app interfaces.
         /// This follows the same structure as `hc sandbox run --ports`.
-        #[clap(short, long, value_delimiter = ',')]
+        #[arg(short, long, value_delimiter = ',')]
     run: Option<Vec<u16>>,
 
         /// A hApp bundle to install.
@@ -75,7 +75,7 @@ pub enum HcSandboxSubcommand {
     /// List sandboxes found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
-        #[clap(short, long, action = ArgAction::Count)]
+        #[arg(short, long, action = ArgAction::Count)]
         verbose: usize,
     },
 
@@ -94,11 +94,11 @@ pub struct Run {
     /// For example, `hc -p=0,9000,0` will create three app interfaces.
     /// Important: Interfaces are persistent. If you add an interface
     /// it will be there next time you run the conductor.
-    #[clap(short, long, value_delimiter = ',')]
+    #[arg(short, long, value_delimiter = ',')]
     ports: Vec<u16>,
 
     /// (flattened)
-    #[clap(flatten)]
+    #[command(flatten)]
     existing: Existing,
 }
 

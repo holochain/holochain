@@ -40,14 +40,14 @@ pub struct Call {
     /// Ports to running conductor admin interfaces.
     /// If this is empty existing sandboxes will be used.
     /// Cannot be combined with existing sandboxes.
-    #[clap(short, long, conflicts_with_all = &["existing-paths", "indices"], value_delimiter = ',')]
+    #[arg(short, long, conflicts_with_all = &["existing-paths", "indices"], value_delimiter = ',')]
     pub running: Vec<u16>,
 
-    #[clap(flatten)]
+    #[command(flatten)]
     pub existing: Existing,
 
     /// The admin request you want to make.
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub call: AdminRequestCli,
 }
 
@@ -103,19 +103,19 @@ pub struct AddAppWs {
 /// and registers a DNA. You can only use a path or a hash, not both.
 #[derive(Debug, Parser, Clone)]
 pub struct RegisterDna {
-    #[clap(short, long)]
+    #[arg(short, long)]
     /// Network seed to override when installing this DNA
     pub network_seed: Option<String>,
-    #[clap(long)]
+    #[arg(long)]
     /// Properties to override when installing this DNA
     pub properties: Option<PathBuf>,
-    #[clap(long)]
+    #[arg(long)]
     /// Origin time to override when installing this DNA
     pub origin_time: Option<Timestamp>,
-    #[clap(long, conflicts_with = "hash", required_unless_present = "hash")]
+    #[arg(long, conflicts_with = "hash", required_unless_present = "hash")]
     /// Path to a DnaBundle file.
     pub path: Option<PathBuf>,
-    #[clap(short, long, value_parser = parse_dna_hash, required_unless_present = "path")]
+    #[arg(short, long, value_parser = parse_dna_hash, required_unless_present = "path")]
     /// Hash of an existing DNA you want to register.
     pub hash: Option<DnaHash>,
 }
@@ -129,17 +129,17 @@ pub struct RegisterDna {
 #[derive(Debug, Parser, Clone)]
 pub struct InstallApp {
     /// Sets the InstalledAppId.
-    #[clap(long)]
+    #[arg(long)]
     pub app_id: Option<String>,
 
     /// If not set then a key will be generated.
     /// Agent key is Base64 (same format that is used in logs).
     /// e.g. `uhCAk71wNXTv7lstvi4PfUr_JDvxLucF9WzUgWPNIEZIoPGMF4b_o`
-    #[clap(long, value_parser = parse_agent_key)]
+    #[arg(long, value_parser = parse_agent_key)]
     pub agent_key: Option<AgentPubKey>,
 
     /// Location of the *.happ bundle file to install.
-    #[clap(required = true)]
+    #[arg(required = true)]
     pub path: PathBuf,
 
     /// Optional network seed override for every DNA in this app
@@ -177,11 +177,11 @@ pub struct DisableApp {
 #[derive(Debug, Parser, Clone)]
 pub struct DumpState {
     /// The DNA hash half of the cell ID to dump.
-    #[clap(value_parser = parse_dna_hash)]
+    #[arg(value_parser = parse_dna_hash)]
     pub dna: DnaHash,
 
     /// The agent half of the cell ID to dump.
-    #[clap(value_parser = parse_agent_key)]
+    #[arg(value_parser = parse_agent_key)]
     pub agent_key: AgentPubKey,
 }
 
@@ -191,11 +191,11 @@ pub struct DumpState {
 #[derive(Debug, Parser, Clone)]
 pub struct ListAgents {
     /// Optionally request agent info for a particular cell ID.
-    #[clap(short, long, value_parser = parse_agent_key, requires = "dna")]
+    #[arg(short, long, value_parser = parse_agent_key, requires = "dna")]
     pub agent_key: Option<AgentPubKey>,
 
     /// Optionally request agent info for a particular cell ID.
-    #[clap(short, long, value_parser = parse_dna_hash, requires = "agent_key")]
+    #[arg(short, long, value_parser = parse_dna_hash, requires = "agent_key")]
     pub dna: Option<DnaHash>,
 }
 
@@ -205,7 +205,7 @@ pub struct ListAgents {
 #[derive(Debug, Parser, Clone)]
 pub struct ListApps {
     /// Optionally request agent info for a particular cell ID.
-    #[clap(short, long, value_parser = parse_status_filter)]
+    #[arg(short, long, value_parser = parse_status_filter)]
     pub status: Option<AppStatusFilter>,
 }
 

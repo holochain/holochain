@@ -26,11 +26,19 @@ use clap::{Parser, Subcommand};
 
 mod external_subcommands;
 
+// TODO: change this so it inherits clap's formatting.
+// Clap 3 and 4 format helptext using colours and bold/underline respectively.
+// https://github.com/clap-rs/clap/pull/4765 introduces the ability to style your own help text
+// using a library like `color_print`.
+// https://github.com/clap-rs/clap/issues/4786 requests that the styler's built-in helper methods
+// be exposed to consumers, thereby allowing us to durably make our styling consistent
+// with whatever clap's happens to be at the moment.
+// I'd prefer the latter approach, if it lands.
 lazy_static! {
     static ref HELP: &'static str = {
         let extensions = external_subcommands::list_external_subcommands()
             .into_iter()
-            .map(|s| format!("    hc {}\t  Run \"hc {} help\" to see its help", s, s))
+            .map(|s| format!("  {}\t  Run \"hc {} help\" to see its help", s, s))
             .collect::<Vec<String>>()
             .join("\n");
 
@@ -38,7 +46,7 @@ lazy_static! {
             0 => String::from(""),
             _ => format!(
                 r#"
-EXTENSIONS:
+Extensions:
 {extensions}"#
             ),
         };
@@ -63,10 +71,10 @@ fn builtin_commands() -> Vec<String> {
 /// The main entry-point for the command.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Parser)]
-#[clap(about = *HELP, infer_subcommands = true, allow_external_subcommands = true)]
+#[command(about = *HELP, infer_subcommands = true, allow_external_subcommands = true)]
 pub struct Cli {
     /// The `hc` subcommand to run.
-    #[clap(subcommand)]
+    #[command(subcommand)]
     command: CliCommand,
 }
 
@@ -82,7 +90,7 @@ pub enum CliCommand {
     /// Work with sandboxed environments for testing and development.
     Sandbox(hc_sandbox::HcSandbox),
     /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`).
-    #[clap(external_subcommand)]
+    #[command(external_subcommand)]
     External(Vec<String>),
 }
 

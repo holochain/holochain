@@ -24,7 +24,7 @@ pub const WEB_APP_BUNDLE_EXT: &str = "webhapp";
 #[derive(Debug, Parser)]
 pub struct HcDnaBundle {
     /// The `hc dna` subcommand to run.
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub command: HcDnaBundleCommand,
 }
 
@@ -55,7 +55,7 @@ pub enum HcDnaBundleCommand {
         ///
         /// If not specified, the `[name].dna` bundle will be placed inside the
         /// provided working directory.
-        #[clap(short = 'o', long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
     },
 
@@ -67,7 +67,7 @@ pub enum HcDnaBundleCommand {
     ///
     /// creates a new directory `./some/dir/my-dna`, containining a new `dna.yaml`
     /// manifest.
-    // #[clap(short = 'u', long)]
+    // #[arg(short = 'u', long)]
     Unpack {
         /// The path to the bundle to unpack.
         path: std::path::PathBuf,
@@ -76,17 +76,17 @@ pub enum HcDnaBundleCommand {
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
-        #[clap(short = 'o', long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Don't attempt to parse the manifest. Useful if you have a manifest
         /// of an outdated format. This command will allow you to unpack the
         /// manifest so that it may be modified and repacked into a valid bundle.
-        #[clap(short = 'r', long)]
+        #[arg(short = 'r', long)]
         raw: bool,
 
         /// Overwrite an existing directory, if one exists.
-        #[clap(short = 'f', long)]
+        #[arg(short = 'f', long)]
         force: bool,
     },
 }
@@ -95,7 +95,7 @@ pub enum HcDnaBundleCommand {
 #[derive(Debug, Parser)]
 pub struct HcAppBundle {
     /// The `hc app` subcommand to run.
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub command: HcAppBundleCommand,
 }
 
@@ -126,14 +126,14 @@ pub enum HcAppBundleCommand {
         ///
         /// If not specified, the `[name].happ` bundle will be placed inside the
         /// provided working directory.
-        #[clap(short = 'o', long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Also run `dna pack` on all DNA manifests
         /// to be bundled into this hApp.
         /// There must exist a `dna.yaml` file in the same directory
         /// as each of the DNA files specified in the manifest.
-        #[clap(short, long)]
+        #[arg(short, long)]
         recursive: bool,
     },
 
@@ -145,7 +145,7 @@ pub enum HcAppBundleCommand {
     ///
     /// creates a new directory `./some/dir/my-app`, containining a new `happ.yaml`
     /// manifest.
-    // #[clap(short = 'u', long)]
+    // #[arg(short = 'u', long)]
     Unpack {
         /// The path to the bundle to unpack.
         path: std::path::PathBuf,
@@ -154,17 +154,17 @@ pub enum HcAppBundleCommand {
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
-        #[clap(short = 'o', long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Don't attempt to parse the manifest. Useful if you have a manifest
         /// of an outdated format. This command will allow you to unpack the
         /// manifest so that it may be modified and repacked into a valid bundle.
-        #[clap(short = 'r', long)]
+        #[arg(short = 'r', long)]
         raw: bool,
 
         /// Overwrite an existing directory, if one exists.
-        #[clap(short = 'f', long)]
+        #[arg(short = 'f', long)]
         force: bool,
     },
 }
@@ -173,7 +173,7 @@ pub enum HcAppBundleCommand {
 #[derive(Debug, Parser)]
 pub struct HcWebAppBundle {
     /// The `hc web-app` subcommand to run.
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub command: HcWebAppBundleCommand,
 }
 
@@ -204,7 +204,7 @@ pub enum HcWebAppBundleCommand {
         ///
         /// If not specified, the `[name].webhapp` bundle will be placed inside the
         /// provided working directory.
-        #[clap(short = 'o', long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Also run `app pack` and `dna pack` on all app and DNA manifests
@@ -213,7 +213,7 @@ pub enum HcWebAppBundleCommand {
         /// as the hApp file specified in the manifest,
         /// as well as `dna.yaml` files in the same directories
         /// as each of the DNA files specified in the hApps' manifests.
-        #[clap(short, long)]
+        #[arg(short, long)]
         recursive: bool,
     },
 
@@ -225,7 +225,7 @@ pub enum HcWebAppBundleCommand {
     ///
     /// creates a new directory `./some/dir/my-app`, containining a new `web-happ.yaml`
     /// manifest.
-    // #[clap(short = 'u', long)]
+    // #[arg(short = 'u', long)]
     Unpack {
         /// The path to the bundle to unpack.
         path: std::path::PathBuf,
@@ -234,17 +234,17 @@ pub enum HcWebAppBundleCommand {
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
-        #[clap(short = 'o', long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Don't attempt to parse the manifest. Useful if you have a manifest
         /// of an outdated format. This command will allow you to unpack the
         /// manifest so that it may be modified and repacked into a valid bundle.
-        #[clap(short = 'r', long)]
+        #[arg(short = 'r', long)]
         raw: bool,
 
         /// Overwrite an existing directory, if one exists.
-        #[clap(short = 'f', long)]
+        #[arg(short = 'f', long)]
         force: bool,
     },
 }

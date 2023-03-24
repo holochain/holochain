@@ -20,7 +20,7 @@ path = "src/bin/hc-dna.rs"
 
 [dependencies]
 anyhow = "1.0"
-clap = { version = "3.0", features = [ "derive" ] }
+clap = { version = "4.0", features = [ "derive" ] }
 holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "^0.2.0-beta-rc.0"}
 holochain_serialized_bytes = "=0.0.51"
 holochain_types = { version = "^0.2.0-beta-rc.0", path = "../holochain_types" }

@@ -13,17 +13,17 @@ use url2::Url2;
 #[derive(Debug, Parser, Clone)]
 pub struct Create {
     /// Number of conductor sandboxes to create.
-    #[clap(short, long, default_value = "1")]
+    #[arg(short, long, default_value = "1")]
     pub num_sandboxes: usize,
 
     /// Add an optional network config.
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub network: Option<NetworkCmd>,
 
     /// Set a root directory for conductor sandboxes to be placed into.
     /// Defaults to the system's temp directory.
     /// This directory must already exist.
-    #[clap(long)]
+    #[arg(long)]
     pub root: Option<PathBuf>,
 
     /// Specify the directory name for each sandbox that is created.
@@ -32,7 +32,7 @@ pub struct Create {
     /// Use this option to override those names with something explicit.
     /// For example `hc sandbox -r path/to/my/chains -n 3 -d=first,second,third`
     /// will create three sandboxes with directories named "first", "second", and "third".
-    #[clap(short, long, value_delimiter = ',')]
+    #[arg(short, long, value_delimiter = ',')]
     pub directories: Vec<PathBuf>,
 }
 
@@ -52,13 +52,13 @@ impl NetworkCmd {
 #[derive(Debug, Parser, Clone)]
 pub struct Network {
     /// Set the type of network.
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub transport: NetworkType,
 
     /// Optionally set a bootstrap service URL.
     /// A bootstrap service can used for peers to discover each other without
     /// prior knowledge of each other.
-    #[clap(short, long, value_parser = try_parse_url2)]
+    #[arg(short, long, value_parser = try_parse_url2)]
     pub bootstrap: Option<Url2>,
 }
 
@@ -71,7 +71,7 @@ pub enum NetworkType {
     /// A transport that uses the MDNS protocol.
     Mdns,
     /// A transport that uses the WebRTC protocol.
-    #[clap(name = "webrtc")]
+    #[command(name = "webrtc")]
     WebRTC {
         /// URL to a holochain tx5 WebRTC signal server.
         signal_url: String,
@@ -82,24 +82,24 @@ pub enum NetworkType {
 pub struct Quic {
     /// The network interface and port to bind to.
     /// Default: "kitsune-quic://0.0.0.0:0".
-    #[clap(short, long, value_parser = try_parse_url2)]
+    #[arg(short, long, value_parser = try_parse_url2)]
     pub bind_to: Option<Url2>,
 
     /// If you have port-forwarding set up,
     /// or wish to apply a vanity domain name,
     /// you may need to override the local NIC IP.
     /// Default: None = use NIC IP.
-    #[clap(long)]
+    #[arg(long)]
     pub override_host: Option<String>,
 
     /// If you have port-forwarding set up,
     /// you may need to override the local NIC port.
     /// Default: None = use NIC port.
-    #[clap(long)]
+    #[arg(long)]
     pub override_port: Option<u16>,
 
     /// Run through an external proxy at this URL.
-    #[clap(short, value_parser = try_parse_url2)]
+    #[arg(short, value_parser = try_parse_url2)]
     pub proxy: Option<Url2>,
 }
 
@@ -107,16 +107,16 @@ pub struct Quic {
 pub struct Existing {
     /// Paths to existing sandbox directories.
     /// For example `hc sandbox run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
-    #[clap(short, long, value_delimiter = ',')]
+    #[arg(short, long, value_delimiter = ',')]
     pub existing_paths: Vec<PathBuf>,
 
     /// Run all the existing conductor sandboxes specified in `$(pwd)/.hc`.
-    #[clap(short, long, conflicts_with_all = &["last", "indices"])]
+    #[arg(short, long, conflicts_with_all = &["last", "indices"])]
     pub all: bool,
 
     /// Run the last created conductor sandbox --
     /// that is, the last line in `$(pwd)/.hc`.
-    #[clap(short, long, conflicts_with_all = &["all", "indices"])]
+    #[arg(short, long, conflicts_with_all = &["all", "indices"])]
     pub last: bool,
 
     /// Run a selection of existing conductor sandboxes
@@ -124,7 +124,7 @@ pub struct Existing {
     /// Existing sandboxes and their indices are visible via `hc list`.
     /// Use the zero-based index to choose which sandboxes to use.
     /// For example `hc sandbox run 1 3 5` or `hc sandbox run 1`
-    #[clap(conflicts_with_all = &["all", "last"])]
+    #[arg(conflicts_with_all = &["all", "last"])]
     pub indices: Vec<usize>,
 }
 

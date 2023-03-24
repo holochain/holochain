@@ -14,7 +14,7 @@ use clap::Parser;
 
 #[derive(Debug, Parser)]
 struct Input {
-    #[clap(short = 'H', long, default_value = "holochain")]
+    #[arg(short = 'H', long, default_value = "holochain")]
     holochain_path: PathBuf,
     happ: Option<PathBuf>,
 }

@@ -1,16 +1,16 @@
 use clap::Parser;
 
 #[derive(Parser, Debug)]
-#[clap(version, about, long_about = None)]
+#[arg(version, about, long_about = None)]
 struct Args {
     /// bind to this interface
-    #[clap(short, long, default_value = "0.0.0.0:0")]
+    #[arg(short, long, default_value = "0.0.0.0:0")]
     interface: String,
 
     /// include this proxy server address in
     /// `proxy_list` call, can be specified
     /// multiple times
-    #[clap(short, long, verbatim_doc_comment)]
+    #[arg(short, long, verbatim_doc_comment)]
     proxy: Vec<String>,
 }
 

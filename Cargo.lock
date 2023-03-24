@@ -2499,7 +2499,7 @@ name = "holochain_cli"
 version = "0.2.0-beta-rc.0"
 dependencies = [
  "anyhow",
- "clap 3.2.23",
+ "clap 4.1.8",
  "futures",
  "holochain_cli_bundle",
  "holochain_cli_sandbox",
@@ -2514,7 +2514,7 @@ version = "0.2.0-beta-rc.0"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
- "clap 3.2.23",
+ "clap 4.1.8",
  "holochain_serialized_bytes",
  "holochain_types",
  "holochain_util",
@@ -2537,7 +2537,7 @@ dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
  "chrono",
- "clap 3.2.23",
+ "clap 4.1.8",
  "futures",
  "holochain_conductor_api",
  "holochain_p2p",
