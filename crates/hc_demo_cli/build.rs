@@ -32,12 +32,15 @@ fn main() {
 
 fn build(cargo_cmd: &std::ffi::OsStr, tgt: &str, out: &std::path::Path) {
     let mut cmd = std::process::Command::new(cargo_cmd);
+    cmd.env_remove("RUSTFLAGS");
+    cmd.env_remove("CARGO_BUILD_RUSTFLAGS");
+    cmd.env_remove("CARGO_ENCODED_RUSTFLAGS");
     cmd.env("HC_DEMO_CLI_INCEPTION", "1");
-    cmd.env("CARGO_NET_OFFLINE", "1");
+    //cmd.env("CARGO_NET_OFFLINE", "1");
     cmd.env("CARGO_TARGET_DIR", out);
     cmd.env("RUSTFLAGS", "-C opt-level=z");
     cmd.arg("build");
-    cmd.arg("--offline");
+    //cmd.arg("--offline");
     cmd.arg("--release");
     cmd.arg("--lib");
     cmd.arg("--target").arg("wasm32-unknown-unknown");
