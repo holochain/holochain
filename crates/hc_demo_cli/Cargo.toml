@@ -13,6 +13,8 @@ hdk = { path = "../hdk", version = "0.2.0-beta-rc.0", optional = true }
 holochain = { path = "../holochain", version = "0.2.0-beta-rc.0", optional = true }
 holochain_types = { path = "../holochain_types", version = "0.2.0-beta-rc.0", optional = true }
 holochain_keystore = { path = "../holochain_keystore", version = "0.2.0-beta-rc.0", optional = true }
+rand = { version = "0.8.5", optional = true }
+rand-utf8 = { version = "0.0.1", optional = true }
 serde = { version = "1", optional = true }
 tokio = { version = "1.26.0", features = [ "full" ], optional = true }
 tracing = { version = "0.1.37", optional = true }
@@ -21,7 +23,7 @@ tracing-subscriber = { version = "0.3.16", optional = true }
 [features]
 default = [ "build_demo" ]
 
-build_demo = [ "clap", "hdi", "hdk", "serde", "tokio", "holochain", "holochain_types", "holochain/test_utils", "holochain/tx5", "holochain_keystore", "tracing", "tracing-subscriber" ]
+build_demo = [ "clap", "hdi", "hdk", "serde", "tokio", "holochain", "holochain_types", "holochain/test_utils", "holochain/tx5", "holochain_keystore", "rand", "rand-utf8", "tracing", "tracing-subscriber" ]
 
 build_integrity_wasm = [ "hdi", "serde" ]
 build_coordinator_wasm = [ "hdi", "hdk", "serde" ]
