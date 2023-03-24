@@ -29,7 +29,7 @@ use std::sync::Arc;
 ///
 /// First, you need to save a dna file to use with the demo:
 ///
-/// `hc demo-cli gen-dna-file --network-seed 'my network seed' --output my.dna`
+/// `hc demo-cli gen-dna-file --output my.dna`
 ///
 /// Then, distribute that dna file to other systems, and run:
 ///
@@ -43,7 +43,7 @@ use std::sync::Arc;
 pub struct RunOpts {
     /// The subcommand to run.
     #[command(subcommand)]
-    command: Option<RunCmd>,
+    command: RunCmd,
 }
 
 impl RunOpts {
@@ -83,13 +83,12 @@ pub enum RunCmd {
 pub async fn run_demo(opts: RunOpts) {
     tracing::info!(?opts);
     match opts.command {
-        Some(RunCmd::Run { dna, inbox, outbox }) => {
+        RunCmd::Run { dna, inbox, outbox } => {
             run(dna, inbox, outbox).await;
         }
-        Some(RunCmd::GenDnaFile { output }) => {
+        RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
         }
-        _ => unreachable!(),
     }
 }
 
