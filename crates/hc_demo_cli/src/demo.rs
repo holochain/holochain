@@ -11,16 +11,10 @@ use hdk::prelude::*;
 super::wasm_common!();
 
 /// hc_demo_cli integrity wasm bytes
-pub const INTEGRITY_WASM: &[u8] = include_bytes!(concat!(
-    env!("OUT_DIR"),
-    "/integrity/wasm32-unknown-unknown/release/hc_demo_cli.wasm"
-));
+pub const INTEGRITY_WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/integrity.wasm"));
 
 /// hc_demo_cli coordinator wasm bytes
-pub const COORDINATOR_WASM: &[u8] = include_bytes!(concat!(
-    env!("OUT_DIR"),
-    "/coordinator/wasm32-unknown-unknown/release/hc_demo_cli.wasm"
-));
+pub const COORDINATOR_WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/coordinator.wasm"));
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
