@@ -37,13 +37,14 @@ fn copy_wasm(from: &std::path::Path, to: &std::path::Path) {
 }
 
 fn build(cargo_cmd: &std::ffi::OsStr, tgt: &str) -> std::path::PathBuf {
-    let target_dir = env!("CARGO_TARGET_DIR");
+    let target_dir =
+        std::env::var_os("CARGO_TARGET_DIR").expect("failed to locate cargo target directory");
 
     let mut cmd = std::process::Command::new(cargo_cmd);
     cmd.env_remove("RUSTFLAGS");
     cmd.env_remove("CARGO_BUILD_RUSTFLAGS");
     cmd.env_remove("CARGO_ENCODED_RUSTFLAGS");
-    cmd.env("CARGO_TARGET_DIR", target_dir);
+    cmd.env("CARGO_TARGET_DIR", target_dir.clone());
     cmd.env("HC_DEMO_CLI_INCEPTION", "1");
     cmd.env("RUSTFLAGS", "-C opt-level=z");
     cmd.arg("build");
@@ -57,7 +58,7 @@ fn build(cargo_cmd: &std::ffi::OsStr, tgt: &str) -> std::path::PathBuf {
 
     assert!(cmd.status().expect("build error").success(), "build error");
 
-    let mut wasm = std::path::PathBuf::from(env!("CARGO_TARGET_DIR"));
+    let mut wasm = std::path::PathBuf::from(target_dir);
     wasm.push("wasm32-unknown-unknown");
     wasm.push("release");
     wasm.push("hc_demo_cli.wasm");
