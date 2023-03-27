@@ -118,5 +118,6 @@ mod version_info {
 }
 
 fn main() {
+    // inwelling::register();
     version_info::populate_env();
 }

@@ -131,6 +131,7 @@ serde_json = { version = "1.0.51" }
 toml = "0.5.6"
 chrono = { version = "0.4.6", features = [ "serde" ] }
 hostname = "0.3.1"
+# inwelling = "0.4"
 
 [[bench]]
 name = "bench"
@@ -147,6 +148,12 @@ path = "src/lib.rs"
 [[bin]]
 name = "holochain"
 path = "src/bin/holochain/main.rs"
+
+
+# Needed for lenses
+[package.metadata.inwelling]
+lens-rs_generator = true
+
 
 [features]
 default = ["slow_tests", "glacial_tests", "test_utils", "no-deps", "tx2", "tx5"]

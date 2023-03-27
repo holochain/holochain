@@ -20,6 +20,9 @@ use holochain_serialized_bytes::prelude::*;
 pub mod builder;
 pub mod conversions;
 
+// #[cfg(feature = "lens")]
+use lens_rs::*;
+
 /// Any action with a action_seq less than this value is part of a record
 /// created during genesis. Anything with this seq or higher was created
 /// after genesis.
@@ -32,20 +35,39 @@ pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
 /// are then used to check the integrity of data using cryptographic hash
 /// functions.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, Prism)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(tag = "type")]
 pub enum Action {
     // The first action in a chain (for the DNA) doesn't have a previous action
+    #[optic]
     Dna(Dna),
+
+    #[optic]
     AgentValidationPkg(AgentValidationPkg),
+
+    #[optic]
     InitZomesComplete(InitZomesComplete),
+
+    #[optic]
     CreateLink(CreateLink),
+
+    #[optic]
     DeleteLink(DeleteLink),
+
+    #[optic]
     OpenChain(OpenChain),
+
+    #[optic]
     CloseChain(CloseChain),
+
+    #[optic]
     Create(Create),
+
+    #[optic]
     Update(Update),
+
+    #[optic]
     Delete(Delete),
 }
 
@@ -403,10 +425,16 @@ pub struct EntryDefIndex(pub u8);
 /// The Dna Action is always the first action in a source chain
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct Dna {
+    #[optic]
     pub author: AgentPubKey,
+
+    #[optic]
     pub timestamp: Timestamp,
+
     // No previous action, because DNA is always first chain entry
+    #[optic]
     pub hash: DnaHash,
 }
 
@@ -414,41 +442,76 @@ pub struct Dna {
 /// is allowed to participate in this DNA
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct AgentValidationPkg {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub action_seq: u32,
-    pub prev_action: ActionHash,
+    #[optic]
+    author: AgentPubKey,
 
-    pub membrane_proof: Option<MembraneProof>,
+    #[optic]
+    timestamp: Timestamp,
+
+    #[optic]
+    action_seq: u32,
+
+    #[optic]
+    prev_action: ActionHash,
+
+    #[optic]
+    membrane_proof: Option<MembraneProof>,
 }
 
 /// A action which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct InitZomesComplete {
+    #[optic]
     pub author: AgentPubKey,
+
+    #[optic]
     pub timestamp: Timestamp,
+
+    #[optic]
     pub action_seq: u32,
+
+    #[optic]
     pub prev_action: ActionHash,
 }
 
 /// Declares that a metadata Link should be made between two EntryHashes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct CreateLink<W = RateWeight> {
+    #[optic]
     pub author: AgentPubKey,
+
+    #[optic]
     pub timestamp: Timestamp,
+
+    #[optic]
     pub action_seq: u32,
+
+    #[optic]
     pub prev_action: ActionHash,
 
+    #[optic]
     pub base_address: AnyLinkableHash,
+
+    #[optic]
     pub target_address: AnyLinkableHash,
+
+    #[optic]
     pub zome_index: ZomeIndex,
+
+    #[optic]
     pub link_type: LinkType,
+
+    #[optic]
     pub tag: LinkTag,
 
+    #[optic]
     pub weight: W,
 }
 

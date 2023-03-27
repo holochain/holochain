@@ -20,6 +20,9 @@ pub mod core;
 #[cfg(feature = "test_utils")]
 pub mod fixt;
 
+#[cfg(feature = "test_utils")]
+mod lens_tests;
+
 #[cfg(any(test, feature = "test_utils"))]
 #[deny(missing_docs)]
 pub mod sweettest;

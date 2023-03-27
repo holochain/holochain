@@ -25,5 +25,11 @@ strum_macros = "0.18.0"
 holochain_util = { version = "^0.2.0-beta-rc.0", path = "../../holochain_util" }
 
 [build-dependencies]
+# inwelling = "0.4"
 toml = "0.5"
 walkdir = "2.3.1"
+
+
+# # Needed for lenses
+# [package.metadata.inwelling]
+# lens-rs_generator = true
