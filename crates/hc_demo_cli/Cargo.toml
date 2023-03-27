@@ -20,6 +20,9 @@ tokio = { version = "1.26.0", features = [ "full" ], optional = true }
 tracing = { version = "0.1.37", optional = true }
 tracing-subscriber = { version = "0.3.16", optional = true }
 
+[build-dependencies]
+wasm-opt = "0.112.0"
+
 [features]
 default = [ "build_demo" ]
 

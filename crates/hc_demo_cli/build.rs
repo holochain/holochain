@@ -32,8 +32,10 @@ fn main() {
 }
 
 fn copy_wasm(from: &std::path::Path, to: &std::path::Path) {
-    println!("cargo:warning=HC_DEMO_CLI copy wasm: from: {from:?}, to: {to:?}");
-    std::fs::copy(from, to).unwrap();
+    println!("cargo:warning=HC_DEMO_CLI opt wasm: from: {from:?}, to: {to:?}");
+    wasm_opt::OptimizationOptions::new_optimize_for_size()
+        .run(from, to)
+        .unwrap();
 }
 
 fn build(cargo_cmd: &std::ffi::OsStr, tgt: &str) -> std::path::PathBuf {
