@@ -379,7 +379,10 @@ impl HcWebAppBundle {
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
             Self::Schema => {
-                println!("{}", include_str!("../schema/web-happ-manifest.schema.json"));
+                println!(
+                    "{}",
+                    include_str!("../schema/web-happ-manifest.schema.json")
+                );
             }
         }
         Ok(())

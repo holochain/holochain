@@ -1,16 +1,16 @@
 use assert_cmd::prelude::*;
+use holochain_types::web_app::WebAppManifest;
 use holochain_types::{prelude::*, web_app::WebAppBundle};
 use holochain_util::ffs;
+use jsonschema::JSONSchema;
+use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
     time::Duration,
 };
-use jsonschema::JSONSchema;
-use serde_json::Value;
 use walkdir::WalkDir;
-use holochain_types::web_app::WebAppManifest;
 
 fn read_app(path: &Path) -> anyhow::Result<AppBundle> {
     Ok(AppBundle::decode(&ffs::sync::read(path).unwrap())?)
@@ -265,7 +265,10 @@ async fn test_multi_integrity() {
 fn test_all_dna_manifests_match_schema() {
     let schema = load_schema("dna-manifest");
 
-    for entry in WalkDir::new("./tests/fixtures").into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new("./tests/fixtures")
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let file_name = entry.file_name().to_string_lossy();
         if file_name.eq("dna.yaml") {
             let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
@@ -273,7 +276,7 @@ fn test_all_dna_manifests_match_schema() {
 
             validate_schema(&schema, &manifest, file_name.as_ref());
         }
-    };
+    }
 }
 
 #[test]
@@ -287,7 +290,8 @@ fn test_default_dna_manifest_matches_schema() {
         vec![],
     );
 
-    let default_manifest: Value = serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+    let default_manifest: Value =
+        serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
     let schema = load_schema("dna-manifest");
     validate_schema(&schema, &default_manifest, "default manifest");
@@ -297,7 +301,10 @@ fn test_default_dna_manifest_matches_schema() {
 fn test_all_app_manifests_match_schema() {
     let schema = load_schema("happ-manifest");
 
-    for entry in WalkDir::new("./tests/fixtures").into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new("./tests/fixtures")
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let file_name = entry.file_name().to_string_lossy();
         if file_name.eq("happ.yaml") {
             let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
@@ -305,7 +312,7 @@ fn test_all_app_manifests_match_schema() {
 
             validate_schema(&schema, &manifest, file_name.as_ref());
         }
-    };
+    }
 }
 
 #[test]
@@ -319,7 +326,8 @@ fn test_default_app_manifest_matches_schema() {
         .unwrap()
         .into();
 
-    let default_manifest: Value = serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+    let default_manifest: Value =
+        serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
     let schema = load_schema("happ-manifest");
     validate_schema(&schema, &default_manifest, "default manifest");
@@ -329,7 +337,10 @@ fn test_default_app_manifest_matches_schema() {
 fn test_all_web_app_manifests_match_schema() {
     let schema = load_schema("web-happ-manifest");
 
-    for entry in WalkDir::new("./tests/fixtures").into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new("./tests/fixtures")
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let file_name = entry.file_name().to_string_lossy();
         if file_name.eq("web-happ.yaml") {
             let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
@@ -337,21 +348,23 @@ fn test_all_web_app_manifests_match_schema() {
 
             validate_schema(&schema, &manifest, file_name.as_ref());
         }
-    };
+    }
 }
 
 #[test]
 fn test_default_web_app_manifest_matches_schema() {
     let default_manifest = WebAppManifest::current("test-web-app".to_string());
 
-    let default_manifest: Value = serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+    let default_manifest: Value =
+        serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
     let schema = load_schema("web-happ-manifest");
     validate_schema(&schema, &default_manifest, "default manifest");
 }
 
 fn load_schema(schema_name: &str) -> JSONSchema {
-    let schema_content = ffs::sync::read_to_string(format!("./schema/{}.schema.json", schema_name)).unwrap();
+    let schema_content =
+        ffs::sync::read_to_string(format!("./schema/{}.schema.json", schema_name)).unwrap();
     let schema: Value = serde_json::from_str(schema_content.as_str()).unwrap();
     let schema = JSONSchema::compile(&schema).expect("Schema should be valid");
     schema
