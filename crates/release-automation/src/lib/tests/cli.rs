@@ -1,4 +1,6 @@
-use std::path::PathBuf;
+use std::env::temp_dir;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use crate::changelog::{sanitize, Frontmatter};
 use crate::changelog::{ChangelogT, CrateChangelog, WorkspaceChangelog};
@@ -7,17 +9,43 @@ use crate::crate_selection::ReleaseWorkspace;
 use crate::tests::workspace_mocker::{
     example_workspace_1, example_workspace_1_aggregated_changelog, example_workspace_4,
 };
+use crate::Fallible;
 use anyhow::Context;
+use once_cell::sync::OnceCell;
 use predicates::prelude::*;
 use serde::Deserialize;
 use std::io::Write;
+
+/// uses a shared temporary directory for all Commands that and sets their HOME and CARGO_HOME respectively.
+/// optionally changes the working directory into the given path.
+pub(crate) fn command_pure(
+    program: &str,
+    maybe_cwd: Option<&Path>,
+) -> Fallible<assert_cmd::Command> {
+    static TMP_HOME: once_cell::sync::Lazy<tempfile::TempDir> =
+        once_cell::sync::Lazy::new(|| tempfile::tempdir().unwrap());
+
+    let home = TMP_HOME.path().join("home");
+
+    std::fs::create_dir_all(&home)?;
+
+    let mut cmd = assert_cmd::Command::new(program);
+    cmd.env("HOME", home.as_path())
+        .env("CARGO_HOME", home.join(".cargo"));
+
+    if let Some(cwd) = maybe_cwd {
+        cmd.current_dir(cwd);
+    }
+
+    Ok(cmd)
+}
 
 #[test]
 fn release_createreleasebranch() {
     let workspace_mocker = example_workspace_1().unwrap();
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
     workspace.git_checkout_new_branch("develop").unwrap();
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "release",
@@ -48,7 +76,7 @@ fn release_createreleasebranch_fails_on_dirty_repo() {
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
     workspace.git_checkout_new_branch("develop").unwrap();
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=debug",
@@ -119,7 +147,7 @@ fn bump_versions_on_selection() {
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
     workspace.git_checkout_new_branch("develop").unwrap();
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -334,7 +362,7 @@ fn changelog_aggregation() {
 
     let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -364,7 +392,7 @@ fn release_publish() {
     workspace.git_checkout_new_branch("develop").unwrap();
 
     // simulate a release
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -378,7 +406,7 @@ fn release_publish() {
     println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1,);
 
     // publish
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -405,7 +433,7 @@ fn post_release_version_bumps() {
     workspace.git_checkout_new_branch("develop").unwrap();
 
     // simulate a release
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -422,7 +450,7 @@ fn post_release_version_bumps() {
     let output = assert_cmd_success!(cmd);
     println!("stderr:\n'{}'\n---\nstdout:\n'{}'\n---", output.0, output.1,);
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace.root().display()),
         "--log-level=trace",
@@ -498,6 +526,7 @@ fn multiple_subsequent_releases() {
     for (
         i,
         (
+            description,
             expected_versions,
             expected_crates,
             allowed_missing_dependencies,
@@ -506,8 +535,7 @@ fn multiple_subsequent_releases() {
         ),
     ) in [
         (
-            // bump the first time as they're initially released
-            // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
+            "bump the first time as they're initially released",
             vec!["0.0.0", "0.1.0", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -516,8 +544,7 @@ fn multiple_subsequent_releases() {
             Box::new(|_| {}) as F,
         ),
         (
-            // should not bump the second time without making any changes
-            // vec!["0.0.2-dev.0", "0.0.3-dev.0", "0.0.2-dev.0"],
+            "should not bump the second time without making any changes",
             vec!["0.0.0", "0.1.0", "0.0.1"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -526,7 +553,7 @@ fn multiple_subsequent_releases() {
             Box::new(|_| {}) as F,
         ),
         (
-            // only crate_a and crate_e have changed, expect these to be bumped
+            "only crate_a and crate_e have changed, expect these to be bumped",
             vec!["0.0.0", "0.1.1", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // crate_b won't be part of the release so we allow it to be missing as we're not publishing
@@ -552,7 +579,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // change crate_b, and as crate_a depends on crate_b it'll be bumped as well
+            "change crate_b, and as crate_a depends on crate_b it'll be bumped as well",
             vec!["0.0.1", "0.1.2", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -577,7 +604,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // add a pre-release for crate_b
+            "add a pre-release for crate_b",
             vec!["1.0.0-rc.0", "0.1.3", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -618,7 +645,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // do another pre-release for crate_b
+            "do another pre-release for crate_b",
             vec!["1.0.0-rc.1", "0.1.4", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -643,7 +670,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // do major release for crate_b
+            "do major release for crate_b",
             vec!["1.0.0", "0.1.5", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -684,7 +711,7 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            // and a default patch release for crate_b again
+            "and a default patch release for crate_b again",
             vec!["1.0.1", "0.1.6", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
@@ -743,7 +770,8 @@ fn multiple_subsequent_releases() {
 
             workspace.git_checkout_branch("develop", true).unwrap();
 
-            let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+            let mut cmd =
+                command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
             let cmd = cmd.args(&[
                 &format!("--workspace-path={}", workspace.root().display()),
                 "--log-level=trace",
@@ -775,7 +803,8 @@ fn multiple_subsequent_releases() {
             assert_eq!(
                 expected_versions,
                 &get_crate_versions(expected_crates, &workspace),
-                "{}",
+                "{} ({})",
+                description,
                 i
             );
 
@@ -862,7 +891,7 @@ fn apply_dev_versions_works() {
 
     assert_eq!(get_crate_a_version(), "0.0.1");
 
-    let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+    let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
     let cmd = cmd.args(&[
         &format!("--workspace-path={}", workspace_mocker.root().display()),
         "--log-level=debug",
@@ -907,13 +936,14 @@ fn release_dry_run_fails_on_unallowed_conditions() {
 
         workspace.git_add_all_and_commit("msg", None).unwrap();
 
-        let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+        let mut cmd = command_pure("release-automation", Some(&workspace_mocker.root())).unwrap();
         let cmd = cmd.args(&[
             &format!("--workspace-path={}", workspace.root().display()),
             &format!("--match-filter={}", member),
             "--log-level=debug",
             "release",
             "--dry-run",
+            "--allowed-semver-increment-modes=patch",
             "--steps=BumpReleaseVersions",
         ]);
 

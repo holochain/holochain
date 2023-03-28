@@ -1543,7 +1543,11 @@ mod tests {
                 .write_all(format!("\n{}\n", FRONTMATTER_VALUE).as_bytes())
                 .unwrap();
 
-            let mut cmd = assert_cmd::Command::cargo_bin("release-automation").unwrap();
+            let mut cmd = crate::tests::cli::command_pure(
+                "release-automation",
+                Some(&workspace_mocker.root()),
+            )
+            .unwrap();
             let cmd = cmd.args(&[
                 &format!("--workspace-path={}", workspace.root().display()),
                 "--log-level=trace",

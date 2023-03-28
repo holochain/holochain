@@ -52,15 +52,14 @@ rec {
       ++ [
       cargo-nextest
     ]
-    ++ (with holonix.pkgs;[
+      ++ (with holonix.pkgs;[
       sqlcipher
       gdb
       gh
       nixpkgs-fmt
       cargo-sweep
-      go
     ])
-    ++ (lib.optionals stdenv.isDarwin
+      ++ (lib.optionals stdenv.isDarwin
       (with holonix.pkgs.darwin; [
         Security
         IOKit
