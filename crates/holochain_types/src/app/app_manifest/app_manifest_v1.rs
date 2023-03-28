@@ -423,14 +423,14 @@ roles:
             manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
+        assert_eq!(
+            manifest.roles[3].dna.modifiers.network_seed.as_ref(),
+            Some(&network_seed)
+        );
 
         // - The others do not.
         assert_ne!(
             manifest.roles[2].dna.modifiers.network_seed.as_ref(),
-            Some(&network_seed)
-        );
-        assert_ne!(
-            manifest.roles[3].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
     }
