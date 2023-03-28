@@ -21,14 +21,21 @@ tokio = { version = "1.26.0", features = [ "full" ], optional = true }
 tracing = { version = "0.1.37", optional = true }
 tracing-subscriber = { version = "0.3.16", optional = true }
 
-[build-dependencies]
+# Special config for when we're in build_wasm mode
+[target.'cfg(build_wasm)'.build-dependencies]
 flate2 = "1.0.25"
 wasm-opt = "0.112.0"
 
 [features]
 default = [ "build_demo" ]
 
+# The default demo feature builds the actual demo lib / executable.
 build_demo = [ "clap", "flate2", "hdi", "hdk", "serde", "tokio", "holochain", "holochain_types", "holochain/test_utils", "holochain/tx5", "holochain_keystore", "rand", "rand-utf8", "tracing", "tracing-subscriber" ]
 
+# You probably won't use this directly, it is used by build.rs when
+# cfg(build_wasm) is enabled.
 build_integrity_wasm = [ "hdi", "serde" ]
+
+# You probably won't use this directly, it is used by build.rs when
+# cfg(build_wasm) is enabled.
 build_coordinator_wasm = [ "hdi", "hdk", "serde" ]

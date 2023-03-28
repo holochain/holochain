@@ -1,12 +1,11 @@
+#[cfg(not(build_wasm))]
+fn main() {}
+
+#[cfg(build_wasm)]
 fn main() {
     println!("cargo:rerun-if-env-changed=HC_DEMO_CLI_INCEPTION");
-    println!("cargo:rerun-if-env-changed=HC_DEMO_CLI_REBUILD_WASM");
 
     if std::env::var_os("HC_DEMO_CLI_INCEPTION").is_some() {
-        return;
-    }
-
-    if std::env::var_os("HC_DEMO_CLI_REBUILD_WASM").is_none() {
         return;
     }
 
@@ -17,6 +16,7 @@ fn main() {
     build(cargo_cmd, "coordinator");
 }
 
+#[cfg(build_wasm)]
 fn build(cargo_cmd: &std::ffi::OsStr, tgt: &str) {
     let target_dir =
         std::env::var_os("CARGO_TARGET_DIR").expect("failed to locate cargo target directory");
