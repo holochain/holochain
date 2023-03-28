@@ -716,7 +716,7 @@ async fn test_enable_disable_enable_clone_cell() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn name_has_no_effect_on_dna_hash() {
-    holochain_trace::test_run().ok();
+    observability::test_run().ok();
     let mut conductor = SweetConductor::from_standard_config().await;
     let (agent1, agent2, agent3) = SweetAgents::three(conductor.keystore()).await;
     let dna = SweetDnaFile::unique_empty().await;
