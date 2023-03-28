@@ -7,5 +7,5 @@ async fn main() -> anyhow::Result<()> {
         holochain_trace::init_fmt(holochain_trace::Output::Log).ok();
     }
     let cli = hc::Cli::parse();
-    cli.run().await
+    cli.subcommand.run().await
 }

@@ -75,7 +75,7 @@ fn builtin_commands() -> Vec<String> {
 pub struct Cli {
     /// The `hc` subcommand to run.
     #[command(subcommand)]
-    command: CliCommand,
+    pub subcommand: CliCommand,
 }
 
 /// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`.
@@ -94,10 +94,10 @@ pub enum CliCommand {
     External(Vec<String>),
 }
 
-impl Cli {
+impl CliCommand {
     /// Run this command.
     pub async fn run(self) -> anyhow::Result<()> {
-        match self.command {
+        match self {
             CliCommand::App(cmd) => cmd.command.run().await?,
             CliCommand::Dna(cmd) => cmd.command.run().await?,
             CliCommand::WebApp(cmd) => cmd.command.run().await?,
