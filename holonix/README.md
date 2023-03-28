@@ -49,7 +49,7 @@ as an exmaple, here is a _flake.nix_ that references a custom branch.
 }
 ```
 
-this exmaple would translate to the following CLI invocatin
+this example would translate to the following CLI invocation
 
 ```shell=
 nix develop \
