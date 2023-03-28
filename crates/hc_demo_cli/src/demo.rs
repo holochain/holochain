@@ -11,10 +11,10 @@ use hdk::prelude::*;
 super::wasm_common!();
 
 /// hc_demo_cli integrity wasm bytes
-pub const INTEGRITY_WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/integrity.wasm"));
+pub const INTEGRITY_WASM_GZ: &[u8] = include_bytes!("integrity.wasm.gz");
 
 /// hc_demo_cli coordinator wasm bytes
-pub const COORDINATOR_WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/coordinator.wasm"));
+pub const COORDINATOR_WASM_GZ: &[u8] = include_bytes!("coordinator.wasm.gz");
 
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -87,14 +87,28 @@ pub async fn run_demo(opts: RunOpts) {
 }
 
 async fn gen_dna_file(output: std::path::PathBuf) {
+    let mut i_wasm = Vec::new();
+    std::io::Read::read_to_end(
+        &mut flate2::read::GzDecoder::new(std::io::Cursor::new(INTEGRITY_WASM_GZ)),
+        &mut i_wasm,
+    )
+    .unwrap();
+
     let i_wasm = DnaWasmHashed::from_content(DnaWasm {
-        code: Arc::new(INTEGRITY_WASM.to_vec().into_boxed_slice()),
+        code: Arc::new(i_wasm.into_boxed_slice()),
     })
     .await;
     let i_zome = IntegrityZomeDef::from(ZomeDef::Wasm(WasmZome::new(i_wasm.hash.clone())));
 
+    let mut c_wasm = Vec::new();
+    std::io::Read::read_to_end(
+        &mut flate2::read::GzDecoder::new(std::io::Cursor::new(COORDINATOR_WASM_GZ)),
+        &mut c_wasm,
+    )
+    .unwrap();
+
     let c_wasm = DnaWasmHashed::from_content(DnaWasm {
-        code: Arc::new(COORDINATOR_WASM.to_vec().into_boxed_slice()),
+        code: Arc::new(c_wasm.into_boxed_slice()),
     })
     .await;
     let c_zome = CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome::new(c_wasm.hash.clone())));
@@ -121,6 +135,10 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     let dna_file: UnsafeBytes = dna_file.try_into().unwrap();
     let dna_file: Vec<u8> = dna_file.into();
 
+    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+    std::io::Write::write_all(&mut gz, &dna_file).unwrap();
+    let dna_file = gz.finish().unwrap();
+
     if output == std::path::PathBuf::from("-") {
         tokio::io::AsyncWriteExt::write_all(&mut tokio::io::stdout(), &dna_file)
             .await
@@ -134,7 +152,24 @@ async fn run(dna: std::path::PathBuf, inbox: std::path::PathBuf, outbox: std::pa
     let _ = tokio::fs::create_dir_all(&inbox).await;
     let _ = tokio::fs::create_dir_all(&outbox).await;
 
-    let dna: UnsafeBytes = tokio::fs::read(dna).await.unwrap().into();
+    let dna_gz = if dna.to_string_lossy() == "-" {
+        let mut dna_gz = Vec::new();
+        tokio::io::AsyncReadExt::read_to_end(&mut tokio::io::stdin(), &mut dna_gz)
+            .await
+            .unwrap();
+        dna_gz
+    } else {
+        tokio::fs::read(dna).await.unwrap()
+    };
+
+    let mut dna = Vec::new();
+    std::io::Read::read_to_end(
+        &mut flate2::read::GzDecoder::new(std::io::Cursor::new(dna_gz)),
+        &mut dna,
+    )
+    .unwrap();
+
+    let dna: UnsafeBytes = dna.into();
     let dna: SerializedBytes = dna.try_into().unwrap();
     let dna: DnaFile = dna.try_into().unwrap();
 
