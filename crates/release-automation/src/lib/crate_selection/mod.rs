@@ -893,9 +893,10 @@ impl<'a> ReleaseWorkspace<'a> {
                                     insert_state!(CrateStateFlags::HasPreviousRelease);
 
                                     // todo: make comparison ref configurable
-                                    if !changed_files(member.package.root(), &git_tag, "HEAD")?
-                                        .is_empty()
+                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD")?;
+                                    if !changed_files.is_empty()
                                     {
+                                        debug!("[{}] changed files since {git_tag}: {changed_files:?}", member.name());
                                         insert_state!(CrateStateFlags::ChangedSincePreviousRelease)
                                     }
                                 } else {
@@ -909,16 +910,7 @@ impl<'a> ReleaseWorkspace<'a> {
 
                     // dependency state
                     // only dependencies of explicitly matched packages are considered here.
-                    //
-                    // note(steveej):
-                    // while trying to signal the inclusion of reverse dependencies it eventually occurred to me
-                    // that only considering the crates in the dependency trees that start with a selected package is preferred.
-                    // even if a reverse dependency of a matched package is changed during the release (by having its dependency version updated),
-                    // its not relevant to the release if it hasn't been requested for release excplicitly or as a dependency of one that has been, in which case it is already considered.
-                    // if get_state!(member.name()).is_matched() && !get_state!(member.name()).blocked()
                     if get_state!(member.name()).is_matched()
-                        && get_state!(member.name()).changed()
-                        && !get_state!(member.name()).blocked()
                     {
                         for (_, deps) in member.dependencies_in_workspace()? {
                             for dep in deps {
