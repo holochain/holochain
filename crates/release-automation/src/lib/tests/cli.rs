@@ -531,6 +531,7 @@ fn multiple_subsequent_releases() {
             expected_crates,
             allowed_missing_dependencies,
             expect_new_release,
+            maybe_match_filter,
             pre_release_fn,
         ),
     ) in [
@@ -541,6 +542,7 @@ fn multiple_subsequent_releases() {
             // allowed missing dependencies
             Vec::<&str>::new(),
             true,
+            None,
             Box::new(|_| {}) as F,
         ),
         (
@@ -550,6 +552,7 @@ fn multiple_subsequent_releases() {
             // allowed missing dependencies
             Vec::<&str>::new(),
             false,
+            None,
             Box::new(|_| {}) as F,
         ),
         (
@@ -559,6 +562,7 @@ fn multiple_subsequent_releases() {
             // crate_b won't be part of the release so we allow it to be missing as we're not publishing
             vec!["crate_b"],
             true,
+            None,
             Box::new(|args: A| {
                 let root = args.0;
 
@@ -579,12 +583,13 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            "change crate_b, and as crate_a depends on crate_b it'll be bumped as well",
+            "matching only crate_a, a change of its dependency crate_b leads to a bump in both",
             vec!["0.0.1", "0.1.2", "0.0.2"],
             vec!["crate_b", "crate_a", "crate_e"],
             // allowed missing dependencies
             vec![],
             true,
+            Some("crate_a"),
             Box::new(|args: A| {
                 let root = args.0;
 
@@ -610,6 +615,7 @@ fn multiple_subsequent_releases() {
             // allowed missing dependencies
             vec![],
             true,
+            None,
             Box::new(|args: A| {
                 let root = args.0;
 
@@ -651,6 +657,7 @@ fn multiple_subsequent_releases() {
             // allowed missing dependencies
             vec![],
             true,
+            None,
             Box::new(|args: A| {
                 let root = args.0;
 
@@ -676,6 +683,7 @@ fn multiple_subsequent_releases() {
             // allowed missing dependencies
             vec![],
             true,
+            None,
             Box::new(|args: A| {
                 let root = args.0;
 
@@ -717,6 +725,7 @@ fn multiple_subsequent_releases() {
             // allowed missing dependencies
             vec![],
             true,
+            None,
             Box::new(|args: A| {
                 let root = args.0;
 
@@ -755,6 +764,8 @@ fn multiple_subsequent_releases() {
                 .collect(),
         ));
 
+        let match_filter = maybe_match_filter.unwrap_or("crate_(a|b|e)");
+
         let topmost_release_title_pre = {
             let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
             let topmost_release_title_pre = match workspace
@@ -775,7 +786,7 @@ fn multiple_subsequent_releases() {
             let cmd = cmd.args(&[
                 &format!("--workspace-path={}", workspace.root().display()),
                 "--log-level=trace",
-                "--match-filter=crate_(a|b|e)",
+                &format!("--match-filter={match_filter}"),
                 "release",
                 &format!(
                     "--cargo-target-dir={}",

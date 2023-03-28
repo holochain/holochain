@@ -319,7 +319,13 @@ pub fn example_workspace_1_aggregated_changelog() -> String {
     ))
 }
 
-/// A workspace with four crates to test changelogs and change detection.
+/// A workspace to test changelogs and change detection.
+/// crate_a -> crate_b
+/// crate_b -> []
+/// crate_c -> []
+/// crate_d -> []
+/// crate_e -> []
+/// crate_f -> []
 pub fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
     use crate::tests::workspace_mocker::{self, MockProject, WorkspaceMocker};
 

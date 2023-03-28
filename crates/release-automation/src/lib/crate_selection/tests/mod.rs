@@ -70,6 +70,8 @@ fn release_selection() {
     let workspace =
         ReleaseWorkspace::try_new_with_criteria(workspace_mocker.root(), criteria).unwrap();
 
+    // TODO: verify that a crate can be selected by being an unmatched, changed crate that's a dependency of a matched, unchanged crate.
+
     let selection = workspace
         .release_selection()
         .unwrap()
