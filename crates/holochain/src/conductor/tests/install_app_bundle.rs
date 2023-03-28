@@ -462,7 +462,6 @@ impl TestCase {
             .await
             .unwrap();
 
-
         let installed_hash = app.all_cells().next().unwrap().dna_hash().clone();
         (installed_hash, case)
     }
