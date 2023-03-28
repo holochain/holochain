@@ -40,7 +40,7 @@ pub struct Call {
     /// Ports to running conductor admin interfaces.
     /// If this is empty existing sandboxes will be used.
     /// Cannot be combined with existing sandboxes.
-    #[arg(short, long, conflicts_with_all = &["existing-paths", "indices"], value_delimiter = ',')]
+    #[arg(short, long, conflicts_with_all = &["existing_paths", "indices"], value_delimiter = ',')]
     pub running: Vec<u16>,
 
     #[command(flatten)]
