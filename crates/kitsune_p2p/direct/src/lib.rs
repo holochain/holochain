@@ -29,7 +29,9 @@ pub mod dependencies {
     pub use futures;
     pub use kitsune_p2p;
     pub use kitsune_p2p_types;
-    pub use kitsune_p2p_types::dependencies::{ghost_actor::dependencies::tracing, observability};
+    pub use kitsune_p2p_types::dependencies::{
+        ghost_actor::dependencies::tracing, holochain_trace,
+    };
     pub use serde_json;
 }
 

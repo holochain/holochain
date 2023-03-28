@@ -39,7 +39,7 @@ fn pass_redundancy(stats: &Stats, redundancy_target: f64) -> bool {
 #[ignore = "Not suitable for ci"]
 fn single_agent_convergence_debug() {
     std::env::set_var("RUST_LOG", "debug");
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let n = 1000;
     let redundancy = 100;
@@ -112,7 +112,7 @@ pub fn run_report(
 #[cfg(feature = "slow_tests")]
 fn parameterized_battery() {
     std::env::set_var("RUST_LOG", "info");
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     use std::collections::HashSet;
 
     let n = 100;
@@ -176,7 +176,7 @@ fn parameterized_battery() {
 #[ignore = "Not suitable for ci"]
 fn parameterized_stability_test() {
     std::env::set_var("RUST_LOG", "debug");
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let mut rng = seeded_rng(None);
 
@@ -212,7 +212,7 @@ fn parameterized_stability_test() {
 #[test]
 #[ignore = "Not suitable for ci"]
 fn test_peer_view_beta() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let mut rng = seeded_rng(None);
 

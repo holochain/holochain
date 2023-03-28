@@ -10,7 +10,7 @@ use kitsune_p2p_types::tx2::tx2_utils::*;
 
 /// init tracing
 pub fn init_tracing() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 }
 
 /// kdirect version harness specifier

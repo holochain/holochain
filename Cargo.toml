@@ -20,6 +20,7 @@ members = [
   "crates/holochain_sqlite",
   "crates/holochain_state",
   "crates/holochain_sqlite",
+  "crates/holochain_trace",
   "crates/holochain_websocket",
   "crates/holochain_util",
 
@@ -66,6 +67,7 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
+# tx5 = { path = "../tx5/crates/tx5" }
 # tx5 = { git = "https://github.com/holochain/tx5.git", rev = "da4cc7ea3cbb53b12e15ab0932a0ad14fdd41659" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "da4cc7ea3cbb53b12e15ab0932a0ad14fdd41659" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
@@ -74,9 +76,7 @@ codegen-units = 16
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
-# observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
-# ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
-# ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
+#ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 #lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 #lair_keystore = { path = "../lair/crates/lair_keystore" }
 #lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
@@ -84,5 +84,4 @@ codegen-units = 16
 #lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }
 #lair_keystore_api_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_api" }
 #lair_keystore_client_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_client" }
-# observability = { path = "../../rust/observability" }
 # r2d2_sqlite = { path = "../r2d2-sqlite" }

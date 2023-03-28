@@ -657,21 +657,18 @@ pub fn insert_entry(
             access,
             functions: _,
         }) => {
-            cap_access = match access {
-                CapAccess::Unrestricted => Some("unrestricted"),
-                CapAccess::Transferable { secret } => {
-                    cap_secret = Some(to_blob(secret)?);
-                    Some("transferable")
-                }
+            cap_secret = match access {
+                CapAccess::Unrestricted => None,
+                CapAccess::Transferable { secret } => Some(to_blob(secret)?),
                 CapAccess::Assigned {
                     secret,
                     assignees: _,
                 } => {
-                    cap_secret = Some(to_blob(secret)?);
+                    Some(to_blob(secret)?)
                     // TODO: put assignees in when we merge in BHashSet from develop.
-                    Some("assigned")
                 }
             };
+            cap_access = Some(access.as_variant_string());
             // TODO: put functions in when we merge in BHashSet from develop.
             Some(tag.clone())
         }
@@ -730,15 +727,10 @@ pub fn unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutatio
     Ok(())
 }
 
-pub fn delete_all_ephemeral_scheduled_fns(
-    txn: &mut Transaction,
-    author: &AgentPubKey,
-) -> StateMutationResult<()> {
+pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute(
         holochain_sqlite::sql::sql_cell::schedule::DELETE_ALL_EPHEMERAL,
-        named_params! {
-            ":author" : author,
-        },
+        named_params! {},
     )?;
     Ok(())
 }
