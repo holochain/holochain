@@ -7,6 +7,10 @@ use std::{
     str::FromStr,
     time::Duration,
 };
+use jsonschema::JSONSchema;
+use serde_json::Value;
+use walkdir::WalkDir;
+use holochain_types::web_app::WebAppManifest;
 
 fn read_app(path: &Path) -> anyhow::Result<AppBundle> {
     Ok(AppBundle::decode(&ffs::sync::read(path).unwrap())?)
@@ -255,4 +259,111 @@ async fn test_multi_integrity() {
         &["zome1".into(), "zome2".into()]
     );
     assert_eq!(*dna.dna_def(), expected);
+}
+
+#[test]
+fn test_all_dna_manifests_match_schema() {
+    let schema = load_schema("dna-manifest");
+
+    for entry in WalkDir::new("./tests/fixtures").into_iter().filter_map(|e| e.ok()) {
+        let file_name = entry.file_name().to_string_lossy();
+        if file_name.eq("dna.yaml") {
+            let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
+            let manifest: Value = serde_yaml::from_str(manifest_content.as_str()).unwrap();
+
+            validate_schema(&schema, &manifest, file_name.as_ref());
+        }
+    };
+}
+
+#[test]
+fn test_default_dna_manifest_matches_schema() {
+    let default_manifest = DnaManifest::current(
+        "test-dna".to_string(),
+        Some("00000000-0000-0000-0000-000000000000".to_string()),
+        None,
+        Timestamp::now().into(),
+        vec![],
+        vec![],
+    );
+
+    let default_manifest: Value = serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+
+    let schema = load_schema("dna-manifest");
+    validate_schema(&schema, &default_manifest, "default manifest");
+}
+
+#[test]
+fn test_all_app_manifests_match_schema() {
+    let schema = load_schema("happ-manifest");
+
+    for entry in WalkDir::new("./tests/fixtures").into_iter().filter_map(|e| e.ok()) {
+        let file_name = entry.file_name().to_string_lossy();
+        if file_name.eq("happ.yaml") {
+            let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
+            let manifest: Value = serde_yaml::from_str(manifest_content.as_str()).unwrap();
+
+            validate_schema(&schema, &manifest, file_name.as_ref());
+        }
+    };
+}
+
+#[test]
+fn test_default_app_manifest_matches_schema() {
+    let role = AppRoleManifest::sample("sample-role".into());
+    let default_manifest: AppManifest = AppManifestCurrentBuilder::default()
+        .name("test-app".to_string())
+        .description(None)
+        .roles(vec![role])
+        .build()
+        .unwrap()
+        .into();
+
+    let default_manifest: Value = serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+
+    let schema = load_schema("happ-manifest");
+    validate_schema(&schema, &default_manifest, "default manifest");
+}
+
+#[test]
+fn test_all_web_app_manifests_match_schema() {
+    let schema = load_schema("web-happ-manifest");
+
+    for entry in WalkDir::new("./tests/fixtures").into_iter().filter_map(|e| e.ok()) {
+        let file_name = entry.file_name().to_string_lossy();
+        if file_name.eq("web-happ.yaml") {
+            let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
+            let manifest: Value = serde_yaml::from_str(manifest_content.as_str()).unwrap();
+
+            validate_schema(&schema, &manifest, file_name.as_ref());
+        }
+    };
+}
+
+#[test]
+fn test_default_web_app_manifest_matches_schema() {
+    let default_manifest = WebAppManifest::current("test-web-app".to_string());
+
+    let default_manifest: Value = serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+
+    let schema = load_schema("web-happ-manifest");
+    validate_schema(&schema, &default_manifest, "default manifest");
+}
+
+fn load_schema(schema_name: &str) -> JSONSchema {
+    let schema_content = ffs::sync::read_to_string(format!("./schema/{}.schema.json", schema_name)).unwrap();
+    let schema: Value = serde_json::from_str(schema_content.as_str()).unwrap();
+    let schema = JSONSchema::compile(&schema).expect("Schema should be valid");
+    schema
+}
+
+fn validate_schema(schema: &JSONSchema, manifest: &Value, context: &str) {
+    let result = schema.validate(&manifest);
+    if let Err(errors) = result {
+        for error in errors {
+            println!("Validation error: {}", error);
+            println!("At path: {}", error.instance_path);
+        }
+        panic!("There were schema validation errors for {}", context);
+    }
 }
