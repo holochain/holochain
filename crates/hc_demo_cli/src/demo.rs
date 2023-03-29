@@ -37,7 +37,7 @@ use std::sync::Arc;
 pub struct RunOpts {
     /// The subcommand to run.
     #[command(subcommand)]
-    command: RunCmd,
+    pub command: RunCmd,
 }
 
 impl RunOpts {
