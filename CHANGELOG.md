@@ -6,6 +6,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230329.130319
+
+## [holochain\_cli-0.2.0-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain-0.2.0-beta-rc.1](crates/holochain/CHANGELOG.md#0.2.0-beta-rc.1)
+
+- Fixes bug where supplying a `network_seed` during an `InstallApp` call does not actually update the network seed for roles whose `provisioning` is set to `None` in the manifest. Now the network seed is correctly updated. [\#2102](https://github.com/holochain/holochain/pull/2102)
+
+## [holochain\_websocket-0.2.0-beta-rc.1](crates/holochain_websocket/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_test\_wasm\_common-0.2.0-beta-rc.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_conductor\_api-0.2.0-beta-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_wasm\_test\_utils-0.2.0-beta-rc.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_cascade-0.2.0-beta-rc.1](crates/holochain_cascade/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_state-0.2.0-beta-rc.1](crates/holochain_state/CHANGELOG.md#0.2.0-beta-rc.1)
+
+- Optimize capability grant verification during zome calls. This speeds up all remote calls, under which fall calls with a cap secret from clients other than the Launcher. Previously hundreds of calls would slow down response time noticeably because of grant verification. Now thousands of calls (rather thousands of records) won’t affect grant verification by more than a millisecond. [\#2097](https://github.com/holochain/holochain/pull/2097)
+
+## [holochain\_p2p-0.2.0-beta-rc.1](crates/holochain_p2p/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_bootstrap-0.1.0-beta-rc.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_types-0.2.0-beta-rc.1](crates/holochain_types/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_keystore-0.2.0-beta-rc.1](crates/holochain_keystore/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_sqlite-0.2.0-beta-rc.1](crates/holochain_sqlite/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p-0.2.0-beta-rc.1](crates/kitsune_p2p/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_proxy-0.2.0-beta-rc.1](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_transport\_quic-0.2.0-beta-rc.1](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_fetch-0.2.0-beta-rc.1](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_types-0.2.0-beta-rc.1](crates/kitsune_p2p_types/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [hdk-0.2.0-beta-rc.1](crates/hdk/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_zome\_types-0.2.0-beta-rc.1](crates/holochain_zome_types/CHANGELOG.md#0.2.0-beta-rc.1)
+
+- `name` in DnaDef no longer has an effect on the DNA hash [\#2099](https://github.com/holochain/holochain/pull/2099)
+
+## [kitsune\_p2p\_dht-0.2.0-beta-rc.1](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_block-0.2.0-beta-rc.1](crates/kitsune_p2p_block/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_bin\_data-0.2.0-beta-rc.1](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [hdi-0.3.0-beta-rc.1](crates/hdi/CHANGELOG.md#0.3.0-beta-rc.1)
+
+## [hdk\_derive-0.2.0-beta-rc.1](crates/hdk_derive/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_integrity\_types-0.2.0-beta-rc.1](crates/holochain_integrity_types/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holo\_hash-0.2.0-beta-rc.1](crates/holo_hash/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_dht\_arc-0.2.0-beta-rc.1](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_trace-0.2.0-beta-rc.1](crates/holochain_trace/CHANGELOG.md#0.2.0-beta-rc.1)
+
 # 20230315.183209
 
 ## [holochain\_cli-0.2.0-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.0)
