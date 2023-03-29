@@ -497,6 +497,57 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn storage_info_for_one_app() {
+        holochain_trace::test_run().ok();
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+
+        // warm the zome
+        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+
+        let dna_hash = dna.dna_hash().clone();
+        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
+
+        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
+
+        let msg = AppRequest::StorageInfo {
+            installed_app_id: Some("test app".to_string()),
+        };
+        let msg = msg.try_into().unwrap();
+        let respond = move |bytes: SerializedBytes| {
+            let response: AppResponse = bytes.try_into().unwrap();
+            match response {
+                AppResponse::StorageInfo(info) => {
+                    assert_eq!(info.app_storage_info.len(), 1);
+                    let app_info = info.app_storage_info.first().unwrap();
+                    assert_eq!(app_info.installed_app_id, "test app");
+                    // App has two zomes but only one DNA/Cell
+                    assert_eq!(app_info.cell_storage_info.len(), 1);
+                    let cell_info = app_info.cell_storage_info.first().unwrap();
+                    assert_eq!(cell_info.cell_id, cell_id);
+                    assert!(cell_info.authored_data_size > 12000);
+                    assert!(cell_info.authored_data_size_on_disk > 114000);
+                    assert!(cell_info.dht_data_size > 12000);
+                    assert!(cell_info.dht_data_size_on_disk > 114000);
+                }
+                other => panic!("unexpected response {:?}", other),
+            }
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, app_api).await.unwrap();
+
+        handle.shutdown().await.unwrap().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn enable_disable_enable_app() {
         holochain_trace::test_run().ok();
         let agent_key = fake_agent_pubkey_1();
