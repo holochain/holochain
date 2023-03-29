@@ -70,6 +70,12 @@ pub enum AppRequest {
 
     /// Info about networking processes
     NetworkInfo(Box<NetworkInfoRequestPayload>),
+
+    /// Info about storage used by apps
+    StorageInfo {
+        /// If specified, the app ID for which to get storage information
+        installed_app_id: Option<InstalledAppId>,
+    },
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -112,6 +118,9 @@ pub enum AppResponse {
 
     /// NetworkInfo is returned
     NetworkInfo(Vec<NetworkInfo>),
+
+    /// StorageInfo is returned
+    StorageInfo(StorageInfo),
 }
 
 /// The data provided over an app interface in order to make a zome call
@@ -429,6 +438,27 @@ impl From<AppInfoStatus> for AppStatus {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct NetworkInfo {
     pub fetch_pool_info: FetchPoolInfo,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct CellStorageInfo {
+    // TODO include a friendly identifier for the cell?
+    pub cell_id: CellId,
+    pub authored_data_size: usize,
+    pub authored_data_size_on_disk: usize,
+    pub dht_data_size: usize,
+    pub dht_data_size_on_disk: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct AppStorageInfo {
+    pub installed_app_id: InstalledAppId,
+    pub cell_storage_info: Vec<CellStorageInfo>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct StorageInfo {
+    pub app_storage_info: Vec<AppStorageInfo>,
 }
 
 #[test]
