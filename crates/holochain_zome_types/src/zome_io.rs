@@ -194,6 +194,7 @@ pub enum ZomeCallAuthorization {
     BadSignature,
     BadCapGrant,
     BadNonce(String),
+    BlockedProvenance,
 }
 
 impl std::fmt::Display for ZomeCallAuthorization {

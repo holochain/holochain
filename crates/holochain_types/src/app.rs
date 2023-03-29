@@ -612,15 +612,21 @@ impl InstalledAppCommon {
 
     /// Disable a clone cell.
     ///
-    /// Removes the cell from the list of clones, and it is not accessible any
-    /// longer.
+    /// Removes the cell from the list of clones, so it is not accessible any
+    /// longer. If the cell is already disabled, do nothing and return Ok.
     pub fn disable_clone_cell(&mut self, clone_id: &CloneId) -> AppResult<()> {
         let app_role_assignment = self.role_mut(&clone_id.as_base_role_name())?;
         // remove clone from role's clones map
         match app_role_assignment.clones.remove(clone_id) {
-            None => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
-                clone_id.to_owned(),
-            ))),
+            None => {
+                if app_role_assignment.disabled_clones.contains_key(clone_id) {
+                    Ok(())
+                } else {
+                    Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
+                        clone_id.to_owned(),
+                    )))
+                }
+            }
             Some(cell_id) => {
                 // insert clone into disabled clones map
                 let insert_result = app_role_assignment
@@ -635,11 +641,10 @@ impl InstalledAppCommon {
         }
     }
 
-    /// Transformer
     /// Enable a disabled clone cell.
     ///
     /// The clone cell is added back to the list of clones and can be accessed
-    /// again.
+    /// again. If the cell is already enabled, do nothing and return Ok.
     ///
     /// # Returns
     /// The enabled clone cell.
@@ -647,9 +652,21 @@ impl InstalledAppCommon {
         let app_role_assignment = self.role_mut(&clone_id.as_base_role_name())?;
         // remove clone from disabled clones map
         match app_role_assignment.disabled_clones.remove(clone_id) {
-            None => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
-                clone_id.to_owned(),
-            ))),
+            None => app_role_assignment
+                .clones
+                .get(clone_id)
+                .cloned()
+                .map(|cell_id| {
+                    Ok(InstalledCell {
+                        role_name: clone_id.as_app_role_name().to_owned(),
+                        cell_id,
+                    })
+                })
+                .unwrap_or_else(|| {
+                    Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
+                        clone_id.to_owned(),
+                    )))
+                }),
             Some(cell_id) => {
                 // insert clone back into role's clones map
                 let insert_result = app_role_assignment
@@ -670,12 +687,19 @@ impl InstalledAppCommon {
     /// Delete a disabled clone cell.
     pub fn delete_clone_cell(&mut self, clone_id: &CloneId) -> AppResult<()> {
         let app_role_assignment = self.role_mut(&clone_id.as_base_role_name())?;
-        match app_role_assignment.disabled_clones.remove(clone_id) {
-            None => Err(AppError::CloneCellNotFound(CloneCellId::CloneId(
-                clone_id.to_owned(),
-            ))),
-            Some(_) => Ok(()),
-        }
+        app_role_assignment
+            .disabled_clones
+            .remove(clone_id)
+            .map(|_| ())
+            .ok_or_else(|| {
+                if app_role_assignment.clones.contains_key(clone_id) {
+                    AppError::CloneCellMustBeDisabledBeforeDeleting(CloneCellId::CloneId(
+                        clone_id.to_owned(),
+                    ))
+                } else {
+                    AppError::CloneCellNotFound(CloneCellId::CloneId(clone_id.to_owned()))
+                }
+            })
     }
 
     /// Accessor
@@ -1110,6 +1134,11 @@ mod tests {
             enabled_cell.role_name,
             clone_id_0.as_app_role_name().to_owned()
         );
+
+        // Enabling an already enabled cell does nothing.
+        let enabled_cell_2 = app.enable_clone_cell(&clone_id_0).unwrap();
+        assert_eq!(enabled_cell_2, enabled_cell);
+
         // Assert it is accessible from the app again
         assert!(app
             .clone_cells()
@@ -1123,6 +1152,9 @@ mod tests {
 
         // Disable and delete a clone cell
         app.disable_clone_cell(&clone_id_0).unwrap();
+        // Disabling is also idempotent
+        app.disable_clone_cell(&clone_id_0).unwrap();
+
         app.delete_clone_cell(&clone_id_0).unwrap();
         // Assert the deleted cell cannot be enabled
         assert!(app.enable_clone_cell(&clone_id_0).is_err());

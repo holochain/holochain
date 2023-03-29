@@ -18,8 +18,10 @@ use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::DatabaseResult;
+use holochain_state::query::StateQueryResult;
 use holochain_types::prelude::*;
 use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTargetId;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
 
@@ -209,10 +211,17 @@ pub trait CellConductorReadHandleT: Send + Sync {
     ) -> ConductorResult<Option<CellId>>;
 
     /// Expose block functionality to zomes.
-    async fn block(&self, block: Block) -> DatabaseResult<()>;
+    async fn block(&self, input: Block) -> DatabaseResult<()>;
 
     /// Expose unblock functionality to zomes.
-    async fn unblock(&self, block: Block) -> DatabaseResult<()>;
+    async fn unblock(&self, input: Block) -> DatabaseResult<()>;
+
+    /// Expose is_blocked functionality to zomes.
+    async fn is_blocked(
+        &self,
+        input: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> StateQueryResult<bool>;
 }
 
 #[async_trait]
@@ -265,11 +274,19 @@ impl CellConductorReadHandleT for CellConductorApi {
             .await
     }
 
-    async fn block(&self, block: Block) -> DatabaseResult<()> {
-        self.conductor_handle.block(block).await
+    async fn block(&self, input: Block) -> DatabaseResult<()> {
+        self.conductor_handle.block(input).await
     }
 
-    async fn unblock(&self, block: Block) -> DatabaseResult<()> {
-        self.conductor_handle.unblock(block).await
+    async fn unblock(&self, input: Block) -> DatabaseResult<()> {
+        self.conductor_handle.unblock(input).await
+    }
+
+    async fn is_blocked(
+        &self,
+        input: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> StateQueryResult<bool> {
+        self.conductor_handle.is_blocked(input, timestamp).await
     }
 }

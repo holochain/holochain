@@ -105,7 +105,7 @@ fn server_signal(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_connect() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, mut listener) = server().await;
     tokio::task::spawn(async move {
         let _ = listener
@@ -123,7 +123,7 @@ async fn can_connect() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_send_signal() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, mut listener) = server().await;
     let jh = tokio::task::spawn(async move {
         let (mut sender, mut receiver) = listener
@@ -181,7 +181,7 @@ async fn can_send_signal() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_send_request() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, mut listener) = server().await;
     let jh = tokio::task::spawn(async move {
         let (mut sender, mut receiver) = listener
@@ -250,7 +250,7 @@ async fn can_send_request() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn shutdown_listener() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, mut listener) = server().await;
     std::mem::drop(handle);
     assert!(listener.next().await.is_none());
@@ -293,7 +293,7 @@ async fn shutdown_listener() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn shutdown_receiver() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, listener) = server().await;
     let s_jh = server_wait(listener);
     let binding = handle.local_addr().clone();
@@ -317,7 +317,7 @@ async fn shutdown_receiver() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn listener_shuts_down_server() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, listener) = server().await;
     let s_jh = server_wait(listener);
     let binding = handle.local_addr().clone();
@@ -341,7 +341,7 @@ async fn listener_shuts_down_server() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn client_shutdown() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, listener) = server().await;
     let s_jh = server_wait(listener);
     let binding = handle.local_addr().clone();
@@ -366,7 +366,7 @@ async fn client_shutdown() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn drop_sender() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, listener) = server().await;
     let s_jh = server_signal(listener, 10);
     let binding = handle.local_addr().clone();
@@ -390,7 +390,7 @@ async fn drop_sender() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn drop_receiver() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, listener) = server().await;
     let s_jh = server_recv(listener);
     let binding = handle.local_addr().clone();
@@ -414,7 +414,7 @@ async fn drop_receiver() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cancel_response() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let (handle, mut listener) = server().await;
     let s_jh = tokio::task::spawn(async move {
         let (mut sender, _receiver) = listener

@@ -1,6 +1,6 @@
 use ghost_actor::dependencies::tracing;
 
-observability::metrics!(
+holochain_trace::metrics!(
     KitsuneMetrics,
     Failure,
     Call,
@@ -17,7 +17,7 @@ observability::metrics!(
 /// Print all metrics as tracing events
 #[tracing::instrument]
 pub fn print_all_metrics() {
-    if observability::metrics::is_enabled() {
+    if holochain_trace::metrics::is_enabled() {
         use std::fmt::Write;
         use KitsuneMetrics::*;
         let mut out = String::new();
@@ -58,7 +58,7 @@ pub fn print_all_metrics() {
 pub fn init() {
     if let Some(km) = std::env::var_os("KITSUNE_METRICS") {
         if km == "ON" {
-            observability::metrics::init();
+            holochain_trace::metrics::init();
         }
     }
 }

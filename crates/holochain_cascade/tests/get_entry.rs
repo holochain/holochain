@@ -1,4 +1,3 @@
-use ghost_actor::dependencies::observability;
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::{Cascade, CascadeImpl};
@@ -225,7 +224,7 @@ async fn assert_can_retrieve<N: HolochainP2pDnaT + Clone + Send + 'static>(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_not_authority_or_authoring() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -248,7 +247,7 @@ async fn entry_not_authority_or_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_authoring() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -286,7 +285,7 @@ async fn entry_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_authority() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -314,7 +313,7 @@ async fn entry_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn content_not_authority_or_authoring() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -342,7 +341,7 @@ async fn content_not_authority_or_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn content_authoring() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -380,7 +379,7 @@ async fn content_authoring() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn content_authority() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -406,7 +405,7 @@ async fn content_authority() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn rejected_ops() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -428,7 +427,7 @@ async fn rejected_ops() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_can_handle_rejected_ops_in_cache() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();
@@ -472,7 +471,7 @@ async fn check_all_queries_still_work_with_scratch() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_pending_data_isnt_returned() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();

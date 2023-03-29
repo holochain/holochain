@@ -1,11 +1,15 @@
 ---
-default_semver_increment_mode: !pre_minor alpha
+default_semver_increment_mode: !pre_minor beta-rc
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+- Optimize capability grant verification during zome calls. This speeds up all remote calls, under which fall calls with a cap secret from clients other than the Launcher. Previously hundreds of calls would slow down response time noticeably because of grant verification. Now thousands of calls (rather thousands of records) won't affect grant verification by more than a millisecond. [#2097](https://github.com/holochain/holochain/pull/2097)
+
+## 0.2.0-beta-rc.0
 
 ## 0.1.0
 

@@ -5,8 +5,8 @@
 pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
+    pub use ::holochain_trace;
     pub use ::lair_keystore_api;
-    pub use ::observability;
     pub use ::paste;
     pub use ::rustls;
     pub use ::serde;
