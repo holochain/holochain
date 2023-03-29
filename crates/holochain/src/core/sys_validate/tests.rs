@@ -38,9 +38,9 @@ use crate::test_utils::fake_genesis_for_agent;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
-use futures::FutureExt;
 use holochain_cascade::MockCascade;
 use holochain_keystore::AgentPubKeyExt;
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::fresh_reader_test;
@@ -57,11 +57,17 @@ use matches::assert_matches;
 use std::convert::TryFrom;
 use std::time::Duration;
 
-/// Creates a MockCascade with the minimal set of actions to make the given
-/// Action valid. Updates the input action's backlinks to point to these other
+/// Creates a valid Record using the given action and constructs a MockCascade
+/// with the minimal set of records to satisfy the validation dependencies
+/// for that Record. Updates the input action's backlinks to point to these other
 /// injected actions, and returns it along with the created MockCascade.
-fn action_with_mock_cascade(mut action: Action) -> (Action, MockCascade) {
-    assert!(action.action_seq() > 0);
+async fn record_with_mock_cascade(
+    keystore: &MetaLairClient,
+    mut action: Action,
+) -> (Record, Vec<Record>) {
+    if action.action_seq() < 2 {
+        *action.action_seq_mut().unwrap() = 2;
+    }
 
     let non_dna_record = || {
         // get anything but a Dna
@@ -72,14 +78,40 @@ fn action_with_mock_cascade(mut action: Action) -> (Action, MockCascade) {
         dep
     };
 
-    let (action, deps) = match action {
-        Action::Dna(_) => (action, vec![]),
-        mut action => {
+    let dna_record = || {
+        // get a Dna record
+        let mut dep = fixt!(Record);
+        while !matches!(dep.action(), Action::Dna(_)) {
+            dep = fixt!(Record);
+        }
+        dep
+    };
+
+    let entry_record = || {
+        let mut r = fixt!(Record);
+        while !matches!(r.action(), Action::Create(_) | Action::Update(_))
+            && r.entry.as_option().is_none()
+        {
+            r = fixt!(Record);
+        }
+        r
+    };
+
+    let (entry, deps) = match &mut action {
+        Action::Dna(_) => (None, vec![]),
+        action => {
             let mut deps = vec![];
-            let mut prev = non_dna_record();
-            *prev.as_action_mut().action_seq_mut().unwrap() = action.action_seq() - 1;
-            let prev_hash = ActionHash::with_data_sync(prev.as_action_mut());
-            *action.prev_action_mut().unwrap() = prev_hash;
+            let prev_seq = action.action_seq() - 1;
+            let prev = if prev_seq == 0 {
+                dna_record()
+            } else {
+                let mut prev = non_dna_record();
+                *prev.as_action_mut().action_seq_mut().unwrap() = action.action_seq() - 1;
+                prev
+            };
+            let prev_hash = ActionHash::with_data_sync(prev.action());
+            *action.prev_action_mut().unwrap() = prev_hash.clone();
+            assert_eq!(*action.prev_action().unwrap(), prev_hash);
             deps.push(prev);
 
             let entry = action.entry_data_mut().map(|(entry_hash, _)| {
@@ -87,75 +119,37 @@ fn action_with_mock_cascade(mut action: Action) -> (Action, MockCascade) {
                 *entry_hash = EntryHash::with_data_sync(&entry);
                 entry
             });
-
             match action {
-                Action::Create(create) => {}
+                Action::Update(update) => {
+                    let dep = entry_record();
+                    update.original_action_address = dep.action_address().clone();
+                    update.original_entry_address =
+                        dep.entry().as_option().unwrap().to_hash().clone();
+                    deps.push(dep);
+                }
+                // Action::CreateLink(link) => {
+                //     link.base_address
+                // }
+                Action::CloseChain(_) | Action::OpenChain(_) | Action::Create(_) => {}
                 Action::Dna(_) => unreachable!(),
-            }
-            (action, deps)
+                _ => {}
+            };
+            (entry, deps)
         }
     };
 
-    (action, MockCascade::with_records(vec![]))
+    let sah = SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action))
+        .await
+        .unwrap();
+    let record = Record::new(sah, entry);
+
+    (record, deps)
 }
 
 // async fn check_sys_val(action: Action) -> anyhow::Result<()> {
-//     let (action, cascade)  =action_with_mock_cascade(action);
+//     let (action, cascade)  =record_with_mock_cascade(action);
 
 // }
-
-#[tokio::test(flavor = "multi_thread")]
-/// Test that the valid_chain contrafact matches our chain validation function,
-/// since many other tests will depend on this constraint
-async fn valid_chain_fact_test() {
-    let keystore = SweetConductor::from_standard_config().await.keystore();
-    let author = SweetAgents::one(keystore.clone()).await;
-
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let fact = contrafact::facts![
-        record::facts::action_and_entry_match(),
-        contrafact::lens(
-            "action is valid",
-            |(a, _)| a,
-            holochain_zome_types::action::facts::valid_chain(author),
-        ),
-    ];
-    let mut chain: Vec<Record> =
-        futures::future::join_all(contrafact::build_seq(&mut u, 100, fact).into_iter().map(
-            |(a, entry)| {
-                let keystore = keystore.clone();
-                async move {
-                    Record::new(
-                        SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
-                            .await
-                            .unwrap(),
-                        entry,
-                    )
-                }
-            },
-        ))
-        .await;
-
-    validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
-
-    let mut last = chain.pop().unwrap();
-    let penult = chain.last().unwrap();
-
-    // clean up this record so it's valid
-    *last.as_action_mut().timestamp_mut() =
-        (penult.action().timestamp() + Duration::from_secs(1)).unwrap();
-    // re-sign it
-    last.signed_action = SignedActionHashed::sign(
-        &keystore,
-        ActionHashed::from_content_sync(last.action().clone()),
-    )
-    .await
-    .unwrap();
-
-    let cascade = MockCascade::with_records(chain);
-
-    sys_validate_record(&last, &cascade).await.unwrap();
-}
 
 /// Mismatched signatures are rejected
 #[tokio::test(flavor = "multi_thread")]
@@ -164,13 +158,14 @@ async fn verify_action_signature_test() {
     let author = fake_agent_pubkey_1();
     let mut action = fixt!(CreateLink);
     action.author = author.clone();
-    let (action, cascade) = action_with_mock_cascade(Action::CreateLink(action));
-    let real_signature = author.sign(&keystore, &action).await.unwrap();
-    let action_valid = SignedActionHashed::new(action.clone(), real_signature);
-    let record_valid = Record::new(action_valid, None);
+    let (record_valid, deps) =
+        record_with_mock_cascade(&keystore, Action::CreateLink(action)).await;
+
+    dbg!(&record_valid, &deps);
+    let cascade = MockCascade::with_records(deps);
 
     let wrong_signature = Signature([1_u8; 64]);
-    let action_invalid = SignedActionHashed::new(action.clone(), wrong_signature);
+    let action_invalid = SignedActionHashed::new(record_valid.action().clone(), wrong_signature);
     let record_invalid = Record::new(action_invalid, None);
 
     sys_validate_record(&record_valid, &cascade).await.unwrap();
@@ -802,4 +797,57 @@ async fn test_agent_update() {
     inline_validation(workspace, network, conductor.raw_handle(), ribosome.clone())
         .await
         .unwrap_err();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+/// Test that the valid_chain contrafact matches our chain validation function,
+/// since many other tests will depend on this constraint
+async fn valid_chain_fact_test() {
+    let keystore = SweetConductor::from_standard_config().await.keystore();
+    let author = SweetAgents::one(keystore.clone()).await;
+
+    let mut u = arbitrary::Unstructured::new(&NOISE);
+    let fact = contrafact::facts![
+        record::facts::action_and_entry_match(),
+        contrafact::lens(
+            "action is valid",
+            |(a, _)| a,
+            holochain_zome_types::action::facts::valid_chain(author),
+        ),
+    ];
+    let mut chain: Vec<Record> =
+        futures::future::join_all(contrafact::build_seq(&mut u, 100, fact).into_iter().map(
+            |(a, entry)| {
+                let keystore = keystore.clone();
+                async move {
+                    Record::new(
+                        SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
+                            .await
+                            .unwrap(),
+                        entry,
+                    )
+                }
+            },
+        ))
+        .await;
+
+    validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
+
+    let mut last = chain.pop().unwrap();
+    let penult = chain.last().unwrap();
+
+    // clean up this record so it's valid
+    *last.as_action_mut().timestamp_mut() =
+        (penult.action().timestamp() + Duration::from_secs(1)).unwrap();
+    // re-sign it
+    last.signed_action = SignedActionHashed::sign(
+        &keystore,
+        ActionHashed::from_content_sync(last.action().clone()),
+    )
+    .await
+    .unwrap();
+
+    let cascade = MockCascade::with_records(chain);
+
+    sys_validate_record(&last, &cascade).await.unwrap();
 }

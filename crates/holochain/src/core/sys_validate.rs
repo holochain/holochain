@@ -304,14 +304,9 @@ pub fn check_prev_seq(action: &Action, prev_action: &Action) -> SysValidationRes
 
 /// Check the entry variant matches the variant in the actions entry type
 pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationResult<()> {
-    match (entry_type, entry) {
-        (EntryType::AgentPubKey, Entry::Agent(_)) => Ok(()),
-        (EntryType::App(_), Entry::App(_)) => Ok(()),
-        (EntryType::App(_), Entry::CounterSign(_, _)) => Ok(()),
-        (EntryType::CapClaim, Entry::CapClaim(_)) => Ok(()),
-        (EntryType::CapGrant, Entry::CapGrant(_)) => Ok(()),
-        _ => Err(ValidationOutcome::EntryTypeMismatch.into()),
-    }
+    entry_type_matches(entry_type, entry)
+        .then_some(())
+        .ok_or_else(|| ValidationOutcome::EntryTypeMismatch.into())
 }
 
 /// Check the AppEntryDef is valid for the zome.

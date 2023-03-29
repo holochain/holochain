@@ -7,6 +7,7 @@
 
 use crate::action::ChainTopOrdering;
 use holochain_integrity_types::EntryDefIndex;
+use holochain_integrity_types::EntryType;
 use holochain_integrity_types::EntryVisibility;
 use holochain_integrity_types::ScopedEntryDefIndex;
 use holochain_integrity_types::ZomeIndex;
@@ -239,5 +240,17 @@ impl From<ScopedEntryDefIndex> for AppEntryDefLocation {
 impl From<ScopedEntryDefIndex> for EntryDefLocation {
     fn from(s: ScopedEntryDefIndex) -> Self {
         Self::App(s.into())
+    }
+}
+
+/// Check the entry variant matches the variant in the actions entry type
+pub fn entry_type_matches(entry_type: &EntryType, entry: &Entry) -> bool {
+    match (entry_type, entry) {
+        (EntryType::AgentPubKey, Entry::Agent(_)) => true,
+        (EntryType::App(_), Entry::App(_)) => true,
+        (EntryType::App(_), Entry::CounterSign(_, _)) => true,
+        (EntryType::CapClaim, Entry::CapClaim(_)) => true,
+        (EntryType::CapGrant, Entry::CapGrant(_)) => true,
+        _ => false,
     }
 }

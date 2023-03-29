@@ -7,8 +7,8 @@ use holo_hash::*;
 type Pair = (Action, Option<Entry>);
 
 /// Fact: Given a pair of an action and optional Entry:
-/// - If the action references an Entry, the Entry will exist and be of the appropriate hash
-/// - If the action does not references an Entry, the entry will be None
+/// - If the action references an Entry, the Entry will exist and be of the appropriate hash, and the entry types will match
+/// - If the action does not reference an Entry, the entry will be None
 //
 // TODO: this Fact is useless until we can write "traversals" in addition to lenses and prisms,
 // because we cannot in general use a lens to extract a `&mut (Action, Option<Entry>)`
@@ -25,9 +25,11 @@ pub fn action_and_entry_match() -> Facts<'static, Pair> {
         brute(
             "Action type matches Entry existence",
             |(action, entry): &Pair| {
-                let has_action = action.entry_data().is_some();
-                let has_entry = entry.is_some();
-                has_action == has_entry
+                match (action.entry_data(), entry) {
+                    (Some((_, et)), Some(entry)) => entry_type_matches(et, entry),
+                    (None, None) => true,
+                    _ => false,
+                }
             }
         ),
         mapped(
