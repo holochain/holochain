@@ -35,3 +35,6 @@ macro_rules! wasm_common {
     };
 }
 pub(crate) use wasm_common;
+
+#[cfg(all(feature = "build_demo", test))]
+mod test;

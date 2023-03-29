@@ -78,7 +78,24 @@ pub async fn run_demo(opts: RunOpts) {
     tracing::info!(?opts);
     match opts.command {
         RunCmd::Run { dna, inbox, outbox } => {
-            run(dna, inbox, outbox).await;
+            run(dna, inbox, outbox, None, None).await;
+        }
+        RunCmd::GenDnaFile { output } => {
+            gen_dna_file(output).await;
+        }
+    }
+}
+
+#[cfg(test)]
+pub async fn run_test_demo(
+    opts: RunOpts,
+    ready: tokio::sync::oneshot::Sender<()>,
+    rendezvous: holochain::sweettest::DynSweetRendezvous,
+) {
+    tracing::info!(?opts);
+    match opts.command {
+        RunCmd::Run { dna, inbox, outbox } => {
+            run(dna, inbox, outbox, Some(ready), Some(rendezvous)).await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
@@ -148,7 +165,13 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     }
 }
 
-async fn run(dna: std::path::PathBuf, inbox: std::path::PathBuf, outbox: std::path::PathBuf) {
+async fn run(
+    dna: std::path::PathBuf,
+    inbox: std::path::PathBuf,
+    outbox: std::path::PathBuf,
+    ready: Option<tokio::sync::oneshot::Sender<()>>,
+    rendezvous: Option<holochain::sweettest::DynSweetRendezvous>,
+) {
     let _ = tokio::fs::create_dir_all(&inbox).await;
     let _ = tokio::fs::create_dir_all(&outbox).await;
 
@@ -173,19 +196,25 @@ async fn run(dna: std::path::PathBuf, inbox: std::path::PathBuf, outbox: std::pa
     let dna: SerializedBytes = dna.try_into().unwrap();
     let dna: DnaFile = dna.try_into().unwrap();
 
-    struct PubRendezvous;
+    let rendezvous = match rendezvous {
+        Some(rendezvous) => rendezvous,
+        None => {
+            struct PubRendezvous;
 
-    impl holochain::sweettest::SweetRendezvous for PubRendezvous {
-        fn bootstrap_addr(&self) -> &str {
-            "https://bootstrap.holo.host"
+            impl holochain::sweettest::SweetRendezvous for PubRendezvous {
+                fn bootstrap_addr(&self) -> &str {
+                    "https://bootstrap.holo.host"
+                }
+
+                fn sig_addr(&self) -> &str {
+                    "wss://holotest.net"
+                }
+            }
+
+            let rendezvous: holochain::sweettest::DynSweetRendezvous = Arc::new(PubRendezvous);
+            rendezvous
         }
-
-        fn sig_addr(&self) -> &str {
-            "wss://holotest.net"
-        }
-    }
-
-    let rendezvous: holochain::sweettest::DynSweetRendezvous = Arc::new(PubRendezvous);
+    };
 
     let config = holochain::sweettest::SweetConductorConfig::standard();
 
@@ -216,6 +245,10 @@ async fn run(dna: std::path::PathBuf, inbox: std::path::PathBuf, outbox: std::pa
     tracing::info!(?c_zome);
 
     let handle = conductor.sweet_handle();
+
+    if let Some(ready) = ready {
+        let _ = ready.send(());
+    }
 
     loop {
         let mut dir = tokio::fs::read_dir(&inbox).await.unwrap();

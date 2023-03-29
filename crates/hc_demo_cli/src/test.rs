@@ -1,3 +1,5 @@
+use super::*;
+
 const NOTICE: &str = r#"--- hc_demo_cli wasm ---
 If this test fails, you may need to recompile the wasm:
 cd crates/hc_demo_cli
@@ -26,8 +28,16 @@ async fn demo() {
         .await
         .unwrap();
 
-    let t1 = tokio::task::spawn(run("one"));
-    let t2 = tokio::task::spawn(run("two"));
+    let (r1s, r1r) = tokio::sync::oneshot::channel();
+    let (r2s, r2r) = tokio::sync::oneshot::channel();
+    let rendezvous = holochain::sweettest::SweetLocalRendezvous::new().await;
+
+    let t1 = tokio::task::spawn(run("one", r1s, rendezvous.clone()));
+    let t2 = tokio::task::spawn(run("two", r2s, rendezvous.clone()));
+
+    let _ = r1r.await;
+    let _ = r2r.await;
+
     let t3 = tokio::task::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
         panic!("Failed to tx file in 60 seconds");
@@ -76,23 +86,27 @@ fn init_tracing() {
 }
 
 async fn gen_dna() {
-    let opts = hc_demo_cli::RunOpts {
-        command: hc_demo_cli::RunCmd::GenDnaFile {
+    let opts = RunOpts {
+        command: RunCmd::GenDnaFile {
             output: std::path::PathBuf::from(DNA),
         },
     };
 
-    hc_demo_cli::run_demo(opts).await;
+    run_demo(opts).await;
 }
 
-async fn run(name: &str) {
-    let opts = hc_demo_cli::RunOpts {
-        command: hc_demo_cli::RunCmd::Run {
+async fn run(
+    name: &str,
+    ready: tokio::sync::oneshot::Sender<()>,
+    rendezvous: holochain::sweettest::DynSweetRendezvous,
+) {
+    let opts = RunOpts {
+        command: RunCmd::Run {
             dna: std::path::PathBuf::from(DNA),
             inbox: std::path::PathBuf::from(format!("{name}-in")),
             outbox: std::path::PathBuf::from(format!("{name}-out")),
         },
     };
 
-    hc_demo_cli::run_demo(opts).await;
+    run_test_demo(opts, ready, rendezvous).await;
 }
