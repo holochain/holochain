@@ -448,6 +448,8 @@ pub struct CellStorageInfo {
     pub authored_data_size_on_disk: usize,
     pub dht_data_size: usize,
     pub dht_data_size_on_disk: usize,
+    pub cache_data_size: usize,
+    pub cache_data_size_on_disk: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]

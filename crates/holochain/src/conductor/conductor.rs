@@ -863,6 +863,7 @@ mod network_impls {
                 futures::future::join_all(app.all_cells().map(|cell_id| async move {
                     let authored_db = self.spaces.authored_db(cell_id.dna_hash())?;
                     let dht_db = self.spaces.dht_db(cell_id.dna_hash())?;
+                    let cache_db = self.spaces.cache(cell_id.dna_hash())?;
 
                     Ok(CellStorageInfo {
                         cell_id: cell_id.clone(),
@@ -879,6 +880,14 @@ mod network_impls {
                             .map_err(db_error_mapper)
                             .await?,
                         dht_data_size: dht_db
+                            .async_reader(get_used_size)
+                            .map_err(db_error_mapper)
+                            .await?,
+                        cache_data_size_on_disk: cache_db
+                            .async_reader(get_size_on_disk)
+                            .map_err(db_error_mapper)
+                            .await?,
+                        cache_data_size: cache_db
                             .async_reader(get_used_size)
                             .map_err(db_error_mapper)
                             .await?,

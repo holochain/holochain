@@ -1042,5 +1042,7 @@ pub mod test {
         assert!(cell_info.authored_data_size_on_disk > 114000);
         assert!(cell_info.dht_data_size > 12000);
         assert!(cell_info.dht_data_size_on_disk > 114000);
+        assert!(cell_info.cache_data_size > 7000);
+        assert!(cell_info.cache_data_size_on_disk > 114000);
     }
 }
