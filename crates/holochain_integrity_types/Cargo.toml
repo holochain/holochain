@@ -23,11 +23,12 @@ kitsune_p2p_timestamp = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/t
 # TODO: Figure out how to remove these dependencies.
 subtle = "2"
 
-# Optional
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
-fixt = { version = "^0.1.0", path = "../fixt", optional = true }
 # lens-rs = { version = "0.3", optional = true }
 lens-rs = { git = "https://github.com/TOETOE55/lens-rs", ref = "c3c5d50c16368174c00cccab1cb012e4ddba350b", optional = false }
+
+# Optional
+arbitrary = { version = "1.0", features = ["derive"], optional = true }
+fixt = { version = "^0.2.0-beta-rc.0", path = "../fixt", optional = true }
 subtle-encoding = {version = "0.5", optional = true}
 tracing = { version = "0.1", optional = true }
 

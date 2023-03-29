@@ -35,9 +35,10 @@ pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
 /// are then used to check the integrity of data using cryptographic hash
 /// functions.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, Prism)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(tag = "type")]
+#[derive(Prism)]
 pub enum Action {
     // The first action in a chain (for the DNA) doesn't have a previous action
     #[optic]
@@ -518,17 +519,24 @@ pub struct CreateLink<W = RateWeight> {
 /// Declares that a previously made Link should be nullified and considered removed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct DeleteLink {
+    #[optic]
     pub author: AgentPubKey,
+    #[optic]
     pub timestamp: Timestamp,
+    #[optic]
     pub action_seq: u32,
+    #[optic]
     pub prev_action: ActionHash,
 
     /// this is redundant with the `CreateLink` action but needs to be included to facilitate DHT ops
     /// this is NOT exposed to wasm developers and is validated by the subconscious to ensure that
     /// it always matches the `base_address` of the `CreateLink`
+    #[optic]
     pub base_address: AnyLinkableHash,
     /// The address of the `CreateLink` being reversed
+    #[optic]
     pub link_add_address: ActionHash,
 }
 
@@ -536,12 +544,18 @@ pub struct DeleteLink {
 /// new chain to declare the migration path taken. **Currently unused**
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct OpenChain {
+    #[optic]
     pub author: AgentPubKey,
+    #[optic]
     pub timestamp: Timestamp,
+    #[optic]
     pub action_seq: u32,
+    #[optic]
     pub prev_action: ActionHash,
 
+    #[optic]
     pub prev_dna_hash: DnaHash,
 }
 
@@ -549,12 +563,18 @@ pub struct OpenChain {
 /// old chain to declare the migration path taken. **Currently unused**
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct CloseChain {
+    #[optic]
     pub author: AgentPubKey,
+    #[optic]
     pub timestamp: Timestamp,
+    #[optic]
     pub action_seq: u32,
+    #[optic]
     pub prev_action: ActionHash,
 
+    #[optic]
     pub new_dna_hash: DnaHash,
 }
 
@@ -562,13 +582,20 @@ pub struct CloseChain {
 /// referenced by multiple such actions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct Create<W = EntryRateWeight> {
+    #[optic]
     pub author: AgentPubKey,
+    #[optic]
     pub timestamp: Timestamp,
+    #[optic]
     pub action_seq: u32,
+    #[optic]
     pub prev_action: ActionHash,
 
+    #[optic]
     pub entry_type: EntryType,
+    #[optic]
     pub entry_hash: EntryHash,
 
     pub weight: W,
@@ -590,16 +617,25 @@ pub struct Create<W = EntryRateWeight> {
 /// experiences repeats.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct Update<W = EntryRateWeight> {
+    #[optic]
     pub author: AgentPubKey,
+    #[optic]
     pub timestamp: Timestamp,
+    #[optic]
     pub action_seq: u32,
+    #[optic]
     pub prev_action: ActionHash,
 
+    #[optic]
     pub original_action_address: ActionHash,
+    #[optic]
     pub original_entry_address: EntryHash,
 
+    #[optic]
     pub entry_type: EntryType,
+    #[optic]
     pub entry_hash: EntryHash,
 
     pub weight: W,
@@ -613,14 +649,21 @@ pub struct Update<W = EntryRateWeight> {
 /// Actions are marked deleted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct Delete<W = RateWeight> {
+    #[optic]
     pub author: AgentPubKey,
+    #[optic]
     pub timestamp: Timestamp,
+    #[optic]
     pub action_seq: u32,
+    #[optic]
     pub prev_action: ActionHash,
 
     /// Address of the Record being deleted
+    #[optic]
     pub deletes_address: ActionHash,
+    #[optic]
     pub deletes_entry_address: EntryHash,
 
     pub weight: W,
@@ -630,12 +673,18 @@ pub struct Delete<W = RateWeight> {
 /// Not currently in use.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct UpdateAction {
+    #[optic]
     pub author: AgentPubKey,
+    #[optic]
     pub timestamp: Timestamp,
+    #[optic]
     pub action_seq: u32,
+    #[optic]
     pub prev_action: ActionHash,
 
+    #[optic]
     pub original_action_address: ActionHash,
 }
 
@@ -643,13 +692,19 @@ pub struct UpdateAction {
 /// Not currently in use.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Lens)]
 pub struct DeleteAction {
+    #[optic]
     pub author: AgentPubKey,
+    #[optic]
     pub timestamp: Timestamp,
+    #[optic]
     pub action_seq: u32,
+    #[optic]
     pub prev_action: ActionHash,
 
     /// Address of the action being deleted
+    #[optic]
     pub deletes_address: ActionHash,
 }
 
