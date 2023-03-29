@@ -252,17 +252,23 @@ jobs:
           # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
           git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
 
-      - name: Push the target branch
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+      - name: Merge release branch (${{ needs.prepare.outputs.release_branch }}) into target branch (${{ needs.vars.outputs.holochain_target_branch }}) and push it
         env:
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
+          DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
 
           git status
 
-          git push origin ${HOLOCHAIN_TARGET_BRANCH}
+          git checkout ${HOLOCHAIN_TARGET_BRANCH}
+          git merge --ff-only ${RELEASE_BRANCH}
+
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            git push origin ${HOLOCHAIN_TARGET_BRANCH}
+          fi
 
       - name: Push the release branch
         id: push-release-branch

@@ -143,7 +143,7 @@ jobs:
             git branch -D ${obsolete_branches}
           fi
 
-          # Merge source branch into the release branch
+          # Merge source branch into the target branch
           if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
             git checkout -B ${HOLOCHAIN_TARGET_BRANCH}
           else
