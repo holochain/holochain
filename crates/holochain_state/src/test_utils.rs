@@ -19,6 +19,47 @@ use crate::prelude::Txn;
 
 pub mod mutations_helpers;
 
+#[cfg(test)]
+pub mod tests {
+    use holochain_sqlite::conn::PConn;
+
+    fn _dbg_db_schema(db_name: &str, conn: PConn) {
+        #[derive(Debug)]
+        pub struct Schema {
+            pub ty: String,
+            pub name: String,
+            pub tbl_name: String,
+            pub rootpage: u64,
+            pub sql: Option<String>,
+        }
+
+        let mut statement = conn.prepare("select * from sqlite_schema").unwrap();
+        let iter = statement
+            .query_map([], |row| {
+                Ok(Schema {
+                    ty: row.get(0)?,
+                    name: row.get(1)?,
+                    tbl_name: row.get(2)?,
+                    rootpage: row.get(3)?,
+                    sql: row.get(4)?,
+                })
+            })
+            .unwrap();
+
+        println!("~~~ {} START ~~~", &db_name);
+        for i in iter {
+            dbg!(&i);
+        }
+        println!("~~~ {} END ~~~", &db_name);
+    }
+
+    #[test]
+    pub fn dbg_db_schema() {
+        _dbg_db_schema("conductor", super::test_conductor_db().db.conn().unwrap());
+        _dbg_db_schema("p2p_agents", super::test_p2p_agents_db().db.conn().unwrap());
+    }
+}
+
 /// Create a [`TestDb`] of [`DbKindAuthored`], backed by a temp directory.
 pub fn test_authored_db() -> TestDb<DbKindAuthored> {
     test_authored_db_with_id(1)
@@ -266,7 +307,7 @@ impl TestDir {
 
 #[allow(missing_docs)]
 impl TestDbs {
-    /// Create all three non-cell environments at once with a custom keystore
+    /// Create all four non-cell environments at once with a custom keystore
     pub fn with_keystore(tempdir: TempDir, keystore: MetaLairClient) -> Self {
         let conductor = DbWrite::test(tempdir.path(), DbKindConductor).unwrap();
         let wasm = DbWrite::test(tempdir.path(), DbKindWasm).unwrap();
