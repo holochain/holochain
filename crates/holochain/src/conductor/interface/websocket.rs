@@ -223,7 +223,7 @@ where
 
 /// Test items needed by other crates
 #[cfg(any(test, feature = "test_utils"))]
-pub use crate::test_utils::setup_app;
+pub use crate::test_utils::setup_app_in_new_conductor;
 
 #[cfg(test)]
 pub mod test {
@@ -238,6 +238,7 @@ pub mod test {
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
     use crate::test_utils::conductor_setup::ConductorTestData;
+    use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
@@ -426,7 +427,12 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let (_tmpdir, _, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
+        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
+            "test app".to_string(),
+            vec![dna],
+            vec![(installed_cell, None)],
+        )
+        .await;
 
         call_zome(
             handle.clone(),
@@ -465,7 +471,12 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
+        let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
+            "test app".to_string(),
+            vec![dna],
+            vec![(installed_cell, None)],
+        )
+        .await;
         let request = NetworkInfoRequestPayload {
             dnas: vec![dna_hash],
         };
@@ -514,7 +525,12 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
+        let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
+            "test app".to_string(),
+            vec![dna],
+            vec![(installed_cell, None)],
+        )
+        .await;
 
         let msg = AppRequest::StorageInfo {
             installed_app_id: Some("test app".to_string()),
@@ -526,15 +542,77 @@ pub mod test {
                 AppResponse::StorageInfo(info) => {
                     assert_eq!(info.app_storage_info.len(), 1);
                     let app_info = info.app_storage_info.first().unwrap();
-                    assert_eq!(app_info.installed_app_id, "test app");
-                    // App has two zomes but only one DNA/Cell
-                    assert_eq!(app_info.cell_storage_info.len(), 1);
-                    let cell_info = app_info.cell_storage_info.first().unwrap();
-                    assert_eq!(cell_info.cell_id, cell_id);
-                    assert!(cell_info.authored_data_size > 12000);
-                    assert!(cell_info.authored_data_size_on_disk > 114000);
-                    assert!(cell_info.dht_data_size > 12000);
-                    assert!(cell_info.dht_data_size_on_disk > 114000);
+                    assert_app_storage_info(app_info, "test app".to_string(), cell_id);
+                }
+                other => panic!("unexpected response {:?}", other),
+            }
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, app_api).await.unwrap();
+
+        handle.shutdown().await.unwrap().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn storage_info_for_all_apps() {
+        holochain_trace::test_run().ok();
+        let uuid_1 = Uuid::new_v4();
+        let dna_1 = fake_dna_zomes(
+            &uuid_1.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+        let uuid_2 = Uuid::new_v4();
+        let dna_2 = fake_dna_zomes(
+            &uuid_2.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+
+        // warm the zome
+        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+
+        let cell_id_1 = CellId::from((dna_1.dna_hash().clone(), fake_agent_pubkey_1()));
+        let installed_cell_1 = InstalledCell::new(cell_id_1.clone(), "handle_1".into());
+
+        let cell_id_2 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_1()));
+        let installed_cell_2 = InstalledCell::new(cell_id_2.clone(), "handle_2".into());
+
+        let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
+            "test app 1".to_string(),
+            vec![dna_1],
+            vec![(installed_cell_1, None)],
+        )
+        .await;
+
+        install_app_in_conductor(
+            handle.clone(),
+            "test app 2".to_string(),
+            vec![dna_2],
+            vec![(installed_cell_2, None)],
+        )
+        .await;
+
+        let msg = AppRequest::StorageInfo {
+            // Don't set an app id, get everything
+            installed_app_id: None,
+        };
+        let msg = msg.try_into().unwrap();
+        let respond = move |bytes: SerializedBytes| {
+            let response: AppResponse = bytes.try_into().unwrap();
+            match response {
+                AppResponse::StorageInfo(mut info) => {
+                    assert_eq!(info.app_storage_info.len(), 2);
+
+                    info.app_storage_info
+                        .sort_by_key(|i| i.installed_app_id.clone());
+
+                    let app_info_1 = info.app_storage_info.first().unwrap();
+                    assert_app_storage_info(app_info_1, "test app 1".to_string(), cell_id_1);
+                    let app_info_2 = info.app_storage_info.last().unwrap();
+                    assert_app_storage_info(app_info_2, "test app 2".to_string(), cell_id_2);
                 }
                 other => panic!("unexpected response {:?}", other),
             }
@@ -949,5 +1027,20 @@ pub mod test {
             .collect::<Vec<_>>();
         results.sort();
         results
+    }
+
+    fn assert_app_storage_info(
+        app_info: &AppStorageInfo,
+        installed_app_id: InstalledAppId,
+        cell_id: CellId,
+    ) {
+        assert_eq!(app_info.installed_app_id, installed_app_id);
+        assert_eq!(app_info.cell_storage_info.len(), 1);
+        let cell_info = app_info.cell_storage_info.first().unwrap();
+        assert_eq!(cell_info.cell_id, cell_id);
+        assert!(cell_info.authored_data_size > 12000);
+        assert!(cell_info.authored_data_size_on_disk > 114000);
+        assert!(cell_info.dht_data_size > 12000);
+        assert!(cell_info.dht_data_size_on_disk > 114000);
     }
 }
