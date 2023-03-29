@@ -84,11 +84,9 @@ pub enum BlockTarget {
 impl From<kitsune_p2p_block::BlockTarget> for BlockTarget {
     fn from(kblock_target: kitsune_p2p_block::BlockTarget) -> Self {
         match kblock_target {
-            kitsune_p2p_block::BlockTarget::NodeSpace(node_id, space, reason) => Self::NodeDna(
-                node_id,
-                DnaHash::from_raw_36(space.0.clone()),
-                reason.into(),
-            ),
+            kitsune_p2p_block::BlockTarget::NodeSpace(node_id, space, reason) => {
+                Self::NodeDna(node_id, DnaHash::from_raw_36(space.0.clone()), reason)
+            }
             kitsune_p2p_block::BlockTarget::Node(node_id, reason) => {
                 Self::Node(node_id, reason.into())
             }

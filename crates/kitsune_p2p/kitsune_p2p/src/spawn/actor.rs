@@ -282,16 +282,13 @@ impl KitsuneP2pActor {
                                         MetaNetEvtAuth::Authorized => {
                                             let _ = i_s.new_con(remote_url, con).await;
                                         }
-                                        MetaNetEvtAuth::UnauthorizedIgnore => {
-                                            return;
-                                        }
+                                        MetaNetEvtAuth::UnauthorizedIgnore => {}
                                         MetaNetEvtAuth::UnauthorizedDisconnect => {
                                             con.close(
                                                 UNAUTHORIZED_DISCONNECT_CODE,
                                                 UNAUTHORIZED_DISCONNECT_REASON,
                                             )
                                             .await;
-                                            return;
                                         }
                                     }
                                 }
@@ -312,16 +309,13 @@ impl KitsuneP2pActor {
                                     )
                                     .await
                                     {
-                                        MetaNetEvtAuth::UnauthorizedIgnore => {
-                                            return;
-                                        }
+                                        MetaNetEvtAuth::UnauthorizedIgnore => {}
                                         MetaNetEvtAuth::UnauthorizedDisconnect => {
                                             con.close(
                                                 UNAUTHORIZED_DISCONNECT_CODE,
                                                 UNAUTHORIZED_DISCONNECT_REASON,
                                             )
                                             .await;
-                                            return;
                                         }
                                         MetaNetEvtAuth::Authorized => {
                                             match data {
@@ -406,16 +400,13 @@ impl KitsuneP2pActor {
                                     )
                                     .await
                                     {
-                                        MetaNetEvtAuth::UnauthorizedIgnore => {
-                                            return;
-                                        }
+                                        MetaNetEvtAuth::UnauthorizedIgnore => {}
                                         MetaNetEvtAuth::UnauthorizedDisconnect => {
                                             con.close(
                                                 UNAUTHORIZED_DISCONNECT_CODE,
                                                 UNAUTHORIZED_DISCONNECT_REASON,
                                             )
                                             .await;
-                                            return;
                                         }
                                         MetaNetEvtAuth::Authorized => {
                                             match data {
