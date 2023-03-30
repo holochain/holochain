@@ -137,6 +137,174 @@ fn members_dependencies() {
 }
 
 #[test]
+fn members_dependants() {
+    let workspace_mocker = example_workspace_2().unwrap();
+    let workspace = ReleaseWorkspace::try_new_with_criteria(
+        workspace_mocker.root(),
+        SelectionCriteria {
+            exclude_optional_deps: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let result = workspace
+        .members()
+        .unwrap()
+        .iter()
+        .map(|crt| {
+            (
+                crt.name(),
+                crt.dependants_in_workspace()
+                    .unwrap()
+                    .into_iter()
+                    .map(|crt| crt.name())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let expected_result = vec![
+        (
+            "crate_b".to_string(),
+            vec![
+                "crate_c".to_string(),
+                "crate_a".to_string(),
+                "crate_d".to_string(), // through crate_a
+            ],
+        ),
+        (
+            "crate_c".to_string(),
+            vec![
+                "crate_a".to_string(),
+                "crate_d".to_string(), // through crate_a
+            ],
+        ),
+        ("crate_a".to_string(), vec!["crate_d".to_string()]),
+        ("crate_d".to_string(), vec![]),
+    ];
+
+    pretty_assertions::assert_eq!(expected_result, result, "left is expected");
+}
+
+#[test]
+fn members_dependants_filtered() {
+    let workspace_mocker = example_workspace_2().unwrap();
+    let workspace = ReleaseWorkspace::try_new_with_criteria(
+        workspace_mocker.root(),
+        SelectionCriteria {
+            exclude_optional_deps: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let result = workspace
+        .members()
+        .unwrap()
+        .iter()
+        .map(|crt| {
+            (
+                crt.name(),
+                crt.dependants_in_workspace_filtered(|(name, _)| !name.contains("_b"))
+                    .unwrap()
+                    .into_iter()
+                    .map(|crt| crt.name())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let expected_result = vec![
+        ("crate_b".to_string(), vec![]), // Filtered out
+        (
+            "crate_c".to_string(),
+            vec![
+                "crate_a".to_string(),
+                "crate_d".to_string(), // through crate_a
+            ],
+        ),
+        ("crate_a".to_string(), vec!["crate_d".to_string()]),
+        ("crate_d".to_string(), vec![]),
+    ];
+
+    pretty_assertions::assert_eq!(expected_result, result, "left is expected");
+}
+
+#[test]
+fn members_dependants_with_two_different_filters() {
+    let workspace_mocker = example_workspace_2().unwrap();
+    let workspace = ReleaseWorkspace::try_new_with_criteria(
+        workspace_mocker.root(),
+        SelectionCriteria {
+            exclude_optional_deps: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let result = workspace
+        .members()
+        .unwrap()
+        .iter()
+        .map(|crt| {
+            (
+                crt.name(),
+                crt.dependants_in_workspace_filtered(|_| false)
+                    .unwrap()
+                    .into_iter()
+                    .map(|crt| crt.name())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    // Everything filtered out
+    let expected_result = vec![
+        ("crate_b".to_string(), vec![]),
+        ("crate_c".to_string(), vec![]),
+        ("crate_a".to_string(), vec![]),
+        ("crate_d".to_string(), vec![]),
+    ];
+
+    pretty_assertions::assert_eq!(expected_result, result, "left is expected");
+
+    let result = workspace
+        .members()
+        .unwrap()
+        .iter()
+        .map(|crt| {
+            (
+                crt.name(),
+                crt.dependants_in_workspace_filtered(|(name, _)| !name.contains("_c"))
+                    .unwrap()
+                    .into_iter()
+                    .map(|crt| crt.name())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    // The actual values in here aren't that important, just need to see that the filter is applied and not
+    // cached as `false` from above.
+    let expected_result = vec![
+        (
+            "crate_b".to_string(),
+            vec![
+                "crate_c".to_string(),
+                "crate_a".to_string(),
+                "crate_d".to_string(),
+            ],
+        ),
+        ("crate_c".to_string(), vec![]),
+        ("crate_a".to_string(), vec!["crate_d".to_string()]),
+        ("crate_d".to_string(), vec![]),
+    ];
+
+    pretty_assertions::assert_eq!(expected_result, result, "left is expected");
+}
+
+#[test]
 fn members_sorted_ws1() {
     let workspace_mocker = example_workspace_1().unwrap();
     let workspace = ReleaseWorkspace::try_new_with_criteria(
@@ -224,7 +392,7 @@ fn crate_state_block_consistency() {
 
     let allowed_dev_dependency_blockers: BitFlags<CrateStateFlags> = (&[
         // CrateStateFlags::MissingChangelog
-        ]
+    ]
         as &[CrateStateFlags])
         .iter()
         .cloned()
