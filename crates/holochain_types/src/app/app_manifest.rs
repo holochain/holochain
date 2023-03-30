@@ -87,7 +87,7 @@ impl AppManifest {
             .map(|InstalledCell { role_name, cell_id }| {
                 let path = PathBuf::from(role_name.clone());
                 AppRoleManifest {
-                    name: role_name.clone(),
+                    name: role_name,
                     provisioning: None,
                     dna: AppRoleDnaManifest {
                         location: Some(mr_bundle::Location::Bundled(path)),
