@@ -8,7 +8,7 @@ use super::{
     error::{AppManifestError, AppManifestResult},
 };
 use crate::prelude::{RoleName, YamlProperties};
-use holo_hash::{DnaHash, DnaHashB64};
+use holo_hash::DnaHashB64;
 use holochain_zome_types::{DnaModifiersOpt, NetworkSeed};
 use std::collections::HashMap;
 
@@ -80,7 +80,7 @@ pub struct AppRoleDnaManifest {
 
     /// The versioning constraints for the DNA. Ensures that only a DNA that
     /// matches the version spec will be used.
-    pub version: Option<DnaVersionFlexible>,
+    pub version: Option<DnaHashB64>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Each runtime clone is created by the `CreateClone` strategy,
@@ -104,57 +104,8 @@ impl AppRoleDnaManifest {
     }
 }
 
-/// Allow the DNA version to be specified as a single hash, rather than a
-/// singleton list. Just a convenience.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
-#[serde(rename_all = "snake_case")]
-#[serde(untagged)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum DnaVersionFlexible {
-    /// A version spec with a single hash
-    Singleton(DnaHashB64),
-    /// An actual version spec
-    Multiple(DnaVersionSpec),
-}
-
-impl From<DnaVersionFlexible> for DnaVersionSpec {
-    fn from(v: DnaVersionFlexible) -> Self {
-        match v {
-            DnaVersionFlexible::Singleton(h) => DnaVersionSpec(vec![h]),
-            DnaVersionFlexible::Multiple(v) => v,
-        }
-    }
-}
-
 /// Specifies remote, local, or bundled location of DNA
 pub type DnaLocation = mr_bundle::Location;
-
-/// Defines a criterion for a DNA version to match against.
-///
-/// Currently we're using the most simple possible version spec: A list of
-/// valid DnaHashes. The order of the list is from latest version to earliest.
-/// In subsequent manifest versions, this will become more expressive.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct DnaVersionSpec(Vec<DnaHashB64>);
-
-// NB: the following is likely to remain in the API for DnaVersionSpec
-impl DnaVersionSpec {
-    /// Check if a DNA satisfies this version spec
-    pub fn matches(&self, hash: DnaHash) -> bool {
-        self.0.contains(&hash.into())
-    }
-}
-
-// NB: the following is likely to be removed from the API for DnaVersionSpec
-// after our versioning becomes more sophisticated
-impl DnaVersionSpec {
-    /// Return the list of hashes covered by a version (obviously temporary,
-    /// while we don't have real versioning)
-    pub fn dna_hashes(&self) -> Vec<&DnaHashB64> {
-        self.0.iter().collect()
-    }
-}
 
 /// Rules to determine if and how a Cell will be created for this Dna
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -281,8 +232,6 @@ impl AppManifestV1 {
 
 #[cfg(test)]
 pub mod tests {
-    use futures::future::join_all;
-
     use super::*;
     use crate::app::app_manifest::AppManifest;
     use crate::prelude::*;
@@ -306,35 +255,26 @@ pub mod tests {
         )
     }
 
-    pub async fn app_manifest_fixture<I: IntoIterator<Item = DnaDef>>(
+    pub async fn app_manifest_fixture(
         location: Option<mr_bundle::Location>,
-        dnas: I,
+        installed_hash: DnaHash,
         modifiers: DnaModifiersOpt<YamlProperties>,
-    ) -> (AppManifestV1, Vec<DnaHashB64>) {
-        let hashes = join_all(
-            dnas.into_iter()
-                .map(|dna| async move { DnaHash::with_data_sync(&dna).into() }),
-        )
-        .await;
-
-        let version = DnaVersionSpec::from(hashes.clone()).into();
-
+    ) -> AppManifestV1 {
         let roles = vec![AppRoleManifest {
             name: "name".into(),
             dna: AppRoleDnaManifest {
                 location,
                 modifiers,
-                version: Some(version),
+                version: Some(installed_hash.into()),
                 clone_limit: 50,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
         }];
-        let manifest = AppManifestV1 {
+        AppManifestV1 {
             name: "Test app".to_string(),
             description: Some("Serialization roundtrip test".to_string()),
             roles,
-        };
-        (manifest, hashes)
+        }
     }
 
     #[tokio::test]
@@ -346,8 +286,8 @@ pub mod tests {
             origin_time: None,
             quantum_time: None,
         };
-        let (manifest, dna_hashes) =
-            app_manifest_fixture(location, vec![fixt!(DnaDef), fixt!(DnaDef)], modifiers).await;
+        let installed_hash = fixt!(DnaHash);
+        let manifest = app_manifest_fixture(location, installed_hash.clone(), modifiers).await;
         let manifest = AppManifest::from(manifest);
         let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
         let manifest_roundtrip = serde_yaml::from_str(&manifest_yaml).unwrap();
@@ -367,16 +307,14 @@ roles:
       deferred: false
     dna:
       path: /tmp/test.dna
-      version:
-        - {}
-        - {}
+      version: {}
       clone_limit: 50
       network_seed: network_seed
       properties:
         salad: "bar"
 
         "#,
-            dna_hashes[0], dna_hashes[1]
+            installed_hash
         );
         let actual = serde_yaml::to_value(&manifest).unwrap();
         let expected: serde_yaml::Value = serde_yaml::from_str(&expected_yaml).unwrap();

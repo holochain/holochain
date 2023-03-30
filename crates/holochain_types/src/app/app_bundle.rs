@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use self::error::AppBundleResult;
 
-use super::{dna_gamut::DnaGamut, AppManifest, AppManifestValidated};
+use super::{AppManifest, AppManifestValidated};
 use crate::prelude::*;
 
 #[allow(missing_docs)]
@@ -50,7 +50,6 @@ impl AppBundle {
     pub async fn resolve_cells(
         self,
         agent: AgentPubKey,
-        _gamut: DnaGamut,
         membrane_proofs: HashMap<RoleName, MembraneProof>,
     ) -> AppBundleResult<AppRoleResolution> {
         let AppManifestValidated { name: _, roles } = self.manifest().clone().validate()?;
@@ -140,7 +139,7 @@ impl AppBundle {
                 deferred: _,
             } => match self.resolve_cell_existing(&version, clone_limit) {
                 op @ CellProvisioningOp::Existing(_, _) => op,
-                CellProvisioningOp::NoMatch => {
+                CellProvisioningOp::HashMismatch(_, _) => {
                     self.resolve_cell_create(&location, Some(&version), clone_limit, modifiers)
                         .await?
                 }
@@ -167,16 +166,16 @@ impl AppBundle {
     async fn resolve_cell_create(
         &self,
         location: &mr_bundle::Location,
-        version: Option<&DnaVersionSpec>,
+        installed_hash: Option<&DnaHashB64>,
         clone_limit: u32,
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<CellProvisioningOp> {
         let bytes = self.resolve(location).await?;
         let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        let (dna_file, original_dna_hash) = dna_bundle.into_dna_file(modifiers).await?;
-        if let Some(spec) = version {
-            if !spec.matches(original_dna_hash) {
-                return Ok(CellProvisioningOp::NoMatch);
+        let (dna_file, actual_hash) = dna_bundle.into_dna_file(modifiers).await?;
+        if let Some(expected_hash) = installed_hash.cloned().map(Into::into) {
+            if expected_hash != actual_hash {
+                return Ok(CellProvisioningOp::HashMismatch(expected_hash, actual_hash));
             }
         }
         Ok(CellProvisioningOp::Create(dna_file, clone_limit))
@@ -184,7 +183,7 @@ impl AppBundle {
 
     fn resolve_cell_existing(
         &self,
-        _version: &DnaVersionSpec,
+        _version: &DnaHashB64,
         _clone_limit: u32,
     ) -> CellProvisioningOp {
         unimplemented!("Reusing existing cells is not yet implemented")
@@ -245,8 +244,8 @@ pub enum CellProvisioningOp {
     /// No provisioning needed, but there might be a clone_limit, and so we need
     /// to know which DNA and Agent to use for making clones
     Noop(CellId, u32),
-    /// Couldn't find a DNA that matches the version spec; can't provision (should this be an Err?)
-    NoMatch,
+    /// The specified installed_hash does not match the actual hash of the DNA selected for provisioning. Expected: {0}, Actual: {1}
+    HashMismatch(DnaHash, DnaHash),
     /// Ambiguous result, needs manual resolution; can't provision (should this be an Err?)
     Conflict(CellProvisioningConflict),
 }

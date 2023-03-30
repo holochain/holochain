@@ -5,10 +5,11 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
+use holo_hash::DnaHashB64;
 use holochain_zome_types::DnaModifiersOpt;
 
 use super::error::{AppManifestError, AppManifestResult};
-use crate::app::app_manifest::current::{DnaLocation, DnaVersionSpec};
+use crate::app::app_manifest::current::DnaLocation;
 use crate::prelude::RoleName;
 use std::collections::HashMap;
 
@@ -54,7 +55,7 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        version: Option<DnaVersionSpec>,
+        version: Option<DnaHashB64>,
     },
     /// Always create a new Cell when installing the App,
     /// and use a unique network seed to ensure a distinct DHT network
@@ -63,7 +64,7 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        version: Option<DnaVersionSpec>,
+        version: Option<DnaHashB64>,
     },
     /// Require that a Cell is already installed which matches the DNA version
     /// spec, and which has an Agent that's associated with this App's agent
@@ -71,7 +72,7 @@ pub enum AppRoleManifestValidated {
     UseExisting {
         clone_limit: u32,
         deferred: bool,
-        version: DnaVersionSpec,
+        version: DnaHashB64,
     },
     /// Try `UseExisting`, and if that fails, fallback to `Create`
     CreateIfNotExists {
@@ -79,12 +80,12 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        version: DnaVersionSpec,
+        version: DnaHashB64,
     },
     /// Disallow provisioning altogether. In this case, we expect
     /// `clone_limit > 0`: otherwise, no cells will ever be created.
     Disabled {
-        version: DnaVersionSpec,
+        version: DnaHashB64,
         clone_limit: u32,
     },
 }

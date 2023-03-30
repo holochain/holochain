@@ -1152,7 +1152,7 @@ mod app_impls {
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
             let ops = bundle
-                .resolve_cells(agent_key.clone(), DnaGamut::placeholder(), membrane_proofs)
+                .resolve_cells(agent_key.clone(), membrane_proofs)
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
