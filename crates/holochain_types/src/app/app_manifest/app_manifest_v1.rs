@@ -85,6 +85,7 @@ pub struct AppRoleDnaManifest {
     /// which allows for re-installing an app which has already been installed by manifest
     /// only (no need to include the DNAs, since they are already installed in the conductor).
     /// In this case, `location` does not even need to be set.
+    #[serde(alias = "version")]
     pub installed_hash: Option<DnaHashB64>,
 
     /// Allow up to this many "clones" to be created at runtime.

@@ -1102,7 +1102,7 @@ mod app_impls {
 
     use super::*;
     impl Conductor {
-        pub(crate) async fn install_app(
+        pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
@@ -1149,8 +1149,10 @@ mod app_impls {
                 }
             };
 
+            let manifest = bundle.manifest().clone();
+
             let installed_app_id =
-                installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
+                installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
             let local_dnas = self
                 .ribosome_store()
@@ -1184,7 +1186,7 @@ mod app_impls {
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await?;
 
             let roles = ops.role_assignments;
-            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles)?;
+            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
             // Update the db
             let stopped_app = self.add_disabled_app_to_db(app).await?;
