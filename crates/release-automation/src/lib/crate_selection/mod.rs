@@ -328,43 +328,38 @@ impl<'a> Crate<'a> {
     }
 
     /// Returns a reference to all workspace crates that depend on this crate.
-    // todo: write a unit test for this
     pub fn dependants_in_workspace(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        self.dependants_in_workspace_filtered(|_| true)
+        self.dependants_in_workspace
+            .get_or_try_init(|| -> Fallible<_> { self.dependants_in_workspace_filtered(|_| true) })
     }
 
     /// Returns a reference to all workspace crates that depend on this crate.
     /// Features filtering by applying a filter function to the dependant's dependencies.
-    // todo: write a unit test for this
     pub fn dependants_in_workspace_filtered<F>(
         &'a self,
         filter_fn: F,
-    ) -> Fallible<&'a Vec<&'a Crate<'a>>>
+    ) -> Fallible<Vec<&'a Crate<'a>>>
     where
         F: Fn(&(&String, &Vec<Dependency>)) -> bool,
         F: Copy,
     {
-        self.dependants_in_workspace.get_or_try_init(|| {
-            let members_dependants = self.workspace.members()?.iter().try_fold(
-                LinkedHashMap::<String, &'a Crate<'a>>::new(),
-                |mut acc, member| -> Fallible<_> {
-                    if member
-                        .dependencies_in_workspace()?
-                        .iter()
-                        .filter(filter_fn)
-                        .map(|(dep_name, _)| dep_name)
-                        .collect::<LinkedHashSet<_>>()
-                        .contains(&self.name())
-                    {
-                        acc.insert(member.name(), *member);
-                    };
+        let members_dependants = self.workspace.members()?.iter().try_fold(
+            LinkedHashMap::<String, &'a Crate<'a>>::new(),
+            |mut acc, member| -> Fallible<_> {
+                if member
+                    .dependencies_in_workspace()?
+                    .iter()
+                    .filter(filter_fn)
+                    .any(|(dep_name, _)| dep_name == &self.name())
+                {
+                    acc.insert(member.name(), *member);
+                };
 
-                    Ok(acc)
-                },
-            )?;
+                Ok(acc)
+            },
+        )?;
 
-            Ok(members_dependants.values().cloned().collect())
-        })
+        Ok(members_dependants.values().cloned().collect())
     }
 
     pub fn root(&self) -> &Path {
