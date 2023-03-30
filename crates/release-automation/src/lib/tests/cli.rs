@@ -292,6 +292,8 @@ fn bump_versions_on_selection() {
 
         - `Signature` is a 64 byte ‘secure primitive’
 
+        ## [crate\_g-0.0.2](crates/crate_g/CHANGELOG.md#0.0.2)
+
         # \[20210304.120604\]
 
         This will include the hdk-0.0.100 release.
@@ -333,6 +335,7 @@ fn bump_versions_on_selection() {
 
         the following crates are part of this release:
 
+        - crate_g-0.0.2
         - crate_b-0.0.0
         - crate_a-0.1.0
         - crate_e-0.0.1
@@ -537,8 +540,8 @@ fn multiple_subsequent_releases() {
     ) in [
         (
             "bump the first time as they're initially released",
-            vec!["0.0.0", "0.1.0", "0.0.1"],
-            vec!["crate_b", "crate_a", "crate_e"],
+            vec!["0.0.0", "0.1.0", "0.0.1", "0.0.2"],
+            vec!["crate_b", "crate_a", "crate_e", "crate_g"],
             // allowed missing dependencies
             Vec::<&str>::new(),
             true,
@@ -557,8 +560,8 @@ fn multiple_subsequent_releases() {
         ),
         (
             "only crate_a and crate_e have changed, expect these to be bumped",
-            vec!["0.0.0", "0.1.1", "0.0.2"],
-            vec!["crate_b", "crate_a", "crate_e"],
+            vec!["0.0.0", "0.1.1", "0.0.2", "0.0.2"],
+            vec!["crate_b", "crate_a", "crate_e", "crate_g"],
             // crate_b won't be part of the release so we allow it to be missing as we're not publishing
             vec!["crate_b"],
             true,
@@ -583,9 +586,9 @@ fn multiple_subsequent_releases() {
             }) as F,
         ),
         (
-            "matching only crate_a, a change of its dependency crate_b leads to a bump in both",
-            vec!["0.0.1", "0.1.2", "0.0.2"],
-            vec!["crate_b", "crate_a", "crate_e"],
+            "matching only crate_a, a change of its transitive dependency crate_g leads to bump in the dependency chain",
+            vec!["0.0.1", "0.1.2", "0.0.3"],
+            vec!["crate_b", "crate_a", "crate_g"],
             // allowed missing dependencies
             vec![],
             true,
@@ -593,7 +596,7 @@ fn multiple_subsequent_releases() {
             Box::new(|args: A| {
                 let root = args.0;
 
-                for crt in &["crate_b"] {
+                for crt in &["crate_g"] {
                     let mut readme = std::fs::OpenOptions::new()
                         .write(true)
                         .append(true)

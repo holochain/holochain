@@ -47,10 +47,12 @@ fn workspace_members() {
         .map(|crt| crt.name())
         .collect::<HashSet<_>>();
 
-    let expected_result = ["crate_a", "crate_b", "crate_c", "crate_e", "crate_f"]
-        .iter()
-        .map(std::string::ToString::to_string)
-        .collect::<HashSet<_>>();
+    let expected_result = [
+        "crate_g", "crate_a", "crate_b", "crate_c", "crate_e", "crate_f",
+    ]
+    .iter()
+    .map(std::string::ToString::to_string)
+    .collect::<HashSet<_>>();
 
     assert_eq!(expected_result, result);
 }
@@ -78,7 +80,7 @@ fn release_selection() {
         .into_iter()
         .map(|c| c.name())
         .collect::<Vec<_>>();
-    let expected_selection = vec!["crate_b", "crate_a", "crate_e"];
+    let expected_selection = vec!["crate_g", "crate_b", "crate_a", "crate_e"];
 
     assert_eq!(expected_selection, selection);
 }
@@ -161,10 +163,12 @@ fn members_sorted_ws1() {
         .map(|crt| crt.name())
         .collect::<Vec<_>>();
 
-    let expected_result = ["crate_b", "crate_a", "crate_c", "crate_e", "crate_f"]
-        .iter()
-        .map(std::string::ToString::to_string)
-        .collect::<Vec<_>>();
+    let expected_result = [
+        "crate_g", "crate_b", "crate_a", "crate_c", "crate_e", "crate_f",
+    ]
+    .iter()
+    .map(std::string::ToString::to_string)
+    .collect::<Vec<_>>();
 
     assert_eq!(expected_result, result);
 }

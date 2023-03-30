@@ -2,8 +2,8 @@ use crate::*;
 
 use anyhow::{bail, Context};
 use cargo_test_support::git::{self, Repository};
-use cargo_test_support::{Project, ProjectBuilder};
 use cargo_test_support::paths::init_root;
+use cargo_test_support::{Project, ProjectBuilder};
 use educe::Educe;
 use log::debug;
 use std::collections::HashMap;
@@ -320,12 +320,13 @@ pub fn example_workspace_1_aggregated_changelog() -> String {
 }
 
 /// A workspace to test changelogs and change detection.
-/// crate_a -> crate_b
+/// crate_a -> crate_b -> crate_g
 /// crate_b -> []
 /// crate_c -> []
 /// crate_d -> []
 /// crate_e -> []
 /// crate_f -> []
+/// crate_g -> []
 pub fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
     use crate::tests::workspace_mocker::{self, MockProject, WorkspaceMocker};
 
@@ -376,7 +377,9 @@ pub fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
         MockProject {
             name: "crate_b".to_string(),
             version: "0.0.0-alpha.1".to_string(),
-            dependencies: vec![],
+            dependencies: vec![
+                r#"crate_g = { path = "../crate_g", version = "=0.0.1" }"#.to_string(),
+            ],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Lib,
             changelog: Some(indoc::formatdoc!(
@@ -453,6 +456,22 @@ pub fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
         MockProject {
             name: "crate_f".to_string(),
             version: "0.2.0".to_string(),
+            dependencies: vec![],
+            excluded: false,
+            ty: workspace_mocker::MockProjectType::Lib,
+            changelog: Some(indoc::formatdoc!(
+                    r#"
+                    # Changelog
+                    Hello. This crate is releasable.
+
+                    ## Unreleased
+                    "#
+                )),
+            .. Default::default()
+        },
+        MockProject {
+            name: "crate_g".to_string(),
+            version: "0.0.1".to_string(),
             dependencies: vec![],
             excluded: false,
             ty: workspace_mocker::MockProjectType::Lib,
