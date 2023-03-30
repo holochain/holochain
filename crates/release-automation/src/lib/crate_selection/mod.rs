@@ -912,8 +912,32 @@ impl<'a> ReleaseWorkspace<'a> {
                         }
                     }
 
+                    // semver_increment_mode checks
+                    if let Some(allowed_semver_increment_modes) = &self.criteria.allowed_semver_increment_modes {
+                        let effective_semver_increment_mode  = member
+                            .changelog()
+                            .map(|cl| cl.front_matter().ok())
+                            .flatten()
+                            .flatten()
+                            .map(|fm| fm.semver_increment_mode())
+                            .unwrap_or_default();
+
+
+                        if !allowed_semver_increment_modes.contains(&effective_semver_increment_mode) {
+                            debug!("Blocking {} due to {:?} with mode: {effective_semver_increment_mode:?}", member.name(), CrateStateFlags::AllowedSemverIncrementModeViolated);
+                            insert_state!(CrateStateFlags::AllowedSemverIncrementModeViolated);
+                        }
+                    }
+                }
+
+                {
                     // dependency state
                     // only dependencies of explicitly matched packages are considered here.
+                    // this detects changes in the transitive dependency chain by two mechanisms
+                    // 1. the loop we're in iterates over the result of `ReleaseWorkspace::members`,
+                    //    which orders the members according to the workspace dependency trees from leafs to roots.
+                    //    this ensures that the states of a member's transitive dependencies have been evaluated by the time *it* is evaluated.
+                    // 2. the `member.dependencies_in_workspace()` yields transitive results.
                     if get_state!(member.name()).is_matched()
                     {
                         for (_, deps) in member.dependencies_in_workspace()? {
@@ -949,22 +973,6 @@ impl<'a> ReleaseWorkspace<'a> {
                     }
                 }
 
-                // semver_increment_mode checks
-                if let Some(allowed_semver_increment_modes) = &self.criteria.allowed_semver_increment_modes {
-                    let effective_semver_increment_mode  = member
-                        .changelog()
-                        .map(|cl| cl.front_matter().ok())
-                        .flatten()
-                        .flatten()
-                        .map(|fm| fm.semver_increment_mode())
-                        .unwrap_or_default();
-
-
-                    if !allowed_semver_increment_modes.contains(&effective_semver_increment_mode) {
-                        debug!("Blocking {} due to {:?} with mode: {effective_semver_increment_mode:?}", member.name(), CrateStateFlags::AllowedSemverIncrementModeViolated);
-                        insert_state!(CrateStateFlags::AllowedSemverIncrementModeViolated);
-                    }
-                }
             }
 
             Ok(members_states)
