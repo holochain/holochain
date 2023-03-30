@@ -55,7 +55,7 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        version: Option<DnaHashB64>,
+        installed_hash: Option<DnaHashB64>,
     },
     /// Always create a new Cell when installing the App,
     /// and use a unique network seed to ensure a distinct DHT network
@@ -64,15 +64,15 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        version: Option<DnaHashB64>,
+        installed_hash: Option<DnaHashB64>,
     },
-    /// Require that a Cell is already installed which matches the DNA version
-    /// spec, and which has an Agent that's associated with this App's agent
+    /// Require that a Cell is already installed with a specified DNA hash,
+    /// and which has an Agent that's associated with this App's agent
     /// via DPKI. If no such Cell exists, *app installation fails*.
     UseExisting {
         clone_limit: u32,
         deferred: bool,
-        version: DnaHashB64,
+        installed_hash: DnaHashB64,
     },
     /// Try `UseExisting`, and if that fails, fallback to `Create`
     CreateIfNotExists {
@@ -80,12 +80,12 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        version: DnaHashB64,
+        installed_hash: DnaHashB64,
     },
     /// Disallow provisioning altogether. In this case, we expect
     /// `clone_limit > 0`: otherwise, no cells will ever be created.
     Disabled {
-        version: DnaHashB64,
+        installed_hash: DnaHashB64,
         clone_limit: u32,
     },
 }

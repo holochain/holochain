@@ -28,7 +28,7 @@ async fn reject_duplicate_app_for_same_agent() {
         dna: AppRoleDnaManifest {
             location: Some(DnaLocation::Bundled(path.clone())),
             modifiers: modifiers.clone(),
-            version: Some(installed_dna_hash.into()),
+            installed_hash: Some(installed_dna_hash.into()),
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
@@ -150,7 +150,7 @@ async fn network_seed_regression() {
             dna: AppRoleDnaManifest {
                 location: Some(DnaLocation::Path(dna_path)),
                 modifiers: DnaModifiersOpt::default(),
-                version: None,
+                installed_hash: None,
                 clone_limit: 0,
             },
             provisioning: None,
@@ -378,7 +378,7 @@ impl TestCase {
                     dna: AppRoleDnaManifest {
                         location: Some(DnaLocation::Bundled(hashpath.clone())),
                         modifiers: dna_modifiers.clone(),
-                        version: None,
+                        installed_hash: None,
                         clone_limit: 10,
                     },
                     provisioning: Some(CellProvisioning::Create { deferred: false }),
@@ -405,7 +405,7 @@ impl TestCase {
                     dna: AppRoleDnaManifest {
                         location: Some(DnaLocation::Path(dna_path.clone())),
                         modifiers: dna_modifiers.clone(),
-                        version: Some(dna_hash.clone().into()),
+                        installed_hash: Some(dna_hash.clone().into()),
                         clone_limit: 0,
                     },
                     provisioning: None,

@@ -1,6 +1,6 @@
-//! App Manifest format, version 1.
+//! App Manifest format, installed_hash 1.
 //!
-//! NB: After stabilization, *do not modify this file*! Create a new version of
+//! NB: After stabilization, *do not modify this file*! Create a new installed_hash of
 //! the spec and leave this one alone to maintain backwards compatibility.
 
 use super::{
@@ -78,9 +78,14 @@ pub struct AppRoleDnaManifest {
     #[serde(default)]
     pub modifiers: DnaModifiersOpt<YamlProperties>,
 
-    /// The versioning constraints for the DNA. Ensures that only a DNA that
-    /// matches the version spec will be used.
-    pub version: Option<DnaHashB64>,
+    /// The hash of the DNA to be installed. If specified, will cause installation to
+    /// fail if the bundled DNA hash does not match this.
+    ///
+    /// Also allows the conductor to search for an already-installed DNA using this hash,
+    /// which allows for re-installing an app which has already been installed by manifest
+    /// only (no need to include the DNAs, since they are already installed in the conductor).
+    /// In this case, `location` does not even need to be set.
+    pub installed_hash: Option<DnaHashB64>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Each runtime clone is created by the `CreateClone` strategy,
@@ -98,7 +103,7 @@ impl AppRoleDnaManifest {
                 "./path/to/my/dnabundle.dna".into(),
             )),
             modifiers: DnaModifiersOpt::none(),
-            version: None,
+            installed_hash: None,
             clone_limit: 0,
         }
     }
@@ -119,7 +124,7 @@ pub enum CellProvisioning {
     /// Always create a new Cell when installing the App,
     /// and use a unique network seed to ensure a distinct DHT network
     CreateClone { deferred: bool },
-    /// Require that a Cell is already installed which matches the DNA version
+    /// Require that a Cell is already installed which matches the DNA installed_hash
     /// spec, and which has an Agent that's associated with this App's agent
     /// via DPKI. If no such Cell exists, *app installation fails*.
     UseExisting { deferred: bool },
@@ -173,20 +178,20 @@ impl AppManifestV1 {
                  }| {
                     let AppRoleDnaManifest {
                         location,
-                        version,
+                        installed_hash,
                         clone_limit,
                         modifiers,
                     } = dna;
                     let modifiers = modifiers.serialized()?;
                     // Go from "flexible" enum into proper DnaVersionSpec.
-                    let version = version.map(Into::into);
+                    let installed_hash = installed_hash.map(Into::into);
                     let validated = match provisioning.unwrap_or_default() {
                         CellProvisioning::Create { deferred } => AppRoleManifestValidated::Create {
                             deferred,
                             clone_limit,
                             location: Self::require(location, "roles.dna.(path|url)")?,
                             modifiers,
-                            version,
+                            installed_hash,
                         },
                         CellProvisioning::CreateClone { deferred } => {
                             AppRoleManifestValidated::CreateClone {
@@ -194,14 +199,17 @@ impl AppManifestV1 {
                                 clone_limit,
                                 location: Self::require(location, "roles.dna.(path|url)")?,
                                 modifiers,
-                                version,
+                                installed_hash,
                             }
                         }
                         CellProvisioning::UseExisting { deferred } => {
                             AppRoleManifestValidated::UseExisting {
                                 deferred,
                                 clone_limit,
-                                version: Self::require(version, "roles.dna.version")?,
+                                installed_hash: Self::require(
+                                    installed_hash,
+                                    "roles.dna.installed_hash",
+                                )?,
                             }
                         }
                         CellProvisioning::CreateIfNotExists { deferred } => {
@@ -209,13 +217,19 @@ impl AppManifestV1 {
                                 deferred,
                                 clone_limit,
                                 location: Self::require(location, "roles.dna.(path|url)")?,
-                                version: Self::require(version, "roles.dna.version")?,
+                                installed_hash: Self::require(
+                                    installed_hash,
+                                    "roles.dna.installed_hash",
+                                )?,
                                 modifiers,
                             }
                         }
                         CellProvisioning::Disabled => AppRoleManifestValidated::Disabled {
                             clone_limit,
-                            version: Self::require(version, "roles.dna.version")?,
+                            installed_hash: Self::require(
+                                installed_hash,
+                                "roles.dna.installed_hash",
+                            )?,
                         },
                     };
                     AppManifestResult::Ok((name, validated))
@@ -265,7 +279,7 @@ pub mod tests {
             dna: AppRoleDnaManifest {
                 location,
                 modifiers,
-                version: Some(installed_hash.into()),
+                installed_hash: Some(installed_hash.into()),
                 clone_limit: 50,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
@@ -307,7 +321,7 @@ roles:
       deferred: false
     dna:
       path: /tmp/test.dna
-      version: {}
+      installed_hash: {}
       clone_limit: 50
       network_seed: network_seed
       properties:
@@ -324,7 +338,7 @@ roles:
         let fields = &[
             "roles[0].id",
             "roles[0].provisioning.deferred",
-            "roles[0].dna.version[1]",
+            "roles[0].dna.installed_hash[1]",
             "roles[0].dna.properties",
         ];
         assert_eq!(actual.get(fields[0]), expected.get(fields[0]));

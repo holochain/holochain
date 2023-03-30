@@ -248,7 +248,7 @@ pub async fn register_and_install_dna_named(
         dna: AppRoleDnaManifest {
             location: Some(DnaLocation::Bundled(dna_path.clone())),
             modifiers: mods,
-            version: Some(dna_hash.clone().into()),
+            installed_hash: Some(dna_hash.clone().into()),
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),

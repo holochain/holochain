@@ -114,12 +114,12 @@ impl AppBundle {
         Ok(match role {
             AppRoleManifestValidated::Create {
                 location,
-                version,
+                installed_hash,
                 clone_limit,
                 modifiers,
                 deferred: _,
             } => {
-                self.resolve_cell_create(&location, version.as_ref(), clone_limit, modifiers)
+                self.resolve_cell_create(&location, installed_hash.as_ref(), clone_limit, modifiers)
                     .await?
             }
 
@@ -127,21 +127,26 @@ impl AppBundle {
                 unimplemented!("`create_clone` provisioning strategy is currently unimplemented")
             }
             AppRoleManifestValidated::UseExisting {
-                version,
+                installed_hash,
                 clone_limit,
                 deferred: _,
-            } => self.resolve_cell_existing(&version, clone_limit),
+            } => self.resolve_cell_existing(&installed_hash, clone_limit),
             AppRoleManifestValidated::CreateIfNotExists {
                 location,
-                version,
+                installed_hash,
                 clone_limit,
                 modifiers,
                 deferred: _,
-            } => match self.resolve_cell_existing(&version, clone_limit) {
+            } => match self.resolve_cell_existing(&installed_hash, clone_limit) {
                 op @ CellProvisioningOp::Existing(_, _) => op,
                 CellProvisioningOp::HashMismatch(_, _) => {
-                    self.resolve_cell_create(&location, Some(&version), clone_limit, modifiers)
-                        .await?
+                    self.resolve_cell_create(
+                        &location,
+                        Some(&installed_hash),
+                        clone_limit,
+                        modifiers,
+                    )
+                    .await?
                 }
                 CellProvisioningOp::Conflict(_) => {
                     unimplemented!("conflicts are not handled, or even possible yet")
@@ -154,7 +159,7 @@ impl AppBundle {
                 }
             },
             AppRoleManifestValidated::Disabled {
-                version: _,
+                installed_hash: _,
                 clone_limit: _,
             } => {
                 unimplemented!("`disabled` provisioning strategy is currently unimplemented")
