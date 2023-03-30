@@ -57,7 +57,11 @@ async fn provisioning_1_create() {
     let cell_id = CellId::new(dna.dna_hash().to_owned(), agent.clone());
 
     let resolution = bundle
-        .resolve_cells(agent.clone(), Default::default())
+        .resolve_cells(
+            &std::collections::HashMap::new(),
+            agent.clone(),
+            Default::default(),
+        )
         .await
         .unwrap();
 

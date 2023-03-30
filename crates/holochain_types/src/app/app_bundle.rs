@@ -45,10 +45,22 @@ impl AppBundle {
         self.0
     }
 
-    /// Given a DnaGamut, decide which of the available DNAs or Cells should be
-    /// used for each cell in this app.
+    /// Look up every installed_hash of every role, getting the DnaFiles from the DnaStore
+    pub fn get_all_dnas_from_store(&self, dna_store: &impl DnaStore) -> HashMap<DnaHash, DnaFile> {
+        self.manifest()
+            .app_roles()
+            .iter()
+            .flat_map(|role| role.dna.installed_hash.to_owned())
+            .map(Into::into)
+            .flat_map(|hash| dna_store.get_dna(&hash).map(|dna| (hash, dna)))
+            .collect()
+    }
+
+    /// Given a partial list of already available DnaFiles, fetch the missing others via
+    /// mr_bundle::Location resolution
     pub async fn resolve_cells(
         self,
+        dna_store: &impl DnaStore,
         agent: AgentPubKey,
         membrane_proofs: HashMap<RoleName, MembraneProof>,
     ) -> AppBundleResult<AppRoleResolution> {
@@ -56,7 +68,7 @@ impl AppBundle {
         let bundle = Arc::new(self);
         let tasks = roles.into_iter().map(|(role_name, role)| async {
             let bundle = bundle.clone();
-            Ok((role_name, bundle.resolve_cell(role).await?))
+            Ok((role_name, bundle.resolve_cell(dna_store, role).await?))
         });
         let resolution = futures::future::join_all(tasks)
             .await
@@ -68,7 +80,7 @@ impl AppBundle {
                 |acc: AppBundleResult<AppRoleResolution>, (role_name, op)| {
                     if let Ok(mut resolution) = acc {
                         match op {
-                            CellProvisioningOp::Create(dna, clone_limit) => {
+                            CellProvisioningOp::CreateFromDnaFile(dna, clone_limit) => {
                                 let agent = resolution.agent.clone();
                                 let dna_hash = dna.dna_hash().clone();
                                 let cell_id = CellId::new(dna_hash, agent);
@@ -78,6 +90,7 @@ impl AppBundle {
                                 resolution.dnas_to_register.push((dna, proof));
                                 resolution.role_assignments.push((role_name, role));
                             }
+
                             CellProvisioningOp::Existing(cell_id, clone_limit) => {
                                 let role = AppRoleAssignment::new(cell_id, true, clone_limit);
                                 resolution.role_assignments.push((role_name, role));
@@ -88,7 +101,8 @@ impl AppBundle {
                                     AppRoleAssignment::new(cell_id, false, clone_limit),
                                 ));
                             }
-                            other => {
+                            other @ CellProvisioningOp::HashMismatch(_, _)
+                            | other @ CellProvisioningOp::Conflict(_) => {
                                 tracing::error!(
                                     "Encountered unexpected CellProvisioningOp: {:?}",
                                     other
@@ -109,6 +123,7 @@ impl AppBundle {
 
     async fn resolve_cell(
         &self,
+        dna_store: &impl DnaStore,
         role: AppRoleManifestValidated,
     ) -> AppBundleResult<CellProvisioningOp> {
         Ok(match role {
@@ -119,8 +134,14 @@ impl AppBundle {
                 modifiers,
                 deferred: _,
             } => {
-                self.resolve_cell_create(&location, installed_hash.as_ref(), clone_limit, modifiers)
-                    .await?
+                self.resolve_cell_create(
+                    dna_store,
+                    &location,
+                    installed_hash.as_ref(),
+                    clone_limit,
+                    modifiers,
+                )
+                .await?
             }
 
             AppRoleManifestValidated::CreateClone { .. } => {
@@ -141,6 +162,7 @@ impl AppBundle {
                 op @ CellProvisioningOp::Existing(_, _) => op,
                 CellProvisioningOp::HashMismatch(_, _) => {
                     self.resolve_cell_create(
+                        dna_store,
                         &location,
                         Some(&installed_hash),
                         clone_limit,
@@ -151,7 +173,7 @@ impl AppBundle {
                 CellProvisioningOp::Conflict(_) => {
                     unimplemented!("conflicts are not handled, or even possible yet")
                 }
-                CellProvisioningOp::Create(_, _) => {
+                CellProvisioningOp::CreateFromDnaFile(_, _) => {
                     unreachable!("resolve_cell_existing will never return a Create op")
                 }
                 CellProvisioningOp::Noop(_, _) => {
@@ -170,20 +192,33 @@ impl AppBundle {
 
     async fn resolve_cell_create(
         &self,
+        dna_store: &impl DnaStore,
         location: &mr_bundle::Location,
         installed_hash: Option<&DnaHashB64>,
         clone_limit: u32,
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<CellProvisioningOp> {
-        let bytes = self.resolve(location).await?;
-        let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
-        let (dna_file, actual_hash) = dna_bundle.into_dna_file(modifiers).await?;
-        if let Some(expected_hash) = installed_hash.cloned().map(Into::into) {
-            if expected_hash != actual_hash {
-                return Ok(CellProvisioningOp::HashMismatch(expected_hash, actual_hash));
+        let dna_file = if let Some(hash) = installed_hash {
+            let (dna_file, original_hash) =
+                if let Some(mut dna_file) = dna_store.get_dna(&hash.clone().into()) {
+                    let original_hash = dna_file.dna_hash().clone();
+                    dna_file = dna_file.update_modifiers(modifiers);
+                    (dna_file, original_hash)
+                } else {
+                    self.resolve_location(location, modifiers).await?
+                };
+            let expected_hash = hash.clone().into();
+            if expected_hash != original_hash {
+                return Ok(CellProvisioningOp::HashMismatch(
+                    expected_hash,
+                    original_hash,
+                ));
             }
-        }
-        Ok(CellProvisioningOp::Create(dna_file, clone_limit))
+            dna_file
+        } else {
+            self.resolve_location(location, modifiers).await?.0
+        };
+        Ok(CellProvisioningOp::CreateFromDnaFile(dna_file, clone_limit))
     }
 
     fn resolve_cell_existing(
@@ -192,6 +227,17 @@ impl AppBundle {
         _clone_limit: u32,
     ) -> CellProvisioningOp {
         unimplemented!("Reusing existing cells is not yet implemented")
+    }
+
+    async fn resolve_location(
+        &self,
+        location: &mr_bundle::Location,
+        modifiers: DnaModifiersOpt,
+    ) -> AppBundleResult<(DnaFile, DnaHash)> {
+        let bytes = self.resolve(location).await?;
+        let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
+        let (dna_file, original_hash) = dna_bundle.into_dna_file(modifiers).await?;
+        Ok((dna_file, original_hash))
     }
 }
 
@@ -242,8 +288,8 @@ impl AppRoleResolution {
 #[warn(missing_docs)]
 #[derive(Debug)]
 pub enum CellProvisioningOp {
-    /// Create a new Cell
-    Create(DnaFile, u32),
+    /// Create a new Cell from the given DNA file
+    CreateFromDnaFile(DnaFile, u32),
     /// Use an existing Cell
     Existing(CellId, u32),
     /// No provisioning needed, but there might be a clone_limit, and so we need
