@@ -195,7 +195,11 @@ impl AppManifestV1 {
     // we know we need it, since this way is substantially simpler.
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for mut role in self.roles.iter_mut() {
-            if matches!(role.provisioning, Some(CellProvisioning::Create { .. })) {
+            if !matches!(
+                role.provisioning.clone().unwrap_or_default(),
+                CellProvisioning::CreateClone { .. } | CellProvisioning::UseExisting { .. }
+            ) {
+                // Only update the network seed for roles for which it makes sense to do so
                 role.dna.modifiers.network_seed = Some(network_seed.clone());
             }
         }
@@ -419,14 +423,14 @@ roles:
             manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
+        assert_eq!(
+            manifest.roles[3].dna.modifiers.network_seed.as_ref(),
+            Some(&network_seed)
+        );
 
         // - The others do not.
         assert_ne!(
             manifest.roles[2].dna.modifiers.network_seed.as_ref(),
-            Some(&network_seed)
-        );
-        assert_ne!(
-            manifest.roles[3].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
     }

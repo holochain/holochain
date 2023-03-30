@@ -24,13 +24,13 @@ pub struct Create {
     /// This directory must already exist.
     #[structopt(long)]
     pub root: Option<PathBuf>,
-    #[structopt(short, long)]
+    #[structopt(short, long, value_delimiter = ",")]
     /// Specify the directory name for each sandbox that is created.
     /// By default, new sandbox directories get a random name
     /// like "kAOXQlilEtJKlTM_W403b".
     /// Use this option to override those names with something explicit.
     ///
-    /// For example `hc gen -r path/to/my/chains -n 3 -d=first,second,third`
+    /// For example `hc s generate path/to/my/chains -r -n 3 -d=first,second,third`
     /// will create three sandboxes with directories named "first", "second", and "third".
     pub directories: Vec<PathBuf>,
 }

@@ -54,7 +54,7 @@ jobs:
           MATRIX: ${{ toJSON(matrix) }}
         run: echo ${MATRIX}
 
-      - name: "Test comand ${{ matrix.nixCommand }}"
+      - name: "Test command ${{ matrix.nixCommand }}"
         env:
           system: ${{ matrix.platform.system }}
         run: |
