@@ -30,7 +30,7 @@ pub struct Create {
     /// By default, new sandbox directories get a random name
     /// like "kAOXQlilEtJKlTM_W403b".
     /// Use this option to override those names with something explicit.
-    /// For example `hc sandbox -r path/to/my/chains -n 3 -d=first,second,third`
+    /// For example `hc sandbox generate -r path/to/my/chains -n 3 -d=first,second,third`
     /// will create three sandboxes with directories named "first", "second", and "third".
     #[structopt(short, long, value_delimiter = ",")]
     pub directories: Vec<PathBuf>,
