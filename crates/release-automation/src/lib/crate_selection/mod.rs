@@ -351,6 +351,10 @@ impl<'a> Crate<'a> {
                     if member
                         .dependencies_in_workspace()?
                         .iter()
+                        // FIXME: applying the filter here is incorrect, because
+                        // it persists the return value for the first call and
+                        // returns that for every subsequent call, regardless of
+                        // the filter function that's passed
                         .filter(filter_fn)
                         .map(|(dep_name, _)| dep_name)
                         .collect::<LinkedHashSet<_>>()
