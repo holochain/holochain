@@ -17,7 +17,7 @@ const DEFAULT_APP_ID: &str = "test-app";
 #[derive(Debug, Parser)]
 pub struct HcSandbox {
     #[command(subcommand)]
-    command: HcSandboxSubcommand,
+    subcommand: HcSandboxSubcommand,
 
     /// Instead of the normal "interactive" passphrase mode,
     /// collect the passphrase by reading stdin to the end.
@@ -106,7 +106,7 @@ impl HcSandbox {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         holochain_util::pw::pw_set_piped(self.piped);
-        match self.command {
+        match self.subcommand {
             HcSandboxSubcommand::Generate {
                 app_id,
                 create,

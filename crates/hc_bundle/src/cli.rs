@@ -25,11 +25,11 @@ pub const WEB_APP_BUNDLE_EXT: &str = "webhapp";
 pub struct HcDnaBundle {
     /// The `hc dna` subcommand to run.
     #[command(subcommand)]
-    pub command: HcDnaBundleCommand,
+    pub subcommand: HcDnaBundleSubcommand,
 }
 
 #[derive(Debug, Subcommand)]
-pub enum HcDnaBundleCommand {
+pub enum HcDnaBundleSubcommand {
     /// Create a new, empty Holochain DNA bundle working directory and create a new
     /// sample `dna.yaml` manifest inside.
     Init {
@@ -96,11 +96,11 @@ pub enum HcDnaBundleCommand {
 pub struct HcAppBundle {
     /// The `hc app` subcommand to run.
     #[command(subcommand)]
-    pub command: HcAppBundleCommand,
+    pub subcommand: HcAppBundleSubcommand,
 }
 
 #[derive(Debug, Subcommand)]
-pub enum HcAppBundleCommand {
+pub enum HcAppBundleSubcommand {
     /// Create a new, empty Holochain app (hApp) working directory and create a new
     /// sample `happ.yaml` manifest inside.
     Init {
@@ -174,11 +174,11 @@ pub enum HcAppBundleCommand {
 pub struct HcWebAppBundle {
     /// The `hc web-app` subcommand to run.
     #[command(subcommand)]
-    pub command: HcWebAppBundleCommand,
+    pub subcommand: HcWebAppBundleSubcommand,
 }
 
 #[derive(Debug, Subcommand)]
-pub enum HcWebAppBundleCommand {
+pub enum HcWebAppBundleSubcommand {
     /// Create a new, empty Holochain web app working directory and create a new
     /// sample `web-happ.yaml` manifest inside.
     Init {
@@ -249,7 +249,35 @@ pub enum HcWebAppBundleCommand {
     },
 }
 
-impl HcDnaBundleCommand {
+// These impls are here to make the code for the three `Hc_Bundle` subcommand wrappers
+// somewhat consistent with the main subcommand wrapper and that of `hc-sandbox`,
+// in which it's the wrapper struct that contains the `run` function.
+// The reason the `run` function is on these subcommands' sub-subcommand enums
+// is that the recursive packing functions call them directly on the variants
+// and don't want to bother instantiating a wrapper just for that.
+
+impl HcDnaBundle {
+    /// Run this subcommand, passing off all the work to the sub-sub-command enum
+    pub async fn run(self) -> anyhow::Result<()> {
+        self.subcommand.run().await
+    }
+}
+
+impl HcAppBundle {
+    /// Run this subcommand, passing off all the work to the sub-sub-command enum
+    pub async fn run(self) -> anyhow::Result<()> {
+        self.subcommand.run().await
+    }
+}
+
+impl HcWebAppBundle {
+    /// Run this subcommand, passing off all the work to the sub-sub-command enum
+    pub async fn run(self) -> anyhow::Result<()> {
+        self.subcommand.run().await
+    }
+}
+
+impl HcDnaBundleSubcommand {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
@@ -293,7 +321,7 @@ impl HcDnaBundleCommand {
     }
 }
 
-impl HcAppBundleCommand {
+impl HcAppBundleSubcommand {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
@@ -341,7 +369,7 @@ impl HcAppBundleCommand {
     }
 }
 
-impl HcWebAppBundleCommand {
+impl HcWebAppBundleSubcommand {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
@@ -439,7 +467,7 @@ async fn web_app_pack_recursive(web_app_workdir_path: &PathBuf) -> anyhow::Resul
             .join(bundled_app_location);
 
         // Pack all the bundled DNAs and the app's manifest
-        HcAppBundleCommand::Pack {
+        HcAppBundleSubcommand::Pack {
             path: ffs::canonicalize(app_workdir_location).await?,
             output: None,
             recursive: true,
@@ -464,7 +492,7 @@ async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
         bundled_dnas_workdir_locations(&app_manifest_path, &manifest).await?;
 
     for dna_workdir_location in dnas_workdir_locations {
-        HcDnaBundleCommand::Pack {
+        HcDnaBundleSubcommand::Pack {
             path: dna_workdir_location,
             output: None,
         }

@@ -75,12 +75,12 @@ fn builtin_commands() -> Vec<String> {
 pub struct Cli {
     /// The `hc` subcommand to run.
     #[command(subcommand)]
-    pub subcommand: CliCommand,
+    pub subcommand: CliSubcommand,
 }
 
 /// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`.
 #[derive(Debug, Subcommand)]
-pub enum CliCommand {
+pub enum CliSubcommand {
     /// Work with DNA bundles.
     Dna(hc_bundle::HcDnaBundle),
     /// Work with hApp bundles.
@@ -94,15 +94,15 @@ pub enum CliCommand {
     External(Vec<String>),
 }
 
-impl CliCommand {
+impl CliSubcommand {
     /// Run this command.
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
-            CliCommand::App(cmd) => cmd.command.run().await?,
-            CliCommand::Dna(cmd) => cmd.command.run().await?,
-            CliCommand::WebApp(cmd) => cmd.command.run().await?,
-            CliCommand::Sandbox(cmd) => cmd.run().await?,
-            CliCommand::External(args) => {
+            CliSubcommand::App(cmd) => cmd.run().await?,
+            CliSubcommand::Dna(cmd) => cmd.run().await?,
+            CliSubcommand::WebApp(cmd) => cmd.run().await?,
+            CliSubcommand::Sandbox(cmd) => cmd.run().await?,
+            CliSubcommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
                 Command::new(format!("hc-{}", command_suffix))
                     .args(&args[1..])
