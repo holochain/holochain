@@ -12,7 +12,6 @@ use holochain_types::prelude::DbKindP2pAgents;
 use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
-use kitsune_p2p::agent_store::AgentInfoSigned;
 
 pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
     db.async_commit(move |txn| mutations::insert_block(txn, input))
@@ -28,7 +27,7 @@ pub fn query_is_blocked(
     txn: &Transaction<'_>,
     target_id: BlockTargetId,
     timestamp: Timestamp,
-) -> StateQueryResult<bool> {
+) -> DatabaseResult<bool> {
     Ok(txn.query_row(
         sql_conductor::IS_BLOCKED,
         named_params! {

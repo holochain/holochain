@@ -15,6 +15,7 @@ edition = "2021"
 kitsune_p2p_dht = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/dht" }
 kitsune_p2p_timestamp = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/timestamp" }
 kitsune_p2p_block = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/block" }
+kitsune_p2p_bin_data = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/bin_data" }
 holo_hash = { version = "^0.2.0-beta-rc.0", path = "../holo_hash", features = ["encoding"] }
 holochain_integrity_types = { version = "^0.2.0-beta-rc.0", path = "../holochain_integrity_types", features = ["tracing"] }
 holochain_serialized_bytes = "=0.0.51"

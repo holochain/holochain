@@ -1,12 +1,14 @@
 //! A "Cell" represents a DNA/AgentId pair - a space where one dna/agent
 //! can track its source chain and service network requests / responses.
 
+use crate::RoleName;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
+use kitsune_p2p_bin_data::KitsuneAgent;
+use kitsune_p2p_bin_data::KitsuneSpace;
 use std::fmt;
-
-use crate::RoleName;
+use std::sync::Arc;
 
 /// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary
@@ -117,6 +119,14 @@ impl CellId {
     /// Create a CellId from its components
     pub fn new(dna_hash: DnaHash, agent_pubkey: AgentPubKey) -> Self {
         CellId(dna_hash, agent_pubkey)
+    }
+
+    /// Create a CellId from kitsune equivalent types.
+    pub fn from_kitsune(space: Arc<KitsuneSpace>, agent: Arc<KitsuneAgent>) -> Self {
+        Self::new(
+            DnaHash::from_raw_32(space.0.clone()),
+            AgentPubKey::from_raw_32(agent.0.clone()),
+        )
     }
 
     /// The dna hash/address for this cell.
