@@ -175,9 +175,10 @@ impl<T: HashType> HoloHash<T> {
     /// The 3 prefix bytes will be added based on the provided HashType,
     /// and the 4 location bytes will be computed.
     pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
-        assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
+        assert_length!(HOLO_HASH_CORE_LEN, &hash);
         hash.append(&mut encode::holo_dht_location_bytes(&hash));
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
+
         HoloHash::from_raw_36_and_type(hash, hash_type)
     }
 }
