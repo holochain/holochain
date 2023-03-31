@@ -9,7 +9,6 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::DbKindConductor;
 use holochain_types::prelude::DbKindP2pAgents;
-use holochain_types::prelude::DbRead;
 use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
