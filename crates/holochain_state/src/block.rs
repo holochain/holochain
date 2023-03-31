@@ -1,14 +1,10 @@
 use crate::mutations;
-use crate::prelude::StateQueryResult;
 use crate::query::prelude::named_params;
-use holochain_sqlite::db::AsP2pStateTxExt;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_sqlite::prelude::DbRead;
 use holochain_sqlite::prelude::DbWrite;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::DbKindConductor;
-use holochain_types::prelude::DbKindP2pAgents;
 use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
