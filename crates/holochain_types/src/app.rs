@@ -403,6 +403,8 @@ pub struct InstalledAppCommon {
     agent_key: AgentPubKey,
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
     role_assignments: HashMap<RoleName, AppRoleAssignment>,
+    /// The manifest used to install the app.
+    manifest: AppManifest,
 }
 
 impl InstalledAppCommon {
@@ -411,6 +413,7 @@ impl InstalledAppCommon {
         installed_app_id: S,
         agent_key: AgentPubKey,
         role_assignments: I,
+        manifest: AppManifest,
     ) -> AppResult<Self> {
         let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
         // ensure no role name contains a clone id delimiter
@@ -424,6 +427,7 @@ impl InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             agent_key,
             role_assignments,
+            manifest,
         })
     }
 
@@ -747,7 +751,9 @@ impl InstalledAppCommon {
             return Err(AppError::DuplicateRoleNames(installed_app_id, duplicates));
         }
 
-        let roles = installed_cells
+        let manifest = AppManifest::from_legacy(installed_cells.clone().into_iter());
+
+        let role_assignments = installed_cells
             .into_iter()
             .map(|InstalledCell { role_name, cell_id }| {
                 let role = AppRoleAssignment {
@@ -761,11 +767,18 @@ impl InstalledAppCommon {
                 (role_name, role)
             })
             .collect();
+
         Ok(Self {
             installed_app_id,
             agent_key: _agent_key,
-            role_assignments: roles,
+            role_assignments,
+            manifest,
         })
+    }
+
+    /// Return the manifest if available
+    pub fn manifest(&self) -> &AppManifest {
+        &self.manifest
     }
 }
 
@@ -1061,10 +1074,12 @@ mod tests {
     use super::{AppRoleAssignment, RunningApp};
     use crate::prelude::*;
     use ::fixt::prelude::*;
+    use arbitrary::Arbitrary;
     use std::collections::HashSet;
 
     #[test]
     fn illegal_role_name_is_rejected() {
+        let mut u = unstructured_noise();
         let result = InstalledAppCommon::new(
             "test_app",
             fixt!(AgentPubKey),
@@ -1072,6 +1087,7 @@ mod tests {
                 CLONE_ID_DELIMITER.into(),
                 AppRoleAssignment::new(fixt!(CellId), false, 0),
             )],
+            AppManifest::arbitrary(&mut u).unwrap(),
         );
         assert!(result.is_err())
     }
@@ -1085,10 +1101,15 @@ mod tests {
         let role1 = AppRoleAssignment::new(base_cell_id, false, clone_limit);
         let agent = fixt!(AgentPubKey);
         let role_name: RoleName = "role_name".into();
-        let mut app: RunningApp =
-            InstalledAppCommon::new("app", agent.clone(), vec![(role_name.clone(), role1)])
-                .unwrap()
-                .into();
+        let manifest = AppManifest::arbitrary(&mut unstructured_noise()).unwrap();
+        let mut app: RunningApp = InstalledAppCommon::new(
+            "app",
+            agent.clone(),
+            vec![(role_name.clone(), role1)],
+            manifest,
+        )
+        .unwrap()
+        .into();
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];

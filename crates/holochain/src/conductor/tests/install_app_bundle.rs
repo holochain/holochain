@@ -8,7 +8,7 @@ use holochain_types::prelude::{
     AppRoleManifest, CellProvisioning, DnaBundle, DnaFile, DnaLocation, InstallAppPayload,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{CellId, DnaModifiersOpt};
+use holochain_zome_types::{CellId, DnaModifiersOpt, Timestamp};
 use matches::assert_matches;
 use tempfile::{tempdir, TempDir};
 
@@ -122,6 +122,100 @@ async fn reject_duplicate_app_for_same_agent() {
         })
         .await;
     assert!(valid_install_of_second_app.is_ok());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_info() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (alice, bobbo) = SweetAgents::two(conductor.keystore()).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let path = PathBuf::from(format!("{}", dna.dna_hash()));
+    let modifiers = DnaModifiersOpt::default()
+        .with_network_seed("initial seed".into())
+        .with_origin_time(Timestamp::now());
+
+    let roles = vec![AppRoleManifest {
+        name: "name".into(),
+        dna: AppRoleDnaManifest {
+            location: Some(DnaLocation::Bundled(path.clone())),
+            modifiers: modifiers.clone(),
+            // Note that there is no installed hash provided. We'll check that this changes later.
+            installed_hash: None,
+            clone_limit: 0,
+        },
+        provisioning: Some(CellProvisioning::Create { deferred: false }),
+    }];
+
+    let manifest = AppManifestCurrentBuilder::default()
+        .name("test_app".into())
+        .description(None)
+        .roles(roles)
+        .build()
+        .unwrap();
+
+    let resources = vec![(
+        path.clone(),
+        DnaBundle::from_dna_file(dna.clone()).await.unwrap(),
+    )];
+
+    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
+        .await
+        .unwrap();
+
+    conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: alice.clone(),
+            source: AppBundleSource::Bundle(bundle),
+            installed_app_id: Some("app_1".into()),
+            network_seed: Some("final seed".into()),
+            membrane_proofs: HashMap::new(),
+        })
+        .await
+        .unwrap();
+
+    let manifest = conductor
+        .get_app_info(&"app_1".to_string())
+        .await
+        .unwrap()
+        .unwrap()
+        .manifest;
+
+    let installed_dna = dna.update_modifiers(
+        modifiers
+            .with_network_seed("final seed".into())
+            .serialized()
+            .unwrap(),
+    );
+    let installed_dna_hash = DnaHash::with_data_sync(installed_dna.dna_def());
+
+    // Check that the returned manifest has the installed DNA hash properly set
+    assert_eq!(
+        manifest.app_roles()[0].dna.installed_hash,
+        Some(installed_dna_hash.into())
+    );
+
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.network_seed,
+        Some("final seed".into())
+    );
+
+    let bundle = AppBundle::new(manifest, vec![], PathBuf::from("."))
+        .await
+        .unwrap();
+
+    conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: bobbo,
+            source: AppBundleSource::Bundle(bundle),
+            installed_app_id: Some("app_2".into()),
+            network_seed: None,
+            membrane_proofs: HashMap::new(),
+        })
+        .await
+        .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
