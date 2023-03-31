@@ -886,8 +886,6 @@ mod network_impls {
             dna_hash: &DnaHash,
             used_by: &Vec<InstalledAppId>,
         ) -> ConductorResult<StorageBlob> {
-            let db_error_mapper = |e| ConductorError::DatabaseError(e);
-
             let authored_db = self.spaces.authored_db(dna_hash)?;
             let dht_db = self.spaces.dht_db(dna_hash)?;
             let cache_db = self.spaces.cache(dna_hash)?;
@@ -895,27 +893,27 @@ mod network_impls {
             Ok(StorageBlob::AppData(AppDataStorageBlob {
                 authored_data_size_on_disk: authored_db
                     .async_reader(get_size_on_disk)
-                    .map_err(db_error_mapper)
+                    .map_err(ConductorError::DatabaseError)
                     .await?,
                 authored_data_size: authored_db
                     .async_reader(get_used_size)
-                    .map_err(db_error_mapper)
+                    .map_err(ConductorError::DatabaseError)
                     .await?,
                 dht_data_size_on_disk: dht_db
                     .async_reader(get_size_on_disk)
-                    .map_err(db_error_mapper)
+                    .map_err(ConductorError::DatabaseError)
                     .await?,
                 dht_data_size: dht_db
                     .async_reader(get_used_size)
-                    .map_err(db_error_mapper)
+                    .map_err(ConductorError::DatabaseError)
                     .await?,
                 cache_data_size_on_disk: cache_db
                     .async_reader(get_size_on_disk)
-                    .map_err(db_error_mapper)
+                    .map_err(ConductorError::DatabaseError)
                     .await?,
                 cache_data_size: cache_db
                     .async_reader(get_used_size)
-                    .map_err(db_error_mapper)
+                    .map_err(ConductorError::DatabaseError)
                     .await?,
                 used_by: used_by.clone(),
             }))
