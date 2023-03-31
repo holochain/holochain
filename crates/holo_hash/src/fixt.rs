@@ -156,7 +156,7 @@ fixturator!(
 
 fixturator!(
     AnyDhtHash;
-    constructor fn from_raw_36_and_type(ThirtyTwoHashBytes, HashTypeAnyDht);
+    constructor fn from_raw_32_and_type(ThirtyTwoHashBytes, HashTypeAnyDht);
 );
 fixturator!(
     AnyDhtHashB64;
@@ -165,7 +165,7 @@ fixturator!(
 
 fixturator!(
     AnyLinkableHash;
-    constructor fn from_raw_36_and_type(ThirtyTwoHashBytes, HashTypeAnyLinkable);
+    constructor fn from_raw_32_and_type(ThirtyTwoHashBytes, HashTypeAnyLinkable);
 );
 fixturator!(
     AnyLinkableHashB64;
