@@ -24,7 +24,7 @@ pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseRes
         .await
 }
 
-fn query_is_blocked(
+pub fn query_is_blocked(
     txn: &Transaction<'_>,
     target_id: BlockTargetId,
     timestamp: Timestamp,
@@ -37,28 +37,6 @@ fn query_is_blocked(
         },
         |row| row.get(0),
     )?)
-}
-
-pub async fn is_blocked(
-    db_conductor: &DbRead<DbKindConductor>,
-    db_p2p_agent_store: &DbRead<DbKindP2pAgents>,
-    target_id_0: BlockTargetId,
-    timestamp: Timestamp,
-) -> StateQueryResult<bool> {
-    let target_id_1 = target_id_0.clone();
-    Ok(db_conductor
-        .async_reader(move |txn| query_is_blocked(&txn, target_id_1, timestamp))
-        .await?
-        // Targets may imply additional sub-targets.
-        || match target_id_0 {
-            BlockTargetId::Cell(_) => false,
-            BlockTargetId::Ip(_) => false,
-            BlockTargetId::Node(_) => {
-                let _agents: StateQueryResult<Vec<AgentInfoSigned>> = db_p2p_agent_store.async_reader(|txn| Ok(txn.p2p_list_agents()?)).await;
-                false
-            }
-            BlockTargetId::NodeDna(_, _) => false,
-        })
 }
 
 #[cfg(test)]

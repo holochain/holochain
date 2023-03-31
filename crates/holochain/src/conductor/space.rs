@@ -179,16 +179,25 @@ impl Spaces {
     /// Check if some target is blocked.
     pub async fn is_blocked(
         &self,
-        input: BlockTargetId,
+        target_id_0: BlockTargetId,
         timestamp: Timestamp,
     ) -> StateQueryResult<bool> {
-        holochain_state::block::is_blocked(
-            &self.conductor_db,
-            &self.p2p_agents_db,
-            input,
-            timestamp,
-        )
-        .await
+        let target_id_1 = target_id_0.clone();
+        Ok(self.db_conductor
+            .async_reader(move |txn| holochain_state::block::query_is_blocked(&txn, target_id_1, timestamp))
+            .await?
+            // Targets may imply additional sub-targets.
+            || match target_id_0 {
+                BlockTargetId::Cell(_) => false,
+                BlockTargetId::Ip(_) => false,
+                BlockTargetId::Node(_) => {
+                    false
+                }
+                BlockTargetId::NodeDna(_, dna_hash) => {
+                    let _agents: StateQueryResult<Vec<AgentInfoSigned>> = self.p2p_agents_db(dna_hash).async_reader(|txn| Ok(txn.p2p_list_agents()?)).await;
+                    false
+                }
+            })
     }
 
     /// Get the holochain conductor state
