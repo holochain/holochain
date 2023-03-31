@@ -182,7 +182,13 @@ impl Spaces {
         input: BlockTargetId,
         timestamp: Timestamp,
     ) -> StateQueryResult<bool> {
-        holochain_state::block::is_blocked(&self.conductor_db, input, timestamp).await
+        holochain_state::block::is_blocked(
+            &self.conductor_db,
+            &self.p2p_agents_db,
+            input,
+            timestamp,
+        )
+        .await
     }
 
     /// Get the holochain conductor state

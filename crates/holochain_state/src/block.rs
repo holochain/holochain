@@ -1,14 +1,18 @@
 use crate::mutations;
 use crate::prelude::StateQueryResult;
 use crate::query::prelude::named_params;
+use holochain_sqlite::db::AsP2pStateTxExt;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::prelude::DbWrite;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::DbKindConductor;
+use holochain_types::prelude::DbKindP2pAgents;
+use holochain_types::prelude::DbRead;
 use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
+use kitsune_p2p::agent_store::AgentInfoSigned;
 
 pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
     db.async_commit(move |txn| mutations::insert_block(txn, input))
@@ -36,12 +40,25 @@ fn query_is_blocked(
 }
 
 pub async fn is_blocked(
-    db: &DbWrite<DbKindConductor>,
-    target_id: BlockTargetId,
+    db_conductor: &DbRead<DbKindConductor>,
+    db_p2p_agent_store: &DbRead<DbKindP2pAgents>,
+    target_id_0: BlockTargetId,
     timestamp: Timestamp,
 ) -> StateQueryResult<bool> {
-    db.async_reader(move |txn| query_is_blocked(&txn, target_id, timestamp))
-        .await
+    let target_id_1 = target_id_0.clone();
+    Ok(db_conductor
+        .async_reader(move |txn| query_is_blocked(&txn, target_id_1, timestamp))
+        .await?
+        // Targets may imply additional sub-targets.
+        || match target_id_0 {
+            BlockTargetId::Cell(_) => false,
+            BlockTargetId::Ip(_) => false,
+            BlockTargetId::Node(_) => {
+                let _agents: StateQueryResult<Vec<AgentInfoSigned>> = db_p2p_agent_store.async_reader(|txn| Ok(txn.p2p_list_agents()?)).await;
+                false
+            }
+            BlockTargetId::NodeDna(_, _) => false,
+        })
 }
 
 #[cfg(test)]
