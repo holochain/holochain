@@ -17,7 +17,7 @@ Each HoloHash has a HashType. There are two flavors of HashType: *primitive*, an
 
 ### Primitive HashTypes
 
-Each primitive HashType has a unique 3-byte prefix associated with it, to easily distiguish between hashes in any environment. These prefixes are multihash compatible. The primitive types are:
+Each primitive HashType has a unique 3-byte prefix associated with it, to easily distinguish between hashes in any environment. These prefixes are multihash compatible. The primitive types are:
 
 | hash type | HoloHash alias | prefix |
 |-----------|----------------|--------|
@@ -43,11 +43,11 @@ Composite hash types are used in contexts when one of several primitive hash typ
 
 `EntryHash`: used to hash Entries. An Entry can hash to either a `ContentHash` or an `AgentPubKey`.
 
-`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either an action or an Entry, therefore AnyDhtHash can refer to either an `ActionHash` or an `EntryHash`.
+`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either an Action or an Entry, therefore AnyDhtHash can refer to either an `ActionHash` or an `EntryHash`.
 
 ## Serialization
 
-HoloHash implements `Display` providing a `to_string()` function accessing the hash as a user friendly string. It also provides TryFrom for string types allowing you to parse this string representation.
+HoloHash implements `Display` providing a `to_string()` function accessing the hash as a user-friendly string. It also provides TryFrom for string types allowing you to parse this string representation.
 
 HoloHash includes a 4 byte (or u32) dht "location" that serves dual purposes. - It is used as a checksum when parsing string representations. - It is used as a u32 in our dht sharding algorithm.
 
