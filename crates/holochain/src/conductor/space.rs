@@ -199,7 +199,7 @@ impl Spaces {
                     for dna in dnas {
                         all_blocked = all_blocked && self.is_blocked(BlockTargetId::NodeDna(node_id.clone(), dna), timestamp).await?;
                     }
-                    false
+                    all_blocked
                 }
                 BlockTargetId::NodeDna(node_id, dna_hash) => {
                     let agents: DatabaseResult<Vec<AgentInfoSigned>> = self.p2p_agents_db(&dna_hash)?.async_reader(|txn| Ok(txn.p2p_list_agents()?)).await;
@@ -702,7 +702,6 @@ impl Space {
         root_db_dir: &DatabaseRootPath,
         db_sync_strategy: DbSyncStrategy,
     ) -> DatabaseResult<Self> {
-        use holochain_p2p::DnaHashExt;
         let space = dna_hash.to_kitsune();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
