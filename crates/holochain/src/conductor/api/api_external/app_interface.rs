@@ -112,23 +112,6 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 let info = self.conductor_handle.network_info(&payload.dnas).await?;
                 Ok(AppResponse::NetworkInfo(info))
             }
-            AppRequest::StorageInfo {
-                installed_app_id: Some(installed_app_id),
-            } => {
-                let app_storage_info = self
-                    .conductor_handle
-                    .storage_info_for_app(&installed_app_id)
-                    .await?;
-
-                Ok(AppResponse::StorageInfo(StorageInfo {
-                    app_storage_info: vec![app_storage_info],
-                }))
-            }
-            AppRequest::StorageInfo {
-                installed_app_id: None,
-            } => Ok(AppResponse::StorageInfo(
-                self.conductor_handle.storage_info_for_apps().await?,
-            )),
         }
     }
 }

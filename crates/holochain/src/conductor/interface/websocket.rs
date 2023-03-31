@@ -508,55 +508,7 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn storage_info_for_one_app() {
-        holochain_trace::test_run().ok();
-        let uuid = Uuid::new_v4();
-        let dna = fake_dna_zomes(
-            &uuid.to_string(),
-            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-        );
-
-        // warm the zome
-        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
-
-        let dna_hash = dna.dna_hash().clone();
-        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
-        let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
-
-        let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
-            "test app".to_string(),
-            vec![dna],
-            vec![(installed_cell, None)],
-        )
-        .await;
-
-        let msg = AppRequest::StorageInfo {
-            installed_app_id: Some("test app".to_string()),
-        };
-        let msg = msg.try_into().unwrap();
-        let respond = move |bytes: SerializedBytes| {
-            let response: AppResponse = bytes.try_into().unwrap();
-            match response {
-                AppResponse::StorageInfo(info) => {
-                    assert_eq!(info.app_storage_info.len(), 1);
-                    let app_info = info.app_storage_info.first().unwrap();
-                    assert_app_storage_info(app_info, "test app".to_string(), cell_id);
-                }
-                other => panic!("unexpected response {:?}", other),
-            }
-            async { Ok(()) }.boxed().into()
-        };
-        let respond = Respond::Request(Box::new(respond));
-        let msg = (msg, respond);
-        handle_incoming_message(msg, app_api).await.unwrap();
-
-        handle.shutdown().await.unwrap().unwrap();
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn storage_info_for_all_apps() {
+    async fn storage_info() {
         holochain_trace::test_run().ok();
         let uuid_1 = Uuid::new_v4();
         let dna_1 = fake_dna_zomes(
@@ -580,7 +532,11 @@ pub mod test {
         let cell_id_2 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_1()));
         let installed_cell_2 = InstalledCell::new(cell_id_2.clone(), "handle_2".into());
 
-        let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
+        // Run the same DNA in cell 3 to check that grouping works correctly
+        let cell_id_3 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_2()));
+        let installed_cell_3 = InstalledCell::new(cell_id_3.clone(), "handle_3".into());
+
+        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
             "test app 1".to_string(),
             vec![dna_1],
             vec![(installed_cell_1, None)],
@@ -590,29 +546,53 @@ pub mod test {
         install_app_in_conductor(
             handle.clone(),
             "test app 2".to_string(),
-            vec![dna_2],
+            vec![dna_2.clone()],
             vec![(installed_cell_2, None)],
         )
         .await;
 
-        let msg = AppRequest::StorageInfo {
-            // Don't set an app id, get everything
-            installed_app_id: None,
-        };
+        install_app_in_conductor(
+            handle.clone(),
+            "test app 3".to_string(),
+            vec![dna_2.clone()],
+            vec![(installed_cell_3, None)],
+        )
+        .await;
+
+        let msg = AdminRequest::StorageInfo;
         let msg = msg.try_into().unwrap();
         let respond = move |bytes: SerializedBytes| {
-            let response: AppResponse = bytes.try_into().unwrap();
+            let response: AdminResponse = bytes.try_into().unwrap();
             match response {
-                AppResponse::StorageInfo(mut info) => {
-                    assert_eq!(info.app_storage_info.len(), 2);
+                AdminResponse::StorageInfo(info) => {
+                    assert_eq!(info.blobs.len(), 2);
 
-                    info.app_storage_info
-                        .sort_by_key(|i| i.installed_app_id.clone());
+                    let blob_one: &AppDataStorageBlob =
+                        get_app_data_storage_info(&info, "test app 1".to_string());
 
-                    let app_info_1 = info.app_storage_info.first().unwrap();
-                    assert_app_storage_info(app_info_1, "test app 1".to_string(), cell_id_1);
-                    let app_info_2 = info.app_storage_info.last().unwrap();
-                    assert_app_storage_info(app_info_2, "test app 2".to_string(), cell_id_2);
+                    assert_eq!(blob_one.used_by, vec!["test app 1".to_string()]);
+                    assert!(blob_one.authored_data_size > 12000);
+                    assert!(blob_one.authored_data_size_on_disk > 114000);
+                    assert!(blob_one.dht_data_size > 12000);
+                    assert!(blob_one.dht_data_size_on_disk > 114000);
+                    assert!(blob_one.cache_data_size > 7000);
+                    assert!(blob_one.cache_data_size_on_disk > 114000);
+
+                    let blob_two: &AppDataStorageBlob =
+                        get_app_data_storage_info(&info, "test app 2".to_string());
+
+                    let mut used_by_two = blob_two.used_by.clone();
+                    used_by_two.sort();
+                    assert_eq!(
+                        used_by_two,
+                        vec!["test app 2".to_string(), "test app 3".to_string()]
+                    );
+                    assert!(blob_two.authored_data_size > 17000);
+                    assert!(blob_two.authored_data_size_on_disk > 114000);
+                    assert!(blob_two.dht_data_size > 17000);
+                    assert!(blob_two.dht_data_size_on_disk > 114000);
+                    assert!(blob_two.cache_data_size > 7000);
+                    assert!(blob_two.cache_data_size_on_disk > 114000);
                 }
                 other => panic!("unexpected response {:?}", other),
             }
@@ -620,7 +600,9 @@ pub mod test {
         };
         let respond = Respond::Request(Box::new(respond));
         let msg = (msg, respond);
-        handle_incoming_message(msg, app_api).await.unwrap();
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+            .await
+            .unwrap();
 
         handle.shutdown().await.unwrap().unwrap();
     }
@@ -1029,20 +1011,22 @@ pub mod test {
         results
     }
 
-    fn assert_app_storage_info(
-        app_info: &AppStorageInfo,
-        installed_app_id: InstalledAppId,
-        cell_id: CellId,
-    ) {
-        assert_eq!(app_info.installed_app_id, installed_app_id);
-        assert_eq!(app_info.cell_storage_info.len(), 1);
-        let cell_info = app_info.cell_storage_info.first().unwrap();
-        assert_eq!(cell_info.cell_id, cell_id);
-        assert!(cell_info.authored_data_size > 12000);
-        assert!(cell_info.authored_data_size_on_disk > 114000);
-        assert!(cell_info.dht_data_size > 12000);
-        assert!(cell_info.dht_data_size_on_disk > 114000);
-        assert!(cell_info.cache_data_size > 7000);
-        assert!(cell_info.cache_data_size_on_disk > 114000);
+    fn get_app_data_storage_info(
+        info: &StorageInfo,
+        match_app_id: InstalledAppId,
+    ) -> &AppDataStorageBlob {
+        info.blobs
+            .iter()
+            .filter_map(|blob| match blob {
+                StorageBlob::AppData(app_data) => {
+                    if app_data.used_by.contains(&match_app_id) {
+                        Some(app_data)
+                    } else {
+                        None
+                    }
+                }
+            })
+            .last()
+            .unwrap()
     }
 }

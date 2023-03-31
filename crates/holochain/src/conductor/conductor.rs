@@ -740,7 +740,7 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use holochain_conductor_api::{AppStorageInfo, CellStorageInfo, NetworkInfo, StorageInfo};
+    use holochain_conductor_api::{AppDataStorageBlob, NetworkInfo, StorageBlob, StorageInfo};
     use holochain_p2p::HolochainP2pSender;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
@@ -850,72 +850,75 @@ mod network_impls {
             .collect::<Result<Vec<_>, _>>()
         }
 
-        pub(crate) async fn storage_info_for_app(
-            &self,
-            installed_app_id: &InstalledAppId,
-        ) -> ConductorResult<AppStorageInfo> {
+        pub(crate) async fn storage_info(&self) -> ConductorResult<StorageInfo> {
             let state = self.get_state().await?;
-            let app = state.get_app(installed_app_id)?;
 
-            let db_error_mapper = |e| ConductorError::DatabaseError(e);
-
-            let cell_storage_info =
-                futures::future::join_all(app.all_cells().map(|cell_id| async move {
-                    let authored_db = self.spaces.authored_db(cell_id.dna_hash())?;
-                    let dht_db = self.spaces.dht_db(cell_id.dna_hash())?;
-                    let cache_db = self.spaces.cache(cell_id.dna_hash())?;
-
-                    Ok(CellStorageInfo {
-                        cell_id: cell_id.clone(),
-                        authored_data_size_on_disk: authored_db
-                            .async_reader(get_size_on_disk)
-                            .map_err(db_error_mapper)
-                            .await?,
-                        authored_data_size: authored_db
-                            .async_reader(get_used_size)
-                            .map_err(db_error_mapper)
-                            .await?,
-                        dht_data_size_on_disk: dht_db
-                            .async_reader(get_size_on_disk)
-                            .map_err(db_error_mapper)
-                            .await?,
-                        dht_data_size: dht_db
-                            .async_reader(get_used_size)
-                            .map_err(db_error_mapper)
-                            .await?,
-                        cache_data_size_on_disk: cache_db
-                            .async_reader(get_size_on_disk)
-                            .map_err(db_error_mapper)
-                            .await?,
-                        cache_data_size: cache_db
-                            .async_reader(get_used_size)
-                            .map_err(db_error_mapper)
-                            .await?,
-                    })
-                }))
-                .await
-                .into_iter()
-                .collect::<Result<Vec<CellStorageInfo>, ConductorError>>()?;
-
-            Ok(AppStorageInfo {
-                installed_app_id: installed_app_id.clone(),
-                cell_storage_info,
-            })
-        }
-
-        pub(crate) async fn storage_info_for_apps(&self) -> ConductorResult<StorageInfo> {
-            let state = self.get_state().await?;
-            let app_storage_info = futures::future::join_all(
+            let all_dna: HashMap<DnaHash, Vec<InstalledAppId>> = HashMap::new();
+            let all_dna =
                 state
                     .installed_apps()
                     .iter()
-                    .map(|(app_id, _)| async { self.storage_info_for_app(app_id).await }),
-            )
-            .await
-            .into_iter()
-            .collect::<Result<Vec<AppStorageInfo>, ConductorError>>()?;
+                    .fold(all_dna, |mut acc, (installed_app_id, app)| {
+                        for dna_hash in app.all_cells().map(|cell_id| cell_id.dna_hash()) {
+                            acc.entry(dna_hash.clone())
+                                .or_default()
+                                .push(installed_app_id.clone());
+                        }
 
-            Ok(StorageInfo { app_storage_info })
+                        acc
+                    });
+
+            let app_data_blobs =
+                futures::future::join_all(all_dna.iter().map(|(dna_hash, used_by)| async {
+                    self.storage_info_for_dna(dna_hash, used_by).await
+                }))
+                .await
+                .into_iter()
+                .collect::<Result<Vec<StorageBlob>, ConductorError>>()?;
+
+            Ok(StorageInfo {
+                blobs: app_data_blobs,
+            })
+        }
+
+        async fn storage_info_for_dna(
+            &self,
+            dna_hash: &DnaHash,
+            used_by: &Vec<InstalledAppId>,
+        ) -> ConductorResult<StorageBlob> {
+            let db_error_mapper = |e| ConductorError::DatabaseError(e);
+
+            let authored_db = self.spaces.authored_db(dna_hash)?;
+            let dht_db = self.spaces.dht_db(dna_hash)?;
+            let cache_db = self.spaces.cache(dna_hash)?;
+
+            Ok(StorageBlob::AppData(AppDataStorageBlob {
+                authored_data_size_on_disk: authored_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(db_error_mapper)
+                    .await?,
+                authored_data_size: authored_db
+                    .async_reader(get_used_size)
+                    .map_err(db_error_mapper)
+                    .await?,
+                dht_data_size_on_disk: dht_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(db_error_mapper)
+                    .await?,
+                dht_data_size: dht_db
+                    .async_reader(get_used_size)
+                    .map_err(db_error_mapper)
+                    .await?,
+                cache_data_size_on_disk: cache_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(db_error_mapper)
+                    .await?,
+                cache_data_size: cache_db
+                    .async_reader(get_used_size)
+                    .map_err(db_error_mapper)
+                    .await?,
+                used_by: used_by.clone(),
+            }))
         }
 
         #[instrument(skip(self))]
