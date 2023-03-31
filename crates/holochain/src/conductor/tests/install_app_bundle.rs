@@ -8,7 +8,7 @@ use holochain_types::prelude::{
     AppRoleManifest, CellProvisioning, DnaBundle, DnaFile, DnaLocation, InstallAppPayload,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{CellId, DnaModifiersOpt};
+use holochain_zome_types::{CellId, DnaModifiersOpt, Timestamp};
 use matches::assert_matches;
 use tempfile::{tempdir, TempDir};
 
@@ -131,8 +131,9 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = PathBuf::from(format!("{}", dna.dna_hash()));
-    let modifiers = DnaModifiersOpt::none();
-    let installed_dna_hash = DnaHash::with_data_sync(dna.dna_def());
+    let modifiers = DnaModifiersOpt::default()
+        .with_network_seed("initial seed".into())
+        .with_origin_time(Timestamp::now());
 
     let roles = vec![AppRoleManifest {
         name: "name".into(),
@@ -168,7 +169,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             agent_key: alice.clone(),
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
-            network_seed: None,
+            network_seed: Some("final seed".into()),
             membrane_proofs: HashMap::new(),
         })
         .await
@@ -181,10 +182,23 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
         .unwrap()
         .manifest;
 
+    let installed_dna = dna.update_modifiers(
+        modifiers
+            .with_network_seed("final seed".into())
+            .serialized()
+            .unwrap(),
+    );
+    let installed_dna_hash = DnaHash::with_data_sync(installed_dna.dna_def());
+
     // Check that the returned manifest has the installed DNA hash properly set
     assert_eq!(
         manifest.app_roles()[0].dna.installed_hash,
         Some(installed_dna_hash.into())
+    );
+
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.network_seed,
+        Some("final seed".into())
     );
 
     let bundle = AppBundle::new(manifest, vec![], PathBuf::from("."))
