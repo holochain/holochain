@@ -1,6 +1,5 @@
 #![allow(missing_docs)]
 
-use crate::encode::holo_dht_location_bytes;
 use crate::hash_type;
 use crate::ActionHash;
 use crate::ActionHashB64;
@@ -49,20 +48,20 @@ fixturator!(
 );
 
 /// A type alias for a `Vec<u8>` whose fixturator is expected to only return
-/// a Vec of length 36
+/// a Vec of length 32
 pub type ThirtyTwoHashBytes = Vec<u8>;
 
-// Simply generate "bytes" which is a Vec<u8> of 36 bytes
+// Simply generate "bytes" which is a Vec<u8> of 32 bytes
 fixturator!(
     ThirtyTwoHashBytes,
-    append_location([0; 32].to_vec()),
+    [0; 32].to_vec(),
     {
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
         for _ in 0..32 {
             bytes.push(u8_fixturator.next().unwrap());
         }
-        append_location(bytes)
+        bytes
     },
     {
         let mut index = get_fixt_index!();
@@ -73,15 +72,9 @@ fixturator!(
         }
         index += 1;
         set_fixt_index!(index);
-        append_location(bytes)
+        bytes
     }
 );
-
-fn append_location(mut base: Vec<u8>) -> Vec<u8> {
-    let mut loc_bytes = holo_dht_location_bytes(&base);
-    base.append(&mut loc_bytes);
-    base
-}
 
 fixturator!(
     with_vec 0 5;
