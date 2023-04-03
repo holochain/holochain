@@ -33,30 +33,28 @@ async fn app_info_returns_all_cells_with_info() {
         .unwrap();
 
     // create 1 clone cell for role 1 = clone cell 1
-    let clone_name_1 = "clone_1".to_string();
     let clone_cell_1 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.clone(),
             role_name: role_name_1.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed numero uno".to_string()),
             membrane_proof: None,
-            name: Some(clone_name_1.clone()),
+            name: None,
         })
         .await
         .unwrap();
     assert_eq!(clone_cell_1.original_dna_hash, dna_1.dna_hash().clone());
 
     // create 1 clone cell for role 2 = clone cell 2
-    let clone_name_2 = "clone_2".to_string();
     let clone_cell_2 = conductor
         .clone()
         .create_clone_cell(CreateCloneCellPayload {
             app_id: app_id.clone(),
             role_name: role_name_2.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("seed".to_string()),
+            modifiers: DnaModifiersOpt::none().with_network_seed("seed numero dos".to_string()),
             membrane_proof: None,
-            name: Some(clone_name_2.clone()),
+            name: None,
         })
         .await
         .unwrap();
