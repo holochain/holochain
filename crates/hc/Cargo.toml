@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli"
-version = "0.2.0-beta-rc.1"
+version = "0.2.0-beta-rc.2"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
@@ -21,8 +21,8 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1.0"
 futures = "0.3"
-holochain_cli_bundle = { path = "../hc_bundle", version = "^0.2.0-beta-rc.0"}
-holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.2.0-beta-rc.0"}
+holochain_cli_bundle = { path = "../hc_bundle", version = "^0.2.0-beta-rc.1"}
+holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.2.0-beta-rc.1"}
 holochain_trace = { version = "^0.2.0-beta-rc.1", path = "../holochain_trace" }
 structopt = "0.3"
 tokio = { version = "1.11", features = [ "full" ] }
