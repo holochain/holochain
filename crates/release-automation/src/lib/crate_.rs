@@ -83,7 +83,7 @@ pub struct CrateFixupUnpublishedReleases {
     #[structopt(long)]
     pub dry_run: bool,
 
-    #[structopt(long, default_value = "latest", value_parser = parse_fixup_releases)]
+    #[structopt(long, default_value = "latest", parse(try_from_str = parse_fixup_releases))]
     pub fixup_releases: FixupReleases,
 
     #[structopt(long)]
