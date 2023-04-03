@@ -22,7 +22,7 @@ use std::process::Command;
 pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
 use lazy_static::lazy_static;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, crate_version};
 
 mod external_subcommands;
 
@@ -71,7 +71,7 @@ fn builtin_commands() -> Vec<String> {
 /// The main entry-point for the command.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Parser)]
-#[command(about = *HELP, infer_subcommands = true, allow_external_subcommands = true)]
+#[command(about = *HELP, infer_subcommands = true, allow_external_subcommands = true, version = crate_version!())]
 pub struct Cli {
     /// The `hc` subcommand to run.
     #[command(subcommand)]

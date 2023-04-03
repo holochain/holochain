@@ -20,7 +20,7 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-clap = { version = "4.0", features = [ "derive" ] }
+clap = { version = "4.0", features = [ "derive", "cargo" ] }
 futures = "0.3"
 lazy_static = "1.4"
 holochain_cli_bundle = { path = "../hc_bundle", version = "^0.2.0-beta-rc.0"}
