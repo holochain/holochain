@@ -75,8 +75,8 @@ pub enum HcSandboxSubcommand {
     /// List sandboxes found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
-        #[arg(short, long, action = ArgAction::Count)]
-        verbose: usize,
+        #[arg(short, long, action = ArgAction::SetTrue)]
+        verbose: bool,
     },
 
     /// Clean (completely remove) sandboxes that are listed in the `$(pwd)/.hc` file.

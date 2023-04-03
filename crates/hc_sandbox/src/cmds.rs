@@ -164,7 +164,7 @@ You can run:
     - `0 2` run multiple sandboxes by indices from the list below.
 Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more information."
             );
-            crate::save::list(std::env::current_dir()?, 0)?;
+            crate::save::list(std::env::current_dir()?, false)?;
         } else {
             // There are no sandboxes
             msg!(

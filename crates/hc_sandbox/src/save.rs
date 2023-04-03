@@ -90,13 +90,13 @@ pub fn load(mut hc_dir: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
 }
 
 /// Print out the sandboxes contained in the `.hc` file.
-pub fn list(hc_dir: PathBuf, verbose: usize) -> anyhow::Result<()> {
+pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
     let out = load(hc_dir)?.into_iter().enumerate().try_fold(
         "\nSandboxes contained in `.hc`\n".to_string(),
         |out, (i, path)| {
             let r = match verbose {
-                0 => format!("{}{}: {}\n", out, i, path.display()),
-                _ => {
+                false => format!("{}{}: {}\n", out, i, path.display()),
+                true => {
                     let config = config::read_config(path.clone())?;
                     format!(
                         "{}{}: {}\nConductor Config:\n{:?}\n",
