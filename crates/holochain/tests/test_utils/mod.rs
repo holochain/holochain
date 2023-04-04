@@ -250,6 +250,7 @@ pub async fn register_and_install_dna_named(
             modifiers: mods,
             installed_hash: Some(dna_hash.clone().into()),
             clone_limit: 0,
+            version: None,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
     }];

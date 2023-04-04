@@ -85,8 +85,13 @@ pub struct AppRoleDnaManifest {
     /// which allows for re-installing an app which has already been installed by manifest
     /// only (no need to include the DNAs, since they are already installed in the conductor).
     /// In this case, `location` does not even need to be set.
-    #[serde(alias = "version")]
+    #[serde(default)]
     pub installed_hash: Option<DnaHashB64>,
+
+    /// For backward compatibility only: `installed_hash` used to take a list of hashes.
+    /// To prevent breaking manifests, this is still allowed, but now has no effect.
+    #[serde(default)]
+    pub(crate) version: Option<VecOrSingle<DnaHashB64>>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Each runtime clone is created by the `CreateClone` strategy,
@@ -94,6 +99,14 @@ pub struct AppRoleDnaManifest {
     /// Default: 0
     #[serde(default)]
     pub clone_limit: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub(crate) enum VecOrSingle<T> {
+    Vec(Vec<T>),
+    Single(T),
 }
 
 impl AppRoleDnaManifest {
@@ -105,6 +118,7 @@ impl AppRoleDnaManifest {
             )),
             modifiers: DnaModifiersOpt::none(),
             installed_hash: None,
+            version: None,
             clone_limit: 0,
         }
     }
@@ -178,6 +192,7 @@ impl AppManifestV1 {
                         installed_hash,
                         clone_limit,
                         modifiers,
+                        version: _,
                     } = dna;
                     let modifiers = modifiers.serialized()?;
                     // Go from "flexible" enum into proper DnaVersionSpec.
@@ -272,12 +287,13 @@ pub mod tests {
         modifiers: DnaModifiersOpt<YamlProperties>,
     ) -> AppManifestV1 {
         let roles = vec![AppRoleManifest {
-            name: "name".into(),
+            name: "role_name".into(),
             dna: AppRoleDnaManifest {
                 location,
                 modifiers,
                 installed_hash: Some(installed_hash.into()),
                 clone_limit: 50,
+                version: None,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
         }];
@@ -312,36 +328,105 @@ manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
 roles:
-  - id: "role_name"
+  - name: "role_name"
     provisioning:
       strategy: "create"
       deferred: false
     dna:
       path: /tmp/test.dna
       installed_hash: {}
+      version:
+        - {}
+        - {}
       clone_limit: 50
       network_seed: network_seed
-      properties:
-        salad: "bar"
+      modifiers:
+        properties:
+          salad: "bar"
 
         "#,
-            installed_hash
+            installed_hash, installed_hash, installed_hash,
         );
         let actual = serde_yaml::to_value(&manifest).unwrap();
         let expected: serde_yaml::Value = serde_yaml::from_str(&expected_yaml).unwrap();
 
         // Check a handful of fields. Order matters in YAML, so to check the
         // entire structure would be too fragile for testing.
-        let fields = &[
-            "roles[0].id",
-            "roles[0].provisioning.deferred",
-            "roles[0].dna.installed_hash[1]",
-            "roles[0].dna.properties",
-        ];
-        assert_eq!(actual.get(fields[0]), expected.get(fields[0]));
-        assert_eq!(actual.get(fields[1]), expected.get(fields[1]));
-        assert_eq!(actual.get(fields[2]), expected.get(fields[2]));
-        assert_eq!(actual.get(fields[3]), expected.get(fields[3]));
+
+        for getter in [
+            |v: &serde_yaml::Value| v["roles"][0]["name"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["provisioning"]["deferred"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["dna"]["installed_hash"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["dna"]["modifiers"]["properties"].clone(),
+        ] {
+            let left = getter(&actual);
+            let right = getter(&expected);
+            assert_eq!(left, right);
+            assert!(!left.is_null());
+        }
+    }
+
+    #[tokio::test]
+    async fn manifest_v1_roundtrip_backward_compat_installed_hash() {
+        let hash1 = fixt!(DnaHashB64);
+        let hash2 = fixt!(DnaHashB64);
+        let yaml1 = format!(
+            r#"---
+
+manifest_version: "1"
+name: "Test app"
+description: "Serialization works using a single value in `version`"
+roles:
+  - name: "role_name"
+    provisioning:
+      strategy: "create"
+      deferred: false
+    dna:
+      path: /tmp/test.dna
+      version: {}
+
+        "#,
+            hash1
+        );
+        let yaml2 = format!(
+            r#"---
+
+manifest_version: "1"
+name: "Test app"
+description: "Serialization works using multiple values in `version`"
+roles:
+  - name: "role_name"
+    dna:
+      path: /tmp/test.dna
+      version:
+        - {}
+        - {}
+        
+        "#,
+            hash1, hash2
+        );
+
+        // dbg!(serde_yaml::from_str::<serde_yaml::Value>(&yaml1).unwrap());
+        // dbg!(serde_yaml::from_str::<serde_yaml::Value>(&yaml2).unwrap());
+        let manifest1: AppManifest = serde_yaml::from_str(&yaml1).unwrap();
+        let manifest2: AppManifest = serde_yaml::from_str(&yaml2).unwrap();
+
+        {
+            let AppManifest::V1(AppManifestCurrent { roles, .. }) = manifest1;
+            assert_eq!(
+                roles[0].dna.version,
+                Some(VecOrSingle::Single(hash1.clone()))
+            );
+            assert!(roles[0].dna.installed_hash.is_none());
+        }
+        {
+            let AppManifest::V1(AppManifestCurrent { roles, .. }) = manifest2;
+            assert_eq!(
+                roles[0].dna.version,
+                Some(VecOrSingle::Vec(vec![hash1, hash2]))
+            );
+            assert!(roles[0].dna.installed_hash.is_none());
+        }
     }
 
     #[tokio::test]
