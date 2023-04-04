@@ -567,7 +567,7 @@ pub mod test {
                 AdminResponse::StorageInfo(info) => {
                     assert_eq!(info.blobs.len(), 2);
 
-                    let blob_one: &AppDataStorageBlob =
+                    let blob_one: &DnaStorageInfo =
                         get_app_data_storage_info(&info, "test app 1".to_string());
 
                     assert_eq!(blob_one.used_by, vec!["test app 1".to_string()]);
@@ -578,7 +578,7 @@ pub mod test {
                     assert!(blob_one.cache_data_size > 7000);
                     assert!(blob_one.cache_data_size_on_disk > 114000);
 
-                    let blob_two: &AppDataStorageBlob =
+                    let blob_two: &DnaStorageInfo =
                         get_app_data_storage_info(&info, "test app 2".to_string());
 
                     let mut used_by_two = blob_two.used_by.clone();
@@ -1014,11 +1014,11 @@ pub mod test {
     fn get_app_data_storage_info(
         info: &StorageInfo,
         match_app_id: InstalledAppId,
-    ) -> &AppDataStorageBlob {
+    ) -> &DnaStorageInfo {
         info.blobs
             .iter()
             .filter_map(|blob| match blob {
-                StorageBlob::AppData(app_data) => {
+                StorageBlob::Dna(app_data) => {
                     if app_data.used_by.contains(&match_app_id) {
                         Some(app_data)
                     } else {

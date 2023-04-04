@@ -740,7 +740,7 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use holochain_conductor_api::{AppDataStorageBlob, NetworkInfo, StorageBlob, StorageInfo};
+    use holochain_conductor_api::{DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo};
     use holochain_p2p::HolochainP2pSender;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
@@ -890,7 +890,7 @@ mod network_impls {
             let dht_db = self.spaces.dht_db(dna_hash)?;
             let cache_db = self.spaces.cache(dna_hash)?;
 
-            Ok(StorageBlob::AppData(AppDataStorageBlob {
+            Ok(StorageBlob::Dna(DnaStorageInfo {
                 authored_data_size_on_disk: authored_db
                     .async_reader(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)

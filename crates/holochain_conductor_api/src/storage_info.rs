@@ -1,8 +1,8 @@
 use holochain_types::prelude::*;
 
-/// Storage blob used by hApps to store data.
+/// Storage info for DNA used by one or more hApps.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct AppDataStorageBlob {
+pub struct DnaStorageInfo {
     pub authored_data_size: usize,
     pub authored_data_size_on_disk: usize,
     pub dht_data_size: usize,
@@ -12,11 +12,11 @@ pub struct AppDataStorageBlob {
     pub used_by: Vec<InstalledAppId>,
 }
 
-/// The type of storage type blob
+/// The type of storage blob
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum StorageBlob {
     /// Storage blob used by hApps to store data
-    AppData(AppDataStorageBlob),
+    Dna(DnaStorageInfo),
 }
 
 /// Response type for storage used by holochain and applications
