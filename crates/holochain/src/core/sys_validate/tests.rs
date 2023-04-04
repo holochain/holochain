@@ -57,7 +57,16 @@ use matches::assert_matches;
 use std::convert::TryFrom;
 use std::time::Duration;
 
-async fn make_record(keystore: &MetaLairClient, action: Action, entry: Option<Entry>) -> Record {
+async fn sign_record(keystore: &MetaLairClient, action: Action, entry: Option<Entry>) -> Record {
+    Record::new(
+        SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action))
+            .await
+            .unwrap(),
+        entry,
+    )
+}
+
+async fn new_record(action: Action, entry: Option<Entry>) -> Record {
     Record::new(
         SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action))
             .await
@@ -139,7 +148,10 @@ async fn record_with_mock_cascade(
                     deps.push(base);
                     deps.push(target);
                 }
-                Action::Create(_) | Action::AgentValidationPkg(_) | Action::CloseChain(_) | Action::OpenChain(_) => {
+                Action::Create(_)
+                | Action::AgentValidationPkg(_)
+                | Action::CloseChain(_)
+                | Action::OpenChain(_) => {
                     // no new deps needed to make this valid
                 }
                 Action::Dna(_) => unreachable!(),
@@ -151,7 +163,7 @@ async fn record_with_mock_cascade(
         }
     };
 
-    let record = make_record(keystore, action, entry).await;
+    let record = sign_record(keystore, action, entry).await;
 
     (record, deps)
 }
