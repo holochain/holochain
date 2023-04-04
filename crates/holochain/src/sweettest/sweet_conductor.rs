@@ -45,11 +45,12 @@ pub struct SweetConductor {
 }
 
 /// Standard config for SweetConductors
-pub fn standard_config() -> ConductorConfig {
-    SweetConductorConfig::standard().into()
+pub fn standard_config() -> SweetConductorConfig {
+    SweetConductorConfig::standard()
 }
 
 /// A DnaFile with a role name assigned
+#[derive(Clone)]
 pub struct DnaWithRole {
     role: RoleName,
     dna: DnaFile,
@@ -132,10 +133,25 @@ impl SweetConductor {
         C: Into<SweetConductorConfig>,
         R: Into<DynSweetRendezvous>,
     {
+        let keystore = test_keystore();
+        Self::from_config_rendezvous_keystore(config, rendezvous, keystore).await
+    }
+
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    pub async fn from_config_rendezvous_keystore<C, R>(
+        config: C,
+        rendezvous: R,
+        keystore: holochain_keystore::MetaLairClient,
+    ) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+        R: Into<DynSweetRendezvous>,
+    {
         let rendezvous = rendezvous.into();
         let config = config.into().into_conductor_config(&*rendezvous).await;
+        tracing::info!(?config);
         let dir = TestDir::new(test_db_dir());
-        let handle = Self::handle_from_existing(&dir, test_keystore(), &config, &[]).await;
+        let handle = Self::handle_from_existing(&dir, keystore, &config, &[]).await;
         Self::new(handle, dir, config, Some(rendezvous)).await
     }
 
