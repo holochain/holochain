@@ -105,8 +105,11 @@ pub struct AppRoleDnaManifest {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
-pub(crate) enum VecOrSingle<T> {
+/// A vec of values or a single value.
+pub enum VecOrSingle<T> {
+    /// A vec of values
     Vec(Vec<T>),
+    /// A single value
     Single(T),
 }
 

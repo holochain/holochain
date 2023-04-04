@@ -231,7 +231,7 @@ async fn network_seed_regression() {
     )
     .await;
 
-    let dna_path = tmp.as_ref().join(format!("the.dna"));
+    let dna_path: PathBuf = tmp.as_ref().join(format!("the.dna"));
     DnaBundle::from_dna_file(dna)
         .await
         .unwrap()
