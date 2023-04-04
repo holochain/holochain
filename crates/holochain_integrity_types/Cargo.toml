@@ -31,9 +31,10 @@ tracing = { version = "0.1", optional = true }
 [features]
 default = []
 
-full = ["default", "kitsune_p2p_timestamp/full"]
+full = ["default", "subtle-encoding", "kitsune_p2p_timestamp/full"]
 
 test_utils = [
+  "full",
   "arbitrary",
   "kitsune_p2p_timestamp/arbitrary",
   "kitsune_p2p_timestamp/now",

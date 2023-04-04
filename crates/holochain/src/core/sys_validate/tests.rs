@@ -57,6 +57,15 @@ use matches::assert_matches;
 use std::convert::TryFrom;
 use std::time::Duration;
 
+async fn make_record(keystore: &MetaLairClient, action: Action, entry: Option<Entry>) -> Record {
+    Record::new(
+        SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action))
+            .await
+            .unwrap(),
+        entry,
+    )
+}
+
 /// Creates a valid Record using the given action and constructs a MockCascade
 /// with the minimal set of records to satisfy the validation dependencies
 /// for that Record. Updates the input action's backlinks to point to these other
@@ -69,32 +78,19 @@ async fn record_with_mock_cascade(
         *action.action_seq_mut().unwrap() = 2;
     }
 
-    let non_dna_record = || {
+    fn matching_record(f: impl Fn(&Record) -> bool) -> Record {
         // get anything but a Dna
         let mut dep = fixt!(Record);
-        while let Action::Dna(_) = dep.action() {
+        while !f(&dep) {
             dep = fixt!(Record);
         }
         dep
-    };
+    }
 
-    let dna_record = || {
-        // get a Dna record
-        let mut dep = fixt!(Record);
-        while !matches!(dep.action(), Action::Dna(_)) {
-            dep = fixt!(Record);
-        }
-        dep
-    };
-
-    let entry_record = || {
-        let mut r = fixt!(Record);
-        while !matches!(r.action(), Action::Create(_) | Action::Update(_))
-            && r.entry.as_option().is_none()
-        {
-            r = fixt!(Record);
-        }
-        r
+    let dna_record = |r: &Record| matches!(r.action(), Action::Dna(_));
+    let pkg_record = |r: &Record| matches!(r.action(), Action::AgentValidationPkg(_));
+    let entry_record = |r: &Record| {
+        matches!(r.action(), Action::Create(_) | Action::Update(_)) && r.entry.as_option().is_some()
     };
 
     let (entry, deps) = match &mut action {
@@ -103,13 +99,21 @@ async fn record_with_mock_cascade(
             let mut deps = vec![];
             let prev_seq = action.action_seq() - 1;
             let prev = if prev_seq == 0 {
-                dna_record()
+                matching_record(dna_record)
             } else {
-                let mut prev = non_dna_record();
+                let mut prev = match action {
+                    Action::Create(Create {
+                        entry_type: EntryType::AgentPubKey,
+                        ..
+                    }) => matching_record(|r| !dna_record(r) && pkg_record(r)),
+                    _ => matching_record(|r| !dna_record(r) && !pkg_record(r)),
+                };
                 *prev.as_action_mut().action_seq_mut().unwrap() = action.action_seq() - 1;
+                *prev.as_action_mut().timestamp_mut() =
+                    (action.timestamp() - Duration::from_micros(1)).unwrap();
                 prev
             };
-            let prev_hash = ActionHash::with_data_sync(prev.action());
+            let prev_hash = prev.action_address().clone();
             *action.prev_action_mut().unwrap() = prev_hash.clone();
             assert_eq!(*action.prev_action().unwrap(), prev_hash);
             deps.push(prev);
@@ -121,35 +125,36 @@ async fn record_with_mock_cascade(
             });
             match action {
                 Action::Update(update) => {
-                    let dep = entry_record();
+                    let dep = matching_record(entry_record);
                     update.original_action_address = dep.action_address().clone();
                     update.original_entry_address =
                         dep.entry().as_option().unwrap().to_hash().clone();
                     deps.push(dep);
                 }
-                // Action::CreateLink(link) => {
-                //     link.base_address
-                // }
-                Action::CloseChain(_) | Action::OpenChain(_) | Action::Create(_) => {}
+                Action::CreateLink(link) => {
+                    let base = fixt!(Record);
+                    let target = fixt!(Record);
+                    link.base_address = base.action_address().clone().into();
+                    link.target_address = target.action_address().clone().into();
+                    deps.push(base);
+                    deps.push(target);
+                }
+                Action::Create(_) | Action::AgentValidationPkg(_) | Action::CloseChain(_) | Action::OpenChain(_) => {
+                    // no new deps needed to make this valid
+                }
                 Action::Dna(_) => unreachable!(),
-                _ => {}
+                Action::InitZomesComplete(_) => todo!(),
+                Action::DeleteLink(_) => todo!(),
+                Action::Delete(_) => todo!(),
             };
             (entry, deps)
         }
     };
 
-    let sah = SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action))
-        .await
-        .unwrap();
-    let record = Record::new(sah, entry);
+    let record = make_record(keystore, action, entry).await;
 
     (record, deps)
 }
-
-// async fn check_sys_val(action: Action) -> anyhow::Result<()> {
-//     let (action, cascade)  =record_with_mock_cascade(action);
-
-// }
 
 /// Mismatched signatures are rejected
 #[tokio::test(flavor = "multi_thread")]
@@ -161,7 +166,6 @@ async fn verify_action_signature_test() {
     let (record_valid, deps) =
         record_with_mock_cascade(&keystore, Action::CreateLink(action)).await;
 
-    dbg!(&record_valid, &deps);
     let cascade = MockCascade::with_records(deps);
 
     let wrong_signature = Signature([1_u8; 64]);
