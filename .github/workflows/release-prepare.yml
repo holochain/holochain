@@ -102,7 +102,7 @@ jobs:
       # - name: Set NIX_PATH (FIXME)
       #   run: echo NIX_PATH=nixpkgs=$(./scripts/nix_path.sh) >> $GITHUB_ENV
 
-      - name: Merge ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }} into ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
+      - name: Merge source branch (${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}) into target branch (${{ inputs.HOLOCHAIN_TARGET_BRANCH }})
         env:
           HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
           HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
@@ -143,13 +143,13 @@ jobs:
             git branch -D ${obsolete_branches}
           fi
 
-          # Merge source branch into the release branch
+          # Merge source branch into the target branch
           if ! (git branch --list --all | grep origin/${HOLOCHAIN_TARGET_BRANCH}); then
             git checkout -B ${HOLOCHAIN_TARGET_BRANCH}
           else
             git checkout --force -B ${HOLOCHAIN_TARGET_BRANCH} origin/${HOLOCHAIN_TARGET_BRANCH}
-            git merge --ff-only "${HOLOCHAIN_SOURCE_BRANCH}"
           fi
+          git merge --ff-only "${HOLOCHAIN_SOURCE_BRANCH}"
 
       - name: Restore holochain cargo related state and build files
         if: ${{ inputs.skip_prepare_logic != 'true' }}
