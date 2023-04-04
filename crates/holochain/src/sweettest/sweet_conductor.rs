@@ -261,7 +261,7 @@ impl SweetConductor {
             })
             .collect();
         self.raw_handle()
-            .install_app(installed_app_id.clone(), installed_cells)
+            .install_app_legacy(installed_app_id.clone(), installed_cells)
             .await?;
 
         self.raw_handle().enable_app(installed_app_id).await?;
