@@ -582,6 +582,10 @@ pub fn example_workspace_1<'a>() -> Fallible<WorkspaceMocker> {
 }
 
 /// A workspace to test dependencies and crate sorting.
+/// crate_a -> [crate_b, crate_c]
+/// crate_b -> []
+/// crate_c -> [crate_b]
+/// crate_d -> [crate_a]
 pub fn example_workspace_2<'a>() -> Fallible<WorkspaceMocker> {
     use crate::tests::workspace_mocker::{self, MockProject, WorkspaceMocker};
 
