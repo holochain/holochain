@@ -111,7 +111,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
             AppRequest::NetworkInfo(payload) => {
                 let info = self
                     .conductor_handle
-                    .network_info(&payload.agent_pub_key, &payload.dnas)
+                    .network_info(&payload)
                     .await?;
                 Ok(AppResponse::NetworkInfo(info))
             }

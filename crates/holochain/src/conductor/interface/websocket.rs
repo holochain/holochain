@@ -470,6 +470,7 @@ pub mod test {
         let request = NetworkInfoRequestPayload {
             agent_pub_key: agent_pub_key.clone(),
             dnas: vec![dna_hash],
+            last_time_queried: None,
         };
 
         let msg = AppRequest::NetworkInfo(Box::new(request));
@@ -484,7 +485,7 @@ pub mod test {
                             fetch_pool_info: FetchPoolInfo::default(),
                             number_of_peers: 1,
                             arc_size: 1.0,
-                            total_peers: 1,
+                            total_peers: vec![1.0],
                             open_peer_connections: 0,
                         }]
                     )

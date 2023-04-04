@@ -70,6 +70,9 @@ pub struct NetworkInfoRequestPayload {
     pub agent_pub_key: AgentPubKey,
     /// Get gossip info for these DNAs
     pub dnas: Vec<DnaHash>,
+    /// Timestamp in ms since which received amount of bytes from peers will
+    /// be returned. Defaults to UNIX_EPOCH.
+    pub last_time_queried: Option<u128>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

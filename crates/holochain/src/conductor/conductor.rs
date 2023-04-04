@@ -838,51 +838,51 @@ mod network_impls {
 
         pub(crate) async fn network_info(
             &self,
-            agent_pub_key: &AgentPubKey,
-            dnas: &[DnaHash],
+            payload: &NetworkInfoRequestPayload,
         ) -> ConductorResult<Vec<NetworkInfo>> {
+            let NetworkInfoRequestPayload {
+                agent_pub_key,
+                dnas,
+                last_time_queried,
+            } = payload;
+
             futures::future::join_all(dnas.iter().map(|dna| async move {
                 let diagnostics = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
                 let fetch_pool_info = diagnostics
                     .fetch_pool
                     .info([dna.to_kitsune()].into_iter().collect());
 
-                // query agents from peer db
-                let agent_expirations = self
-                    .get_p2p_db(dna)
-                    .async_reader(|txn| {
-                        txn.prepare(
-                            "
-                            SELECT expires_at_ms
-                            FROM p2p_agent_store;
-                            ",
-                        )?
-                        .query_and_then([], |row| {
-                            row.get(0).map_err(|err| DatabaseError::SqliteError(err))
-                        })?
-                        .collect::<Result<Vec<u64>, _>>()
-                    })
-                    .await?;
-                let number_of_peers = agent_expirations.len();
+                // query number agents from peer db
+                let db = { self.p2p_agents_db(dna) };
+                let permit = db.conn_permit().await;
+                let mut conn = db.with_permit(permit)?;
+                let agent_infos = conn.p2p_list_agents()?;
+                let number_of_peers = agent_infos.len();
+                println!("all_peers {:?}", number_of_peers);
 
-                // calculate peers in arc and total peers
+                // query extrapolated coverage
                 let cell_id = CellId::new(dna.as_hash().clone(), agent_pub_key.clone());
-                let agent_info = &self
+                let agent_infos = self
                     .get_agent_infos(Some(cell_id.clone()))
                     .await
-                    .map_err(|_| ConductorError::CellMissing(cell_id.clone()))?[0];
-                let arc = agent_info.storage_arc;
-                let arc_size = arc.coverage();
-                let now = std::time::UNIX_EPOCH
-                    .elapsed()
-                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
-                let peers_in_arc = agent_expirations
-                    .iter()
-                    .filter(|agent| **agent as u128 > now.as_millis())
-                    .count();
-                let total_peers = peers_in_arc / arc_size.round() as usize;
+                    .map_err(|_| ConductorError::CellMissing(cell_id.clone()))?;
+                let arc_size = agent_infos[0].storage_arc.coverage();
+                
+                let permit = db.conn_permit().await;
+                let mut conn = db.with_permit(permit)?;
+                let extrapolated_coverage =
+                    conn.p2p_extrapolated_coverage(agent_infos[0].storage_arc.inner().into())?;
+                println!("total_peers {:?}", extrapolated_coverage);
+                // let total_peers = extrapolated_coverage
 
-                // get number of bytes since last time request was made from dht and cache db
+                // get amount of bytes from dht and cache db since last time request was made
+                let last_time_queried = match last_time_queried {
+                    Some(timestamp) => *timestamp,
+                    None => std::time::UNIX_EPOCH
+                        .elapsed()
+                        .map_err(|err| ConductorError::Other(Box::new(err)))?
+                        .as_millis(),
+                };
                 let number_of_bytes_row_fn = |row: &Row| {
                     row.get(0)
                         .map(|maybe_bytes_received: Option<u64>| {
@@ -895,7 +895,6 @@ mod network_impls {
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let dht_bytes_received = dht_db
                     .async_reader({
-                        let last_time_queried = now.as_millis() as u64 - 10000;
                         move |txn| {
                             txn.query_row_and_then(
                                 "
@@ -904,7 +903,7 @@ mod network_impls {
                             WHERE DhtOp.authored_timestamp > ?1 
                             AND DhtOp.action_hash = Action.hash;
                             ",
-                                params![last_time_queried],
+                                params![last_time_queried as u64],
                                 number_of_bytes_row_fn,
                             )
                         }
@@ -924,7 +923,7 @@ mod network_impls {
                             WHERE DhtOp.authored_timestamp > ?1 
                             AND DhtOp.action_hash = Action.hash;
                             ",
-                            params![now.as_millis() as u64 - 10000],
+                            params![last_time_queried as u64],
                             number_of_bytes_row_fn,
                         )
                     })
@@ -939,11 +938,12 @@ mod network_impls {
                     .iter()
                     .filter(|(_, history)| history.current_round)
                     .count() as u16;
+
                 ConductorResult::Ok(NetworkInfo {
                     fetch_pool_info,
                     number_of_peers,
                     arc_size,
-                    total_peers,
+                    total_peers: extrapolated_coverage,
                     open_peer_connections,
                 })
             }))

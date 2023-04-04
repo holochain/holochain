@@ -415,7 +415,7 @@ pub struct NetworkInfo {
     pub fetch_pool_info: FetchPoolInfo,
     pub number_of_peers: usize,
     pub arc_size: f64,
-    pub total_peers: usize,
+    pub total_peers: Vec<f64>,
     pub open_peer_connections: u16,
 }
 
