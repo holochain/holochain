@@ -66,6 +66,8 @@ pub struct RegisterDnaPayload {
 /// The instructions on how to request NetworkInfo
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NetworkInfoRequestPayload {
+    /// The calling agent
+    pub agent_pub_key: AgentPubKey,
     /// Get gossip info for these DNAs
     pub dnas: Vec<DnaHash>,
 }

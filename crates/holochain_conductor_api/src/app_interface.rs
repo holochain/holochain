@@ -410,9 +410,13 @@ impl From<AppInfoStatus> for AppStatus {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct NetworkInfo {
     pub fetch_pool_info: FetchPoolInfo,
+    pub number_of_peers: usize,
+    pub arc_size: f64,
+    pub total_peers: usize,
+    pub open_peer_connections: u16,
 }
 
 #[test]

@@ -109,7 +109,10 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
             AppRequest::NetworkInfo(payload) => {
-                let info = self.conductor_handle.network_info(&payload.dnas).await?;
+                let info = self
+                    .conductor_handle
+                    .network_info(&payload.agent_pub_key, &payload.dnas)
+                    .await?;
                 Ok(AppResponse::NetworkInfo(info))
             }
         }

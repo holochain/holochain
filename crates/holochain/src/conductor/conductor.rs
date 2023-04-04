@@ -744,6 +744,7 @@ mod network_impls {
     use holochain_p2p::HolochainP2pSender;
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
+    use rusqlite::params;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -837,12 +838,114 @@ mod network_impls {
 
         pub(crate) async fn network_info(
             &self,
+            agent_pub_key: &AgentPubKey,
             dnas: &[DnaHash],
         ) -> ConductorResult<Vec<NetworkInfo>> {
             futures::future::join_all(dnas.iter().map(|dna| async move {
-                let d = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
-                let fetch_pool_info = d.fetch_pool.info([dna.to_kitsune()].into_iter().collect());
-                ConductorResult::Ok(NetworkInfo { fetch_pool_info })
+                let diagnostics = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
+                let fetch_pool_info = diagnostics
+                    .fetch_pool
+                    .info([dna.to_kitsune()].into_iter().collect());
+
+                // query agents from peer db
+                let agent_expirations = self
+                    .get_p2p_db(dna)
+                    .async_reader(|txn| {
+                        txn.prepare(
+                            "
+                            SELECT expires_at_ms
+                            FROM p2p_agent_store;
+                            ",
+                        )?
+                        .query_and_then([], |row| {
+                            row.get(0).map_err(|err| DatabaseError::SqliteError(err))
+                        })?
+                        .collect::<Result<Vec<u64>, _>>()
+                    })
+                    .await?;
+                let number_of_peers = agent_expirations.len();
+
+                // calculate peers in arc and total peers
+                let cell_id = CellId::new(dna.as_hash().clone(), agent_pub_key.clone());
+                let agent_info = &self
+                    .get_agent_infos(Some(cell_id.clone()))
+                    .await
+                    .map_err(|_| ConductorError::CellMissing(cell_id.clone()))?[0];
+                let arc = agent_info.storage_arc;
+                let arc_size = arc.coverage();
+                let now = std::time::UNIX_EPOCH
+                    .elapsed()
+                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
+                let peers_in_arc = agent_expirations
+                    .iter()
+                    .filter(|agent| **agent as u128 > now.as_millis())
+                    .count();
+                let total_peers = peers_in_arc / arc_size.round() as usize;
+
+                // get number of bytes since last time request was made from dht and cache db
+                let number_of_bytes_row_fn = |row: &Row| {
+                    row.get(0)
+                        .map(|maybe_bytes_received: Option<u64>| {
+                            maybe_bytes_received.unwrap_or_else(|| 0)
+                        })
+                        .map_err(|err| DatabaseError::SqliteError(err))
+                };
+                let dht_db = self
+                    .get_dht_db(dna)
+                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
+                let dht_bytes_received = dht_db
+                    .async_reader({
+                        let last_time_queried = now.as_millis() as u64 - 10000;
+                        move |txn| {
+                            txn.query_row_and_then(
+                                "
+                            SELECT SUM(LENGTH(Action.blob))
+                            FROM Action, DhtOp
+                            WHERE DhtOp.authored_timestamp > ?1 
+                            AND DhtOp.action_hash = Action.hash;
+                            ",
+                                params![last_time_queried],
+                                number_of_bytes_row_fn,
+                            )
+                        }
+                    })
+                    .await?;
+                println!("b is {:?}", dht_bytes_received);
+                let cache_db = self
+                    .get_cache_db(&cell_id)
+                    .await
+                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
+                let cache_dht_received = cache_db
+                    .async_reader(move |txn| {
+                        txn.query_row_and_then(
+                            "
+                            SELECT SUM(LENGTH(Action.blob))
+                            FROM Action, DhtOp
+                            WHERE DhtOp.authored_timestamp > ?1 
+                            AND DhtOp.action_hash = Action.hash;
+                            ",
+                            params![now.as_millis() as u64 - 10000],
+                            number_of_bytes_row_fn,
+                        )
+                    })
+                    .await?;
+                println!("c is {:?}", cache_dht_received);
+
+                // calculate open peer connections based on current gossip sessions
+                let open_peer_connections = diagnostics
+                    .metrics
+                    .read()
+                    .peer_agent_histories()
+                    .iter()
+                    .filter(|(_, history)| history.current_round)
+                    .count() as u16;
+                ConductorResult::Ok(NetworkInfo {
+                    fetch_pool_info,
+                    number_of_peers,
+                    arc_size,
+                    total_peers,
+                    open_peer_connections,
+                })
             }))
             .await
             .into_iter()

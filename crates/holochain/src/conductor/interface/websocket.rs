@@ -462,11 +462,13 @@ pub mod test {
             .unwrap();
 
         let dna_hash = dna.dna_hash().clone();
-        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+        let agent_pub_key = fake_agent_pubkey_1();
+        let cell_id = CellId::from((dna_hash.clone(), agent_pub_key.clone()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
         let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
         let request = NetworkInfoRequestPayload {
+            agent_pub_key: agent_pub_key.clone(),
             dnas: vec![dna_hash],
         };
 
@@ -479,7 +481,11 @@ pub mod test {
                     assert_eq!(
                         info,
                         vec![NetworkInfo {
-                            fetch_pool_info: FetchPoolInfo::default()
+                            fetch_pool_info: FetchPoolInfo::default(),
+                            number_of_peers: 1,
+                            arc_size: 1.0,
+                            total_peers: 1,
+                            open_peer_connections: 0,
                         }]
                     )
                 }
