@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- `AppInfo` now includes a copy of the `AppManifest` which was used to install the app. This can be used to reinstall the same app under a different agent in the same conductor without needing to supply the original DNA files.
+- `AppInfo` now includes a copy of the `AppManifest` which was used to install the app. This can be used to reinstall the same app under a different agent in the same conductor without needing to supply the original DNA files. [\#2157](https://github.com/holochain/holochain/pull/2157)
 
 ## 0.2.0-beta-rc.1
 
