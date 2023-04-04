@@ -12,6 +12,11 @@
 #   - push updated source branch
 #   - create a pull-request towards the source branch
 #   - create a github release
+#
+# involved branches:
+# - the target branch is expected to never change outside of the release workflow, hence the usage of `git merge --ff-only`.
+# - the source branch is the one that developers create changes to; we do use pull-requests for that but that's not part of the release workflow's concern.
+# - the release branch is a temporary branch that is created ad-hoc by the release workflow that contains the version bumps before merging them into the target branch and back into the source branch.
 
 name: release holochain
 
