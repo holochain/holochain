@@ -27,6 +27,9 @@ pub mod sql_cell {
 
     pub const FETCH_PUBLISHABLE_OP: &str = include_str!("sql/cell/fetch_publishable_op.sql");
 
+    pub const SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP: &str =
+        include_str!("sql/cell/sum_of_received_bytes_since_timestamp.sql");
+
     pub mod must_get_agent_activity {
         pub const MUST_GET_AGENT_ACTIVITY: &str =
             include_str!("sql/cell/agent_activity/must_get_agent_activity.sql");

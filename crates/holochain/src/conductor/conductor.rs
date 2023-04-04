@@ -840,6 +840,8 @@ mod network_impls {
             &self,
             payload: &NetworkInfoRequestPayload,
         ) -> ConductorResult<Vec<NetworkInfo>> {
+            use holochain_sqlite::sql::sql_cell::SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP;
+
             let NetworkInfoRequestPayload {
                 agent_pub_key,
                 dnas,
@@ -867,7 +869,7 @@ mod network_impls {
                     .await
                     .map_err(|_| ConductorError::CellMissing(cell_id.clone()))?;
                 let arc_size = agent_infos[0].storage_arc.coverage();
-                
+
                 let permit = db.conn_permit().await;
                 let mut conn = db.with_permit(permit)?;
                 let extrapolated_coverage =
@@ -897,12 +899,7 @@ mod network_impls {
                     .async_reader({
                         move |txn| {
                             txn.query_row_and_then(
-                                "
-                            SELECT SUM(LENGTH(Action.blob))
-                            FROM Action, DhtOp
-                            WHERE DhtOp.authored_timestamp > ?1 
-                            AND DhtOp.action_hash = Action.hash;
-                            ",
+                                SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
                                 params![last_time_queried as u64],
                                 number_of_bytes_row_fn,
                             )
@@ -910,6 +907,7 @@ mod network_impls {
                     })
                     .await?;
                 println!("b is {:?}", dht_bytes_received);
+
                 let cache_db = self
                     .get_cache_db(&cell_id)
                     .await
@@ -917,12 +915,7 @@ mod network_impls {
                 let cache_dht_received = cache_db
                     .async_reader(move |txn| {
                         txn.query_row_and_then(
-                            "
-                            SELECT SUM(LENGTH(Action.blob))
-                            FROM Action, DhtOp
-                            WHERE DhtOp.authored_timestamp > ?1 
-                            AND DhtOp.action_hash = Action.hash;
-                            ",
+                            SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
                             params![last_time_queried as u64],
                             number_of_bytes_row_fn,
                         )
