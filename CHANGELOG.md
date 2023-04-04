@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230404.093137
+
+## [holochain\_cli-0.2.0-beta-rc.2](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_cli\_sandbox-0.2.0-beta-rc.1](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.0-beta-rc.1)
+
+- Fix bug in `hc sandbox generate`, where a comma-separated argument passed to the `--directories` option was treated as a single directory name. [\#2080](https://github.com/holochain/holochain/pull/2080)
+
+## [holochain\_cli\_bundle-0.2.0-beta-rc.1](crates/holochain_cli_bundle/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain-0.2.0-beta-rc.2](crates/holochain/CHANGELOG.md#0.2.0-beta-rc.2)
+
+- Fixes bug where supplying a `network_seed` during an `InstallApp` call does not actually update the network seed for roles whose `provisioning` is set to `None` in the manifest. Now the network seed is correctly updated. [\#2102](https://github.com/holochain/holochain/pull/2102)
+
+## [holochain\_test\_wasm\_common-0.2.0-beta-rc.2](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_conductor\_api-0.2.0-beta-rc.2](crates/holochain_conductor_api/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_wasm\_test\_utils-0.2.0-beta-rc.2](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_cascade-0.2.0-beta-rc.2](crates/holochain_cascade/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_state-0.2.0-beta-rc.2](crates/holochain_state/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_p2p-0.2.0-beta-rc.2](crates/holochain_p2p/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_types-0.2.0-beta-rc.2](crates/holochain_types/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_keystore-0.2.0-beta-rc.2](crates/holochain_keystore/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_sqlite-0.2.0-beta-rc.2](crates/holochain_sqlite/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [kitsune\_p2p-0.2.0-beta-rc.2](crates/kitsune_p2p/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [hdk-0.2.0-beta-rc.2](crates/hdk/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_zome\_types-0.2.0-beta-rc.2](crates/holochain_zome_types/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [hdi-0.3.0-beta-rc.2](crates/hdi/CHANGELOG.md#0.3.0-beta-rc.2)
+
+## [hdk\_derive-0.2.0-beta-rc.2](crates/hdk_derive/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_integrity\_types-0.2.0-beta-rc.2](crates/holochain_integrity_types/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holo\_hash-0.2.0-beta-rc.2](crates/holo_hash/CHANGELOG.md#0.2.0-beta-rc.2)
+
 # 20230322.003727
 
 ## [holochain\_cli-0.2.0-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.1)
