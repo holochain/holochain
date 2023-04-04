@@ -85,7 +85,7 @@ pub struct AppRoleDnaManifest {
     /// which allows for re-installing an app which has already been installed by manifest
     /// only (no need to include the DNAs, since they are already installed in the conductor).
     /// In this case, `location` does not even need to be set.
-    #[serde(alias = "version")]
+    #[serde(default)]
     pub installed_hash: Option<DnaHashB64>,
 
     /// Allow up to this many "clones" to be created at runtime.
@@ -316,7 +316,7 @@ manifest_version: "1"
 name: "Test app"
 description: "Serialization roundtrip test"
 roles:
-  - id: "role_name"
+  - name: "role_name"
     provisioning:
       strategy: "create"
       deferred: false
@@ -325,8 +325,9 @@ roles:
       installed_hash: {}
       clone_limit: 50
       network_seed: network_seed
-      properties:
-        salad: "bar"
+      modifiers:
+        properties:
+          salad: "bar"
 
         "#,
             installed_hash
@@ -336,16 +337,18 @@ roles:
 
         // Check a handful of fields. Order matters in YAML, so to check the
         // entire structure would be too fragile for testing.
-        let fields = &[
-            "roles[0].id",
-            "roles[0].provisioning.deferred",
-            "roles[0].dna.installed_hash[1]",
-            "roles[0].dna.properties",
-        ];
-        assert_eq!(actual.get(fields[0]), expected.get(fields[0]));
-        assert_eq!(actual.get(fields[1]), expected.get(fields[1]));
-        assert_eq!(actual.get(fields[2]), expected.get(fields[2]));
-        assert_eq!(actual.get(fields[3]), expected.get(fields[3]));
+
+        for getter in [
+            |v: &serde_yaml::Value| v["roles"][0]["name"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["provisioning"]["deferred"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["dna"]["installed_hash"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["dna"]["modifiers"]["properties"].clone(),
+        ] {
+            let left = getter(&actual);
+            let right = getter(&expected);
+            assert_eq!(left, right);
+            assert!(!left.is_null());
+        }
     }
 
     #[tokio::test]
