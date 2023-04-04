@@ -86,6 +86,57 @@ fn release_selection() {
 }
 
 #[test]
+fn members_dependencies() {
+    let workspace_mocker = example_workspace_2().unwrap();
+    let workspace = ReleaseWorkspace::try_new_with_criteria(
+        workspace_mocker.root(),
+        SelectionCriteria {
+            exclude_optional_deps: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let result = workspace
+        .members()
+        .unwrap()
+        .iter()
+        .map(|crt| {
+            (
+                crt.name(),
+                crt.dependencies_in_workspace()
+                    .unwrap()
+                    .into_iter()
+                    .map(|(dep_name, _)| dep_name.clone())
+                    .collect::<HashSet<_>>(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let expected_result = [
+        ("crate_b".to_string(), vec![]),
+        ("crate_c".to_string(), vec!["crate_b".to_string()]),
+        (
+            "crate_a".to_string(),
+            vec!["crate_c".to_string(), "crate_b".to_string()],
+        ),
+        (
+            "crate_d".to_string(),
+            vec![
+                "crate_a".to_string(),
+                "crate_c".to_string(),
+                "crate_b".to_string(),
+            ],
+        ),
+    ]
+    .into_iter()
+    .map(|(name, deps)| (name, deps.into_iter().collect::<HashSet<_>>()))
+    .collect::<Vec<_>>();
+
+    pretty_assertions::assert_eq!(expected_result, result, "left is expected");
+}
+
+#[test]
 fn crate_dependants_unfiltered_and_filtered() {
     let workspace_mocker = example_workspace_2().unwrap();
     let workspace = ReleaseWorkspace::try_new_with_criteria(
