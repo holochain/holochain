@@ -38,3 +38,6 @@ holochain_keystore = { version = "^0.2.0-beta-rc.0", path = "../holochain_keysto
 default = []
 
 db_explorer = ["dep:clap", "dep:shlex", "dep:holochain_conductor_api", "dep:holochain", "dep:walkdir", "dep:holochain_websocket", "dep:holochain_keystore"]
+
+db-encryption = [ "holochain_keystore?/db-encryption", "holochain?/db-encryption" ]
+
