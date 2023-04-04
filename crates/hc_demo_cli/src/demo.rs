@@ -29,10 +29,10 @@ use std::sync::Arc;
 ///
 /// `hc demo-cli run --dna my.dna`
 ///
-/// The demo will create two directories: `hc-demo-cli-inbox` and
-/// `hc-demo-cli-outbox`. Put files into the inbox, and they will
+/// The demo will create two directories: `hc-demo-cli-outbox` and
+/// `hc-demo-cli-inbox`. Put files into the outbox, and they will
 /// be published to the network. All files discovered on the network
-/// will be written to the outbox.
+/// will be written to the inbox.
 #[derive(Debug, clap::Parser, serde::Serialize, serde::Deserialize)]
 pub struct RunOpts {
     /// The subcommand to run.
@@ -56,13 +56,13 @@ pub enum RunCmd {
         #[arg(long, default_value = "-")]
         dna: std::path::PathBuf,
 
-        /// The inbox path.
-        #[arg(long, default_value = "hc-demo-cli-inbox")]
-        inbox: std::path::PathBuf,
-
         /// the outbox path.
         #[arg(long, default_value = "hc-demo-cli-outbox")]
         outbox: std::path::PathBuf,
+
+        /// The inbox path.
+        #[arg(long, default_value = "hc-demo-cli-inbox")]
+        inbox: std::path::PathBuf,
     },
 
     /// Generate a dna file that can be used with hc demo-cli.
@@ -77,8 +77,8 @@ pub enum RunCmd {
 pub async fn run_demo(opts: RunOpts) {
     tracing::info!(?opts);
     match opts.command {
-        RunCmd::Run { dna, inbox, outbox } => {
-            run(dna, inbox, outbox, None, None).await;
+        RunCmd::Run { dna, outbox, inbox } => {
+            run(dna, outbox, inbox, None, None).await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
@@ -94,8 +94,8 @@ pub async fn run_test_demo(
 ) {
     tracing::info!(?opts);
     match opts.command {
-        RunCmd::Run { dna, inbox, outbox } => {
-            run(dna, inbox, outbox, Some(ready), Some(rendezvous)).await;
+        RunCmd::Run { dna, outbox, inbox } => {
+            run(dna, outbox, inbox, Some(ready), Some(rendezvous)).await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
@@ -167,13 +167,13 @@ async fn gen_dna_file(output: std::path::PathBuf) {
 
 async fn run(
     dna: std::path::PathBuf,
-    inbox: std::path::PathBuf,
     outbox: std::path::PathBuf,
+    inbox: std::path::PathBuf,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     rendezvous: Option<holochain::sweettest::DynSweetRendezvous>,
 ) {
-    let _ = tokio::fs::create_dir_all(&inbox).await;
     let _ = tokio::fs::create_dir_all(&outbox).await;
+    let _ = tokio::fs::create_dir_all(&inbox).await;
 
     let dna_gz = if dna.to_string_lossy() == "-" {
         let mut dna_gz = Vec::new();
@@ -251,7 +251,7 @@ async fn run(
     }
 
     loop {
-        let mut dir = tokio::fs::read_dir(&inbox).await.unwrap();
+        let mut dir = tokio::fs::read_dir(&outbox).await.unwrap();
 
         while let Ok(Some(i)) = dir.next_entry().await {
             if i.file_type().await.unwrap().is_file() {
@@ -286,7 +286,7 @@ async fn run(
         let all_files: Vec<ActionHash> = handle.call(&c_zome, "get_all_files", ()).await;
 
         for file in all_files {
-            let mut path = outbox.clone();
+            let mut path = inbox.clone();
             path.push(file.to_string());
 
             if tokio::fs::metadata(&path).await.is_ok() {
@@ -316,5 +316,6 @@ async fn run(
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 
+    // If the loop above can ever exit, we should shutdown the conductor:
     // conductor.shutdown().await;
 }

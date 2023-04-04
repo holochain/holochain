@@ -22,9 +22,9 @@ async fn demo() {
 
     gen_dna().await;
 
-    tokio::fs::create_dir_all("one-in").await.unwrap();
-    tokio::fs::create_dir_all("two-out").await.unwrap();
-    tokio::fs::write(format!("one-in/{FILE}"), CONTENT)
+    tokio::fs::create_dir_all("one-out").await.unwrap();
+    tokio::fs::create_dir_all("two-in").await.unwrap();
+    tokio::fs::write(format!("one-out/{FILE}"), CONTENT)
         .await
         .unwrap();
 
@@ -46,7 +46,7 @@ async fn demo() {
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-        let mut nodes = tokio::fs::read_dir("two-out").await.unwrap();
+        let mut nodes = tokio::fs::read_dir("two-in").await.unwrap();
         while let Some(node) = nodes.next_entry().await.unwrap() {
             if !node.file_type().await.unwrap().is_dir() {
                 continue;
@@ -103,8 +103,8 @@ async fn run(
     let opts = RunOpts {
         command: RunCmd::Run {
             dna: std::path::PathBuf::from(DNA),
-            inbox: std::path::PathBuf::from(format!("{name}-in")),
             outbox: std::path::PathBuf::from(format!("{name}-out")),
+            inbox: std::path::PathBuf::from(format!("{name}-in")),
         },
     };
 
