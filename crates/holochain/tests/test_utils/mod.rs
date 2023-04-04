@@ -243,14 +243,12 @@ pub async fn register_and_install_dna_named(
         .await
         .unwrap();
 
-    let version = DnaVersionSpec::from(vec![dna_hash.clone().into()]).into();
-
     let roles = vec![AppRoleManifest {
         name: role_name,
         dna: AppRoleDnaManifest {
             location: Some(DnaLocation::Bundled(dna_path.clone())),
             modifiers: mods,
-            version: Some(version),
+            installed_hash: Some(dna_hash.clone().into()),
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
