@@ -3,9 +3,9 @@ name = "holochain_cli"
 version = "0.2.0-beta-rc.1"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo" ]
-categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo"]
+categories = ["command-line-utilities", "development-tools::build-utils", "filesystem"]
 edition = "2021"
 license = "Apache-2.0"
 description = "Provides the `hc` binary, a helpful CLI tool for working with Holochain."
@@ -25,4 +25,16 @@ holochain_cli_bundle = { path = "../hc_bundle", version = "^0.2.0-beta-rc.0"}
 holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.2.0-beta-rc.0"}
 holochain_trace = { version = "^0.2.0-beta-rc.1", path = "../holochain_trace" }
 structopt = "0.3"
-tokio = { version = "1.11", features = [ "full" ] }
+tokio = { version = "1.11", features = ["full"] }
+clap = { version = "4", optional = true }
+shlex = { version = "1.1.0", optional = true }
+holochain_conductor_api = { version = "^0.2.0-beta-rc.0", path = "../holochain_conductor_api", optional = true }
+holochain = { version = "^0.2.0-beta-rc.0", path = "../holochain", optional = true }
+walkdir = { version = "2.3.3", optional = true }
+holochain_websocket = { version = "^0.2.0-beta-rc.0", path = "../holochain_websocket", optional = true }
+holochain_keystore = { version = "^0.2.0-beta-rc.0", path = "../holochain_keystore", optional = true }
+
+[features]
+default = []
+
+db_explorer = ["dep:clap", "dep:shlex", "dep:holochain_conductor_api", "dep:holochain", "dep:walkdir", "dep:holochain_websocket", "dep:holochain_keystore"]

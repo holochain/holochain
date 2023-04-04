@@ -115,6 +115,8 @@ pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
 use structopt::{lazy_static::lazy_static, StructOpt};
 
+#[cfg(feature = "db_explorer")]
+mod db_explorer;
 mod external_subcommands;
 
 lazy_static! {
@@ -163,6 +165,9 @@ pub enum Opt {
     App(hc_bundle::HcAppBundle),
     /// Work with Web-hApp bundles
     WebApp(hc_bundle::HcWebAppBundle),
+    /// Explore holochain data interactively
+    #[cfg(feature = "db_explorer")]
+    DbExplore,
     /// Work with sandboxed environments for testing and development
     Sandbox(hc_sandbox::HcSandbox),
     /// Allow redirect of external subcommands (like hc-scaffold and hc-launch)
@@ -178,6 +183,8 @@ impl Opt {
             Self::App(cmd) => cmd.run().await?,
             Self::WebApp(cmd) => cmd.run().await?,
             Self::Sandbox(cmd) => cmd.run().await?,
+            #[cfg(feature = "db_explorer")]
+            Self::DbExplore => db_explorer::run_db_explorer().await?,
             Self::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
                 Command::new(format!("hc-{}", command_suffix))
