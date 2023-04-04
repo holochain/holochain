@@ -53,6 +53,15 @@ pub struct Crate<'a> {
     dependants_in_workspace: OnceCell<Vec<&'a Crate<'a>>>,
 }
 
+#[cfg(test)]
+impl PartialEq for Crate<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.package == other.package
+            && self.dependencies_in_workspace == other.dependencies_in_workspace
+            && self.dependants_in_workspace == other.dependants_in_workspace
+    }
+}
+
 impl<'a> Crate<'a> {
     /// Instantiate a new Crate with the given CargoPackage.
     pub fn with_cargo_package(
