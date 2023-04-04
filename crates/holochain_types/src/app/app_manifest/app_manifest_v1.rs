@@ -91,7 +91,8 @@ pub struct AppRoleDnaManifest {
     /// For backward compatibility only: `installed_hash` used to take a list of hashes.
     /// To prevent breaking manifests, this is still allowed, but now has no effect.
     #[serde(default)]
-    pub(crate) version: Option<VecOrSingle<DnaHashB64>>,
+    #[serde(alias = "version")]
+    pub _version: Option<VecOrSingle<DnaHashB64>>,
 
     /// Allow up to this many "clones" to be created at runtime.
     /// Each runtime clone is created by the `CreateClone` strategy,
@@ -118,7 +119,7 @@ impl AppRoleDnaManifest {
             )),
             modifiers: DnaModifiersOpt::none(),
             installed_hash: None,
-            version: None,
+            _version: None,
             clone_limit: 0,
         }
     }
@@ -192,7 +193,7 @@ impl AppManifestV1 {
                         installed_hash,
                         clone_limit,
                         modifiers,
-                        version: _,
+                        _version: _,
                     } = dna;
                     let modifiers = modifiers.serialized()?;
                     // Go from "flexible" enum into proper DnaVersionSpec.
@@ -293,7 +294,7 @@ pub mod tests {
                 modifiers,
                 installed_hash: Some(installed_hash.into()),
                 clone_limit: 50,
-                version: None,
+                _version: None,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
         }];
@@ -414,7 +415,7 @@ roles:
         {
             let AppManifest::V1(AppManifestCurrent { roles, .. }) = manifest1;
             assert_eq!(
-                roles[0].dna.version,
+                roles[0].dna._version,
                 Some(VecOrSingle::Single(hash1.clone()))
             );
             assert!(roles[0].dna.installed_hash.is_none());
@@ -422,7 +423,7 @@ roles:
         {
             let AppManifest::V1(AppManifestCurrent { roles, .. }) = manifest2;
             assert_eq!(
-                roles[0].dna.version,
+                roles[0].dna._version,
                 Some(VecOrSingle::Vec(vec![hash1, hash2]))
             );
             assert!(roles[0].dna.installed_hash.is_none());

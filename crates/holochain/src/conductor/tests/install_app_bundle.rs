@@ -29,7 +29,7 @@ async fn reject_duplicate_app_for_same_agent() {
             modifiers: modifiers.clone(),
             installed_hash: Some(installed_dna_hash.into()),
             clone_limit: 0,
-            version: None,
+            _version: None,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
     }];
@@ -143,7 +143,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             // Note that there is no installed hash provided. We'll check that this changes later.
             installed_hash: None,
             clone_limit: 0,
-            version: None,
+            _version: None,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
     }];
@@ -246,7 +246,7 @@ async fn network_seed_regression() {
                 location: Some(DnaLocation::Path(dna_path)),
                 modifiers: DnaModifiersOpt::default(),
                 installed_hash: None,
-                version: None,
+                _version: None,
                 clone_limit: 0,
             },
             provisioning: None,
@@ -476,7 +476,7 @@ impl TestCase {
                         modifiers: dna_modifiers.clone(),
                         installed_hash: None,
                         clone_limit: 10,
-                        version: None,
+                        _version: None,
                     },
                     provisioning: Some(CellProvisioning::Create { deferred: false }),
                 }];
@@ -503,7 +503,7 @@ impl TestCase {
                         location: Some(DnaLocation::Path(dna_path.clone())),
                         modifiers: dna_modifiers.clone(),
                         installed_hash: Some(dna_hash.clone().into()),
-                        version: None,
+                        _version: None,
                         clone_limit: 0,
                     },
                     provisioning: None,

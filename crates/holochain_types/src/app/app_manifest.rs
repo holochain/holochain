@@ -94,7 +94,7 @@ impl AppManifest {
                         modifiers: Default::default(),
                         installed_hash: Some(cell_id.dna_hash().clone().into()),
                         clone_limit: 256,
-                        version: None,
+                        _version: None,
                     },
                 }
             })
