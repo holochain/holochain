@@ -358,6 +358,9 @@ ghost_actor::ghost_chan! {
             dna_hash: Option<DnaHash>,
         ) -> String;
 
+        /// Dump network stats.
+        fn dump_network_stats() -> String;
+
         /// Get struct for diagnostic data
         fn get_diagnostics(dna_hash: DnaHash) -> KitsuneDiagnostics;
     }

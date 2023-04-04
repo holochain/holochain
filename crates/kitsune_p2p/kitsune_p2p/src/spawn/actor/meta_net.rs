@@ -757,4 +757,32 @@ impl MetaNet {
 
         Err("invalid features".into())
     }
+
+    pub fn dump_network_stats(&self) -> impl std::future::Future<Output = KitsuneResult<serde_json::Value>> + 'static + Send {
+        use futures::FutureExt;
+
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNet::Tx2(ep) = self {
+                let res = ep.debug();
+                return async move {
+                    Ok(res)
+                }.boxed();
+            }
+        }
+
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNet::Tx5(ep, _, _) = self {
+                let fut = ep.get_stats();
+                return async move {
+                    fut.await.map_err(KitsuneError::other)
+                }.boxed();
+            }
+        }
+
+        async move {
+            Err("invalid features".into())
+        }.boxed()
+    }
 }

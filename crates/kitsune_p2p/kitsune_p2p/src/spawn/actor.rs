@@ -1150,6 +1150,15 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(results)
     }
 
+    fn handle_dump_network_stats(&mut self) -> KitsuneP2pHandlerResult<serde_json::Value> {
+        let fut = self.ep_hnd.dump_network_stats();
+        Ok(async move {
+            Ok(fut.await?)
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_get_diagnostics(
         &mut self,
         space: KSpace,

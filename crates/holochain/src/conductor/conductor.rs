@@ -2033,6 +2033,15 @@ mod misc_impls {
                 .map_err(crate::conductor::api::error::ConductorApiError::other)
         }
 
+        /// JSON dump of backend network stats
+        pub async fn dump_network_stats(&self) -> ConductorApiResult<String> {
+            use holochain_p2p::HolochainP2pSender;
+            self.holochain_p2p()
+                .dump_network_stats()
+                .await
+                .map_err(crate::conductor::api::error::ConductorApiError::other)
+        }
+
         /// Add signed agent info to the conductor
         pub async fn add_agent_infos(
             &self,

@@ -222,6 +222,9 @@ pub enum AdminRequest {
         dna_hash: Option<DnaHash>,
     },
 
+    /// Dump raw json network statistics from the backend networking lib.
+    DumpNetworkStats,
+
     /// Add a list of agents to this conductor's peer store.
     ///
     /// This is a way of shortcutting peer discovery and is useful for testing.
@@ -430,6 +433,12 @@ pub enum AdminResponse {
     ///
     /// The string is a JSON blob of the metrics results.
     NetworkMetricsDumped(String),
+
+    /// The successful result of a call to [`AdminRequest::DumpNetworkStats`].
+    ///
+    /// The string is a raw JSON blob returned directly from the backend
+    /// networking library.
+    NetworkStatsDumped(String),
 
     /// The successful response to an [`AdminRequest::AddAgentInfo`].
     ///
