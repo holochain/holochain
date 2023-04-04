@@ -276,7 +276,7 @@ pub mod tests {
         modifiers: DnaModifiersOpt<YamlProperties>,
     ) -> AppManifestV1 {
         let roles = vec![AppRoleManifest {
-            name: "name".into(),
+            name: "role_name".into(),
             dna: AppRoleDnaManifest {
                 location,
                 modifiers,
