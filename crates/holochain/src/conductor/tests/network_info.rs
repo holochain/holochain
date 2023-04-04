@@ -1,6 +1,6 @@
 use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::RoleName;
+// use holochain_zome_types::RoleName;
 
 use crate::sweettest::{SweetConductorBatch, SweetDnaFile};
 
