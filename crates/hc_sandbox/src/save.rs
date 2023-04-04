@@ -1,5 +1,5 @@
 //! # Manage persistence of sandboxes
-//! 
+//!
 //! This module gives basic helpers to save / load your sandboxes
 //! to / from a `.hc` file.
 //! This is very much WIP and subject to change.

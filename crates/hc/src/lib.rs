@@ -6,12 +6,12 @@
 //! or make a PR.
 //!
 //! ## CLI
-//! 
+//!
 //! The `hc` CLI makes it easy to create, modify, and run hApps that
 //! you are working on or someone has sent you.
 //! It has been designed to use sensible defaults but still give you
 //! the configurability when that's required.
-//! 
+//!
 //! Setups are stored in tmp directories by default and the paths are
 //! persisted in a `.hc` file which is created wherever you are using
 //! the CLI.

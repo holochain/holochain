@@ -7,7 +7,7 @@
 //! **Warning: this is still WIP and subject to change**
 //! There's probably a few bugs. If you find one please open an [issue](https://github.com/holochain/holochain/issues)
 //! or make a PR.
-//! 
+//!
 //! While this crate can be compiled into an executable, it can also be used as a library so you can create more
 //! complex sandboxes / admin calls.
 //! See the docs:
