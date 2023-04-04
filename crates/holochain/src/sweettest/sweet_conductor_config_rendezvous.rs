@@ -5,15 +5,11 @@ use std::sync::Arc;
 /// Signal/TURN + bootstrap in tx5 mode.
 pub trait SweetRendezvous: 'static + Send + Sync {
     /// Get the bootstrap address.
-    fn bootstrap_addr(&self) -> std::net::SocketAddr;
-
-    #[cfg(feature = "tx5")]
-    /// Get the turn server address.
-    fn turn_addr(&self) -> &str;
+    fn bootstrap_addr(&self) -> &str;
 
     #[cfg(feature = "tx5")]
     /// Get the signal server address.
-    fn sig_addr(&self) -> std::net::SocketAddr;
+    fn sig_addr(&self) -> &str;
 }
 
 /// Trait object rendezvous.
@@ -21,15 +17,13 @@ pub type DynSweetRendezvous = Arc<dyn SweetRendezvous + 'static + Send + Sync>;
 
 /// Local rendezvous infrastructure for unit testing.
 pub struct SweetLocalRendezvous {
-    bs_addr: std::net::SocketAddr,
+    bs_addr: String,
     bs_shutdown: Option<kitsune_p2p_bootstrap::BootstrapShutdown>,
 
     #[cfg(feature = "tx5")]
-    turn_addr: String,
-    #[cfg(feature = "tx5")]
     turn_srv: Option<tx5_go_pion_turn::Tx5TurnServer>,
     #[cfg(feature = "tx5")]
-    sig_addr: std::net::SocketAddr,
+    sig_addr: String,
     #[cfg(feature = "tx5")]
     sig_shutdown: Option<tokio::task::JoinHandle<()>>,
 }
@@ -75,6 +69,7 @@ impl SweetLocalRendezvous {
             .await
             .unwrap();
         tokio::task::spawn(bs_driver);
+        let bs_addr = format!("http://{bs_addr}");
         tracing::info!("RUNNING BOOTSTRAP: {bs_addr:?}");
 
         #[cfg(not(feature = "tx5"))]
@@ -105,14 +100,14 @@ impl SweetLocalRendezvous {
 
             let (sig_addr, sig_driver) = tx5_signal_srv::exec_tx5_signal_srv(sig_conf).unwrap();
             let sig_port = sig_addr.port();
-            let sig_addr = (addr, sig_port).into();
+            let sig_addr: std::net::SocketAddr = (addr, sig_port).into();
             let sig_shutdown = tokio::task::spawn(sig_driver);
+            let sig_addr = format!("ws://{sig_addr}");
             tracing::info!("RUNNING SIG: {sig_addr:?}");
 
             Arc::new(Self {
                 bs_addr,
                 bs_shutdown: Some(bs_shutdown),
-                turn_addr,
                 turn_srv: Some(turn_srv),
                 sig_addr,
                 sig_shutdown: Some(sig_shutdown),
@@ -123,19 +118,13 @@ impl SweetLocalRendezvous {
 
 impl SweetRendezvous for SweetLocalRendezvous {
     /// Get the bootstrap address.
-    fn bootstrap_addr(&self) -> std::net::SocketAddr {
-        self.bs_addr
-    }
-
-    #[cfg(feature = "tx5")]
-    /// Get the turn server address.
-    fn turn_addr(&self) -> &str {
-        &self.turn_addr
+    fn bootstrap_addr(&self) -> &str {
+        self.bs_addr.as_str()
     }
 
     #[cfg(feature = "tx5")]
     /// Get the signal server address.
-    fn sig_addr(&self) -> std::net::SocketAddr {
-        self.sig_addr
+    fn sig_addr(&self) -> &str {
+        self.sig_addr.as_str()
     }
 }
