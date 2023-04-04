@@ -1,10 +1,10 @@
 //! Definitions of Parser options for use in the CLI
 
 use crate::cmds::*;
+use clap::{ArgAction, Parser};
 use holochain_types::prelude::InstalledAppId;
 use std::path::Path;
 use std::path::PathBuf;
-use clap::{ArgAction, Parser};
 
 const DEFAULT_APP_ID: &str = "test-app";
 
@@ -31,7 +31,12 @@ pub struct HcSandbox {
     force_admin_ports: Vec<u16>,
 
     /// Set the path to the holochain binary.
-    #[arg(short = 'H', long, env = "HC_HOLOCHAIN_PATH", default_value = "holochain")]
+    #[arg(
+        short = 'H',
+        long,
+        env = "HC_HOLOCHAIN_PATH",
+        default_value = "holochain"
+    )]
     holochain_path: PathBuf,
 }
 
@@ -60,7 +65,7 @@ pub enum HcSandboxSubcommand {
         /// Or, use `hc sandbox generate -r` to run without attaching any app interfaces.
         /// This follows the same structure as `hc sandbox run --ports`.
         #[arg(short, long, value_delimiter = ',')]
-    run: Option<Vec<u16>>,
+        run: Option<Vec<u16>>,
 
         /// A hApp bundle to install.
         happ: Option<PathBuf>,

@@ -1,5 +1,5 @@
-use holochain_cli_bundle::HcDnaBundle;
 use clap::Parser;
+use holochain_cli_bundle::HcDnaBundle;
 
 /// Main `hc-dna` executable entrypoint.
 #[tokio::main]

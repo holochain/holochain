@@ -19,10 +19,10 @@
 use std::process::Command;
 
 // Useful to have this public when using this as a library.
+use clap::{crate_version, Parser, Subcommand};
 pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
 use lazy_static::lazy_static;
-use clap::{Parser, Subcommand, crate_version};
 
 mod external_subcommands;
 
@@ -80,6 +80,7 @@ pub struct Cli {
 
 /// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`.
 #[derive(Debug, Subcommand)]
+#[warn(clippy::large_enum_variant)]
 pub enum CliSubcommand {
     /// Work with DNA bundles.
     Dna(hc_bundle::HcDnaBundle),

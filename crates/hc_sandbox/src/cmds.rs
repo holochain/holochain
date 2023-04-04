@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
+use clap::Parser;
 use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use holochain_p2p::kitsune_p2p::TransportConfig;
-use clap::Parser;
 use url2::Url2;
 
 // This creates a new Holochain sandbox

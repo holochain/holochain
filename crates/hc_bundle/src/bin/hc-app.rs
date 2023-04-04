@@ -1,5 +1,5 @@
-use holochain_cli_bundle::HcAppBundle;
 use clap::Parser;
+use holochain_cli_bundle::HcAppBundle;
 
 /// Main `hc-app` executable entrypoint.
 #[tokio::main]

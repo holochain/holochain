@@ -1,5 +1,5 @@
-use holochain_cli as hc;
 use clap::Parser;
+use holochain_cli as hc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
