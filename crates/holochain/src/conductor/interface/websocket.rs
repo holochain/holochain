@@ -483,9 +483,9 @@ pub mod test {
                         info,
                         vec![NetworkInfo {
                             fetch_pool_info: FetchPoolInfo::default(),
-                            number_of_peers: 1,
+                            current_number_of_peers: 1,
                             arc_size: 1.0,
-                            total_peers: 1,
+                            total_network_peers: 1,
                             bytes_since_last_time_queried: 1844,
                             completed_rounds_since_last_time_queried: 0,
                         }]
