@@ -854,7 +854,7 @@ mod network_impls {
                     .fetch_pool
                     .info([dna.to_kitsune()].into_iter().collect());
 
-                // query number agents from peer db
+                // query number of agents from peer db
                 let db = { self.p2p_agents_db(dna) };
                 let permit = db.conn_permit().await;
                 let mut conn = db.with_permit(permit)?;
