@@ -883,10 +883,8 @@ mod network_impls {
                 };
                 let sum_of_bytes_row_fn = |row: &Row| {
                     row.get(0)
-                        .map(|maybe_bytes_received: Option<u64>| {
-                            maybe_bytes_received.unwrap_or_else(|| 0)
-                        })
-                        .map_err(|err| DatabaseError::SqliteError(err))
+                        .map(|maybe_bytes_received: Option<u64>| maybe_bytes_received.unwrap_or(0))
+                        .map_err(DatabaseError::SqliteError)
                 };
                 let dht_db = self
                     .get_dht_db(dna)
