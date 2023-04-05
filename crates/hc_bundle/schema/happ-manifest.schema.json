@@ -184,17 +184,19 @@
                 }
               },
               "version": {
-                "oneOf": [{
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }, {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }]
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Deprecated, use installed_hash instead",
+                "deprecationMessage": "use installed_hash instead"
+              },
+              "installed_hash": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The hash of the DNA to be installed. If specified, will cause installation to fail if the bundled DNA hash does not match this"
               },
               "clone_limit": {
                 "type": "number",
