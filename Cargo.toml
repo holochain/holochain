@@ -27,6 +27,7 @@ members = [
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
+  "crates/hc_demo_cli",
 
   "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/dht",

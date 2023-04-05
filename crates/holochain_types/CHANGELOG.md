@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- BREAKING: AppManifest's `version` now only accepts a single optional DNA hash value, whereas previously it could accept a list of values.
+- AppManifest's `version` is renamed to `installed_hash` (there is still an alias to `version` for limited backward compatibility, so the old field name will still work).
+
+## 0.2.0-beta-rc.1
+
 ## 0.2.0-beta-rc.0
 
 ## 0.1.0

@@ -309,7 +309,7 @@ pub async fn install_app(
     }
     conductor_handle
         .clone()
-        .install_app(name.to_string(), cell_data)
+        .install_app_legacy(name.to_string(), cell_data)
         .await
         .unwrap();
 
@@ -348,7 +348,7 @@ pub async fn setup_app(
 
     conductor_handle
         .clone()
-        .install_app("test app".to_string(), cell_data)
+        .install_app_legacy("test app".to_string(), cell_data)
         .await
         .unwrap();
 
