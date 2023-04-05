@@ -447,16 +447,16 @@ roles:
             AppRoleManifest::arbitrary(&mut u).unwrap(),
             AppRoleManifest::arbitrary(&mut u).unwrap(),
         ];
-        manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });
+        manifest.roles[0].provisioning = None;
         manifest.roles[1].provisioning = Some(CellProvisioning::Create { deferred: false });
-        manifest.roles[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
-        manifest.roles[3].provisioning =
+        manifest.roles[2].provisioning =
             Some(CellProvisioning::CreateIfNotExists { deferred: false });
+        manifest.roles[3].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
 
         let network_seed = NetworkSeed::from("blabla");
         manifest.set_network_seed(network_seed.clone());
 
-        // - The Create roles have the network seed rewritten.
+        // - The Create-based roles have the network seed rewritten.
         assert_eq!(
             manifest.roles[0].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
@@ -465,12 +465,12 @@ roles:
             manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
-
-        // - The others do not.
-        assert_ne!(
+        assert_eq!(
             manifest.roles[2].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
+
+        // - The others do not.
         assert_ne!(
             manifest.roles[3].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
