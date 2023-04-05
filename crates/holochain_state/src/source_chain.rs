@@ -18,6 +18,8 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
+use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_types::chc::ChcError;
 use holochain_types::db::DbRead;
 use holochain_types::db::DbWrite;
@@ -657,48 +659,22 @@ where
                     let maybe_entry = if let Some(cap_secret) = &check_secret {
                         // cap grant for cap secret must exist
                         // that has not been updated or deleted
-                        let sql = "
-                            SELECT Entry.blob
-                            FROM Entry
-                            WHERE Entry.cap_secret = ?1
-                            AND (
-                                SELECT COUNT(Action.hash)
-                                FROM Action
-                                WHERE Action.author = ?2
-                                AND (
-                                    Action.original_entry_hash = Entry.hash
-                                    OR Action.deletes_entry_hash = Entry.hash
-                                )
-                            ) = 0
-                            "
-                        .trim();
                         let cap_secret_blob = to_blob(cap_secret).map_err(|err| {
                             DatabaseError::SerializedBytes(SerializedBytesError::Serialize(
                                 err.to_string(),
                             ))
                         })?;
-                        txn.query_row(sql, params![cap_secret_blob, agent_pubkey], query_row_fn)
-                            .optional()?
+                        txn.query_row(
+                            SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET,
+                            params![cap_secret_blob, agent_pubkey],
+                            query_row_fn,
+                        )
+                        .optional()?
                     } else {
                         // unrestricted cap grant must exist
                         // that has not been updated or deleted
-                        let sql = "
-                            SELECT blob
-                            FROM Entry
-                            WHERE access_type = ?1
-                            AND (
-                                SELECT COUNT(Action.hash)
-                                FROM Action
-                                WHERE Action.author = ?2
-                                AND (
-                                    Action.original_entry_hash = Entry.hash
-                                    OR Action.deletes_entry_hash = Entry.hash
-                                )
-                            ) = 0;
-                            "
-                        .trim();
                         txn.query_row(
-                            sql,
+                            SELECT_VALID_UNRESTRICTED_CAP_GRANT,
                             params![CapAccess::Unrestricted.as_sql(), agent_pubkey],
                             query_row_fn,
                         )

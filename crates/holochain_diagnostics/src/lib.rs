@@ -50,7 +50,7 @@ where
 }
 
 pub fn config_standard() -> ConductorConfig {
-    holochain::sweettest::standard_config()
+    holochain::sweettest::standard_config().into()
 }
 
 pub fn config_no_networking() -> ConductorConfig {
