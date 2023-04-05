@@ -367,8 +367,7 @@ pub async fn install_app_in_conductor(
 
     conductor_handle
         .clone()
-        .install_app(installed_app_id.clone(), cell_data)
-        .install_app_legacy("test app".to_string(), cell_data)
+        .install_app_legacy(installed_app_id.clone(), cell_data)
         .await
         .unwrap();
 
