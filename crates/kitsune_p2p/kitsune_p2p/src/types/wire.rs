@@ -157,3 +157,23 @@ kitsune_p2p_types::write_codec_enum! {
         },
     }
 }
+
+impl Wire {
+    pub fn maybe_space(&self) -> Option<Arc<KitsuneSpace>> {
+        match self {
+            Wire::Call(Call { space, .. })
+            | Wire::DelegateBroadcast(DelegateBroadcast { space, .. })
+            | Wire::Broadcast(Broadcast { space, .. })
+            | Wire::Gossip(Gossip { space, .. })
+            | Wire::PeerGet(PeerGet { space, .. })
+            | Wire::PeerQuery(PeerQuery { space, .. })
+            | Wire::MetricExchange(MetricExchange { space, .. }) => Some(space.clone()),
+            Wire::Failure(_)
+            | Wire::CallResp(_)
+            | Wire::PeerGetResp(_)
+            | Wire::PeerQueryResp(_)
+            | Wire::FetchOp(_)
+            | Wire::PushOpData(_) => None,
+        }
+    }
+}
