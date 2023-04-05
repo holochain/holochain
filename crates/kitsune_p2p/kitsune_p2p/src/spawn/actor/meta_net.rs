@@ -31,6 +31,8 @@ use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
 
+use kitsune_p2p_block::BlockTargetId;
+use kitsune_p2p_timestamp::Timestamp;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -115,6 +117,69 @@ pub enum MetaNetEvt {
         /// The request data sent by the remote peer.
         data: wire::Wire,
     },
+}
+
+pub enum MetaNetEvtAuth {
+    Authorized,
+    UnauthorizedIgnore,
+    UnauthorizedDisconnect,
+}
+
+impl MetaNetEvt {
+    pub fn con(&self) -> &MetaNetCon {
+        match self {
+            MetaNetEvt::Connected { con, .. }
+            | MetaNetEvt::Disconnected { con, .. }
+            | MetaNetEvt::Request { con, .. }
+            | MetaNetEvt::Notify { con, .. } => con,
+        }
+    }
+
+    pub fn maybe_space(&self) -> Option<Arc<KitsuneSpace>> {
+        match self {
+            MetaNetEvt::Request { data, .. } | MetaNetEvt::Notify { data, .. } => {
+                data.maybe_space()
+            }
+            MetaNetEvt::Connected { .. } | MetaNetEvt::Disconnected { .. } => None,
+        }
+    }
+}
+
+pub async fn node_is_authorized(
+    host: &HostApi,
+    node_id: Arc<[u8; 32]>,
+    now: Timestamp,
+) -> MetaNetEvtAuth {
+    match host.is_blocked(BlockTargetId::Node(node_id), now).await {
+        Ok(true) => MetaNetEvtAuth::UnauthorizedDisconnect,
+        Ok(false) => MetaNetEvtAuth::Authorized,
+        Err(_) => MetaNetEvtAuth::UnauthorizedIgnore,
+    }
+}
+
+pub async fn nodespace_is_authorized(
+    host: &HostApi,
+    node_id: Arc<[u8; 32]>,
+    maybe_space: Option<Arc<KitsuneSpace>>,
+    now: Timestamp,
+) -> MetaNetEvtAuth {
+    if let Some(space) = maybe_space {
+        match node_is_authorized(host, node_id.clone(), now).await {
+            MetaNetEvtAuth::Authorized => {
+                match host
+                    .is_blocked(BlockTargetId::NodeSpace(node_id, space), now)
+                    .await
+                {
+                    Ok(true) => MetaNetEvtAuth::UnauthorizedIgnore,
+                    Ok(false) => MetaNetEvtAuth::Authorized,
+                    Err(_) => MetaNetEvtAuth::UnauthorizedIgnore,
+                }
+            }
+            unauthorized => unauthorized,
+        }
+    } else {
+        MetaNetEvtAuth::Authorized
+    }
 }
 
 pub type MetaNetEvtRecv = futures::channel::mpsc::Receiver<MetaNetEvt>;
@@ -300,6 +365,7 @@ impl MetaNet {
     /// Construct abstraction with tx2 backend.
     #[cfg(feature = "tx2")]
     pub async fn new_tx2(
+        host: HostApi,
         config: KitsuneP2pConfig,
         tls_config: kitsune_p2p_types::tls::TlsConfig,
         metrics: Tx2ApiMetrics,
@@ -578,6 +644,7 @@ impl MetaNet {
                         permit,
                     } => {
                         tracing::trace!(%rem_cli_url, byte_count=?data.remaining(), "received bytes");
+
                         match WireWrap::decode(&mut bytes::Buf::reader(data)) {
                             Ok(WireWrap::Notify(Notify { msg_id, data })) => {
                                 match wire::Wire::decode_ref(&data) {
