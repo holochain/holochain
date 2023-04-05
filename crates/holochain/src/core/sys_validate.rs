@@ -234,30 +234,18 @@ pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
     Ok(())
 }
 
-/// Check previous action type is valid
-pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+/// Check that created agents are always paired with an AgentValidationPkg and vice versa
+pub fn check_agent_validation_pkg_predecessor(
+    action: &Action,
+    prev_action: &Action,
+) -> SysValidationResult<()> {
     let maybe_error = match (prev_action, action) {
-        (
-            Action::AgentValidationPkg(AgentValidationPkg {
-                author: author1, ..
-            }),
-            Action::Create(Create {
-                author: author2,
-                entry_type: EntryType::AgentPubKey,
-                ..
-            }),
-        ) => {
-            if author1 != author2 {
-                Some("author of agent validation package must match succeeding agent")
-            } else {
-                None
-            }
+        (Action::AgentValidationPkg(AgentValidationPkg { .. }), Action::Create(Create { .. })) => {
+            None
         }
-
         (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => {
             Some("Every AgentValidationPkg must be followed by a Create for an AgentPubKey")
         }
-
         (
             _,
             Action::Create(Create {
@@ -265,7 +253,6 @@ pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationRe
                 ..
             }),
         ) => Some("Every Create for an AgentPubKey must be preceded by an AgentValidationPkg"),
-
         _ => None,
     };
 
@@ -277,6 +264,31 @@ pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationRe
         .map_err(|e| ValidationOutcome::from(e).into())
     } else {
         Ok(())
+    }
+}
+
+/// Check that the author didn't change between actions
+pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+    if let Action::Update(Update {
+        entry_type: EntryType::AgentPubKey,
+        entry_hash,
+        ..
+    }) = prev_action
+    {
+        // When the agent key has been updated,
+        let new_author: AgentPubKey = entry_hash.clone().into();
+        if *action.author() == new_author {
+            tracing::warn!("Validated a correct Update Agent sequence, which will be valid when full DPKI support is implemented, but for now it must be marked invalid.");
+        }
+    }
+
+    let a1 = prev_action.author();
+    let a2 = action.author();
+    if a2 == a1 {
+        Ok(())
+    } else {
+        Err(PrevActionError::Author(a1.clone(), a2.clone()))
+            .map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
