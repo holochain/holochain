@@ -860,24 +860,20 @@ mod network_impls {
                 let mut conn = db.with_permit(permit)?;
                 let agent_infos = conn.p2p_list_agents()?;
                 let number_of_peers = agent_infos.len();
-                println!("all_peers {:?}", number_of_peers);
 
-                // query extrapolated coverage
+                // query arc size and extrapolated coverage and estimate total peers
                 let cell_id = CellId::new(dna.as_hash().clone(), agent_pub_key.clone());
                 let agent_infos = self
                     .get_agent_infos(Some(cell_id.clone()))
                     .await
                     .map_err(|_| ConductorError::CellMissing(cell_id.clone()))?;
                 let arc_size = agent_infos[0].storage_arc.coverage();
-
-                let permit = db.conn_permit().await;
-                let mut conn = db.with_permit(permit)?;
                 let extrapolated_coverage =
                     conn.p2p_extrapolated_coverage(agent_infos[0].storage_arc.inner().into())?;
-                println!("total_peers {:?}", extrapolated_coverage);
-                // let total_peers = extrapolated_coverage
+                let total_peers = (extrapolated_coverage[0] / arc_size) as u64;
 
-                // get amount of bytes from dht and cache db since last time request was made
+                // get sum of bytes from dht and cache db since last time
+                // request was made or since the beginning of time
                 let last_time_queried = match last_time_queried {
                     Some(timestamp) => *timestamp,
                     None => std::time::UNIX_EPOCH
@@ -885,7 +881,7 @@ mod network_impls {
                         .map_err(|err| ConductorError::Other(Box::new(err)))?
                         .as_millis(),
                 };
-                let number_of_bytes_row_fn = |row: &Row| {
+                let sum_of_bytes_row_fn = |row: &Row| {
                     row.get(0)
                         .map(|maybe_bytes_received: Option<u64>| {
                             maybe_bytes_received.unwrap_or_else(|| 0)
@@ -901,43 +897,47 @@ mod network_impls {
                             txn.query_row_and_then(
                                 SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
                                 params![last_time_queried as u64],
-                                number_of_bytes_row_fn,
+                                sum_of_bytes_row_fn,
                             )
                         }
                     })
                     .await?;
-                println!("b is {:?}", dht_bytes_received);
 
                 let cache_db = self
                     .get_cache_db(&cell_id)
                     .await
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
-                let cache_dht_received = cache_db
+                let cache_bytes_received = cache_db
                     .async_reader(move |txn| {
                         txn.query_row_and_then(
                             SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
                             params![last_time_queried as u64],
-                            number_of_bytes_row_fn,
+                            sum_of_bytes_row_fn,
                         )
                     })
                     .await?;
-                println!("c is {:?}", cache_dht_received);
+                let bytes_since_last_time_queried = dht_bytes_received + cache_bytes_received;
 
                 // calculate open peer connections based on current gossip sessions
-                let open_peer_connections = diagnostics
+                let completed_rounds_since_last_time_queried = diagnostics
                     .metrics
                     .read()
-                    .peer_agent_histories()
+                    .peer_node_histories()
                     .iter()
-                    .filter(|(_, history)| history.current_round)
-                    .count() as u16;
+                    .flat_map(|(_, node_history)| node_history.completed_rounds.clone())
+                    .filter(|completed_round| {
+                        // this should compare to last_time_queried but I couldn't come up with that comparison
+                        completed_round.start_time > tokio::time::Instant::now()
+                    })
+                    .count();
 
                 ConductorResult::Ok(NetworkInfo {
                     fetch_pool_info,
                     number_of_peers,
                     arc_size,
-                    total_peers: extrapolated_coverage,
-                    open_peer_connections,
+                    total_peers,
+                    bytes_since_last_time_queried,
+                    completed_rounds_since_last_time_queried,
                 })
             }))
             .await

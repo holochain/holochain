@@ -485,8 +485,9 @@ pub mod test {
                             fetch_pool_info: FetchPoolInfo::default(),
                             number_of_peers: 1,
                             arc_size: 1.0,
-                            total_peers: vec![1.0],
-                            open_peer_connections: 0,
+                            total_peers: 1,
+                            bytes_since_last_time_queried: 0,
+                            completed_rounds_since_last_time_queried: 0,
                         }]
                     )
                 }
