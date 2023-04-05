@@ -667,11 +667,20 @@ async fn network_stats() {
 
     let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
 
+    #[cfg(not(feature = "tx5"))]
+    const EXPECT: &str = "tx2-quic";
+    #[cfg(feature = "tx5")]
+    const EXPECT: &str = "go-pion";
+
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();
     match res {
         AdminResponse::NetworkStatsDumped(json) => {
             println!("{json}");
+
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+            let backend = parsed.as_object().unwrap().get("backend").unwrap();
+            assert_eq!(EXPECT, backend);
         }
         _ => panic!("unexpected"),
     }

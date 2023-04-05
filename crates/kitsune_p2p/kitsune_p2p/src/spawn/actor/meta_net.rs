@@ -831,7 +831,10 @@ impl MetaNet {
         #[cfg(feature = "tx2")]
         {
             if let MetaNet::Tx2(ep) = self {
-                let res = ep.debug();
+                let mut res = ep.debug();
+                if let Some(map) = res.as_object_mut() {
+                    map.insert("backend".into(), "tx2-quic".into());
+                }
                 return async move {
                     Ok(res)
                 }.boxed();
