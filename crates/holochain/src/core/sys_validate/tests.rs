@@ -36,6 +36,8 @@ use crate::sweettest::SweetConductor;
 use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis_for_agent;
 use ::fixt::prelude::*;
+use arbitrary::Arbitrary;
+use arbitrary::Unstructured;
 use error::SysValidationError;
 
 use holochain_cascade::MockCascade;
@@ -66,62 +68,65 @@ async fn sign_record(keystore: &MetaLairClient, action: Action, entry: Option<En
     )
 }
 
-async fn new_record(action: Action, entry: Option<Entry>) -> Record {
-    Record::new(
-        SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action))
-            .await
-            .unwrap(),
-        entry,
-    )
+fn matching_record(u: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record {
+    // get anything but a Dna
+    let mut dep = Record::arbitrary(u).unwrap();
+    while !f(&dep) {
+        dep = Record::arbitrary(u).unwrap();
+    }
+    dep
 }
 
 /// Creates a valid Record using the given action and constructs a MockCascade
 /// with the minimal set of records to satisfy the validation dependencies
 /// for that Record. Updates the input action's backlinks to point to these other
 /// injected actions, and returns it along with the created MockCascade.
-async fn record_with_mock_cascade(
-    keystore: &MetaLairClient,
-    mut action: Action,
-) -> (Record, Vec<Record>) {
-    if action.action_seq() < 2 {
-        *action.action_seq_mut().unwrap() = 2;
-    }
-
-    fn matching_record(f: impl Fn(&Record) -> bool) -> Record {
-        // get anything but a Dna
-        let mut dep = fixt!(Record);
-        while !f(&dep) {
-            dep = fixt!(Record);
-        }
-        dep
-    }
-
+async fn record_with_deps(keystore: &MetaLairClient, mut action: Action) -> (Record, Vec<Record>) {
+    let mut u = unstructured_noise();
     let dna_record = |r: &Record| matches!(r.action(), Action::Dna(_));
     let pkg_record = |r: &Record| matches!(r.action(), Action::AgentValidationPkg(_));
     let entry_record = |r: &Record| {
-        matches!(r.action(), Action::Create(_) | Action::Update(_)) && r.entry.as_option().is_some()
+        matches!(r.action(), Action::Create(_) | Action::Update(_))
+            && r.entry
+                .as_option()
+                .map(|e| entry_type_matches(r.action().entry_type().unwrap(), e))
+                .unwrap_or(false)
     };
+
+    if action.action_seq() == 1 {
+        // In case this is an Agent entry, allow the previous to be something other than Dna
+        *action.action_seq_mut().unwrap() = 2;
+    }
+
+    *action.author_mut() = fake_agent_pubkey_1();
 
     let (entry, deps) = match &mut action {
         Action::Dna(_) => (None, vec![]),
+        action if action.action_seq() == 0 => {
+            *action = Action::Dna(fixt!(Dna));
+            *action.author_mut() = fake_agent_pubkey_1();
+            (None, vec![])
+        }
         action => {
             let mut deps = vec![];
             let prev_seq = action.action_seq() - 1;
-            let prev = if prev_seq == 0 {
-                matching_record(dna_record)
+            let mut prev = if prev_seq == 0 {
+                matching_record(&mut u, dna_record)
             } else {
                 let mut prev = match action {
                     Action::Create(Create {
                         entry_type: EntryType::AgentPubKey,
                         ..
-                    }) => matching_record(|r| !dna_record(r) && pkg_record(r)),
-                    _ => matching_record(|r| !dna_record(r) && !pkg_record(r)),
+                    }) => matching_record(&mut u, pkg_record),
+                    _ => matching_record(&mut u, |r| !dna_record(r) && !pkg_record(r)),
                 };
                 *prev.as_action_mut().action_seq_mut().unwrap() = action.action_seq() - 1;
-                *prev.as_action_mut().timestamp_mut() =
-                    (action.timestamp() - Duration::from_micros(1)).unwrap();
                 prev
             };
+            *prev.as_action_mut().author_mut() = action.author().clone();
+            *prev.as_action_mut().timestamp_mut() =
+                (action.timestamp() - Duration::from_micros(1)).unwrap();
+            // NOTE: hash integrity is broken at this point, record needs to be rebuilt
             let prev_hash = prev.action_address().clone();
             *action.prev_action_mut().unwrap() = prev_hash.clone();
             assert_eq!(*action.prev_action().unwrap(), prev_hash);
@@ -134,10 +139,19 @@ async fn record_with_mock_cascade(
             });
             match action {
                 Action::Update(update) => {
-                    let dep = matching_record(entry_record);
+                    let mut dep = matching_record(&mut u, entry_record);
                     update.original_action_address = dep.action_address().clone();
                     update.original_entry_address =
                         dep.entry().as_option().unwrap().to_hash().clone();
+                    *dep.as_action_mut().entry_data_mut().unwrap().1 = update.entry_type.clone();
+                    deps.push(dep);
+                }
+                Action::Delete(delete) => {
+                    let dep = matching_record(&mut u, entry_record);
+                    delete.deletes_address = dep.action_address().clone();
+                    delete.deletes_entry_address =
+                        dep.entry().as_option().unwrap().to_hash().clone();
+
                     deps.push(dep);
                 }
                 Action::CreateLink(link) => {
@@ -148,37 +162,71 @@ async fn record_with_mock_cascade(
                     deps.push(base);
                     deps.push(target);
                 }
+                Action::DeleteLink(delete) => {
+                    let base = fixt!(Record);
+                    let create =
+                        matching_record(&mut u, |r| matches!(r.action(), Action::CreateLink(_)));
+                    delete.base_address = base.action_address().clone().into();
+                    delete.link_add_address = create.action_address().clone().into();
+                    deps.push(base);
+                    deps.push(create);
+                }
                 Action::Create(_)
                 | Action::AgentValidationPkg(_)
                 | Action::CloseChain(_)
+                | Action::InitZomesComplete(_)
                 | Action::OpenChain(_) => {
                     // no new deps needed to make this valid
                 }
                 Action::Dna(_) => unreachable!(),
-                Action::InitZomesComplete(_) => todo!(),
-                Action::DeleteLink(_) => todo!(),
-                Action::Delete(_) => todo!(),
             };
             (entry, deps)
         }
     };
+
+    assert_eq!(*action.author(), fake_agent_pubkey_1());
 
     let record = sign_record(keystore, action, entry).await;
 
     (record, deps)
 }
 
+async fn record_with_cascade(keystore: &MetaLairClient, action: Action) -> (Record, MockCascade) {
+    let (record, deps) = record_with_deps(keystore, action).await;
+    (record, MockCascade::with_records(deps))
+}
+
+async fn validate_action(keystore: &MetaLairClient, action: Action) -> SysValidationOutcome<()> {
+    let (record, deps) = record_with_deps(keystore, action).await;
+    let cascade = MockCascade::with_records(deps.clone());
+    sys_validate_record(&record, &cascade).await
+}
+
+async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
+    let (record, deps) = record_with_deps(keystore, action).await;
+    let cascade = MockCascade::with_records(deps.clone());
+    let result = sys_validate_record(&record, &cascade).await;
+    if result.is_err() {
+        dbg!(&deps, &record);
+        result.unwrap()
+    }
+}
+
+/// Mismatched signatures are rejected
+#[tokio::test(flavor = "multi_thread")]
+async fn test_record_with_cascade() {
+    let keystore = holochain_state::test_utils::test_keystore();
+    for _ in 0..100 {
+        assert_valid_action(&keystore, fixt!(Action)).await;
+    }
+}
+
 /// Mismatched signatures are rejected
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_action_signature_test() {
     let keystore = holochain_state::test_utils::test_keystore();
-    let author = fake_agent_pubkey_1();
-    let mut action = fixt!(CreateLink);
-    action.author = author.clone();
-    let (record_valid, deps) =
-        record_with_mock_cascade(&keystore, Action::CreateLink(action)).await;
-
-    let cascade = MockCascade::with_records(deps);
+    let action = fixt!(CreateLink);
+    let (record_valid, cascade) = record_with_cascade(&keystore, Action::CreateLink(action)).await;
 
     let wrong_signature = Signature([1_u8; 64]);
     let action_invalid = SignedActionHashed::new(record_valid.action().clone(), wrong_signature);
@@ -193,20 +241,26 @@ async fn verify_action_signature_test() {
 /// Any action other than DNA cannot be at seq 0
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_action() {
-    let mut action = fixt!(CreateLink);
-    action.prev_action = fixt!(ActionHash);
-    action.action_seq = 1;
-    assert_matches!(check_prev_action(&action.clone().into()), Ok(()));
-    action.action_seq = 0;
-    assert_matches!(
-        check_prev_action(&action.clone().into()),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::InvalidRoot)
-        ))
-    );
+    use contrafact::*;
+    let mut u = unstructured_noise();
+    let keystore = holochain_state::test_utils::test_keystore();
+    let mut action = brute("not dna", |a| !matches!(a, Action::Dna(_))).build(&mut u);
+
+    *action.action_seq_mut().unwrap() = 7;
+
+    assert_valid_action(&keystore, action.clone()).await;
+
+    *action.action_seq_mut().unwrap() = 0;
+
+    assert!(validate_action(&keystore, action.clone()).await.is_err());
+
+    // Err(OutcomeOrError::Outcome(ValidationOutcome::PrevActionError(
+    //     PrevActionError::InvalidRoot
+    // )))
+
     // Dna is always ok because of the type system
-    let action = fixt!(Dna);
-    assert_matches!(check_prev_action(&action.into()), Ok(()));
+    let action = Action::Dna(fixt!(Dna));
+    assert_valid_action(&keystore, action.clone()).await;
 }
 
 /// The DNA action can only be validated if the chain is empty,
