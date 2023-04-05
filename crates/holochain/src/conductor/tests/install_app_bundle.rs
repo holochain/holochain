@@ -10,6 +10,7 @@ use holochain_types::prelude::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CellId, DnaModifiersOpt, Timestamp};
 use matches::assert_matches;
+use tempfile::{tempdir, TempDir};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_duplicate_app_for_same_agent() {
