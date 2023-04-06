@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- Adds new functionality to the conductor app API which returns disk storage information. It is possible to query for the
+  storage space being used by one app or all apps. The storage used is broken down by cell to make it easier to identify
+  intensive components of apps.
+
 # 20230405.003224
 
 ## [holochain\_cli-0.2.0-beta-rc.2](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.2)

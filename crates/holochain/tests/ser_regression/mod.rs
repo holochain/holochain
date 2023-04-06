@@ -5,7 +5,7 @@ use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
-use holochain::test_utils::setup_app;
+use holochain::test_utils::setup_app_in_new_conductor;
 use holochain_state::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -93,7 +93,8 @@ async fn ser_regression_test() {
     // START CONDUCTOR
     // ///////////////
 
-    let (_tmpdir, app_api, handle) = setup_app(
+    let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
+        "test app".to_string(),
         vec![dna_file],
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
     )
