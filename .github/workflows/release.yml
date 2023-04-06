@@ -328,6 +328,9 @@ jobs:
           HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
         run: |
           set -xeu
+          cd "${HOLOCHAIN_REPO}"
+          git status
+          git pull origin ${HOLOCHAIN_SOURCE_BRANCH}
           git push origin ${HOLOCHAIN_SOURCE_BRANCH}
 
       - name: Create a pull-request towards the source branch
