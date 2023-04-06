@@ -1,4 +1,7 @@
+use std::fs;
 use std::future::Future;
+use std::path::PathBuf;
+use std::process::Stdio;
 use std::sync::Arc;
 
 // TODO: do the create tests first
@@ -12,6 +15,7 @@ use holochain_conductor_api::AppResponse;
 use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, WebsocketSender};
 use matches::assert_matches;
 use portpicker::pick_unused_port;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use url2::url2;
 
@@ -49,48 +53,119 @@ async fn check_timeout<T>(response: impl Future<Output = Result<T, ws::Websocket
     }
 }
 
+async fn package_fixture_if_not_packaged() {
+    if PathBuf::from("tests/fixtures/my-app/my-fixture-app.happ").exists() {
+        return;
+    }
+
+    Command::new("hc")
+        .arg("dna")
+        .arg("pack")
+        .arg("tests/fixtures/my-app/dna")
+        .stdout(Stdio::null())
+        .status()
+        .await
+        .expect("Failed to pack DNA");
+
+    Command::new("hc")
+        .arg("app")
+        .arg("pack")
+        .arg("tests/fixtures/my-app")
+        .stdout(Stdio::null())
+        .status()
+        .await
+        .expect("Failed to pack hApp");
+}
+
+fn clean_sandboxes() {
+    std::process::Command::cargo_bin("hc-sandbox")
+        .unwrap()
+        .arg("clean")
+        .stdout(Stdio::null())
+        .status()
+        .unwrap();
+}
+
 /// Runs holochain and creates a temp directory
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Figure out how to get holochain bin in CI"]
 async fn run_holochain() {
+    clean_sandboxes();
+    package_fixture_if_not_packaged().await;
+
     holochain_trace::test_run().ok();
     let port: u16 = pick_unused_port().expect("No ports free");
-    let cmd = std::process::Command::cargo_bin("hc").unwrap();
+    let cmd = std::process::Command::cargo_bin("hc-sandbox").unwrap();
     let mut cmd = Command::from(cmd);
-    cmd.arg("run")
-        .arg(format!("-p={}", port))
-        .arg("../../../elemental-chat/elemental-chat.dna")
+    cmd.arg("--piped")
+        .arg("generate")
+        .arg(format!("--run={}", port))
+        .arg(
+            fs::canonicalize(PathBuf::from("tests/fixtures/my-app/"))
+                .unwrap()
+                .to_str()
+                .unwrap(),
+        )
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
         .kill_on_drop(true);
-    let _hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+
+    let hc_admin = cmd.spawn().expect("Failed to spawn holochain");
+
+    let mut child_stdin = hc_admin.stdin.unwrap();
+    child_stdin.write_all(b"test-phrase\n").await.unwrap();
+    drop(child_stdin);
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     // - Make a call to list app info to the port
     call_app_interface(port).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Figure out how to get holochain bin in CI"]
 async fn run_multiple_on_same_port() {
+    clean_sandboxes();
+    package_fixture_if_not_packaged().await;
+
     holochain_trace::test_run().ok();
     let port: u16 = pick_unused_port().expect("No ports free");
     let app_port: u16 = pick_unused_port().expect("No ports free");
-    let cmd = std::process::Command::cargo_bin("hc").unwrap();
+    let cmd = std::process::Command::cargo_bin("hc-sandbox").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg(format!("-f={}", port))
-        .arg("run")
-        .arg(format!("-p={}", app_port))
-        .arg("../../../elemental-chat/elemental-chat.dna")
+        .arg("--piped")
+        .arg("generate")
+        .arg(format!("--run={}", app_port))
+        .arg(
+            fs::canonicalize(PathBuf::from("tests/fixtures/my-app/"))
+                .unwrap()
+                .to_str()
+                .unwrap(),
+        )
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
         .kill_on_drop(true);
-    let _hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+
+    let hc_admin = cmd.spawn().expect("Failed to spawn holochain");
+    let mut child_stdin = hc_admin.stdin.unwrap();
+    child_stdin.write_all(b"test-phrase\n").await.unwrap();
+    drop(child_stdin);
+
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     // - Make a call to list app info to the port
     call_app_interface(app_port).await;
 
-    let cmd = std::process::Command::cargo_bin("hc").unwrap();
+    let cmd = std::process::Command::cargo_bin("hc-sandbox").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg(format!("-f={}", port))
+        .arg("--piped")
         .arg("call")
         .arg("list-dnas")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
         .kill_on_drop(true);
-    let _hc_admin2 = cmd.spawn().expect("Failed to spawn holochain");
+    let _hc_call = cmd.spawn().expect("Failed to spawn holochain");
+    let mut child_stdin = _hc_call.stdin.unwrap();
+    child_stdin.write_all(b"test-phrase\n").await.unwrap();
+    drop(child_stdin);
+
     tokio::time::sleep(std::time::Duration::from_secs(4)).await;
 }
