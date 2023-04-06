@@ -269,6 +269,8 @@ pub fn check_agent_validation_pkg_predecessor(
 
 /// Check that the author didn't change between actions
 pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+    // Agent updates will be valid when DPKI support lands
+    #[cfg(feature = "dpki")]
     if let Action::Update(Update {
         entry_type: EntryType::AgentPubKey,
         entry_hash,
@@ -278,7 +280,7 @@ pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidation
         // When the agent key has been updated,
         let new_author: AgentPubKey = entry_hash.clone().into();
         if *action.author() == new_author {
-            tracing::warn!("Validated a correct Update Agent sequence, which will be valid when full DPKI support is implemented, but for now it must be marked invalid.");
+            return Ok(());
         }
     }
 

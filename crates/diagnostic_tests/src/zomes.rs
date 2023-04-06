@@ -66,7 +66,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
                     let gets = links
                         .iter()
                         .map(|l| {
-                            let target = l.target.clone().retype(holo_hash::hash_type::Action);
+                            let target = l.target.clone().into_action_hash().unwrap();
                             GetInput::new(target.into(), Default::default())
                         })
                         .collect();
