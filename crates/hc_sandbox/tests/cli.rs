@@ -1,4 +1,3 @@
-use std::fs;
 use std::future::Future;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -99,12 +98,7 @@ async fn run_holochain() {
     cmd.arg("--piped")
         .arg("generate")
         .arg(format!("--run={}", port))
-        .arg(
-            fs::canonicalize(PathBuf::from("tests/fixtures/my-app/"))
-                .unwrap()
-                .to_str()
-                .unwrap(),
-        )
+        .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .kill_on_drop(true);
@@ -134,12 +128,7 @@ async fn run_multiple_on_same_port() {
         .arg("--piped")
         .arg("generate")
         .arg(format!("--run={}", app_port))
-        .arg(
-            fs::canonicalize(PathBuf::from("tests/fixtures/my-app/"))
-                .unwrap()
-                .to_str()
-                .unwrap(),
-        )
+        .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .kill_on_drop(true);
