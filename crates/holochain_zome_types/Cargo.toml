@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.2.0-beta-rc.1"
+version = "0.2.0-beta-rc.2"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,8 +15,8 @@ edition = "2021"
 kitsune_p2p_dht = { version = "^0.2.0-beta-rc.1", path = "../kitsune_p2p/dht" }
 kitsune_p2p_timestamp = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/timestamp" }
 kitsune_p2p_block = { version = "^0.2.0-beta-rc.1", path = "../kitsune_p2p/block" }
-holo_hash = { version = "^0.2.0-beta-rc.1", path = "../holo_hash", features = ["encoding"] }
-holochain_integrity_types = { version = "^0.2.0-beta-rc.1", path = "../holochain_integrity_types", features = ["tracing"] }
+holo_hash = { version = "^0.2.0-beta-rc.2", path = "../holo_hash", features = ["encoding"] }
+holochain_integrity_types = { version = "^0.2.0-beta-rc.2", path = "../holochain_integrity_types", features = ["tracing"] }
 holochain_serialized_bytes = "=0.0.51"
 paste = "1.0.12"
 serde = { version = "1.0", features = [ "derive", "rc" ] }
