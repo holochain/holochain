@@ -60,6 +60,10 @@ pub mod sql_conductor {
     pub const FROM_BLOCK_SPAN_WHERE_OVERLAPPING: &str =
         include_str!("sql/conductor/from_block_span_where_overlapping.sql");
     pub const IS_BLOCKED: &str = include_str!("sql/conductor/is_blocked.sql");
+    pub const SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET: &str =
+        include_str!("sql/conductor/select_valid_cap_grant_for_cap_secret.sql");
+    pub const SELECT_VALID_UNRESTRICTED_CAP_GRANT: &str =
+        include_str!("sql/conductor/select_valid_unrestricted_cap_grant.sql");
 }
 
 pub(crate) mod sql_p2p_agent_store {

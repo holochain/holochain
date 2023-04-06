@@ -7,7 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.2.0-beta-rc.2
+
 - Fixes bug where supplying a `network_seed` during an `InstallApp` call does not actually update the network seed for roles whose `provisioning` is set to `None` in the manifest. Now the network seed is correctly updated. [\#2102](https://github.com/holochain/holochain/pull/2102)
+
+- Adds new functionality to the conductor admin API which returns disk storage information. The storage used by apps
+  is broken down into blobs which are being used by one or more app.
 
 ## 0.2.0-beta-rc.1
 

@@ -2,6 +2,7 @@ use crate::mutations;
 use crate::prelude::StateQueryResult;
 use crate::query::prelude::named_params;
 use holochain_sqlite::prelude::DatabaseResult;
+use holochain_sqlite::prelude::DbRead;
 use holochain_sqlite::prelude::DbWrite;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
@@ -36,7 +37,7 @@ fn query_is_blocked(
 }
 
 pub async fn is_blocked(
-    db: &DbWrite<DbKindConductor>,
+    db: &DbRead<DbKindConductor>,
     target_id: BlockTargetId,
     timestamp: Timestamp,
 ) -> StateQueryResult<bool> {
