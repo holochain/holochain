@@ -825,7 +825,9 @@ impl MetaNet {
         Err("invalid features".into())
     }
 
-    pub fn dump_network_stats(&self) -> impl std::future::Future<Output = KitsuneResult<serde_json::Value>> + 'static + Send {
+    pub fn dump_network_stats(
+        &self,
+    ) -> impl std::future::Future<Output = KitsuneResult<serde_json::Value>> + 'static + Send {
         use futures::FutureExt;
 
         #[cfg(feature = "tx2")]
@@ -835,9 +837,7 @@ impl MetaNet {
                 if let Some(map) = res.as_object_mut() {
                     map.insert("backend".into(), "tx2-quic".into());
                 }
-                return async move {
-                    Ok(res)
-                }.boxed();
+                return async move { Ok(res) }.boxed();
             }
         }
 
@@ -845,14 +845,10 @@ impl MetaNet {
         {
             if let MetaNet::Tx5(ep, _, _) = self {
                 let fut = ep.get_stats();
-                return async move {
-                    fut.await.map_err(KitsuneError::other)
-                }.boxed();
+                return async move { fut.await.map_err(KitsuneError::other) }.boxed();
             }
         }
 
-        async move {
-            Err("invalid features".into())
-        }.boxed()
+        async move { Err("invalid features".into()) }.boxed()
     }
 }
