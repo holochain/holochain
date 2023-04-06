@@ -923,9 +923,9 @@ mod network_impls {
                     .filter(|completed_round| {
                         let now = tokio::time::Instant::now();
                         let round_start_time_diff = now - completed_round.start_time;
-                        let a = Timestamp::from_micros(round_start_time_diff.as_micros() as i64);
-                        println!("{:?} {:?}", a, last_time_queried);
-                        a > last_time_queried
+                        let round_start_timestamp =
+                            Timestamp::from_micros(round_start_time_diff.as_micros() as i64);
+                        round_start_timestamp > last_time_queried
                     })
                     .count() as u32;
 
