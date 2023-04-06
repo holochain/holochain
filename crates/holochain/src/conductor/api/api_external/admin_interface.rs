@@ -176,7 +176,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             ListCellIds => {
                 let cell_ids = self
                     .conductor_handle
-                    .list_cell_ids(Some(CellStatus::Joined));
+                    .running_cell_ids(Some(CellStatus::Joined))
+                    .into_iter()
+                    .collect();
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
             ListApps { status_filter } => {

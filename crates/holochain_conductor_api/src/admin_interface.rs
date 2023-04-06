@@ -101,7 +101,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::AgentPubKeyGenerated`]
     GenerateAgentPubKey,
 
-    /// List all the cell IDs in the conductor.
+    /// List the IDs of all live cells currently running in the conductor.
     ///
     /// # Returns
     ///

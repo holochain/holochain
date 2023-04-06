@@ -171,16 +171,6 @@ struct CellItem {
     status: CellStatus,
 }
 
-impl CellItem {
-    pub fn is_running(&self) -> bool {
-        self.status == CellStatus::Joined
-    }
-
-    pub fn is_pending(&self) -> bool {
-        self.status == CellStatus::PendingJoin
-    }
-}
-
 #[allow(dead_code)]
 pub(crate) type StopBroadcaster = task_motel::StopBroadcaster;
 pub(crate) type StopReceiver = task_motel::StopListener;
@@ -644,8 +634,6 @@ mod dna_impls {
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
                     .collect()
             });
-            self.running_cells.share_ref(|cells| dbg!(cells.len()));
-
             for (cell_id, item) in to_cleanup {
                 if let Err(err) = item.cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
@@ -938,7 +926,7 @@ mod network_impls {
                 | ValidationReceiptReceived { .. } => {
                     let cell_id =
                         CellId::new(event.dna_hash().clone(), event.target_agents().clone());
-                    let cell = self.cell_by_id(&cell_id)?;
+                    let cell = self.cell_by_id(&cell_id).await?;
                     cell.handle_holochain_p2p_event(event).await?;
                 }
                 Publish {
@@ -1006,7 +994,7 @@ mod network_impls {
 
         /// Invoke a zome function on a Cell
         pub async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-            let cell = self.cell_by_id(&call.cell_id)?;
+            let cell = self.cell_by_id(&call.cell_id).await?;
             Ok(cell.call_zome(call, None).await?)
         }
 
@@ -1016,7 +1004,7 @@ mod network_impls {
             workspace_lock: SourceChainWorkspace,
         ) -> ConductorApiResult<ZomeCallResult> {
             debug!(cell_id = ?call.cell_id);
-            let cell = self.cell_by_id(&call.cell_id)?;
+            let cell = self.cell_by_id(&call.cell_id).await?;
             Ok(cell.call_zome(call, Some(workspace_lock)).await?)
         }
     }
@@ -1027,7 +1015,7 @@ mod app_impls {
 
     use super::*;
     impl Conductor {
-        pub(crate) async fn install_app(
+        pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
@@ -1074,10 +1062,16 @@ mod app_impls {
                 }
             };
 
+            let manifest = bundle.manifest().clone();
+
             let installed_app_id =
-                installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
+                installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
+
+            let local_dnas = self
+                .ribosome_store()
+                .share_ref(|store| bundle.get_all_dnas_from_store(store));
             let ops = bundle
-                .resolve_cells(agent_key.clone(), DnaGamut::placeholder(), membrane_proofs)
+                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
@@ -1105,7 +1099,7 @@ mod app_impls {
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await?;
 
             let roles = ops.role_assignments;
-            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles)?;
+            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
             // Update the db
             let stopped_app = self.add_disabled_app_to_db(app).await?;
@@ -1245,32 +1239,40 @@ mod app_impls {
 mod cell_impls {
     use super::*;
     impl Conductor {
-        pub(crate) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
-            let cell = self
+        pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
+            // Can only get a cell from the running_cells list
+            if let Some(cell) = self
                 .running_cells
                 .share_ref(|c| c.get(cell_id).map(|i| i.cell.clone()))
-                .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-            Ok(cell)
+            {
+                Ok(cell)
+            } else {
+                // If not in running_cells list, check if the cell id is registered at all,
+                // to give a different error message for disabled vs missing.
+                let present = self
+                    .get_state()
+                    .await?
+                    .installed_apps()
+                    .values()
+                    .flat_map(|app| app.all_cells())
+                    .any(|id| id == cell_id);
+                if present {
+                    Err(ConductorError::CellDisabled(cell_id.clone()))
+                } else {
+                    Err(ConductorError::CellMissing(cell_id.clone()))
+                }
+            }
         }
 
-        /// Iterator over only the cells which are fully running. Generally used
-        /// to handle conductor interface requests
-        pub fn running_cell_ids(&self) -> HashSet<CellId> {
-            self.running_cells.share_ref(|c| {
-                c.iter()
-                    .filter_map(|(id, item)| {
-                        if item.is_running() {
-                            Some(id.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            })
+        /// Iterator over only the cells which are fully "live", meaning they have been
+        /// fully initialized and are registered with the kitsune network layer.
+        /// Generally used to handle conductor interface requests.
+        pub fn live_cell_ids(&self) -> HashSet<CellId> {
+            self.running_cell_ids(Some(CellStatusFilter::Joined))
         }
 
         /// List CellIds for Cells which match a status filter
-        pub fn list_cell_ids(&self, filter: Option<CellStatusFilter>) -> Vec<CellId> {
+        pub fn running_cell_ids(&self, filter: Option<CellStatusFilter>) -> HashSet<CellId> {
             self.running_cells.share_ref(|cells| {
                 cells
                     .iter()
@@ -1620,11 +1622,11 @@ mod app_status_impls {
                 let network = cell.holochain_p2p_dna().clone();
                 match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_initial_arc)).await {
                     Ok(Err(e)) => {
-                        tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
+                        tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
                         Err(cell_id)
                     }
                     Err(_) => {
-                        tracing::info!(cell_id = ?cell_id, "Timed out trying to join the network");
+                        tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
                         Err(cell_id)
                     }
                     Ok(Ok(_)) => Ok(cell_id),
@@ -1666,7 +1668,18 @@ mod app_status_impls {
             use AppStatus::*;
             use AppStatusTransition::*;
 
-            let running_cells: HashSet<CellId> = self.running_cell_ids();
+            // NOTE: this is checking all *live* cells, meaning all cells
+            // which have fully joined the network. This could lead to a race condition
+            // when an app is first starting up, it checks its cell status, and if
+            // all cells haven't joined the network yet, the app will get disabled again.
+            //
+            // How this *should* be handled is that join retrying should be more frequent,
+            // and should be sure to update app state on every newly joined cell, so that
+            // the app will be enabled as soon as all cells are fully live. For now though,
+            // we might consider relaxing this check so that this race condition isn't
+            // possible, and let ourselves be optimistic that all cells will join soon after
+            // the app starts.
+            let cell_ids: HashSet<CellId> = self.live_cell_ids();
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -1684,7 +1697,7 @@ mod app_status_impls {
                                     // If not all required cells are running, pause the app
                                     let missing: Vec<_> = app
                                         .required_cells()
-                                        .filter(|id| !running_cells.contains(id))
+                                        .filter(|id| !cell_ids.contains(id))
                                         .collect();
                                     if !missing.is_empty() {
                                         let reason = PausedAppReason::Error(format!(
@@ -1698,7 +1711,7 @@ mod app_status_impls {
                                 }
                                 Paused(_) => {
                                     // If all required cells are now running, restart the app
-                                    if app.required_cells().all(|id| running_cells.contains(id)) {
+                                    if app.required_cells().all(|id| cell_ids.contains(id)) {
                                         app.status.transition(Start)
                                     } else {
                                         AppStatusFx::NoChange
@@ -1785,18 +1798,11 @@ mod scheduler_impls {
         /// So ideally this would be called ONCE per conductor lifecyle ONLY.
         pub(crate) async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
             // Clear all ephemeral cruft in all cells before starting a scheduler.
-            let cell_arcs = {
-                let mut cell_arcs = vec![];
-                for cell_id in self.running_cell_ids() {
-                    if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
-                        cell_arcs.push(cell_arc);
-                    }
-                }
-                cell_arcs
-            };
-            let tasks = cell_arcs
-                .into_iter()
-                .map(|cell_arc| cell_arc.delete_all_ephemeral_scheduled_fns());
+            let tasks = self.spaces.get_from_spaces(|space| {
+                let db = space.authored_db.clone();
+                async move { db.async_commit(delete_all_ephemeral_scheduled_fns).await }
+            });
+
             futures::future::join_all(tasks).await;
 
             let scheduler_handle = self.clone();
@@ -1816,8 +1822,8 @@ mod scheduler_impls {
         pub(crate) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
             let cell_arcs = {
                 let mut cell_arcs = vec![];
-                for cell_id in self.running_cell_ids() {
-                    if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
+                for cell_id in self.live_cell_ids() {
+                    if let Ok(cell_arc) = self.cell_by_id(&cell_id).await {
                         cell_arcs.push(cell_arc);
                     }
                 }
@@ -1870,7 +1876,7 @@ mod misc_impls {
                 )
                 .await?;
 
-            let cell = self.cell_by_id(&cell_id)?;
+            let cell = self.cell_by_id(&cell_id).await?;
             source_chain.flush(cell.holochain_p2p_dna()).await?;
 
             Ok(())
@@ -1878,7 +1884,7 @@ mod misc_impls {
 
         /// Create a JSON dump of the cell's state
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
-            let cell = self.cell_by_id(cell_id)?;
+            let cell = self.cell_by_id(cell_id).await?;
             let authored_db = cell.authored_db();
             let dht_db = cell.dht_db();
             let space = cell_id.dna_hash();
@@ -2141,7 +2147,7 @@ impl Conductor {
             cells
                 .iter_mut()
                 .filter_map(|(id, item)| {
-                    if item.is_pending() {
+                    if item.status == CellStatus::PendingJoin {
                         item.status = CellStatus::Joining;
                         Some((id.clone(), item.cell.clone()))
                     } else {
@@ -2412,12 +2418,26 @@ impl Conductor {
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
+                let state_copy = state.clone();
                 let app = state.get_app_mut(&app_id)?;
                 let agent_key = app.role(&role_name)?.agent_key().to_owned();
-                let cell_id = CellId::new(clone_dna_hash, agent_key);
-                let clone_id = app.add_clone(&role_name, &cell_id)?;
+                let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
+
+                // if cell id of new clone cell already exists, reject as duplicate
+                if state_copy
+                    .installed_apps()
+                    .iter()
+                    .flat_map(|(_, app)| app.all_cells())
+                    .any(|cell_id| *cell_id == clone_cell_id)
+                {
+                    return Err(ConductorError::AppError(AppError::DuplicateCellId(
+                        clone_cell_id,
+                    )));
+                }
+
+                let clone_id = app.add_clone(&role_name, &clone_cell_id)?;
                 let installed_clone_cell = ClonedCell {
-                    cell_id,
+                    cell_id: clone_cell_id,
                     clone_id,
                     original_dna_hash,
                     dna_modifiers,
@@ -2491,8 +2511,11 @@ mod test_utils_impls {
             Ok(self.get_or_create_space(dna_hash)?.dht_query_cache)
         }
 
-        pub fn get_cache_db(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite<DbKindCache>> {
-            let cell = self.cell_by_id(cell_id)?;
+        pub async fn get_cache_db(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<DbWrite<DbKindCache>> {
+            let cell = self.cell_by_id(cell_id).await?;
             Ok(cell.cache().clone())
         }
 
@@ -2508,8 +2531,11 @@ mod test_utils_impls {
             self.spaces.clone()
         }
 
-        pub fn get_cell_triggers(&self, cell_id: &CellId) -> ConductorApiResult<QueueTriggers> {
-            let cell = self.cell_by_id(cell_id)?;
+        pub async fn get_cell_triggers(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<QueueTriggers> {
+            let cell = self.cell_by_id(cell_id).await?;
             Ok(cell.triggers().clone())
         }
     }

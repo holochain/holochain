@@ -67,21 +67,20 @@ validated.
 All of these validation rules are declared in the `validate` callback. It
 is executed for a new action by each validation authority.
 
-There's a helper type called `OpType` available for easy
+There's a helper type called `FlatOp` available for easy
 access to all link and entry variants when validating an operation. In many cases, this type can
-be easier to work with than the bare `Op`, which contains the
-same information as `OpType`, but the former has a flatter data structure, whereas the latter has
-a deeply nested structure.
+be easier to work with than the bare `Op`. `FlatOp` contains the
+same information as `Op` but with a flatter, more accessible data structure than `Op`'s deeply nested and concise structure.
 
 ```rust
-match op.to_type()? {
-    OpType::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+match op.flattened()? {
+    FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
         EntryTypes::A(_) => Ok(ValidateCallbackResult::Valid),
         EntryTypes::B(_) => Ok(ValidateCallbackResult::Invalid(
             "No Bs allowed in this app".to_string(),
         )),
     },
-    OpType::RegisterCreateLink {
+    FlatOp::RegisterCreateLink {
         base_address: _,
         target_address: _,
         tag: _,

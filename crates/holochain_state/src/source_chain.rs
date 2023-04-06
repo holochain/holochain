@@ -15,6 +15,8 @@ use holo_hash::HasHash;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_sqlite::rusqlite::params;
+use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::chc::ChcError;
 use holochain_types::db::DbRead;
@@ -628,113 +630,113 @@ where
     ) -> SourceChainResult<Option<CapGrant>> {
         let author_grant = CapGrant::from(self.agent_pubkey().clone());
         if author_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
+            // caller is source chain author
             return Ok(Some(author_grant));
         }
-        let author = self.author.clone();
-        // TODO: SQL_PERF: This query could have a fast upper bound if we add indexes.
-        let valid_cap_grant = self
+
+        // remote caller
+        let maybe_cap_grant: Option<CapGrant> = self
             .vault
-            .async_reader(move |txn| {
-                let not_referenced_action = "
-            SELECT COUNT(H_REF.hash)
-            FROM Action AS H_REF
-            JOIN DhtOp AS D_REF ON D_REF.action_hash = H_REF.hash
-            WHERE
-            H_REF.author = :author
-            AND
-            (H_REF.original_action_hash = Action.hash
-            OR
-            H_REF.deletes_action_hash = Action.hash)
-            ";
-                let sql = format!(
-                    "
-                SELECT DISTINCT Entry.blob
-                FROM Entry
-                JOIN Action ON Action.entry_hash = Entry.hash
-                JOIN DhtOp ON Action.hash = DhtOp.action_hash
-                WHERE
-                Action.author = :author
-                AND
-                Entry.access_type IS NOT NULL
-                AND
-                ({}) = 0
-                ",
-                    not_referenced_action
-                );
-                txn.prepare(&sql)?
-                    .query_and_then(
-                        named_params! {
-                            ":author": author,
-                        },
-                        |row| from_blob(row.get("blob")?),
-                    )?
-                    .filter_map(|result: StateQueryResult<Entry>| match result {
-                        Ok(entry) => entry
-                            .as_cap_grant()
-                            .filter(|grant| !matches!(grant, CapGrant::ChainAuthor(_)))
-                            .filter(|grant| {
-                                grant.is_valid(&check_function, &check_agent, check_secret.as_ref())
-                            })
-                            .map(|cap| Some(Ok(cap)))
-                            .unwrap_or(None),
-                        Err(e) => Some(Err(e)),
-                    })
-                    // if there are still multiple grants, fold them down based on specificity
-                    // authorship > assigned > transferable > unrestricted
-                    .fold(
-                        Ok(None),
-                        |acc: StateQueryResult<Option<CapGrant>>, grant| {
-                            let grant = grant?;
-                            let acc = acc?;
-                            let acc = match &grant {
-                                CapGrant::RemoteAgent(zome_call_cap_grant) => {
-                                    match &zome_call_cap_grant.access {
-                                        CapAccess::Assigned { .. } => match &acc {
-                                            Some(CapGrant::RemoteAgent(
-                                                acc_zome_call_cap_grant,
-                                            )) => {
-                                                match acc_zome_call_cap_grant.access {
-                                                    // an assigned acc takes precedence
-                                                    CapAccess::Assigned { .. } => acc,
-                                                    // current grant takes precedence over all other accs
-                                                    _ => Some(grant),
-                                                }
-                                            }
-                                            None => Some(grant),
-                                            // authorship should be short circuit and filtered
-                                            _ => unreachable!(),
-                                        },
-                                        CapAccess::Transferable { .. } => match &acc {
-                                            Some(CapGrant::RemoteAgent(
-                                                acc_zome_call_cap_grant,
-                                            )) => {
-                                                match acc_zome_call_cap_grant.access {
-                                                    // an assigned acc takes precedence
-                                                    CapAccess::Assigned { .. } => acc,
-                                                    // transferable acc takes precedence
-                                                    CapAccess::Transferable { .. } => acc,
-                                                    // current grant takes preference over other accs
-                                                    _ => Some(grant),
-                                                }
-                                            }
-                                            None => Some(grant),
-                                            // authorship should be short circuited and filtered by now
-                                            _ => unreachable!(),
-                                        },
-                                        CapAccess::Unrestricted => match acc {
-                                            Some(_) => acc,
-                                            None => Some(grant),
-                                        },
-                                    }
-                                }
-                                // ChainAuthor should have short circuited and be filtered out already
-                                _ => unreachable!(),
-                            };
-                            Ok(acc)
-                        },
-                    )
+            .async_reader({
+                let agent_pubkey = self.agent_pubkey().clone();
+                move |txn| -> Result<_, DatabaseError> {
+                    // closure to process resulting rows from query
+                    let query_row_fn = |row: &Row| {
+                        from_blob::<Entry>(row.get("blob")?).map_err(|err| {
+                            holochain_sqlite::rusqlite::Error::InvalidColumnType(
+                                0,
+                                err.to_string(),
+                                holochain_sqlite::rusqlite::types::Type::Blob,
+                            )
+                        })
+                    };
+                    // prepare sql statement depending on provided cap secret
+                    // and query for one cap grant
+                    //
+                    // query row is called inside the two arms instead of once
+                    // afterwards because of difficulty passing around params
+                    // between scopes
+                    let maybe_entry = if let Some(cap_secret) = &check_secret {
+                        // cap grant for cap secret must exist
+                        // that has not been updated or deleted
+                        let sql = "
+                            SELECT Entry.blob
+                            FROM Entry
+                            WHERE Entry.cap_secret = ?1
+                            AND (
+                                SELECT COUNT(Action.hash)
+                                FROM Action
+                                WHERE Action.author = ?2
+                                AND (
+                                    Action.original_entry_hash = Entry.hash
+                                    OR Action.deletes_entry_hash = Entry.hash
+                                )
+                            ) = 0
+                            "
+                        .trim();
+                        let cap_secret_blob = to_blob(cap_secret).map_err(|err| {
+                            DatabaseError::SerializedBytes(SerializedBytesError::Serialize(
+                                err.to_string(),
+                            ))
+                        })?;
+                        txn.query_row(sql, params![cap_secret_blob, agent_pubkey], query_row_fn)
+                            .optional()?
+                    } else {
+                        // unrestricted cap grant must exist
+                        // that has not been updated or deleted
+                        let sql = "
+                            SELECT blob
+                            FROM Entry
+                            WHERE access_type = ?1
+                            AND (
+                                SELECT COUNT(Action.hash)
+                                FROM Action
+                                WHERE Action.author = ?2
+                                AND (
+                                    Action.original_entry_hash = Entry.hash
+                                    OR Action.deletes_entry_hash = Entry.hash
+                                )
+                            ) = 0;
+                            "
+                        .trim();
+                        txn.query_row(
+                            sql,
+                            params![CapAccess::Unrestricted.as_sql(), agent_pubkey],
+                            query_row_fn,
+                        )
+                        .optional()?
+                    };
+
+                    Ok(maybe_entry)
+                }
             })
-            .await?;
+            .await?
+            .and_then(|entry| entry.as_cap_grant());
+
+        let valid_cap_grant = match maybe_cap_grant {
+            None => None,
+            Some(cap_grant) => {
+                // validate cap grant in itself, especially check if functions are authorized
+                if !cap_grant.is_valid(&check_function, &check_agent, check_secret.as_ref()) {
+                    return Ok(None);
+                }
+                match &cap_grant {
+                    CapGrant::RemoteAgent(zome_call_cap_grant) => {
+                        match &zome_call_cap_grant.access {
+                            // transferable and assigned cap grant when cap secret provided
+                            CapAccess::Transferable { .. } => Some(cap_grant),
+                            CapAccess::Assigned { assignees, .. } => {
+                                assignees.contains(&check_agent).then_some(cap_grant)
+                            }
+                            // unrestricted cap grant only possible without cap secret
+                            CapAccess::Unrestricted => Some(cap_grant),
+                        }
+                    }
+                    // chain author cap grant has been handled at the beginning
+                    CapGrant::ChainAuthor(_) => unreachable!(),
+                }
+            }
+        };
         Ok(valid_cap_grant)
     }
 
@@ -1436,6 +1438,7 @@ pub mod tests {
 
         Ok(())
     }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering_with_entry() -> SourceChainResult<()> {
         let test_db = test_authored_db();
@@ -1579,6 +1582,7 @@ pub mod tests {
         let keystore = test_keystore();
         let db = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        // create transferable cap grant
         let access = CapAccess::from(secret.unwrap());
         let mut mock = MockHolochainP2pDnaT::new();
         mock.expect_authority_for_hash().returning(|_| Ok(false));
@@ -1594,6 +1598,8 @@ pub mod tests {
         let mut agents = AgentPubKeyFixturator::new(Predictable);
         let alice = agents.next().unwrap();
         let bob = agents.next().unwrap();
+        // predictable fixturator creates only two different agent keys
+        let carol = keystore.new_sign_keypair_random().await.unwrap();
         source_chain::genesis(
             db.clone(),
             dht_db.to_db(),
@@ -1607,40 +1613,33 @@ pub mod tests {
         .await
         .unwrap();
 
-        {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
+        let chain = SourceChain::new(
+            db.clone(),
+            dht_db.to_db(),
+            dht_db_cache.clone(),
+            keystore.clone(),
+            alice.clone(),
+        )
+        .await?;
+        // alice as chain author always has a valid cap grant; provided secrets
+        // are ignored
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
 
-            // bob should not match anything as the secret hasn't been committed yet
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
-                    .await?,
-                None
-            );
-        }
+        // bob should not get a cap grant as the secret hasn't been committed yet
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .await?,
+            None
+        );
 
+        // write cap grant to alice's source chain
         let (original_action_address, original_entry_address) = {
-            let chain = SourceChain::new(
-                db.clone().into(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
             let action_builder = builder::Create {
@@ -1650,47 +1649,49 @@ pub mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-
             chain.flush(&mock).await.unwrap();
-
             (action, entry_hash)
         };
 
-        {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
-            // alice should find her own authorship with higher priority than the committed grant
-            // even if she passes in the secret
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
+        // alice should find her own authorship with higher priority than the
+        // committed grant even if she passes in the secret
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
 
-            // bob should be granted with the committed grant as it matches the secret he passes to
-            // alice at runtime
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
-                    .await?,
-                Some(grant.clone().into())
-            );
-        }
+        // bob and carol (and everyone else) should be authorized with transferable cap grant
+        // when passing in the secret
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .await?,
+            Some(grant.clone().into())
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), carol.clone(), secret.clone())
+                .await?,
+            Some(grant.clone().into())
+        );
+        // bob should not be authorized for other zomes/functions than the ones granted
+        assert_eq!(
+            chain
+                .valid_cap_grant(("boo".into(), "far".into()), bob.clone(), secret.clone())
+                .await?,
+            None
+        );
 
-        // let's roll the secret and assign the grant to bob specifically
+        // convert transferable cap grant to assigned with bob as assignee
         let mut assignees = BTreeSet::new();
         assignees.insert(bob.clone());
         let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let updated_access = CapAccess::from((updated_secret.clone().unwrap(), assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
+        // commit grant update to alice's source chain
         let (updated_action_hash, updated_entry_hash) = {
             let chain = SourceChain::new(
                 db.clone().into(),
@@ -1711,51 +1712,59 @@ pub mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-
             chain.flush(&mock).await.unwrap();
 
             (action, entry_hash)
         };
 
-        {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
-            // alice should find her own authorship with higher priority than the committed grant
-            // even if she passes in the secret
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
+        // alice as chain owner should be unaffected by updates
+        // chain author grant should always be returned
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
 
-            // bob MUST provide the updated secret as the old one is invalidated by the new one
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
-                    .await?,
-                None
-            );
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
-                    .await?,
-                Some(updated_grant.into())
-            );
-        }
+        // bob must not get a valid cap grant with the initial cap secret,
+        // as it is invalidated by the cap grant update
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .await?,
+            None
+        );
+        // when bob provides the updated secret, validation should succeed,
+        // bob being an assignee
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
+                .await?,
+            Some(updated_grant.clone().into())
+        );
 
+        // carol must not get a valid cap grant with either the original secret (because it was replaced)
+        // or the updated secret (because she is not an assignee)
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), carol.clone(), secret.clone())
+                .await?,
+            None
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), carol.clone(), updated_secret.clone())
+                .await?,
+            None
+        );
+
+        // delete updated cap grant
         {
             let chain = SourceChain::new(
                 db.clone().into(),
@@ -1772,47 +1781,110 @@ pub mod tests {
             chain
                 .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
-
             chain.flush(&mock).await.unwrap();
         }
 
-        {
+        // alice should get her author cap grant as always, independent of
+        // any provided secret
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
+                .await?,
+            Some(CapGrant::ChainAuthor(alice.clone())),
+        );
+
+        // bob should not get a cap grant for any secret anymore
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
+                .await?,
+            None
+        );
+        assert_eq!(
+            chain
+                .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
+                .await?,
+            None
+        );
+
+        // create an unrestricted cap grant in alice's chain
+        let unrestricted_grant = ZomeCallCapGrant::new(
+            "unrestricted".into(),
+            CapAccess::Unrestricted,
+            GrantedFunctions::All,
+        );
+        let (original_action_address, original_entry_address) = {
             let chain = SourceChain::new(
-                db.clone(),
+                db.clone().into(),
                 dht_db.to_db(),
                 dht_db_cache.clone(),
                 keystore.clone(),
                 alice.clone(),
             )
             .await?;
-            // alice should find her own authorship
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice.clone())),
-            );
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), alice.clone(), updated_secret.clone())
-                    .await?,
-                Some(CapGrant::ChainAuthor(alice)),
-            );
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(unrestricted_grant.clone()))
+                    .into_inner();
+            let action_builder = builder::Create {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+            };
+            let action = chain
+                .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
+                .await?;
+            chain.flush(&mock).await.unwrap();
+            (action, entry_hash)
+        };
 
-            // bob has no access
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), secret.clone())
-                    .await?,
-                None
-            );
-            assert_eq!(
-                chain
-                    .valid_cap_grant(function.clone(), bob.clone(), updated_secret.clone())
-                    .await?,
-                None
-            );
+        // bob should get a cap grant for any zome and function
+        let granted_function: GrantedFunction = ("zome".into(), "fn".into());
+        assert_eq!(
+            chain
+                .valid_cap_grant(granted_function.clone(), bob.clone(), None)
+                .await?,
+            Some(unrestricted_grant.clone().into())
+        );
+        // carol should get a cap grant now too
+        assert_eq!(
+            chain
+                .valid_cap_grant(granted_function.clone(), carol.clone(), None)
+                .await?,
+            Some(unrestricted_grant.clone().into())
+        );
+
+        // delete unrestricted cap grant
+        {
+            let chain = SourceChain::new(
+                db.clone().into(),
+                dht_db.to_db(),
+                dht_db_cache.clone(),
+                keystore.clone(),
+                alice.clone(),
+            )
+            .await?;
+            let action_builder = builder::Delete {
+                deletes_address: original_action_address,
+                deletes_entry_address: original_entry_address,
+            };
+            chain
+                .put_weightless(action_builder, None, ChainTopOrdering::default())
+                .await?;
+            chain.flush(&mock).await.unwrap();
         }
+
+        // bob must not get unrestricted cap grant any longer
+        assert_eq!(
+            chain
+                .valid_cap_grant(granted_function.clone(), bob.clone(), None)
+                .await?,
+            None
+        );
 
         Ok(())
     }

@@ -134,6 +134,7 @@ impl Scratch {
             let entry = shh
                 .action()
                 .entry_hash()
+                // TODO: let's use Arc<Entry> from here on instead of dereferencing
                 .and_then(|eh| self.entries.get(eh).map(|e| (**e).clone()));
             Record::new(shh, entry)
         })

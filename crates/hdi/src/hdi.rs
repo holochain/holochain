@@ -57,57 +57,57 @@ pub trait HdiT: Send + Sync {
 pub struct ErrHdi;
 
 impl ErrHdi {
-    fn err<T>() -> ExternResult<T> {
-        Err(wasm_error!(WasmErrorInner::Guest(
-            HDI_NOT_REGISTERED.to_string()
-        )))
+    fn err<T>(name: &str) -> ExternResult<T> {
+        Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "error calling '{name}': {HDI_NOT_REGISTERED}"
+        ))))
     }
 }
 
 /// Every call is an error for the ErrHdi.
 impl HdiT for ErrHdi {
     fn verify_signature(&self, _: VerifySignature) -> ExternResult<bool> {
-        Self::err()
+        Self::err("verify_signature")
     }
     fn hash(&self, _: HashInput) -> ExternResult<HashOutput> {
-        Self::err()
+        Self::err("hash")
     }
     fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
-        Self::err()
+        Self::err("must_get_entry")
     }
     fn must_get_action(&self, _: MustGetActionInput) -> ExternResult<SignedActionHashed> {
-        Self::err()
+        Self::err("must_get_action")
     }
     fn must_get_valid_record(&self, _: MustGetValidRecordInput) -> ExternResult<Record> {
-        Self::err()
+        Self::err("must_get_valid_record")
     }
     fn must_get_agent_activity(
         &self,
         _: MustGetAgentActivityInput,
     ) -> ExternResult<Vec<RegisterAgentActivity>> {
-        Self::err()
+        Self::err("must_get_agent_activity")
     }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
-        Self::err()
+        Self::err("dna_info")
     }
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
-        Self::err()
+        Self::err("zome_info")
     }
     // Trace
     fn trace(&self, _: TraceMsg) -> ExternResult<()> {
-        Self::err()
+        Self::err("trace")
     }
     fn x_salsa20_poly1305_decrypt(
         &self,
         _: XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-        Self::err()
+        Self::err("x_salsa20_poly1305_decrypt")
     }
     fn x_25519_x_salsa20_poly1305_decrypt(
         &self,
         _: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
-        Self::err()
+        Self::err("x_25519_x_salsa20_poly1305_decrypt")
     }
 }
 

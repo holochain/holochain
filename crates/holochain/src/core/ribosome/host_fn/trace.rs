@@ -84,6 +84,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Doesn't work concurrently"]
     async fn wasm_trace_test() {
+        use holochain_types::prelude::Level::*;
         CAPTURE.store(true, std::sync::atomic::Ordering::SeqCst);
         observability::test_run().ok();
         let RibosomeTestFixture {
@@ -93,29 +94,44 @@ pub mod wasm_test {
         let _: () = conductor.call(&alice, "debug", ()).await;
         let r: Vec<_> = CAPTURED.lock().unwrap().clone();
         let expect = vec![
+            // two traces from the two validations of genesis entries
+            TraceMsg {
+                msg:
+                    "integrity_test_wasm_debug:debug/src/integrity.rs:5 tracing in validation works"
+                        .to_string(),
+                level: INFO,
+            },
+            TraceMsg {
+                msg:
+                    "integrity_test_wasm_debug:debug/src/integrity.rs:5 tracing in validation works"
+                        .to_string(),
+                level: INFO,
+            },
+            // followed by the zome call traces
             TraceMsg {
                 msg: "test_wasm_debug:debug/src/lib.rs:5 tracing works!".to_string(),
-                level: holochain_types::prelude::Level::TRACE,
+                level: TRACE,
             },
             TraceMsg {
                 msg: "test_wasm_debug:debug/src/lib.rs:6 debug works".to_string(),
-                level: holochain_types::prelude::Level::DEBUG,
+                level: DEBUG,
             },
             TraceMsg {
                 msg: "test_wasm_debug:debug/src/lib.rs:7 info works".to_string(),
-                level: holochain_types::prelude::Level::INFO,
+                level: INFO,
             },
             TraceMsg {
                 msg: "test_wasm_debug:debug/src/lib.rs:8 warn works".to_string(),
-                level: holochain_types::prelude::Level::WARN,
+                level: WARN,
             },
             TraceMsg {
                 msg: "test_wasm_debug:debug/src/lib.rs:9 error works".to_string(),
-                level: holochain_types::prelude::Level::ERROR,
+                level: ERROR,
             },
             TraceMsg {
-                msg: "test_wasm_debug:debug/src/lib.rs:10 foo = \"fields\"; bar = \"work\"; too".to_string(),
-                level: holochain_types::prelude::Level::DEBUG,
+                msg: "test_wasm_debug:debug/src/lib.rs:10 foo = \"fields\"; bar = \"work\"; too"
+                    .to_string(),
+                level: DEBUG,
             },
         ];
         assert_eq!(r, expect);

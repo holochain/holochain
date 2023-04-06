@@ -133,10 +133,7 @@ impl Entry {
     }
 
     /// Create an Entry::App from SerializedBytes
-    pub fn app_fancy<
-        E: Into<EntryError>,
-        SB: TryInto<SerializedBytes, Error = SerializedBytesError>,
-    >(
+    pub fn app_fancy<SB: TryInto<SerializedBytes, Error = SerializedBytesError>>(
         sb: SB,
     ) -> Result<Self, EntryError> {
         Ok(Entry::App(AppEntryBytes::try_from(sb.try_into()?)?))

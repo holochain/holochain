@@ -237,17 +237,6 @@ impl Cell {
         self.conductor_api.signal_broadcaster()
     }
 
-    pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
-        let author = self.id.agent_pubkey().clone();
-        Ok(self
-            .space
-            .authored_db
-            .async_commit(move |txn: &mut Transaction| {
-                delete_all_ephemeral_scheduled_fns(txn, &author)
-            })
-            .await?)
-    }
-
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         let author = self.id.agent_pubkey().clone();
         let lives = self

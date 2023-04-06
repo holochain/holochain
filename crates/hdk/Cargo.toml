@@ -17,6 +17,7 @@ encoding = ["holo_hash/encoding"]
 fixturators = ["holochain_zome_types/fixturators", "holo_hash/fixturators"]
 test_utils = [
     "fixturators",
+    "hdi/test_utils",
     "holochain_zome_types/test_utils",
     "holo_hash/test_utils",
 ]

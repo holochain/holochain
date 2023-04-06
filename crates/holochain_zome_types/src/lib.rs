@@ -142,3 +142,9 @@ pub static NOISE: once_cell::sync::Lazy<Vec<u8>> = once_cell::sync::Lazy::new(||
         .take(10_000_000)
         .collect()
 });
+
+/// 10MB of random Unstructured data for use with `arbitrary`
+#[cfg(all(any(test, feature = "test_utils"), feature = "arbitrary"))]
+pub fn unstructured_noise() -> arbitrary::Unstructured<'static> {
+    arbitrary::Unstructured::new(&NOISE)
+}

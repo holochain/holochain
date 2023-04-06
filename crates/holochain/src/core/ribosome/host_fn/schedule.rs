@@ -154,7 +154,7 @@ pub mod tests {
                 assert!(
                     fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap()
                 );
-                delete_all_ephemeral_scheduled_fns(txn, &alice_pubkey).unwrap();
+                delete_all_ephemeral_scheduled_fns(txn).unwrap();
                 assert!(
                     !fn_is_scheduled(txn, ephemeral_scheduled_fn.clone(), &alice_pubkey,).unwrap()
                 );

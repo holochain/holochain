@@ -31,7 +31,7 @@ pub async fn validation_receipt_workflow(
     // Who we are.
     // TODO: I think this is right but maybe we need to make sure these cells are in
     // running apps?.
-    let cell_ids = conductor.list_cell_ids(Some(CellStatus::Joined));
+    let cell_ids = conductor.running_cell_ids(Some(CellStatus::Joined));
 
     if cell_ids.is_empty() {
         return Ok(WorkComplete::Complete);

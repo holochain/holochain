@@ -619,6 +619,7 @@ async fn store_entry(
     if let EntryType::App(app_entry_def) = entry_type {
         let entry_def =
             check_app_entry_def(workspace.dna_hash(), app_entry_def, conductor_handle).await?;
+        // TODO: MD: this doesn't seem right. A private StoreEntry can be validated. Not a private StoreRecord though.
         check_not_private(&entry_def)?;
     }
 
