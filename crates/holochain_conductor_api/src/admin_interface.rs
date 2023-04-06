@@ -3,7 +3,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
-use crate::{AppInfo, FullStateDump};
+use crate::{AppInfo, FullStateDump, StorageInfo};
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -323,6 +323,9 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::CloneCellDeleted`]
     DeleteCloneCell(Box<DeleteCloneCellPayload>),
+
+    /// Info about storage used by apps
+    StorageInfo,
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -458,6 +461,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::DeleteCloneCell`].
     CloneCellDeleted,
+
+    /// The successful response to an [`AdminRequest::StorageInfo`].
+    StorageInfo(StorageInfo),
 }
 
 /// Error type that goes over the websocket wire.

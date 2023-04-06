@@ -288,6 +288,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::CloneCellDeleted)
             }
+            StorageInfo => Ok(AdminResponse::StorageInfo(
+                self.conductor_handle.storage_info().await?,
+            )),
         }
     }
 }
