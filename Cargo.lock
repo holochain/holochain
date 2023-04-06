@@ -3495,7 +3495,7 @@ dependencies = [
  "anyhow",
  "base64 0.21.0",
  "bytecount",
- "clap 4.1.9",
+ "clap 4.2.1",
  "fancy-regex",
  "fraction",
  "getrandom 0.2.8",
