@@ -2,7 +2,6 @@ use super::*;
 use crate::error::HoloHashError;
 use crate::hash_type;
 use crate::AgentPubKey;
-use crate::EntryHash;
 use std::convert::TryInto;
 // Valid Holochain options for prefixes:
 // hCAk 4100 <Buffer 84 20 24> * AGENT
@@ -163,7 +162,7 @@ macro_rules! primitive_hash_type {
 }
 
 primitive_hash_type!(Agent, AgentPubKey, AgentVisitor, AGENT_PREFIX);
-primitive_hash_type!(Entry, EntryHash, EntryVisitor, ENTRY_PREFIX);
+primitive_hash_type!(NonAgentEntry, NonAgentEntryHash, EntryVisitor, ENTRY_PREFIX);
 primitive_hash_type!(Dna, DnaHash, DnaVisitor, DNA_PREFIX);
 primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
 primitive_hash_type!(Action, ActionHash, ActionVisitor, ACTION_PREFIX);
@@ -174,7 +173,7 @@ primitive_hash_type!(External, ExternalHash, ExternalVisitor, EXTERNAL_PREFIX);
 // DhtOps are mostly hashes
 impl HashTypeSync for DhtOp {}
 // Entries are capped at 16MB, which is small enough to hash synchronously
-impl HashTypeSync for Entry {}
+impl HashTypeSync for NonAgentEntry {}
 // Actions are only a few hundred bytes at most
 impl HashTypeSync for Action {}
 // A DnaHash is a hash of the DnaDef, which excludes the wasm bytecode
@@ -194,15 +193,3 @@ impl HashTypeAsync for External {}
 
 impl HashTypeAsync for NetId {}
 impl HashTypeAsync for Wasm {}
-
-impl From<AgentPubKey> for EntryHash {
-    fn from(hash: AgentPubKey) -> EntryHash {
-        hash.retype(hash_type::Entry)
-    }
-}
-
-impl From<EntryHash> for AgentPubKey {
-    fn from(hash: EntryHash) -> AgentPubKey {
-        hash.retype(hash_type::Agent)
-    }
-}
