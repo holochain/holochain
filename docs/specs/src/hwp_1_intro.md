@@ -53,16 +53,18 @@ We begin by stating our axioms[^byzantine] regarding the nature of coordination:
     Ludos]{.underline}](https://docs.google.com/document/d/1HBNgIooElD5widCuX9XmiOzbVIpEF5XXH67mZbnUFjo/edit#)\].
 
 1.  **Coordination arises from agents** starting from the same
-  ground-rules and acting as soon as each party in any interaction
-  can confirm that each other\'s actions confirm that actions or
-  interactions conform to those ground rules. (Thus, in our frame,
+  ground-rules and then, any single agent's ability to act *as soon* as they have 
+  confirmed to their satisfaction that other agent's previous actions
+  conform to those ground rules. (Thus, in our frame,
   coordination looks like alignment heading in the same direction,
   rather than agreement proceeding in lockstep.)
 
-1.  **Coordination is grammatic**, in that it comes from embodying a
+1.  **Coordination is grammatic[^grammatic]**, in that it comes from embodying a
   geometry that removes uncertainty, and embodying an ability to
   compose different coordinative subsystems that have different
   ground-rules.
+
+[^grammatic]: We use the term grammatic as a way to generalize from the usual understanding of grammar which is linguistic.  Where grammar is often understood to be limited to language, grammatics points to the pattern of creating templates with classes of items that can fill slots in those templates.  This pattern can be used for creating "grammars" of social interaction,  "grammars" of physical structures (we would call Christopher Alexander's "Pattern Language" for architecture an example of grammatics) and so on.
 
 Axiom 1 arises from the insight that we cannot fight against the
 physical reality of different experiences by different nodes in the
@@ -87,12 +89,23 @@ elements are changed by the fact of their coordination. Coordination is
 a co-evolutionary context. We claim by this axiom that what meets the
 challenge of anti-fragility in such contexts is composable sub-systems,
 in which the composition comes out of a grammar that embodies the
-actual dimensionality of the problem subdomains (i.e. their geometry),
+actual dimensionality of the problem subdomains (i.e. their geometry)[^embodiment],
 and by which agents in that context can react powerfully to
 perturbations because the available composability is dimensionally
 aligned.
 
 [^antifragile]: Antifragile: Things that Gain from Disorder. Nassim Nicholas Taleb
+[^embodiment]: Insofar as our compute powered platforms are meant to solve problems
+in particular domains, we take it as critical that how those problems show up
+in the platform, actually meets the dimensionality of the problem space.  By this
+we mean that the independent variables, or ontological entities that are part of
+the problem space are reflected in the compute system.  That reflection we call 
+embodiment in the system.  A generalized platform for creating applications that
+solve problems, must therefore embody this higher level dimensionality of
+the problem space of "generalized application creation" itself, and in our case, 
+it must do so in an evolvable manner.  Our use of the term geometry here is similarly
+intended to help elucidate the notion of dimensionality, in that geometries distiguish
+independent directions of motion and the relations between them. 
 
 The core axiom (though not explicitly stated as such) of the Byzantine
 Generals Problem is that coordination starts AFTER "consensus on state",
@@ -143,7 +156,7 @@ across the participants in the network. This approach requires that we:
   which players can add deterministic elements of certainty into
   their interactions.
 
-2.  Ensure that all agents can *reliably* see what's going on. i.e.
+1.  Ensure that all agents can *reliably* see what's going on. i.e.
   offer a framework for adding to and querying a collectively held
   database in which there is a knowable level of confidence in its
   reliability and integrity that can also be graduated to fit the 
