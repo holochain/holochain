@@ -413,7 +413,7 @@ pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
             if size < MAX_ENTRY_SIZE {
                 Ok(())
             } else {
-                Err(ValidationOutcome::EntryTooLarge(size, MAX_ENTRY_SIZE).into())
+                Err(ValidationOutcome::EntryTooLarge(size).into())
             }
         }
         // Other entry types are small

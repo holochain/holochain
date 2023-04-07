@@ -249,7 +249,7 @@ impl PreflightRequest {
 
 /// Every agent must send back a preflight response.
 /// All the preflight response data is signed by each agent and included in the session data.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct PreflightResponse {
     /// The request this is a response to.

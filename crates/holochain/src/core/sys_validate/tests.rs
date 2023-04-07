@@ -68,6 +68,16 @@ async fn sign_record(keystore: &MetaLairClient, action: Action, entry: Option<En
     )
 }
 
+pub async fn rebuild_record(record: Record, keystore: &MetaLairClient) -> Record {
+    let (action, entry) = record.into_inner();
+    sign_record(
+        keystore,
+        action.into_inner().0.into_content(),
+        entry.into_option(),
+    )
+    .await
+}
+
 fn matching_record(u: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record {
     // get anything but a Dna
     let mut dep = Record::arbitrary(u).unwrap();
@@ -77,32 +87,47 @@ fn matching_record(u: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record 
     dep
 }
 
+fn is_dna_record(r: &Record) -> bool {
+    matches!(r.action(), Action::Dna(_))
+}
+fn is_pkg_record(r: &Record) -> bool {
+    matches!(r.action(), Action::AgentValidationPkg(_))
+}
+fn is_entry_record(r: &Record) -> bool {
+    matches!(r.action(), Action::Create(_) | Action::Update(_))
+        && r.entry
+            .as_option()
+            .map(|e| entry_type_matches(r.action().entry_type().unwrap(), e))
+            .unwrap_or(false)
+}
+
+async fn record_with_deps(keystore: &MetaLairClient, action: Action) -> (Record, Vec<Record>) {
+    record_with_deps_fixup(keystore, action, true).await
+}
+
 /// Creates a valid Record using the given action and constructs a MockCascade
 /// with the minimal set of records to satisfy the validation dependencies
 /// for that Record. Updates the input action's backlinks to point to these other
 /// injected actions, and returns it along with the created MockCascade.
-async fn record_with_deps(keystore: &MetaLairClient, mut action: Action) -> (Record, Vec<Record>) {
+async fn record_with_deps_fixup(
+    keystore: &MetaLairClient,
+    mut action: Action,
+    fixup: bool,
+) -> (Record, Vec<Record>) {
     let mut u = unstructured_noise();
-    let dna_record = |r: &Record| matches!(r.action(), Action::Dna(_));
-    let pkg_record = |r: &Record| matches!(r.action(), Action::AgentValidationPkg(_));
-    let entry_record = |r: &Record| {
-        matches!(r.action(), Action::Create(_) | Action::Update(_))
-            && r.entry
-                .as_option()
-                .map(|e| entry_type_matches(r.action().entry_type().unwrap(), e))
-                .unwrap_or(false)
-    };
 
-    if action.action_seq() == 1 {
-        // In case this is an Agent entry, allow the previous to be something other than Dna
-        *action.action_seq_mut().unwrap() = 2;
+    if fixup {
+        if action.action_seq() == 1 {
+            // In case this is an Agent entry, allow the previous to be something other than Dna
+            *action.action_seq_mut().unwrap() = 2;
+        }
+
+        *action.author_mut() = fake_agent_pubkey_1();
     }
-
-    *action.author_mut() = fake_agent_pubkey_1();
 
     let (entry, deps) = match &mut action {
         Action::Dna(_) => (None, vec![]),
-        action if action.action_seq() == 0 => {
+        action if fixup && action.action_seq() == 0 => {
             *action = Action::Dna(fixt!(Dna));
             *action.author_mut() = fake_agent_pubkey_1();
             (None, vec![])
@@ -111,14 +136,14 @@ async fn record_with_deps(keystore: &MetaLairClient, mut action: Action) -> (Rec
             let mut deps = vec![];
             let prev_seq = action.action_seq() - 1;
             let mut prev = if prev_seq == 0 {
-                matching_record(&mut u, dna_record)
+                matching_record(&mut u, is_dna_record)
             } else {
                 let mut prev = match action {
                     Action::Create(Create {
                         entry_type: EntryType::AgentPubKey,
                         ..
-                    }) => matching_record(&mut u, pkg_record),
-                    _ => matching_record(&mut u, |r| !dna_record(r) && !pkg_record(r)),
+                    }) => matching_record(&mut u, is_pkg_record),
+                    _ => matching_record(&mut u, |r| !is_dna_record(r) && !is_pkg_record(r)),
                 };
                 *prev.as_action_mut().action_seq_mut().unwrap() = action.action_seq() - 1;
                 prev
@@ -139,7 +164,7 @@ async fn record_with_deps(keystore: &MetaLairClient, mut action: Action) -> (Rec
             });
             match action {
                 Action::Update(update) => {
-                    let mut dep = matching_record(&mut u, entry_record);
+                    let mut dep = matching_record(&mut u, is_entry_record);
                     update.original_action_address = dep.action_address().clone();
                     update.original_entry_address =
                         dep.entry().as_option().unwrap().to_hash().clone();
@@ -147,7 +172,7 @@ async fn record_with_deps(keystore: &MetaLairClient, mut action: Action) -> (Rec
                     deps.push(dep);
                 }
                 Action::Delete(delete) => {
-                    let dep = matching_record(&mut u, entry_record);
+                    let dep = matching_record(&mut u, is_entry_record);
                     delete.deletes_address = dep.action_address().clone();
                     delete.deletes_entry_address =
                         dep.entry().as_option().unwrap().to_hash().clone();
@@ -199,6 +224,7 @@ async fn record_with_cascade(keystore: &MetaLairClient, action: Action) -> (Reco
 async fn validate_action(keystore: &MetaLairClient, action: Action) -> SysValidationOutcome<()> {
     let (record, deps) = record_with_deps(keystore, action).await;
     let cascade = MockCascade::with_records(deps.clone());
+    dbg!(&deps, &record);
     sys_validate_record(&record, &cascade).await
 }
 
@@ -209,6 +235,16 @@ async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
     if result.is_err() {
         dbg!(&deps, &record);
         result.unwrap()
+    }
+}
+
+async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
+    let (record, deps) = record_with_deps(keystore, action).await;
+    let cascade = MockCascade::with_records(deps.clone());
+    let result = sys_validate_record(&record, &cascade).await;
+    if result.is_ok() {
+        dbg!(&deps, &record);
+        result.unwrap_err();
     }
 }
 
@@ -241,10 +277,10 @@ async fn verify_action_signature_test() {
 /// Any action other than DNA cannot be at seq 0
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_action() {
-    use contrafact::*;
     let mut u = unstructured_noise();
     let keystore = holochain_state::test_utils::test_keystore();
-    let mut action = brute("not dna", |a| !matches!(a, Action::Dna(_))).build(&mut u);
+    let mut action = Action::Delete(fixt!(Delete));
+    *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
 
     *action.action_seq_mut().unwrap() = 7;
 
@@ -252,11 +288,22 @@ async fn check_previous_action() {
 
     *action.action_seq_mut().unwrap() = 0;
 
-    assert!(validate_action(&keystore, action.clone()).await.is_err());
+    // This check is manual because `validate_action` will modify any action
+    // coming in with a 0 action_seq since it knows that can't be valid.
+    {
+        let actual = sys_validate_record(
+            &sign_record(&keystore, action, None).await,
+            &MockCascade::new(),
+        )
+        .await
+        .unwrap_err()
+        .into_outcome();
 
-    // Err(OutcomeOrError::Outcome(ValidationOutcome::PrevActionError(
-    //     PrevActionError::InvalidRoot
-    // )))
+        let expected = Some(ValidationOutcome::PrevActionError(
+            PrevActionError::InvalidRoot,
+        ));
+        assert_eq!(actual, expected);
+    }
 
     // Dna is always ok because of the type system
     let action = Action::Dna(fixt!(Dna));
@@ -349,22 +396,29 @@ async fn check_valid_if_dna_test() {
 /// Timestamps must increase monotonically
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_timestamp() {
-    let mut action = fixt!(CreateLink);
-    let mut prev_action = fixt!(CreateLink);
-    action.timestamp = Timestamp::now().into();
-    let before = chrono::Utc::now() - chrono::Duration::weeks(1);
-    let after = chrono::Utc::now() + chrono::Duration::weeks(1);
+    let before = Timestamp::from(chrono::Utc::now() - chrono::Duration::weeks(1));
+    let after = Timestamp::from(chrono::Utc::now() + chrono::Duration::weeks(1));
 
-    prev_action.timestamp = Timestamp::from(before).into();
-    let r = check_prev_timestamp(&action.clone().into(), &prev_action.clone().into());
-    assert_matches!(r, Ok(()));
+    let keystore = test_keystore();
+    let (record, mut deps) = record_with_deps(&keystore, fixt!(CreateLink).into()).await;
+    *deps[0].as_action_mut().timestamp_mut() = before;
 
-    prev_action.timestamp = Timestamp::from(after).into();
-    let r = check_prev_timestamp(&action.clone().into(), &prev_action.clone().into());
+    assert!(
+        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+            .await
+            .is_ok()
+    );
+
+    *deps[0].as_action_mut().timestamp_mut() = after;
+    let r = sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+        .await
+        .unwrap_err()
+        .into_outcome();
+
     assert_matches!(
         r,
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::Timestamp(_, _))
+        Some(ValidationOutcome::PrevActionError(
+            PrevActionError::Timestamp(_, _)
         ))
     );
 }
@@ -372,39 +426,54 @@ async fn check_previous_timestamp() {
 /// Sequence numbers must increment by 1 for each new action
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_seq() {
-    let mut action = fixt!(CreateLink);
-    let mut prev_action = fixt!(CreateLink);
+    let keystore = test_keystore();
+    let mut action: Action = fixt!(CreateLink).into();
+    *action.action_seq_mut().unwrap() = 2;
+    let (mut record, mut deps) = record_with_deps(&keystore, action).await;
 
-    action.action_seq = 2;
-    prev_action.action_seq = 1;
-    assert_matches!(
-        check_prev_seq(&action.clone().into(), &prev_action.clone().into()),
-        Ok(())
+    dbg!(&deps, &record);
+    // *record.as_action_mut().action_seq_mut().unwrap() = 2;
+    *deps[0].as_action_mut().action_seq_mut().unwrap() = 1;
+
+    assert!(
+        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+            .await
+            .is_ok()
     );
 
-    prev_action.action_seq = 2;
-    assert_matches!(
-        check_prev_seq(&action.clone().into(), &prev_action.clone().into()),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::InvalidSeq(_, _)),
-        ),)
+    *deps[0].as_action_mut().action_seq_mut().unwrap() = 2;
+    assert_eq!(
+        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+            .await
+            .unwrap_err()
+            .into_outcome(),
+        Some(ValidationOutcome::PrevActionError(
+            PrevActionError::InvalidSeq(2, 2)
+        )),
     );
 
-    prev_action.action_seq = 3;
-    assert_matches!(
-        check_prev_seq(&action.clone().into(), &prev_action.clone().into()),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::InvalidSeq(_, _)),
-        ),)
+    *deps[0].as_action_mut().action_seq_mut().unwrap() = 3;
+    assert_eq!(
+        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+            .await
+            .unwrap_err()
+            .into_outcome(),
+        Some(ValidationOutcome::PrevActionError(
+            PrevActionError::InvalidSeq(2, 3)
+        )),
     );
 
-    action.action_seq = 0;
-    prev_action.action_seq = 0;
-    assert_matches!(
-        check_prev_seq(&action.clone().into(), &prev_action.clone().into()),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PrevActionError(PrevActionError::InvalidSeq(_, _)),
-        ),)
+    *record.as_action_mut().action_seq_mut().unwrap() = 0;
+    let record = rebuild_record(record, &keystore).await;
+    *deps[0].as_action_mut().action_seq_mut().unwrap() = 0;
+    assert_eq!(
+        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+            .await
+            .unwrap_err()
+            .into_outcome(),
+        Some(ValidationOutcome::PrevActionError(
+            PrevActionError::InvalidRoot
+        )),
     );
 }
 
@@ -468,15 +537,28 @@ async fn check_entry_hash_test() {
 /// The size of an entry does not exceed the max
 #[tokio::test(flavor = "multi_thread")]
 async fn check_entry_size_test() {
-    // let tiny = Entry::App(SerializedBytes::from(UnsafeBytes::from(vec![0; 1])));
-    // let bytes = (0..16_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>();
-    // let huge = Entry::App(SerializedBytes::from(UnsafeBytes::from(bytes)));
-    // assert_matches!(check_entry_size(&tiny), Ok(()));
+    let keystore = test_keystore();
 
-    // assert_matches!(
-    //     check_entry_size(&huge),
-    //     Err(SysValidationError::ValidationOutcome(ValidationOutcome::EntryTooLarge(_, _)))
-    // );
+    let (mut record, cascade) = record_with_cascade(&keystore, fixt!(Create).into()).await;
+
+    assert!(sys_validate_record(&record, &cascade).await.is_ok());
+
+    let huge_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
+        (0..5_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
+    ))));
+    match record.as_entry_mut() {
+        RecordEntry::Present(entry) => *entry = huge_entry,
+        _ => {}
+    };
+    let record = rebuild_record(record, &keystore).await;
+
+    assert_eq!(
+        sys_validate_record(&record, &cascade)
+            .await
+            .unwrap_err()
+            .into_outcome(),
+        Some(ValidationOutcome::EntryTooLarge(5_000_000))
+    );
 }
 
 /// Check that updates can't switch the entry type
