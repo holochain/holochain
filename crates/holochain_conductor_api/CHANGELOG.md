@@ -7,7 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Adds new functionality to the conductor admin API which returns disk storage information. The storage used by apps is broken down into blobs which are being used by one or more app.
+
 ## 0.2.0-beta-rc.2
+
+- `AppInfo` now includes a copy of the `AppManifest` which was used to install the app. This can be used to reinstall the same app under a different agent in the same conductor without needing to supply the original DNA files. [\#2157](https://github.com/holochain/holochain/pull/2157)
 
 ## 0.2.0-beta-rc.1
 

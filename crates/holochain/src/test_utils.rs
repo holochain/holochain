@@ -331,7 +331,8 @@ pub async fn install_app(
 pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<MembraneProof>)>;
 
 /// One of various ways to setup an app, used somewhere...
-pub async fn setup_app(
+pub async fn setup_app_in_new_conductor(
+    installed_app_id: InstalledAppId,
     dnas: Vec<DnaFile>,
     cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
@@ -342,19 +343,37 @@ pub async fn setup_app(
         .await
         .unwrap();
 
+    install_app_in_conductor(conductor_handle.clone(), installed_app_id, dnas, cell_data).await;
+
+    let handle = conductor_handle.clone();
+
+    (
+        Arc::new(db_dir),
+        RealAppInterfaceApi::new(conductor_handle),
+        handle,
+    )
+}
+
+/// Install an app into an existing conductor instance
+pub async fn install_app_in_conductor(
+    conductor_handle: ConductorHandle,
+    installed_app_id: InstalledAppId,
+    dnas: Vec<DnaFile>,
+    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+) {
     for dna in dnas {
         conductor_handle.register_dna(dna).await.unwrap();
     }
 
     conductor_handle
         .clone()
-        .install_app_legacy("test app".to_string(), cell_data)
+        .install_app_legacy(installed_app_id.clone(), cell_data)
         .await
         .unwrap();
 
     conductor_handle
         .clone()
-        .enable_app("test app".to_string())
+        .enable_app(installed_app_id)
         .await
         .unwrap();
 
@@ -365,14 +384,6 @@ pub async fn setup_app(
         .unwrap();
 
     assert!(errors.is_empty());
-
-    let handle = conductor_handle.clone();
-
-    (
-        Arc::new(db_dir),
-        RealAppInterfaceApi::new(conductor_handle),
-        handle,
-    )
 }
 
 /// Setup an app for testing
