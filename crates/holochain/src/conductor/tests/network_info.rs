@@ -5,7 +5,7 @@ use holochain_zome_types::Timestamp;
 
 use crate::{
     sweettest::{SweetConductorBatch, SweetDnaFile, SweetZome},
-    test_utils::{wait_for_integration, wait_for_integration_1m, wait_for_integration_with_others},
+    test_utils::wait_for_integration,
 };
 
 #[tokio::test(flavor = "multi_thread")]

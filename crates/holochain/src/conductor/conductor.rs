@@ -744,6 +744,8 @@ mod network_impls {
     use holochain_p2p::HolochainP2pSender;
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
+    use kitsune_p2p::KitsuneAgent;
+    use kitsune_p2p::KitsuneBinType;
     use rusqlite::params;
 
     use crate::conductor::api::error::{
@@ -860,17 +862,32 @@ mod network_impls {
                 let mut conn = db.with_permit(permit)?;
                 let agent_infos = conn.p2p_list_agents()?;
                 let current_number_of_peers = agent_infos.len() as u32;
+                agent_infos
+                    .iter()
+                    .for_each(|agent| println!("arc {:?}", agent));
 
                 // query arc size and extrapolated coverage and estimate total peers
                 let cell_id = CellId::new(dna.as_hash().clone(), agent_pub_key.clone());
-                let agent_infos = self
-                    .get_agent_infos(Some(cell_id.clone()))
-                    .await
-                    .map_err(|_| ConductorError::CellMissing(cell_id.clone()))?;
-                let arc_size = agent_infos[0].storage_arc.coverage();
-                let extrapolated_coverage =
-                    conn.p2p_extrapolated_coverage(agent_infos[0].storage_arc.inner().into())?;
-                let total_network_peers = (extrapolated_coverage[0] / arc_size) as u32;
+                let (arc_size, total_network_peers) = match conn
+                    .p2p_get_agent(&KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()))?
+                {
+                    None => (0.0, 0),
+                    Some(agent) => {
+                        let arc_size = agent.storage_arc.coverage();
+                        let agents_in_arc = conn.p2p_gossip_query_agents(
+                            u64::MIN,
+                            u64::MAX,
+                            agent.storage_arc.inner().into(),
+                        )?;
+                        let number_of_agents_in_arc = agents_in_arc.len();
+                        let total_network_peers = if number_of_agents_in_arc == 0 {
+                            0
+                        } else {
+                            (number_of_agents_in_arc as f64 / arc_size) as u32
+                        };
+                        (arc_size, total_network_peers)
+                    }
+                };
 
                 // get sum of bytes from dht and cache db since last time
                 // request was made or since the beginning of time
