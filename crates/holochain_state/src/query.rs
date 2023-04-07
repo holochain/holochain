@@ -361,29 +361,33 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     ) -> StateQueryResult<Option<Record>> {
         match hash.clone().into_primitive() {
             // Try to get a public record.
-            AnyDhtHashPrimitive::Entry(hash) => match self.get_any_public_record(&hash)? {
-                Some(el) => Ok(Some(el)),
-                None => match author {
-                    // If there are none try to get a private authored record.
-                    Some(author) => self.get_any_authored_record(&hash.clone().into(), author),
-                    // If there are no private authored records then try to get any record and
-                    // remove the entry.
-                    None => Ok(self
-                        .get_any_record(&hash.clone().into())?
-                        .map(|el| Record::new(el.into_inner().0, None))),
-                },
-            },
-            AnyDhtHashPrimitive::Action(hash) => Ok(self.get_exact_record(&hash)?.map(|el| {
-                // Filter out the entry if it's private.
-                let is_private_entry = el.action().entry_type().map_or(false, |et| {
-                    matches!(et.visibility(), EntryVisibility::Private)
-                });
-                if is_private_entry {
-                    Record::new(el.into_inner().0, None)
-                } else {
-                    el
+            AnyDhtHashPrimitive::Entry(hash) => {
+                match self.get_any_public_record(&hash)? {
+                    Some(el) => Ok(Some(el)),
+                    None => match author {
+                        // If there are none try to get a private authored record.
+                        Some(author) => self.get_any_authored_record(&hash, author),
+                        // If there are no private authored records then try to get any record and
+                        // remove the entry.
+                        None => Ok(self
+                            .get_any_record(&hash)?
+                            .map(|el| Record::new(el.into_inner().0, None))),
+                    },
                 }
-            })),
+            }
+            AnyDhtHashPrimitive::Action(hash) => {
+                Ok(self.get_exact_record(&hash)?.map(|el| {
+                    // Filter out the entry if it's private.
+                    let is_private_entry = el.action().entry_type().map_or(false, |et| {
+                        matches!(et.visibility(), EntryVisibility::Private)
+                    });
+                    if is_private_entry {
+                        Record::new(el.into_inner().0, None)
+                    } else {
+                        el
+                    }
+                }))
+            }
         }
     }
 }
