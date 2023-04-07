@@ -408,16 +408,19 @@ pub fn check_new_entry_action(action: &Action) -> SysValidationResult<()> {
 /// Check the entry size is under the MAX_ENTRY_SIZE
 pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
     match entry {
-        Entry::App(bytes) => {
+        Entry::App(bytes) | Entry::CounterSign(_, bytes) => {
             let size = std::mem::size_of_val(&bytes.bytes()[..]);
+            dbg!(&size);
             if size < MAX_ENTRY_SIZE {
                 Ok(())
             } else {
                 Err(ValidationOutcome::EntryTooLarge(size).into())
             }
         }
-        // Other entry types are small
-        _ => Ok(()),
+        _ => {
+            // TODO: size checks on other types (cap grant and claim)
+            Ok(())
+        }
     }
 }
 

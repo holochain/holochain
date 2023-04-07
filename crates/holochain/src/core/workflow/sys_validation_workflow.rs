@@ -428,9 +428,7 @@ async fn sys_validate_record_inner(
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
         store_record(action, cascade).await?;
-        if let Some((maybe_entry, EntryVisibility::Public)) =
-            &maybe_entry.and_then(|e| action.entry_type().map(|et| (e, et.visibility())))
-        {
+        if let Some(maybe_entry) = maybe_entry {
             store_entry(
                 (action)
                     .try_into()

@@ -117,7 +117,7 @@ async fn record_with_deps_fixup(
     let mut u = unstructured_noise();
 
     if fixup {
-        if action.action_seq() == 1 {
+        if !matches!(action, Action::Dna(_)) && action.action_seq() < 2 {
             // In case this is an Agent entry, allow the previous to be something other than Dna
             *action.action_seq_mut().unwrap() = 2;
         }
@@ -127,11 +127,6 @@ async fn record_with_deps_fixup(
 
     let (entry, deps) = match &mut action {
         Action::Dna(_) => (None, vec![]),
-        action if fixup && action.action_seq() == 0 => {
-            *action = Action::Dna(fixt!(Dna));
-            *action.author_mut() = fake_agent_pubkey_1();
-            (None, vec![])
-        }
         action => {
             let mut deps = vec![];
             let prev_seq = action.action_seq() - 1;
@@ -541,16 +536,21 @@ async fn check_entry_size_test() {
 
     let (mut record, cascade) = record_with_cascade(&keystore, fixt!(Create).into()).await;
 
-    assert!(sys_validate_record(&record, &cascade).await.is_ok());
+    let tiny_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
+        (0..5).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
+    ))));
+    *record.as_action_mut().entry_data_mut().unwrap().1 = EntryType::App(fixt!(AppEntryDef));
+    *record.as_entry_mut() = RecordEntry::Present(tiny_entry);
+    let mut record = rebuild_record(record, &keystore).await;
+    dbg!(&record);
+    sys_validate_record(&record, &cascade).await.unwrap();
 
     let huge_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         (0..5_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
     ))));
-    match record.as_entry_mut() {
-        RecordEntry::Present(entry) => *entry = huge_entry,
-        _ => {}
-    };
+    *record.as_entry_mut() = RecordEntry::Present(huge_entry);
     let record = rebuild_record(record, &keystore).await;
+    dbg!(&record);
 
     assert_eq!(
         sys_validate_record(&record, &cascade)
