@@ -15,6 +15,8 @@ use wasmer_middlewares::Metering;
 
 const WASM_METERING_LIMIT: u64 = 100_000_000_000;
 
+// TODO-connor: don't have this code copy-pasted from real_ribosome.
+// instead place it in TBD appropriate place to be shared between?
 pub fn cranelift() -> Cranelift {
     let cost_function = |_operator: &wasmparser::Operator| -> u64 { 1 };
     // @todo 100 giga-ops is totally arbitrary cutoff so we probably
