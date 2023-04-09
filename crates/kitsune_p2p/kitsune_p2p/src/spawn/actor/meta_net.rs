@@ -31,6 +31,7 @@ use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
 
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_block::BlockTargetId;
 use kitsune_p2p_timestamp::Timestamp;
 use parking_lot::Mutex;
@@ -80,6 +81,9 @@ pub enum MetaNetEvt {
 
         /// Handle to the connection.
         con: MetaNetCon,
+
+        /// Signed agent info for the node.
+        agents: Vec<AgentInfoSigned>,
     },
 
     /// A connection has been closed.
@@ -365,6 +369,7 @@ impl MetaNet {
     /// Construct abstraction with tx2 backend.
     #[cfg(feature = "tx2")]
     pub async fn new_tx2(
+        spaces: Spaces,
         host: HostApi,
         config: KitsuneP2pConfig,
         tls_config: kitsune_p2p_types::tls::TlsConfig,
@@ -481,10 +486,16 @@ impl MetaNet {
             while let Some(evt) = ep.next().await {
                 match evt {
                     Tx2EpEvent::OutgoingConnection(Tx2EpConnection { con, url }) => {
+                        let mut agents_map: HashMap<Arc<KitsuneAgent>, Arc<SignedAgentInfo>> = Default::default();
+                        for space in spaces {
+                            agents_map.extend(space.local_joined_agents.clone());
+                        }
+                        let agents = agents_map.values().into_iter().collect();
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: url.to_string(),
                                 con: MetaNetCon::Tx2(con),
+                                agents,
                             })
                             .await
                             .is_err()

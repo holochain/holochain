@@ -53,6 +53,10 @@ impl KitsuneHost for StandardResponsesHostApi {
         box_fut(Ok(Some(agent)))
     }
 
+    fn put_agent_info_signed(&self, _input: Vec<AgentInfoSigned>) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
     fn remove_agent_info_signed(
         &self,
         _input: GetAgentInfoSignedEvt,

@@ -276,21 +276,7 @@ impl KitsuneP2pActor {
 
                             match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
-                                    match node_is_authorized(&host, con.peer_id(), Timestamp::now())
-                                        .await
-                                    {
-                                        MetaNetEvtAuth::Authorized => {
-                                            let _ = i_s.new_con(remote_url, con).await;
-                                        }
-                                        MetaNetEvtAuth::UnauthorizedIgnore => {}
-                                        MetaNetEvtAuth::UnauthorizedDisconnect => {
-                                            con.close(
-                                                UNAUTHORIZED_DISCONNECT_CODE,
-                                                UNAUTHORIZED_DISCONNECT_REASON,
-                                            )
-                                            .await;
-                                        }
-                                    }
+                                    let _ = i_s.new_con(remote_url, con).await;
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     let _ = i_s.del_con(remote_url).await;
