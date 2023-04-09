@@ -823,13 +823,7 @@ impl KitsuneP2pHandler for Space {
             }
         }
 
-        Ok(async move {
-            let resp = fut.await;
-            tracing::debug!("got to i2");
-            resp
-        }
-        .boxed()
-        .into())
+        Ok(async move { fut.await }.boxed().into())
     }
 
     fn handle_leave(
