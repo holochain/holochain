@@ -182,15 +182,15 @@ impl Spaces {
     #[async_recursion::async_recursion]
     pub async fn is_blocked(
         &self,
-        target_id_0: BlockTargetId,
+        target_id: BlockTargetId,
         timestamp: Timestamp,
     ) -> DatabaseResult<bool> {
-        let target_id_1 = target_id_0.clone();
+        let target_id_1 = target_id.clone();
         Ok(self.conductor_db
             .async_reader(move |txn| holochain_state::block::query_is_blocked(&txn, target_id_1, timestamp))
             .await?
             // Targets may imply additional sub-targets.
-            || match target_id_0 {
+            || match target_id {
                 BlockTargetId::Cell(_) => false,
                 BlockTargetId::Ip(_) => false,
                 BlockTargetId::Node(node_id) => {
