@@ -146,7 +146,7 @@ pub struct WasmZomeDylib {
     pub dependencies: Vec<ZomeName>,
 }
 
-/// TODO: change this comment
+/// TODO-connor: change this comment
 /// Just the definition of a Zome, without the name included. This exists
 /// mainly for use in HashMaps where ZomeDefs are keyed by ZomeName.
 ///
