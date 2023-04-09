@@ -242,6 +242,9 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
     u64::from_le_bytes(bits)
 }
 
+// TODO-connor consolidate aspects of this with the code
+// in the hc_bundle packing crate, so that there will always
+// be alignment
 pub fn ios_dylib_store() -> Store {
     let triple = Triple::from_str("aarch64-apple-ios").unwrap();
     let cpu_feature = CpuFeature::set();
