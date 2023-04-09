@@ -2,7 +2,8 @@
 // TODO [ B-03669 ] move to own crate
 
 use super::{
-    SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig, SweetConductorHandle,
+    DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
+    SweetConductorHandle, SweetLocalRendezvous,
 };
 use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
@@ -40,14 +41,16 @@ pub struct SweetConductor {
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
+    _rendezvous: Option<DynSweetRendezvous>,
 }
 
 /// Standard config for SweetConductors
-pub fn standard_config() -> ConductorConfig {
-    SweetConductorConfig::standard().into()
+pub fn standard_config() -> SweetConductorConfig {
+    SweetConductorConfig::standard()
 }
 
 /// A DnaFile with a role name assigned
+#[derive(Clone)]
 pub struct DnaWithRole {
     role: RoleName,
     dna: DnaFile,
@@ -78,6 +81,7 @@ impl SweetConductor {
         handle: ConductorHandle,
         env_dir: TestDir,
         config: ConductorConfig,
+        _rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
         // Automatically add a test app interface
         handle
@@ -110,15 +114,45 @@ impl SweetConductor {
             config,
             dnas: Vec::new(),
             signal_stream: Some(Box::new(signal_stream)),
+            _rendezvous,
         }
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config<C: Into<ConductorConfig>>(config: C) -> SweetConductor {
-        let config = config.into();
+    pub async fn from_config<C>(config: C) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+    {
+        let rendezvous = SweetLocalRendezvous::new().await;
+        Self::from_config_rendezvous(config, rendezvous).await
+    }
+
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    pub async fn from_config_rendezvous<C, R>(config: C, rendezvous: R) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+        R: Into<DynSweetRendezvous>,
+    {
+        let keystore = test_keystore();
+        Self::from_config_rendezvous_keystore(config, rendezvous, keystore).await
+    }
+
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    pub async fn from_config_rendezvous_keystore<C, R>(
+        config: C,
+        rendezvous: R,
+        keystore: holochain_keystore::MetaLairClient,
+    ) -> SweetConductor
+    where
+        C: Into<SweetConductorConfig>,
+        R: Into<DynSweetRendezvous>,
+    {
+        let rendezvous = rendezvous.into();
+        let config = config.into().into_conductor_config(&*rendezvous).await;
+        tracing::info!(?config);
         let dir = TestDir::new(test_db_dir());
-        let handle = Self::handle_from_existing(&dir, test_keystore(), &config, &[]).await;
-        Self::new(handle, dir, config).await
+        let handle = Self::handle_from_existing(&dir, keystore, &config, &[]).await;
+        Self::new(handle, dir, config, Some(rendezvous)).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
@@ -126,7 +160,7 @@ impl SweetConductor {
         let db_dir = TestDir::new(test_db_dir());
         let config = builder.config.clone();
         let handle = builder.test(&db_dir, &[]).await.unwrap();
-        Self::new(handle, db_dir, config).await
+        Self::new(handle, db_dir, config, None).await
     }
 
     /// Create a handle from an existing environment and config
@@ -227,7 +261,7 @@ impl SweetConductor {
             })
             .collect();
         self.raw_handle()
-            .install_app(installed_app_id.clone(), installed_cells)
+            .install_app_legacy(installed_app_id.clone(), installed_cells)
             .await?;
 
         self.raw_handle().enable_app(installed_app_id).await?;
@@ -368,6 +402,18 @@ impl SweetConductor {
         Ok(SweetAppBatch(apps))
     }
 
+    /// Call into the underlying create_clone_cell function, and register the
+    /// created dna with SweetConductor so it will be reloaded on restart.
+    pub async fn create_clone_cell(
+        &mut self,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorApiResult<holochain_conductor_api::ClonedCell> {
+        let clone = self.raw_handle().create_clone_cell(payload).await?;
+        let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
+        self.dnas.push(dna_file);
+        Ok(clone)
+    }
+
     /// Get a stream of all Signals emitted on the "sweet-interface" AppInterface.
     ///
     /// This is designed to crash if called more than once, because as currently
@@ -396,7 +442,7 @@ impl SweetConductor {
     /// Attempting to use this conductor without starting it up again will cause a panic.
     pub async fn shutdown(&mut self) {
         if let Some(handle) = self.handle.take() {
-            handle.shutdown_and_wait().await;
+            handle.shutdown().await.unwrap().unwrap();
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }
@@ -424,9 +470,9 @@ impl SweetConductor {
         self.handle.is_some()
     }
 
-    // NB: keep this private to prevent leaking out owned references
+    /// Get the underlying SweetConductorHandle.
     #[allow(dead_code)]
-    fn sweet_handle(&self) -> SweetConductorHandle {
+    pub fn sweet_handle(&self) -> SweetConductorHandle {
         self.handle
             .as_ref()
             .map(|h| h.clone_privately())
@@ -448,10 +494,10 @@ impl SweetConductor {
     pub async fn force_all_publish_dht_ops(&self) {
         use futures::stream::StreamExt;
         if let Some(handle) = self.handle.as_ref() {
-            let iter = handle.list_cell_ids(None).into_iter().map(|id| async {
+            let iter = handle.running_cell_ids(None).into_iter().map(|id| async {
                 let id = id;
                 let db = self.get_authored_db(id.dna_hash()).unwrap();
-                let trigger = self.get_cell_triggers(&id).unwrap();
+                let trigger = self.get_cell_triggers(&id).await.unwrap();
                 (db, trigger)
             });
             futures::stream::iter(iter)
@@ -510,15 +556,7 @@ pub async fn websocket_client_by_port(
 impl Drop for SweetConductor {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            tokio::task::spawn(async move {
-                // Shutdown the conductor
-                if let Some(shutdown) = handle.take_shutdown_handle() {
-                    handle.shutdown();
-                    if let Err(e) = shutdown.await {
-                        tracing::warn!("Failed to join conductor shutdown task: {:?}", e);
-                    }
-                }
-            });
+            tokio::task::spawn(handle.shutdown());
         }
     }
 }

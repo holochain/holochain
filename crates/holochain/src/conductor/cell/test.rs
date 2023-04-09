@@ -1,5 +1,5 @@
 use crate::conductor::space::TestSpaces;
-use crate::conductor::{manager::spawn_task_manager, Conductor};
+use crate::conductor::Conductor;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::test_utils::{fake_valid_dna_file, test_network};
@@ -7,7 +7,6 @@ use holo_hash::HasHash;
 use holochain_state::test_utils::{test_db_dir, test_keystore};
 use holochain_types::prelude::*;
 use holochain_zome_types::action;
-use tokio::sync;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
@@ -50,16 +49,11 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let (add_task_sender, shutdown) = spawn_task_manager(handle.clone());
-    let (stop_tx, _) = sync::broadcast::channel(1);
-
     let (_cell, _) = super::Cell::create(
         cell_id,
-        handle,
+        handle.clone(),
         spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,
-        add_task_sender,
-        stop_tx.clone(),
     )
     .await
     .unwrap();
@@ -82,6 +76,5 @@ async fn test_cell_handle_publish() {
 
     op_exists(&dht_db, op_hash).await.unwrap();
 
-    stop_tx.send(()).unwrap();
-    shutdown.await.unwrap().unwrap();
+    handle.shutdown().await.unwrap().unwrap();
 }

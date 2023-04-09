@@ -1,5 +1,5 @@
 use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
-use crate::conductor::{api::error::ConductorApiResult, config::ConductorConfig};
+use crate::conductor::api::error::ConductorApiResult;
 use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
@@ -11,16 +11,34 @@ pub struct SweetConductorBatch(Vec<SweetConductor>);
 
 impl SweetConductorBatch {
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
-    pub async fn from_configs<C: Into<ConductorConfig>, I: IntoIterator<Item = C>>(
-        configs: I,
-    ) -> SweetConductorBatch {
-        future::join_all(configs.into_iter().map(SweetConductor::from_config::<C>))
-            .await
-            .into()
+    pub async fn from_configs<C, I>(configs: I) -> SweetConductorBatch
+    where
+        C: Into<SweetConductorConfig>,
+        I: IntoIterator<Item = C>,
+    {
+        let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
+        Self::from_configs_rendezvous(configs, rendezvous).await
+    }
+
+    /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    pub async fn from_configs_rendezvous<C, I, R>(configs: I, rendezvous: R) -> SweetConductorBatch
+    where
+        C: Into<SweetConductorConfig>,
+        I: IntoIterator<Item = C>,
+        R: Into<crate::sweettest::DynSweetRendezvous>,
+    {
+        let rendezvous = rendezvous.into();
+        future::join_all(
+            configs
+                .into_iter()
+                .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
+        )
+        .await
+        .into()
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
-    pub async fn from_config<C: Clone + Into<ConductorConfig>>(
+    pub async fn from_config<C: Clone + Into<SweetConductorConfig>>(
         num: usize,
         config: C,
     ) -> SweetConductorBatch {

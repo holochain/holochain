@@ -139,6 +139,12 @@ impl AnyDhtHash {
     }
 }
 
+// We have From impls for:
+// - any primitive hash into a composite hash which contains that primitive
+// - any composite hash which is a subset of another composite hash (AnyDht < AnyLinkable)
+// - converting between EntryHash and AgentPubKey
+// We must NOT have any other From impls, viz. any composite hash into a subset.
+
 impl From<AnyDhtHash> for AnyLinkableHash {
     fn from(hash: AnyDhtHash) -> Self {
         let t = (*hash.hash_type()).into();
@@ -166,18 +172,6 @@ impl From<AgentPubKey> for AnyDhtHash {
     }
 }
 
-impl From<AnyDhtHash> for ActionHash {
-    fn from(hash: AnyDhtHash) -> Self {
-        hash.retype(hash_type::Action)
-    }
-}
-
-impl From<AnyDhtHash> for EntryHash {
-    fn from(hash: AnyDhtHash) -> Self {
-        hash.retype(hash_type::Entry)
-    }
-}
-
 impl From<ActionHash> for AnyLinkableHash {
     fn from(hash: ActionHash) -> Self {
         hash.retype(hash_type::AnyLinkable::Action)
@@ -202,30 +196,12 @@ impl From<ExternalHash> for AnyLinkableHash {
     }
 }
 
-impl From<AnyLinkableHash> for ActionHash {
-    fn from(hash: AnyLinkableHash) -> Self {
-        hash.retype(hash_type::Action)
-    }
-}
-
-impl From<AnyLinkableHash> for EntryHash {
-    fn from(hash: AnyLinkableHash) -> Self {
-        hash.retype(hash_type::Entry)
-    }
-}
-
-impl From<AnyLinkableHash> for ExternalHash {
-    fn from(hash: AnyLinkableHash) -> Self {
-        hash.retype(hash_type::External)
-    }
-}
-
 #[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 
 /// A newtype for a collection of EntryHashes, needed for some wasm return types.
 #[cfg(feature = "serialization")]
-#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct EntryHashes(pub Vec<EntryHash>);

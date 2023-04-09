@@ -1,4 +1,5 @@
-use kitsune_p2p_fetch::FetchQueueConfig;
+use kitsune_p2p_fetch::FetchPoolConfig;
+use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
@@ -8,9 +9,25 @@ use super::*;
 /// Allows only specifying the methods you care about, and letting all the rest
 /// throw errors if called
 #[allow(missing_docs)]
-pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
+pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
     /// Name to be printed out on unimplemented error
     const NAME: &'static str;
+
+    fn block(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn unblock(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn is_blocked(
+        &self,
+        _input: kitsune_p2p_block::BlockTargetId,
+        _timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(false))
+    }
 
     fn get_agent_info_signed(
         &self,
@@ -19,6 +36,15 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
             "get_agent_info_signed",
+            Self::NAME
+        )
+        .into()))
+    }
+
+    fn remove_agent_info_signed(&self, _input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "remove_agent_info_signed",
             Self::NAME
         )
         .into()))
@@ -117,11 +143,31 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchQueueConfig {
 }
 
 impl<T: KitsuneHostDefaultError> KitsuneHost for T {
+    fn block(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::block(self, input)
+    }
+
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::unblock(self, input)
+    }
+
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::is_blocked(self, input, timestamp)
+    }
+
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         KitsuneHostDefaultError::get_agent_info_signed(self, input)
+    }
+
+    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::remove_agent_info_signed(self, input)
     }
 
     fn peer_extrapolated_coverage(

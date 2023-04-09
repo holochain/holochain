@@ -1,7 +1,4 @@
-use crate::record::Record;
 use crate::CallbackResult;
-use holo_hash::AnyDhtHash;
-use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_common::*;
 
 pub use holochain_integrity_types::validate::*;
@@ -46,45 +43,6 @@ impl CallbackResult for ValidateCallbackResult {
             | WasmErrorInner::Memory
             | WasmErrorInner::UninitializedSerializedModuleCache => Err(wasm_error),
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct ValidationPackage(pub Vec<Record>);
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes, Debug)]
-pub enum ValidationPackageCallbackResult {
-    Success(ValidationPackage),
-    Fail(String),
-    UnresolvedDependencies(Vec<AnyDhtHash>),
-}
-
-impl CallbackResult for ValidationPackageCallbackResult {
-    fn is_definitive(&self) -> bool {
-        matches!(self, ValidationPackageCallbackResult::Fail(_))
-    }
-    fn try_from_wasm_error(wasm_error: WasmError) -> Result<Self, WasmError> {
-        match wasm_error.error {
-            WasmErrorInner::Guest(_)
-            | WasmErrorInner::Serialize(_)
-            | WasmErrorInner::Deserialize(_) => Ok(ValidationPackageCallbackResult::Fail(
-                wasm_error.to_string(),
-            )),
-            WasmErrorInner::Host(_)
-            | WasmErrorInner::HostShortCircuit(_)
-            | WasmErrorInner::Compile(_)
-            | WasmErrorInner::CallError(_)
-            | WasmErrorInner::PointerMap
-            | WasmErrorInner::ErrorWhileError
-            | WasmErrorInner::Memory
-            | WasmErrorInner::UninitializedSerializedModuleCache => Err(wasm_error),
-        }
-    }
-}
-
-impl ValidationPackage {
-    pub fn new(records: Vec<Record>) -> Self {
-        Self(records)
     }
 }
 

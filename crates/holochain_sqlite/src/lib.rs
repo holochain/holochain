@@ -14,6 +14,7 @@ pub mod nonce;
 pub mod prelude;
 pub mod schema;
 pub mod sql;
+pub mod stats;
 pub mod swansong;
 
 mod table;

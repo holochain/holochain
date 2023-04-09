@@ -1,5 +1,5 @@
 /// Data that can be encrypted with secretbox.
-#[derive(PartialEq, serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct XSalsa20Poly1305Data(#[serde(with = "serde_bytes")] Vec<u8>);
 pub type SecretBoxData = XSalsa20Poly1305Data;
 pub type BoxData = XSalsa20Poly1305Data;

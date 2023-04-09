@@ -44,7 +44,6 @@ mod validation_tests;
 
 mod error;
 mod types;
-pub mod validation_package;
 
 const NUM_CONCURRENT_OPS: usize = 50;
 
@@ -122,7 +121,7 @@ async fn app_validation_workflow_inner(
                 let mut cascade = workspace.full_cascade(network.clone());
                 let r = match dhtop_to_op(op, &mut cascade).await {
                     Ok(op) => {
-                        validate_op_outer(dna_hash, &op, &conductor, &(*workspace), &network).await
+                        validate_op_outer(dna_hash, &op, &conductor, &workspace, &network).await
                     }
                     Err(e) => Err(e),
                 };
@@ -184,7 +183,6 @@ async fn app_validation_workflow_inner(
                         }
                     }
 
-
                     if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
                         warn!(
                             msg = "DhtOp has failed app validation",
@@ -207,7 +205,10 @@ async fn app_validation_workflow_inner(
                         }
                         Outcome::Rejected(_) => {
                             rejected += 1;
-                            tracing::warn!("Received invalid op! Warrants aren't implemented yet, so we can't do anything about this right now, but be warned that somebody on the network has maliciously hacked their node.\nOp: {:?}", op_light);
+                            tracing::info!(
+                                "Received invalid op. The op author will be blocked.\nOp: {:?}",
+                                op_light
+                            );
                             if let Dependency::Null = dependency {
                                 put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
                             } else {
@@ -219,6 +220,7 @@ async fn app_validation_workflow_inner(
                 WorkflowResult::Ok((total, awaiting, rejected, agent_activity))
             })
             .await?;
+
         // Once the database transaction is committed, add agent activity to the cache
         // that is ready for integration.
         for (author, seq, has_no_dependency) in activity {
@@ -270,41 +272,62 @@ pub async fn record_to_op(
     cascade: &mut Cascade,
 ) -> AppValidationOutcome<(Op, Option<Entry>)> {
     use DhtOpType::*;
-    let mut activity_entry = None;
+
+    // Hide private data where appropriate
+    let (record, mut hidden_entry) = if matches!(op_type, DhtOpType::StoreEntry) {
+        // We don't want to hide private data for a StoreEntry, because when doing
+        // inline validation as an author, we want to validate and integrate our own entry!
+        // Publishing and gossip rules state that a private StoreEntry will never be transmitted
+        // to another node.
+        (record, None)
+    } else {
+        // All other records have private entry data hidden, including from ourselves if we are
+        // authoring private data.
+        record.privatized()
+    };
+
     let (shh, entry) = record.into_inner();
     let mut entry = entry.into_option();
     let action = shh.into();
     // Register agent activity doesn't store the entry so we need to
     // save it so we can reconstruct the record later.
     if matches!(op_type, RegisterAgentActivity) {
-        activity_entry = entry.take();
+        hidden_entry = entry.take().or(hidden_entry);
     }
     let dht_op = DhtOp::from_type(op_type, action, entry)?;
-    Ok((dhtop_to_op(dht_op, cascade).await?, activity_entry))
+    Ok((dhtop_to_op(dht_op, cascade).await?, hidden_entry))
 }
 
-pub fn op_to_record(op: Op, activity_entry: Option<Entry>) -> Record {
+pub fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
     match op {
-        Op::StoreRecord(StoreRecord { record }) => record,
+        Op::StoreRecord(StoreRecord { mut record }) => {
+            if let Some(e) = omitted_entry {
+                *record.as_entry_mut() = RecordEntry::Present(e);
+            }
+            record
+        }
         Op::StoreEntry(StoreEntry { action, entry }) => {
             Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
         }
         Op::RegisterUpdate(RegisterUpdate {
             update, new_entry, ..
         }) => Record::new(SignedActionHashed::raw_from_same_hash(update), new_entry),
-        Op::RegisterDelete(RegisterDelete { delete, .. }) => {
-            Record::new(SignedActionHashed::raw_from_same_hash(delete), None)
-        }
+        Op::RegisterDelete(RegisterDelete { delete, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete),
+            omitted_entry,
+        ),
         Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Record::new(
             SignedActionHashed::raw_from_same_hash(action),
-            activity_entry,
+            omitted_entry,
         ),
-        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => {
-            Record::new(SignedActionHashed::raw_from_same_hash(create_link), None)
-        }
-        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
-            Record::new(SignedActionHashed::raw_from_same_hash(delete_link), None)
-        }
+        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(create_link),
+            omitted_entry,
+        ),
+        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete_link),
+            omitted_entry,
+        ),
     }
 }
 
@@ -523,7 +546,7 @@ pub fn entry_creation_zomes_to_invoke(
             let zome = ribosome
                 .get_integrity_zome(&app_entry_def.zome_index())
                 .ok_or_else(|| {
-                    Outcome::rejected(&format!(
+                    Outcome::rejected(format!(
                         "Zome does not exist for {:?}",
                         app_entry_def.zome_index()
                     ))
@@ -541,7 +564,7 @@ fn create_link_zomes_to_invoke(
     let zome = ribosome
         .get_integrity_zome(&create_link.zome_index)
         .ok_or_else(|| {
-            Outcome::rejected(&format!(
+            Outcome::rejected(format!(
                 "Zome does not exist for {:?}",
                 create_link.link_type
             ))
@@ -565,7 +588,7 @@ fn store_record_zomes_to_invoke(
             ..
         }) => {
             let zome = ribosome.get_integrity_zome(zome_index).ok_or_else(|| {
-                Outcome::rejected(&format!("Zome does not exist for {:?}", zome_index))
+                Outcome::rejected(format!("Zome does not exist for {:?}", zome_index))
             })?;
             Ok(ZomesToInvoke::OneIntegrity(zome))
         }
@@ -740,5 +763,12 @@ pub fn put_integrated(
     // it's integrated.
     set_validation_stage(txn, hash, ValidationLimboStatus::Pending)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
+
+    // If the op is rejected then force a receipt to be processed because the
+    // receipt is a warrant, so of course the author won't want it to be
+    // produced.
+    if matches!(status, ValidationStatus::Rejected) {
+        set_require_receipt(txn, hash, true)?;
+    }
     Ok(())
 }

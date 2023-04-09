@@ -31,7 +31,7 @@ impl HarnessHost {
     }
 }
 
-impl FetchQueueConfig for HarnessHost {
+impl FetchPoolConfig for HarnessHost {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }
@@ -96,7 +96,7 @@ pub(crate) async fn spawn_test_agent(
     Ok((agent, p2p, control))
 }
 
-use kitsune_p2p_fetch::FetchQueueConfig;
+use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;

@@ -26,7 +26,7 @@ pub(crate) async fn handle_rpc_multi_as_single(
     let space = &space;
     let payload = &payload;
 
-    let make_req = move |con_hnd: Tx2ConHnd<crate::wire::Wire>,
+    let make_req = move |con_hnd: MetaNetCon,
                          agent: Arc<KitsuneAgent>|
           -> BoxFuture<'_, KitsuneP2pResult<Vec<actor::RpcMultiResponse>>> {
         async move {
@@ -61,7 +61,7 @@ pub(crate) async fn handle_rpc_multi_as_single(
                         .write()
                         .record_latency_micros(start.elapsed().as_micros(), [&agent]);
                     tracing::warn!(?oth, "unexpected remote call result");
-                    Err("rpc_multi failed to get results".into())
+                    Err(format!("rpc_multi request failed: {:?}", oth).into())
                 }
             }
         }
@@ -70,6 +70,7 @@ pub(crate) async fn handle_rpc_multi_as_single(
 
     max_timeout
         .mix("rpc_multi", async move {
+            let mut errs = vec![];
             for _ in 0..2 {
                 let mut infos = None;
 
@@ -115,11 +116,12 @@ pub(crate) async fn handle_rpc_multi_as_single(
                         .await
                         {
                             PeerDiscoverResult::OkShortcut => {
-                                tracing::trace!("remote peer is local");
+                                tracing::warn!("remote peer is local");
                                 continue;
                             }
                             PeerDiscoverResult::Err(err) => {
-                                tracing::warn!(?err, "remote call error");
+                                tracing::warn!(?err, "peer discovery error");
+                                errs.push(err);
                                 continue;
                             }
                             PeerDiscoverResult::OkRemote { con_hnd, .. } => con_hnd,
@@ -127,11 +129,17 @@ pub(crate) async fn handle_rpc_multi_as_single(
 
                         match make_req(con_hnd, info.agent.clone()).await {
                             Ok(res) => return Ok(res),
-                            _ => continue,
+                            Err(err) => {
+                                tracing::warn!(?err, "remote call error");
+                                errs.push(err);
+                                continue;
+                            }
                         }
                     }
                 }
             }
+
+            let num_local_agents = local_joined_agents.len();
 
             // fall back to self-get
             for agent in local_joined_agents {
@@ -145,13 +153,19 @@ pub(crate) async fn handle_rpc_multi_as_single(
                     }
                     Err(err) => {
                         tracing::warn!(?err, "local call error");
+                        errs.push(err);
                         continue;
                     }
                 }
             }
 
             // finally, return an error
-            Err("rpc_multi failed to get results".into())
+            let error_msg = format!(
+                "rpc_multi failed to get results. Local agents: {}, Errors: {:?}",
+                num_local_agents, errs
+            );
+            tracing::error!("{}", error_msg);
+            Err(error_msg.into())
         })
         .await
         .map_err(|err| err.into())

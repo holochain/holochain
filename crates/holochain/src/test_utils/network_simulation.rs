@@ -298,7 +298,7 @@ fn get_cached() -> Option<GeneratedData> {
     let p = std::env::temp_dir()
         .join("mock_test_data")
         .join("mock_test_data.sqlite3");
-    p.exists().then(|| ()).and_then(|_| {
+    p.exists().then_some(()).and_then(|_| {
         let mut conn = Connection::open(p).ok()?;
         let mut txn = conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)
@@ -362,7 +362,7 @@ async fn create_test_data(
         let entry = Entry::app(d.try_into().unwrap()).unwrap();
         let hash = EntryHash::with_data_sync(&entry);
         let loc = hash.get_loc();
-        if let Some(index) = buckets.iter().position(|b| b.contains(&loc)) {
+        if let Some(index) = buckets.iter().position(|b| b.contains(loc)) {
             if bucket_counts[index] < approx_num_ops_held * 100 {
                 entries.push(entry);
                 bucket_counts[index] += 1;

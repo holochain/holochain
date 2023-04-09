@@ -309,7 +309,7 @@ impl AsKdPersist for PersistMem {
                 .await
                 .map_err(KdError::other)?;
             let mut out = [0; 64];
-            out.copy_from_slice(&*sig.read_lock());
+            out.copy_from_slice(&sig.read_lock());
             Ok(Arc::new(out))
         }
         .boxed()

@@ -140,7 +140,7 @@ macro_rules! basic_test {
 }
 
 /// implements a FooFixturator for any type Foo
-/// this simply wraps Fixturator<Foo, Curve> up as FooFixturator<Curve>
+/// this simply wraps `Fixturator<Foo, Curve>` up as `FooFixturator<Curve>`
 ///
 /// this macro serves a few purposes:
 /// - we avoid the orphan rule that would prevent us implementing Iterator on Fixturator directly
@@ -523,7 +523,7 @@ macro_rules! get_fixt_curve {
 ///
 /// simple wrapper around the standard Iterator trait from rust
 /// the expression in the third parameter to curve! is just the body of .next() without the need or
-/// ability to return an Option - i.e. return a value of type Foo _not_ Option<Foo>
+/// ability to return an Option - i.e. return a value of type Foo _not_ `Option<Foo>`
 /// if the body of the expression changes the index it will be respected, if not then it will be
 /// incremented by 1 automatically by the macro
 macro_rules! curve {

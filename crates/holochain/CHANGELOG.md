@@ -7,6 +7,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.2.0-beta-rc.2
+
+- Fixes bug where supplying a `network_seed` during an `InstallApp` call does not actually update the network seed for roles whose `provisioning` is set to `None` in the manifest. Now the network seed is correctly updated. [\#2102](https://github.com/holochain/holochain/pull/2102)
+- If AppManifest specifies an `installed_hash` for a DNA, it will check the conductor for an already-registered DNA at that hash, ignoring the DNA passed in as part of the bundle. Note that this means you can install apps without passing in any DNA, if the DNAs are already installed in the conductor. [\#2157](https://github.com/holochain/holochain/pull/2157)
+
+## 0.2.0-beta-rc.1
+
+## 0.2.0-beta-rc.0
+
+- When uninstalling an app, local data is now cleaned up where appropriate. [\#1805](https://github.com/holochain/holochain/pull/1805)
+  - Detail: any time an app is uninstalled, if the removal of that app’s cells would cause there to be no cell installed which uses a given DNA, the databases for that DNA space are deleted. So, if you have an app installed twice under two different agents and uninstall one of them, no data will be removed, but if you uninstall both, then all local data will be cleaned up. If any of your data was gossiped to other peers though, it will live on in the DHT, and even be gossiped back to you if you reinstall that same app with a new agent.
+- Renames `OpType` to `FlatOp`, and `Op::to_type()` to `Op::flattened()`. Aliases for the old names still exist, so this is not a breaking change. [\#1909](https://github.com/holochain/holochain/pull/1909)
+- Fixed a [problem with validation of Ops with private entry data](https://github.com/holochain/holochain/issues/1861), where  `Op::to_type()` would fail for private `StoreEntry` ops. [\#1910](https://github.com/holochain/holochain/pull/1910)
+
+## 0.1.0
+
+## 0.1.0-beta-rc.4
+
+- Fix: Disabled clone cells are no longer started when conductor restarts. [\#1775](https://github.com/holochain/holochain/pull/1775)
+
+## 0.1.0-beta-rc.3
+
+- Fix: calling `emit_signal` from the `post_commit` callback caused a panic, this is now fixed [\#1749](https://github.com/holochain/holochain/pull/1749)
+- Fix: When you install an app with a cell that already exists for the same agent, the installation will error now. [\#1773](https://github.com/holochain/holochain/pull/1773)
+- Fixes problem where disabling and re-enabling an app causes all of its cells to become unresponsive to any `get*` requests. [\#1744](https://github.com/holochain/holochain/pull/1744)
+- Fixes problem where a disabled cell can continue to respond to zome calls and transmit data until the conductor is restarted. [\#1761](https://github.com/holochain/holochain/pull/1761)
+- Adds Ctrl+C handling, so that graceful conductor shutdown is possible. [\#1761](https://github.com/holochain/holochain/pull/1761)
+- BREAKING CHANGE - Added zome name to the signal emitted when using `emit_signal`.
+
 ## 0.1.0-beta-rc.2
 
 ## 0.1.0-beta-rc.1

@@ -3,7 +3,7 @@ use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
-use crate::{AppInfo, FullStateDump};
+use crate::{AppInfo, FullStateDump, StorageInfo};
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -101,7 +101,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::AgentPubKeyGenerated`]
     GenerateAgentPubKey,
 
-    /// List all the cell IDs in the conductor.
+    /// List the IDs of all live cells currently running in the conductor.
     ///
     /// # Returns
     ///
@@ -144,11 +144,6 @@ pub enum AdminRequest {
     /// [`AdminResponse::AppDisabled`]
     DisableApp {
         /// The app ID to disable
-        installed_app_id: InstalledAppId,
-    },
-
-    StartApp {
-        /// The app ID to (re)start
         installed_app_id: InstalledAppId,
     },
 
@@ -325,6 +320,9 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::CloneCellDeleted`]
     DeleteCloneCell(Box<DeleteCloneCellPayload>),
+
+    /// Info about storage used by apps
+    StorageInfo,
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -417,14 +415,6 @@ pub enum AdminResponse {
     /// It means the app was disabled successfully.
     AppDisabled,
 
-    /// The successful response to an [`AdminRequest::StartApp`].
-    ///
-    /// The boolean determines whether or not the app was actually started.
-    /// If `false`, it was because the app was in a disabled state, or the app
-    /// failed to start.
-    /// TODO: add reason why app couldn't start
-    AppStarted(bool),
-
     /// The successful response to an [`AdminRequest::DumpState`].
     ///
     /// The result contains a string of serialized JSON data which can be deserialized to access the
@@ -462,6 +452,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::DeleteCloneCell`].
     CloneCellDeleted,
+
+    /// The successful response to an [`AdminRequest::StorageInfo`].
+    StorageInfo(StorageInfo),
 }
 
 /// Error type that goes over the websocket wire.

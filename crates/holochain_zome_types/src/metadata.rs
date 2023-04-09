@@ -11,14 +11,14 @@ use holochain_serialized_bytes::prelude::*;
 /// ActionHash returns a Record.
 /// EntryHash returns an Entry.
 pub enum Details {
-    /// Variant asking for a specific record
+    /// Variant holding a specific record. Returned when an action hash was passed.
     Record(RecordDetails),
-    /// Variant asking for any information on data
+    /// Variant holding all information on a record. Returned when an entry hash was passed.
     Entry(EntryDetails),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
-/// A specific Record with any deletes
+/// A specific Record with any updates and deletes.
 /// This is all the metadata available for a record.
 pub struct RecordDetails {
     /// The specific record.

@@ -1,4 +1,4 @@
-use kitsune_p2p_fetch::{FetchKey, FetchQueuePush, OpHashSized};
+use kitsune_p2p_fetch::{FetchKey, FetchPoolPush, OpHashSized};
 use kitsune_p2p_types::{combinators::second, dht::region::Region};
 
 use super::*;
@@ -101,7 +101,7 @@ impl ShardedGossipLocal {
 
     pub(super) async fn queue_incoming_regions(
         &self,
-        peer_cert: &Tx2Cert,
+        peer_cert: &Arc<[u8; 32]>,
         state: RoundState,
         region_set: RegionSetLtcs,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
@@ -299,7 +299,7 @@ impl ShardedGossipLocal {
     ) -> KitsuneResult<()> {
         for op_hash in ops {
             let (hash, size) = op_hash.into_inner();
-            let request = FetchQueuePush {
+            let request = FetchPoolPush {
                 key: FetchKey::Op(hash),
                 author: None,
                 context: None,
@@ -307,7 +307,7 @@ impl ShardedGossipLocal {
                 source: source.clone(),
                 size,
             };
-            self.fetch_queue.push(request);
+            self.fetch_pool.push(request);
         }
         Ok(())
     }

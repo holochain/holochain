@@ -25,7 +25,7 @@ use crate::RoleName;
 )]
 pub struct CellId(DnaHash, AgentPubKey);
 
-/// Delimiter in a clone id that separates the base cell's role id from the
+/// Delimiter in a clone id that separates the base cell's role name from the
 /// clone index.
 pub const CLONE_ID_DELIMITER: &str = ".";
 
@@ -57,7 +57,7 @@ impl CloneId {
         clone_index.parse::<u32>().unwrap()
     }
 
-    /// Get an app role id representation of the clone id.
+    /// Get an app role name representation of the clone id.
     pub fn as_app_role_name(&self) -> &RoleName {
         &self.0
     }
@@ -78,14 +78,14 @@ impl fmt::Display for CloneId {
 /// Errors during conversion from [`RoleName`] to [`CloneId`].
 #[derive(Debug, thiserror::Error)]
 pub enum CloneIdError {
-    /// Multiple clone id delimiters found in app role id. There must only be one delimiter.
+    /// Multiple clone id delimiters found in app role name. There must only be one delimiter.
     #[error("Multiple occurrences of reserved character '{CLONE_ID_DELIMITER}' found in app role name: {0}")]
     MultipleDelimiters(RoleName),
     /// The clone index could not be parsed into a u32.
     #[error("Malformed clone index in app role name: {0}")]
     MalformedCloneIndex(RoleName),
-    /// The role id is not composed of two parts separated by the clone id delimiter.
-    #[error("The role id is not composed of two parts separated by the clone id delimiter: {0}")]
+    /// The role name is not composed of two parts separated by the clone id delimiter.
+    #[error("The role name is not composed of two parts separated by the clone id delimiter: {0}")]
     MalformedCloneId(RoleName),
 }
 

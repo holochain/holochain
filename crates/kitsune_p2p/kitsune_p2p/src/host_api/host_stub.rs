@@ -1,6 +1,7 @@
 use super::*;
 use crate::KitsuneHostDefaultError;
 use kitsune_p2p_fetch::*;
+use kitsune_p2p_timestamp::Timestamp;
 
 /// Signature for check_op_data_impl
 pub type CheckOpDataImpl = Box<
@@ -20,7 +21,7 @@ impl KitsuneHostDefaultError for HostStubErr {
     const NAME: &'static str = "HostStub";
 }
 
-impl FetchQueueConfig for HostStubErr {
+impl FetchPoolConfig for HostStubErr {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }
@@ -51,11 +52,31 @@ impl HostStub {
 }
 
 impl KitsuneHost for HostStub {
+    fn block(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::block(&self.err, input)
+    }
+
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        KitsuneHostDefaultError::unblock(&self.err, input)
+    }
+
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::is_blocked(&self.err, input, timestamp)
+    }
+
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         KitsuneHostDefaultError::get_agent_info_signed(&self.err, input)
+    }
+
+    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
+        KitsuneHostDefaultError::remove_agent_info_signed(&self.err, input)
     }
 
     fn peer_extrapolated_coverage(
@@ -121,7 +142,7 @@ impl KitsuneHost for HostStub {
     }
 }
 
-impl FetchQueueConfig for HostStub {
+impl FetchPoolConfig for HostStub {
     fn merge_fetch_contexts(&self, _a: u32, _b: u32) -> u32 {
         unimplemented!()
     }

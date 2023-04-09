@@ -22,11 +22,25 @@ pub enum LinkTypes {
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op {
         // This is a pretty pointless example as everything is valid.
-        Op::RegisterCreateLink(RegisterCreateLink {  create_link  }) => {
-            let base: MaybeLinkable =
-                must_get_entry(create_link.hashed.content.base_address.into())?.try_into()?;
-            let target: MaybeLinkable =
-                must_get_entry(create_link.hashed.content.target_address.into())?.try_into()?;
+        Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+            let base: MaybeLinkable = must_get_entry(
+                create_link
+                    .hashed
+                    .content
+                    .base_address
+                    .into_entry_hash()
+                    .expect("must be entry hash"),
+            )?
+            .try_into()?;
+            let target: MaybeLinkable = must_get_entry(
+                create_link
+                    .hashed
+                    .content
+                    .target_address
+                    .into_entry_hash()
+                    .expect("must be entry hash"),
+            )?
+            .try_into()?;
             Ok(match base {
                 MaybeLinkable::AlwaysLinkable => match target {
                     MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
@@ -35,9 +49,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
             })
         }
-        Op::RegisterDeleteLink(RegisterDeleteLink {  create_link, ..  }) => {
-            let base: MaybeLinkable =
-                must_get_entry(create_link.base_address.into())?.try_into()?;
+        Op::RegisterDeleteLink(RegisterDeleteLink { create_link, .. }) => {
+            let base: MaybeLinkable = must_get_entry(
+                create_link
+                    .base_address
+                    .into_entry_hash()
+                    .expect("must be entry hash"),
+            )?
+            .try_into()?;
             Ok(match base {
                 MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
                 _ => ValidateCallbackResult::Invalid("base never validates".to_string()),

@@ -368,7 +368,7 @@ impl PeerViewQ {
             .filter(|(i, _)| self.skip_index.as_ref() != Some(i))
             .map(|(_, arq)| arq);
 
-        it.filter(move |arq| filter.contains(&arq.start_loc()))
+        it.filter(move |arq| filter.contains(arq.start_loc()))
     }
 }
 

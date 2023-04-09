@@ -17,7 +17,7 @@ Each HoloHash has a HashType. There are two flavors of HashType: *primitive*, an
 
 ### Primitive HashTypes
 
-Each primitive HashType has a unique 3-byte prefix associated with it, to easily distiguish between hashes in any environment. These prefixes are multihash compatible. The primitive types are:
+Each primitive HashType has a unique 3-byte prefix associated with it, to easily distinguish between hashes in any environment. These prefixes are multihash compatible. The primitive types are:
 
 | hash type | HoloHash alias | prefix |
 |-----------|----------------|--------|
@@ -43,11 +43,11 @@ Composite hash types are used in contexts when one of several primitive hash typ
 
 `EntryHash`: used to hash Entries. An Entry can hash to either a `ContentHash` or an `AgentPubKey`.
 
-`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either an action or an Entry, therefore AnyDhtHash can refer to either an `ActionHash` or an `EntryHash`.
+`AnyDhtHash`: used to hash arbitrary DHT data. DHT data is either an Action or an Entry, therefore AnyDhtHash can refer to either an `ActionHash` or an `EntryHash`.
 
 ## Serialization
 
-HoloHash implements `Display` providing a `to_string()` function accessing the hash as a user friendly string. It also provides TryFrom for string types allowing you to parse this string representation.
+HoloHash implements `Display` providing a `to_string()` function accessing the hash as a user-friendly string. It also provides TryFrom for string types allowing you to parse this string representation.
 
 HoloHash includes a 4 byte (or u32) dht "location" that serves dual purposes. - It is used as a checksum when parsing string representations. - It is used as a u32 in our dht sharding algorithm.
 
@@ -116,7 +116,7 @@ Holochain is an open source project.  We welcome all sorts of participation and 
 ## License
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Copyright (C) 2019 - 2022, Holochain Foundation
+Copyright (C) 2019 - 2023, Holochain Foundation
 
 This program is free software: you can redistribute it and/or modify it under the terms of the license
 provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,

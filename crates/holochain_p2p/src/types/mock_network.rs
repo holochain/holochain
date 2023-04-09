@@ -212,7 +212,7 @@ impl HolochainP2pMockChannel {
                             (delay, keep)
                         };
                         tokio::time::sleep(delay).await;
-                        keep.then(|| t)
+                        keep.then_some(t)
                             .filter(|m| !offline_nodes.contains(m.cert()))
                     }
                 }

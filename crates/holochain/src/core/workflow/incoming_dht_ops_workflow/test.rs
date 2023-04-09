@@ -6,7 +6,7 @@ use holochain_keystore::AgentPubKeyExt;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_to_limbo() {
-    observability::test_run().unwrap();
+    holochain_trace::test_run().unwrap();
     let space = TestSpace::new(fixt!(DnaHash));
     let env = space.space.dht_db.clone();
     let keystore = holochain_state::test_utils::test_keystore();
@@ -34,7 +34,7 @@ async fn incoming_ops_to_limbo() {
         let space = space.space.clone();
         all.push(tokio::task::spawn(async move {
             let start = std::time::Instant::now();
-            incoming_dht_ops_workflow(&space, sys_validation_trigger, vec![op], false)
+            incoming_dht_ops_workflow(space, sys_validation_trigger, vec![op], false)
                 .await
                 .unwrap();
             println!("IN OP in {} s", start.elapsed().as_secs_f64());

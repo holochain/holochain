@@ -3,6 +3,7 @@ use crate::event::*;
 use crate::HostApi;
 
 mod actor;
+pub(crate) use actor::meta_net;
 use actor::*;
 
 #[cfg(any(test, feature = "test_utils"))]

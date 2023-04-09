@@ -89,11 +89,9 @@ impl KdHashExt for KdHash {
         async move {
             async {
                 let sig = sodoken::BufReadSized::new_no_lock(*signature);
-                KdResult::Ok(
-                    sodoken::sign::verify_detached(sig, data, pk)
-                        .await
-                        .map_err(KdError::other)?,
-                )
+                sodoken::sign::verify_detached(sig, data, pk)
+                    .await
+                    .map_err(KdError::other)
             }
             .await
             .unwrap_or(false)

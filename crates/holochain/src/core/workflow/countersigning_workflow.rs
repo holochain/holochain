@@ -106,9 +106,9 @@ pub(crate) fn incoming_countersigning(
 /// Countersigning workflow that checks for complete sessions and
 /// pushes the complete ops to validation then messages the signers.
 pub(crate) async fn countersigning_workflow(
-    space: &Space,
-    network: &(dyn HolochainP2pDnaT + Send + Sync),
-    sys_validation_trigger: &TriggerSender,
+    space: Space,
+    network: impl HolochainP2pDnaT + Send + Sync,
+    sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Get any complete sessions.
     let complete_sessions = space.countersigning_workspace.get_complete_sessions();
@@ -122,7 +122,7 @@ pub(crate) async fn countersigning_workflow(
             .collect();
         if !non_enzymatic_ops.is_empty() {
             incoming_dht_ops_workflow(
-                space,
+                space.clone(),
                 sys_validation_trigger.clone(),
                 non_enzymatic_ops,
                 false,

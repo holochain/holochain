@@ -1,9 +1,11 @@
 use kitsune_p2p_fetch::OpHashSized;
+use kitsune_p2p_timestamp::Timestamp;
 use must_future::MustBoxFuture;
 use std::sync::Arc;
 
 use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
+    dependencies::lair_keystore_api,
     dht::{
         region::{Region, RegionCoords},
         region_set::RegionSetLtcs,
@@ -22,11 +24,27 @@ pub type KitsuneHostResult<'a, T> =
 /// The interface to be implemented by the host, which handles various requests
 /// for data
 pub trait KitsuneHost: 'static + Send + Sync {
+    /// We are requesting a block.
+    fn block(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()>;
+
+    /// We are requesting an unblock.
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()>;
+
+    /// We want to know if a target is blocked.
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> KitsuneHostResult<bool>;
+
     /// We need to get previously stored agent info.
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>>;
+
+    /// Remove an agent info from storage
+    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool>;
 
     /// Extrapolated Peer Coverage.
     fn peer_extrapolated_coverage(
@@ -84,6 +102,18 @@ pub trait KitsuneHost: 'static + Send + Sync {
             async move { Ok(op_hash_list.into_iter().map(|_| false).collect()) },
         )
         .into()
+    }
+
+    /// Get the lair "tag" identifying the id seed to use for crypto signing.
+    /// (this is currently only used in tx5/WebRTC if that feature is enabled.)
+    fn lair_tag(&self) -> Option<Arc<str>> {
+        None
+    }
+
+    /// Get the lair client to use as the backend keystore.
+    /// (this is currently only used in tx5/WebRTC if that feature is enabled.)
+    fn lair_client(&self) -> Option<lair_keystore_api::LairClient> {
+        None
     }
 }
 

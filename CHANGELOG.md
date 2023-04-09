@@ -6,6 +6,416 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- Adds new functionality to the conductor app API which returns disk storage information. It is possible to query for the
+  storage space being used by one app or all apps. The storage used is broken down by cell to make it easier to identify
+  intensive components of apps.
+
+# 20230405.003224
+
+## [holochain\_cli-0.2.0-beta-rc.2](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_cli\_sandbox-0.2.0-beta-rc.1](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.0-beta-rc.1)
+
+- Fix bug in `hc sandbox generate`, where a comma-separated argument passed to the `--directories` option was treated as a single directory name. [\#2080](https://github.com/holochain/holochain/pull/2080)
+
+## [holochain\_cli\_bundle-0.2.0-beta-rc.1](crates/holochain_cli_bundle/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain-0.2.0-beta-rc.2](crates/holochain/CHANGELOG.md#0.2.0-beta-rc.2)
+
+- Fixes bug where supplying a `network_seed` during an `InstallApp` call does not actually update the network seed for roles whose `provisioning` is set to `None` in the manifest. Now the network seed is correctly updated. [\#2102](https://github.com/holochain/holochain/pull/2102)
+
+## [holochain\_test\_wasm\_common-0.2.0-beta-rc.2](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_conductor\_api-0.2.0-beta-rc.2](crates/holochain_conductor_api/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_wasm\_test\_utils-0.2.0-beta-rc.2](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_cascade-0.2.0-beta-rc.2](crates/holochain_cascade/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_state-0.2.0-beta-rc.2](crates/holochain_state/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_p2p-0.2.0-beta-rc.2](crates/holochain_p2p/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_types-0.2.0-beta-rc.2](crates/holochain_types/CHANGELOG.md#0.2.0-beta-rc.2)
+
+- BREAKING: AppManifest’s `version` now only accepts a single optional DNA hash value, whereas previously it could accept a list of values.
+- AppManifest’s `version` is renamed to `installed_hash` (there is still an alias to `version` for limited backward compatibility, so the old field name will still work).
+
+## [holochain\_keystore-0.2.0-beta-rc.2](crates/holochain_keystore/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_sqlite-0.2.0-beta-rc.2](crates/holochain_sqlite/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [kitsune\_p2p-0.2.0-beta-rc.2](crates/kitsune_p2p/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [hdk-0.2.0-beta-rc.2](crates/hdk/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_zome\_types-0.2.0-beta-rc.2](crates/holochain_zome_types/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [hdi-0.3.0-beta-rc.2](crates/hdi/CHANGELOG.md#0.3.0-beta-rc.2)
+
+## [hdk\_derive-0.2.0-beta-rc.2](crates/hdk_derive/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holochain\_integrity\_types-0.2.0-beta-rc.2](crates/holochain_integrity_types/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [holo\_hash-0.2.0-beta-rc.2](crates/holo_hash/CHANGELOG.md#0.2.0-beta-rc.2)
+
+# 20230322.003727
+
+## [holochain\_cli-0.2.0-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain-0.2.0-beta-rc.1](crates/holochain/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_websocket-0.2.0-beta-rc.1](crates/holochain_websocket/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_test\_wasm\_common-0.2.0-beta-rc.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_conductor\_api-0.2.0-beta-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_wasm\_test\_utils-0.2.0-beta-rc.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_cascade-0.2.0-beta-rc.1](crates/holochain_cascade/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_state-0.2.0-beta-rc.1](crates/holochain_state/CHANGELOG.md#0.2.0-beta-rc.1)
+
+- Optimize capability grant verification during zome calls. This speeds up all remote calls, under which fall calls with a cap secret from clients other than the Launcher. Previously hundreds of calls would slow down response time noticeably because of grant verification. Now thousands of calls (rather thousands of records) won’t affect grant verification by more than a millisecond. [\#2097](https://github.com/holochain/holochain/pull/2097)
+
+## [holochain\_p2p-0.2.0-beta-rc.1](crates/holochain_p2p/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_bootstrap-0.1.0-beta-rc.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [holochain\_types-0.2.0-beta-rc.1](crates/holochain_types/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_keystore-0.2.0-beta-rc.1](crates/holochain_keystore/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_sqlite-0.2.0-beta-rc.1](crates/holochain_sqlite/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p-0.2.0-beta-rc.1](crates/kitsune_p2p/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_proxy-0.2.0-beta-rc.1](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_transport\_quic-0.2.0-beta-rc.1](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_fetch-0.2.0-beta-rc.1](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_types-0.2.0-beta-rc.1](crates/kitsune_p2p_types/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [hdk-0.2.0-beta-rc.1](crates/hdk/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_zome\_types-0.2.0-beta-rc.1](crates/holochain_zome_types/CHANGELOG.md#0.2.0-beta-rc.1)
+
+- `name` in DnaDef no longer has an effect on the DNA hash [\#2099](https://github.com/holochain/holochain/pull/2099)
+
+## [kitsune\_p2p\_dht-0.2.0-beta-rc.1](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_block-0.2.0-beta-rc.1](crates/kitsune_p2p_block/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_bin\_data-0.2.0-beta-rc.1](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [hdi-0.3.0-beta-rc.1](crates/hdi/CHANGELOG.md#0.3.0-beta-rc.1)
+
+## [hdk\_derive-0.2.0-beta-rc.1](crates/hdk_derive/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_integrity\_types-0.2.0-beta-rc.1](crates/holochain_integrity_types/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holo\_hash-0.2.0-beta-rc.1](crates/holo_hash/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [kitsune\_p2p\_dht\_arc-0.2.0-beta-rc.1](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.0-beta-rc.1)
+
+## [holochain\_trace-0.2.0-beta-rc.1](crates/holochain_trace/CHANGELOG.md#0.2.0-beta-rc.1)
+
+# 20230315.183209
+
+## [holochain\_cli-0.2.0-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_cli\_sandbox-0.2.0-beta-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_cli\_bundle-0.2.0-beta-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain-0.2.0-beta-rc.0](crates/holochain/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- When uninstalling an app, local data is now cleaned up where appropriate. [\#1805](https://github.com/holochain/holochain/pull/1805)
+  - Detail: any time an app is uninstalled, if the removal of that app’s cells would cause there to be no cell installed which uses a given DNA, the databases for that DNA space are deleted. So, if you have an app installed twice under two different agents and uninstall one of them, no data will be removed, but if you uninstall both, then all local data will be cleaned up. If any of your data was gossiped to other peers though, it will live on in the DHT, and even be gossiped back to you if you reinstall that same app with a new agent.
+- Renames `OpType` to `FlatOp`, and `Op::to_type()` to `Op::flattened()`. Aliases for the old names still exist, so this is not a breaking change. [\#1909](https://github.com/holochain/holochain/pull/1909)
+- Fixed a [problem with validation of Ops with private entry data](https://github.com/holochain/holochain/issues/1861), where  `Op::to_type()` would fail for private `StoreEntry` ops. [\#1910](https://github.com/holochain/holochain/pull/1910)
+
+## [holochain\_websocket-0.2.0-beta-rc.0](crates/holochain_websocket/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_test\_wasm\_common-0.2.0-beta-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_conductor\_api-0.2.0-beta-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Reject creation of duplicate clone cells. It was possible to create a clone cell with a DNA hash identical to an already existing DNA. [\#1997](https://github.com/holochain/holochain/pull/1997)
+- Adds doc comments for `StemCell`, `ProvisionedCell` and `CloneCell` structs
+
+## [holochain\_wasm\_test\_utils-0.2.0-beta-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_cascade-0.2.0-beta-rc.0](crates/holochain_cascade/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_state-0.2.0-beta-rc.0](crates/holochain_state/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_p2p-0.2.0-beta-rc.0](crates/holochain_p2p/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_bootstrap-0.0.12-dev.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.0.12-dev.0)
+
+## [holochain\_types-0.2.0-beta-rc.0](crates/holochain_types/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_keystore-0.2.0-beta-rc.0](crates/holochain_keystore/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_sqlite-0.2.0-beta-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p-0.2.0-beta-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Adds feature flipper `tx5` which enables experimental integration with holochains WebRTC networking backend. This is not enabled by default. [\#1741](https://github.com/holochain/holochain/pull/1741)
+
+## [kitsune\_p2p\_proxy-0.2.0-beta-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.0-beta-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_mdns-0.2.0-beta-rc.0](crates/kitsune_p2p_mdns/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_fetch-0.2.0-beta-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_types-0.2.0-beta-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [mr\_bundle-0.2.0-beta-rc.0](crates/mr_bundle/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_util-0.2.0-beta-rc.0](crates/holochain_util/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [hdk-0.2.0-beta-rc.0](crates/hdk/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Add block/unblock agent functions to HDK [\#1828](https://github.com/holochain/holochain/pull/1828)
+
+## [holochain\_zome\_types-0.2.0-beta-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_dht-0.2.0-beta-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_block-0.2.0-beta-rc.0](crates/kitsune_p2p_block/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Crate now exists
+
+## [kitsune\_p2p\_bin\_data-0.2.0-beta-rc.0](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.0-beta-rc.0)
+
+- Crate now exists
+
+## [hdi-0.3.0-beta-rc.0](crates/hdi/CHANGELOG.md#0.3.0-beta-rc.0)
+
+## [hdk\_derive-0.2.0-beta-rc.0](crates/hdk_derive/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_integrity\_types-0.2.0-beta-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_timestamp-0.2.0-beta-rc.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holo\_hash-0.2.0-beta-rc.0](crates/holo_hash/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [kitsune\_p2p\_dht\_arc-0.2.0-beta-rc.0](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [holochain\_trace-0.2.0-beta-rc.0](crates/holochain_trace/CHANGELOG.md#0.2.0-beta-rc.0)
+
+## [fixt-0.2.0-beta-rc.0](crates/fixt/CHANGELOG.md#0.2.0-beta-rc.0)
+
+# 20230126.223635
+
+- First beta release
+
+## [holochain\_cli-0.1.0](crates/holochain_cli/CHANGELOG.md#0.1.0)
+
+## [holochain\_cli\_sandbox-0.1.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.1.0)
+
+## [holochain\_cli\_bundle-0.1.0](crates/holochain_cli_bundle/CHANGELOG.md#0.1.0)
+
+## [holochain-0.1.0](crates/holochain/CHANGELOG.md#0.1.0)
+
+## [holochain\_websocket-0.1.0](crates/holochain_websocket/CHANGELOG.md#0.1.0)
+
+## [holochain\_test\_wasm\_common-0.1.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.0)
+
+## [holochain\_conductor\_api-0.1.0](crates/holochain_conductor_api/CHANGELOG.md#0.1.0)
+
+## [holochain\_wasm\_test\_utils-0.1.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.0)
+
+## [holochain\_cascade-0.1.0](crates/holochain_cascade/CHANGELOG.md#0.1.0)
+
+## [holochain\_state-0.1.0](crates/holochain_state/CHANGELOG.md#0.1.0)
+
+## [holochain\_p2p-0.1.0](crates/holochain_p2p/CHANGELOG.md#0.1.0)
+
+## [holochain\_types-0.1.0](crates/holochain_types/CHANGELOG.md#0.1.0)
+
+## [holochain\_keystore-0.1.0](crates/holochain_keystore/CHANGELOG.md#0.1.0)
+
+## [holochain\_sqlite-0.1.0](crates/holochain_sqlite/CHANGELOG.md#0.1.0)
+
+## [kitsune\_p2p-0.1.0](crates/kitsune_p2p/CHANGELOG.md#0.1.0)
+
+## [kitsune\_p2p\_proxy-0.1.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.1.0)
+
+## [kitsune\_p2p\_transport\_quic-0.1.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.1.0)
+
+## [kitsune\_p2p\_mdns-0.1.0](crates/kitsune_p2p_mdns/CHANGELOG.md#0.1.0)
+
+## [kitsune\_p2p\_fetch-0.1.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.1.0)
+
+## [kitsune\_p2p\_types-0.1.0](crates/kitsune_p2p_types/CHANGELOG.md#0.1.0)
+
+## [mr\_bundle-0.1.0](crates/mr_bundle/CHANGELOG.md#0.1.0)
+
+## [holochain\_util-0.1.0](crates/holochain_util/CHANGELOG.md#0.1.0)
+
+## [hdk-0.1.0](crates/hdk/CHANGELOG.md#0.1.0)
+
+- Add note in HDK documentation about links not deduplicating. ([\#1791](https://github.com/holochain/holochain/pull/1791))
+
+## [holochain\_zome\_types-0.1.0](crates/holochain_zome_types/CHANGELOG.md#0.1.0)
+
+## [kitsune\_p2p\_dht-0.1.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.1.0)
+
+## [hdi-0.2.0](crates/hdi/CHANGELOG.md#0.2.0)
+
+## [hdk\_derive-0.1.0](crates/hdk_derive/CHANGELOG.md#0.1.0)
+
+## [holochain\_integrity\_types-0.1.0](crates/holochain_integrity_types/CHANGELOG.md#0.1.0)
+
+## [kitsune\_p2p\_timestamp-0.1.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.1.0)
+
+## [holo\_hash-0.1.0](crates/holo_hash/CHANGELOG.md#0.1.0)
+
+## [kitsune\_p2p\_dht\_arc-0.1.0](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.1.0)
+
+## [fixt-0.1.0](crates/fixt/CHANGELOG.md#0.1.0)
+
+# 20230120.225800
+
+## [holochain\_cli-0.1.0-beta-rc.4](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.4)
+
+## [holochain-0.1.0-beta-rc.4](crates/holochain/CHANGELOG.md#0.1.0-beta-rc.4)
+
+- Fix: Disabled clone cells are no longer started when conductor restarts. [\#1775](https://github.com/holochain/holochain/pull/1775)
+
+## [holochain\_websocket-0.1.0-beta-rc.1](crates/holochain_websocket/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holochain\_test\_wasm\_common-0.1.0-beta-rc.3](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_conductor\_api-0.1.0-beta-rc.4](crates/holochain_conductor_api/CHANGELOG.md#0.1.0-beta-rc.4)
+
+- **BREAKING CHANGE**: `CreateCloneCell` returns `ClonedCell` instead of `InstalledCell`.
+- **BREAKING CHANGE**: `EnableCloneCell` returns `ClonedCell` instead of `InstalledCell`.
+- **BREAKING CHANGE**: Remove unused call `AdminRequest::StartApp`.
+- **BREAKING CHANGE**: `Cell` is split up into `ProvisionedCell` and `ClonedCell`.
+- **BREAKING CHANGE**: `CellInfo` variants are renamed to snake case during serde.
+- Return additional field `agent_pub_key` in `AppInfo`.
+
+## [holochain\_wasm\_test\_utils-0.1.0-beta-rc.3](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_cascade-0.1.0-beta-rc.3](crates/holochain_cascade/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_state-0.1.0-beta-rc.3](crates/holochain_state/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_p2p-0.1.0-beta-rc.3](crates/holochain_p2p/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_types-0.1.0-beta-rc.3](crates/holochain_types/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_keystore-0.1.0-beta-rc.3](crates/holochain_keystore/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_sqlite-0.1.0-beta-rc.3](crates/holochain_sqlite/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [kitsune\_p2p-0.1.0-beta-rc.2](crates/kitsune_p2p/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [kitsune\_p2p\_proxy-0.1.0-beta-rc.2](crates/kitsune_p2p_proxy/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [kitsune\_p2p\_transport\_quic-0.1.0-beta-rc.2](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [kitsune\_p2p\_fetch-0.1.0-beta-rc.1](crates/kitsune_p2p_fetch/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [kitsune\_p2p\_types-0.1.0-beta-rc.2](crates/kitsune_p2p_types/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [mr\_bundle-0.1.0-beta-rc.2](crates/mr_bundle/CHANGELOG.md#0.1.0-beta-rc.2)
+
+- **BREAKING CHANGE:** The `resources` field of bundles was not properly set up for efficient serialization. Bundles built before this change must now be rebuilt. [\#1723](https://github.com/holochain/holochain/pull/1723)
+  - Where the actual bytes of the resource were previously specified by a simple sequence of numbers, now a byte array is expected. For instance, in JavaScript, this is the difference between an Array and a Buffer.
+
+## [hdk-0.1.0-beta-rc.3](crates/hdk/CHANGELOG.md#0.1.0-beta-rc.3)
+
+- Fix typos and links in docs and add links to wasm examples.
+
+## [holochain\_zome\_types-0.1.0-beta-rc.3](crates/holochain_zome_types/CHANGELOG.md#0.1.0-beta-rc.3)
+
+- Added the `author` field to the `Link` struct for easy access after a `get_links` call.
+
+## [hdi-0.2.0-beta-rc.3](crates/hdi/CHANGELOG.md#0.2.0-beta-rc.3)
+
+## [hdk\_derive-0.1.0-beta-rc.3](crates/hdk_derive/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_integrity\_types-0.1.0-beta-rc.3](crates/holochain_integrity_types/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holo\_hash-0.1.0-beta-rc.2](crates/holo_hash/CHANGELOG.md#0.1.0-beta-rc.2)
+
+# 20230117.165308
+
+## [holochain\_cli-0.1.0-beta-rc.3](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain-0.1.0-beta-rc.3](crates/holochain/CHANGELOG.md#0.1.0-beta-rc.3)
+
+- Fix: calling `emit_signal` from the `post_commit` callback caused a panic, this is now fixed [\#1749](https://github.com/holochain/holochain/pull/1749)
+- Fixes problem where disabling and re-enabling an app causes all of its cells to become unresponsive to any `get*` requests. [\#1744](https://github.com/holochain/holochain/pull/1744)
+- Fixes problem where a disabled cell can continue to respond to zome calls and transmit data until the conductor is restarted. [\#1761](https://github.com/holochain/holochain/pull/1761)
+- Adds Ctrl+C handling, so that graceful conductor shutdown is possible. [\#1761](https://github.com/holochain/holochain/pull/1761)
+- BREAKING CHANGE - Added zome name to the signal emitted when using `emit_signal`.
+
+## [holochain\_test\_wasm\_common-0.1.0-beta-rc.2](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_conductor\_api-0.1.0-beta-rc.3](crates/holochain_conductor_api/CHANGELOG.md#0.1.0-beta-rc.3)
+
+## [holochain\_wasm\_test\_utils-0.1.0-beta-rc.2](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_cascade-0.1.0-beta-rc.2](crates/holochain_cascade/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_state-0.1.0-beta-rc.2](crates/holochain_state/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_p2p-0.1.0-beta-rc.2](crates/holochain_p2p/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_types-0.1.0-beta-rc.2](crates/holochain_types/CHANGELOG.md#0.1.0-beta-rc.2)
+
+- BREAKING CHANGE - Added zome name to the signal emitted when using `emit_signal`.
+
+## [holochain\_keystore-0.1.0-beta-rc.2](crates/holochain_keystore/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_sqlite-0.1.0-beta-rc.2](crates/holochain_sqlite/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [kitsune\_p2p-0.1.0-beta-rc.1](crates/kitsune_p2p/CHANGELOG.md#0.1.0-beta-rc.1)
+
+- Fixes some bad logic around leaving spaces, which can cause problems upon rejoining [\#1744](https://github.com/holochain/holochain/pull/1744)
+  - When an agent leaves a space, an `AgentInfoSigned` with an empty arc is published before leaving. Previously, this empty-arc agent info was also persisted to the database, but this is inappropriate because upon rejoining, they will start with an empty arc. Now, the agent info is removed from the database altogether upon leaving.
+
+## [kitsune\_p2p\_proxy-0.1.0-beta-rc.1](crates/kitsune_p2p_proxy/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [kitsune\_p2p\_transport\_quic-0.1.0-beta-rc.1](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [kitsune\_p2p\_fetch-0.1.0-beta-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.1.0-beta-rc.0)
+
+## [kitsune\_p2p\_types-0.1.0-beta-rc.1](crates/kitsune_p2p_types/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [mr\_bundle-0.1.0-beta-rc.1](crates/mr_bundle/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [hdk-0.1.0-beta-rc.2](crates/hdk/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_zome\_types-0.1.0-beta-rc.2](crates/holochain_zome_types/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [kitsune\_p2p\_dht-0.1.0-beta-rc.1](crates/kitsune_p2p_dht/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [hdi-0.2.0-beta-rc.2](crates/hdi/CHANGELOG.md#0.2.0-beta-rc.2)
+
+## [hdk\_derive-0.1.0-beta-rc.2](crates/hdk_derive/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_integrity\_types-0.1.0-beta-rc.2](crates/holochain_integrity_types/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [kitsune\_p2p\_timestamp-0.1.0-beta-rc.1](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [holo\_hash-0.1.0-beta-rc.1](crates/holo_hash/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [kitsune\_p2p\_dht\_arc-0.1.0-beta-rc.1](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.1.0-beta-rc.1)
+
+## [fixt-0.1.0-beta-rc.1](crates/fixt/CHANGELOG.md#0.1.0-beta-rc.1)
+
 # 20221223.034701
 
 ## [holochain\_cli-0.1.0-beta-rc.2](crates/holochain_cli/CHANGELOG.md#0.1.0-beta-rc.2)

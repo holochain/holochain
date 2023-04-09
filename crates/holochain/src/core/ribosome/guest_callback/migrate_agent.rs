@@ -78,7 +78,7 @@ impl Invocation for MigrateAgentInvocation {
 impl TryFrom<MigrateAgentInvocation> for ExternIO {
     type Error = SerializedBytesError;
     fn try_from(migrate_agent_invocation: MigrateAgentInvocation) -> Result<Self, Self::Error> {
-        ExternIO::encode(&migrate_agent_invocation.migrate_agent)
+        ExternIO::encode(migrate_agent_invocation.migrate_agent)
     }
 }
 

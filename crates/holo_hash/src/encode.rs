@@ -47,22 +47,22 @@ pub fn holo_hash_decode_unchecked(s: &str) -> Result<Vec<u8>, HoloHashError> {
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);
     }
-    let s = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
+    let b = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
         Err(_) => return Err(HoloHashError::BadBase64),
         Ok(s) => s,
     };
-    if s.len() != HOLO_HASH_FULL_LEN {
+    if b.len() != HOLO_HASH_FULL_LEN {
         return Err(HoloHashError::BadSize);
     }
     let loc_bytes = holo_dht_location_bytes(
-        &s[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
+        &b[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
     );
     let loc_bytes: &[u8] = &loc_bytes;
-    if loc_bytes != &s[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
-        return Err(HoloHashError::BadChecksum);
+    if loc_bytes != &b[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
+        return Err(HoloHashError::BadChecksum(s.to_string()));
     }
-    assert_length!(HOLO_HASH_FULL_LEN, &s);
-    Ok(s.to_vec())
+    assert_length!(HOLO_HASH_FULL_LEN, &b);
+    Ok(b.to_vec())
 }
 
 /// internal PARSE for holo hash REPR
@@ -70,14 +70,14 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
     if &s[..1] != "u" {
         return Err(HoloHashError::NoU);
     }
-    let s = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
+    let b = match base64::decode_config(&s[1..], base64::URL_SAFE_NO_PAD) {
         Err(_) => return Err(HoloHashError::BadBase64),
         Ok(s) => s,
     };
-    if s.len() != HOLO_HASH_FULL_LEN {
+    if b.len() != HOLO_HASH_FULL_LEN {
         return Err(HoloHashError::BadSize);
     }
-    let actual_prefix: [u8; HOLO_HASH_PREFIX_LEN] = s[..HOLO_HASH_PREFIX_LEN].try_into().unwrap();
+    let actual_prefix: [u8; HOLO_HASH_PREFIX_LEN] = b[..HOLO_HASH_PREFIX_LEN].try_into().unwrap();
     if actual_prefix != prefix {
         return Err(HoloHashError::BadPrefix(
             format!("{:?}", prefix),
@@ -85,14 +85,14 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
         ));
     }
     let loc_bytes = holo_dht_location_bytes(
-        &s[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
+        &b[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
     );
     let loc_bytes: &[u8] = &loc_bytes;
-    if loc_bytes != &s[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
-        return Err(HoloHashError::BadChecksum);
+    if loc_bytes != &b[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
+        return Err(HoloHashError::BadChecksum(s.to_string()));
     }
-    assert_length!(HOLO_HASH_FULL_LEN, &s);
-    Ok(s.to_vec())
+    assert_length!(HOLO_HASH_FULL_LEN, &b);
+    Ok(b.to_vec())
 }
 
 /// internal compute the holo dht location u32

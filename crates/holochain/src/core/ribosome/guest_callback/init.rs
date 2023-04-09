@@ -83,7 +83,7 @@ pub enum InitResult {
     Fail(ZomeName, String),
     /// no init failed but some zome has unresolved dependencies
     /// ZomeName is the first zome that has unresolved dependencies
-    /// Vec<EntryHash> is the list of all missing dependency addresses
+    /// `Vec<EntryHash>` is the list of all missing dependency addresses
     UnresolvedDependencies(ZomeName, UnresolvedDependencies),
 }
 

@@ -37,7 +37,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_sys_time_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::SysTime).await;

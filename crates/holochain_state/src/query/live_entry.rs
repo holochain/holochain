@@ -117,8 +117,7 @@ impl Query for GetLiveEntryQuery {
         let authored_action = self.1.as_ref().map(|a| a.as_ref()).and_then(|a| {
             state
                 .creates
-                .iter()
-                .map(|(_, v)| v)
+                .values()
                 .find(|h| *h.action().author() == *a)
                 .cloned()
         });
@@ -128,7 +127,7 @@ impl Query for GetLiveEntryQuery {
             // The line below was added when migrating to rust edition 2021, per
             // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
             let _ = &state;
-            state.creates.into_iter().map(|(_, v)| v).next()
+            state.creates.into_values().next()
         });
         match action {
             Some(action) => {

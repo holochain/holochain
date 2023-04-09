@@ -12,20 +12,21 @@ use structopt::StructOpt;
 use crate_selection::{aliases::CargoDepKind, CrateState, CrateStateFlags};
 use release::ReleaseSteps;
 
-pub(crate) mod changelog;
-pub(crate) mod check;
-pub(crate) mod common;
-pub(crate) mod crate_;
-pub(crate) mod crate_selection;
+pub mod changelog;
+pub mod check;
+pub mod common;
+pub mod crate_;
+pub mod crate_selection;
 pub mod release;
 
 #[cfg(test)]
-pub(crate) mod tests;
+pub mod tests;
 
-pub(crate) type Fallible<T> = anyhow::Result<T>;
+pub type Fallible<T> = anyhow::Result<T>;
 pub type CommandResult = Fallible<()>;
 
-pub(crate) mod cli {
+pub mod cli {
+    use crate::common::SemverIncrementMode;
     use crate::crate_::CrateArgs;
 
     use super::*;
@@ -36,29 +37,29 @@ pub(crate) mod cli {
 
     #[derive(Debug, StructOpt)]
     #[structopt(name = "release-automation")]
-    pub(crate) struct Args {
+    pub struct Args {
         #[structopt(long)]
-        pub(crate) workspace_path: PathBuf,
+        pub workspace_path: PathBuf,
 
         #[structopt(subcommand)]
-        pub(crate) cmd: Commands,
+        pub cmd: Commands,
 
         #[structopt(long, default_value = "warn")]
-        pub(crate) log_level: log::Level,
+        pub log_level: log::Level,
 
         #[structopt(long, default_value = "")]
-        pub(crate) log_filters: String,
+        pub log_filters: String,
 
         /// Allows filtering to a subset of crates that will be processed for the given command.
         /// This string will be used as a regex to filter the package names.
         /// By default, all crates will be considered.
         #[structopt(long, default_value = ".*")]
-        pub(crate) match_filter: fancy_regex::Regex,
+        pub match_filter: fancy_regex::Regex,
     }
 
     #[derive(Debug, StructOpt)]
     #[structopt(name = "ra")]
-    pub(crate) enum Commands {
+    pub enum Commands {
         Changelog(ChangelogArgs),
         Release(ReleaseArgs),
         Check(CheckArgs),
@@ -66,64 +67,71 @@ pub(crate) mod cli {
     }
 
     #[derive(Debug, StructOpt)]
-    pub(crate) struct ChangelogAggregateArgs {
+    pub struct ChangelogAggregateArgs {
         /// Output path, relative to the workspace root.
         #[structopt(long, default_value = "CHANGELOG.md")]
-        pub(crate) output_path: PathBuf,
+        pub output_path: PathBuf,
     }
 
     #[derive(Debug, StructOpt)]
-    pub(crate) struct ChangelogSetFrontmatterArgs {
+    pub struct ChangelogSetFrontmatterArgs {
         /// Activate dry-run mode which avoid changing any files
         #[structopt(long)]
-        pub(crate) dry_run: bool,
+        pub dry_run: bool,
 
         /// YAML file that defines the new frontmatter content. (will be validated by parsing)
-        pub(crate) frontmatter_yaml_path: PathBuf,
+        pub frontmatter_yaml_path: PathBuf,
     }
 
     #[derive(Debug, StructOpt)]
-    pub(crate) enum ChangelogCommands {
+    pub enum ChangelogCommands {
         Aggregate(ChangelogAggregateArgs),
         SetFrontmatter(ChangelogSetFrontmatterArgs),
     }
 
     #[derive(StructOpt, Debug)]
-    pub(crate) struct ChangelogArgs {
+    pub struct ChangelogArgs {
         #[structopt(subcommand)]
-        pub(crate) command: ChangelogCommands,
+        pub command: ChangelogCommands,
     }
 
     /// Determine whether there are any release blockers by analyzing the state of the workspace.
     #[derive(StructOpt, Debug)]
-    pub(crate) struct CheckArgs {
+    pub struct CheckArgs {
         /// All existing versions must match these requirements.
         /// Can be passed more than once to specify multiple.
         /// See https://docs.rs/semver/0.11.0/semver/?search=#requirements
         #[structopt(long)]
-        pub(crate) enforced_version_reqs: Vec<semver::VersionReq>,
+        pub enforced_version_reqs: Vec<semver::VersionReq>,
 
         /// None of the existing versions are allowed to match these requirements.
         /// Can be passed more than once to specify multiple.
         /// See https://docs.rs/semver/0.11.0/semver/?search=#requirements
         #[structopt(long)]
-        pub(crate) disallowed_version_reqs: Vec<semver::VersionReq>,
+        pub disallowed_version_reqs: Vec<semver::VersionReq>,
 
         /// Allow these blocking states for dev dependency crates.
         /// Comma separated.
         /// Valid values are: MissingReadme, UnreleasableViaChangelogFrontmatter, DisallowedVersionReqViolated, EnforcedVersionReqViolated
         #[structopt(long, default_value = "", parse(try_from_str = parse_cratestateflags))]
-        pub(crate) allowed_dev_dependency_blockers: BitFlags<CrateStateFlags>,
+        pub allowed_dev_dependency_blockers: BitFlags<CrateStateFlags>,
 
         /// Allow these blocking states for crates via the packages filter.
         /// Comma separated.
         /// Valid values are: MissingReadme, UnreleasableViaChangelogFrontmatter, DisallowedVersionReqViolated, EnforcedVersionReqViolated
         #[structopt(long, default_value = "", parse(try_from_str = parse_cratestateflags))]
-        pub(crate) allowed_matched_blockers: BitFlags<CrateStateFlags>,
+        pub allowed_matched_blockers: BitFlags<CrateStateFlags>,
 
         /// Exclude optional dependencies.
         #[structopt(long)]
-        pub(crate) exclude_optional_deps: bool,
+        pub exclude_optional_deps: bool,
+
+        /// If given, only these SemverIncrementMode values will be allowed.
+        /// Comma separated.
+        /// The values shall be given as YAML strings, matching the way they are configured in the CHANGELOG.md front matters.
+        /// For a list of values and examples please see [this document](https://github.com/holochain/holochain/blob/develop/docs/release/release.md#permanently-marking-a-crate-for-majorminorpatchpre-version-bumps).
+        #[structopt(long, parse(try_from_str = parse_semverincrementmode))]
+        allowed_semver_increment_modes: Option<HashSet<SemverIncrementMode>>,
     }
 
     fn parse_depkind(input: &str) -> Fallible<HashSet<CargoDepKind>> {
@@ -162,9 +170,27 @@ pub(crate) mod cli {
             )
     }
 
+    fn parse_semverincrementmode(input: &str) -> Fallible<HashSet<SemverIncrementMode>> {
+        input
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|sim| {
+                serde_yaml::from_str(sim).map_err(|_| {
+                    anyhow::anyhow!("could not parse '{}' as SemverIncrementMode", input)
+                })
+            })
+            .try_fold(
+                Default::default(),
+                |mut acc, elem| -> Fallible<HashSet<SemverIncrementMode>> {
+                    acc.insert(elem?);
+                    Ok(acc)
+                },
+            )
+    }
+
     impl CheckArgs {
         /// Boilerplate to instantiate `SelectionCriteria` from `CheckArgs`
-        pub(crate) fn to_selection_criteria(&self, args: &Args) -> SelectionCriteria {
+        pub fn to_selection_criteria(&self, args: &Args) -> SelectionCriteria {
             SelectionCriteria {
                 match_filter: args.match_filter.clone(),
                 disallowed_version_reqs: self.disallowed_version_reqs.clone(),
@@ -172,6 +198,7 @@ pub(crate) mod cli {
                 allowed_dev_dependency_blockers: self.allowed_dev_dependency_blockers,
                 allowed_selection_blockers: self.allowed_matched_blockers,
                 exclude_optional_deps: self.exclude_optional_deps,
+                allowed_semver_increment_modes: self.allowed_semver_increment_modes.clone(),
             }
         }
     }
@@ -180,60 +207,60 @@ pub(crate) mod cli {
     ///
     /// See https://docs.rs/semver/0.11.0/semver/?search=#requirements for details on the requirements arguments.
     #[derive(StructOpt, Debug)]
-    pub(crate) struct ReleaseArgs {
+    pub struct ReleaseArgs {
         #[structopt(flatten)]
-        pub(crate) check_args: CheckArgs,
+        pub check_args: CheckArgs,
 
         #[structopt(long)]
-        pub(crate) dry_run: bool,
+        pub dry_run: bool,
 
         /// Will be inferred from the current name if not given.
         #[structopt(long)]
-        pub(crate) release_branch_name: Option<String>,
+        pub release_branch_name: Option<String>,
 
         /// The release steps to perform.
         /// These will be reordered to their defined ordering.
         ///
         /// See `ReleaseSteps` for the list of steps.
         #[structopt(long, default_value="", parse(try_from_str = parse_releasesteps))]
-        pub(crate) steps: BTreeSet<ReleaseSteps>,
+        pub steps: BTreeSet<ReleaseSteps>,
 
         /// Force creation of the branch regardless of source branch.
         #[structopt(long)]
-        pub(crate) force_branch_creation: bool,
+        pub force_branch_creation: bool,
 
         /// Force creation of the git tags.
         #[structopt(long)]
-        pub(crate) force_tag_creation: bool,
+        pub force_tag_creation: bool,
 
         /// Force creation of the git tags.
         #[structopt(long)]
-        pub(crate) no_tag_creation: bool,
+        pub no_tag_creation: bool,
 
         /// The dependencies that are allowed to be missing at the search location despite not being released.
         #[structopt(long, default_value="", parse(from_str = parse_string_set))]
-        pub(crate) allowed_missing_dependencies: HashSet<String>,
+        pub allowed_missing_dependencies: HashSet<String>,
 
         /// Set a custom CARGO_TARGET_DIR when shelling out to `cargo`.
         /// Currently only used for `cargo publish`.
         #[structopt(long)]
-        pub(crate) cargo_target_dir: Option<PathBuf>,
+        pub cargo_target_dir: Option<PathBuf>,
 
         /// Don't run consistency verification checks.
         #[structopt(long)]
-        pub(crate) no_verify: bool,
+        pub no_verify: bool,
 
         /// Don't run consistency verification pre-change.
         #[structopt(long)]
-        pub(crate) no_verify_pre: bool,
+        pub no_verify_pre: bool,
 
         /// Don't run consistency verification post-change.
         #[structopt(long)]
-        pub(crate) no_verify_post: bool,
+        pub no_verify_post: bool,
 
         /// Paths to manifest that will also be considered when updating the Cargo.lock files
         #[structopt(long)]
-        pub(crate) additional_manifests: Vec<String>,
+        pub additional_manifests: Vec<String>,
 
         #[structopt(
             long,
@@ -241,11 +268,11 @@ pub(crate) mod cli {
             use_delimiter = true,
             multiple = false,
         )]
-        pub(crate) minimum_crate_owners: Vec<String>,
+        pub minimum_crate_owners: Vec<String>,
     }
 
     /// Parses a commad separated input string to a set of strings.
-    pub(crate) fn parse_string_set(input: &str) -> HashSet<String> {
+    pub fn parse_string_set(input: &str) -> HashSet<String> {
         use std::str::FromStr;
 
         input.split(',').filter(|s| !s.is_empty()).fold(
@@ -258,7 +285,7 @@ pub(crate) mod cli {
     }
 
     /// Parses an input string to an ordered set of release steps.
-    pub(crate) fn parse_releasesteps(input: &str) -> Fallible<BTreeSet<ReleaseSteps>> {
+    pub fn parse_releasesteps(input: &str) -> Fallible<BTreeSet<ReleaseSteps>> {
         use std::str::FromStr;
 
         input

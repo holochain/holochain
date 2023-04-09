@@ -254,7 +254,8 @@ async fn test_update_admin_interface() {
 
     let code = DnaWasm::from(TestCoordinatorWasm::CoordinatorZomeUpdate)
         .code
-        .to_vec();
+        .to_vec()
+        .into();
 
     let source: CoordinatorBundle = Bundle::new(
         manifest,

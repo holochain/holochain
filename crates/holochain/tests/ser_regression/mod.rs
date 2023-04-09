@@ -5,7 +5,7 @@ use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
-use holochain::test_utils::setup_app;
+use holochain::test_utils::setup_app_in_new_conductor;
 use holochain_state::nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -23,7 +23,7 @@ pub struct ChannelName(String);
 
 #[tokio::test(flavor = "multi_thread")]
 async fn ser_entry_hash_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let eh = fixt!(EntryHash);
     let extern_io: ExternIO = ExternIO::encode(eh).unwrap();
     tracing::debug!(?extern_io);
@@ -36,7 +36,7 @@ async fn ser_entry_hash_test() {
 #[tokio::test(flavor = "multi_thread")]
 /// we can call a fn on a remote
 async fn ser_regression_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // ////////////
     // START DNA
     // ////////////
@@ -93,7 +93,8 @@ async fn ser_regression_test() {
     // START CONDUCTOR
     // ///////////////
 
-    let (_tmpdir, app_api, handle) = setup_app(
+    let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
+        "test app".to_string(),
         vec![dna_file],
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
     )
@@ -191,7 +192,5 @@ async fn ser_regression_test() {
         _ => panic!("{:?}", output),
     };
 
-    let shutdown = handle.take_shutdown_handle().unwrap();
-    handle.shutdown();
-    shutdown.await.unwrap().unwrap();
+    handle.shutdown().await.unwrap().unwrap();
 }

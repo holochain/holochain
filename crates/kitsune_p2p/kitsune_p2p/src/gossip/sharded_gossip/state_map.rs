@@ -53,7 +53,7 @@ impl RoundStateMap {
     }
 
     /// Get the set of current rounds and remove any expired rounds.
-    pub(super) fn current_rounds(&mut self) -> HashSet<Tx2Cert> {
+    pub(super) fn current_rounds(&mut self) -> HashSet<Arc<[u8; 32]>> {
         for (k, v) in std::mem::take(&mut self.map) {
             if v.last_touch.elapsed() < v.round_timeout {
                 self.map.insert(k, v);

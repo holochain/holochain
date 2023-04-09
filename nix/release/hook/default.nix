@@ -1,9 +1,9 @@
 { pkgs, config }:
 {
- buildInputs = []
+  buildInputs = [ ]
 
- ++ (pkgs.callPackage ./version {
-  config = config;
- }).buildInputs
- ;
+    ++ (pkgs.callPackage ./version {
+    config = config;
+  }).buildInputs
+  ;
 }

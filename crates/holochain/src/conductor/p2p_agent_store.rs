@@ -294,12 +294,16 @@ pub async fn dump_state(
 
         use chrono::{DateTime, Duration, NaiveDateTime, Utc};
         let duration = Duration::milliseconds(info.signed_at_ms as i64);
-        let s = duration.num_seconds() as i64;
+        let s = duration.num_seconds();
         let n = duration.clone().to_std().unwrap().subsec_nanos();
+        // TODO FIXME
+        #[allow(deprecated)]
         let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
         let duration = Duration::milliseconds(info.expires_at_ms as i64);
-        let s = duration.num_seconds() as i64;
+        let s = duration.num_seconds();
         let n = duration.clone().to_std().unwrap().subsec_nanos();
+        // TODO FIXME
+        #[allow(deprecated)]
         let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
         let now = Utc::now();
 
@@ -342,7 +346,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let test_db = test_p2p_agents_db();
         let db = test_db.to_db();
@@ -362,7 +366,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_to_db() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let t_db = test_p2p_agents_db();
         let db = t_db.to_db();
 

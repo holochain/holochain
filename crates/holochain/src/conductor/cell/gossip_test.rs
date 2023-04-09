@@ -1,7 +1,7 @@
 use crate::sweettest::*;
 use crate::test_utils::conductor_setup::ConductorTestData;
-use crate::test_utils::consistency_10s;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
+use crate::test_utils::{consistency_10s, consistency_60s};
 use hdk::prelude::*;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::fresh_reader_test;
@@ -11,7 +11,7 @@ use kitsune_p2p::KitsuneP2pConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
@@ -26,7 +26,7 @@ async fn gossip_test() {
         .call(&cell_1.zome(TestWasm::Anchor), "anchor", anchor)
         .await;
 
-    consistency_10s([&cell_1, &cell_2]).await;
+    consistency_60s([&cell_1, &cell_2]).await;
 
     let hashes: EntryHashes = conductors[1]
         .call(
@@ -40,7 +40,7 @@ async fn gossip_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signature_smoke_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut network_config = KitsuneP2pConfig::default();
     network_config.transport_pool = vec![kitsune_p2p::TransportConfig::Mem {}];
     // Hit an actual bootstrap service so it can blow up and return an error if we get our end of
@@ -54,7 +54,7 @@ async fn signature_smoke_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 

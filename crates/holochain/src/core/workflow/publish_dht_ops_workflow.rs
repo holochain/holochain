@@ -18,6 +18,7 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time;
 use tracing::*;
 
@@ -34,8 +35,8 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 
 #[instrument(skip(db, network, trigger_self))]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
-    network: &(dyn HolochainP2pDnaT + Send + Sync),
-    trigger_self: &TriggerSender,
+    network: Arc<impl HolochainP2pDnaT + Send + Sync>,
+    trigger_self: TriggerSender,
     agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
@@ -130,9 +131,9 @@ mod tests {
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
+    use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::prelude::*;
-    use observability;
     use rusqlite::Transaction;
     use std::collections::HashMap;
     use std::convert::TryInto;
@@ -247,9 +248,14 @@ mod tests {
         author: AgentPubKey,
     ) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(db.clone().into(), &dna_network, &trigger_sender, author)
-            .await
-            .unwrap();
+        publish_dht_ops_workflow(
+            db.clone().into(),
+            Arc::new(dna_network),
+            trigger_sender,
+            author,
+        )
+        .await
+        .unwrap();
     }
 
     /// There is a test that shows that network messages would be sent to all agents via broadcast.
@@ -265,7 +271,7 @@ mod tests {
     #[ignore = "(david.b) tests should be re-written using mock network"]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
-            observability::test_run().ok();
+            holochain_trace::test_run().ok();
 
             // Create test db
             let test_db = test_authored_db();
@@ -319,7 +325,7 @@ mod tests {
     #[test_case(100, 100)]
     fn test_no_republish(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
-            observability::test_run().ok();
+            holochain_trace::test_run().ok();
 
             // Create test db
             let test_db = test_authored_db();
@@ -372,7 +378,7 @@ mod tests {
     fn test_private_entries(num_agents: u32) {
         tokio_helper::block_forever_on(
             async {
-                observability::test_run().ok();
+                holochain_trace::test_run().ok();
 
                 // Create test db
                 let test_db = test_authored_db();

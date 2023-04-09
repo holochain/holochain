@@ -28,6 +28,7 @@ use holochain_sqlite::{
     prelude::{DatabaseError, DatabaseResult},
 };
 use holochain_state::{
+    host_fn_workspace::SourceChainWorkspace,
     mutations,
     prelude::{from_blob, StateQueryResult},
     query::{map_sql_dht_op_common, StateQueryError},
@@ -37,7 +38,7 @@ use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
 };
-use holochain_zome_types::{Entry, EntryVisibility, SignedAction, Timestamp};
+use holochain_zome_types::{DnaDef, Entry, EntryVisibility, SignedAction, Timestamp};
 use kitsune_p2p::{
     event::{TimeWindow, TimeWindowInclusive},
     KitsuneP2pConfig,
@@ -55,6 +56,8 @@ use crate::core::{
         },
     },
 };
+use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTargetId;
 
 use super::{
     conductor::RwShare,
@@ -161,6 +164,25 @@ impl Spaces {
             wasm_db,
             network_config: config.network.clone().unwrap_or_default(),
         })
+    }
+
+    /// Block some target.
+    pub async fn block(&self, input: Block) -> DatabaseResult<()> {
+        holochain_state::block::block(&self.conductor_db, input).await
+    }
+
+    /// Unblock some target.
+    pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
+        holochain_state::block::unblock(&self.conductor_db, input).await
+    }
+
+    /// Check if some target is blocked.
+    pub async fn is_blocked(
+        &self,
+        input: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> StateQueryResult<bool> {
+        holochain_state::block::is_blocked(&self.conductor_db, input, timestamp).await
     }
 
     /// Get the holochain conductor state
@@ -312,9 +334,12 @@ impl Spaces {
         let max_ops: u32 = max_ops.try_into().unwrap_or(u32::MAX);
 
         let db = self.dht_db(dna_hash)?;
-        let include_limbo = include_limbo
-            .then(|| "\n")
-            .unwrap_or("AND DhtOp.when_integrated IS NOT NULL\n");
+
+        let include_limbo = if include_limbo {
+            "\n"
+        } else {
+            "AND DhtOp.when_integrated IS NOT NULL\n"
+        };
 
         let intervals = dht_arc_set.intervals();
         let sql = if let Some(DhtArcRange::Full) = intervals.first() {
@@ -627,7 +652,7 @@ impl Spaces {
                 // Note this is not an error because only a validation receipt is proof of a publish.
                 None => return Ok(()),
             };
-            incoming_dht_ops_workflow(&space, trigger, ops, request_validation_receipt).await?;
+            incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
         }
         Ok(())
     }
@@ -722,6 +747,25 @@ impl Space {
             author,
         )
         .await
+    }
+
+    /// Create a SourceChainWorkspace from this Space
+    pub async fn source_chain_workspace(
+        &self,
+        keystore: MetaLairClient,
+        agent_pubkey: AgentPubKey,
+        dna_def: Arc<DnaDef>,
+    ) -> ConductorResult<SourceChainWorkspace> {
+        Ok(SourceChainWorkspace::new(
+            self.authored_db.clone(),
+            self.dht_db.clone(),
+            self.dht_query_cache.clone(),
+            self.cache_db.clone(),
+            keystore,
+            agent_pubkey,
+            dna_def,
+        )
+        .await?)
     }
 }
 

@@ -242,6 +242,7 @@ async fn publish_loop() {
             tx.try_send(()).unwrap();
             Ok(())
         });
+    let dna_network = Arc::new(dna_network);
 
     let (ts, mut trigger_recv) =
         TriggerSender::new_with_loop(Duration::from_secs(60)..Duration::from_secs(60 * 5), true);
@@ -253,7 +254,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -267,7 +268,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -283,7 +284,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -314,7 +315,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -336,7 +337,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60 * 2)
             && timer.elapsed() < Duration::from_secs(60 * 2 + 1)
     );
-    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -369,7 +370,7 @@ async fn publish_loop() {
     let timer = tokio::time::Instant::now();
     trigger_recv.listen().await.unwrap();
     assert!(timer.elapsed() < Duration::from_secs(1));
-    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
 
@@ -383,7 +384,7 @@ async fn publish_loop() {
         timer.elapsed() >= Duration::from_secs(60) && timer.elapsed() < Duration::from_secs(61)
     );
 
-    publish_dht_ops_workflow(db.clone(), &dna_network, &ts, author.clone())
+    publish_dht_ops_workflow(db.clone(), dna_network.clone(), ts.clone(), author.clone())
         .await
         .unwrap();
     // - The op is not published because of the time interval.

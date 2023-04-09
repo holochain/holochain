@@ -32,7 +32,7 @@ mod tests;
 /// (Assuming a baseline 5mbps upload for now... update this
 /// as consumer internet connections trend toward more upload)
 /// Consider splitting large entries up.
-pub const MAX_ENTRY_SIZE: usize = 4_000_000;
+pub const MAX_ENTRY_SIZE: usize = ENTRY_SIZE_LIMIT;
 
 /// 1kb limit on LinkTags.
 /// Tags are used as keys to the database to allow
@@ -234,6 +234,52 @@ pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
     Ok(())
 }
 
+/// Check previous action type is valid
+pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+    let maybe_error = match (prev_action, action) {
+        (
+            Action::AgentValidationPkg(AgentValidationPkg {
+                author: author1, ..
+            }),
+            Action::Create(Create {
+                author: author2,
+                entry_type: EntryType::AgentPubKey,
+                ..
+            }),
+        ) => {
+            if author1 != author2 {
+                Some("author of agent validation package must match succeeding agent")
+            } else {
+                None
+            }
+        }
+
+        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => {
+            Some("Every AgentValidationPkg must be followed by a Create for an AgentPubKey")
+        }
+
+        (
+            _,
+            Action::Create(Create {
+                entry_type: EntryType::AgentPubKey,
+                ..
+            }),
+        ) => Some("Every Create for an AgentPubKey must be preceded by an AgentValidationPkg"),
+
+        _ => None,
+    };
+
+    if let Some(error) = maybe_error {
+        Err(PrevActionError::InvalidSuccessor(
+            error.to_string(),
+            Box::new((prev_action.clone(), action.clone())),
+        ))
+        .map_err(|e| ValidationOutcome::from(e).into())
+    } else {
+        Ok(())
+    }
+}
+
 /// Check previous action timestamp is before this action
 pub fn check_prev_timestamp(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
     let t1 = prev_action.timestamp();
@@ -271,6 +317,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 
 /// Check the AppEntryDef is valid for the zome.
 /// Check the EntryDefId and ZomeIndex are in range.
+// TODO: MD: shouldn't this be part of App validation, since it invokes Wasm?
 pub async fn check_app_entry_def(
     dna_hash: &DnaHash,
     entry_type: &AppEntryDef,
@@ -599,9 +646,14 @@ impl IncomingDhtOpSender {
     ) -> SysValidationResult<()> {
         if let Some(op) = make_op(record) {
             let ops = vec![op];
-            incoming_dht_ops_workflow(self.space.as_ref(), self.sys_validation_trigger, ops, false)
-                .await
-                .map_err(Box::new)?;
+            incoming_dht_ops_workflow(
+                self.space.as_ref().clone(),
+                self.sys_validation_trigger,
+                ops,
+                false,
+            )
+            .await
+            .map_err(Box::new)?;
         }
         Ok(())
     }
@@ -609,6 +661,7 @@ impl IncomingDhtOpSender {
         self.send_op(record, make_store_record).await
     }
     async fn send_store_entry(self, record: Record) -> SysValidationResult<()> {
+        // TODO: MD: isn't it already too late if we've received a private entry from the network at this point?
         let is_public_entry = record.action().entry_type().map_or(false, |et| {
             matches!(et.visibility(), EntryVisibility::Public)
         });
@@ -669,7 +722,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
         .retrieve(hash.clone(), Default::default())
         .await?
     {
-        Some(el) => Ok(Source::Network(el.privatized())),
+        Some(el) => Ok(Source::Network(el.privatized().0)),
         None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }
@@ -683,7 +736,7 @@ async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
 /// to return an error.
 fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     // Extract the data
-    let (shh, record_entry) = record.privatized().into_inner();
+    let (shh, record_entry) = record.privatized().0.into_inner();
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 

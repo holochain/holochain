@@ -4,14 +4,12 @@ use std::time::Instant;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
-use holochain::sweettest::{
-    standard_config, SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes,
-};
+use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes};
 use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
-use holochain::test_utils::{consistency_10s, consistency_60s, consistency_60s_advanced};
+use holochain::test_utils::{consistency_10s, consistency_60s, consistency_advanced};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
@@ -22,7 +20,11 @@ use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_ag
 use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
-fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) -> ConductorConfig {
+fn make_config(
+    recent: bool,
+    historical: bool,
+    recent_threshold: Option<u64>,
+) -> holochain::sweettest::SweetConductorConfig {
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
@@ -31,28 +33,23 @@ fn make_config(recent: bool, historical: bool, recent_threshold: Option<u64>) ->
     tuning.disable_historical_gossip = !historical;
     tuning.danger_gossip_recent_threshold_secs =
         recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
+
     tuning.gossip_inbound_target_mbps = 10000.0;
     tuning.gossip_outbound_target_mbps = 10000.0;
     tuning.gossip_historic_outbound_target_mbps = 10000.0;
     tuning.gossip_historic_inbound_target_mbps = 10000.0;
-    // tuning.gossip_max_batch_size = 32_000_000;
 
-    let mut network = KitsuneP2pConfig::default();
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    network.tuning_params = Arc::new(tuning);
-    let mut config = standard_config();
-    config.network = Some(network);
-    config
+    // This allows attempting to contact an offline node to timeout quickly,
+    // so we can fallback to the next one
+    tuning.default_rpc_single_timeout_ms = 3_000;
+
+    holochain::sweettest::SweetConductorConfig::standard().tune(Arc::new(tuning))
 }
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
-    let _g = observability::test_run().ok();
+async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors =
@@ -72,7 +69,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    consistency_10s([&alice, &bobbo]).await;
+    consistency_60s([&alice, &bobbo]).await;
     // let p2p = conductors[0].envs().p2p().lock().values().next().cloned().unwrap();
     // holochain_state::prelude::dump_tmp(&p2p);
     // holochain_state::prelude::dump_tmp(&alice.env());
@@ -95,7 +92,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
-    // let _g = observability::test_run().ok();
+    // let _g = holochain_trace::test_run().ok();
 
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
@@ -164,12 +161,12 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Test that a gossip payload larger than the max frame size does not
-/// cause problems
+/// Test that when the conductor shuts down, gossip does not continue,
+/// and when it restarts, gossip resumes.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_gossip_shutdown() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut conductors = SweetConductorBatch::from_config(2, make_config(true, true, None)).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -204,7 +201,7 @@ async fn test_gossip_shutdown() {
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 async fn three_way_gossip_recent() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let config = make_config(true, false, None);
     three_way_gossip(config).await;
 }
@@ -212,7 +209,7 @@ async fn three_way_gossip_recent() {
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 async fn three_way_gossip_historical() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let config = make_config(false, true, Some(0));
     three_way_gossip(config).await;
 }
@@ -221,7 +218,7 @@ async fn three_way_gossip_historical() {
 /// - 6MB of data can pass from node A to B,
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
-async fn three_way_gossip(config: ConductorConfig) {
+async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let mut conductors = SweetConductorBatch::from_config(2, config.clone()).await;
     let start = Instant::now();
 
@@ -246,14 +243,13 @@ async fn three_way_gossip(config: ConductorConfig) {
         let bytes = vec![42u8 + i as u8; size];
         let hash: ActionHash = conductors[0].call(&zomes[0], "create_bytes", bytes).await;
         hashes.push(hash);
-        dbg!(start.elapsed());
     }
 
     conductors.exchange_peer_info().await;
-    consistency_10s([&cells[0], &cells[1]]).await;
+    consistency_60s([&cells[0], &cells[1]]).await;
 
-    tracing::info!(
-        "CONSISTENCY REACHED between first two nodes in {:?}",
+    println!(
+        "Done waiting for consistency between first two nodes. Elapsed: {:?}",
         start.elapsed()
     );
 
@@ -274,7 +270,6 @@ async fn three_way_gossip(config: ConductorConfig) {
             .collect::<Vec<_>>()
     );
     assert_eq!(records_0, records_1);
-    dbg!(start.elapsed());
 
     conductors[0].shutdown().await;
 
@@ -290,11 +285,29 @@ async fn three_way_gossip(config: ConductorConfig) {
     conductors.add_conductor(conductor);
     conductors.exchange_peer_info().await;
 
-    consistency_60s_advanced([(&cells[0], false), (&cells[1], true), (&cell, true)]).await;
+    consistency_advanced(
+        [(&cells[0], false), (&cells[1], true), (&cell, true)],
+        30,
+        std::time::Duration::from_secs(1),
+    )
+    .await;
 
-    dbg!(start.elapsed());
+    println!(
+        "Done waiting for consistency between last two nodes. Elapsed: {:?}",
+        start.elapsed()
+    );
 
     let records_2: Vec<Option<Record>> = conductors[2].call(&zome, "read_multi", hashes).await;
+    assert_eq!(
+        records_2.iter().filter(|r| r.is_some()).count(),
+        num,
+        "couldn't get records at positions: {:?}",
+        records_2
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| r.is_none().then(|| i))
+            .collect::<Vec<_>>()
+    );
     assert_eq!(records_2, records_1);
 }
 
@@ -303,7 +316,7 @@ async fn three_way_gossip(config: ConductorConfig) {
 async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     use holochain::{sweettest::SweetConductor, test_utils::inline_zomes::simple_create_read_zome};
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
 
     let mut conductor = SweetConductor::from_config(make_config(true, true, None)).await;
 
@@ -385,7 +398,7 @@ async fn mock_network_sharded_gossip() {
     // Check if we should for new data to be generated even if it already exists.
     let force_new_data = std::env::var_os("FORCE_NEW_DATA").is_some();
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
 
     // Generate or use cached test data.
     let (data, mut conn) = generate_test_data(num_agents, min_ops, false, force_new_data).await;
@@ -927,7 +940,7 @@ async fn mock_network_sharding() {
     // Check if we should for new data to be generated even if it already exists.
     let force_new_data = std::env::var_os("FORCE_NEW_DATA").is_some();
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
 
     // Generate or use cached test data.
     let (data, mut conn) = generate_test_data(num_agents, min_ops, false, force_new_data).await;

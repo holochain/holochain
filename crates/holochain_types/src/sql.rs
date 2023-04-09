@@ -86,6 +86,14 @@ impl<'a, 'b> From<&'b ZomeIndex> for SqlOutput<'a> {
     }
 }
 
+impl<'a> From<&CapAccess> for SqlOutput<'a> {
+    fn from(value: &CapAccess) -> Self {
+        SqlOutput(ToSqlOutput::Owned(
+            value.as_variant_string().to_owned().into(),
+        ))
+    }
+}
+
 impl ToSqlStatement for LinkTypeFilter {
     fn to_sql_statement(&self) -> String {
         match self {

@@ -5,8 +5,8 @@
 pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
+    pub use ::holochain_trace;
     pub use ::lair_keystore_api;
-    pub use ::observability;
     pub use ::paste;
     pub use ::rustls;
     pub use ::serde;
@@ -53,12 +53,18 @@ pub fn ok_fut<E1, R: Send + 'static>(result: R) -> Result<MustBoxFuture<'static,
 }
 
 /// Helper function for the common case of returning this boxed future type.
-pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
+pub fn box_fut_plain<'a, R: Send + 'a>(result: R) -> BoxFuture<'a, R> {
     use futures::FutureExt;
-    async move { result }.boxed().into()
+    async move { result }.boxed()
+}
+
+/// Helper function for the common case of returning this boxed future type.
+pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
+    box_fut_plain(result).into()
 }
 
 use ::ghost_actor::dependencies::tracing;
+use futures::future::BoxFuture;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 
 /// 32 byte binary TLS certificate digest.
@@ -81,6 +87,12 @@ impl CertDigestExt for CertDigest {
 /// Wrapper around CertDigest that provides some additional debugging helpers.
 #[derive(Clone)]
 pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
+
+impl From<Tx2Cert> for Arc<[u8; 32]> {
+    fn from(f: Tx2Cert) -> Self {
+        f.0 .0 .0.clone()
+    }
+}
 
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
@@ -186,7 +198,7 @@ impl From<Arc<Vec<u8>>> for Tx2Cert {
 
 impl From<CertDigest> for Tx2Cert {
     fn from(c: CertDigest) -> Self {
-        let b64 = base64::encode_config(&*c, base64::URL_SAFE_NO_PAD);
+        let b64 = base64::encode_config(*c, base64::URL_SAFE_NO_PAD);
         let nick = {
             let (start, _) = b64.split_at(6);
             let (_, end) = b64.split_at(b64.len() - 6);
@@ -319,7 +331,6 @@ pub mod agent_info;
 pub mod async_lazy;
 mod auto_stream_select;
 pub use auto_stream_select::*;
-pub mod bin_types;
 pub mod bootstrap;
 pub mod codec;
 pub mod combinators;
@@ -329,6 +340,9 @@ pub mod metrics;
 pub mod reverse_semaphore;
 pub mod task_agg;
 pub mod tls;
+pub use kitsune_p2p_bin_data as bin_types;
+
+#[cfg(feature = "tx2")]
 pub mod tx2;
 
 pub use kitsune_p2p_dht as dht;

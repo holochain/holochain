@@ -11,6 +11,7 @@ use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use mr_bundle::error::MrBundleError;
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 /// Errors occurring during a [`CellConductorApi`](super::CellConductorApi) or [`InterfaceApi`](super::InterfaceApi) call
@@ -160,5 +161,14 @@ impl From<SerializationError> for ExternalApiWireError {
 impl From<RibosomeError> for ExternalApiWireError {
     fn from(e: RibosomeError) -> Self {
         ExternalApiWireError::RibosomeError(e.to_string())
+    }
+}
+
+pub fn zome_call_response_to_conductor_api_result<T: DeserializeOwned + std::fmt::Debug>(
+    zcr: ZomeCallResponse,
+) -> ConductorApiResult<T> {
+    match zcr {
+        ZomeCallResponse::Ok(bytes) => Ok(bytes.decode().map_err(SerializationError::from)?),
+        other => Err(ConductorApiError::other(format!("{:?}", other))),
     }
 }

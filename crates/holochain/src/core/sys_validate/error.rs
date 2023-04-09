@@ -25,6 +25,8 @@ use thiserror::Error;
 /// unstable but when it lands we should use:
 /// <https://docs.rs/try-guard/0.2.0/try_guard/>
 #[derive(Error, Debug)]
+// TODO FIXME
+#[allow(clippy::large_enum_variant)]
 pub enum SysValidationError {
     #[error(transparent)]
     CascadeError(#[from] holochain_cascade::error::CascadeError),
@@ -168,4 +170,6 @@ pub enum PrevActionError {
     MissingPrev,
     #[error("The previous action's timestamp is not before the current action's timestamp: {0:?} >= {1:?}")]
     Timestamp(Timestamp, Timestamp),
+    #[error("It is invalid for these two actions to be paired with each other. context: {0}, actions: {1:?}")]
+    InvalidSuccessor(String, Box<(Action, Action)>),
 }

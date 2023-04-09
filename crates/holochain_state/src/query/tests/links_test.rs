@@ -2,9 +2,9 @@ use super::*;
 use crate::here;
 use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::prelude::*;
+use holochain_trace;
 use holochain_types::db::DbWrite;
 use holochain_types::record::SignedActionHashedExt;
-use observability;
 
 #[derive(Clone)]
 struct TestData {
@@ -24,18 +24,21 @@ struct TestData {
 fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
     let mut tag_fix = BytesFixturator::new(Predictable);
     let mut data = Vec::new();
+    let mut agent_pub_key_fixt = AgentPubKeyFixturator::new(Predictable);
     let mut base_hash_fixt = EntryHashFixturator::new(Predictable);
     let mut target_hash_fixt = EntryHashFixturator::new(Unpredictable);
     for i in 0..n {
         // Create a known link add
         let base_address = base_hash_fixt.next().unwrap();
         let target_address = target_hash_fixt.next().unwrap();
+        let agent_pub_key = agent_pub_key_fixt.next().unwrap();
 
         let tag = LinkTag::new(tag_fix.next().unwrap());
         let zome_index = ZomeIndex(i as u8);
         let link_type = LinkType(i as u8);
 
         let link_add = KnownCreateLink {
+            author: agent_pub_key.clone(),
             base_address: base_address.clone().into(),
             target_address: target_address.clone().into(),
             zome_index,
@@ -50,6 +53,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
             ActionHashed::from_content_sync(Action::CreateLink(link_add.clone())).into();
 
         let expected_link = Link {
+            author: agent_pub_key,
             create_link_hash: link_add_hash.clone(),
             target: target_address.clone().into(),
             zome_index,
@@ -527,7 +531,7 @@ async fn multiple_links() {
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn duplicate_links() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -589,7 +593,7 @@ async fn duplicate_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_base() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -679,7 +683,7 @@ async fn links_on_same_base() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_tag() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -750,7 +754,7 @@ async fn links_on_same_tag() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_type() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -807,7 +811,7 @@ async fn links_on_same_type() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn link_type_ranges() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 

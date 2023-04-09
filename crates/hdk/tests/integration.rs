@@ -488,6 +488,7 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
     if !matches!(compare, Compare::GetLinks(_)) {
         mock_hdk.expect_get_links().returning(|_| {
             Ok(vec![vec![Link {
+                author: ::fixt::fixt!(AgentPubKey),
                 target: base(),
                 timestamp: Timestamp(0),
                 zome_index: 0.into(),
@@ -508,6 +509,7 @@ fn set_zome_types_and_compare(entries: &[(u8, u8)], links: &[(u8, u8)], compare:
                 })
                 .returning(|_| {
                     Ok(vec![vec![Link {
+                        author: ::fixt::fixt!(AgentPubKey),
                         target: base(),
                         timestamp: Timestamp(0),
                         zome_index: 0.into(),

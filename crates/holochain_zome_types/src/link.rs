@@ -19,7 +19,9 @@ pub use holochain_integrity_types::link::*;
     SerializedBytes,
 )]
 pub struct Link {
-    /// The [`Entry`](crate::entry::Entry) being linked to
+    /// The author of this link
+    pub author: holo_hash::AgentPubKey,
+    /// The [`Entry`](crate::entry::Entry) or [`Action`](holochain_integrity_types::action::Action) being linked to
     pub target: holo_hash::AnyLinkableHash,
     /// When the link was added
     pub timestamp: crate::Timestamp,

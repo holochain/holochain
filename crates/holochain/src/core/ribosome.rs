@@ -25,8 +25,6 @@ use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use derive_more::Constructor;
 use error::RibosomeResult;
@@ -35,7 +33,6 @@ use guest_callback::init::InitHostAccess;
 use guest_callback::migrate_agent::MigrateAgentHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
-use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
@@ -45,6 +42,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::nonce::*;
 use holochain_types::prelude::*;
 use holochain_types::zome_types::GlobalZomeTypes;
+use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
 use std::iter::Iterator;
 use std::sync::Arc;
@@ -105,7 +103,6 @@ pub enum HostContext {
     MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
     Validate(ValidateHostAccess),
-    ValidationPackage(ValidationPackageHostAccess),
     ZomeCall(ZomeCallHostAccess),
 }
 
@@ -118,7 +115,6 @@ impl From<&HostContext> for HostFnAccess {
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),
             HostContext::MigrateAgent(access) => access.into(),
-            HostContext::ValidationPackage(access) => access.into(),
             HostContext::PostCommit(access) => access.into(),
         }
     }
@@ -132,8 +128,7 @@ impl HostContext {
             | Self::Init(InitHostAccess { workspace, .. })
             | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
-            Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
-            | Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
+            Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that uses the workspace without providing a workspace"
             ),
@@ -171,7 +166,6 @@ impl HostContext {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
-            | Self::ValidationPackage(ValidationPackageHostAccess { network, .. })
             | Self::Validate(ValidateHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
@@ -184,6 +178,7 @@ impl HostContext {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. })
             | Self::Init(InitHostAccess { signal_tx, .. })
+            | Self::PostCommit(PostCommitHostAccess { signal_tx, .. })
             => signal_tx,
             _ => panic!(
                 "Gave access to a host function that uses the signal broadcaster without providing one"
@@ -376,10 +371,32 @@ impl ZomeCallInvocation {
         )
     }
 
+    pub async fn verify_blocked_provenance(
+        &self,
+        host_access: &ZomeCallHostAccess,
+    ) -> RibosomeResult<ZomeCallAuthorization> {
+        if host_access
+            .call_zome_handle
+            .is_blocked(
+                BlockTargetId::Cell(CellId::new(
+                    (*self.cell_id.dna_hash()).clone(),
+                    self.provenance.clone(),
+                )),
+                Timestamp::now(),
+            )
+            .await?
+        {
+            Ok(ZomeCallAuthorization::BlockedProvenance)
+        } else {
+            Ok(ZomeCallAuthorization::Authorized)
+        }
+    }
+
     /// to verify if the zome call is authorized:
     /// - the signature must be valid
     /// - the nonce must not have already been seen
     /// - the grant must be valid
+    /// - the provenance must not have any active blocks against them right now
     /// the checks MUST be done in this order as witnessing the nonce is a write
     /// and so we MUST NOT write nonces until after we verify the signature.
     #[allow(clippy::extra_unused_lifetimes)]
@@ -389,7 +406,12 @@ impl ZomeCallInvocation {
     ) -> RibosomeResult<ZomeCallAuthorization> {
         Ok(match self.verify_signature().await? {
             ZomeCallAuthorization::Authorized => match self.verify_nonce(host_access).await? {
-                ZomeCallAuthorization::Authorized => self.verify_grant(host_access).await?,
+                ZomeCallAuthorization::Authorized => match self.verify_grant(host_access).await? {
+                    ZomeCallAuthorization::Authorized => {
+                        self.verify_blocked_provenance(host_access).await?
+                    }
+                    unauthorized => unauthorized,
+                },
                 unauthorized => unauthorized,
             },
             unauthorized => unauthorized,
@@ -648,12 +670,6 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult>;
 
-    fn run_validation_package(
-        &self,
-        access: ValidationPackageHostAccess,
-        invocation: ValidationPackageInvocation,
-    ) -> RibosomeResult<ValidationPackageResult>;
-
     fn run_post_commit(
         &self,
         access: PostCommitHostAccess,
@@ -710,7 +726,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn verify_zome_call_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

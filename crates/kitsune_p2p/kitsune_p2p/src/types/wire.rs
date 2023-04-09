@@ -120,9 +120,9 @@ kitsune_p2p_types::write_codec_enum! {
             agent.1: Arc<KitsuneAgent>,
         },
 
-        /// Response to a peer get
+        /// Response to a peer get. If the agent isn't known, None will be returned.
         PeerGetResp(0x51) {
-            agent_info_signed.0: AgentInfoSigned,
+            agent_info_signed.0: Option<AgentInfoSigned>,
         },
 
         /// Query a remote node for peers holding
@@ -132,7 +132,7 @@ kitsune_p2p_types::write_codec_enum! {
             basis_loc.1: DhtLocation,
         },
 
-        /// Response to a peer query
+        /// Response to a peer query. May be empty if no matching agents are known.
         PeerQueryResp(0x53) {
             peer_list.0: Vec<AgentInfoSigned>,
         },
@@ -155,5 +155,25 @@ kitsune_p2p_types::write_codec_enum! {
             space.0: Arc<KitsuneSpace>,
             msgs.1: Vec<MetricExchangeMsg>,
         },
+    }
+}
+
+impl Wire {
+    pub fn maybe_space(&self) -> Option<Arc<KitsuneSpace>> {
+        match self {
+            Wire::Call(Call { space, .. })
+            | Wire::DelegateBroadcast(DelegateBroadcast { space, .. })
+            | Wire::Broadcast(Broadcast { space, .. })
+            | Wire::Gossip(Gossip { space, .. })
+            | Wire::PeerGet(PeerGet { space, .. })
+            | Wire::PeerQuery(PeerQuery { space, .. })
+            | Wire::MetricExchange(MetricExchange { space, .. }) => Some(space.clone()),
+            Wire::Failure(_)
+            | Wire::CallResp(_)
+            | Wire::PeerGetResp(_)
+            | Wire::PeerQueryResp(_)
+            | Wire::FetchOp(_)
+            | Wire::PushOpData(_) => None,
+        }
     }
 }

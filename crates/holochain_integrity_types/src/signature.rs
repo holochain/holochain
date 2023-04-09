@@ -43,7 +43,7 @@ pub struct EphemeralSignatures {
 }
 
 /// Mirror struct for Sign that includes a signature to verify against a key and data.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct VerifySignature {
     /// The public key associated with the private key that should be used to
     /// verify the signature.

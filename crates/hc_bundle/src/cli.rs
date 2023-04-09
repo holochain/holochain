@@ -88,6 +88,9 @@ pub enum HcDnaBundle {
         #[structopt(short = "f", long)]
         force: bool,
     },
+
+    /// Print the schema for a DNA manifest
+    Schema,
 }
 
 /// Work with Holochain hApp bundles
@@ -157,6 +160,9 @@ pub enum HcAppBundle {
         #[structopt(short = "f", long)]
         force: bool,
     },
+
+    /// Print the schema for a hApp manifest
+    Schema,
 }
 
 /// Work with Holochain Web-hApp bundles
@@ -226,6 +232,9 @@ pub enum HcWebAppBundle {
         #[structopt(short = "f", long)]
         force: bool,
     },
+
+    /// Print the schema for a web hApp manifest
+    Schema,
 }
 
 impl HcDnaBundle {
@@ -266,6 +275,9 @@ impl HcDnaBundle {
                     .await?
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
+            }
+            Self::Schema => {
+                println!("{}", include_str!("../schema/dna-manifest.schema.json"));
             }
         }
         Ok(())
@@ -314,6 +326,9 @@ impl HcAppBundle {
                         .await?
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
+            }
+            Self::Schema => {
+                println!("{}", include_str!("../schema/happ-manifest.schema.json"));
             }
         }
         Ok(())
@@ -368,6 +383,12 @@ impl HcWebAppBundle {
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
+            Self::Schema => {
+                println!(
+                    "{}",
+                    include_str!("../schema/web-happ-manifest.schema.json")
+                );
+            }
         }
         Ok(())
     }
@@ -375,7 +396,7 @@ impl HcWebAppBundle {
 
 async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&ValidatedDnaManifest::path());
+    let manifest_path = manifest_path.join(ValidatedDnaManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.name())
@@ -383,7 +404,7 @@ async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
 
 async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&AppManifest::path());
+    let manifest_path = manifest_path.join(AppManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: AppManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())
@@ -391,7 +412,7 @@ async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
 
 async fn get_web_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(&WebAppManifest::path());
+    let manifest_path = manifest_path.join(WebAppManifest::path());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: WebAppManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())

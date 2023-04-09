@@ -206,15 +206,15 @@ pub(crate) fn initialize_connection(
 
     // this is recommended to always be off:
     // https://sqlite.org/pragma.html#pragma_trusted_schema
-    conn.pragma_update(None, "trusted_schema", &false)?;
+    conn.pragma_update(None, "trusted_schema", false)?;
 
     // enable foreign key support
-    conn.pragma_update(None, "foreign_keys", &"ON".to_string())?;
+    conn.pragma_update(None, "foreign_keys", "ON".to_string())?;
 
     match synchronous_level {
-        DbSyncLevel::Full => conn.pragma_update(None, "synchronous", &"2".to_string())?,
-        DbSyncLevel::Normal => conn.pragma_update(None, "synchronous", &"1".to_string())?,
-        DbSyncLevel::Off => conn.pragma_update(None, "synchronous", &"0".to_string())?,
+        DbSyncLevel::Full => conn.pragma_update(None, "synchronous", "2".to_string())?,
+        DbSyncLevel::Normal => conn.pragma_update(None, "synchronous", "1".to_string())?,
+        DbSyncLevel::Off => conn.pragma_update(None, "synchronous", "0".to_string())?,
     }
 
     add_custom_functions(conn)?;

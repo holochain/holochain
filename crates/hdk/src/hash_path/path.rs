@@ -21,7 +21,7 @@ pub fn root_hash() -> ExternResult<AnyLinkableHash> {
 
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
 /// Technically it's moving each string component in as bytes.
-/// If this is a problem for you simply build the components yourself as a Vec<Vec<u8>>.
+/// If this is a problem for you simply build the components yourself as a `Vec<Vec<u8>>`.
 ///
 /// See `impl From<String> for Path` below.
 pub const DELIMITER: &str = ".";
@@ -214,7 +214,7 @@ impl AsRef<Vec<Component>> for Path {
 /// some disambiguation logic is not included in higher level abstractions.
 ///
 /// This supports sharding strategies from a small inline DSL.
-/// Start each component with <width>:<depth># to get shards out of the string.
+/// Start each component with `<width>:<depth>#` to get shards out of the string.
 ///
 /// e.g.
 /// - foo.barbaz => normal path as above ["foo", "barbaz"]
@@ -318,7 +318,7 @@ impl TypedPath {
             path,
         }
     }
-    /// Does an entry exist at the hash we expect?
+    /// Does data exist at the hash we expect?
     pub fn exists(&self) -> ExternResult<bool> {
         if self.0.is_empty() {
             Ok(false)
