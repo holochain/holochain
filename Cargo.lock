@@ -2485,7 +2485,7 @@ dependencies = [
  "holochain_types",
  "holochain_util",
  "holochain_wasm_test_utils",
- "holochain_wasmer_host 0.0.83",
+ "holochain_wasmer_host",
  "holochain_websocket",
  "holochain_zome_types",
  "hostname",
@@ -2604,7 +2604,7 @@ dependencies = [
  "holochain_serialized_bytes 0.0.51",
  "holochain_types",
  "holochain_util",
- "holochain_wasmer_host 0.0.82",
+ "holochain_wasmer_host",
  "jsonschema",
  "matches",
  "mr_bundle",
@@ -3038,19 +3038,6 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.82"
-source = "git+https://github.com/Sprillow/holochain-wasmer.git?rev=1323eca56d836d6b0bd9dcff46869638e8c846da#1323eca56d836d6b0bd9dcff46869638e8c846da"
-dependencies = [
- "holochain_serialized_bytes 0.0.51",
- "serde",
- "serde_bytes",
- "thiserror",
- "wasmer",
- "wasmer-engine",
-]
-
-[[package]]
-name = "holochain_wasmer_common"
 version = "0.0.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce2c50cfaf43ccfaf9c584eae3864dffb3f010f140dad6e52368f0969ce680d7"
@@ -3071,27 +3058,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5539ab71791a3f9d0febbd2822ba398ef34e18f55f86eafc4918a776d12d7db"
 dependencies = [
  "holochain_serialized_bytes 0.0.51",
- "holochain_wasmer_common 0.0.83",
+ "holochain_wasmer_common",
  "parking_lot 0.12.1",
  "paste",
  "serde",
  "tracing",
-]
-
-[[package]]
-name = "holochain_wasmer_host"
-version = "0.0.82"
-source = "git+https://github.com/Sprillow/holochain-wasmer.git?rev=1323eca56d836d6b0bd9dcff46869638e8c846da#1323eca56d836d6b0bd9dcff46869638e8c846da"
-dependencies = [
- "bimap",
- "holochain_serialized_bytes 0.0.51",
- "holochain_wasmer_common 0.0.82",
- "once_cell",
- "parking_lot 0.12.1",
- "rand 0.8.5",
- "serde",
- "tracing",
- "wasmer",
 ]
 
 [[package]]
@@ -3102,7 +3073,7 @@ checksum = "22765ece4cda73be1bb004f849e8c71b921916fd9fb05bfc7110dfb5b1864cdd"
 dependencies = [
  "bimap",
  "holochain_serialized_bytes 0.0.51",
- "holochain_wasmer_common 0.0.83",
+ "holochain_wasmer_common",
  "once_cell",
  "parking_lot 0.12.1",
  "rand 0.8.5",
@@ -3150,7 +3121,7 @@ dependencies = [
  "holo_hash",
  "holochain_integrity_types",
  "holochain_serialized_bytes 0.0.51",
- "holochain_wasmer_common 0.0.83",
+ "holochain_wasmer_common",
  "kitsune_p2p_block",
  "kitsune_p2p_dht",
  "kitsune_p2p_timestamp",
