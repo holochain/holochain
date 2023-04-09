@@ -1314,7 +1314,7 @@ pub(crate) struct Space {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) host_api: HostApi,
-    pub(crate) local_joined_agents: HashMap<Arc<KitsuneAgent>, Arc<SignedAgentInfo>>,
+    pub(crate) local_joined_agents: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
