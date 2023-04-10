@@ -3,10 +3,10 @@
 use crate::authority;
 use crate::authority::get_entry_ops_query::GetEntryOpsQuery;
 use crate::authority::get_record_query::GetRecordOpsQuery;
-use holo_hash::hash_type::AnyDht;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
+use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holochain_p2p::actor;
@@ -108,28 +108,22 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         options: actor::GetOptions,
     ) -> actor::HolochainP2pResult<Vec<WireOps>> {
         let mut out = Vec::new();
-        match *dht_hash.hash_type() {
-            AnyDht::Entry => {
+        match dht_hash.into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => {
                 for env in &self.envs {
-                    let r = authority::handle_get_entry(
-                        env.clone(),
-                        dht_hash.clone().into(),
-                        (&options).into(),
-                    )
-                    .await
-                    .map_err(|e| HolochainP2pError::Other(e.into()))?;
+                    let r =
+                        authority::handle_get_entry(env.clone(), hash.clone(), (&options).into())
+                            .await
+                            .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Entry(r));
                 }
             }
-            AnyDht::Action => {
+            AnyDhtHashPrimitive::Action(hash) => {
                 for env in &self.envs {
-                    let r = authority::handle_get_record(
-                        env.clone(),
-                        dht_hash.clone().into(),
-                        (&options).into(),
-                    )
-                    .await
-                    .map_err(|e| HolochainP2pError::Other(e.into()))?;
+                    let r =
+                        authority::handle_get_record(env.clone(), hash.clone(), (&options).into())
+                            .await
+                            .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Record(r));
                 }
             }
@@ -527,9 +521,13 @@ pub fn handle_get_txn(
     hash: AnyDhtHash,
     options: holochain_p2p::event::GetOptions,
 ) -> WireOps {
-    match *hash.hash_type() {
-        AnyDht::Entry => WireOps::Entry(handle_get_entry_txn(txn, hash.into(), options)),
-        AnyDht::Action => WireOps::Record(handle_get_record_txn(txn, hash.into(), options)),
+    match hash.into_primitive() {
+        AnyDhtHashPrimitive::Entry(hash) => {
+            WireOps::Entry(handle_get_entry_txn(txn, hash, options))
+        }
+        AnyDhtHashPrimitive::Action(hash) => {
+            WireOps::Record(handle_get_record_txn(txn, hash, options))
+        }
     }
 }
 
