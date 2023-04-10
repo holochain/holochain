@@ -668,7 +668,27 @@ impl KitsuneP2pActor {
                                                         .incoming_metric_exchange(space, msgs)
                                                         .await;
                                                 }
-                                                data => unimplemented!("{:?}", data),
+                                                wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
+                                                    space, peer_list }) => {
+                                                    if let Err(err) = evt_sender
+                                                        .put_agent_info_signed(
+                                                            PutAgentInfoSignedEvt {
+                                                                space,
+                                                                peer_data: peer_list
+                                                            },
+                                                        ).await {
+                                                            tracing::warn!(?err, "error processing incoming agent info unsolicited");
+                                                        }
+                                                }
+                                                wire::Wire::Failure(_)
+                                                | wire::Wire::Call(_)
+                                                | wire::Wire::CallResp(_)
+                                                | wire::Wire::PeerGet(_)
+                                                | wire::Wire::PeerGetResp(_)
+                                                | wire::Wire::PeerQuery(_)
+                                                | wire::Wire::PeerQueryResp(_) => {
+                                                    tracing::warn!("received non-notify data in a notify");
+                                                }
                                             }
                                         }
                                     }
