@@ -378,6 +378,19 @@ impl KitsuneP2pActor {
                                     con,
                                     data,
                                 } => {
+                                    if let wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
+                                        space, peer_list
+                                    }) = &data {
+                                        if let Err(err) = evt_sender
+                                        .put_agent_info_signed(
+                                            PutAgentInfoSignedEvt {
+                                                space: space.clone(),
+                                                peer_data: peer_list.clone()
+                                            },
+                                        ).await {
+                                            tracing::warn!(?err, "error processing incoming agent info unsolicited");
+                                        }
+                                    }
                                     match nodespace_is_authorized(
                                         &host,
                                         con.peer_id(),
@@ -669,16 +682,9 @@ impl KitsuneP2pActor {
                                                         .await;
                                                 }
                                                 wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
-                                                    space, peer_list }) => {
-                                                    if let Err(err) = evt_sender
-                                                        .put_agent_info_signed(
-                                                            PutAgentInfoSignedEvt {
-                                                                space,
-                                                                peer_data: peer_list
-                                                            },
-                                                        ).await {
-                                                            tracing::warn!(?err, "error processing incoming agent info unsolicited");
-                                                        }
+                                                    .. }) => {
+                                                        // Nothing needs doing as we handled this
+                                                        // above the authorization check.
                                                 }
                                                 wire::Wire::Failure(_)
                                                 | wire::Wire::Call(_)
