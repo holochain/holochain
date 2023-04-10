@@ -366,6 +366,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg(feature = "tx2")]
     async fn test_tx2_digest() {
         let d: Tx2Cert = vec![0xdb; 32].into();
         println!("raw_debug: {:?}", d);
