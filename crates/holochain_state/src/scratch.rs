@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use holo_hash::hash_type::AnyDht;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
@@ -242,9 +241,9 @@ impl Store for Scratch {
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
-        match *hash.hash_type() {
-            AnyDht::Entry => self.get_any_record(&hash.clone().into()),
-            AnyDht::Action => self.get_exact_record(&hash.clone().into()),
+        match hash.clone().into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self.get_any_record(&hash),
+            AnyDhtHashPrimitive::Action(hash) => self.get_exact_record(&hash),
         }
     }
 

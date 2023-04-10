@@ -740,8 +740,9 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use holochain_conductor_api::NetworkInfo;
+    use holochain_conductor_api::{DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo};
     use holochain_p2p::HolochainP2pSender;
+    use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
 
@@ -847,6 +848,75 @@ mod network_impls {
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
+        }
+
+        pub(crate) async fn storage_info(&self) -> ConductorResult<StorageInfo> {
+            let state = self.get_state().await?;
+
+            let all_dna: HashMap<DnaHash, Vec<InstalledAppId>> = HashMap::new();
+            let all_dna =
+                state
+                    .installed_apps()
+                    .iter()
+                    .fold(all_dna, |mut acc, (installed_app_id, app)| {
+                        for dna_hash in app.all_cells().map(|cell_id| cell_id.dna_hash()) {
+                            acc.entry(dna_hash.clone())
+                                .or_default()
+                                .push(installed_app_id.clone());
+                        }
+
+                        acc
+                    });
+
+            let app_data_blobs =
+                futures::future::join_all(all_dna.iter().map(|(dna_hash, used_by)| async {
+                    self.storage_info_for_dna(dna_hash, used_by).await
+                }))
+                .await
+                .into_iter()
+                .collect::<Result<Vec<StorageBlob>, ConductorError>>()?;
+
+            Ok(StorageInfo {
+                blobs: app_data_blobs,
+            })
+        }
+
+        async fn storage_info_for_dna(
+            &self,
+            dna_hash: &DnaHash,
+            used_by: &Vec<InstalledAppId>,
+        ) -> ConductorResult<StorageBlob> {
+            let authored_db = self.spaces.authored_db(dna_hash)?;
+            let dht_db = self.spaces.dht_db(dna_hash)?;
+            let cache_db = self.spaces.cache(dna_hash)?;
+
+            Ok(StorageBlob::Dna(DnaStorageInfo {
+                authored_data_size_on_disk: authored_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                authored_data_size: authored_db
+                    .async_reader(get_used_size)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                dht_data_size_on_disk: dht_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                dht_data_size: dht_db
+                    .async_reader(get_used_size)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                cache_data_size_on_disk: cache_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                cache_data_size: cache_db
+                    .async_reader(get_used_size)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                used_by: used_by.clone(),
+            }))
         }
 
         #[instrument(skip(self))]
@@ -1102,7 +1172,7 @@ mod app_impls {
 
     use super::*;
     impl Conductor {
-        pub(crate) async fn install_app(
+        pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
@@ -1149,10 +1219,16 @@ mod app_impls {
                 }
             };
 
+            let manifest = bundle.manifest().clone();
+
             let installed_app_id =
-                installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
+                installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
+
+            let local_dnas = self
+                .ribosome_store()
+                .share_ref(|store| bundle.get_all_dnas_from_store(store));
             let ops = bundle
-                .resolve_cells(agent_key.clone(), DnaGamut::placeholder(), membrane_proofs)
+                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
@@ -1180,7 +1256,7 @@ mod app_impls {
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await?;
 
             let roles = ops.role_assignments;
-            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles)?;
+            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
             // Update the db
             let stopped_app = self.add_disabled_app_to_db(app).await?;

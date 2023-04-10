@@ -296,6 +296,9 @@ pub struct AppInfo {
     pub status: AppInfoStatus,
     /// The app's agent pub key.
     pub agent_pub_key: AgentPubKey,
+    /// The original AppManifest used to install the app, which can also be used to
+    /// install the app again under a new agent.
+    pub manifest: AppManifest,
 }
 
 impl AppInfo {
@@ -306,6 +309,7 @@ impl AppInfo {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
         let agent_pub_key = app.agent_key().to_owned();
+        let mut manifest = app.manifest().clone();
 
         let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
         app.roles().iter().for_each(|(role_name, role_assignment)| {
@@ -322,6 +326,17 @@ impl AppInfo {
                         dna_def.name.to_owned(),
                     );
                     cell_info_for_role.push(cell_info);
+
+                    // Update the manifest with the installed hash
+                    match &mut manifest {
+                        AppManifest::V1(manifest) => {
+                            if let Some(role) =
+                                manifest.roles.iter_mut().find(|r| r.name == *role_name)
+                            {
+                                role.dna.installed_hash = Some(dna_def.hash.clone().into());
+                            }
+                        }
+                    }
                 } else {
                     tracing::error!("no DNA definition found for cell id {}", provisioned_cell);
                 }
@@ -377,6 +392,7 @@ impl AppInfo {
             cell_info,
             status,
             agent_pub_key,
+            manifest,
         }
     }
 }

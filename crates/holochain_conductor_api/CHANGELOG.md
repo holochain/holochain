@@ -7,12 +7,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Adds new functionality to the conductor admin API which returns disk storage information. The storage used by apps is broken down into blobs which are being used by one or more app.
+
+## 0.2.0-beta-rc.2
+
+- `AppInfo` now includes a copy of the `AppManifest` which was used to install the app. This can be used to reinstall the same app under a different agent in the same conductor without needing to supply the original DNA files. [\#2157](https://github.com/holochain/holochain/pull/2157)
+
+## 0.2.0-beta-rc.1
+
 ## 0.2.0-beta-rc.0
 
 - Reject creation of duplicate clone cells. It was possible to create a clone cell with a DNA hash identical to an already existing DNA. [\#1997](https://github.com/holochain/holochain/pull/1997)
 - Adds doc comments for `StemCell`, `ProvisionedCell` and `CloneCell` structs
-- Various methods may return a `CellMissing` error if an operation is performed on a disabled cell. Now such calls will return `CellDisabled` to differentiate between a truly missing cell and one that's just disabled. [\#2092](https://github.com/holochain/holochain/pull/2092)
-- Enabling a clone cell that's already enabled or disabling a clone cell that's already disabled would previously return a `CloneCellNotFound` error. Now, in those cases, nothing happens and a successful result is returned. [\#2093](https://github.com/holochain/holochain/pull/2093)
+- Various methods may return a `CellMissing` error if an operation is performed on a disabled cell. Now such calls will return `CellDisabled` to differentiate between a truly missing cell and one that’s just disabled. [\#2092](https://github.com/holochain/holochain/pull/2092)
+- Enabling a clone cell that’s already enabled or disabling a clone cell that’s already disabled would previously return a `CloneCellNotFound` error. Now, in those cases, nothing happens and a successful result is returned. [\#2093](https://github.com/holochain/holochain/pull/2093)
 
 ## 0.1.0
 
