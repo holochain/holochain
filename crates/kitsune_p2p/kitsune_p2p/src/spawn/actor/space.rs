@@ -1220,6 +1220,11 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
+    fn handle_dump_network_stats(&mut self) -> KitsuneP2pHandlerResult<serde_json::Value> {
+        // call handled by parent actor and never delegated to spaces
+        unreachable!()
+    }
+
     fn handle_get_diagnostics(
         &mut self,
         _space: KSpace,
