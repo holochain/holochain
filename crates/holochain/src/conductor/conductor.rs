@@ -861,8 +861,7 @@ mod network_impls {
                 let db = { self.p2p_agents_db(dna) };
                 let permit = db.conn_permit().await;
                 let mut conn = db.with_permit(permit)?;
-                let agent_infos = conn.p2p_list_agents()?;
-                let current_number_of_peers = agent_infos.len() as u32;
+                let current_number_of_peers = conn.p2p_count_agents()?;
 
                 // query arc size and extrapolated coverage and estimate total peers
                 let cell_id = CellId::new(dna.as_hash().clone(), agent_pub_key.clone());
