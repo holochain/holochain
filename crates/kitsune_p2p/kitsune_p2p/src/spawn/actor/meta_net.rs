@@ -224,7 +224,16 @@ impl MetaNetCon {
             }
         }
 
-        // TODO - no way to close a tx5 con currently
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNetCon::Tx5 {
+                ep, rem_url, tun, ..
+            } = self
+            {
+                ep.ban(rem_url.id().unwrap(), tun.tx5_ban_time());
+                return;
+            }
+        }
     }
 
     pub fn is_closed(&self) -> bool {
@@ -237,7 +246,7 @@ impl MetaNetCon {
 
         #[cfg(feature = "tx5")]
         {
-            // TODO - erm, tx5 connections are never exactly "closed"
+            // NOTE - tx5 connections are never exactly "closed"
             //        since it's more of a message queue...
             return false;
         }
@@ -302,7 +311,13 @@ impl MetaNetCon {
 
             #[cfg(feature = "tx5")]
             {
-                if let MetaNetCon::Tx5 { ep, rem_url, res: res_store, .. } = self {
+                if let MetaNetCon::Tx5 {
+                    ep,
+                    rem_url,
+                    res: res_store,
+                    ..
+                } = self
+                {
                     let (s, r) = tokio::sync::oneshot::channel();
                     res_store.lock().insert(msg_id, s);
 
@@ -760,12 +775,15 @@ impl MetaNet {
             }
         });
 
-        Ok((MetaNet::Tx5 {
-            ep: ep_hnd,
-            url: cli_url,
-            res: res_store,
-            tun: tuning_params,
-        }, evt_recv))
+        Ok((
+            MetaNet::Tx5 {
+                ep: ep_hnd,
+                url: cli_url,
+                res: res_store,
+                tun: tuning_params,
+            },
+            evt_recv,
+        ))
     }
 
     pub fn local_addr(&self) -> KitsuneResult<String> {
@@ -864,7 +882,7 @@ impl MetaNet {
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5(ep, _, _) = self {
+            if let MetaNet::Tx5 { ep, .. } = self {
                 let fut = ep.get_stats();
                 return async move { fut.await.map_err(KitsuneError::other) }.boxed();
             }
