@@ -331,11 +331,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1681006747,
-        "narHash": "sha256-QM9p0hTtZ5ZeK2jUCNrkgnuiBRh7wVDYBoxvId5aZzM=",
+        "lastModified": 1681093076,
+        "narHash": "sha256-6uLZNeuP5jDDGlFkXgcoAxsJhTKy8yUTw25zdLHzdxE=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "9e55ff64c777f05310d83be0a0cbf0c7e299f63a",
+        "rev": "45c2ed9dd1397526dad35fc867c43955d87f9f3f",
         "type": "github"
       },
       "original": {
