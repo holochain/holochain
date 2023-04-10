@@ -3660,57 +3660,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kitsune_p2p_direct"
-version = "0.0.1"
-dependencies = [
- "arrayref",
- "base64 0.13.1",
- "derive_more",
- "futures",
- "hyper",
- "if-addrs 0.8.0",
- "kitsune_p2p",
- "kitsune_p2p_bootstrap",
- "kitsune_p2p_direct_api",
- "kitsune_p2p_proxy",
- "kitsune_p2p_transport_quic",
- "kitsune_p2p_types",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "sodoken",
- "structopt",
- "tokio",
- "tokio-tungstenite 0.14.0",
- "tungstenite 0.13.0",
- "url2",
-]
-
-[[package]]
-name = "kitsune_p2p_direct_api"
-version = "0.0.1"
-dependencies = [
- "arrayref",
- "base64 0.13.1",
- "kitsune_p2p_dht_arc",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "kitsune_p2p_direct_test"
-version = "0.0.1"
-dependencies = [
- "kitsune_p2p_direct",
- "kitsune_p2p_proxy",
- "kitsune_p2p_transport_quic",
- "rand 0.8.5",
- "structopt",
- "tokio",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "kitsune_p2p_fetch"
 version = "0.2.0-beta-rc.1"
 dependencies = [
@@ -7206,19 +7155,6 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e96bb520beab540ab664bd5a9cfeaa1fcd846fa68c830b42e2c8963071251d2"
-dependencies = [
- "futures-util",
- "log",
- "pin-project",
- "tokio",
- "tungstenite 0.13.0",
-]
-
-[[package]]
-name = "tokio-tungstenite"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f714dd15bead90401d77e04243611caec13726c2408afd5b31901dfcdcb3b181"
@@ -7475,27 +7411,6 @@ dependencies = [
  "native-tls",
  "rand 0.8.5",
  "sha-1 0.9.8",
- "url 2.3.1",
- "utf-8",
-]
-
-[[package]]
-name = "tungstenite"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fe8dada8c1a3aeca77d6b51a4f1314e0f4b8e438b7b1b71e3ddaca8080e4093"
-dependencies = [
- "base64 0.13.1",
- "byteorder",
- "bytes",
- "http",
- "httparse",
- "input_buffer",
- "log",
- "native-tls",
- "rand 0.8.5",
- "sha-1 0.9.8",
- "thiserror",
  "url 2.3.1",
  "utf-8",
 ]
