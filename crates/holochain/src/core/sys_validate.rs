@@ -270,27 +270,31 @@ pub fn check_agent_validation_pkg_predecessor(
 /// Check that the author didn't change between actions
 pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
     // Agent updates will be valid when DPKI support lands
-    #[cfg(feature = "dpki")]
-    if let Action::Update(Update {
-        entry_type: EntryType::AgentPubKey,
-        entry_hash,
-        ..
-    }) = prev_action
+    let a1: AgentPubKey = if let Action::Update(
+        u @ Update {
+            entry_type: EntryType::AgentPubKey,
+            ..
+        },
+    ) = prev_action
     {
-        // When the agent key has been updated,
-        let new_author: AgentPubKey = entry_hash.clone().into();
-        if *action.author() == new_author {
-            return Ok(());
+        #[cfg(feature = "dpki")]
+        {
+            u.entry_hash.clone().into()
         }
-    }
 
-    let a1 = prev_action.author();
+        #[cfg(not(feature = "dpki"))]
+        {
+            u.author.clone()
+        }
+    } else {
+        prev_action.author().clone()
+    };
+
     let a2 = action.author();
-    if a2 == a1 {
+    if a1 == *a2 {
         Ok(())
     } else {
-        Err(PrevActionError::Author(a1.clone(), a2.clone()))
-            .map_err(|e| ValidationOutcome::from(e).into())
+        Err(PrevActionError::Author(a1, a2.clone())).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 

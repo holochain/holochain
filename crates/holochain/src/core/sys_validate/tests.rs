@@ -1,15 +1,10 @@
 use super::*;
 use crate::conductor::space::TestSpaces;
-use crate::core::workflow::inline_validation;
-use crate::sweettest::SweetAgents;
-use crate::sweettest::SweetConductor;
-use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::test_authored_db;
@@ -577,6 +572,12 @@ fn valid_chain_test() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "dpki")]
 async fn test_dpki_agent_update() {
+    use crate::core::workflow::inline_validation;
+    use crate::sweettest::SweetAgents;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use holochain_p2p::actor::HolochainP2pRefToDna;
+
     let dna = SweetDnaFile::unique_empty().await;
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 4).await;
