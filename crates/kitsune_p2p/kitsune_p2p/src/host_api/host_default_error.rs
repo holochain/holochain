@@ -29,6 +29,13 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
         box_fut(Ok(false))
     }
 
+    fn put_agent_info_signed(
+        &self,
+        _input: Vec<crate::types::agent_store::AgentInfoSigned>
+    ) -> KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
     fn get_agent_info_signed(
         &self,
         _input: GetAgentInfoSignedEvt,
@@ -157,6 +164,13 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         timestamp: Timestamp,
     ) -> crate::KitsuneHostResult<bool> {
         KitsuneHostDefaultError::is_blocked(self, input, timestamp)
+    }
+
+    fn put_agent_info_signed(
+        &self,
+        input: Vec<crate::types::agent_store::AgentInfoSigned>,
+    ) -> KitsuneHostResult<()> {
+        KitsuneHostDefaultError::put_agent_info_signed(self, input)
     }
 
     fn get_agent_info_signed(

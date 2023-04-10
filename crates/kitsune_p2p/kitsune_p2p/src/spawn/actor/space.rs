@@ -917,9 +917,9 @@ impl KitsuneP2pHandler for Space {
         let local_agents_holding_basis = self
             .local_joined_agents
             .iter()
-            .filter(|agent| {
+            .filter(|agent_key| {
                 self.agent_arcs
-                    .get(*agent)
+                    .get(*agent_key)
                     .map_or(false, |arc| arc.contains(location))
             })
             .cloned()
@@ -944,12 +944,12 @@ impl KitsuneP2pHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match &data {
             BroadcastData::User(data) => {
-                for agent in self.local_joined_agents.iter() {
-                    if let Some(arc) = self.agent_arcs.get(agent) {
+                for agent_key in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent_key) {
                         if arc.contains(basis.get_loc()) {
                             let fut =
                                 self.evt_sender
-                                    .notify(space.clone(), agent.clone(), data.clone());
+                                    .notify(space.clone(), agent_key.clone(), data.clone());
                             local_notify_events.push(async move {
                                 if let Err(err) = fut.await {
                                     tracing::warn!(?err, "failed local broadcast");
@@ -1314,7 +1314,7 @@ pub(crate) struct Space {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) host_api: HostApi,
-    pub(crate) local_joined_agents: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
+    pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
@@ -1515,7 +1515,7 @@ impl Space {
             i_s,
             evt_sender,
             host_api,
-            local_joined_agents: HashMap::new(),
+            local_joined_agents: HashSet::new(),
             agent_arcs: HashMap::new(),
             config,
             mdns_handles: HashMap::new(),
