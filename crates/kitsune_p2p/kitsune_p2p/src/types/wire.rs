@@ -141,8 +141,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Notably they may want to send their own peer info to prevent being
         /// inadvertantly blocked.
         PeerUnsolicited(0x54) {
-            space.0: Arc<KitsuneSpace>,
-            peer_list.1: Vec<AgentInfoSigned>,
+            peer_list.0: Vec<AgentInfoSigned>,
         },
 
         /// Request the peer send op data.
@@ -176,13 +175,14 @@ impl Wire {
             | Wire::PeerGet(PeerGet { space, .. })
             | Wire::PeerQuery(PeerQuery { space, .. })
             | Wire::MetricExchange(MetricExchange { space, .. })
-            | Wire::PeerUnsolicited(PeerUnsolicited { space, .. }) => Some(space.clone()),
+             => Some(space.clone()),
             Wire::Failure(_)
             | Wire::CallResp(_)
             | Wire::PeerGetResp(_)
             | Wire::PeerQueryResp(_)
             | Wire::FetchOp(_)
-            | Wire::PushOpData(_) => None,
+            | Wire::PushOpData(_)
+            | Wire::PeerUnsolicited(_) => None,
         }
     }
 }

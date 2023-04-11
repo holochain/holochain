@@ -262,6 +262,7 @@ impl KitsuneP2pActor {
             let host = host.clone();
             let tuning_params = config.tuning_params.clone();
             let fetch_pool = fetch_pool.clone();
+            let timeout = config.tuning_params.implicit_timeout();
             async move {
                 let fetch_response_queue = &fetch_response_queue;
                 let fetch_pool = &fetch_pool;
@@ -276,7 +277,12 @@ impl KitsuneP2pActor {
 
                             match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
-                                    let _ = i_s.new_con(remote_url, con).await;
+                                    let _ = i_s.new_con(remote_url, con.clone()).await;
+
+                                    let payload = wire::Wire::peer_unsolicited(vec![]);
+                                    if let Err(err) = con.notify(&payload, timeout).await {
+                                        tracing::warn!(?err, "error responding to op fetch");
+                                    }
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     let _ = i_s.del_con(remote_url).await;
@@ -379,16 +385,18 @@ impl KitsuneP2pActor {
                                     data,
                                 } => {
                                     if let wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
-                                        space, peer_list
+                                        peer_list
                                     }) = &data {
-                                        if let Err(err) = evt_sender
-                                        .put_agent_info_signed(
-                                            PutAgentInfoSignedEvt {
-                                                space: space.clone(),
-                                                peer_data: peer_list.clone()
-                                            },
-                                        ).await {
-                                            tracing::warn!(?err, "error processing incoming agent info unsolicited");
+                                        for peer in peer_list {
+                                            if let Err(err) = evt_sender
+                                            .put_agent_info_signed(
+                                                PutAgentInfoSignedEvt {
+                                                    space: peer.space.clone(),
+                                                    peer_data: vec![peer.clone()],
+                                                },
+                                            ).await {
+                                                tracing::warn!(?err, "error processing incoming agent info unsolicited");
+                                            }
                                         }
                                     }
                                     match nodespace_is_authorized(
