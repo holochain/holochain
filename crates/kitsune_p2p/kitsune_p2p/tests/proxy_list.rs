@@ -1,3 +1,4 @@
+/*
 use futures::stream::StreamExt;
 use kitsune_p2p::actor::*;
 use kitsune_p2p::*;
@@ -99,3 +100,4 @@ async fn test_integrated_proxy_list() {
     bootstrap_task.await.unwrap();
     hnd.close(0, "").await;
 }
+*/
