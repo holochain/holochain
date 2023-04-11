@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- BREAKING CHANGE - Removes conductor networking types "Proxy" ("proxy") and "Quic" ("quic"). Please transition to "WebRTC" ("webrtc"). [\#2208](https://github.com/holochain/holochain/pull/2208)
 - Adds `DumpNetworkStats` api to admin websocket [\#2182](https://github.com/holochain/holochain/pull/2182).
 
 ## 0.2.0-beta-rc.2

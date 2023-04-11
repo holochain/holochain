@@ -168,14 +168,8 @@ pub mod tests {
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
       transport_pool:
-        - type: proxy
-          sub_transport:
-            type: quic
-            bind_to: kitsune-quic://0.0.0.0:0
-          proxy_config:
-            type: remote_proxy_client_from_bootstrap
-            bootstrap_url: https://bootstrap.holo.host
-            fallback_proxy_url: ~
+        - type: webrtc
+          signal_url: wss://signal.holotest.net
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -193,16 +187,8 @@ pub mod tests {
         use holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool.push(TransportConfig::Proxy {
-            sub_transport: Box::new(TransportConfig::Quic {
-                bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
-                override_host: None,
-                override_port: None,
-            }),
-            proxy_config: ProxyConfig::RemoteProxyClientFromBootstrap {
-                bootstrap_url: url2::url2!("https://bootstrap.holo.host"),
-                fallback_proxy_url: None,
-            },
+        network_config.transport_pool.push(TransportConfig::WebRTC {
+            signal_url: "wss://signal.holotest.net".into(),
         });
         let mut tuning_params =
             kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
