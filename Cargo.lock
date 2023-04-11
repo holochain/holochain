@@ -1748,6 +1748,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "escargot"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5584ba17d7ab26a8a7284f13e5bd196294dd2f2d79773cff29b9e9edef601a6"
+dependencies = [
+ "log",
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2627,6 +2639,7 @@ dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
  "chrono",
+ "escargot",
  "futures",
  "holochain_conductor_api",
  "holochain_p2p",
@@ -2985,7 +2998,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",

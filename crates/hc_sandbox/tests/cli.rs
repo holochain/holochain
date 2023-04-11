@@ -2,23 +2,32 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-
-// TODO: do the create tests first
-// TODO: run hc-sandbox then see if we can call the app websocket
-// TODO: Put holochain on the path
-// TODO:
-
 use assert_cmd::prelude::*;
 use holochain_conductor_api::AppRequest;
 use holochain_conductor_api::AppResponse;
 use holochain_websocket::{self as ws, WebsocketConfig, WebsocketReceiver, WebsocketSender};
 use matches::assert_matches;
+use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use url2::url2;
 
 const WEBSOCKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
+    let out = escargot::CargoBuild::new()
+        .package("holochain")
+        .bin("holochain")
+        .current_target()
+        .release()
+        .manifest_path("../holochain/Cargo.toml")
+        .target_dir("../../target")
+        .run()
+        .unwrap();
+
+    out.path().to_path_buf()
+});
 
 async fn websocket_client_by_port(
     port: u16,
@@ -27,7 +36,7 @@ async fn websocket_client_by_port(
         url2!("ws://127.0.0.1:{}", port),
         Arc::new(WebsocketConfig::default()),
     )
-    .await?)
+        .await?)
 }
 
 async fn call_app_interface(port: u16) {
@@ -43,7 +52,7 @@ async fn call_app_interface(port: u16) {
     assert_matches!(r, AppResponse::AppInfo(None));
 }
 
-async fn check_timeout<T>(response: impl Future<Output = Result<T, ws::WebsocketError>>) -> T {
+async fn check_timeout<T>(response: impl Future<Output=Result<T, ws::WebsocketError>>) -> T {
     match tokio::time::timeout(WEBSOCKET_TIMEOUT, response).await {
         Ok(response) => response.expect("Calling websocket failed"),
         Err(_) => {
@@ -95,7 +104,8 @@ async fn run_holochain() {
     let port: u16 = pick_unused_port().expect("No ports free");
     let cmd = std::process::Command::cargo_bin("hc-sandbox").unwrap();
     let mut cmd = Command::from(cmd);
-    cmd.arg("--piped")
+    cmd.arg(format!("--holochain-path={}", HOLOCHAIN_BUILT_PATH.to_str().unwrap()))
+        .arg("--piped")
         .arg("generate")
         .arg(format!("--run={}", port))
         .arg("tests/fixtures/my-app/")
@@ -125,6 +135,7 @@ async fn run_multiple_on_same_port() {
     let cmd = std::process::Command::cargo_bin("hc-sandbox").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg(format!("-f={}", port))
+        .arg(format!("--holochain-path={}", HOLOCHAIN_BUILT_PATH.to_str().unwrap()))
         .arg("--piped")
         .arg("generate")
         .arg(format!("--run={}", app_port))
@@ -145,6 +156,7 @@ async fn run_multiple_on_same_port() {
     let cmd = std::process::Command::cargo_bin("hc-sandbox").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg(format!("-f={}", port))
+        .arg(format!("--holochain-path={}", HOLOCHAIN_BUILT_PATH.to_str().unwrap()))
         .arg("--piped")
         .arg("call")
         .arg("list-dnas")
