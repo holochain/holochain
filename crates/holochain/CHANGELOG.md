@@ -1,4 +1,5 @@
 ---
+semver_increment_mode: major
 default_semver_increment_mode: !pre_minor beta-dev
 ---
 # Changelog

@@ -48,7 +48,7 @@ members = [
   "crates/diagnostic_tests",
 ]
 
-exclude = ["crates/release-automation"]
+exclude = ["crates/release-automation", "crates/debug-build"]
 
 resolver = "2"
 

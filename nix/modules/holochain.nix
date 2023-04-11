@@ -3,7 +3,7 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-      rustToolchain = config.rust.mkRust {
+      rustToolchain = config.rustHelper.mkRust {
         track = "stable";
         version = "1.66.1";
       };
@@ -31,14 +31,17 @@
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
-            CoreFoundation
-            CoreServices
             Security
             IOKit
           ]));
 
-        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config go ])
-          ++ lib.optionals pkgs.stdenv.isDarwin
+        nativeBuildInputs = (with pkgs; [
+          pkg-config
+          makeWrapper
+          perl
+          self'.packages.goWrapper
+        ])
+        ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
       };
 
@@ -60,7 +63,7 @@
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
-        passthru.src.rev = inputs.holochain.rev;
+        passthru.src.rev = (inputs.holochain.rev or "unknown");
       });
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {

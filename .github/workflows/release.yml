@@ -1,7 +1,7 @@
 # Contained Jobs
 # - vars: processes the input
 # - prepare: imported from ./release-prepare.yml
-# - test: currently unimplemented
+# - test: calls ./holochain-build-and-test.yml
 # - finalize:
 #   - restore repo from cache
 #   - push to the target branch
@@ -61,7 +61,7 @@ on:
         default: "false"
         type: string
 
-  pull_request: {}
+  # pull_request: {}
 
 concurrency:
   group: release-${{ github.ref_name }}-${{ github.event_name }}
