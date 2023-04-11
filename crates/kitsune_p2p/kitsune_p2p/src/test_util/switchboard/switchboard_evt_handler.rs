@@ -70,10 +70,6 @@ impl KitsuneHost for SwitchboardEventHandler {
         box_fut(Ok(false))
     }
 
-    fn put_agent_info_signed(&self, _input: Vec<crate::types::agent_store::AgentInfoSigned>) -> crate::KitsuneHostResult<()> {
-        todo!();
-    }
-
     fn get_agent_info_signed(
         &self,
         GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,

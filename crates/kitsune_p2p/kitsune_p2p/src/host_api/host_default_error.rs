@@ -166,13 +166,6 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         KitsuneHostDefaultError::is_blocked(self, input, timestamp)
     }
 
-    fn put_agent_info_signed(
-        &self,
-        input: Vec<crate::types::agent_store::AgentInfoSigned>,
-    ) -> KitsuneHostResult<()> {
-        KitsuneHostDefaultError::put_agent_info_signed(self, input)
-    }
-
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,

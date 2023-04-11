@@ -43,12 +43,6 @@ pub trait KitsuneHost: 'static + Send + Sync {
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>>;
 
-    /// Put some agent infos in storage.
-    fn put_agent_info_signed(
-        &self,
-        input: Vec<crate::types::agent_store::AgentInfoSigned>,
-    ) -> KitsuneHostResult<()>;
-
     /// Remove an agent info from storage
     fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool>;
 

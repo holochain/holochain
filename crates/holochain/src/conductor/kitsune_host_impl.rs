@@ -132,17 +132,6 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
-    fn put_agent_info_signed(&self, _input: Vec<AgentInfoSigned>) -> KitsuneHostResult<()> {
-        todo!();
-        // async move {
-        //     for agent_info in input {
-        //         let dna_hash = DnaHash::from_kitsune(&agent_info.space);
-        //         let db = self.spaces.p2p_agents_db(&dna_hash);
-        //         Ok(super::p2p_agent_store::put_agent_info_signed(db?.into(), agent_info).await?)
-        //     }
-        // }.boxed().into()
-    }
-
     fn get_agent_info_signed(
         &self,
         GetAgentInfoSignedEvt { space, agent }: GetAgentInfoSignedEvt,
