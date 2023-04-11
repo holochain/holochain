@@ -15,6 +15,21 @@ use url2::url2;
 
 const WEBSOCKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
+static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
+    let out = escargot::CargoBuild::new()
+        .package("hc")
+        .bin("hc")
+        .current_target()
+        .release()
+        .manifest_path("../hc/Cargo.toml")
+        .target_dir("../../target")
+        .run()
+        .unwrap();
+
+    out.path().to_path_buf()
+});
+
+
 static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let out = escargot::CargoBuild::new()
         .package("holochain")
@@ -66,7 +81,7 @@ async fn package_fixture_if_not_packaged() {
         return;
     }
 
-    Command::new("hc")
+    Command::new(HC_BUILT_PATH.as_path())
         .arg("dna")
         .arg("pack")
         .arg("tests/fixtures/my-app/dna")
@@ -75,7 +90,7 @@ async fn package_fixture_if_not_packaged() {
         .await
         .expect("Failed to pack DNA");
 
-    Command::new("hc")
+    Command::new(HC_BUILT_PATH.as_path())
         .arg("app")
         .arg("pack")
         .arg("tests/fixtures/my-app")
