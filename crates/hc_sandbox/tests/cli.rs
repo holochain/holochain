@@ -29,7 +29,6 @@ static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     out.path().to_path_buf()
 });
 
-
 static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let out = escargot::CargoBuild::new()
         .package("holochain")
