@@ -98,6 +98,9 @@ pub enum RibosomeError {
 
     #[error(transparent)]
     ZomeTypesError(#[from] holochain_types::zome_types::ZomeTypesError),
+
+    #[error(transparent)]
+    ModuleDeserializeError(#[from] holochain_wasmer_host::prelude::DeserializeError),
 }
 
 /// Type alias

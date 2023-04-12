@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_util::ffs;
-use holochain_wasmer_host::prelude::SerializeError;
+use holochain_wasmer_host::prelude::{SerializeError, CompileError};
 
 /// HcBundleError type.
 #[derive(Debug, thiserror::Error)]
@@ -39,6 +39,9 @@ pub enum HcBundleError {
 
     #[error(transparent)]
     SerializedModuleError(#[from] SerializeError),
+
+    #[error(transparent)]
+    ModuleCompileError(#[from] CompileError),
 }
 
 /// HcBundle Result type.

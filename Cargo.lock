@@ -2486,7 +2486,7 @@ dependencies = [
  "holochain_types",
  "holochain_util",
  "holochain_wasm_test_utils",
- "holochain_wasmer_host",
+ "holochain_wasmer_host 0.0.83 (registry+https://github.com/rust-lang/crates.io-index)",
  "holochain_websocket",
  "holochain_zome_types",
  "hostname",
@@ -2605,7 +2605,7 @@ dependencies = [
  "holochain_serialized_bytes 0.0.51",
  "holochain_types",
  "holochain_util",
- "holochain_wasmer_host",
+ "holochain_wasmer_host 0.0.83 (git+https://github.com/Sprillow/holochain-wasmer.git?rev=b62e66ef1fd7011967ab210fb0dc9ac65794d8d8)",
  "jsonschema",
  "matches",
  "mr_bundle",
@@ -2618,8 +2618,8 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tracing",
  "walkdir",
- "wasmer-middlewares",
 ]
 
 [[package]]
@@ -2976,6 +2976,7 @@ dependencies = [
  "holochain_trace",
  "holochain_types",
  "holochain_util",
+ "holochain_wasmer_host 0.0.83 (git+https://github.com/Sprillow/holochain-wasmer.git?rev=b62e66ef1fd7011967ab210fb0dc9ac65794d8d8)",
  "holochain_zome_types",
  "isotest",
  "itertools 0.10.5",
@@ -3007,6 +3008,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "wasmer-middlewares",
 ]
 
 [[package]]
@@ -3053,13 +3055,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_wasmer_common"
+version = "0.0.83"
+source = "git+https://github.com/Sprillow/holochain-wasmer.git?rev=b62e66ef1fd7011967ab210fb0dc9ac65794d8d8#b62e66ef1fd7011967ab210fb0dc9ac65794d8d8"
+dependencies = [
+ "holochain_serialized_bytes 0.0.51",
+ "serde",
+ "serde_bytes",
+ "test-fuzz",
+ "thiserror",
+ "wasmer",
+ "wasmer-engine",
+]
+
+[[package]]
 name = "holochain_wasmer_guest"
 version = "0.0.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5539ab71791a3f9d0febbd2822ba398ef34e18f55f86eafc4918a776d12d7db"
 dependencies = [
  "holochain_serialized_bytes 0.0.51",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.83 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.12.1",
  "paste",
  "serde",
@@ -3074,7 +3090,23 @@ checksum = "22765ece4cda73be1bb004f849e8c71b921916fd9fb05bfc7110dfb5b1864cdd"
 dependencies = [
  "bimap",
  "holochain_serialized_bytes 0.0.51",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.83 (registry+https://github.com/rust-lang/crates.io-index)",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "rand 0.8.5",
+ "serde",
+ "tracing",
+ "wasmer",
+]
+
+[[package]]
+name = "holochain_wasmer_host"
+version = "0.0.83"
+source = "git+https://github.com/Sprillow/holochain-wasmer.git?rev=b62e66ef1fd7011967ab210fb0dc9ac65794d8d8#b62e66ef1fd7011967ab210fb0dc9ac65794d8d8"
+dependencies = [
+ "bimap",
+ "holochain_serialized_bytes 0.0.51",
+ "holochain_wasmer_common 0.0.83 (git+https://github.com/Sprillow/holochain-wasmer.git?rev=b62e66ef1fd7011967ab210fb0dc9ac65794d8d8)",
  "once_cell",
  "parking_lot 0.12.1",
  "rand 0.8.5",
@@ -3122,7 +3154,7 @@ dependencies = [
  "holo_hash",
  "holochain_integrity_types",
  "holochain_serialized_bytes 0.0.51",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.83 (registry+https://github.com/rust-lang/crates.io-index)",
  "kitsune_p2p_block",
  "kitsune_p2p_dht",
  "kitsune_p2p_timestamp",
