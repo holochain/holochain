@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.2.0-beta-rc.3
+
+- **BREAKING CHANGE**: `HoloHash::retype()` is removed from the public API, and some `From<AnyDhtHash>` and `From<AnyLinkableHash>` impls were removed. Instances of casting one hash type to another must be done via the remaining From impls, or via `into_primitive()`, `into_entry_hash()`, `into_action_hash()`, etc. for converting from a composite hash to a primitive hash. See [holo\_hash::aliases](https://github.com/holochain/holochain/blob/bf242f00f7ef84cd7f09efc9770dc632f0da4310/crates/holo_hash/src/aliases.rs#L49-L140) for a full listing. [\#2191](https://github.com/holochain/holochain/pull/2191)
+
 ## 0.2.0-beta-rc.2
 
 ## 0.2.0-beta-rc.1
@@ -31,7 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.0.31
 
-- BREAKING CHANGE - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
+- **BREAKING CHANGE** - Refactor: Property `integrity.uid` of DNA Yaml files renamed to `integrity.network_seed`. Functionality has not changed. [\#1493](https://github.com/holochain/holochain/pull/1493)
 
 ## 0.0.30
 

@@ -27,7 +27,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use error::CascadeResult;
-use holo_hash::hash_type::AnyDht;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
@@ -853,9 +852,9 @@ where
         hash: AnyDhtHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Record>> {
-        match *hash.hash_type() {
-            AnyDht::Entry => self.dht_get_entry(hash.into(), options).await,
-            AnyDht::Action => self.dht_get_action(hash.into(), options).await,
+        match hash.into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self.dht_get_entry(hash, options).await,
+            AnyDhtHashPrimitive::Action(hash) => self.dht_get_action(hash, options).await,
         }
     }
 
@@ -866,13 +865,13 @@ where
         hash: AnyDhtHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Details>> {
-        match *hash.hash_type() {
-            AnyDht::Entry => Ok(self
-                .get_entry_details(hash.into(), options)
+        match hash.into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => Ok(self
+                .get_entry_details(hash, options)
                 .await?
                 .map(Details::Entry)),
-            AnyDht::Action => Ok(self
-                .get_record_details(hash.into(), options)
+            AnyDhtHashPrimitive::Action(hash) => Ok(self
+                .get_record_details(hash, options)
                 .await?
                 .map(Details::Record)),
         }

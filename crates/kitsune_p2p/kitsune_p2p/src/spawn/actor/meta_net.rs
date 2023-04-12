@@ -379,7 +379,7 @@ impl MetaNet {
         let mut is_mock = false;
 
         // set up our backend based on config
-        let (f, bind_to) = match tx2_conf.backend {
+        let (f, bind_to): (_, kitsune_p2p_types::tx2::tx2_utils::TxUrl) = match tx2_conf.backend {
             KitsuneP2pTx2Backend::Mem => {
                 let mut conf = MemConfig::default();
                 conf.tls = Some(tls_config.clone());
@@ -391,6 +391,7 @@ impl MetaNet {
                     "none:".into(),
                 )
             }
+            /*
             KitsuneP2pTx2Backend::Quic { bind_to } => {
                 let mut conf = QuicConfig::default();
                 conf.tls = Some(tls_config.clone());
@@ -402,6 +403,7 @@ impl MetaNet {
                     bind_to,
                 )
             }
+            */
             KitsuneP2pTx2Backend::Mock { mock_network } => {
                 is_mock = true;
                 (mock_network, "none:".into())
@@ -823,5 +825,32 @@ impl MetaNet {
         }
 
         Err("invalid features".into())
+    }
+
+    pub fn dump_network_stats(
+        &self,
+    ) -> impl std::future::Future<Output = KitsuneResult<serde_json::Value>> + 'static + Send {
+        use futures::FutureExt;
+
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNet::Tx2(ep) = self {
+                let mut res = ep.debug();
+                if let Some(map) = res.as_object_mut() {
+                    map.insert("backend".into(), "tx2-quic".into());
+                }
+                return async move { Ok(res) }.boxed();
+            }
+        }
+
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNet::Tx5(ep, _, _) = self {
+                let fut = ep.get_stats();
+                return async move { fut.await.map_err(KitsuneError::other) }.boxed();
+            }
+        }
+
+        async move { Err("invalid features".into()) }.boxed()
     }
 }
