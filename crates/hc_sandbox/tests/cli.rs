@@ -25,7 +25,9 @@ static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
         .release()
         .manifest_path(manifest_path)
         // Not defined on CI
-        .target_dir(PathBuf::from(option_env!("CARGO_TARGET_DIR").unwrap_or("./target")))
+        .target_dir(PathBuf::from(
+            option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
+        ))
         .run()
         .unwrap();
 
@@ -42,7 +44,9 @@ static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
         // Potentially faster builds with `.current_release` but the debug binary is much slower to launch once built.
         .release()
         .manifest_path(manifest_path)
-        .target_dir(PathBuf::from(option_env!("CARGO_TARGET_DIR").unwrap_or("./target")))
+        .target_dir(PathBuf::from(
+            option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
+        ))
         .run()
         .unwrap();
 
