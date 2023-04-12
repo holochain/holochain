@@ -70,12 +70,11 @@ async fn sign_record(keystore: &MetaLairClient, action: Action, entry: Option<En
 
 pub async fn rebuild_record(record: Record, keystore: &MetaLairClient) -> Record {
     let (action, entry) = record.into_inner();
-    sign_record(
-        keystore,
-        action.into_inner().0.into_content(),
-        entry.into_option(),
-    )
-    .await
+    let mut action = action.into_inner().0.into_content();
+    if let (Some(ed), Some(entry)) = (action.entry_data_mut(), entry.as_option()) {
+        *ed.0 = EntryHash::with_data_sync(entry);
+    }
+    sign_record(keystore, action, entry.into_option()).await
 }
 
 fn matching_record(u: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record {
@@ -542,7 +541,6 @@ async fn check_entry_size_test() {
     *record.as_action_mut().entry_data_mut().unwrap().1 = EntryType::App(fixt!(AppEntryDef));
     *record.as_entry_mut() = RecordEntry::Present(tiny_entry);
     let mut record = rebuild_record(record, &keystore).await;
-    dbg!(&record);
     sys_validate_record(&record, &cascade).await.unwrap();
 
     let huge_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
@@ -550,7 +548,6 @@ async fn check_entry_size_test() {
     ))));
     *record.as_entry_mut() = RecordEntry::Present(huge_entry);
     let record = rebuild_record(record, &keystore).await;
-    dbg!(&record);
 
     assert_eq!(
         sys_validate_record(&record, &cascade)
