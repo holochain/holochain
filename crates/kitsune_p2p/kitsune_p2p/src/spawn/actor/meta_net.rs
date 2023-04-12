@@ -192,7 +192,12 @@ pub enum MetaNetCon {
     Tx2(Tx2ConHnd<wire::Wire>),
 
     #[cfg(feature = "tx5")]
-    Tx5(tx5::Ep, tx5::Tx5Url, ResStore),
+    Tx5 {
+        ep: tx5::Ep,
+        rem_url: tx5::Tx5Url,
+        res: ResStore,
+        tun: KitsuneP2pTuningParams,
+    },
 }
 
 impl PartialEq for MetaNetCon {
@@ -201,7 +206,7 @@ impl PartialEq for MetaNetCon {
             #[cfg(feature = "tx2")]
             (MetaNetCon::Tx2(a), MetaNetCon::Tx2(b)) => a == b,
             #[cfg(feature = "tx5")]
-            (MetaNetCon::Tx5(a, _, _), MetaNetCon::Tx5(b, _, _)) => a == b,
+            (MetaNetCon::Tx5 { ep: a, .. }, MetaNetCon::Tx5 { ep: b, .. }) => a == b,
             _ => false,
         }
     }
@@ -219,7 +224,16 @@ impl MetaNetCon {
             }
         }
 
-        // TODO - no way to close a tx5 con currently
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNetCon::Tx5 {
+                ep, rem_url, tun, ..
+            } = self
+            {
+                ep.ban(rem_url.id().unwrap(), tun.tx5_ban_time());
+                return;
+            }
+        }
     }
 
     pub fn is_closed(&self) -> bool {
@@ -232,7 +246,7 @@ impl MetaNetCon {
 
         #[cfg(feature = "tx5")]
         {
-            // TODO - erm, tx5 connections are never exactly "closed"
+            // NOTE - tx5 connections are never exactly "closed"
             //        since it's more of a message queue...
             return false;
         }
@@ -254,7 +268,7 @@ impl MetaNetCon {
 
             #[cfg(feature = "tx5")]
             {
-                if let MetaNetCon::Tx5(ep, rem_url, _res_store) = self {
+                if let MetaNetCon::Tx5 { ep, rem_url, .. } = self {
                     let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                     let wrap = WireWrap::notify(msg_id, WireData(wire));
 
@@ -297,7 +311,13 @@ impl MetaNetCon {
 
             #[cfg(feature = "tx5")]
             {
-                if let MetaNetCon::Tx5(ep, rem_url, res_store) = self {
+                if let MetaNetCon::Tx5 {
+                    ep,
+                    rem_url,
+                    res: res_store,
+                    ..
+                } = self
+                {
                     let (s, r) = tokio::sync::oneshot::channel();
                     res_store.lock().insert(msg_id, s);
 
@@ -339,7 +359,7 @@ impl MetaNetCon {
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNetCon::Tx5(_con, rem_url, _res_store) = self {
+            if let MetaNetCon::Tx5 { rem_url, .. } = self {
                 let id = rem_url.id().unwrap();
                 return Arc::new(id.0);
             }
@@ -358,7 +378,12 @@ pub enum MetaNet {
 
     /// Tx5 Abstraction
     #[cfg(feature = "tx5")]
-    Tx5(tx5::Ep, tx5::Tx5Url, ResStore),
+    Tx5 {
+        ep: tx5::Ep,
+        url: tx5::Tx5Url,
+        res: ResStore,
+        tun: KitsuneP2pTuningParams,
+    },
 }
 
 impl MetaNet {
@@ -379,7 +404,7 @@ impl MetaNet {
         let mut is_mock = false;
 
         // set up our backend based on config
-        let (f, bind_to) = match tx2_conf.backend {
+        let (f, bind_to): (_, kitsune_p2p_types::tx2::tx2_utils::TxUrl) = match tx2_conf.backend {
             KitsuneP2pTx2Backend::Mem => {
                 let mut conf = MemConfig::default();
                 conf.tls = Some(tls_config.clone());
@@ -391,6 +416,7 @@ impl MetaNet {
                     "none:".into(),
                 )
             }
+            /*
             KitsuneP2pTx2Backend::Quic { bind_to } => {
                 let mut conf = QuicConfig::default();
                 conf.tls = Some(tls_config.clone());
@@ -402,6 +428,7 @@ impl MetaNet {
                     bind_to,
                 )
             }
+            */
             KitsuneP2pTx2Backend::Mock { mock_network } => {
                 is_mock = true;
                 (mock_network, "none:".into())
@@ -597,6 +624,7 @@ impl MetaNet {
 
         let ep_hnd2 = ep_hnd.clone();
         let res_store2 = res_store.clone();
+        let tuning_params2 = tuning_params.clone();
         tokio::task::spawn(async move {
             while let Some(evt) = ep_evt.recv().await {
                 let evt = match evt {
@@ -610,11 +638,12 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: rem_cli_url.to_string(),
-                                con: MetaNetCon::Tx5(
-                                    ep_hnd2.clone(),
-                                    rem_cli_url,
-                                    res_store2.clone(),
-                                ),
+                                con: MetaNetCon::Tx5 {
+                                    ep: ep_hnd2.clone(),
+                                    rem_url: rem_cli_url,
+                                    res: res_store2.clone(),
+                                    tun: tuning_params2.clone(),
+                                },
                             })
                             .await
                             .is_err()
@@ -626,11 +655,12 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Disconnected {
                                 remote_url: rem_cli_url.to_string(),
-                                con: MetaNetCon::Tx5(
-                                    ep_hnd2.clone(),
-                                    rem_cli_url,
-                                    res_store2.clone(),
-                                ),
+                                con: MetaNetCon::Tx5 {
+                                    ep: ep_hnd2.clone(),
+                                    rem_url: rem_cli_url,
+                                    res: res_store2.clone(),
+                                    tun: tuning_params2.clone(),
+                                },
                             })
                             .await
                             .is_err()
@@ -653,11 +683,12 @@ impl MetaNet {
                                         if evt_send
                                             .send(MetaNetEvt::Notify {
                                                 remote_url: rem_cli_url.to_string(),
-                                                con: MetaNetCon::Tx5(
-                                                    ep_hnd2.clone(),
-                                                    rem_cli_url,
-                                                    res_store2.clone(),
-                                                ),
+                                                con: MetaNetCon::Tx5 {
+                                                    ep: ep_hnd2.clone(),
+                                                    rem_url: rem_cli_url,
+                                                    res: res_store2.clone(),
+                                                    tun: tuning_params2.clone(),
+                                                },
                                                 data,
                                             })
                                             .await
@@ -698,11 +729,12 @@ impl MetaNet {
                                         if evt_send
                                             .send(MetaNetEvt::Request {
                                                 remote_url: rem_cli_url.to_string(),
-                                                con: MetaNetCon::Tx5(
-                                                    ep_hnd2.clone(),
-                                                    rem_cli_url,
-                                                    res_store2.clone(),
-                                                ),
+                                                con: MetaNetCon::Tx5 {
+                                                    ep: ep_hnd2.clone(),
+                                                    rem_url: rem_cli_url,
+                                                    res: res_store2.clone(),
+                                                    tun: tuning_params2.clone(),
+                                                },
                                                 data,
                                                 respond,
                                             })
@@ -745,7 +777,15 @@ impl MetaNet {
             }
         });
 
-        Ok((MetaNet::Tx5(ep_hnd, cli_url, res_store), evt_recv))
+        Ok((
+            MetaNet::Tx5 {
+                ep: ep_hnd,
+                url: cli_url,
+                res: res_store,
+                tun: tuning_params,
+            },
+            evt_recv,
+        ))
     }
 
     pub fn local_addr(&self) -> KitsuneResult<String> {
@@ -758,8 +798,8 @@ impl MetaNet {
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5(_ep, cli_url, _res_store) = self {
-                return Ok(cli_url.to_string());
+            if let MetaNet::Tx5 { url, .. } = self {
+                return Ok(url.to_string());
             }
         }
 
@@ -776,8 +816,8 @@ impl MetaNet {
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5(_ep, cli_url, _res_store) = self {
-                if let Some(id) = cli_url.id() {
+            if let MetaNet::Tx5 { url, .. } = self {
+                if let Some(id) = url.id() {
                     return Arc::new(id.0);
                 }
             }
@@ -813,15 +853,43 @@ impl MetaNet {
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5(ep, _cli_url, res_store) = self {
-                return Ok(MetaNetCon::Tx5(
-                    ep.clone(),
-                    tx5::Tx5Url::new(remote_url).map_err(KitsuneError::other)?,
-                    res_store.clone(),
-                ));
+            if let MetaNet::Tx5 { ep, res, tun, .. } = self {
+                return Ok(MetaNetCon::Tx5 {
+                    ep: ep.clone(),
+                    rem_url: tx5::Tx5Url::new(remote_url).map_err(KitsuneError::other)?,
+                    res: res.clone(),
+                    tun: tun.clone(),
+                });
             }
         }
 
         Err("invalid features".into())
+    }
+
+    pub fn dump_network_stats(
+        &self,
+    ) -> impl std::future::Future<Output = KitsuneResult<serde_json::Value>> + 'static + Send {
+        use futures::FutureExt;
+
+        #[cfg(feature = "tx2")]
+        {
+            if let MetaNet::Tx2(ep) = self {
+                let mut res = ep.debug();
+                if let Some(map) = res.as_object_mut() {
+                    map.insert("backend".into(), "tx2-quic".into());
+                }
+                return async move { Ok(res) }.boxed();
+            }
+        }
+
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNet::Tx5 { ep, .. } = self {
+                let fut = ep.get_stats();
+                return async move { fut.await.map_err(KitsuneError::other) }.boxed();
+            }
+        }
+
+        async move { Err("invalid features".into()) }.boxed()
     }
 }

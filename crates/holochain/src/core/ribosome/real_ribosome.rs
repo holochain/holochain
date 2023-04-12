@@ -445,9 +445,12 @@ impl RealRibosome {
         context_key: u64,
     ) -> RibosomeResult<Arc<Mutex<Instance>>> {
         let module = match &zome.def {
-            ZomeDef::Wasm(_wasm_zome) => self.runtime_compiled_module(zome.zome_name())?,
-            ZomeDef::WasmDylib(wasm_zome_dylib) => {
-                self.precompiled_module(&wasm_zome_dylib.path)?
+            ZomeDef::Wasm(wasm_zome) => {
+                if let Some(path) = wasm_zome.preserialized_path {
+                    self.precompiled_module(&path)?
+                } else {
+                    self.runtime_compiled_module(zome.zome_name())?
+                }
             }
             _ => {
                 // TODO-connor replace error
@@ -838,12 +841,12 @@ impl RibosomeT for RealRibosome {
             },
             extern_fns: {
                 match zome.zome_def() {
-                    ZomeDef::Wasm(_) => {
-                        let module = self.runtime_compiled_module(zome.zome_name())?;
-                        self.get_extern_fns_for_wasm(module)
-                    }
-                    ZomeDef::WasmDylib(zome_wasm_dylib) => {
-                        let module = self.precompiled_module(&zome_wasm_dylib.path)?;
+                    ZomeDef::Wasm(wasm_zome) => {
+                        let module = if let Some(path) = wasm_zome.preserialized_path {
+                            self.precompiled_module(&path)?
+                        } else {
+                            self.runtime_compiled_module(zome.zome_name())?
+                        };
                         self.get_extern_fns_for_wasm(module)
                     }
                     ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),
@@ -870,12 +873,12 @@ impl RibosomeT for RealRibosome {
         };
 
         match zome.zome_def() {
-            ZomeDef::Wasm(_) => {
-                let module = self.runtime_compiled_module(zome.zome_name())?;
-                self.do_wasm_call_for_module::<I>(call_context, invocation, zome, to_call, module)
-            }
-            ZomeDef::WasmDylib(zome_wasm_dylib) => {
-                let module = self.precompiled_module(&zome_wasm_dylib.path)?;
+            ZomeDef::Wasm(wasm_zome) => {
+                let module = if let Some(path) = wasm_zome.preserialized_path {
+                    self.precompiled_module(&path)?
+                } else {
+                    self.runtime_compiled_module(zome.zome_name())?
+                };
                 self.do_wasm_call_for_module::<I>(call_context, invocation, zome, to_call, module)
             }
             ZomeDef::Inline {
@@ -899,12 +902,12 @@ impl RibosomeT for RealRibosome {
         };
 
         match zome.zome_def() {
-            ZomeDef::Wasm(_) => {
-                let module = self.runtime_compiled_module(zome.zome_name())?;
-                self.get_const_fn_for_wasm(call_context, name, module)
-            }
-            ZomeDef::WasmDylib(zome_wasm_dylib) => {
-                let module = self.precompiled_module(&zome_wasm_dylib.path)?;
+            ZomeDef::Wasm(wasm_zome) => {
+                let module = if let Some(path) = wasm_zome.preserialized_path {
+                    self.precompiled_module(&path)?
+                } else {
+                    self.runtime_compiled_module(zome.zome_name())?
+                };
                 self.get_const_fn_for_wasm(call_context, name, module)
             }
             ZomeDef::Inline {

@@ -312,7 +312,6 @@ impl DnaDef {
             .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
             .and_then(|def| match def {
                 ZomeDef::Wasm(wasm_zome) => Ok(wasm_zome.wasm_hash.clone()),
-                ZomeDef::WasmDylib(wasm_zome_dylib) => Ok(wasm_zome_dylib.wasm_hash.clone()),
                 _ => Err(ZomeError::NonWasmZome(zome_name.clone())),
             })
     }
@@ -376,24 +375,9 @@ impl HashableContent for DnaDef {
     }
 
     fn hashable_content(&self) -> HashableContentBytes {
-        let integrity_zomes = &self
-            .integrity_zomes
-            .iter()
-            .map(|(zome_name, zome_def)| {
-                let altered_zome_def: IntegrityZomeDef = match zome_def.clone().as_any_zome_def() {
-                    ZomeDef::WasmDylib(wasm_dylib_zome) => ZomeDef::Wasm(WasmZome {
-                        wasm_hash: wasm_dylib_zome.wasm_hash.clone(),
-                        dependencies: wasm_dylib_zome.dependencies.clone(),
-                    })
-                    .into(),
-                    _ => zome_def.clone(),
-                };
-                (zome_name.clone(), altered_zome_def)
-            })
-            .collect();
         let hash = DnaDefHash {
             modifiers: &self.modifiers,
-            integrity_zomes,
+            integrity_zomes: &self.integrity_zomes,
         };
         HashableContentBytes::Content(
             holochain_serialized_bytes::UnsafeBytes::from(

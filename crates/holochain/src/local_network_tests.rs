@@ -1,33 +1,36 @@
+/*
 use std::convert::TryFrom;
 use std::sync::Arc;
 
 use crate::conductor::p2p_agent_store::all_agent_infos;
 use crate::conductor::p2p_agent_store::exchange_peer_info;
 use crate::conductor::ConductorHandle;
-use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::Post;
 use crate::test_utils::install_app;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::setup_app_with_network;
 use crate::test_utils::wait_for_integration_with_others;
-use futures::StreamExt;
 use hdk::prelude::CellId;
-use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
-use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
 use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use shrinkwraprs::Shrinkwrap;
 use tempfile::TempDir;
-use test_case::test_case;
 use tokio_helper;
 use tracing::debug_span;
+*/
+
+use crate::sweettest::*;
+use futures::StreamExt;
+use holo_hash::ActionHash;
+use holochain_wasm_test_utils::TestWasm;
+use test_case::test_case;
 
 #[test_case(2)]
 #[test_case(4)]
@@ -72,6 +75,9 @@ async fn conductors_call_remote(num_conductors: usize) {
     drop(keep);
 }
 
+// TODO - rewrite all these tests to use local sweettest
+
+/*
 #[test_case(2, 1, 1)]
 #[test_case(5, 1, 1)]
 #[test_case(1, 5, 5)]
@@ -507,3 +513,4 @@ async fn setup(
     }
     handles
 }
+*/

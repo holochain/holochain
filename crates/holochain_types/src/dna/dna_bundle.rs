@@ -73,34 +73,22 @@ impl DnaBundle {
         let integrity_zomes = data[0]
             .iter()
             .map(|(zome_name, hash, _, dependencies, dylib_path)| {
-                let zome_def = match dylib_path {
-                    Some(dylib) => ZomeDef::WasmDylib(WasmZomeDylib {
-                        wasm_hash: hash.clone(),
-                        path: dylib.clone(),
-                        dependencies: dependencies.clone(),
-                    }),
-                    None => ZomeDef::Wasm(WasmZome {
-                        wasm_hash: hash.clone(),
-                        dependencies: dependencies.clone(),
-                    }),
-                };
+                let zome_def = ZomeDef::Wasm(WasmZome {
+                    wasm_hash: hash.clone(),
+                    dependencies: dependencies.clone(),
+                    preserialized_path: dylib_path.clone(),
+                });
                 (zome_name.clone(), zome_def.into())
             })
             .collect();
         let coordinator_zomes = data[1]
             .iter()
             .map(|(zome_name, hash, _, dependencies, dylib_path)| {
-                let zome_def = match dylib_path {
-                    Some(dylib) => ZomeDef::WasmDylib(WasmZomeDylib {
-                        wasm_hash: hash.clone(),
-                        path: dylib.clone(),
-                        dependencies: dependencies.clone(),
-                    }),
-                    None => ZomeDef::Wasm(WasmZome {
-                        wasm_hash: hash.clone(),
-                        dependencies: dependencies.clone(),
-                    }),
-                };
+                let zome_def = ZomeDef::Wasm(WasmZome {
+                    wasm_hash: hash.clone(),
+                    dependencies: dependencies.clone(),
+                    preserialized_path: dylib_path.clone(),
+                });
                 (zome_name.clone(), zome_def.into())
             })
             .collect();

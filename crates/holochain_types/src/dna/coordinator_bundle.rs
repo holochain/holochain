@@ -1,7 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::CoordinatorZomes;
 use holochain_zome_types::WasmZome;
-use holochain_zome_types::WasmZomeDylib;
 use holochain_zome_types::ZomeDef;
 use mr_bundle::Manifest;
 
@@ -48,18 +47,12 @@ impl CoordinatorBundle {
         let coordinator = hash_bytes(self.manifest().zomes.iter().cloned(), &mut resources).await?;
         let coordinator_zomes = coordinator
             .iter()
-            .map(|(zome_name, hash, _, dependencies, dylib_path)| {
-                let zome_def = match dylib_path {
-                    Some(dylib) => ZomeDef::WasmDylib(WasmZomeDylib {
-                        wasm_hash: hash.clone(),
-                        path: dylib.clone(),
-                        dependencies: dependencies.clone(),
-                    }),
-                    None => ZomeDef::Wasm(WasmZome {
-                        wasm_hash: hash.clone(),
-                        dependencies: dependencies.clone(),
-                    }),
-                };
+            .map(|(zome_name, hash, _, dependencies, preserialized_path)| {
+                let zome_def = ZomeDef::Wasm(WasmZome {
+                    wasm_hash: hash.clone(),
+                    dependencies: dependencies.clone(),
+                    preserialized_path: preserialized_path.clone(),
+                });
                 (zome_name.clone(), zome_def.into())
             })
             .collect();

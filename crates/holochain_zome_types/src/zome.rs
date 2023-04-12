@@ -133,20 +133,20 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
     }
 }
 
-/// A zome defined by a preserialized
-/// wasmer module, as a "dynamic library" (dylib)
-/// Useful for iOS
+/// A zome defined by Wasm bytecode
+
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct WasmZomeDylib {
+#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
+pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
-    /// The path to the dylib
-    pub path: PathBuf,
+    /// The path to a preserialized wasmer module used as a "dynamic library" (dylib).
+    /// Useful for iOS and other targets.
+    pub preserialized_path: Option<PathBuf>,
     /// The zome dependencies
     pub dependencies: Vec<ZomeName>,
 }
 
-/// TODO-connor: change this comment
 /// Just the definition of a Zome, without the name included. This exists
 /// mainly for use in HashMaps where ZomeDefs are keyed by ZomeName.
 ///
@@ -164,11 +164,6 @@ pub struct WasmZomeDylib {
 pub enum ZomeDef {
     /// A zome defined by Wasm bytecode
     Wasm(WasmZome),
-
-    /// A zome defined by a preserialized
-    /// wasmer module, as a "dynamic library" (dylib)
-    /// Useful for iOS
-    WasmDylib(WasmZomeDylib),
 
     /// A zome defined by Rust closures. Cannot be deserialized.
     #[serde(skip_deserializing)]
@@ -192,8 +187,6 @@ pub struct CoordinatorZomeDef(ZomeDef);
 enum ZomeDefSerialized {
     Wasm(WasmZome),
 
-    WasmDylib(WasmZomeDylib),
-
     #[cfg(feature = "full-dna-def")]
     InlineUid(String),
 }
@@ -202,8 +195,6 @@ impl From<ZomeDef> for ZomeDefSerialized {
     fn from(d: ZomeDef) -> Self {
         match d {
             ZomeDef::Wasm(zome) => Self::Wasm(zome),
-
-            ZomeDef::WasmDylib(zome) => Self::WasmDylib(zome),
 
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { inline_zome, .. } => Self::InlineUid(inline_zome.0.uuid()),
@@ -227,10 +218,6 @@ impl CoordinatorZomeDef {
     pub fn set_dependency(&mut self, zome_name: impl Into<ZomeName>) {
         match &mut self.0 {
             ZomeDef::Wasm(WasmZome { dependencies, .. }) => dependencies.push(zome_name.into()),
-
-            ZomeDef::WasmDylib(WasmZomeDylib { dependencies, .. }) => {
-                dependencies.push(zome_name.into())
-            }
 
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { dependencies, .. } => dependencies.push(zome_name.into()),
@@ -288,8 +275,6 @@ impl ZomeDef {
         match self {
             ZomeDef::Wasm(WasmZome { wasm_hash, .. }) => Ok(wasm_hash.clone()),
 
-            ZomeDef::WasmDylib(WasmZomeDylib { wasm_hash, .. }) => Ok(wasm_hash.clone()),
-
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { .. } => Err(ZomeError::NonWasmZome(_zome_name.clone())),
         }
@@ -299,8 +284,6 @@ impl ZomeDef {
     pub fn dependencies(&self) -> &[ZomeName] {
         match self {
             ZomeDef::Wasm(WasmZome { dependencies, .. }) => &dependencies[..],
-
-            ZomeDef::WasmDylib(WasmZomeDylib { dependencies, .. }) => &dependencies[..],
 
             #[cfg(feature = "full-dna-def")]
             ZomeDef::Inline { dependencies, .. } => &dependencies[..],
@@ -353,24 +336,13 @@ impl<'a> arbitrary::Arbitrary<'a> for CoordinatorZomeDef {
     }
 }
 
-/// A zome defined by Wasm bytecode
-#[derive(
-    Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, SerializedBytes,
-)]
-#[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
-pub struct WasmZome {
-    /// The WasmHash representing the WASM byte code for this zome.
-    pub wasm_hash: holo_hash::WasmHash,
-    /// Integrity zomes this zome depends on.
-    pub dependencies: Vec<ZomeName>,
-}
-
 impl WasmZome {
     /// Constructor
     pub fn new(wasm_hash: holo_hash::WasmHash) -> Self {
         Self {
             wasm_hash,
             dependencies: Default::default(),
+            preserialized_path: None,
         }
     }
 }
@@ -381,6 +353,7 @@ impl ZomeDef {
         Self::Wasm(WasmZome {
             wasm_hash,
             dependencies: Default::default(),
+            preserialized_path: None,
         })
     }
 }
