@@ -29,21 +29,19 @@
 
 use super::*;
 use crate::conductor::space::TestSpaces;
-use crate::core::workflow::inline_validation;
 use crate::core::workflow::sys_validation_workflow::sys_validate_record;
 use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
-use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis_for_agent;
 use ::fixt::prelude::*;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
+use contrafact::Fact;
 use error::SysValidationError;
 
 use holochain_cascade::MockCascade;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::test_authored_db;
@@ -271,7 +269,6 @@ async fn verify_action_signature_test() {
 /// Any action other than DNA cannot be at seq 0
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_action() {
-    let mut u = unstructured_noise();
     let keystore = holochain_state::test_utils::test_keystore();
     let mut action = Action::Delete(fixt!(Delete));
     *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
@@ -561,39 +558,43 @@ async fn check_entry_size_test() {
 /// Check that updates can't switch the entry type
 #[tokio::test(flavor = "multi_thread")]
 async fn check_update_reference_test() {
-    let mut ec = fixt!(Create);
-    let mut eu = fixt!(Update);
-    let et_cap = EntryType::CapClaim;
-    let mut app_entry_def_fixt = AppEntryDefFixturator::new(Predictable).map(EntryType::App);
-    let et_app_1 = app_entry_def_fixt.next().unwrap();
-    let et_app_2 = app_entry_def_fixt.next().unwrap();
+    let mut u = unstructured_noise();
+    let keystore = test_keystore();
 
-    // Same entry type
-    ec.entry_type = et_app_1.clone();
-    eu.entry_type = et_app_1;
+    let action = contrafact::brute("non agent entry type", move |a: &Action| {
+        matches!(a, Action::Update(..))
+            && a.entry_type()
+                .map(|et| *et != EntryType::AgentPubKey)
+                .unwrap_or(false)
+    })
+    .build(&mut u);
+    let (mut record, cascade) = record_with_cascade(&keystore, action.into()).await;
 
-    assert_matches!(
-        check_update_reference(&eu, &NewEntryActionRef::from(&ec)),
-        Ok(())
-    );
+    let entry_type = record.action().entry_type().unwrap().clone();
+    let et2 = entry_type.clone();
+    let new_entry_type = contrafact::brute("different entry type", move |et: &EntryType| {
+        *et != et2 && *et != EntryType::AgentPubKey
+    })
+    .build(&mut u);
 
-    // Different app entry type
-    ec.entry_type = et_app_2;
+    let net = new_entry_type.clone();
+    let entry = contrafact::brute("matching entry", move |e: &Entry| {
+        entry_type_matches(&net, e)
+    })
+    .build(&mut u);
 
-    assert_matches!(
-        check_update_reference(&eu, &NewEntryActionRef::from(&ec)),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::UpdateTypeMismatch(_, _)
-        ))
-    );
+    *record.as_action_mut().entry_data_mut().unwrap().1 = new_entry_type.clone();
+    *record.as_entry_mut() = RecordEntry::Present(entry);
+    let record = rebuild_record(record, &keystore).await;
 
-    // Different entry type
-    eu.entry_type = et_cap;
-
-    assert_matches!(
-        check_update_reference(&eu, &NewEntryActionRef::from(&ec)),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::UpdateTypeMismatch(_, _)
+    assert_eq!(
+        sys_validate_record(&record, &cascade)
+            .await
+            .unwrap_err()
+            .into_outcome(),
+        Some(ValidationOutcome::UpdateTypeMismatch(
+            entry_type,
+            new_entry_type
         ))
     );
 }

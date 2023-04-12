@@ -469,8 +469,8 @@ pub fn check_update_reference(
         Ok(())
     } else {
         Err(ValidationOutcome::UpdateTypeMismatch(
-            eu.entry_type.clone(),
             original_entry_action.entry_type().clone(),
+            eu.entry_type.clone(),
         )
         .into())
     }
