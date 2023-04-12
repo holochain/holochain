@@ -234,38 +234,32 @@ pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
     Ok(())
 }
 
-/// Check previous action type is valid
-pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+/// Check that created agents are always paired with an AgentValidationPkg and vice versa
+pub fn check_agent_validation_pkg_predecessor(
+    action: &Action,
+    prev_action: &Action,
+) -> SysValidationResult<()> {
     let maybe_error = match (prev_action, action) {
         (
-            Action::AgentValidationPkg(AgentValidationPkg {
-                author: author1, ..
-            }),
-            Action::Create(Create {
-                author: author2,
-                entry_type: EntryType::AgentPubKey,
-                ..
-            }),
-        ) => {
-            if author1 != author2 {
-                Some("author of agent validation package must match succeeding agent")
-            } else {
-                None
-            }
-        }
-
-        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => {
-            Some("Every AgentValidationPkg must be followed by a Create for an AgentPubKey")
-        }
-
+            Action::AgentValidationPkg(AgentValidationPkg { .. }),
+            Action::Create(Create { .. }) | Action::Update(Update { .. }),
+        ) => None,
+        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => Some(
+            "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey",
+        ),
         (
             _,
             Action::Create(Create {
                 entry_type: EntryType::AgentPubKey,
                 ..
+            })
+            | Action::Update(Update {
+                entry_type: EntryType::AgentPubKey,
+                ..
             }),
-        ) => Some("Every Create for an AgentPubKey must be preceded by an AgentValidationPkg"),
-
+        ) => Some(
+            "Every Create or Update for an AgentPubKey must be preceded by an AgentValidationPkg",
+        ),
         _ => None,
     };
 
@@ -277,6 +271,37 @@ pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationRe
         .map_err(|e| ValidationOutcome::from(e).into())
     } else {
         Ok(())
+    }
+}
+
+/// Check that the author didn't change between actions
+pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+    // Agent updates will be valid when DPKI support lands
+    let a1: AgentPubKey = if let Action::Update(
+        u @ Update {
+            entry_type: EntryType::AgentPubKey,
+            ..
+        },
+    ) = prev_action
+    {
+        #[cfg(feature = "dpki")]
+        {
+            u.entry_hash.clone().into()
+        }
+
+        #[cfg(not(feature = "dpki"))]
+        {
+            u.author.clone()
+        }
+    } else {
+        prev_action.author().clone()
+    };
+
+    let a2 = action.author();
+    if a1 == *a2 {
+        Ok(())
+    } else {
+        Err(PrevActionError::Author(a1, a2.clone())).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
