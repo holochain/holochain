@@ -54,8 +54,8 @@ pub enum HcDnaBundle {
 
         /// Output shared object "dylib" files
         /// that can be used to run this happ on iOS
-        #[structopt(short = "i", long)]
-        ios_serialize: bool,
+        #[structopt(long)]
+        dylib_ios: bool,
     },
 
     /// Unpack parts of the `.dna` bundle file into a specific directory.
@@ -244,10 +244,10 @@ impl HcDnaBundle {
             Self::Init { path } => {
                 crate::init::init_dna(path).await?;
             }
-            Self::Pack { path, output, ios_serialize } => {
+            Self::Pack { path, output, dylib_ios } => {
                 let name = get_dna_name(&path).await?;
                 let (bundle_path, _) =
-                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name, ios_serialize).await?;
+                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name, dylib_ios).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -467,7 +467,7 @@ async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
         HcDnaBundle::Pack {
             path: dna_workdir_location,
             output: None,
-            ios_serialize: false
+            dylib_ios: false
         }
         .run()
         .await?;
