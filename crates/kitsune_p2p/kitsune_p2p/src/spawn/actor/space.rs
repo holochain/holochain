@@ -309,7 +309,15 @@ impl SpaceInternalHandler for Space {
     fn handle_get_all_local_joined_agent_infos(
         &mut self,
     ) -> SpaceInternalHandlerResult<Vec<AgentInfoSigned>> {
-        todo!();
+        let agent_infos: Vec<AgentInfoSigned> = self
+            .local_joined_agents
+            .values()
+            .into_iter()
+            .filter_map(|maybe_agent_info| maybe_agent_info.as_ref())
+            .cloned()
+            .collect();
+
+        Ok(async move { Ok(agent_infos) }.boxed().into())
     }
 
     fn handle_is_agent_local(

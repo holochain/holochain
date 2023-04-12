@@ -291,8 +291,6 @@ impl KitsuneP2pActor {
                                         }
                                     }
 
-
-
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     let _ = i_s.del_con(remote_url).await;
