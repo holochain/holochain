@@ -280,8 +280,6 @@ impl KitsuneP2pActor {
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     let _ = i_s.new_con(remote_url, con.clone()).await;
 
-
-
                                     // match host.get_all_local_agent_info_signed().await {
                                     //     Ok(agent_list) => {
                                     //         let payload = wire::Wire::peer_unsolicited(agent_list);
@@ -291,7 +289,6 @@ impl KitsuneP2pActor {
                                     //     },
                                     //     Err(err) => tracing::warn!(?err, "error getting local peer list"),
                                     // }
-
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     let _ = i_s.del_con(remote_url).await;
@@ -1257,6 +1254,11 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .boxed()
         .into();
         Ok(results)
+    }
+
+    fn handle_dump_network_stats(&mut self) -> KitsuneP2pHandlerResult<serde_json::Value> {
+        let fut = self.ep_hnd.dump_network_stats();
+        Ok(async move { Ok(fut.await?) }.boxed().into())
     }
 
     fn handle_get_diagnostics(

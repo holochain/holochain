@@ -2,7 +2,6 @@
 
 on:
   workflow_dispatch:
-  pull_request:
 
 concurrency:
   group: build-${{ github.ref_name }}-${{ github.event_name }}

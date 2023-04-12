@@ -650,6 +650,43 @@ async fn concurrent_install_dna() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn network_stats() {
+    holochain_trace::test_run().ok();
+
+    let mut batch = SweetConductorBatch::from_standard_config(2).await;
+
+    let dna_file = SweetDnaFile::unique_empty().await;
+
+    let apps = batch.setup_app("app", &[dna_file]).await.unwrap();
+
+    batch.exchange_peer_info().await;
+
+    let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    holochain::test_utils::consistency_60s([&alice, &bobbo]).await;
+
+    let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
+
+    #[cfg(not(feature = "tx5"))]
+    const EXPECT: &str = "tx2-quic";
+    #[cfg(feature = "tx5")]
+    const EXPECT: &str = "go-pion";
+
+    let req = AdminRequest::DumpNetworkStats;
+    let res: AdminResponse = client.request(req).await.unwrap();
+    match res {
+        AdminResponse::NetworkStatsDumped(json) => {
+            println!("{json}");
+
+            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+            let backend = parsed.as_object().unwrap().get("backend").unwrap();
+            assert_eq!(EXPECT, backend);
+        }
+        _ => panic!("unexpected"),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn full_state_dump_cursor_works() {
     holochain_trace::test_run().ok();
 

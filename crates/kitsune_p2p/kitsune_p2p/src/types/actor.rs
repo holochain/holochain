@@ -160,6 +160,9 @@ ghost_actor::ghost_chan! {
             space: KSpaceOpt,
         ) -> serde_json::Value;
 
+        /// dump network stats
+        fn dump_network_stats() -> serde_json::Value;
+
         /// Get data for diagnostics
         fn get_diagnostics(space: KSpace) -> KitsuneDiagnostics;
     }

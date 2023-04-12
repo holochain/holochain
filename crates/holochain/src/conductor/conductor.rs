@@ -740,10 +740,14 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use holochain_conductor_api::NetworkInfo;
+    use holochain_conductor_api::{DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo};
     use holochain_p2p::HolochainP2pSender;
+    use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
+    use kitsune_p2p::KitsuneAgent;
+    use kitsune_p2p::KitsuneBinType;
+    use rusqlite::params;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -837,16 +841,189 @@ mod network_impls {
 
         pub(crate) async fn network_info(
             &self,
-            dnas: &[DnaHash],
+            payload: &NetworkInfoRequestPayload,
         ) -> ConductorResult<Vec<NetworkInfo>> {
+            use holochain_sqlite::sql::sql_cell::SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP;
+
+            let NetworkInfoRequestPayload {
+                agent_pub_key,
+                dnas,
+                last_time_queried,
+            } = payload;
+
             futures::future::join_all(dnas.iter().map(|dna| async move {
-                let d = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
-                let fetch_pool_info = d.fetch_pool.info([dna.to_kitsune()].into_iter().collect());
-                ConductorResult::Ok(NetworkInfo { fetch_pool_info })
+                let diagnostics = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
+                let fetch_pool_info = diagnostics
+                    .fetch_pool
+                    .info([dna.to_kitsune()].into_iter().collect());
+
+                // query number of agents from peer db
+                let db = { self.p2p_agents_db(dna) };
+                let permit = db.conn_permit().await;
+                let mut conn = db.with_permit(permit)?;
+                let current_number_of_peers = conn.p2p_count_agents()?;
+
+                // query arc size and extrapolated coverage and estimate total peers
+                let cell_id = CellId::new(dna.as_hash().clone(), agent_pub_key.clone());
+                let (arc_size, total_network_peers) = match conn
+                    .p2p_get_agent(&KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()))?
+                {
+                    None => (0.0, 0),
+                    Some(agent) => {
+                        let arc_size = agent.storage_arc.coverage();
+                        let agents_in_arc = conn.p2p_gossip_query_agents(
+                            u64::MIN,
+                            u64::MAX,
+                            agent.storage_arc.inner().into(),
+                        )?;
+                        let number_of_agents_in_arc = agents_in_arc.len();
+                        let total_network_peers = if number_of_agents_in_arc == 0 {
+                            0
+                        } else {
+                            (number_of_agents_in_arc as f64 / arc_size) as u32
+                        };
+                        (arc_size, total_network_peers)
+                    }
+                };
+
+                // get sum of bytes from dht and cache db since last time
+                // request was made or since the beginning of time
+                let last_time_queried = match last_time_queried {
+                    Some(timestamp) => *timestamp,
+                    None => Timestamp::ZERO,
+                };
+                let sum_of_bytes_row_fn = |row: &Row| {
+                    row.get(0)
+                        .map(|maybe_bytes_received: Option<u64>| maybe_bytes_received.unwrap_or(0))
+                        .map_err(DatabaseError::SqliteError)
+                };
+                let dht_db = self
+                    .get_dht_db(dna)
+                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
+                let dht_bytes_received = dht_db
+                    .async_reader({
+                        move |txn| {
+                            txn.query_row_and_then(
+                                SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
+                                params![last_time_queried.as_micros()],
+                                sum_of_bytes_row_fn,
+                            )
+                        }
+                    })
+                    .await?;
+
+                let cache_db = self
+                    .get_cache_db(&cell_id)
+                    .await
+                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
+                let cache_bytes_received = cache_db
+                    .async_reader(move |txn| {
+                        txn.query_row_and_then(
+                            SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
+                            params![last_time_queried.as_micros()],
+                            sum_of_bytes_row_fn,
+                        )
+                    })
+                    .await?;
+                let bytes_since_last_time_queried = dht_bytes_received + cache_bytes_received;
+
+                // calculate open peer connections based on current gossip sessions
+                let completed_rounds_since_last_time_queried = diagnostics
+                    .metrics
+                    .read()
+                    .peer_node_histories()
+                    .iter()
+                    .flat_map(|(_, node_history)| node_history.completed_rounds.clone())
+                    .filter(|completed_round| {
+                        let now = tokio::time::Instant::now();
+                        let round_start_time_diff = now - completed_round.start_time;
+                        let round_start_timestamp =
+                            Timestamp::from_micros(round_start_time_diff.as_micros() as i64);
+                        round_start_timestamp > last_time_queried
+                    })
+                    .count() as u32;
+
+                ConductorResult::Ok(NetworkInfo {
+                    fetch_pool_info,
+                    current_number_of_peers,
+                    arc_size,
+                    total_network_peers,
+                    bytes_since_last_time_queried,
+                    completed_rounds_since_last_time_queried,
+                })
             }))
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
+        }
+
+        pub(crate) async fn storage_info(&self) -> ConductorResult<StorageInfo> {
+            let state = self.get_state().await?;
+
+            let all_dna: HashMap<DnaHash, Vec<InstalledAppId>> = HashMap::new();
+            let all_dna =
+                state
+                    .installed_apps()
+                    .iter()
+                    .fold(all_dna, |mut acc, (installed_app_id, app)| {
+                        for dna_hash in app.all_cells().map(|cell_id| cell_id.dna_hash()) {
+                            acc.entry(dna_hash.clone())
+                                .or_default()
+                                .push(installed_app_id.clone());
+                        }
+
+                        acc
+                    });
+
+            let app_data_blobs =
+                futures::future::join_all(all_dna.iter().map(|(dna_hash, used_by)| async {
+                    self.storage_info_for_dna(dna_hash, used_by).await
+                }))
+                .await
+                .into_iter()
+                .collect::<Result<Vec<StorageBlob>, ConductorError>>()?;
+
+            Ok(StorageInfo {
+                blobs: app_data_blobs,
+            })
+        }
+
+        async fn storage_info_for_dna(
+            &self,
+            dna_hash: &DnaHash,
+            used_by: &Vec<InstalledAppId>,
+        ) -> ConductorResult<StorageBlob> {
+            let authored_db = self.spaces.authored_db(dna_hash)?;
+            let dht_db = self.spaces.dht_db(dna_hash)?;
+            let cache_db = self.spaces.cache(dna_hash)?;
+
+            Ok(StorageBlob::Dna(DnaStorageInfo {
+                authored_data_size_on_disk: authored_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                authored_data_size: authored_db
+                    .async_reader(get_used_size)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                dht_data_size_on_disk: dht_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                dht_data_size: dht_db
+                    .async_reader(get_used_size)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                cache_data_size_on_disk: cache_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                cache_data_size: cache_db
+                    .async_reader(get_used_size)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                used_by: used_by.clone(),
+            }))
         }
 
         #[instrument(skip(self))]
@@ -1102,7 +1279,7 @@ mod app_impls {
 
     use super::*;
     impl Conductor {
-        pub(crate) async fn install_app(
+        pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
@@ -1149,10 +1326,16 @@ mod app_impls {
                 }
             };
 
+            let manifest = bundle.manifest().clone();
+
             let installed_app_id =
-                installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
+                installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
+
+            let local_dnas = self
+                .ribosome_store()
+                .share_ref(|store| bundle.get_all_dnas_from_store(store));
             let ops = bundle
-                .resolve_cells(agent_key.clone(), DnaGamut::placeholder(), membrane_proofs)
+                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
@@ -1180,7 +1363,7 @@ mod app_impls {
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await?;
 
             let roles = ops.role_assignments;
-            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles)?;
+            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
             // Update the db
             let stopped_app = self.add_disabled_app_to_db(app).await?;
@@ -2023,6 +2206,15 @@ mod misc_impls {
             use holochain_p2p::HolochainP2pSender;
             self.holochain_p2p()
                 .dump_network_metrics(dna_hash)
+                .await
+                .map_err(crate::conductor::api::error::ConductorApiError::other)
+        }
+
+        /// JSON dump of backend network stats
+        pub async fn dump_network_stats(&self) -> ConductorApiResult<String> {
+            use holochain_p2p::HolochainP2pSender;
+            self.holochain_p2p()
+                .dump_network_stats()
                 .await
                 .map_err(crate::conductor::api::error::ConductorApiError::other)
         }

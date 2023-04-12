@@ -251,6 +251,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let dump = self.conductor_handle.dump_network_metrics(dna_hash).await?;
                 Ok(AdminResponse::NetworkMetricsDumped(dump))
             }
+            DumpNetworkStats => {
+                let stats = self.conductor_handle.dump_network_stats().await?;
+                Ok(AdminResponse::NetworkStatsDumped(stats))
+            }
             AddAgentInfo { agent_infos } => {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
                 Ok(AdminResponse::AgentInfoAdded)
@@ -284,6 +288,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::CloneCellDeleted)
             }
+            StorageInfo => Ok(AdminResponse::StorageInfo(
+                self.conductor_handle.storage_info().await?,
+            )),
         }
     }
 }

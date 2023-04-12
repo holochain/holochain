@@ -1,6 +1,7 @@
 use crate::mutations;
 use crate::query::prelude::named_params;
 use holochain_sqlite::prelude::DatabaseResult;
+use holochain_sqlite::prelude::DbRead;
 use holochain_sqlite::prelude::DbWrite;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;

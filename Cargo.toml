@@ -27,13 +27,11 @@ members = [
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
+  "crates/hc_demo_cli",
 
   "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/dht",
   "crates/kitsune_p2p/dht_arc",
-  "crates/kitsune_p2p/direct",
-  "crates/kitsune_p2p/direct_api",
-  "crates/kitsune_p2p/direct_test",
   "crates/kitsune_p2p/fetch",
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/mdns",
@@ -51,9 +49,6 @@ members = [
 
 exclude = ["crates/release-automation"]
 
-[build]
-incremental = true
-
 [profile.fast-test]
 inherits = "dev"
 debug = 1
@@ -68,6 +63,8 @@ codegen-units = 16
 
 [patch.crates-io]
 # tx5 = { path = "../tx5/crates/tx5" }
+# tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
+# tx5-signal = { path = "../tx5/crates/tx5-signal" }
 # tx5 = { git = "https://github.com/holochain/tx5.git", rev = "da4cc7ea3cbb53b12e15ab0932a0ad14fdd41659" }
 # tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "da4cc7ea3cbb53b12e15ab0932a0ad14fdd41659" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
