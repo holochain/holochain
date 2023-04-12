@@ -160,7 +160,7 @@ impl SpaceInternalHandler for Space {
         _basis: Arc<KitsuneBasis>,
     ) -> SpaceInternalHandlerResult<HashSet<Arc<KitsuneAgent>>> {
         let mut res: HashSet<Arc<KitsuneAgent>> =
-            self.local_joined_agents.iter().cloned().collect();
+            self.local_joined_agents.keys().cloned().collect();
         let all_peers_fut = self
             .evt_sender
             .query_agents(QueryAgentsEvt::new(self.space.clone()));
@@ -179,7 +179,7 @@ impl SpaceInternalHandler for Space {
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
         let mut agent_list = Vec::with_capacity(self.local_joined_agents.len());
-        for agent in self.local_joined_agents.iter().cloned() {
+        for agent in self.local_joined_agents.keys().cloned() {
             let arc = self.get_agent_arc(&agent);
             agent_list.push((agent, arc));
         }
@@ -308,7 +308,7 @@ impl SpaceInternalHandler for Space {
         &mut self,
         agent: Arc<KitsuneAgent>,
     ) -> SpaceInternalHandlerResult<bool> {
-        let res = self.local_joined_agents.contains(&agent);
+        let res = self.local_joined_agents.contains_key(&agent);
         Ok(async move { Ok(res) }.boxed().into())
     }
 
@@ -337,7 +337,7 @@ impl SpaceInternalHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match &data {
             BroadcastData::User(data) => {
-                for agent in self.local_joined_agents.iter() {
+                for agent in self.local_joined_agents.keys() {
                     if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut =
@@ -764,13 +764,14 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        agent_info: AgentInfoSigned,
         initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         tracing::debug!(?space, ?agent, ?initial_arc, "handle_join");
         if let Some(initial_arc) = initial_arc {
             self.agent_arcs.insert(agent.clone(), initial_arc);
         }
-        self.local_joined_agents.insert(agent.clone());
+        self.local_joined_agents.insert(agent.clone(), agent_info);
         for module in self.gossip_mod.values() {
             module.local_agent_join(agent.clone());
         }
@@ -917,6 +918,7 @@ impl KitsuneP2pHandler for Space {
         let local_agents_holding_basis = self
             .local_joined_agents
             .iter()
+            .map(|(agent_key, _agent_info)| agent_key)
             .filter(|agent_key| {
                 self.agent_arcs
                     .get(*agent_key)
@@ -944,7 +946,7 @@ impl KitsuneP2pHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match &data {
             BroadcastData::User(data) => {
-                for agent_key in self.local_joined_agents.iter() {
+                for (agent_key, _agent_info) in self.local_joined_agents.iter() {
                     if let Some(arc) = self.agent_arcs.get(agent_key) {
                         if arc.contains(basis.get_loc()) {
                             let fut =
@@ -1314,7 +1316,7 @@ pub(crate) struct Space {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) host_api: HostApi,
-    pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
+    pub(crate) local_joined_agents: HashMap<Arc<KitsuneAgent>, AgentInfoSigned>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
@@ -1515,7 +1517,7 @@ impl Space {
             i_s,
             evt_sender,
             host_api,
-            local_joined_agents: HashSet::new(),
+            local_joined_agents: HashMap::new(),
             agent_arcs: HashMap::new(),
             config,
             mdns_handles: HashMap::new(),

@@ -20,6 +20,7 @@ use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// See <https://github.com/holochain/bootstrap>
@@ -279,10 +280,18 @@ impl KitsuneP2pActor {
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     let _ = i_s.new_con(remote_url, con.clone()).await;
 
-                                    let payload = wire::Wire::peer_unsolicited(vec![]);
-                                    if let Err(err) = con.notify(&payload, timeout).await {
-                                        tracing::warn!(?err, "error responding to op fetch");
-                                    }
+
+
+                                    // match host.get_all_local_agent_info_signed().await {
+                                    //     Ok(agent_list) => {
+                                    //         let payload = wire::Wire::peer_unsolicited(agent_list);
+                                    //         if let Err(err) = con.notify(&payload, timeout).await {
+                                    //             tracing::warn!(?err, "error responding to op fetch");
+                                    //         }
+                                    //     },
+                                    //     Err(err) => tracing::warn!(?err, "error getting local peer list"),
+                                    // }
+
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     let _ = i_s.del_con(remote_url).await;
@@ -1042,6 +1051,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        agent_info: AgentInfoSigned,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
@@ -1079,7 +1089,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = space_sender.get();
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.join(space, agent, initial_arc).await
+            space_sender.join(space, agent, agent_info, initial_arc).await
         }
         .boxed()
         .into())
