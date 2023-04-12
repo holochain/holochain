@@ -174,8 +174,7 @@ impl Wire {
             | Wire::Gossip(Gossip { space, .. })
             | Wire::PeerGet(PeerGet { space, .. })
             | Wire::PeerQuery(PeerQuery { space, .. })
-            | Wire::MetricExchange(MetricExchange { space, .. })
-             => Some(space.clone()),
+            | Wire::MetricExchange(MetricExchange { space, .. }) => Some(space.clone()),
             Wire::Failure(_)
             | Wire::CallResp(_)
             | Wire::PeerGetResp(_)

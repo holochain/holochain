@@ -3,6 +3,11 @@
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use super::{
+    conductor::RwShare,
+    error::ConductorResult,
+    p2p_agent_store::{self, P2pBatch},
+};
 use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::{
     queue_consumer::QueueConsumerMap,
@@ -16,6 +21,7 @@ use crate::core::{
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::DnaHashExt;
 use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
@@ -59,14 +65,8 @@ use kitsune_p2p::{
 };
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rusqlite::{named_params, OptionalExtension};
-use tracing::instrument;
-use holochain_p2p::DnaHashExt;
-use super::{
-    conductor::RwShare,
-    error::ConductorResult,
-    p2p_agent_store::{self, P2pBatch},
-};
 use std::convert::TryInto;
+use tracing::instrument;
 
 #[cfg(test)]
 mod tests;

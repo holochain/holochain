@@ -84,7 +84,9 @@ impl KitsuneHost for SwitchboardEventHandler {
         })))
     }
 
-    fn get_all_local_agent_info_signed(&self) -> crate::KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
+    fn get_all_local_agent_info_signed(
+        &self,
+    ) -> crate::KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
         todo!();
     }
 

@@ -14,13 +14,13 @@ use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 /// The bootstrap service is much more thoroughly documented in the default service implementation.
 /// See <https://github.com/holochain/bootstrap>
@@ -96,6 +96,9 @@ ghost_actor::ghost_chan! {
 
         /// Fetch an op from a remote
         fn fetch(key: FetchKey, space: KSpace, source: FetchSource) -> ();
+
+        /// Get all local joined agent infos across all spaces.
+        fn get_all_local_joined_agent_infos() -> Vec<AgentInfoSigned>;
     }
 }
 
@@ -258,6 +261,7 @@ impl KitsuneP2pActor {
         }
 
         let i_s = internal_sender.clone();
+
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
             let host = host.clone();
@@ -280,15 +284,15 @@ impl KitsuneP2pActor {
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     let _ = i_s.new_con(remote_url, con.clone()).await;
 
-                                    // match host.get_all_local_agent_info_signed().await {
-                                    //     Ok(agent_list) => {
-                                    //         let payload = wire::Wire::peer_unsolicited(agent_list);
-                                    //         if let Err(err) = con.notify(&payload, timeout).await {
-                                    //             tracing::warn!(?err, "error responding to op fetch");
-                                    //         }
-                                    //     },
-                                    //     Err(err) => tracing::warn!(?err, "error getting local peer list"),
-                                    // }
+                                    if let Ok(agent_list) = i_s.get_all_local_joined_agent_infos().await {
+                                        let payload = wire::Wire::peer_unsolicited(agent_list);
+                                        if let Err(err) = con.notify(&payload, timeout).await {
+                                            tracing::warn!(?err, "error sending local peer list");
+                                        }
+                                    }
+
+
+
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     let _ = i_s.del_con(remote_url).await;
@@ -958,6 +962,35 @@ impl InternalHandler for KitsuneP2pActor {
         .boxed()
         .into())
     }
+
+    /// Best effort to retrieve all local agent infos across all spaces. If there
+    /// is an error for some space we simply log it and ignore the error for that
+    /// space and return local joined agent infos from the other spaces.
+    fn handle_get_all_local_joined_agent_infos(
+        &mut self,
+    ) -> InternalHandlerResult<Vec<AgentInfoSigned>> {
+        let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (_, space) in futures::future::join_all(spaces).await {
+                all.push(space.get_all_local_joined_agent_infos());
+            }
+            let agent_infos = futures::future::join_all(all)
+                .await
+                .into_iter()
+                .filter_map(|maybe_agent_infos| {
+                    if let Err(err) = &maybe_agent_infos {
+                        tracing::warn!(?err, "error reading agent infos from spaces");
+                    }
+                    maybe_agent_infos.ok()
+                })
+                .flatten()
+                .collect();
+            Ok(agent_infos)
+        }
+        .boxed()
+        .into())
+    }
 }
 
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for KitsuneP2pActor {}
@@ -1048,7 +1081,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
-        agent_info: AgentInfoSigned,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
@@ -1086,7 +1119,9 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = space_sender.get();
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.join(space, agent, agent_info, initial_arc).await
+            space_sender
+                .join(space, agent, maybe_agent_info, initial_arc)
+                .await
         }
         .boxed()
         .into())

@@ -31,7 +31,7 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
 
     fn put_agent_info_signed(
         &self,
-        _input: Vec<crate::types::agent_store::AgentInfoSigned>
+        _input: Vec<crate::types::agent_store::AgentInfoSigned>,
     ) -> KitsuneHostResult<()> {
         box_fut(Ok(()))
     }
@@ -48,7 +48,9 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
         .into()))
     }
 
-    fn get_all_local_agent_info_signed(&self) -> crate::KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
+    fn get_all_local_agent_info_signed(
+        &self,
+    ) -> crate::KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
         todo!();
     }
 
@@ -177,7 +179,9 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         KitsuneHostDefaultError::get_agent_info_signed(self, input)
     }
 
-    fn get_all_local_agent_info_signed(&self) -> crate::KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
+    fn get_all_local_agent_info_signed(
+        &self,
+    ) -> crate::KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
         todo!();
     }
 

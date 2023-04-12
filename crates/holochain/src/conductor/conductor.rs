@@ -1876,15 +1876,15 @@ mod app_status_impls {
             .map(|(cell_id, cell)| async move {
                 let p2p_agents_db = cell.p2p_agents_db().clone();
                 let kagent = cell_id.agent_pubkey().to_kitsune();
-                let agent_info = match p2p_agents_db.async_reader(move |tx| {
+                let maybe_agent_info = match p2p_agents_db.async_reader(move |tx| {
                     tx.p2p_get_agent(&kagent)
                 }).await {
                     Ok(maybe_info) => maybe_info,
                     _ => None,
                 };
-                let maybe_initial_arc = agent_info.map(|i| i.storage_arc);
+                let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                 let network = cell.holochain_p2p_dna().clone();
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_initial_arc)).await {
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
                     Ok(Err(e)) => {
                         tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
                         Err(cell_id)

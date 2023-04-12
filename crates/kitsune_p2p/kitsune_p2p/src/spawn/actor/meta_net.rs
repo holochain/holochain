@@ -31,9 +31,9 @@ use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::*;
 
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_block::BlockTargetId;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
