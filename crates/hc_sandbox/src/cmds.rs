@@ -64,10 +64,10 @@ pub struct Network {
 pub enum NetworkType {
     /// A transport that uses the local memory transport protocol.
     Mem,
-    /// A transport that uses the QUIC protocol.
-    Quic(Quic),
-    /// A transport that uses the MDNS protocol.
-    Mdns,
+    // /// A transport that uses the QUIC protocol.
+    // Quic(Quic),
+    // /// A transport that uses the MDNS protocol.
+    // Mdns,
     /// A transport that uses the WebRTC protocol.
     #[structopt(name = "webrtc")]
     WebRTC {
@@ -76,6 +76,7 @@ pub enum NetworkType {
     },
 }
 
+/*
 #[derive(Debug, StructOpt, Clone)]
 pub struct Quic {
     #[structopt(short, long, parse(from_str = Url2::parse))]
@@ -97,6 +98,7 @@ pub struct Quic {
     /// Run through an external proxy at this url.
     pub proxy: Option<Url2>,
 }
+*/
 
 #[derive(Debug, StructOpt, Clone)]
 pub struct Existing {
@@ -183,6 +185,7 @@ impl From<Network> for KitsuneP2pConfig {
 
         match transport {
             NetworkType::Mem => (),
+            /*
             NetworkType::Mdns => {
                 kit.network_type = holochain_p2p::kitsune_p2p::NetworkType::QuicMdns;
                 kit.transport_pool = vec![TransportConfig::Quic {
@@ -221,6 +224,7 @@ impl From<Network> for KitsuneP2pConfig {
                     },
                 }];
             }
+            */
             NetworkType::WebRTC { signal_url } => {
                 let transport = TransportConfig::WebRTC { signal_url };
                 kit.transport_pool = vec![transport];

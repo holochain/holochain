@@ -379,7 +379,7 @@ impl MetaNet {
         let mut is_mock = false;
 
         // set up our backend based on config
-        let (f, bind_to) = match tx2_conf.backend {
+        let (f, bind_to): (_, kitsune_p2p_types::tx2::tx2_utils::TxUrl) = match tx2_conf.backend {
             KitsuneP2pTx2Backend::Mem => {
                 let mut conf = MemConfig::default();
                 conf.tls = Some(tls_config.clone());
@@ -391,6 +391,7 @@ impl MetaNet {
                     "none:".into(),
                 )
             }
+            /*
             KitsuneP2pTx2Backend::Quic { bind_to } => {
                 let mut conf = QuicConfig::default();
                 conf.tls = Some(tls_config.clone());
@@ -402,6 +403,7 @@ impl MetaNet {
                     bind_to,
                 )
             }
+            */
             KitsuneP2pTx2Backend::Mock { mock_network } => {
                 is_mock = true;
                 (mock_network, "none:".into())
