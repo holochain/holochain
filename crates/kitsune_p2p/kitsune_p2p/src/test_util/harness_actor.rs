@@ -183,9 +183,9 @@ impl ghost_actor::GhostHandler<HarnessInner> for HarnessActor {}
 impl HarnessInnerHandler for HarnessActor {
     fn handle_finish_agent(
         &mut self,
-        agent: Arc<KitsuneAgent>,
-        p2p: ghost_actor::GhostSender<KitsuneP2p>,
-        ctrl: ghost_actor::GhostSender<HarnessAgentControl>,
+        _agent: Arc<KitsuneAgent>,
+        _p2p: ghost_actor::GhostSender<KitsuneP2p>,
+        _ctrl: ghost_actor::GhostSender<HarnessAgentControl>,
     ) -> HarnessInnerHandlerResult<()> {
         todo!();
         // self.agents.insert(agent.clone(), (p2p.clone(), ctrl));

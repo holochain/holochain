@@ -7458,9 +7458,8 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.1-alpha.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b33ed8a4bf9ea9573c711e8de5ed0e3758c1465941ab0bd0e862cae780e0278"
+version = "0.0.1-alpha.9"
+source = "git+https://github.com/holochain/tx5?rev=aff3205e4256599fb50005a8d08c561aacc90101#aff3205e4256599fb50005a8d08c561aacc90101"
 dependencies = [
  "bytes",
  "futures",
@@ -7472,7 +7471,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.4 (git+https://github.com/holochain/tx5?rev=aff3205e4256599fb50005a8d08c561aacc90101)",
  "tx5-go-pion",
  "tx5-signal",
  "url 2.3.1",
@@ -7493,10 +7492,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tx5-core"
+version = "0.0.1-alpha.4"
+source = "git+https://github.com/holochain/tx5?rev=aff3205e4256599fb50005a8d08c561aacc90101#aff3205e4256599fb50005a8d08c561aacc90101"
+dependencies = [
+ "base64 0.13.1",
+ "once_cell",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "url 2.3.1",
+]
+
+[[package]]
 name = "tx5-go-pion"
 version = "0.0.1-alpha.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c40a2a06014d8c061ece18eb9a695395262b2986b6da3ad8fc3b0104d472820"
+source = "git+https://github.com/holochain/tx5?rev=aff3205e4256599fb50005a8d08c561aacc90101#aff3205e4256599fb50005a8d08c561aacc90101"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -7508,8 +7519,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.0.1-alpha.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c92a9d445cc2ec59c1b68d78d7673eb17e0fd114bdfb3ecf81187492d697acee"
+source = "git+https://github.com/holochain/tx5?rev=aff3205e4256599fb50005a8d08c561aacc90101#aff3205e4256599fb50005a8d08c561aacc90101"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -7521,7 +7531,7 @@ dependencies = [
  "ouroboros",
  "sha2 0.10.6",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.4 (git+https://github.com/holochain/tx5?rev=aff3205e4256599fb50005a8d08c561aacc90101)",
  "zip",
 ]
 
@@ -7539,15 +7549,14 @@ dependencies = [
  "sha2 0.10.6",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "zip",
 ]
 
 [[package]]
 name = "tx5-signal"
 version = "0.0.1-alpha.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "864e07dcea8bbefff8074ca920e8dcc3bb414f9b71f8f06e0e227010b89af75f"
+source = "git+https://github.com/holochain/tx5?rev=aff3205e4256599fb50005a8d08c561aacc90101#aff3205e4256599fb50005a8d08c561aacc90101"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -7567,7 +7576,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite 0.17.2",
  "tracing",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.4 (git+https://github.com/holochain/tx5?rev=aff3205e4256599fb50005a8d08c561aacc90101)",
  "url 2.3.1",
 ]
 
@@ -7588,7 +7597,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "tx5-core",
+ "tx5-core 0.0.1-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "warp",
 ]
 

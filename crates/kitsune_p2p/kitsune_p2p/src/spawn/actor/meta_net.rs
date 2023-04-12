@@ -789,6 +789,30 @@ impl MetaNet {
         panic!("invalid features");
     }
 
+    pub async fn broadcast(
+        &self,
+        payload: &wire::Wire,
+        timeout: KitsuneTimeout,
+    ) -> KitsuneResult<()> {
+        let msg_id = next_msg_id();
+
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNet::Tx5(ep, _cli_url, _res_store) = self {
+                let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                let wrap = WireWrap::notify(msg_id, WireData(wire));
+
+                let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+                ep.broadcast(data.as_slice())
+                    .await
+                    .map_err(KitsuneError::other)?;
+                return Ok(());
+            }
+        }
+
+        Err("invalid features".into())
+    }
+
     pub async fn close(&self, code: u32, reason: &str) {
         #[cfg(feature = "tx2")]
         {

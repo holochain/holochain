@@ -284,22 +284,31 @@ impl SpaceInternalHandler for Space {
         input: PutAgentInfoSignedEvt,
     ) -> SpaceInternalHandlerResult<()> {
         let timeout = self.config.tuning_params.implicit_timeout();
-        let tasks: Vec<_> = input
+        let tasks: Result<Vec<_>, _> = input
             .peer_data
-            .into_iter()
+            .iter()
             .map(|agent_info| {
                 self.handle_broadcast(
                     self.space.clone(),
                     Arc::new(KitsuneBasis::new(agent_info.agent.0.clone())),
                     timeout,
-                    BroadcastData::AgentInfo(agent_info),
+                    BroadcastData::AgentInfo(agent_info.clone()),
                 )
             })
             .collect();
+        let ep_hnd = self.ro_inner.ep_hnd.clone();
         Ok(async move {
-            for f in tasks {
-                f?.await?;
-            }
+            futures::future::join(
+                ep_hnd.broadcast(
+                    &wire::Wire::PeerUnsolicited(crate::wire::PeerUnsolicited {
+                        peer_list: input.peer_data,
+                    }),
+                    timeout,
+                ),
+                futures::future::join_all(tasks?),
+            )
+            .await
+            .0?;
             Ok(())
         }
         .boxed()
