@@ -2986,7 +2986,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -7458,9 +7458,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.1-alpha.9"
+version = "0.0.1-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aec258e2917ebdbaef374b21c3ada4c344d9099aec1f303d129c058e202e50ac"
+checksum = "8e3537222d8a1573e19372edc250ba633e1252d5b012f10d1420ab69777c92b7"
 dependencies = [
  "bytes",
  "futures",
