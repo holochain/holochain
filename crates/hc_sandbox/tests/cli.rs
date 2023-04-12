@@ -16,13 +16,15 @@ use url2::url2;
 const WEBSOCKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
 static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
+    let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_path.push("../hc/Cargo.toml");
+
     let out = escargot::CargoBuild::new()
-        .package("hc")
         .bin("hc")
         .current_target()
         .release()
-        .manifest_path("../hc/Cargo.toml")
-        .target_dir("../../target")
+        .manifest_path(manifest_path)
+        .target_dir(PathBuf::from(env!("CARGO_TARGET_DIR")))
         .run()
         .unwrap();
 
@@ -30,13 +32,16 @@ static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
 });
 
 static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
+    let mut manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_path.push("../holochain/Cargo.toml");
+
     let out = escargot::CargoBuild::new()
-        .package("holochain")
         .bin("holochain")
         .current_target()
+        // Potentially faster builds with `.current_release` but the debug binary is much slower to launch once built.
         .release()
-        .manifest_path("../holochain/Cargo.toml")
-        .target_dir("../../target")
+        .manifest_path(manifest_path)
+        .target_dir(PathBuf::from(env!("CARGO_TARGET_DIR")))
         .run()
         .unwrap();
 
