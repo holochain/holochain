@@ -615,45 +615,51 @@ async fn test_dpki_agent_update() {
         author: agents[0].clone(),
         timestamp: (head.timestamp + sec).unwrap(),
         action_seq: head.seq + 1,
-        prev_action: head.action,
+        prev_action: head.action.clone(),
         membrane_proof: None,
     });
 
-    let a2 = Action::Create(Create {
+    let a2 = Action::Update(Update {
         author: agents[0].clone(),
         timestamp: (a1.timestamp() + sec).unwrap(),
         action_seq: a1.action_seq() + 1,
         prev_action: a1.to_hash(),
         entry_type: EntryType::AgentPubKey,
         entry_hash: agents[1].clone().into(),
+        original_action_address: head.action,
+        original_entry_address: agents[0].clone().into(),
         weight: EntryRateWeight::default(),
     });
 
     let a3 = Action::AgentValidationPkg(AgentValidationPkg {
         author: agents[1].clone(),
-        timestamp: (head.timestamp + sec).unwrap(),
+        timestamp: (a2.timestamp() + sec).unwrap(),
         action_seq: a2.action_seq() + 1,
         prev_action: a2.to_hash(),
         membrane_proof: None,
     });
 
-    let a4 = Action::Create(Create {
+    let a4 = Action::Update(Update {
         author: agents[1].clone(),
-        timestamp: (a1.timestamp() + sec).unwrap(),
+        timestamp: (a3.timestamp() + sec).unwrap(),
         action_seq: a3.action_seq() + 1,
         prev_action: a3.to_hash(),
         entry_type: EntryType::AgentPubKey,
         entry_hash: agents[2].clone().into(),
+        original_action_address: ActionHash::with_data_sync(&a2),
+        original_entry_address: agents[1].clone().into(),
         weight: EntryRateWeight::default(),
     });
 
-    let a5 = Action::Create(Create {
+    let a5 = Action::Update(Update {
         author: agents[2].clone(),
-        timestamp: (a2.timestamp() + sec).unwrap(),
+        timestamp: (a4.timestamp() + sec).unwrap(),
         action_seq: a4.action_seq() + 1,
         prev_action: a4.to_hash(),
         entry_type: EntryType::AgentPubKey,
         entry_hash: agents[3].clone().into(),
+        original_action_address: ActionHash::with_data_sync(&a4),
+        original_entry_address: agents[2].clone().into(),
         weight: EntryRateWeight::default(),
     });
 

@@ -240,19 +240,26 @@ pub fn check_agent_validation_pkg_predecessor(
     prev_action: &Action,
 ) -> SysValidationResult<()> {
     let maybe_error = match (prev_action, action) {
-        (Action::AgentValidationPkg(AgentValidationPkg { .. }), Action::Create(Create { .. })) => {
-            None
-        }
-        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => {
-            Some("Every AgentValidationPkg must be followed by a Create for an AgentPubKey")
-        }
+        (
+            Action::AgentValidationPkg(AgentValidationPkg { .. }),
+            Action::Create(Create { .. }) | Action::Update(Update { .. }),
+        ) => None,
+        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => Some(
+            "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey",
+        ),
         (
             _,
             Action::Create(Create {
                 entry_type: EntryType::AgentPubKey,
                 ..
+            })
+            | Action::Update(Update {
+                entry_type: EntryType::AgentPubKey,
+                ..
             }),
-        ) => Some("Every Create for an AgentPubKey must be preceded by an AgentValidationPkg"),
+        ) => Some(
+            "Every Create or Update for an AgentPubKey must be preceded by an AgentValidationPkg",
+        ),
         _ => None,
     };
 
