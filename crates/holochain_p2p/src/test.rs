@@ -167,6 +167,10 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
+    fn handle_dump_network_stats(&mut self) -> HolochainP2pHandlerResult<String> {
+        Err("stub".into())
+    }
+
     fn handle_get_diagnostics(
         &mut self,
         dna_hash: DnaHash,
