@@ -75,12 +75,6 @@ impl KitsuneHost for HostStub {
         KitsuneHostDefaultError::get_agent_info_signed(&self.err, input)
     }
 
-    fn get_all_local_agent_info_signed(
-        &self,
-    ) -> crate::KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        todo!();
-    }
-
     fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
         KitsuneHostDefaultError::remove_agent_info_signed(&self.err, input)
     }

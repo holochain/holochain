@@ -43,12 +43,6 @@ pub trait KitsuneHost: 'static + Send + Sync {
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>>;
 
-    /// Analogous to all the local joined agents across all spaces, but from the
-    /// perspective of the host.
-    fn get_all_local_agent_info_signed(
-        &self,
-    ) -> KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>>;
-
     /// Remove an agent info from storage
     fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool>;
 

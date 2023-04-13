@@ -48,12 +48,6 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
         .into()))
     }
 
-    fn get_all_local_agent_info_signed(
-        &self,
-    ) -> crate::KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        todo!();
-    }
-
     fn remove_agent_info_signed(&self, _input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
@@ -177,12 +171,6 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         input: GetAgentInfoSignedEvt,
     ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         KitsuneHostDefaultError::get_agent_info_signed(self, input)
-    }
-
-    fn get_all_local_agent_info_signed(
-        &self,
-    ) -> crate::KitsuneHostResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        todo!();
     }
 
     fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
