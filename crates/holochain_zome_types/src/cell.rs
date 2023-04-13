@@ -1,12 +1,11 @@
 //! A "Cell" represents a DNA/AgentId pair - a space where one dna/agent
 //! can track its source chain and service network requests / responses.
 
+use crate::RoleName;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use std::fmt;
-
-use crate::RoleName;
 
 /// The unique identifier for a Cell.
 /// Cells are uniquely determined by this pair - this pair is necessary

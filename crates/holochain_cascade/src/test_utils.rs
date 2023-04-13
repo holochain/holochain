@@ -53,6 +53,7 @@ use holochain_zome_types::QueryFilter;
 use holochain_zome_types::Signature;
 use holochain_zome_types::Timestamp;
 use holochain_zome_types::ValidationStatus;
+use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 
 pub use activity_test_data::*;
@@ -264,6 +265,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     async fn join(
         &self,
         _agent: AgentPubKey,
+        _maybe_agent_info: Option<AgentInfoSigned>,
         _initial_arc: Option<DhtArc>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
@@ -466,6 +468,7 @@ impl HolochainP2pDnaT for MockNetwork {
     async fn join(
         &self,
         _agent: AgentPubKey,
+        _agent_info: Option<AgentInfoSigned>,
         _initial_arc: Option<DhtArc>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
