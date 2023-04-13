@@ -170,7 +170,7 @@ async fn start_lair(passphrase: &Vec<u8>, lair_path: PathBuf) -> anyhow::Result<
     let mut lair = cmd.spawn().expect("Failed to spawn lair-keystore");
 
     let mut stdin = lair.stdin.take().unwrap();
-    stdin.write_all(&passphrase).await?;
+    stdin.write_all(passphrase).await?;
     stdin.shutdown().await?;
     drop(stdin);
 
