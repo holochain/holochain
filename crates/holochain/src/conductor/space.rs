@@ -64,6 +64,7 @@ use kitsune_p2p::{
     event::{TimeWindow, TimeWindowInclusive},
     KitsuneP2pConfig,
 };
+use kitsune_p2p_block::NodeId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
@@ -179,42 +180,88 @@ impl Spaces {
         holochain_state::block::unblock(&self.conductor_db, input).await
     }
 
+    async fn node_agents_in_spaces(
+        &self,
+        node_id: NodeId,
+        dnas: Vec<DnaHash>,
+    ) -> DatabaseResult<Vec<CellId>> {
+        let mut agent_lists: Vec<Vec<AgentInfoSigned>> = vec![];
+        for dna in dnas {
+            // @todo join_all for these awaits
+            agent_lists.push(
+                self.p2p_agents_db(&dna)?
+                    .async_reader(|txn| txn.p2p_list_agents())
+                    .await?,
+            );
+        }
+
+        Ok(agent_lists
+            .into_iter()
+            .flatten()
+            .filter(|agent| {
+                agent.url_list.iter().any(|url| {
+                    kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str())
+                        .digest()
+                        .0
+                        == node_id
+                })
+            })
+            .map(|agent_info| {
+                CellId::new(
+                    DnaHash::from_kitsune(&agent_info.space),
+                    AgentPubKey::from_kitsune(&agent_info.agent),
+                )
+            })
+            .collect())
+    }
+
     /// Check if some target is blocked.
-    #[async_recursion::async_recursion]
     pub async fn is_blocked(
         &self,
         target_id: BlockTargetId,
         timestamp: Timestamp,
     ) -> DatabaseResult<bool> {
-        let target_id_1 = target_id.clone();
-        Ok(self.conductor_db
-            .async_reader(move |txn| holochain_state::block::query_is_blocked(&txn, target_id_1, timestamp))
-            .await?
-            // Targets may imply additional sub-targets.
-            || match target_id {
-                BlockTargetId::Cell(_) => false,
-                BlockTargetId::Ip(_) => false,
-                BlockTargetId::Node(node_id) => {
-                    let dnas: Vec<DnaHash> = self.map.share_ref(|m| m.keys().cloned().collect::<Vec<DnaHash>>());
-                    let mut all_blocked = true;
-                    for dna in dnas {
-                        all_blocked = all_blocked && self.is_blocked(BlockTargetId::NodeDna(node_id.clone(), dna), timestamp).await?;
-                    }
-                    all_blocked
+        let cell_ids = match &target_id {
+            BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
+            BlockTargetId::NodeDna(node_id, dna_hash) => {
+                self.node_agents_in_spaces((*node_id).clone(), vec![dna_hash.clone()])
+                    .await?
+            }
+            BlockTargetId::Node(node_id) => {
+                self.node_agents_in_spaces(
+                    (*node_id).clone(),
+                    self.map
+                        .share_ref(|m| m.keys().cloned().collect::<Vec<DnaHash>>()),
+                )
+                .await?
+            }
+            // @todo
+            BlockTargetId::Ip(_) => {
+                vec![]
+            }
+        };
+
+        self.conductor_db
+            .async_reader(move |txn| {
+                Ok(
+                    // If the target_id is directly blocked then we always return true.
+                    holochain_state::block::query_is_blocked(&txn, target_id, timestamp)?
+            // If there are zero unblocked cells then return true.
+            || {
+                let mut all_blocked_cell_ids = true;
+                for cell_id in cell_ids {
+                    if !holochain_state::block::query_is_blocked(
+                        &txn,
+                        BlockTargetId::Cell(cell_id), timestamp)? {
+                            all_blocked_cell_ids = false;
+                            break;
+                        }
                 }
-                BlockTargetId::NodeDna(node_id, dna_hash) => {
-                    let agents: DatabaseResult<Vec<AgentInfoSigned>> = self.p2p_agents_db(&dna_hash)?.async_reader(|txn| txn.p2p_list_agents()).await;
-                    let agents_for_target_node_id = agents?.into_iter().filter(|agent| {
-                        DnaHash::from_kitsune(&agent.space) == dna_hash &&
-                        agent.url_list.iter().any(|url| kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str()).digest().0 == node_id)
-                    });
-                    let mut all_blocked = true;
-                    for agent in agents_for_target_node_id {
-                        all_blocked = all_blocked && self.is_blocked(BlockTargetId::Cell(CellId::new(DnaHash::from_kitsune(&agent.space), AgentPubKey::from_kitsune(&agent.agent))), timestamp).await?;
-                    }
-                    all_blocked
-                }
+                all_blocked_cell_ids
+            },
+                )
             })
+            .await
     }
 
     /// Get the holochain conductor state
