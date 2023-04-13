@@ -138,7 +138,7 @@ async fn generate_sandbox_and_connect() {
         .arg(format!("--run={}", port))
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
-        .stdout(Stdio::null())
+        //.stdout(Stdio::null())
         .kill_on_drop(true);
 
     let hc_admin = cmd.spawn().expect("Failed to spawn holochain");
@@ -174,7 +174,7 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg(format!("--run={}", app_port))
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
-        .stdout(Stdio::null())
+        //.stdout(Stdio::null())
         .kill_on_drop(true);
 
     let hc_admin = cmd.spawn().expect("Failed to spawn holochain");
