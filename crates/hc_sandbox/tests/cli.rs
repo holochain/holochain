@@ -22,7 +22,7 @@ static HC_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let out = escargot::CargoBuild::new()
         .bin("hc")
         .current_target()
-        .release()
+        .current_release()
         .manifest_path(manifest_path)
         // Not defined on CI
         .target_dir(PathBuf::from(
@@ -41,8 +41,7 @@ static HOLOCHAIN_BUILT_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let out = escargot::CargoBuild::new()
         .bin("holochain")
         .current_target()
-        // Potentially faster builds with `.current_release` but the debug binary is much slower to launch once built.
-        .release()
+        .current_release()
         .manifest_path(manifest_path)
         .target_dir(PathBuf::from(
             option_env!("CARGO_TARGET_DIR").unwrap_or("./target"),
