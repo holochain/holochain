@@ -2,12 +2,9 @@
 //! This module contains all the checks we run for sys validation
 
 use super::queue_consumer::TriggerSender;
-use super::ribosome::RibosomeT;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
-use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::space::Space;
-use crate::conductor::Conductor;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeSource;
 use holochain_keystore::AgentPubKeyExt;
@@ -332,59 +329,6 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
     entry_type_matches(entry_type, entry)
         .then_some(())
         .ok_or_else(|| ValidationOutcome::EntryTypeMismatch.into())
-}
-
-/// Check the AppEntryDef is valid for the zome.
-/// Check the EntryDefId and ZomeIndex are in range.
-pub async fn check_entry_def(
-    op: &Op,
-    dna_hash: &DnaHash,
-    conductor: &Conductor,
-) -> SysValidationResult<()> {
-    if let Some((_, entry_type)) = op.entry_data() {
-        if let EntryType::App(app_entry_def) = entry_type {
-            check_app_entry_def(app_entry_def, dna_hash, conductor).await
-        } else {
-            Ok(())
-        }
-    } else {
-        Ok(())
-    }
-}
-
-/// Check the AppEntryDef is valid for the zome.
-/// Check the EntryDefId and ZomeIndex are in range.
-pub async fn check_app_entry_def(
-    app_entry_def: &AppEntryDef,
-    dna_hash: &DnaHash,
-    conductor: &Conductor,
-) -> SysValidationResult<()> {
-    // We want to be careful about holding locks open to the conductor api
-    // so calls are made in blocks
-    let ribosome = conductor
-        .get_ribosome(dna_hash)
-        .map_err(|_| SysValidationError::DnaMissing(dna_hash.clone()))?;
-
-    // Check if the zome is found
-    let zome = ribosome
-        .get_integrity_zome(&app_entry_def.zome_index())
-        .ok_or_else(|| ValidationOutcome::ZomeIndex(app_entry_def.clone()))?
-        .into_inner()
-        .1;
-
-    let entry_def = get_entry_def(app_entry_def.entry_index(), zome, dna_hash, conductor).await?;
-
-    // Check the visibility and return
-    match entry_def {
-        Some(entry_def) => {
-            if entry_def.visibility == *app_entry_def.visibility() {
-                Ok(())
-            } else {
-                Err(ValidationOutcome::EntryVisibility(app_entry_def.clone()).into())
-            }
-        }
-        None => Err(ValidationOutcome::EntryDefId(app_entry_def.clone()).into()),
-    }
 }
 
 /// Check the app entry type isn't private for store entry

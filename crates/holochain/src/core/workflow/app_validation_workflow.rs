@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
+use crate::conductor::entry_def_store::get_entry_def;
+use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
@@ -13,6 +15,9 @@ use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::SysValidationError;
+use crate::core::SysValidationResult;
+use crate::core::ValidationOutcome;
 use error::AppValidationResult;
 pub use error::*;
 use futures::stream::StreamExt;
@@ -478,7 +483,7 @@ pub async fn validate_op<R>(
 where
     R: RibosomeT,
 {
-    crate::core::check_entry_def(op, &network.dna_hash(), conductor_handle)
+    check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
         .map_err(AppValidationError::SysValidationError)?;
 
@@ -534,6 +539,59 @@ where
     .await?;
 
     Ok(outcome)
+}
+
+/// Check the AppEntryDef is valid for the zome.
+/// Check the EntryDefId and ZomeIndex are in range.
+pub async fn check_entry_def(
+    op: &Op,
+    dna_hash: &DnaHash,
+    conductor: &Conductor,
+) -> SysValidationResult<()> {
+    if let Some((_, entry_type)) = op.entry_data() {
+        if let EntryType::App(app_entry_def) = entry_type {
+            check_app_entry_def(app_entry_def, dna_hash, conductor).await
+        } else {
+            Ok(())
+        }
+    } else {
+        Ok(())
+    }
+}
+
+/// Check the AppEntryDef is valid for the zome.
+/// Check the EntryDefId and ZomeIndex are in range.
+pub async fn check_app_entry_def(
+    app_entry_def: &AppEntryDef,
+    dna_hash: &DnaHash,
+    conductor: &Conductor,
+) -> SysValidationResult<()> {
+    // We want to be careful about holding locks open to the conductor api
+    // so calls are made in blocks
+    let ribosome = conductor
+        .get_ribosome(dna_hash)
+        .map_err(|_| SysValidationError::DnaMissing(dna_hash.clone()))?;
+
+    // Check if the zome is found
+    let zome = ribosome
+        .get_integrity_zome(&app_entry_def.zome_index())
+        .ok_or_else(|| ValidationOutcome::ZomeIndex(app_entry_def.clone()))?
+        .into_inner()
+        .1;
+
+    let entry_def = get_entry_def(app_entry_def.entry_index(), zome, dna_hash, conductor).await?;
+
+    // Check the visibility and return
+    match entry_def {
+        Some(entry_def) => {
+            if entry_def.visibility == *app_entry_def.visibility() {
+                Ok(())
+            } else {
+                Err(ValidationOutcome::EntryVisibility(app_entry_def.clone()).into())
+            }
+        }
+        None => Err(ValidationOutcome::EntryDefId(app_entry_def.clone()).into()),
+    }
 }
 
 pub fn entry_creation_zomes_to_invoke(

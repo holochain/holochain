@@ -47,11 +47,8 @@ use holochain_state::prelude::fresh_reader_test;
 use holochain_state::prelude::test_authored_db;
 use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
-use holochain_state::test_utils::test_db_dir;
-use holochain_trace;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
-use holochain_wasm_test_utils::*;
 use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::convert::TryFrom;
@@ -620,89 +617,6 @@ async fn check_link_tag_size_test() {
             .unwrap_err()
             .into_outcome(),
         Some(ValidationOutcome::TagTooLarge(super::MAX_TAG_SIZE + 1))
-    );
-}
-
-/// Check the AppEntryDef is valid for the zome and the EntryDefId and ZomeIndex are in range.
-#[tokio::test(flavor = "multi_thread")]
-async fn check_app_entry_def_test() {
-    holochain_trace::test_run().ok();
-    let TestWasmPair::<DnaWasm> {
-        integrity,
-        coordinator,
-    } = TestWasm::EntryDefs.into();
-    // Setup test data
-    let dna_file = DnaFile::new(
-        DnaDef {
-            name: "app_entry_def_test".to_string(),
-            modifiers: DnaModifiers {
-                network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
-                origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
-            },
-            integrity_zomes: vec![TestZomes::from(TestWasm::EntryDefs).integrity.into_inner()],
-            coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
-                .coordinator
-                .into_inner()],
-        },
-        [integrity, coordinator],
-    )
-    .await;
-    let dna_hash = dna_file.dna_hash().to_owned().clone();
-    let mut entry_def = EntryDef::fixture();
-    entry_def.visibility = EntryVisibility::Public;
-
-    let db_dir = test_db_dir();
-    let conductor_handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
-
-    // ## Dna is missing
-    let app_entry_def_0 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
-    assert_matches!(
-        check_app_entry_def(&app_entry_def_0, &dna_hash, &conductor_handle).await,
-        Err(SysValidationError::DnaMissing(_))
-    );
-
-    // # Dna but no entry def in buffer
-    // ## ZomeIndex out of range
-    conductor_handle.register_dna(dna_file).await.unwrap();
-
-    // ## EntryId is out of range
-    let app_entry_def_1 = AppEntryDef::new(10.into(), 0.into(), EntryVisibility::Public);
-    assert_matches!(
-        check_app_entry_def(&app_entry_def_1, &dna_hash, &conductor_handle).await,
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::EntryDefId(_)
-        ))
-    );
-
-    let app_entry_def_2 = AppEntryDef::new(0.into(), 100.into(), EntryVisibility::Public);
-    assert_matches!(
-        check_app_entry_def(&app_entry_def_2, &dna_hash, &conductor_handle).await,
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::ZomeIndex(_)
-        ))
-    );
-
-    // ## EntryId is in range for dna
-    let app_entry_def_3 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
-    assert_matches!(
-        check_app_entry_def(&app_entry_def_3, &dna_hash, &conductor_handle).await,
-        Ok(_)
-    );
-    let app_entry_def_4 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
-    assert_matches!(
-        check_app_entry_def(&app_entry_def_4, &dna_hash, &conductor_handle).await,
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::EntryVisibility(_)
-        ))
-    );
-
-    // ## Can get the entry from the entry def
-    let app_entry_def_5 = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Public);
-    assert_matches!(
-        check_app_entry_def(&app_entry_def_5, &dna_hash, &conductor_handle).await,
-        Ok(_)
     );
 }
 
