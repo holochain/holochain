@@ -27,13 +27,16 @@ use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
 #[cfg(feature = "tx2")]
 use kitsune_p2p_types::tx2::*;
 
-use kitsune_p2p_types::codec::Codec;
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
-use kitsune_p2p_types::*;
-
+use crate::spawn::actor::InternalSender;
+use crate::spawn::KitsuneP2pEvent;
+use crate::spawn::PutAgentInfoSignedEvt;
+use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_block::BlockTargetId;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
+use kitsune_p2p_types::codec::Codec;
+use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::*;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -595,6 +598,8 @@ impl MetaNet {
     pub async fn new_tx5(
         tuning_params: KitsuneP2pTuningParams,
         host: HostApi,
+        kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
+        evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         signal_url: String,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
         let (mut evt_send, evt_recv) =
@@ -604,7 +609,55 @@ impl MetaNet {
             .with_max_send_bytes(tuning_params.tx5_max_send_bytes)
             .with_max_recv_bytes(tuning_params.tx5_max_recv_bytes)
             .with_max_conn_count(tuning_params.tx5_max_conn_count)
-            .with_max_conn_init(tuning_params.tx5_max_conn_init());
+            .with_max_conn_init(tuning_params.tx5_max_conn_init())
+            .with_conn_preflight(move |_, _| {
+                let i_s = kitsune_internal_sender.clone();
+
+                Box::pin(async move {
+                    match i_s.get_all_local_joined_agent_infos().await {
+                        Ok(agent_list) => Ok(wire::Wire::peer_unsolicited(agent_list)
+                            .encode_vec()
+                            .ok()
+                            .map(|v| v.into())),
+                        Err(err) => {
+                            tracing::warn!(?err, "error getting local peer list");
+                            Ok(None)
+                        }
+                    }
+                })
+            })
+            .with_conn_validate(move |_, _, maybe_data| {
+                let e_s = evt_sender.clone();
+                Box::pin(async move {
+                    match maybe_data.map(|data| wire::Wire::decode_ref(&data)) {
+                        Some(Ok((_, wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
+                            peer_list,
+                        })))) => {
+                            // @todo This loop only exists because we have to put a
+                            // space on PutAgentInfoSignedEvt, if the internal peer
+                            // space was used instead we could do this in a single
+                            // event with the whole list.
+                            for peer in peer_list {
+                                if let Err(err) = e_s
+                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                        space: peer.space.clone(),
+                                        peer_data: vec![peer.clone()],
+                                    })
+                                    .await
+                                {
+                                    tracing::warn!(
+                                        ?err,
+                                        "error processing incoming agent info unsolicited"
+                                    );
+                                }
+                            }
+                        }
+                        Some(Err(err)) => tracing::warn!(?err, "error decoding connection peers"),
+                        _ => {},
+                    }
+                    Ok(())
+                })
+            });
 
         tracing::info!(/*?tx5_config,*/ "meta net startup tx5");
 
@@ -836,7 +889,7 @@ impl MetaNet {
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5(ep, _cli_url, _res_store) = self {
+            if let MetaNet::Tx5 { ep, .. } = self {
                 let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                 let wrap = WireWrap::notify(msg_id, WireData(wire));
 

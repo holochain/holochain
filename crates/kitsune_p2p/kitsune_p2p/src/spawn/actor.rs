@@ -47,7 +47,7 @@ const UNAUTHORIZED_DISCONNECT_REASON: &str = "unauthorized";
 
 ghost_actor::ghost_chan! {
     #[allow(clippy::too_many_arguments)]
-    pub(crate) chan Internal<crate::KitsuneP2pError> {
+    pub chan Internal<crate::KitsuneP2pError> {
         /// Register space event handler
         fn register_space_event_handler(recv: EvtRcv) -> ();
 
@@ -172,8 +172,14 @@ impl KitsuneP2pActor {
                 TransportConfig::WebRTC { signal_url } => signal_url.clone(),
                 _ => unreachable!(),
             };
-            let (h, e) =
-                MetaNet::new_tx5(config.tuning_params.clone(), host.clone(), signal_url).await?;
+            let (h, e) = MetaNet::new_tx5(
+                config.tuning_params.clone(),
+                host.clone(),
+                internal_sender.clone(),
+                evt_sender.clone(),
+                signal_url,
+            )
+            .await?;
             ep_hnd = Some(h);
             ep_evt = Some(e);
             bootstrap_net = Some(BootstrapNet::Tx5);
@@ -267,7 +273,6 @@ impl KitsuneP2pActor {
             let host = host.clone();
             let tuning_params = config.tuning_params.clone();
             let fetch_pool = fetch_pool.clone();
-            let timeout = config.tuning_params.implicit_timeout();
             async move {
                 let fetch_response_queue = &fetch_response_queue;
                 let fetch_pool = &fetch_pool;
@@ -283,14 +288,6 @@ impl KitsuneP2pActor {
                             match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     let _ = i_s.new_con(remote_url, con.clone()).await;
-
-                                    if let Ok(agent_list) = i_s.get_all_local_joined_agent_infos().await {
-                                        let payload = wire::Wire::peer_unsolicited(agent_list);
-                                        if let Err(err) = con.notify(&payload, timeout).await {
-                                            tracing::warn!(?err, "error sending local peer list");
-                                        }
-                                    }
-
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     let _ = i_s.del_con(remote_url).await;
@@ -392,21 +389,6 @@ impl KitsuneP2pActor {
                                     con,
                                     data,
                                 } => {
-                                    if let wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
-                                        peer_list
-                                    }) = &data {
-                                        for peer in peer_list {
-                                            if let Err(err) = evt_sender
-                                            .put_agent_info_signed(
-                                                PutAgentInfoSignedEvt {
-                                                    space: peer.space.clone(),
-                                                    peer_data: vec![peer.clone()],
-                                                },
-                                            ).await {
-                                                tracing::warn!(?err, "error processing incoming agent info unsolicited");
-                                            }
-                                        }
-                                    }
                                     match nodespace_is_authorized(
                                         &host,
                                         con.peer_id(),
@@ -697,10 +679,11 @@ impl KitsuneP2pActor {
                                                         .incoming_metric_exchange(space, msgs)
                                                         .await;
                                                 }
-                                                wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
-                                                    .. }) => {
-                                                        // Nothing needs doing as we handled this
-                                                        // above the authorization check.
+                                                wire::Wire::PeerUnsolicited(
+                                                    wire::PeerUnsolicited { .. },
+                                                ) => {
+                                                    // Nothing needs doing as we handle
+                                                    // this in tx5 conn_validate.
                                                 }
                                                 wire::Wire::Failure(_)
                                                 | wire::Wire::Call(_)
@@ -709,7 +692,9 @@ impl KitsuneP2pActor {
                                                 | wire::Wire::PeerGetResp(_)
                                                 | wire::Wire::PeerQuery(_)
                                                 | wire::Wire::PeerQueryResp(_) => {
-                                                    tracing::warn!("received non-notify data in a notify");
+                                                    tracing::warn!(
+                                                        "received non-notify data in a notify"
+                                                    );
                                                 }
                                             }
                                         }
