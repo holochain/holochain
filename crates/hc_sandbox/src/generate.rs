@@ -99,7 +99,7 @@ pub(crate) fn init_lair(
             std::io::ErrorKind::Other,
             format!("Failed to execute 'lair-keystore init': {:?}", err),
         )
-        .into()),
+            .into()),
         Ok(url) => Ok(url),
     }
 }

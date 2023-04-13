@@ -7,6 +7,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
+use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
@@ -112,6 +113,7 @@ async fn start_holochain(
     use tokio::io::AsyncWriteExt;
     let passphrase = holochain_util::pw::pw_get()?.read_lock().to_vec();
 
+    // TODO should prefer getting this from the config
     let mut lair_path = config_path.clone();
     lair_path.pop();
     lair_path.push("keystore");
