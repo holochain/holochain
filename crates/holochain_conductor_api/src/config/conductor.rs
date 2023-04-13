@@ -28,6 +28,10 @@ use std::path::Path;
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Default, Debug, PartialEq)]
 pub struct ConductorConfig {
+    /// Override the environment specified tracing config.
+    #[serde(default)]
+    pub tracing_override: Option<String>,
+
     /// The path to the database for this conductor;
     /// if omitted, chooses a default path.
     pub environment_path: DatabaseRootPath,
@@ -127,6 +131,7 @@ pub mod tests {
         assert_eq!(
             result,
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,
@@ -140,7 +145,7 @@ pub mod tests {
 
     #[test]
     fn test_config_complete_config() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let yaml = r#"---
     environment_path: /path/to/env
@@ -163,14 +168,8 @@ pub mod tests {
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
       transport_pool:
-        - type: proxy
-          sub_transport:
-            type: quic
-            bind_to: kitsune-quic://0.0.0.0:0
-          proxy_config:
-            type: remote_proxy_client_from_bootstrap
-            bootstrap_url: https://bootstrap.holo.host
-            fallback_proxy_url: ~
+        - type: webrtc
+          signal_url: wss://signal.holotest.net
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -188,16 +187,8 @@ pub mod tests {
         use holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool.push(TransportConfig::Proxy {
-            sub_transport: Box::new(TransportConfig::Quic {
-                bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
-                override_host: None,
-                override_port: None,
-            }),
-            proxy_config: ProxyConfig::RemoteProxyClientFromBootstrap {
-                bootstrap_url: url2::url2!("https://bootstrap.holo.host"),
-                fallback_proxy_url: None,
-            },
+        network_config.transport_pool.push(TransportConfig::WebRTC {
+            signal_url: "wss://signal.holotest.net".into(),
         });
         let mut tuning_params =
             kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
@@ -213,6 +204,7 @@ pub mod tests {
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
@@ -243,6 +235,7 @@ pub mod tests {
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
+                tracing_override: None,
                 environment_path: PathBuf::from("/path/to/env").into(),
                 network: None,
                 dpki: None,

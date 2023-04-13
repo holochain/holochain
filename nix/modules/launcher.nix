@@ -46,6 +46,10 @@
             perl
             pkg-config
           ])
+          ++ (lib.optionals pkgs.stdenv.isLinux
+            (with pkgs; [
+              wrapGAppsHook
+            ]))
           ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs; [
             xcbuild
             libiconv
@@ -66,10 +70,14 @@
         ];
 
         preFixup = ''
-          wrapProgram $out/bin/hc-launch \
-            --set WEBKIT_DISABLE_COMPOSITING_MODE 1 \
-            --set GIO_MODULE_DIR ${pkgs.glib-networking}/lib/gio/modules \
-            --prefix GIO_EXTRA_MODULES : ${pkgs.glib-networking}/lib/gio/modules
+          gappsWrapperArgs+=(
+            --set WEBKIT_DISABLE_COMPOSITING_MODE 1
+          )
+
+          # without this the DevTools will just display an unparsed HTML file (see https://github.com/tauri-apps/tauri/issues/5711#issuecomment-1336409601)
+          gappsWrapperArgs+=(
+            --prefix XDG_DATA_DIRS : "${pkgs.shared-mime-info}/share"
+          )
         '';
       });
 
@@ -81,3 +89,4 @@
       };
     };
 }
+

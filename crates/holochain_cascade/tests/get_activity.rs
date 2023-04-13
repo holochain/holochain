@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ghost_actor::dependencies::observability;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_cascade::test_utils::*;
@@ -21,7 +20,7 @@ use test_case::test_case;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     // Environments
     let cache = test_cache_db();

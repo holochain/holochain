@@ -34,11 +34,11 @@ use holochain_state::record_buf::RecordBuf;
 use holochain_types::prelude::*;
 use holochain_types::prelude::*;
 
+use holochain_trace;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::Entry;
 use maplit::btreeset;
-use observability;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -55,7 +55,7 @@ use holochain::test_utils::host_fn_caller::*;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn get_updates_cache() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // Database setup
     let test_db = test_cell_db();
     let db = test_db.db();
@@ -99,7 +99,7 @@ async fn get_updates_cache() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky!"]
 async fn get_meta_updates_meta_cache() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     // Database setup
     let test_db = test_cell_db();
     let db = test_db.db();
@@ -165,7 +165,7 @@ let mut reader = g.reader().unwrap();
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn get_from_another_agent() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let dna_file = DnaFile::new(
         DnaDef {
             name: "dht_get_test".to_string(),
@@ -297,7 +297,7 @@ async fn get_from_another_agent() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky for some reason"]
 async fn get_links_from_another_agent() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let dna_file = DnaFile::new(
         DnaDef {
             name: "dht_get_test".to_string(),

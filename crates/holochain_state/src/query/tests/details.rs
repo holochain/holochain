@@ -9,7 +9,7 @@ use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_scratch_same_as_sql() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
@@ -43,7 +43,7 @@ async fn entry_scratch_same_as_sql() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn record_scratch_same_as_sql() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();

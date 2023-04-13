@@ -136,6 +136,8 @@ macro_rules! holochain_externs {
             accept_countersigning_preflight_request:1,
             query:1,
             call_remote:1,
+            block_agent:1,
+            unblock_agent:1,
             call:1,
             create:1,
             emit_signal:1,

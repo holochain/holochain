@@ -323,7 +323,7 @@ async fn test_metric_task() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sys_info() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     init_sys_info_poll();
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     let sys_info = get_sys_info();

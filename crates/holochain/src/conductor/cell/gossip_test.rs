@@ -11,7 +11,7 @@ use kitsune_p2p::KitsuneP2pConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn gossip_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
@@ -40,7 +40,7 @@ async fn gossip_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signature_smoke_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut network_config = KitsuneP2pConfig::default();
     network_config.transport_pool = vec![kitsune_p2p::TransportConfig::Mem {}];
     // Hit an actual bootstrap service so it can blow up and return an error if we get our end of
@@ -54,7 +54,7 @@ async fn signature_smoke_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let config = SweetConductorConfig::standard().no_publish();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 

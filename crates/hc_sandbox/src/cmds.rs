@@ -24,13 +24,13 @@ pub struct Create {
     /// This directory must already exist.
     #[structopt(long)]
     pub root: Option<PathBuf>,
-    #[structopt(short, long)]
+    #[structopt(short, long, value_delimiter = ",")]
     /// Specify the directory name for each sandbox that is created.
     /// By default, new sandbox directories get a random name
     /// like "kAOXQlilEtJKlTM_W403b".
     /// Use this option to override those names with something explicit.
     ///
-    /// For example `hc gen -r path/to/my/chains -n 3 -d=first,second,third`
+    /// For example `hc s generate path/to/my/chains -r -n 3 -d=first,second,third`
     /// will create three sandboxes with directories named "first", "second", and "third".
     pub directories: Vec<PathBuf>,
 }
@@ -64,17 +64,19 @@ pub struct Network {
 pub enum NetworkType {
     /// A transport that uses the local memory transport protocol.
     Mem,
-    /// A transport that uses the QUIC protocol.
-    Quic(Quic),
-    /// A transport that uses the MDNS protocol.
-    Mdns,
+    // /// A transport that uses the QUIC protocol.
+    // Quic(Quic),
+    // /// A transport that uses the MDNS protocol.
+    // Mdns,
     /// A transport that uses the WebRTC protocol.
-    WebRtc {
+    #[structopt(name = "webrtc")]
+    WebRTC {
         /// URL to a holochain tx5 WebRTC signal server.
         signal_url: String,
     },
 }
 
+/*
 #[derive(Debug, StructOpt, Clone)]
 pub struct Quic {
     #[structopt(short, long, parse(from_str = Url2::parse))]
@@ -96,6 +98,7 @@ pub struct Quic {
     /// Run through an external proxy at this url.
     pub proxy: Option<Url2>,
 }
+*/
 
 #[derive(Debug, StructOpt, Clone)]
 pub struct Existing {
@@ -182,6 +185,7 @@ impl From<Network> for KitsuneP2pConfig {
 
         match transport {
             NetworkType::Mem => (),
+            /*
             NetworkType::Mdns => {
                 kit.network_type = holochain_p2p::kitsune_p2p::NetworkType::QuicMdns;
                 kit.transport_pool = vec![TransportConfig::Quic {
@@ -220,7 +224,8 @@ impl From<Network> for KitsuneP2pConfig {
                     },
                 }];
             }
-            NetworkType::WebRtc { signal_url } => {
+            */
+            NetworkType::WebRTC { signal_url } => {
                 let transport = TransportConfig::WebRTC { signal_url };
                 kit.transport_pool = vec![transport];
             }
