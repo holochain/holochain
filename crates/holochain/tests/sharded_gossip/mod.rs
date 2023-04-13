@@ -161,8 +161,8 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Test that a gossip payload larger than the max frame size does not
-/// cause problems
+/// Test that when the conductor shuts down, gossip does not continue,
+/// and when it restarts, gossip resumes.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_gossip_shutdown() {

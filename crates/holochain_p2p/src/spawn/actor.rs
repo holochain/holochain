@@ -1421,6 +1421,16 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
+    fn handle_dump_network_stats(&mut self) -> HolochainP2pHandlerResult<String> {
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            serde_json::to_string_pretty(&kitsune_p2p.dump_network_stats().await?)
+                .map_err(HolochainP2pError::other)
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_get_diagnostics(
         &mut self,
         dna_hash: DnaHash,

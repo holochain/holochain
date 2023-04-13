@@ -185,7 +185,7 @@ async fn invalid_cell() -> anyhow::Result<()> {
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     tracing::debug!(dnas = ?conductor.list_dnas());
-    tracing::debug!(cell_ids = ?conductor.list_cell_ids(None));
+    tracing::debug!(cell_ids = ?conductor.running_cell_ids(None));
     tracing::debug!(apps = ?conductor.list_running_apps().await.unwrap());
 
     display_agent_infos(&conductor).await;

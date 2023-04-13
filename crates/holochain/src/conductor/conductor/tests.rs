@@ -666,7 +666,7 @@ async fn test_enable_disable_enable_clone_cell() {
     assert!(matches!(
         result,
         Err(ConductorApiError::ConductorError(
-            ConductorError::CellMissing(_)
+            ConductorError::CellDisabled(_)
         ))
     ));
 
@@ -686,7 +686,7 @@ async fn test_enable_disable_enable_clone_cell() {
         assert!(matches!(
             result,
             Err(ConductorApiError::ConductorError(
-                ConductorError::CellMissing(_)
+                ConductorError::CellDisabled(_)
             ))
         ));
     }
@@ -713,6 +713,61 @@ async fn test_enable_disable_enable_clone_cell() {
             .await
             .expect("can call zome fn now");
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn name_has_no_effect_on_dna_hash() {
+    holochain_trace::test_run().ok();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let (agent1, agent2, agent3) = SweetAgents::three(conductor.keystore()).await;
+    let dna = SweetDnaFile::unique_empty().await;
+    let apps = conductor
+        .setup_app_for_agents("app", [&agent1, &agent2, &agent3], [&dna])
+        .await
+        .unwrap();
+    let app_id1 = apps[0].installed_app_id().clone();
+    let app_id2 = apps[1].installed_app_id().clone();
+    let app_id3 = apps[2].installed_app_id().clone();
+    let ((cell1,), (cell2,), (cell3,)) = apps.into_tuples();
+    let role_name1 = cell1.cell_id().dna_hash().to_string();
+    let role_name2 = cell2.cell_id().dna_hash().to_string();
+    let role_name3 = cell3.cell_id().dna_hash().to_string();
+
+    let clone1 = conductor
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: app_id1.clone(),
+            role_name: role_name1.clone(),
+            modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
+            membrane_proof: None,
+            name: None,
+        })
+        .await
+        .unwrap();
+
+    let clone2 = conductor
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: app_id2.clone(),
+            role_name: role_name2.clone(),
+            modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
+            membrane_proof: None,
+            name: Some("Rumpelstiltskin".to_string()),
+        })
+        .await
+        .unwrap();
+
+    let clone3 = conductor
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: app_id3.clone(),
+            role_name: role_name3.clone(),
+            modifiers: DnaModifiersOpt::default().with_network_seed("new seed".into()),
+            membrane_proof: None,
+            name: Some("Chara".to_string()),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(clone1.cell_id.dna_hash(), clone2.cell_id.dna_hash());
+    assert_eq!(clone2.cell_id.dna_hash(), clone3.cell_id.dna_hash());
 }
 
 fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_conductor_api::ClonedCell {
@@ -948,7 +1003,7 @@ async fn test_cell_and_app_status_reconciliation() {
     let mut conductor = SweetConductor::from_standard_config().await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
-    let cell_ids = conductor.list_cell_ids(None);
+    let cell_ids: Vec<_> = conductor.running_cell_ids(None).into_iter().collect();
     let cell1 = &cell_ids[0..1];
 
     let check = || async {
@@ -956,8 +1011,8 @@ async fn test_cell_and_app_status_reconciliation() {
             AppStatusKind::from(AppStatus::from(
                 conductor.list_apps(None).await.unwrap()[0].status.clone(),
             )),
-            conductor.list_cell_ids(Some(Joined)).len(),
-            conductor.list_cell_ids(Some(PendingJoin)).len(),
+            conductor.running_cell_ids(Some(Joined)).len(),
+            conductor.running_cell_ids(Some(PendingJoin)).len(),
         )
     };
 

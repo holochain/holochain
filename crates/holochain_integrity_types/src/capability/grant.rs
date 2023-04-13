@@ -172,6 +172,17 @@ impl From<(CapSecret, AgentPubKey)> for CapAccess {
     }
 }
 
+impl CapAccess {
+    /// Return variant denominator as string slice
+    pub fn as_variant_string(&self) -> &str {
+        match self {
+            CapAccess::Unrestricted => "unrestricted",
+            CapAccess::Transferable { .. } => "transferable",
+            CapAccess::Assigned { .. } => "assigned",
+        }
+    }
+}
+
 /// a single zome/function pair
 pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs

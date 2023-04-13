@@ -16,8 +16,8 @@
 name: release holochain
 
 on:
-  # schedule:
-  #   - cron: "0 0 * * 3" # at 0 AM on wednesday
+  schedule:
+    - cron: "0 0 * * 3" # at 0 AM on wednesday
   workflow_dispatch:
     inputs:
       # holochain_url:
@@ -36,7 +36,7 @@ on:
         default: ""
         type: string
       dry_run:
-        description: "prevent, publishing and pushing to the tags and the target branch"
+        description: "dry-run: prevent crate.io publishing and pushing the git tags, target and source branches"
         required: false
         default: "true"
         type: string
@@ -179,7 +179,7 @@ jobs:
 
   test:
     needs: [vars, prepare]
-    if: ${{ github.event_name != 'pull_request' && needs.vars.outputs.skip_test != 'true' }}
+    if: ${{ needs.vars.outputs.skip_test != 'true' }}
     uses: ./.github/workflows/holochain-build-and-test.yml
     with:
       repo_path: ${{ needs.prepare.outputs.repo_nix_store_path }}
@@ -252,17 +252,23 @@ jobs:
           # use our custom token for more permissions, e.g. "workflow" which is needed to push workflow files
           git config --local "http.https://github.com/.extraheader" "AUTHORIZATION: basic $(echo -n pat:${HRA_GITHUB_TOKEN} | base64)"
 
-      - name: Push the target branch
-        if: ${{ needs.vars.outputs.dry_run == 'false' }}
+      - name: Merge release branch (${{ needs.prepare.outputs.release_branch }}) into target branch (${{ needs.vars.outputs.holochain_target_branch }}) and push it
         env:
+          RELEASE_BRANCH: ${{ needs.prepare.outputs.release_branch }}
           HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
+          DRY_RUN: "${{ needs.vars.outputs.dry_run }}"
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
 
           git status
 
-          git push origin ${HOLOCHAIN_TARGET_BRANCH}
+          git checkout ${HOLOCHAIN_TARGET_BRANCH}
+          git merge --ff-only ${RELEASE_BRANCH}
+
+          if [[ "${DRY_RUN}" == "false" ]]; then
+            git push origin ${HOLOCHAIN_TARGET_BRANCH}
+          fi
 
       - name: Push the release branch
         id: push-release-branch
@@ -297,9 +303,10 @@ jobs:
       - name: Push the tags
         if: ${{ needs.vars.outputs.dry_run == 'false' }}
         id: push-tags
+        env:
+          HOLOCHAIN_TARGET_BRANCH: ${{ needs.vars.outputs.holochain_target_branch }}
         run: |
           set -eu
-          source ${HOLOCHAIN_RELEASE_SH}
           cd "${HOLOCHAIN_REPO}"
 
           git status
@@ -328,6 +335,8 @@ jobs:
         run: |
           set -xeu
           cd "${HOLOCHAIN_REPO}"
+          git status
+          git pull origin ${HOLOCHAIN_SOURCE_BRANCH}
           git push origin ${HOLOCHAIN_SOURCE_BRANCH}
 
       - name: Create a pull-request towards the source branch
@@ -339,7 +348,7 @@ jobs:
           HOLOCHAIN_SOURCE_BRANCH: ${{ needs.vars.outputs.holochain_source_branch }}
           GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
         run: |
-          set -euE -o pipefail
+          set -xeuE -o pipefail
 
           cd "${HOLOCHAIN_REPO}"
 
@@ -383,7 +392,7 @@ jobs:
   github-actions-ci-jobs-succeed:
     if: ${{ always() && github.event_name == 'pull_request' }}
     runs-on: "ubuntu-latest"
-    needs: [vars, prepare]
+    needs: [vars, test, prepare]
     steps:
       - name: Check status
         id: check-status
