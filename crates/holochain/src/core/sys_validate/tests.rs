@@ -51,7 +51,6 @@ use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
 use holochain_zome_types::Action;
 use matches::assert_matches;
-use std::convert::TryFrom;
 use std::time::Duration;
 
 async fn sign_record(keystore: &MetaLairClient, action: Action, entry: Option<Entry>) -> Record {
@@ -210,6 +209,7 @@ async fn record_with_cascade(keystore: &MetaLairClient, action: Action) -> (Reco
     (record, MockCascade::with_records(deps))
 }
 
+#[allow(dead_code)]
 async fn validate_action(keystore: &MetaLairClient, action: Action) -> SysValidationOutcome<()> {
     let (record, deps) = record_with_deps(keystore, action).await;
     let cascade = MockCascade::with_records(deps.clone());
@@ -227,6 +227,7 @@ async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
     }
 }
 
+#[allow(dead_code)]
 async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
     let (record, deps) = record_with_deps(keystore, action).await;
     let cascade = MockCascade::with_records(deps.clone());
@@ -642,10 +643,10 @@ async fn incoming_ops_filters_private_entry() {
 
     let shh =
         SignedActionHashed::with_presigned(ActionHashed::from_content_sync(action), signature);
-    let el = Record::new(shh, Some(private_entry));
+    let record = Record::new(shh, Some(private_entry));
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
-    ops_sender.send_store_entry(el.clone()).await.unwrap();
+    ops_sender.send_store_entry(record.clone()).await.unwrap();
     let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
         txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
             .unwrap()
@@ -653,7 +654,7 @@ async fn incoming_ops_filters_private_entry() {
     assert_eq!(num_ops, 0);
 
     let ops_sender = IncomingDhtOpSender::new(space.clone(), tx.clone());
-    ops_sender.send_store_record(el.clone()).await.unwrap();
+    ops_sender.send_store_record(record.clone()).await.unwrap();
     let num_ops: usize = fresh_reader_test(vault.clone(), |txn| {
         txn.query_row("SELECT COUNT(rowid) FROM DhtOp", [], |row| row.get(0))
             .unwrap()
