@@ -260,7 +260,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::EntryTooLarge(_) => Rejected,
         ValidationOutcome::EntryTypeMismatch => Rejected,
         ValidationOutcome::EntryVisibility(_) => Rejected,
-        ValidationOutcome::TagTooLarge(_, _) => Rejected,
+        ValidationOutcome::TagTooLarge(_) => Rejected,
         ValidationOutcome::MalformedDhtOp(_, _, _) => Rejected,
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,

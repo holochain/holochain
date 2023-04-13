@@ -603,21 +603,23 @@ async fn check_update_reference_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_link_tag_size_test() {
     let keystore = test_keystore();
-    let (mut record, cascade) = record_with_cascade(&keystore, CreateLink::fixture().into()).await;
 
-    let tiny = LinkTag(vec![0; 1]);
     let bytes = (0..super::MAX_TAG_SIZE + 1)
         .map(|_| 0u8)
         .into_iter()
         .collect::<Vec<_>>();
     let huge = LinkTag(bytes);
-    assert_matches!(check_tag_size(&tiny), Ok(()));
 
-    assert_matches!(
-        check_tag_size(&huge),
-        Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::TagTooLarge(_, _)
-        ))
+    let mut action = CreateLink::fixture();
+    action.tag = huge;
+    let (record, cascade) = record_with_cascade(&keystore, action.into()).await;
+
+    assert_eq!(
+        sys_validate_record(&record, &cascade)
+            .await
+            .unwrap_err()
+            .into_outcome(),
+        Some(ValidationOutcome::TagTooLarge(super::MAX_TAG_SIZE + 1))
     );
 }
 

@@ -436,7 +436,7 @@ pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
         Entry::App(bytes) | Entry::CounterSign(_, bytes) => {
             let size = std::mem::size_of_val(&bytes.bytes()[..]);
             dbg!(&size);
-            if size < MAX_ENTRY_SIZE {
+            if size <= MAX_ENTRY_SIZE {
                 Ok(())
             } else {
                 Err(ValidationOutcome::EntryTooLarge(size).into())
@@ -452,10 +452,10 @@ pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
 /// Check the link tag size is under the MAX_TAG_SIZE
 pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     let size = std::mem::size_of_val(&tag.0[..]);
-    if size < MAX_TAG_SIZE {
+    if size <= MAX_TAG_SIZE {
         Ok(())
     } else {
-        Err(ValidationOutcome::TagTooLarge(size, MAX_TAG_SIZE).into())
+        Err(ValidationOutcome::TagTooLarge(size).into())
     }
 }
 

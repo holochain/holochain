@@ -121,8 +121,11 @@ pub enum ValidationOutcome {
     EntryTypeMismatch,
     #[error("The app entry def {0:?} visibility didn't match the zome")]
     EntryVisibility(AppEntryDef),
-    #[error("The link tag size {0} was larger than the MAX_TAG_SIZE {1}")]
-    TagTooLarge(usize, usize),
+    #[error(
+        "The link tag size {0} was larger than the MAX_TAG_SIZE {}",
+        super::MAX_TAG_SIZE
+    )]
+    TagTooLarge(usize),
     #[error("An op with non-private entry type is missing its entry data. Action: {0:?}, Op type: {1:?} Reason: {2}")]
     MalformedDhtOp(Box<Action>, DhtOpType, String),
     #[error("The action {0:?} was expected to be a link add action")]
