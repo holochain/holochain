@@ -943,8 +943,7 @@ impl KitsuneP2pHandler for Space {
         let location = input.basis.get_loc();
         let local_agents_holding_basis = self
             .local_joined_agents
-            .iter()
-            .map(|(agent_key, _agent_info)| agent_key)
+            .keys()
             .filter(|agent_key| {
                 self.agent_arcs
                     .get(*agent_key)

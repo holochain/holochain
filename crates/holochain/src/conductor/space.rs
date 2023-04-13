@@ -203,10 +203,10 @@ impl Spaces {
                     all_blocked
                 }
                 BlockTargetId::NodeDna(node_id, dna_hash) => {
-                    let agents: DatabaseResult<Vec<AgentInfoSigned>> = self.p2p_agents_db(&dna_hash)?.async_reader(|txn| Ok(txn.p2p_list_agents()?)).await;
+                    let agents: DatabaseResult<Vec<AgentInfoSigned>> = self.p2p_agents_db(&dna_hash)?.async_reader(|txn| txn.p2p_list_agents()).await;
                     let agents_for_target_node_id = agents?.into_iter().filter(|agent| {
-                        &DnaHash::from_kitsune(&agent.space) == &dna_hash &&
-                        agent.url_list.iter().find(|&url| kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str()).digest().0 == node_id).is_some()
+                        DnaHash::from_kitsune(&agent.space) == dna_hash &&
+                        agent.url_list.iter().any(|url| kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str()).digest().0 == node_id)
                     });
                     let mut all_blocked = true;
                     for agent in agents_for_target_node_id {
