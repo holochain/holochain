@@ -112,14 +112,13 @@ async fn start_holochain(
     use tokio::io::AsyncWriteExt;
     let passphrase = holochain_util::pw::pw_get()?.read_lock().to_vec();
 
-    // TODO should prefer getting this from the config
     let mut lair_path = config_path.clone();
     lair_path.pop();
     lair_path.push("keystore");
 
     let lair = match config.keystore {
         KeystoreConfig::LairServer { .. } => {
-            let lair = start_lair(&passphrase, lair_path).await?;
+            let lair = start_lair(passphrase.as_slice(), lair_path).await?;
             Some(lair)
         }
         _ => None,
@@ -151,7 +150,7 @@ async fn start_holochain(
     Ok((holochain, lair))
 }
 
-async fn start_lair(passphrase: &Vec<u8>, lair_path: PathBuf) -> anyhow::Result<Child> {
+async fn start_lair(passphrase: &[u8], lair_path: PathBuf) -> anyhow::Result<Child> {
     use tokio::io::AsyncWriteExt;
 
     tracing::info!("\n\n----\nstarting lair\n----\n\n");
