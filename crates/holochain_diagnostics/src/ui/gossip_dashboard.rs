@@ -28,7 +28,7 @@ use tui::{
     backend::Backend,
     layout::Constraint,
     style::{Color, Modifier, Style},
-    widgets::*,
+    widgets::{Block, *},
     Frame,
 };
 

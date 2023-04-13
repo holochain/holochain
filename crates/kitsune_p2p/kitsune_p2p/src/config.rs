@@ -15,8 +15,8 @@ pub const BOOTSTRAP_SERVICE_DEV: &str = "https://bootstrap-dev.holohost.workers.
 pub(crate) enum KitsuneP2pTx2Backend {
     #[cfg(feature = "tx2")]
     Mem,
-    #[cfg(feature = "tx2")]
-    Quic { bind_to: TxUrl },
+    //#[cfg(feature = "tx2")]
+    //Quic { bind_to: TxUrl },
     #[cfg(feature = "tx2")]
     Mock { mock_network: AdapterFactory },
 }
@@ -24,7 +24,9 @@ pub(crate) enum KitsuneP2pTx2Backend {
 #[cfg(feature = "tx2")]
 pub(crate) enum KitsuneP2pTx2ProxyConfig {
     NoProxy,
+    #[allow(dead_code)]
     Specific(TxUrl),
+    #[allow(dead_code)]
     Bootstrap {
         #[allow(dead_code)]
         bootstrap_url: TxUrl,
@@ -67,6 +69,7 @@ impl Default for KitsuneP2pConfig {
     }
 }
 
+#[allow(dead_code)]
 fn cnv_bind_to(bind_to: &Option<url2::Url2>) -> TxUrl {
     match bind_to {
         Some(bind_to) => bind_to.clone().into(),
@@ -116,6 +119,7 @@ impl KitsuneP2pConfig {
     pub(crate) fn to_tx2(&self) -> KitsuneResult<KitsuneP2pTx2Config> {
         use KitsuneP2pTx2ProxyConfig::*;
         match self.transport_pool.get(0) {
+            /*
             Some(TransportConfig::Proxy {
                 sub_transport,
                 proxy_config,
@@ -150,6 +154,7 @@ impl KitsuneP2pConfig {
                     use_proxy: NoProxy,
                 })
             }
+            */
             Some(TransportConfig::Mock { mock_network }) => Ok(KitsuneP2pTx2Config {
                 backend: KitsuneP2pTx2Backend::Mock {
                     mock_network: mock_network.0.clone(),
@@ -188,6 +193,7 @@ pub enum TransportConfig {
     /// (this is mainly for testing)
     #[cfg(feature = "tx2")]
     Mem {},
+    /*
     /// A transport that uses the QUIC protocol
     #[cfg(feature = "tx2")]
     Quic {
@@ -219,15 +225,17 @@ pub enum TransportConfig {
         /// - be directly addressable, but not proxy for others
         proxy_config: ProxyConfig,
     },
-    #[serde(skip)]
-    #[cfg(feature = "tx2")]
+    */
     /// A mock network for testing
+    #[cfg(feature = "tx2")]
+    #[serde(skip)]
     Mock {
         /// The adaptor for mocking the network
         mock_network: AdapterFactoryMock,
     },
-    #[cfg(feature = "tx5")]
     /// Configure to use Tx5 WebRTC for kitsune networking.
+    #[cfg(feature = "tx5")]
+    #[serde(rename = "webrtc", alias = "web_r_t_c", alias = "web_rtc")]
     WebRTC {
         /// The url of the signal server to connect to for addressability.
         signal_url: String,

@@ -56,6 +56,10 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
+    StateQueryError(#[from] holochain_state::query::StateQueryError),
+
+    /// ident
+    #[error(transparent)]
     CascadeError(#[from] CascadeError),
 
     /// ident

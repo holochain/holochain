@@ -69,8 +69,9 @@ is executed for a new action by each validation authority.
 
 There's a helper type called `FlatOp` available for easy
 access to all link and entry variants when validating an operation. In many cases, this type can
-be easier to work with than the bare `Op`. `FlatOp` contains the
-same information as `Op` but with a flatter, more accessible data structure than `Op`'s deeply nested and concise structure.
+be easier to work with than the bare `Op`.
+`FlatOp` contains the same information as `Op` but with a flatter, more accessible data structure
+than `Op`'s deeply nested and concise structure.
 
 ```rust
 match op.flattened()? {
@@ -85,6 +86,7 @@ match op.flattened()? {
         target_address: _,
         tag: _,
         link_type,
+        action: _,
     } => match link_type {
         LinkTypes::A => Ok(ValidateCallbackResult::Valid),
         LinkTypes::B => Ok(ValidateCallbackResult::Invalid(

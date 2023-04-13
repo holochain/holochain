@@ -21,7 +21,7 @@ criterion_group!(benches, consistency);
 criterion_main!(benches);
 
 fn consistency(bench: &mut Criterion) {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let mut group = bench.benchmark_group("consistency");
     group.sample_size(
         std::env::var_os("BENCH_SAMPLE_SIZE")

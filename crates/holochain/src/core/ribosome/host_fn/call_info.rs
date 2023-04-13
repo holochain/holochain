@@ -98,7 +98,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_info_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::ZomeInfo).await;
@@ -109,7 +109,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_info_provenance_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

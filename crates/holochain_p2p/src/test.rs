@@ -167,6 +167,10 @@ impl HolochainP2pHandler for StubNetwork {
         Err("stub".into())
     }
 
+    fn handle_dump_network_stats(&mut self) -> HolochainP2pHandlerResult<String> {
+        Err("stub".into())
+    }
+
     fn handle_get_diagnostics(
         &mut self,
         dna_hash: DnaHash,
@@ -241,7 +245,7 @@ mod tests {
         holo_hash::AgentPubKey,
         holo_hash::AgentPubKey,
     ) {
-        observability::test_run().unwrap();
+        holochain_trace::test_run().unwrap();
         (
             newhash!(DnaHash, 's'),
             fixt!(AgentPubKey, Predictable, 0),
@@ -480,7 +484,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_workflow() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (dna, a1, a2, _a3) = test_setup();
 

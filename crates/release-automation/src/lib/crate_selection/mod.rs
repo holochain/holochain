@@ -53,6 +53,15 @@ pub struct Crate<'a> {
     dependants_in_workspace: OnceCell<Vec<&'a Crate<'a>>>,
 }
 
+#[cfg(test)]
+impl PartialEq for Crate<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.package == other.package
+            && self.dependencies_in_workspace == other.dependencies_in_workspace
+            && self.dependants_in_workspace == other.dependants_in_workspace
+    }
+}
+
 impl<'a> Crate<'a> {
     /// Instantiate a new Crate with the given CargoPackage.
     pub fn with_cargo_package(
@@ -328,43 +337,38 @@ impl<'a> Crate<'a> {
     }
 
     /// Returns a reference to all workspace crates that depend on this crate.
-    // todo: write a unit test for this
     pub fn dependants_in_workspace(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        self.dependants_in_workspace_filtered(|_| true)
+        self.dependants_in_workspace
+            .get_or_try_init(|| -> Fallible<_> { self.dependants_in_workspace_filtered(|_| true) })
     }
 
     /// Returns a reference to all workspace crates that depend on this crate.
     /// Features filtering by applying a filter function to the dependant's dependencies.
-    // todo: write a unit test for this
     pub fn dependants_in_workspace_filtered<F>(
         &'a self,
         filter_fn: F,
-    ) -> Fallible<&'a Vec<&'a Crate<'a>>>
+    ) -> Fallible<Vec<&'a Crate<'a>>>
     where
         F: Fn(&(&String, &Vec<Dependency>)) -> bool,
         F: Copy,
     {
-        self.dependants_in_workspace.get_or_try_init(|| {
-            let members_dependants = self.workspace.members()?.iter().try_fold(
-                LinkedHashMap::<String, &'a Crate<'a>>::new(),
-                |mut acc, member| -> Fallible<_> {
-                    if member
-                        .dependencies_in_workspace()?
-                        .iter()
-                        .filter(filter_fn)
-                        .map(|(dep_name, _)| dep_name)
-                        .collect::<LinkedHashSet<_>>()
-                        .contains(&self.name())
-                    {
-                        acc.insert(member.name(), *member);
-                    };
+        let members_dependants = self.workspace.members()?.iter().try_fold(
+            LinkedHashMap::<String, &'a Crate<'a>>::new(),
+            |mut acc, member| -> Fallible<_> {
+                if member
+                    .dependencies_in_workspace()?
+                    .iter()
+                    .filter(filter_fn)
+                    .any(|(dep_name, _)| dep_name == &self.name())
+                {
+                    acc.insert(member.name(), *member);
+                };
 
-                    Ok(acc)
-                },
-            )?;
+                Ok(acc)
+            },
+        )?;
 
-            Ok(members_dependants.values().cloned().collect())
-        })
+        Ok(members_dependants.values().cloned().collect())
     }
 
     pub fn root(&self) -> &Path {
@@ -893,9 +897,10 @@ impl<'a> ReleaseWorkspace<'a> {
                                     insert_state!(CrateStateFlags::HasPreviousRelease);
 
                                     // todo: make comparison ref configurable
-                                    if !changed_files(member.package.root(), &git_tag, "HEAD")?
-                                        .is_empty()
+                                    let changed_files = changed_files(member.package.root(), &git_tag, "HEAD")?;
+                                    if !changed_files.is_empty()
                                     {
+                                        debug!("[{}] changed files since {git_tag}: {changed_files:?}", member.name());
                                         insert_state!(CrateStateFlags::ChangedSincePreviousRelease)
                                     }
                                 } else {
@@ -907,18 +912,33 @@ impl<'a> ReleaseWorkspace<'a> {
                         }
                     }
 
+                    // semver_increment_mode checks
+                    if let Some(allowed_semver_increment_modes) = &self.criteria.allowed_semver_increment_modes {
+                        let effective_semver_increment_mode  = member
+                            .changelog()
+                            .map(|cl| cl.front_matter().ok())
+                            .flatten()
+                            .flatten()
+                            .map(|fm| fm.semver_increment_mode())
+                            .unwrap_or_default();
+
+
+                        if !allowed_semver_increment_modes.contains(&effective_semver_increment_mode) {
+                            debug!("Blocking {} due to {:?} with mode: {effective_semver_increment_mode:?}", member.name(), CrateStateFlags::AllowedSemverIncrementModeViolated);
+                            insert_state!(CrateStateFlags::AllowedSemverIncrementModeViolated);
+                        }
+                    }
+                }
+
+                {
                     // dependency state
                     // only dependencies of explicitly matched packages are considered here.
-                    //
-                    // note(steveej):
-                    // while trying to signal the inclusion of reverse dependencies it eventually occurred to me
-                    // that only considering the crates in the dependency trees that start with a selected package is preferred.
-                    // even if a reverse dependency of a matched package is changed during the release (by having its dependency version updated),
-                    // its not relevant to the release if it hasn't been requested for release excplicitly or as a dependency of one that has been, in which case it is already considered.
-                    // if get_state!(member.name()).is_matched() && !get_state!(member.name()).blocked()
+                    // this detects changes in the transitive dependency chain by two mechanisms
+                    // 1. the loop we're in iterates over the result of `ReleaseWorkspace::members`,
+                    //    which orders the members according to the workspace dependency trees from leafs to roots.
+                    //    this ensures that the states of a member's transitive dependencies have been evaluated by the time *it* is evaluated.
+                    // 2. the `member.dependencies_in_workspace()` yields transitive results.
                     if get_state!(member.name()).is_matched()
-                        && get_state!(member.name()).changed()
-                        && !get_state!(member.name()).blocked()
                     {
                         for (_, deps) in member.dependencies_in_workspace()? {
                             for dep in deps {
@@ -953,22 +973,6 @@ impl<'a> ReleaseWorkspace<'a> {
                     }
                 }
 
-                // semver_increment_mode checks
-                if let Some(allowed_semver_increment_modes) = &self.criteria.allowed_semver_increment_modes {
-                    let effective_semver_increment_mode  = member
-                        .changelog()
-                        .map(|cl| cl.front_matter().ok())
-                        .flatten()
-                        .flatten()
-                        .map(|fm| fm.semver_increment_mode())
-                        .unwrap_or_default();
-
-
-                    if !allowed_semver_increment_modes.contains(&effective_semver_increment_mode) {
-                        debug!("Blocking {} due to {:?} with mode: {effective_semver_increment_mode:?}", member.name(), CrateStateFlags::AllowedSemverIncrementModeViolated);
-                        insert_state!(CrateStateFlags::AllowedSemverIncrementModeViolated);
-                    }
-                }
             }
 
             Ok(members_states)

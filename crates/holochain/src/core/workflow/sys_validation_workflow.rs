@@ -210,11 +210,11 @@ async fn sys_validation_workflow_inner(
     })
 }
 
-/// TODO: Some of these params are unnecessary or soon will be:
-/// - The Workspace is only needed for some checks which are done in sys validation in appropriately, like fork detection.
-/// - The Conductor handle is only needed for another inappropriate check of entry type, which invokes wasm and is not proper sys validation.
-/// These two params can go away soon.
-/// What's important to note is that the cascade must be passed in explicitly so that it can be mocked.
+// TODO: Some of these params are unnecessary or soon will be:
+// - The Workspace is only needed for some checks which are done in sys validation inappropriately, like fork detection.
+// - The Conductor handle is only needed for another inappropriate check of entry type, which invokes wasm and is not proper sys validation.
+// These two params can go away soon.
+// What's important to note is that the cascade must be passed in explicitly so that it can be mocked.
 async fn validate_op(
     op: &DhtOp,
     workspace: &SysValidationWorkspace,
@@ -513,9 +513,10 @@ async fn store_record(action: &Action, cascade: &Cascade) -> SysValidationResult
             .retrieve_action(prev_action_hash.clone(), Default::default())
             .await?
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
-        check_prev_type(action, prev_action.action())?;
+        check_prev_author(action, prev_action.action())?;
         check_prev_timestamp(action, prev_action.action())?;
         check_prev_seq(action, prev_action.action())?;
+        check_agent_validation_pkg_predecessor(action, prev_action.action())?;
     }
     Ok(())
 }

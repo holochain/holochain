@@ -14,11 +14,12 @@ pub fn unblock_agent(
 ) -> Result<(), RuntimeError> {
     tokio_helper::block_forever_on(async move {
         call_context.host_context().call_zome_handle().unblock(Block::new(
-            BlockTarget::Cell(call_context
+            BlockTarget::Cell(CellId::new(call_context
                 .host_context()
                 .call_zome_handle()
                 .cell_id()
-                .clone(), CellBlockReason::App(input.reason)),
+                .dna_hash()
+                .clone(), input.target), CellBlockReason::App(input.reason)),
                 input.interval
             )).await.map_err(|e| -> RuntimeError {
             wasm_error!(e.to_string()).into()
