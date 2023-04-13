@@ -36,7 +36,7 @@ on:
         default: ""
         type: string
       dry_run:
-        description: "prevent, publishing and pushing to the tags and the target branch"
+        description: "dry-run: prevent crate.io publishing and pushing the git tags, target and source branches"
         required: false
         default: "true"
         type: string
