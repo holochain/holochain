@@ -6,6 +6,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230413.193011
+
+## [holochain\_cli-0.1.4](crates/holochain_cli/CHANGELOG.md#0.1.4)
+
+## [holochain\_cli\_sandbox-0.1.4](crates/holochain_cli_sandbox/CHANGELOG.md#0.1.4)
+
+## [holochain\_cli\_bundle-0.1.4](crates/holochain_cli_bundle/CHANGELOG.md#0.1.4)
+
+## [holochain-0.1.4](crates/holochain/CHANGELOG.md#0.1.4)
+
+- Fixes bug where supplying a `network_seed` during an `InstallApp` call does not actually update the network seed for roles whose `provisioning` is set to `None` in the manifest. Now the network seed is correctly updated. [\#2102](https://github.com/holochain/holochain/pull/2102)
+- When uninstalling an app, local data is now cleaned up where appropriate. [\#1805](https://github.com/holochain/holochain/pull/1805)
+  - Detail: any time an app is uninstalled, if the removal of that app’s cells would cause there to be no cell installed which uses a given DNA, the databases for that DNA space are deleted. So, if you have an app installed twice under two different agents and uninstall one of them, no data will be removed, but if you uninstall both, then all local data will be cleaned up. If any of your data was gossiped to other peers though, it will live on in the DHT, and even be gossiped back to you if you reinstall that same app with a new agent.
+- Renames `OpType` to `FlatOp`, and `Op::to_type()` to `Op::flattened()`. Aliases for the old names still exist, so this is not a breaking change. [\#1909](https://github.com/holochain/holochain/pull/1909)
+- Fixed a [problem with validation of Ops with private entry data](https://github.com/holochain/holochain/issues/1861), where  `Op::to_type()` would fail for private `StoreEntry` ops. [\#1910](https://github.com/holochain/holochain/pull/1910)
+
+## [holochain\_test\_wasm\_common-0.1.2](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.2)
+
+## [holochain\_conductor\_api-0.1.4](crates/holochain_conductor_api/CHANGELOG.md#0.1.4)
+
+- Various methods may return a `CellMissing` error if an operation is performed on a disabled cell. Now such calls will return `CellDisabled` to differentiate between a truly missing cell and one that’s just disabled. [\#2092](https://github.com/holochain/holochain/pull/2092)
+- Enabling a clone cell that’s already enabled or disabling a clone cell that’s already disabled would previously return a `CloneCellNotFound` error. Now, in those cases, nothing happens and a successful result is returned. [\#2093](https://github.com/holochain/holochain/pull/2093)
+- Reject creation of duplicate clone cells. It was possible to create a clone cell with a DNA hash identical to an already existing DNA. [\#1997](https://github.com/holochain/holochain/pull/1997)
+- Adds doc comments for `StemCell`, `ProvisionedCell` and `CloneCell` structs
+
+## [holochain\_wasm\_test\_utils-0.1.4](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.4)
+
+## [holochain\_cascade-0.1.4](crates/holochain_cascade/CHANGELOG.md#0.1.4)
+
+## [holochain\_state-0.1.4](crates/holochain_state/CHANGELOG.md#0.1.4)
+
+- Optimize capability grant verification during zome calls. This speeds up all remote calls, under which fall calls with a cap secret from clients other than the Launcher. Previously hundreds of calls would slow down response time noticeably because of grant verification. Now thousands of calls (rather thousands of records) won’t affect grant verification by more than a millisecond. [\#2097](https://github.com/holochain/holochain/pull/2097)
+
+## [holochain\_p2p-0.1.4](crates/holochain_p2p/CHANGELOG.md#0.1.4)
+
+## [holochain\_types-0.1.4](crates/holochain_types/CHANGELOG.md#0.1.4)
+
+- BREAKING: AppManifest’s `version` now only accepts a single optional DNA hash value, whereas previously it could accept a list of values.
+- AppManifest’s `version` is renamed to `installed_hash` (there is still an alias to `version` for limited backward compatibility, so the old field name will still work).
+
+## [holochain\_keystore-0.1.4](crates/holochain_keystore/CHANGELOG.md#0.1.4)
+
+## [holochain\_sqlite-0.1.4](crates/holochain_sqlite/CHANGELOG.md#0.1.4)
+
+## [kitsune\_p2p-0.1.3](crates/kitsune_p2p/CHANGELOG.md#0.1.3)
+
+## [hdk-0.1.2](crates/hdk/CHANGELOG.md#0.1.2)
+
+## [holochain\_zome\_types-0.1.2](crates/holochain_zome_types/CHANGELOG.md#0.1.2)
+
+## [hdi-0.2.2](crates/hdi/CHANGELOG.md#0.2.2)
+
+## [hdk\_derive-0.1.2](crates/hdk_derive/CHANGELOG.md#0.1.2)
+
+## [holochain\_integrity\_types-0.1.2](crates/holochain_integrity_types/CHANGELOG.md#0.1.2)
+
+## [holo\_hash-0.1.2](crates/holo_hash/CHANGELOG.md#0.1.2)
+
 # 20230203.200648
 
 ## [holochain\_cli-0.1.3](crates/holochain_cli/CHANGELOG.md#0.1.3)
