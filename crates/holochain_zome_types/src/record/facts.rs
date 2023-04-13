@@ -56,11 +56,11 @@ pub fn action_and_entry_match() -> Facts<'static, Pair> {
 mod tests {
     use super::*;
     use crate::action::facts as action_facts;
-    use arbitrary::{Arbitrary, Unstructured};
+    use arbitrary::Arbitrary;
 
     #[test]
     fn test_action_and_entry_match() {
-        let mut uu = Unstructured::new(&crate::NOISE);
+        let mut uu = unstructured_noise();
         let u = &mut uu;
 
         let e = Entry::arbitrary(u).unwrap();

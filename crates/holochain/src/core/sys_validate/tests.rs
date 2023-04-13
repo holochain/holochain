@@ -150,7 +150,7 @@ async fn record_with_deps_fixup(
             deps.push(prev);
 
             let entry = action.entry_data_mut().map(|(entry_hash, _)| {
-                let entry = fixt!(Entry);
+                let entry = Entry::fixture();
                 *entry_hash = EntryHash::with_data_sync(&entry);
                 entry
             });
@@ -172,15 +172,15 @@ async fn record_with_deps_fixup(
                     deps.push(dep);
                 }
                 Action::CreateLink(link) => {
-                    let base = fixt!(Record);
-                    let target = fixt!(Record);
+                    let base = Record::fixture();
+                    let target = Record::fixture();
                     link.base_address = base.action_address().clone().into();
                     link.target_address = target.action_address().clone().into();
                     deps.push(base);
                     deps.push(target);
                 }
                 Action::DeleteLink(delete) => {
-                    let base = fixt!(Record);
+                    let base = Record::fixture();
                     let create =
                         matching_record(&mut u, |r| matches!(r.action(), Action::CreateLink(_)));
                     delete.base_address = base.action_address().clone().into();
@@ -245,7 +245,7 @@ async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
 async fn test_record_with_cascade() {
     let keystore = holochain_state::test_utils::test_keystore();
     for _ in 0..100 {
-        assert_valid_action(&keystore, fixt!(Action)).await;
+        assert_valid_action(&keystore, Action::fixture()).await;
     }
 }
 
@@ -253,7 +253,7 @@ async fn test_record_with_cascade() {
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_action_signature_test() {
     let keystore = holochain_state::test_utils::test_keystore();
-    let action = fixt!(CreateLink);
+    let action = CreateLink::fixture();
     let (record_valid, cascade) = record_with_cascade(&keystore, Action::CreateLink(action)).await;
 
     let wrong_signature = Signature([1_u8; 64]);
@@ -270,7 +270,7 @@ async fn verify_action_signature_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_action() {
     let keystore = holochain_state::test_utils::test_keystore();
-    let mut action = Action::Delete(fixt!(Delete));
+    let mut action = Action::Delete(Delete::fixture());
     *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
 
     *action.action_seq_mut().unwrap() = 7;
@@ -297,7 +297,7 @@ async fn check_previous_action() {
     }
 
     // Dna is always ok because of the type system
-    let action = Action::Dna(fixt!(Dna));
+    let action = Action::Dna(Dna::fixture());
     assert_valid_action(&keystore, action.clone()).await;
 }
 
@@ -312,13 +312,13 @@ async fn check_valid_if_dna_test() {
     let keystore = test_keystore();
     let db = tmp.to_db();
     // Test data
-    let _activity_return = vec![fixt!(ActionHash)];
+    let _activity_return = vec![ActionHash::fixture()];
 
-    let mut dna_def = fixt!(DnaDef);
+    let mut dna_def = DnaDef::fixture();
     dna_def.modifiers.origin_time = Timestamp::MIN;
 
     // Empty store not dna
-    let action = fixt!(CreateLink);
+    let action = CreateLink::fixture();
     let cache: DhtDbQueryCache = tmp_dht.to_db().into();
     let mut workspace = SysValidationWorkspace::new(
         db.clone().into(),
@@ -335,7 +335,7 @@ async fn check_valid_if_dna_test() {
         check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Ok(())
     );
-    let mut action = fixt!(Dna);
+    let mut action = Dna::fixture();
     action.hash = DnaHash::with_data_sync(&dna_def);
 
     assert_matches!(
@@ -391,7 +391,7 @@ async fn check_previous_timestamp() {
     let after = Timestamp::from(chrono::Utc::now() + chrono::Duration::weeks(1));
 
     let keystore = test_keystore();
-    let (record, mut deps) = record_with_deps(&keystore, fixt!(CreateLink).into()).await;
+    let (record, mut deps) = record_with_deps(&keystore, CreateLink::fixture().into()).await;
     *deps[0].as_action_mut().timestamp_mut() = before;
 
     assert!(
@@ -418,7 +418,7 @@ async fn check_previous_timestamp() {
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_seq() {
     let keystore = test_keystore();
-    let mut action: Action = fixt!(CreateLink).into();
+    let mut action: Action = CreateLink::fixture().into();
     *action.action_seq_mut().unwrap() = 2;
     let (mut record, mut deps) = record_with_deps(&keystore, action).await;
 
@@ -496,8 +496,8 @@ async fn check_entry_type_test() {
 /// Hash integrity check. The hash of an entry always matches what's in the action.
 #[tokio::test(flavor = "multi_thread")]
 async fn check_entry_hash_test() {
-    let mut ec = fixt!(Create);
-    let entry = fixt!(Entry);
+    let mut ec = Create::fixture();
+    let entry = Entry::fixture();
     let hash = EntryHash::with_data_sync(&entry);
     let action: Action = ec.clone().into();
 
@@ -518,7 +518,7 @@ async fn check_entry_hash_test() {
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(check_entry_hash(&eh, &entry).await, Ok(()));
     assert_matches!(
-        check_new_entry_action(&fixt!(CreateLink).into()),
+        check_new_entry_action(&CreateLink::fixture().into()),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::NotNewEntry(_)
         ))
@@ -530,12 +530,12 @@ async fn check_entry_hash_test() {
 async fn check_entry_size_test() {
     let keystore = test_keystore();
 
-    let (mut record, cascade) = record_with_cascade(&keystore, fixt!(Create).into()).await;
+    let (mut record, cascade) = record_with_cascade(&keystore, Create::fixture().into()).await;
 
     let tiny_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         (0..5).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
     ))));
-    *record.as_action_mut().entry_data_mut().unwrap().1 = EntryType::App(fixt!(AppEntryDef));
+    *record.as_action_mut().entry_data_mut().unwrap().1 = EntryType::App(AppEntryDef::fixture());
     *record.as_entry_mut() = RecordEntry::Present(tiny_entry);
     let mut record = rebuild_record(record, &keystore).await;
     sys_validate_record(&record, &cascade).await.unwrap();
@@ -602,6 +602,9 @@ async fn check_update_reference_test() {
 /// The link tag size is bounded
 #[tokio::test(flavor = "multi_thread")]
 async fn check_link_tag_size_test() {
+    let keystore = test_keystore();
+    let (mut record, cascade) = record_with_cascade(&keystore, CreateLink::fixture().into()).await;
+
     let tiny = LinkTag(vec![0; 1]);
     let bytes = (0..super::MAX_TAG_SIZE + 1)
         .map(|_| 0u8)
@@ -645,7 +648,7 @@ async fn check_app_entry_def_test() {
     )
     .await;
     let dna_hash = dna_file.dna_hash().to_owned().clone();
-    let mut entry_def = fixt!(EntryDef);
+    let mut entry_def = EntryDef::fixture();
     entry_def.visibility = EntryVisibility::Public;
 
     let db_dir = test_db_dir();
@@ -704,15 +707,15 @@ async fn check_app_entry_def_test() {
 /// Check that StoreEntry does not have a private entry type
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_filters_private_entry() {
-    let dna = fixt!(DnaHash);
+    let dna = DnaHash::fixture();
     let spaces = TestSpaces::new([dna.clone()]);
     let space = Arc::new(spaces.test_spaces[&dna].space.clone());
     let vault = space.dht_db.clone();
     let keystore = test_keystore();
     let (tx, _rx) = TriggerSender::new();
 
-    let private_entry = fixt!(Entry);
-    let mut create = fixt!(Create);
+    let private_entry = Entry::fixture();
+    let mut create = Create::fixture();
     let author = keystore.new_sign_keypair_random().await.unwrap();
     let app_entry_def = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
     create.entry_type = EntryType::App(app_entry_def);

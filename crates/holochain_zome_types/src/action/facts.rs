@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_valid_chain_fact() {
-        let mut u = Unstructured::new(&crate::NOISE);
+        let mut u = unstructured_noise();
         let author = ::fixt::fixt!(AgentPubKey);
 
         let chain = build_seq(&mut u, 5, valid_chain(author.clone()));

@@ -59,3 +59,6 @@ pub use crate::fixt::*;
 
 #[cfg(feature = "test_utils")]
 pub use crate::test_utils::*;
+
+#[cfg(all(any(test, feature = "test_utils"), feature = "arbitrary"))]
+pub use crate::entropy::*;
