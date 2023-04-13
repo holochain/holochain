@@ -680,10 +680,19 @@ impl KitsuneP2pActor {
                                                         .await;
                                                 }
                                                 wire::Wire::PeerUnsolicited(
-                                                    wire::PeerUnsolicited { .. },
+                                                    wire::PeerUnsolicited { peer_list },
                                                 ) => {
-                                                    // Nothing needs doing as we handle
-                                                    // this in tx5 conn_validate.
+                                                    for peer in peer_list {
+                                                        if let Err(err) = evt_sender
+                                                        .put_agent_info_signed(
+                                                            PutAgentInfoSignedEvt {
+                                                                space: peer.space.clone(),
+                                                                peer_data: vec![peer.clone()],
+                                                            },
+                                                        ).await {
+                                                            tracing::warn!(?err, "error processing incoming agent info unsolicited");
+                                                        }
+                                                    }
                                                 }
                                                 wire::Wire::Failure(_)
                                                 | wire::Wire::Call(_)
