@@ -3,29 +3,13 @@
 //! Defines the CLI commands for packing/unpacking both DNA and hApp bundles
 
 use crate::error::{HcBundleError, HcBundleResult};
+use holochain_types::wasmer_types::build_ios_module;
 use holochain_util::ffs;
-use holochain_wasmer_host::prelude::*;
 use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
+use tracing::info;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::Arc;
-use wasmer_middlewares::Metering;
-
-const WASM_METERING_LIMIT: u64 = 100_000_000_000;
-
-// TODO-connor: don't have this code copy-pasted from real_ribosome.
-// instead place it in TBD appropriate place to be shared between?
-pub fn cranelift() -> Cranelift {
-    let cost_function = |_operator: &wasmparser::Operator| -> u64 { 1 };
-    // @todo 100 giga-ops is totally arbitrary cutoff so we probably
-    // want to make the limit configurable somehow.
-    let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
-    let mut cranelift = Cranelift::default();
-    cranelift.canonicalize_nans(true).push_middleware(metering);
-    cranelift
-}
 
 /// Unpack a DNA bundle into a working directory, returning the directory path used.
 pub async fn unpack<M: Manifest>(
@@ -88,21 +72,6 @@ fn bundle_path_to_dir(path: &Path, extension: &'static str) -> HcBundleResult<Pa
         .join(stem))
 }
 
-pub fn preserialized_module(wasm: &[u8]) -> Module {
-    println!("Found wasm and was instructed to serialize it to wasmer format, doing so now...");
-    let compiler_config = cranelift();
-    // use what I see in
-    // platform ios headless example
-    // https://github.com/wasmerio/wasmer/blob/447c2e3a152438db67be9ef649327fabcad6f5b8/examples/platform_ios_headless.rs#L38-L53
-    let triple = Triple::from_str("aarch64-apple-ios").unwrap();
-    let cpu_feature = CpuFeature::set();
-    let target = Target::new(triple, cpu_feature);
-    let engine = Dylib::new(compiler_config).target(target).engine();
-    let store = Store::new(&engine);
-    let module = Module::from_binary(&store, wasm).unwrap();
-    module
-}
-
 /// Pack a directory containing a yaml Manifest (Dna, Happ, WebHapp) into a Bundle, returning
 /// the path to which the bundle file was written
 pub async fn pack<M: Manifest>(
@@ -146,13 +115,15 @@ pub async fn pack<M: Manifest>(
                         ffs::create_dir_all(ios_folder_path).await?;
                         ffs::write(&resource_path_adjoined, vec![].as_slice()).await?;
                         let resource_path = ffs::canonicalize(resource_path_adjoined).await?;
-                        let module = preserialized_module(bytes.as_slice());
-                        match module.serialize_to_file(resource_path.clone()) {
-                            Ok(()) => {
-                                println!("wrote ios dylib to {:?}", resource_path);
-                                Ok(())
-                            }
-                            Err(e) => Err(HcBundleError::SerializedModuleError(e)),
+                        match build_ios_module(bytes.as_slice()) {
+                            Ok(module) => match module.serialize_to_file(resource_path.clone()) {
+                                Ok(()) => {
+                                    info!("wrote ios dylib to {:?}", resource_path);
+                                    Ok(())
+                                }
+                                Err(e) => Err(HcBundleError::SerializedModuleError(e)),
+                            },
+                            Err(e) => Err(HcBundleError::ModuleCompileError(e)),
                         }
                     } else {
                         Ok(())

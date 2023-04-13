@@ -287,8 +287,6 @@ impl DnaDef {
             .collect()
     }
 
-    /// TODO-connor fix this... to be a WasmDylib zome here should also be acceptible.
-    /// need to alter the return type
     /// Return a Zome, error if not a WasmZome
     pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, ZomeError> {
         self.all_zomes()

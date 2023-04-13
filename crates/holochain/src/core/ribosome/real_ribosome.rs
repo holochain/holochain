@@ -74,30 +74,19 @@ use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::module::SerializedModuleCache;
-use wasmer_middlewares::Metering;
 // This is here because there were errors about different crate versions
 // without it.
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
 
+use holochain_types::wasmer_types::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-
-#[cfg(not(test))]
-/// one hundred giga ops
-const WASM_METERING_LIMIT: u64 = 100_000_000_000;
-
-#[cfg(test)]
-
-/// ten mega ops.
-/// We don't want tests to run forever, and it can take several minutes for 100 giga ops to run.
-const WASM_METERING_LIMIT: u64 = 10_000_000;
 
 /// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -242,18 +231,6 @@ fn context_key_from_key(key: &[u8; 32]) -> u64 {
     u64::from_le_bytes(bits)
 }
 
-// TODO-connor consolidate aspects of this with the code
-// in the hc_bundle packing crate, so that there will always
-// be alignment
-pub fn ios_dylib_store() -> Store {
-    let triple = Triple::from_str("aarch64-apple-ios").unwrap();
-    let cpu_feature = CpuFeature::set();
-    let target = Target::new(triple, cpu_feature);
-    let engine = Dylib::headless().target(target).engine();
-    let store = Store::new(&engine);
-    store
-}
-
 impl RealRibosome {
     /// Create a new instance
     pub fn new(dna_file: DnaFile) -> RibosomeResult<Self> {
@@ -360,18 +337,10 @@ impl RealRibosome {
     }
 
     pub fn precompiled_module(&self, dylib_path: &PathBuf) -> RibosomeResult<Arc<Module>> {
-        let store = ios_dylib_store();
-        println!("dylib path {:?}", dylib_path);
+        let store = ios_dylib_headless_store();
         match unsafe { Module::deserialize_from_file(&store, dylib_path) } {
             Ok(module) => Ok(Arc::new(module)),
-            // TODO-connor fix to real error
-            Err(e) => {
-                println!("error during deserialize_from_file {:?}", e);
-                Err(RibosomeError::ZomeFnNotExists(
-                    ZomeName::from("this is not the real error"),
-                    FunctionName::from("this is not the real error"),
-                ))
-            }
+            Err(e) => Err(RibosomeError::ModuleDeserializeError(e)),
         }
     }
 
@@ -381,7 +350,9 @@ impl RealRibosome {
             .is_none()
         {
             holochain_wasmer_host::module::SERIALIZED_MODULE_CACHE
-                .set(RwLock::new(SerializedModuleCache::default()))
+                .set(RwLock::new(SerializedModuleCache::default_with_cranelift(
+                    cranelift,
+                )))
                 // An error here means the cell is full when we tried to set it, so
                 // some other thread must have done something in between the get
                 // above and the set here. In this case we don't care as we don't
@@ -446,18 +417,16 @@ impl RealRibosome {
     ) -> RibosomeResult<Arc<Mutex<Instance>>> {
         let module = match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
-                if let Some(path) = wasm_zome.preserialized_path {
+                if let Some(path) = &wasm_zome.preserialized_path {
                     self.precompiled_module(&path)?
                 } else {
                     self.runtime_compiled_module(zome.zome_name())?
                 }
             }
             _ => {
-                // TODO-connor replace error
-                return RibosomeResult::Err(RibosomeError::ZomeFnNotExists(
-                    ZomeName::new("m"),
-                    FunctionName("m".to_string()),
-                ));
+                return RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
+                    ZomeError::NonWasmZome(zome.zome_name().clone()),
+                )));
             }
         };
         let imports: ImportObject = Self::imports(self, context_key, module.store());
@@ -529,16 +498,6 @@ impl RealRibosome {
         }
         // Fallback to creating the instance.
         Ok((instance, context_key))
-    }
-
-    pub fn cranelift() -> Cranelift {
-        let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
-        // @todo 100 giga-ops is totally arbitrary cutoff so we probably
-        // want to make the limit configurable somehow.
-        let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
-        let mut cranelift = Cranelift::default();
-        cranelift.canonicalize_nans(true).push_middleware(metering);
-        cranelift
     }
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
@@ -842,7 +801,7 @@ impl RibosomeT for RealRibosome {
             extern_fns: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
-                        let module = if let Some(path) = wasm_zome.preserialized_path {
+                        let module = if let Some(path) = &wasm_zome.preserialized_path {
                             self.precompiled_module(&path)?
                         } else {
                             self.runtime_compiled_module(zome.zome_name())?
@@ -874,7 +833,7 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(wasm_zome) => {
-                let module = if let Some(path) = wasm_zome.preserialized_path {
+                let module = if let Some(path) = &wasm_zome.preserialized_path {
                     self.precompiled_module(&path)?
                 } else {
                     self.runtime_compiled_module(zome.zome_name())?
@@ -903,7 +862,7 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(wasm_zome) => {
-                let module = if let Some(path) = wasm_zome.preserialized_path {
+                let module = if let Some(path) = &wasm_zome.preserialized_path {
                     self.precompiled_module(&path)?
                 } else {
                     self.runtime_compiled_module(zome.zome_name())?

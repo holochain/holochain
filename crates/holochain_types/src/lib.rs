@@ -39,6 +39,7 @@ pub mod signal;
 pub mod sql;
 pub mod web_app;
 pub mod zome_types;
+pub mod wasmer_types;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;

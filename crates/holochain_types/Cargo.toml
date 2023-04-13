@@ -12,6 +12,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+wasmer-middlewares = "2"
+holochain_wasmer_host = { git = "https://github.com/Sprillow/holochain-wasmer.git", rev = "b62e66ef1fd7011967ab210fb0dc9ac65794d8d8", features = ["dylib"] } # "=0.0.83"
 anyhow = "1.0.26"
 async-trait = "0.1"
 automap = { version = "0.1", features = ["serde"] }

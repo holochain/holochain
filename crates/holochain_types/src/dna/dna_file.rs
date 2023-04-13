@@ -4,7 +4,6 @@ use holo_hash::*;
 use holochain_zome_types::ZomeName;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 #[cfg(test)]
 mod test;
@@ -39,9 +38,6 @@ impl From<WasmMapSerialized> for WasmMap {
         Self(w.0.into_iter().collect())
     }
 }
-
-/// Store the paths to dylib precompiled wasmer modules
-pub type DylibZomeMap = BTreeMap<holo_hash::WasmHash, PathBuf>;
 
 /// Represents a full DNA, including DnaDef and WebAssembly bytecode.
 ///
