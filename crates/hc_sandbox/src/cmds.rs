@@ -33,6 +33,11 @@ pub struct Create {
     /// For example `hc s generate path/to/my/chains -r -n 3 -d=first,second,third`
     /// will create three sandboxes with directories named "first", "second", and "third".
     pub directories: Vec<PathBuf>,
+
+    /// Launch holochain with an embedded lair server instead of a standalone process.
+    /// Use this option to run the sand-boxed conductors when you don't have access to the lair binary.
+    #[structopt(long)]
+    pub in_process_lair: bool,
 }
 
 #[derive(Debug, StructOpt, Clone)]
@@ -241,6 +246,7 @@ impl Default for Create {
             network: None,
             root: None,
             directories: Vec::with_capacity(0),
+            in_process_lair: false,
         }
     }
 }

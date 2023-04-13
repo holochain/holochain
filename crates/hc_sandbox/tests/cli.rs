@@ -134,10 +134,11 @@ async fn run_holochain() {
     ))
     .arg("--piped")
     .arg("generate")
+    .arg("--in-process-lair")
     .arg(format!("--run={}", port))
     .arg("tests/fixtures/my-app/")
     .stdin(Stdio::piped())
-    .stdout(Stdio::null())
+    //.stdout(Stdio::null())
     .kill_on_drop(true);
 
     let hc_admin = cmd.spawn().expect("Failed to spawn holochain");
@@ -168,6 +169,7 @@ async fn run_multiple_on_same_port() {
         ))
         .arg("--piped")
         .arg("generate")
+        .arg("--in-process-lair")
         .arg(format!("--run={}", app_port))
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())

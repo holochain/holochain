@@ -6,6 +6,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
+use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
@@ -35,7 +36,7 @@ pub async fn run(
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    let (port, mut holochain, mut lair) =
+    let (port, mut holochain, lair) =
         run_async(holochain_path, sandbox_path.clone(), force_admin_port).await?;
     msg!("Running conductor on admin port {}", port);
     for app_port in app_ports {
@@ -55,8 +56,10 @@ pub async fn run(
     let e = format!("Failed to run holochain at {}", sandbox_path.display());
 
     holochain.wait().await.expect(&e);
-    let _ = lair.kill().await;
-    lair.wait().await.expect("Failed to wait on lair-keystore");
+    if let Some(mut lair) = lair {
+        let _ = lair.kill().await;
+        lair.wait().await.expect("Failed to wait on lair-keystore");
+    }
 
     Ok(())
 }
@@ -72,7 +75,7 @@ pub async fn run_async(
     holochain_path: &Path,
     sandbox_path: PathBuf,
     force_admin_port: Option<u16>,
-) -> anyhow::Result<(u16, Child, Child)> {
+) -> anyhow::Result<(u16, Child, Option<Child>)> {
     let mut config = match read_config(sandbox_path.clone())? {
         Some(c) => c,
         None => {
@@ -80,7 +83,7 @@ pub async fn run_async(
             keystore_dir.push("keystore");
             let passphrase = holochain_util::pw::pw_get()?;
             let con_url = crate::generate::init_lair(&keystore_dir, passphrase)?;
-            create_config(sandbox_path.clone(), con_url)
+            create_config(sandbox_path.clone(), Some(con_url))
         }
     };
     match force_admin_port {
@@ -91,7 +94,7 @@ pub async fn run_async(
     }
     let config_path = write_config(sandbox_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
-    let (mut child, lair) = start_holochain(holochain_path, config_path, tx_config).await?;
+    let (mut child, lair) = start_holochain(holochain_path, &config, config_path, tx_config).await?;
     check_started(&mut child).await;
     let port = rx_config
         .await
@@ -101,37 +104,27 @@ pub async fn run_async(
 
 async fn start_holochain(
     holochain_path: &Path,
+    config: &ConductorConfig,
     config_path: PathBuf,
     tx_config: oneshot::Sender<u16>,
-) -> anyhow::Result<(Child, Child)> {
+) -> anyhow::Result<(Child, Option<Child>)> {
     use tokio::io::AsyncWriteExt;
     let passphrase = holochain_util::pw::pw_get()?.read_lock().to_vec();
 
+    // TODO should prefer getting this from the config
     let mut lair_path = config_path.clone();
     lair_path.pop();
     lair_path.push("keystore");
 
-    tracing::info!("\n\n----\nstarting lair\n----\n\n");
-    let mut cmd = Command::new("lair-keystore");
-    cmd.arg("--lair-root")
-        .arg(lair_path)
-        .arg("server")
-        .arg("--piped")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true);
-
-    msg!("{:?}", cmd);
-
-    let mut lair = cmd.spawn().expect("Failed to spawn lair-keystore");
-
-    let mut stdin = lair.stdin.take().unwrap();
-    stdin.write_all(&passphrase).await?;
-    stdin.shutdown().await?;
-    drop(stdin);
-
-    check_lair_running(lair.stdout.take().unwrap()).await;
+    let lair = match config.keystore {
+        KeystoreConfig::LairServer { .. } => {
+            let lair = start_lair(&passphrase, lair_path).await?;
+            Some(lair)
+        }
+        _ => {
+            None
+        }
+    };
 
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let mut cmd = Command::new(holochain_path);
@@ -159,8 +152,35 @@ async fn start_holochain(
     Ok((holochain, lair))
 }
 
+async fn start_lair(passphrase: &Vec<u8>, lair_path: PathBuf) -> anyhow::Result<Child> {
+    use tokio::io::AsyncWriteExt;
+
+    tracing::info!("\n\n----\nstarting lair\n----\n\n");
+    let mut cmd = Command::new("lair-keystore");
+    cmd.arg("--lair-root")
+        .arg(lair_path)
+        .arg("server")
+        .arg("--piped")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    msg!("{:?}", cmd);
+
+    let mut lair = cmd.spawn().expect("Failed to spawn lair-keystore");
+
+    let mut stdin = lair.stdin.take().unwrap();
+    stdin.write_all(&passphrase).await?;
+    stdin.shutdown().await?;
+    drop(stdin);
+
+    check_lair_running(lair.stdout.take().unwrap()).await;
+    Ok(lair)
+}
+
 async fn check_lair_running(stdout: tokio::process::ChildStdout) {
-    let (s, r) = tokio::sync::oneshot::channel();
+    let (s, r) = oneshot::channel();
     let mut s = Some(s);
     tokio::task::spawn(async move {
         let mut lines = BufReader::new(stdout).lines();

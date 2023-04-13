@@ -20,8 +20,9 @@ pub fn generate(
     network: Option<KitsuneP2pConfig>,
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
+    in_process_lair: bool,
 ) -> anyhow::Result<PathBuf> {
-    let (dir, con_url) = generate_directory(root, directory)?;
+    let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url);
     config.network = network;
@@ -50,11 +51,11 @@ pub fn generate_with_config(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
 ) -> anyhow::Result<PathBuf> {
-    let (dir, con_url) = generate_directory(root, directory)?;
+    let (dir, con_url) = generate_directory(root, directory, true)?;
     let config = config.unwrap_or_else(|| {
         let mut config = create_config(dir.clone(), con_url.clone());
         config.keystore = KeystoreConfig::LairServer {
-            connection_url: con_url,
+            connection_url: con_url.expect("Lair should have been initialised but did not get a connection URl for it"),
         };
         config
     });
@@ -66,7 +67,8 @@ pub fn generate_with_config(
 pub fn generate_directory(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
-) -> anyhow::Result<(PathBuf, url2::Url2)> {
+    initialise_lair: bool,
+) -> anyhow::Result<(PathBuf, Option<url2::Url2>)> {
     let passphrase = holochain_util::pw::pw_get()?;
 
     let mut dir = root.unwrap_or_else(std::env::temp_dir);
@@ -77,7 +79,11 @@ pub fn generate_directory(
     keystore_dir.push("keystore");
     std::fs::create_dir(&keystore_dir)?;
 
-    let con_url = init_lair(&keystore_dir, passphrase)?;
+    let con_url = if initialise_lair {
+        Some(init_lair(&keystore_dir, passphrase)?)
+    } else {
+        None
+    };
 
     Ok((dir, con_url))
 }
@@ -91,7 +97,7 @@ pub(crate) fn init_lair(
             std::io::ErrorKind::Other,
             format!("Failed to execute 'lair-keystore init': {:?}", err),
         )
-        .into()),
+            .into()),
         Ok(url) => Ok(url),
     }
 }

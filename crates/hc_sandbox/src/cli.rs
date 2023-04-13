@@ -164,6 +164,7 @@ impl HcSandbox {
                 network,
                 root,
                 directories,
+                in_process_lair,
             }) => {
                 let mut paths = Vec::with_capacity(num_sandboxes);
                 msg!(
@@ -175,6 +176,7 @@ impl HcSandbox {
                         network.clone().map(|n| n.into_inner().into()),
                         root.clone(),
                         directories.get(i).cloned(),
+                        in_process_lair
                     )?;
                     paths.push(path);
                 }

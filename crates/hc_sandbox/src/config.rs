@@ -9,16 +9,25 @@ pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
 
 /// Create a new default [`ConductorConfig`] with environment path
 /// and keystore all in the same directory.
-pub fn create_config(environment_path: PathBuf, con_url: url2::Url2) -> ConductorConfig {
+pub fn create_config(environment_path: PathBuf, con_url: Option<url2::Url2>) -> ConductorConfig {
     let mut conductor_config = ConductorConfig {
         environment_path: environment_path.clone().into(),
         ..Default::default()
     };
     let mut keystore_path = environment_path;
     keystore_path.push("keystore");
-    conductor_config.keystore = KeystoreConfig::LairServer {
-        connection_url: con_url,
-    };
+    match con_url {
+        Some(url) => {
+            conductor_config.keystore = KeystoreConfig::LairServer {
+                connection_url: url,
+            };
+        }
+        None => {
+            conductor_config.keystore = KeystoreConfig::LairServerInProc {
+                lair_root: None
+            };
+        }
+    }
     conductor_config
 }
 
