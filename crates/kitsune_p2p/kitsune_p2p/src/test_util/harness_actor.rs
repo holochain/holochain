@@ -183,28 +183,27 @@ impl ghost_actor::GhostHandler<HarnessInner> for HarnessActor {}
 impl HarnessInnerHandler for HarnessActor {
     fn handle_finish_agent(
         &mut self,
-        _agent: Arc<KitsuneAgent>,
-        _p2p: ghost_actor::GhostSender<KitsuneP2p>,
-        _ctrl: ghost_actor::GhostSender<HarnessAgentControl>,
+        agent: Arc<KitsuneAgent>,
+        p2p: ghost_actor::GhostSender<KitsuneP2p>,
+        ctrl: ghost_actor::GhostSender<HarnessAgentControl>,
     ) -> HarnessInnerHandlerResult<()> {
-        todo!();
-        // self.agents.insert(agent.clone(), (p2p.clone(), ctrl));
+        self.agents.insert(agent.clone(), (p2p.clone(), ctrl));
 
-        // let harness_chan = self.harness_chan.clone();
-        // let space_list = self.space_list.clone();
-        // Ok(async move {
-        //     for space in space_list {
-        //         p2p.join(space.clone(), agent.clone(), None).await?;
+        let harness_chan = self.harness_chan.clone();
+        let space_list = self.space_list.clone();
+        Ok(async move {
+            for space in space_list {
+                p2p.join(space.clone(), agent.clone(), None, None).await?;
 
-        //         harness_chan.publish(HarnessEventType::Join {
-        //             agent: (&agent).into(),
-        //             space: space.into(),
-        //         });
-        //     }
-        //     Ok(())
-        // }
-        // .boxed()
-        // .into())
+                harness_chan.publish(HarnessEventType::Join {
+                    agent: (&agent).into(),
+                    space: space.into(),
+                });
+            }
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 }
 
@@ -212,21 +211,19 @@ impl ghost_actor::GhostHandler<HarnessControlApi> for HarnessActor {}
 
 impl HarnessControlApiHandler for HarnessActor {
     fn handle_add_space(&mut self) -> HarnessControlApiHandlerResult<Arc<KitsuneSpace>> {
-        todo!();
+        let space: Arc<KitsuneSpace> = TestVal::test_val();
+        self.space_list.push(space.clone());
+        let mut all = Vec::new();
 
-        // let space: Arc<KitsuneSpace> = TestVal::test_val();
-        // self.space_list.push(space.clone());
-        // let mut all = Vec::new();
-
-        // for (agent, (p2p, _)) in self.agents.iter() {
-        //     all.push(p2p.join(space.clone(), agent.clone(), None));
-        // }
-        // Ok(async move {
-        //     futures::future::try_join_all(all).await?;
-        //     Ok(space)
-        // }
-        // .boxed()
-        // .into())
+        for (agent, (p2p, _)) in self.agents.iter() {
+            all.push(p2p.join(space.clone(), agent.clone(), None, None));
+        }
+        Ok(async move {
+            futures::future::try_join_all(all).await?;
+            Ok(space)
+        }
+        .boxed()
+        .into())
     }
 
     /*
