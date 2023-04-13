@@ -176,7 +176,7 @@ impl HcSandbox {
                         network.clone().map(|n| n.into_inner().into()),
                         root.clone(),
                         directories.get(i).cloned(),
-                        in_process_lair
+                        in_process_lair,
                     )?;
                     paths.push(path);
                 }

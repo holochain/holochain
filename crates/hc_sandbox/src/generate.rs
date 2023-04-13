@@ -55,7 +55,9 @@ pub fn generate_with_config(
     let config = config.unwrap_or_else(|| {
         let mut config = create_config(dir.clone(), con_url.clone());
         config.keystore = KeystoreConfig::LairServer {
-            connection_url: con_url.expect("Lair should have been initialised but did not get a connection URl for it"),
+            connection_url: con_url.expect(
+                "Lair should have been initialised but did not get a connection URl for it",
+            ),
         };
         config
     });
@@ -97,7 +99,7 @@ pub(crate) fn init_lair(
             std::io::ErrorKind::Other,
             format!("Failed to execute 'lair-keystore init': {:?}", err),
         )
-            .into()),
+        .into()),
         Ok(url) => Ok(url),
     }
 }

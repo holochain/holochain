@@ -19,8 +19,18 @@ pub async fn default_with_network(
     happ: PathBuf,
     app_id: InstalledAppId,
 ) -> anyhow::Result<PathBuf> {
-    let Create { network, root, in_process_lair, .. } = create;
-    let path = crate::generate::generate(network.map(|n| n.into_inner().into()), root, directory, in_process_lair)?;
+    let Create {
+        network,
+        root,
+        in_process_lair,
+        ..
+    } = create;
+    let path = crate::generate::generate(
+        network.map(|n| n.into_inner().into()),
+        root,
+        directory,
+        in_process_lair,
+    )?;
     let conductor = run_async(holochain_path, path.clone(), None).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
     let install_bundle = InstallApp {

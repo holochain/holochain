@@ -23,9 +23,7 @@ pub fn create_config(environment_path: PathBuf, con_url: Option<url2::Url2>) -> 
             };
         }
         None => {
-            conductor_config.keystore = KeystoreConfig::LairServerInProc {
-                lair_root: None
-            };
+            conductor_config.keystore = KeystoreConfig::LairServerInProc { lair_root: None };
         }
     }
     conductor_config

@@ -2,11 +2,11 @@
 use std::path::Path;
 use std::{path::PathBuf, process::Stdio};
 
+use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
-use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
@@ -94,7 +94,8 @@ pub async fn run_async(
     }
     let config_path = write_config(sandbox_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
-    let (mut child, lair) = start_holochain(holochain_path, &config, config_path, tx_config).await?;
+    let (mut child, lair) =
+        start_holochain(holochain_path, &config, config_path, tx_config).await?;
     check_started(&mut child).await;
     let port = rx_config
         .await
@@ -121,9 +122,7 @@ async fn start_holochain(
             let lair = start_lair(&passphrase, lair_path).await?;
             Some(lair)
         }
-        _ => {
-            None
-        }
+        _ => None,
     };
 
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
