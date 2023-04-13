@@ -161,44 +161,43 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     Ok(())
 }
 
-// @todo commented out for node blocking pr
-//
-// /// Test that when the conductor shuts down, gossip does not continue,
-// /// and when it restarts, gossip resumes.
-// #[cfg(feature = "slow_tests")]
-// #[tokio::test(flavor = "multi_thread")]
-// async fn test_gossip_shutdown() {
-//     holochain_trace::test_run().ok();
-//     let mut conductors = SweetConductorBatch::from_config(2, make_config(true, true, None)).await;
+/// Test that when the conductor shuts down, gossip does not continue,
+/// and when it restarts, gossip resumes.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "deal with connections closing and banning for 10s"]
+async fn test_gossip_shutdown() {
+    holochain_trace::test_run().ok();
+    let mut conductors = SweetConductorBatch::from_config(2, make_config(true, true, None)).await;
 
-//     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
-//     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-//     let ((cell_0,), (cell_1,)) = apps.into_tuples();
-//     let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
-//     let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let ((cell_0,), (cell_1,)) = apps.into_tuples();
+    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
+    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
 
-//     // Create an entry before the conductors know about each other
-//     let hash: ActionHash = conductors[0]
-//         .call(&zome_0, "create_string", "hi".to_string())
-//         .await;
+    // Create an entry before the conductors know about each other
+    let hash: ActionHash = conductors[0]
+        .call(&zome_0, "create_string", "hi".to_string())
+        .await;
 
-//     // After shutting down conductor 0, test that gossip doesn't happen within 3 seconds
-//     // of peer discovery (assuming it will never happen)
-//     conductors[0].shutdown().await;
-//     conductors.exchange_peer_info().await;
-//     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    // After shutting down conductor 0, test that gossip doesn't happen within 3 seconds
+    // of peer discovery (assuming it will never happen)
+    conductors[0].shutdown().await;
+    conductors.exchange_peer_info().await;
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-//     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
-//     assert!(record.is_none());
+    let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
+    assert!(record.is_none());
 
-//     // Ensure that gossip loops resume upon startup
-//     conductors[0].startup().await;
+    // Ensure that gossip loops resume upon startup
+    conductors[0].startup().await;
 
-//     consistency_60s([&cell_0, &cell_1]).await;
-//     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
-//     assert_eq!(record.unwrap().action_address(), &hash);
-// }
+    consistency_60s([&cell_0, &cell_1]).await;
+    let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
+    assert_eq!(record.unwrap().action_address(), &hash);
+}
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]

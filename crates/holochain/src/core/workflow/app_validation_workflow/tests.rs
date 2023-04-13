@@ -28,47 +28,45 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::time::Duration;
 
-// @todo this seems to need a rethink in light of invalid data leading to agents
-// blocking each other.
-//
-// #[tokio::test(flavor = "multi_thread")]
-// async fn app_validation_workflow_test() {
-//     holochain_trace::test_run().ok();
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "deal with the invalid data that leads to blocks being enforced"]
+async fn app_validation_workflow_test() {
+    holochain_trace::test_run().ok();
 
-//     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
-//         TestWasm::Validate,
-//         TestWasm::ValidateLink,
-//         TestWasm::Create,
-//     ])
-//     .await;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
+        TestWasm::Validate,
+        TestWasm::ValidateLink,
+        TestWasm::Create,
+    ])
+    .await;
 
-//     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-//     let apps = conductors
-//         .setup_app(&"test_app", &[dna_file.clone()])
-//         .await
-//         .unwrap();
-//     let ((alice,), (bob,)) = apps.into_tuples();
-//     let alice_cell_id = alice.cell_id().clone();
-//     let bob_cell_id = bob.cell_id().clone();
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let apps = conductors
+        .setup_app(&"test_app", &[dna_file.clone()])
+        .await
+        .unwrap();
+    let ((alice,), (bob,)) = apps.into_tuples();
+    let alice_cell_id = alice.cell_id().clone();
+    let bob_cell_id = bob.cell_id().clone();
 
-//     conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
-//     let expected_count = run_test(
-//         alice_cell_id.clone(),
-//         bob_cell_id.clone(),
-//         &conductors,
-//         &dna_file,
-//     )
-//     .await;
-//     run_test_entry_def_id(
-//         alice_cell_id,
-//         bob_cell_id,
-//         &conductors,
-//         &dna_file,
-//         expected_count,
-//     )
-//     .await;
-// }
+    let expected_count = run_test(
+        alice_cell_id.clone(),
+        bob_cell_id.clone(),
+        &conductors,
+        &dna_file,
+    )
+    .await;
+    run_test_entry_def_id(
+        alice_cell_id,
+        bob_cell_id,
+        &conductors,
+        &dna_file,
+        expected_count,
+    )
+    .await;
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_private_entries_are_passed_to_validation_only_when_authored_with_full_entry() {
