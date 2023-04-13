@@ -539,6 +539,7 @@ async fn mock_network_sharded_gossip() {
                     HolochainP2pMockMsg::PeerGetResp(_) => debug!("PeerGetResp"),
                     HolochainP2pMockMsg::PeerQuery(_) => debug!("PeerQuery"),
                     HolochainP2pMockMsg::PeerQueryResp(_) => debug!("PeerQueryResp"),
+                    HolochainP2pMockMsg::PeerUnsolicited(_) => debug!("PeerUnsolicited"),
                     HolochainP2pMockMsg::MetricExchange(_) => debug!("MetricExchange"),
                     HolochainP2pMockMsg::Gossip {
                         dna,
@@ -1057,6 +1058,7 @@ async fn mock_network_sharding() {
                     HolochainP2pMockMsg::MetricExchange(_) => debug!("MetricExchange"),
                     HolochainP2pMockMsg::PeerGet(_) => eprintln!("PeerGet"),
                     HolochainP2pMockMsg::PeerGetResp(_) => debug!("PeerGetResp"),
+                    HolochainP2pMockMsg::PeerUnsolicited(_) => debug!("PeerUnsolicited"),
                     HolochainP2pMockMsg::PeerQuery(kitsune_p2p::wire::PeerQuery {
                         basis_loc,
                         ..

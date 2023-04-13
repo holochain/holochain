@@ -630,9 +630,10 @@ impl MetaNet {
                 let e_s = evt_sender.clone();
                 Box::pin(async move {
                     match maybe_data.map(|data| wire::Wire::decode_ref(&data)) {
-                        Some(Ok((_, wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
-                            peer_list,
-                        })))) => {
+                        Some(Ok((
+                            _,
+                            wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }),
+                        ))) => {
                             // @todo This loop only exists because we have to put a
                             // space on PutAgentInfoSignedEvt, if the internal peer
                             // space was used instead we could do this in a single
@@ -653,7 +654,7 @@ impl MetaNet {
                             }
                         }
                         Some(Err(err)) => tracing::warn!(?err, "error decoding connection peers"),
-                        _ => {},
+                        _ => {}
                     }
                     Ok(())
                 })
