@@ -7,7 +7,6 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
-use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
