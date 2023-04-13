@@ -888,6 +888,12 @@ impl MetaNet {
     ) -> KitsuneResult<()> {
         let msg_id = next_msg_id();
 
+        #[cfg(feature = "tx2")]
+        {
+            tracing::debug!("broadcast on tx2");
+            return Ok(());
+        }
+
         #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 { ep, .. } = self {
