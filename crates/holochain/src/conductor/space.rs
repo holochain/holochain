@@ -21,6 +21,7 @@ use crate::core::{
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::{
     dht::{
@@ -209,7 +210,7 @@ impl Spaces {
                     });
                     let mut all_blocked = true;
                     for agent in agents_for_target_node_id {
-                        all_blocked = all_blocked && self.is_blocked(BlockTargetId::Cell(CellId::from_kitsune(agent.space.clone(), agent.agent.clone())), timestamp).await?;
+                        all_blocked = all_blocked && self.is_blocked(BlockTargetId::Cell(CellId::new(DnaHash::from_kitsune(&agent.space), AgentPubKey::from_kitsune(&agent.agent))), timestamp).await?;
                     }
                     all_blocked
                 }
