@@ -92,6 +92,10 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
+    fn get_all_local_agent_info_signed(&self) -> KitsuneHostResult<Vec<AgentInfoSigned>> {
+        todo!();
+    }
+
     fn peer_extrapolated_coverage(
         &self,
         space: std::sync::Arc<kitsune_p2p::KitsuneSpace>,

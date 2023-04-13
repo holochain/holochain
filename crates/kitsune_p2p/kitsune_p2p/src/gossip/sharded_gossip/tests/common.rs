@@ -53,6 +53,10 @@ impl KitsuneHost for StandardResponsesHostApi {
         box_fut(Ok(Some(agent)))
     }
 
+    fn get_all_local_agent_info_signed(&self) -> crate::KitsuneHostResult<Vec<AgentInfoSigned>> {
+        todo!();
+    }
+
     fn remove_agent_info_signed(
         &self,
         _input: GetAgentInfoSignedEvt,

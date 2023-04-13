@@ -1,8 +1,6 @@
 use crate::mutations;
-use crate::prelude::StateQueryResult;
 use crate::query::prelude::named_params;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_sqlite::prelude::DbRead;
 use holochain_sqlite::prelude::DbWrite;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
@@ -21,11 +19,11 @@ pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseRes
         .await
 }
 
-fn query_is_blocked(
+pub fn query_is_blocked(
     txn: &Transaction<'_>,
     target_id: BlockTargetId,
     timestamp: Timestamp,
-) -> StateQueryResult<bool> {
+) -> DatabaseResult<bool> {
     Ok(txn.query_row(
         sql_conductor::IS_BLOCKED,
         named_params! {
@@ -34,15 +32,6 @@ fn query_is_blocked(
         },
         |row| row.get(0),
     )?)
-}
-
-pub async fn is_blocked(
-    db: &DbRead<DbKindConductor>,
-    target_id: BlockTargetId,
-    timestamp: Timestamp,
-) -> StateQueryResult<bool> {
-    db.async_reader(move |txn| query_is_blocked(&txn, target_id, timestamp))
-        .await
 }
 
 #[cfg(test)]

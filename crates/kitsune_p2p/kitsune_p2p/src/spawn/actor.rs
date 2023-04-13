@@ -14,6 +14,7 @@ use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use kitsune_p2p_types::tx2::tx2_api::*;
 use kitsune_p2p_types::*;
@@ -95,6 +96,9 @@ ghost_actor::ghost_chan! {
 
         /// Fetch an op from a remote
         fn fetch(key: FetchKey, space: KSpace, source: FetchSource) -> ();
+
+        /// Get all local joined agent infos across all spaces.
+        fn get_all_local_joined_agent_infos() -> Vec<AgentInfoSigned>;
     }
 }
 
@@ -257,11 +261,13 @@ impl KitsuneP2pActor {
         }
 
         let i_s = internal_sender.clone();
+
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
             let host = host.clone();
             let tuning_params = config.tuning_params.clone();
             let fetch_pool = fetch_pool.clone();
+            let timeout = config.tuning_params.implicit_timeout();
             async move {
                 let fetch_response_queue = &fetch_response_queue;
                 let fetch_pool = &fetch_pool;
@@ -276,21 +282,15 @@ impl KitsuneP2pActor {
 
                             match event {
                                 MetaNetEvt::Connected { remote_url, con } => {
-                                    match node_is_authorized(&host, con.peer_id(), Timestamp::now())
-                                        .await
-                                    {
-                                        MetaNetEvtAuth::Authorized => {
-                                            let _ = i_s.new_con(remote_url, con).await;
-                                        }
-                                        MetaNetEvtAuth::UnauthorizedIgnore => {}
-                                        MetaNetEvtAuth::UnauthorizedDisconnect => {
-                                            con.close(
-                                                UNAUTHORIZED_DISCONNECT_CODE,
-                                                UNAUTHORIZED_DISCONNECT_REASON,
-                                            )
-                                            .await;
+                                    let _ = i_s.new_con(remote_url, con.clone()).await;
+
+                                    if let Ok(agent_list) = i_s.get_all_local_joined_agent_infos().await {
+                                        let payload = wire::Wire::peer_unsolicited(agent_list);
+                                        if let Err(err) = con.notify(&payload, timeout).await {
+                                            tracing::warn!(?err, "error sending local peer list");
                                         }
                                     }
+
                                 }
                                 MetaNetEvt::Disconnected { remote_url, con: _ } => {
                                     let _ = i_s.del_con(remote_url).await;
@@ -392,6 +392,21 @@ impl KitsuneP2pActor {
                                     con,
                                     data,
                                 } => {
+                                    if let wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
+                                        peer_list
+                                    }) = &data {
+                                        for peer in peer_list {
+                                            if let Err(err) = evt_sender
+                                            .put_agent_info_signed(
+                                                PutAgentInfoSignedEvt {
+                                                    space: peer.space.clone(),
+                                                    peer_data: vec![peer.clone()],
+                                                },
+                                            ).await {
+                                                tracing::warn!(?err, "error processing incoming agent info unsolicited");
+                                            }
+                                        }
+                                    }
                                     match nodespace_is_authorized(
                                         &host,
                                         con.peer_id(),
@@ -682,7 +697,20 @@ impl KitsuneP2pActor {
                                                         .incoming_metric_exchange(space, msgs)
                                                         .await;
                                                 }
-                                                data => unimplemented!("{:?}", data),
+                                                wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
+                                                    .. }) => {
+                                                        // Nothing needs doing as we handled this
+                                                        // above the authorization check.
+                                                }
+                                                wire::Wire::Failure(_)
+                                                | wire::Wire::Call(_)
+                                                | wire::Wire::CallResp(_)
+                                                | wire::Wire::PeerGet(_)
+                                                | wire::Wire::PeerGetResp(_)
+                                                | wire::Wire::PeerQuery(_)
+                                                | wire::Wire::PeerQueryResp(_) => {
+                                                    tracing::warn!("received non-notify data in a notify");
+                                                }
                                             }
                                         }
                                     }
@@ -932,6 +960,35 @@ impl InternalHandler for KitsuneP2pActor {
         .boxed()
         .into())
     }
+
+    /// Best effort to retrieve all local agent infos across all spaces. If there
+    /// is an error for some space we simply log it and ignore the error for that
+    /// space and return local joined agent infos from the other spaces.
+    fn handle_get_all_local_joined_agent_infos(
+        &mut self,
+    ) -> InternalHandlerResult<Vec<AgentInfoSigned>> {
+        let spaces = self.spaces.values().map(|s| s.get()).collect::<Vec<_>>();
+        Ok(async move {
+            let mut all = Vec::new();
+            for (_, space) in futures::future::join_all(spaces).await {
+                all.push(space.get_all_local_joined_agent_infos());
+            }
+            let agent_infos = futures::future::join_all(all)
+                .await
+                .into_iter()
+                .filter_map(|maybe_agent_infos| {
+                    if let Err(err) = &maybe_agent_infos {
+                        tracing::warn!(?err, "error reading agent infos from spaces");
+                    }
+                    maybe_agent_infos.ok()
+                })
+                .flatten()
+                .collect();
+            Ok(agent_infos)
+        }
+        .boxed()
+        .into())
+    }
 }
 
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for KitsuneP2pActor {}
@@ -1022,6 +1079,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
@@ -1059,7 +1117,9 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = space_sender.get();
         Ok(async move {
             let (space_sender, _) = space_sender.await;
-            space_sender.join(space, agent, initial_arc).await
+            space_sender
+                .join(space, agent, maybe_agent_info, initial_arc)
+                .await
         }
         .boxed()
         .into())

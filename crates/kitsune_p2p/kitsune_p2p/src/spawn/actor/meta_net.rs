@@ -33,6 +33,7 @@ use kitsune_p2p_types::*;
 
 use kitsune_p2p_block::BlockTargetId;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -824,6 +825,30 @@ impl MetaNet {
         }
 
         panic!("invalid features");
+    }
+
+    pub async fn broadcast(
+        &self,
+        payload: &wire::Wire,
+        timeout: KitsuneTimeout,
+    ) -> KitsuneResult<()> {
+        let msg_id = next_msg_id();
+
+        #[cfg(feature = "tx5")]
+        {
+            if let MetaNet::Tx5(ep, _cli_url, _res_store) = self {
+                let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                let wrap = WireWrap::notify(msg_id, WireData(wire));
+
+                let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+                ep.broadcast(data.as_slice())
+                    .await
+                    .map_err(KitsuneError::other)?;
+                return Ok(());
+            }
+        }
+
+        Err("invalid features".into())
     }
 
     pub async fn close(&self, code: u32, reason: &str) {
