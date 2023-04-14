@@ -813,7 +813,7 @@ mod network_impls {
             &self,
             input: BlockTargetId,
             timestamp: Timestamp,
-        ) -> StateQueryResult<bool> {
+        ) -> DatabaseResult<bool> {
             self.spaces.is_blocked(input, timestamp).await
         }
 
@@ -1876,15 +1876,15 @@ mod app_status_impls {
             .map(|(cell_id, cell)| async move {
                 let p2p_agents_db = cell.p2p_agents_db().clone();
                 let kagent = cell_id.agent_pubkey().to_kitsune();
-                let agent_info = match p2p_agents_db.async_reader(move |tx| {
+                let maybe_agent_info = match p2p_agents_db.async_reader(move |tx| {
                     tx.p2p_get_agent(&kagent)
                 }).await {
                     Ok(maybe_info) => maybe_info,
                     _ => None,
                 };
-                let maybe_initial_arc = agent_info.map(|i| i.storage_arc);
+                let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
                 let network = cell.holochain_p2p_dna().clone();
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_initial_arc)).await {
+                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
                     Ok(Err(e)) => {
                         tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
                         Err(cell_id)
@@ -2325,21 +2325,21 @@ mod accessor_impls {
         }
 
         /// Get a dna space or create it if one doesn't exist.
-        pub(crate) fn get_or_create_space(&self, dna_hash: &DnaHash) -> ConductorResult<Space> {
+        pub(crate) fn get_or_create_space(&self, dna_hash: &DnaHash) -> DatabaseResult<Space> {
             self.spaces.get_or_create_space(dna_hash)
         }
 
         pub(crate) fn get_or_create_authored_db(
             &self,
             dna_hash: &DnaHash,
-        ) -> ConductorResult<DbWrite<DbKindAuthored>> {
+        ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
             self.spaces.authored_db(dna_hash)
         }
 
         pub(crate) fn get_or_create_dht_db(
             &self,
             dna_hash: &DnaHash,
-        ) -> ConductorResult<DbWrite<DbKindDht>> {
+        ) -> DatabaseResult<DbWrite<DbKindDht>> {
             self.spaces.dht_db(dna_hash)
         }
 
@@ -2568,7 +2568,7 @@ impl Conductor {
 
                 let space = handle
                     .get_or_create_space(cell_id.dna_hash())
-                    .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()))
+                    .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))
                     .map_err(|err| (cell_id.clone(), err))?;
 
                 Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell)
@@ -2826,7 +2826,7 @@ pub(crate) async fn genesis_cells(
     let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
         let space = conductor
             .get_or_create_space(cell_id.dna_hash())
-            .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()));
+            .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()));
         async {
             let space = space?;
             let authored_db = space.authored_db;
