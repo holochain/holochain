@@ -2659,6 +2659,7 @@ dependencies = [
  "tracing",
  "url2",
  "walkdir",
+ "which",
 ]
 
 [[package]]

@@ -14,7 +14,7 @@ pub fn create_config(environment_path: PathBuf, con_url: Option<url2::Url2>) -> 
         environment_path: environment_path.clone().into(),
         ..Default::default()
     };
-    let mut keystore_path = environment_path;
+    let mut keystore_path = environment_path.clone();
     keystore_path.push("keystore");
     match con_url {
         Some(url) => {
@@ -23,7 +23,12 @@ pub fn create_config(environment_path: PathBuf, con_url: Option<url2::Url2>) -> 
             };
         }
         None => {
-            conductor_config.keystore = KeystoreConfig::LairServerInProc { lair_root: None };
+            let mut lair_root = environment_path.clone();
+            // Keep the path short so that when it's used in CI the path doesn't get too long to be used as a domain socket
+            lair_root.push("ks");
+            conductor_config.keystore = KeystoreConfig::LairServerInProc {
+                lair_root: Some(lair_root),
+            };
         }
     }
     conductor_config

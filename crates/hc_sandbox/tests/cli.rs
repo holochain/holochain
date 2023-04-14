@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use url2::url2;
+use which::which;
 
 const WEBSOCKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
@@ -89,7 +90,7 @@ async fn package_fixture_if_not_packaged() {
         return;
     }
 
-    Command::new(HC_BUILT_PATH.as_path())
+    get_hc_command()
         .arg("dna")
         .arg("pack")
         .arg("tests/fixtures/my-app/dna")
@@ -98,7 +99,7 @@ async fn package_fixture_if_not_packaged() {
         .await
         .expect("Failed to pack DNA");
 
-    Command::new(HC_BUILT_PATH.as_path())
+    get_hc_command()
         .arg("app")
         .arg("pack")
         .arg("tests/fixtures/my-app")
@@ -108,37 +109,37 @@ async fn package_fixture_if_not_packaged() {
         .expect("Failed to pack hApp");
 }
 
-fn clean_sandboxes() {
-    std::process::Command::cargo_bin("hc-sandbox")
-        .unwrap()
+async fn clean_sandboxes() {
+    get_sandbox_command()
         .arg("clean")
         .stdout(Stdio::null())
         .status()
+        .await
         .unwrap();
 }
 
-/// Runs holochain and creates a temp directory
+/// Generates a new sandbox with a single app deployed and tries to get app info
 #[tokio::test(flavor = "multi_thread")]
-async fn run_holochain() {
-    clean_sandboxes();
+async fn generate_sandbox_and_connect() {
+    clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run().ok();
     let port: u16 = pick_unused_port().expect("No ports free");
-    let cmd = std::process::Command::cargo_bin("hc-sandbox").unwrap();
-    let mut cmd = Command::from(cmd);
-    cmd.arg(format!(
-        "--holochain-path={}",
-        HOLOCHAIN_BUILT_PATH.to_str().unwrap()
-    ))
-    .arg("--piped")
-    .arg("generate")
-    .arg("--in-process-lair")
-    .arg(format!("--run={}", port))
-    .arg("tests/fixtures/my-app/")
-    .stdin(Stdio::piped())
-    //.stdout(Stdio::null())
-    .kill_on_drop(true);
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(format!("--run={}", port))
+        .arg("tests/fixtures/my-app/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .kill_on_drop(true);
 
     let hc_admin = cmd.spawn().expect("Failed to spawn holochain");
 
@@ -151,20 +152,21 @@ async fn run_holochain() {
     call_app_interface(port).await;
 }
 
+/// Generates a new sandbox with a single app deployed and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
-async fn run_multiple_on_same_port() {
-    clean_sandboxes();
+async fn generate_sandbox_and_call_list_dna() {
+    clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run().ok();
     let port: u16 = pick_unused_port().expect("No ports free");
     let app_port: u16 = pick_unused_port().expect("No ports free");
-    let cmd = std::process::Command::cargo_bin("hc-sandbox").unwrap();
-    let mut cmd = Command::from(cmd);
-    cmd.arg(format!("-f={}", port))
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!("-f={}", port))
         .arg(format!(
             "--holochain-path={}",
-            HOLOCHAIN_BUILT_PATH.to_str().unwrap()
+            get_holochain_bin_path().to_str().unwrap()
         ))
         .arg("--piped")
         .arg("generate")
@@ -172,7 +174,7 @@ async fn run_multiple_on_same_port() {
         .arg(format!("--run={}", app_port))
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
-        //.stdout(Stdio::null())
+        .stdout(Stdio::null())
         .kill_on_drop(true);
 
     let hc_admin = cmd.spawn().expect("Failed to spawn holochain");
@@ -184,12 +186,12 @@ async fn run_multiple_on_same_port() {
     // - Make a call to list app info to the port
     call_app_interface(app_port).await;
 
-    let cmd = std::process::Command::cargo_bin("hc-sandbox").unwrap();
-    let mut cmd = Command::from(cmd);
-    cmd.arg(format!("-f={}", port))
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!("-f={}", port))
         .arg(format!(
             "--holochain-path={}",
-            HOLOCHAIN_BUILT_PATH.to_str().unwrap()
+            get_holochain_bin_path().to_str().unwrap()
         ))
         .arg("--piped")
         .arg("call")
@@ -203,4 +205,25 @@ async fn run_multiple_on_same_port() {
     drop(child_stdin);
 
     tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+}
+
+fn get_hc_command() -> Command {
+    Command::new(match which("hc") {
+        Ok(p) => p,
+        Err(_) => HC_BUILT_PATH.clone(),
+    })
+}
+
+fn get_holochain_bin_path() -> PathBuf {
+    match which("holochain") {
+        Ok(p) => p,
+        Err(_) => HOLOCHAIN_BUILT_PATH.clone(),
+    }
+}
+
+fn get_sandbox_command() -> Command {
+    match which("hc-sandbox") {
+        Ok(p) => Command::new(p),
+        Err(_) => Command::from(std::process::Command::cargo_bin("hc-sandbox").unwrap()),
+    }
 }
