@@ -136,8 +136,6 @@ async fn start_holochain(
         .stderr(Stdio::piped())
         .kill_on_drop(true);
 
-    msg!("{:?}", cmd);
-
     let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
 
     let mut stdin = holochain.stdin.take().unwrap();
