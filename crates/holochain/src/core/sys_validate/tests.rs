@@ -29,6 +29,10 @@
 
 use super::*;
 use crate::conductor::space::TestSpaces;
+use crate::core::workflow::sys_validation_workflow::sys_validate_record;
+use crate::sweettest::SweetAgents;
+use crate::sweettest::SweetConductor;
+use crate::test_utils::fake_genesis_for_agent;
 use ::fixt::prelude::*;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
@@ -209,7 +213,6 @@ async fn record_with_cascade(keystore: &MetaLairClient, action: Action) -> (Reco
 async fn validate_action(keystore: &MetaLairClient, action: Action) -> SysValidationOutcome<()> {
     let (record, deps) = record_with_deps(keystore, action).await;
     let cascade = MockCascade::with_records(deps.clone());
-    dbg!(&deps, &record);
     sys_validate_record(&record, &cascade).await
 }
 
@@ -218,7 +221,6 @@ async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
     let cascade = MockCascade::with_records(deps.clone());
     let result = sys_validate_record(&record, &cascade).await;
     if result.is_err() {
-        dbg!(&deps, &record);
         result.unwrap()
     }
 }
@@ -229,7 +231,6 @@ async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
     let cascade = MockCascade::with_records(deps.clone());
     let result = sys_validate_record(&record, &cascade).await;
     if result.is_ok() {
-        dbg!(&deps, &record);
         result.unwrap_err();
     }
 }
@@ -416,7 +417,6 @@ async fn check_previous_seq() {
     *action.action_seq_mut().unwrap() = 2;
     let (mut record, mut deps) = record_with_deps(&keystore, action).await;
 
-    dbg!(&deps, &record);
     // *record.as_action_mut().action_seq_mut().unwrap() = 2;
     *deps[0].as_action_mut().action_seq_mut().unwrap() = 1;
 
