@@ -17,6 +17,7 @@ pub use types::*;
 mod spawn;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 pub use spawn::*;
 pub use test::stub_network;
 pub use test::HolochainP2pDnaFixturator;
@@ -36,6 +37,7 @@ pub trait HolochainP2pDnaT: Send + Sync {
     async fn join(
         &self,
         agent: AgentPubKey,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> actor::HolochainP2pResult<()>;
 
@@ -180,10 +182,16 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn join(
         &self,
         agent: AgentPubKey,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .join((*self.dna_hash).clone(), agent, initial_arc)
+            .join(
+                (*self.dna_hash).clone(),
+                agent,
+                maybe_agent_info,
+                initial_arc,
+            )
             .await
     }
 
