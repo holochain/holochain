@@ -56,7 +56,7 @@ pub fn generate_with_config(
         let mut config = create_config(dir.clone(), con_url.clone());
         config.keystore = KeystoreConfig::LairServer {
             connection_url: con_url.expect(
-                "Lair should have been initialised but did not get a connection URl for it",
+                "Lair should have been initialised but did not get a connection URL for it",
             ),
         };
         config
