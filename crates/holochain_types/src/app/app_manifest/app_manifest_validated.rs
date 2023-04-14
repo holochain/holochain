@@ -33,7 +33,7 @@ impl AppManifestValidated {
         roles: HashMap<RoleName, AppRoleManifestValidated>,
     ) -> AppManifestResult<Self> {
         for (role_name, role) in roles.iter() {
-            if let AppRoleManifestValidated::Disabled { clone_limit, .. } = role {
+            if let AppRoleManifestValidated::CloneOnly { clone_limit, .. } = role {
                 if *clone_limit == 0 {
                     return Err(AppManifestError::InvalidStrategyDisabled(
                         role_name.to_owned(),
@@ -73,9 +73,10 @@ pub enum AppRoleManifestValidated {
         modifiers: DnaModifiersOpt,
         installed_hash: DnaHashB64,
     },
-    /// Disallow provisioning altogether. In this case, we expect
-    /// `clone_limit > 0`: otherwise, no cells will ever be created.
-    Disabled {
+    /// Install or located the DNA, but never create a Cell for this DNA.
+    /// Only allow clones to be created from the DNA specified.
+    /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
+    CloneOnly {
         installed_hash: DnaHashB64,
         clone_limit: u32,
     },

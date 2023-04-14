@@ -126,9 +126,10 @@ pub enum CellProvisioning {
     UseExisting { deferred: bool },
     /// Try `UseExisting`, and if that fails, fallback to `Create`
     CreateIfNotExists { deferred: bool },
-    /// Disallow provisioning altogether. In this case, we expect
-    /// `clone_limit > 0`: otherwise, no Cells will ever be created.
-    Disabled,
+    /// Install or located the DNA, but never create a Cell for this DNA.
+    /// Only allow clones to be created from the DNA specified.
+    /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
+    CloneOnly,
 }
 
 impl Default for CellProvisioning {
@@ -211,7 +212,7 @@ impl AppManifestV1 {
                                 modifiers,
                             }
                         }
-                        CellProvisioning::Disabled => AppRoleManifestValidated::Disabled {
+                        CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
                             installed_hash: Self::require(
                                 installed_hash,

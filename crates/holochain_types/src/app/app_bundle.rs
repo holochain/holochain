@@ -177,7 +177,7 @@ impl AppBundle {
                     unreachable!("resolve_cell_existing will never return a Noop")
                 }
             },
-            AppRoleManifestValidated::Disabled {
+            AppRoleManifestValidated::CloneOnly {
                 installed_hash: _,
                 clone_limit: _,
             } => {
