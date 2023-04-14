@@ -15,7 +15,7 @@
       };
       generated = crate2nixTools.generatedCargoNix {
         name = "holochain-generated-crate2nix";
-        src = flake.config.srcCleanedHolochain;
+        src = flake.config.srcCleanedHolochainNoTests;
       };
       cargoNix = pkgs.callPackage "${generated}/default.nix" {
         buildRustCrateForPkgs = customBuildRustCrateForPkgs;

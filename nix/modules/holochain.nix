@@ -17,7 +17,6 @@
         RUST_SODIUM_SHARED = "1";
 
         pname = "holochain";
-        src = flake.config.srcCleanedHolochain;
 
         version = "workspace";
 
@@ -44,26 +43,31 @@
 
       # derivation building all dependencies
       holochainDeps = craneLib.buildDepsOnly (commonArgs // {
-        src = flake.config.srcCleanedHolochain;
+        src = flake.config.srcCleanedHolochainNoTests;
+
         doCheck = false;
       });
 
       holochainDepsRelease = craneLib.buildDepsOnly (commonArgs // {
+        src = flake.config.srcCleanedHolochainNoTests;
+
         CARGO_PROFILE = "release";
-        src = flake.config.srcCleanedHolochain;
         doCheck = false;
       });
 
       # derivation with the main crates
       holochain = craneLib.buildPackage (commonArgs // {
+        src = flake.config.srcCleanedHolochainNoTests;
+
         CARGO_PROFILE = "release";
         cargoArtifacts = holochainDepsRelease;
-        src = flake.config.srcCleanedHolochain;
         doCheck = false;
         passthru.src.rev = inputs.holochain.rev;
       });
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
+        src = flake.config.srcCleanedHolochain;
+
         pname = "holochain-tests-nextest";
         CARGO_PROFILE = "fast-test";
         nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ pkgs.cargo-nextest ];
@@ -97,6 +101,8 @@
           '';
         in
         (commonArgs // {
+          src = flake.config.srcCleanedHolochain;
+
           __noChroot = pkgs.stdenv.isLinux;
           cargoArtifacts = holochainNextestDeps;
 
@@ -140,8 +146,9 @@
       });
 
       build-holochain-tests-static-clippy = craneLib.cargoClippy (commonArgs // {
-        pname = "holochain-tests-clippy";
         src = flake.config.srcCleanedHolochain;
+
+        pname = "holochain-tests-clippy";
         cargoArtifacts = holochainDeps;
         doCheck = false;
 
@@ -157,6 +164,8 @@
       });
 
       holochainWasmArgs = (commonArgs // {
+        src = flake.config.srcCleanedHolochain;
+
         pname = "holochain-tests-wasm";
 
         postConfigure = ''
@@ -186,6 +195,8 @@
       });
 
       build-holochain-tests-static-doc = craneLib.cargoDoc (commonArgs // {
+        src = flake.config.srcCleanedHolochain;
+
         pname = "holochain-tests-docs";
         cargoArtifacts = holochainDeps;
       });

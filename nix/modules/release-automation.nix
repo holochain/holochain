@@ -5,7 +5,6 @@
 #         pkgs.callPackage ../../crates/release-automation/default.nix {
 #           crate2nixSrc = inputs.crate2nix;
 #         };
-
 #       release-automation-regenerate-readme =
 #         pkgs.writeShellScriptBin "release-automation-regenerate-readme" ''
 #           set -x
@@ -14,13 +13,11 @@
 #     };
 #   };
 # }
-
 # Definitions can be imported from a separate file like this one
 
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-
       rustToolchain = config.rust.mkRust {
         track = "stable";
         version = "latest";
@@ -30,9 +27,6 @@
       commonArgs = {
         pname = "release-automation";
         version = "workspace";
-        src = flake.config.srcCleanedReleaseAutomationRepo;
-
-        cargoExtraArgs = "--all-targets";
 
         buildInputs = (with pkgs; [ openssl ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
@@ -51,16 +45,22 @@
 
       # derivation building all dependencies
       deps = craneLib.buildDepsOnly (commonArgs // {
+        src = flake.config.srcCleanedReleaseAutomationRepoNoTests;
+
         doCheck = false;
       });
 
       # derivation with the main crates
       package = craneLib.buildPackage (commonArgs // {
+        src = flake.config.srcCleanedReleaseAutomationRepoNoTests;
+
         cargoArtifacts = deps;
         doCheck = false;
       });
 
       tests = craneLib.cargoNextest (commonArgs // {
+        src = flake.config.srcCleanedReleaseAutomationRepo;
+
         pname = "${commonArgs.pname}-tests";
         __noChroot = pkgs.stdenv.isLinux;
 
@@ -99,7 +99,6 @@
       });
 
       packagePath = lib.makeBinPath [ package ];
-
     in
     {
       packages = {
@@ -141,7 +140,7 @@
           export TEST_WORKSPACE="''${HOME:?}/src"
 
           cp -r --no-preserve=mode,ownership ${flake.config.srcCleanedRepo} ''${TEST_WORKSPACE:?}
-          cp --no-preserve=mode,ownership ${self}/CHANGELOG.md ''${TEST_WORKSPACE:?}/CHANGELOG.md
+          cp --no-preserve=mode,ownership ${../../CHANGELOG.md} ''${TEST_WORKSPACE:?}/CHANGELOG.md
           cd ''${TEST_WORKSPACE:?}
 
           git init

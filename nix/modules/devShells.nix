@@ -86,13 +86,17 @@
 
           in
           pkgs.mkShell {
-            inputsFrom = [ self'.devShells.rustDev ] ++ (builtins.attrValues holochainTestDrvs);
+            inputsFrom = [
+              self'.devShells.rustDev
+              self'.packages.release-automation
+            ] ++ (builtins.attrValues holochainTestDrvs);
 
             packages = with pkgs; [
               cargo-nextest
 
               (pkgs.writeShellScriptBin "script-cargo-regen-lockfiles" ''
                 cargo fetch --locked
+                cargo fetch --locked --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
                 cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
                 cargo generate-lockfile --offline
                 cargo generate-lockfile --offline --manifest-path=crates/test_utils/wasm/wasm_workspace/Cargo.toml
