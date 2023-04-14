@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- `StorageBlob` is an enum that serialized to camel case named variants. Renames all variants to snake case now.
+
 ## 0.2.0-beta-rc.4
 
 ## 0.2.0-beta-rc.3
