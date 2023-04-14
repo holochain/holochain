@@ -14,7 +14,7 @@ necessary confidence:
 
 2.  **Completeness/Fit:** the system's apriori design elements that
   demonstrate fitness for purpose. We demonstrate this by describing
-  how Holochain addresses, multi-agent reality binding, scalability,
+  how Holochain addresses: multi-agent reality binding, scalability,
   and shared-state finality.
 
 3.  **Security:** the system's resilience to intentional disruption by
@@ -178,14 +178,13 @@ e.  **Generalized Micro-Consensus Consent: Entwined multi-agent state
 ```{=html}
 <!-- -->
 ```
-1.  **Scaling:** a system's resilience and characteristics as both
-  number of users and interactions grow. Notes: architecture has no
-  bottle-necks; multiple networks: one per DNA; consensus doesn't
-  block progress; the amount of work that can be done scales
-  linearly with the amount of users (as opposed to blockchain)
-  global consensus mechanisms are essentially single-threaded
-  processes where all users have to advance state simultaneously.
-  \[todo: ACB\]
+1.  **Scaling:** Holochain's architecture is specifically designed to maintain resilience and performance as both the number of users and interactions increase. Key factors contributing to its scaling capabilities include:
+  a. Agent-centric approach: Unlike traditional blockchain systems, which require global consensus before progressing, Holochain adopts an agent-centric approach where changes made to an agent’s state become authoritative once signed to their chain and communicated to others via the DHT. As a result, agents are able to initiate actions without delay.
+  b. Bottle-neck Free Sharded DHT: Holochain's DHT is sharded, meaning that each node only stores a fraction of the total data, reducing the storage and computational requirements for each participant. At the same time, the storage of content with agents whose public key is “near” the hash of each Action or Entry enables in combination with the use of Linking metadata to make the DHT a graphing DHT enables participants to create paths to quickly locate relevant content. When the agents responsible for validating a particular state change receive an authoring agent’s proposed state change, they are able to a) request information from others in the DHT regarding the prior state of the authoring agent (where relevant), and b) make use of their own copy of the apps validation rules to deterministically validate the change.
+  While that agent and its validating peers are engaged with the creation and validation of a particular change to the state of the authors chain, in parallel, other agents are able to author state changes to their own chain and have these validated by the validating peers for each of those changes.  This bottle-neck free architecture allows users to continue interacting with the system without waiting for global agreement.
+  With singular actions by any particular agent (and the validation of those actions by a small number of other agents) able to occur simultaneous with singular actions by other agents as well as countersigned actions by particular groups of agents. The network is not updating state globally (as blockchains typically do) but is instead creating, validating, storing and serving changes of the state of particular agents in parallel. 
+  c. Multiple networks: In Holochain, each application (DNA) operates on its own independent network, effectively isolating the performance of individual apps. This prevents a high-traffic, data heavy, or processing heavy app from affecting the performance of other lighter apps within the ecosystem. Participants are able to decide for themselves which applications they want to participate in.
+  \[TODO: ACB REVIEW could we add in any O(n) notation here?\] 
 
 1.  **Shared-state Finality:** Many blockchains approximate chain
   finality by assuming that the "longest-chain wins." That strategy
@@ -278,9 +277,16 @@ network as every agent can deterministically verify data and thus
 self-secure. It is also important, however, to be able to eject
 malicious actors who generate or propagate such invalid data from
 network participation so as to secure against the resource drain that
-such action could incur.
+such action could incur.  This is part of acheiving a "O of N" trust model,
+where any node can always validate data for themself independent of what any other nodes say.
 
-More details on warranting \[Todo: ACB\] \[expand on: one good apple
+As agents publish actions to the DHT, validators sign and report
+the results of their validation.  Thus when validation fails (which it can only
+do so deterministically) the system can propigagte these provably invalid attempted
+actions, which serve as warrants for other nodes to stop interacting with the offending
+agent, and which all nodes can confirm for themselves as they are based on deterministic
+validation rules, which all agents have a copy of.  
+\[TODO: ACB REVIEW\] \[expand on: one good apple
 heals the bunch\]
 
 ### Security from Attack Categories

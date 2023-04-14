@@ -119,7 +119,7 @@ the Byzantine Generals Problem.
 [^faults]: In Reaching Agreement in the Presence of Faults:
     [[https://dl.acm.org/doi/pdf/10.1145/322186.322188]{.underline}](https://dl.acm.org/doi/pdf/10.1145/322186.322188)
     MARSHALL PEASE, ROBERT SHOSTAK, and LESLIE LAMPORT, this single data
-    reality is called "interactive consistency" as is about the vector
+    reality is called "interactive consistency" and is about the vector
     of "Private Values" sent by each node.
 
 From Global Consensus to Scaled Consent
@@ -201,11 +201,11 @@ self-proving data of various types:
   retrieving data it's possible to have deterministic confidence
   that it hasn't been tampered with by whoever was storing it.
 
--   Structural Monotonicity (for chains and DHT): non-repudiable
-  state-change \[TODO: ACB\]
-
--   Logical Monotonicity: Crossings that you can't uncross (once
-  something has become true, it can't become untrue) \[TODO: ACB\]
+-   Monotonicity: The system is structured to be both structurally
+   and logically, monotonic, i.e. that there is a single direction of change.  We use
+   monotnicity to ensure that all state changes are non-repudiable
+   and that once something has happened (i.e. there has been a state change) it won't 
+   subsequently appear to have never happened.   \[TODO: ACB REVIEW\]
 
 -   Common Genesis: The Validation Rules and joining criteria of an
   application are the first entry in every chain. This
