@@ -1,6 +1,5 @@
 manifest_version: '1'
 name: my-fixture-app
-description: it's an app
 roles:
   - name: role-1
     provisioning:
