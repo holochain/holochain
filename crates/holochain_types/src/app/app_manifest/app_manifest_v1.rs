@@ -89,8 +89,6 @@ pub struct AppRoleDnaManifest {
     pub installed_hash: Option<DnaHashB64>,
 
     /// Allow up to this many "clones" to be created at runtime.
-    /// Each runtime clone is created by the `CreateClone` strategy,
-    /// regardless of the provisioning strategy set in the manifest.
     /// Default: 0
     #[serde(default)]
     pub clone_limit: u32,
@@ -122,9 +120,6 @@ pub type DnaLocation = mr_bundle::Location;
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
-    /// Always create a new Cell when installing the App,
-    /// and use a unique network seed to ensure a distinct DHT network
-    CreateClone { deferred: bool },
     /// Require that a Cell is already installed which matches the DNA installed_hash
     /// spec, and which has an Agent that's associated with this App's agent
     /// via DPKI. If no such Cell exists, *app installation fails*.
@@ -154,7 +149,7 @@ impl AppManifestV1 {
         for mut role in self.roles.iter_mut() {
             if !matches!(
                 role.provisioning.clone().unwrap_or_default(),
-                CellProvisioning::CreateClone { .. } | CellProvisioning::UseExisting { .. }
+                CellProvisioning::UseExisting { .. }
             ) {
                 // Only update the network seed for roles for which it makes sense to do so
                 role.dna.modifiers.network_seed = Some(network_seed.clone());
@@ -194,15 +189,6 @@ impl AppManifestV1 {
                             modifiers,
                             installed_hash,
                         },
-                        CellProvisioning::CreateClone { deferred } => {
-                            AppRoleManifestValidated::CreateClone {
-                                deferred,
-                                clone_limit,
-                                location: Self::require(location, "roles.dna.(path|url)")?,
-                                modifiers,
-                                installed_hash,
-                            }
-                        }
                         CellProvisioning::UseExisting { deferred } => {
                             AppRoleManifestValidated::UseExisting {
                                 deferred,

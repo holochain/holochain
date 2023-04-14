@@ -57,15 +57,6 @@ pub enum AppRoleManifestValidated {
         modifiers: DnaModifiersOpt,
         installed_hash: Option<DnaHashB64>,
     },
-    /// Always create a new Cell when installing the App,
-    /// and use a unique network seed to ensure a distinct DHT network
-    CreateClone {
-        clone_limit: u32,
-        deferred: bool,
-        location: DnaLocation,
-        modifiers: DnaModifiersOpt,
-        installed_hash: Option<DnaHashB64>,
-    },
     /// Require that a Cell is already installed with a specified DNA hash,
     /// and which has an Agent that's associated with this App's agent
     /// via DPKI. If no such Cell exists, *app installation fails*.

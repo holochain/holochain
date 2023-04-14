@@ -144,9 +144,6 @@ impl AppBundle {
                 .await?
             }
 
-            AppRoleManifestValidated::CreateClone { .. } => {
-                unimplemented!("`create_clone` provisioning strategy is currently unimplemented")
-            }
             AppRoleManifestValidated::UseExisting {
                 installed_hash,
                 clone_limit,
