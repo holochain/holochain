@@ -62,26 +62,7 @@
                   }
                 }
               },
-              {
-                "description": "Always create a new Cell when installing the App, and use a unique network seed to ensure a distinct DHT network",
-                "type": "object",
-                "required": [
-                  "deferred",
-                  "strategy"
-                ],
-                "properties": {
-                  "deferred": {
-                    "type": "boolean"
-                  },
-                  "strategy": {
-                    "type": "string",
-                    "enum": [
-                      "create_clone"
-                    ]
-                  }
-                }
-              },
-              {
+              /*{
                 "description": "Require that a Cell is already installed which matches the DNA version spec, and which has an Agent that's associated with this App's agent via DPKI. If no such Cell exists, *app installation fails*.",
                 "type": "object",
                 "required": [
@@ -118,9 +99,9 @@
                     ]
                   }
                 }
-              },
+              },*/
               {
-                "description": "Disallow provisioning altogether. In this case, we expect `clone_limit > 0`: otherwise, no Cells will ever be created.",
+                "description": "Install or locate the DNA, but never create a Cell for this DNA. Only allow clones to be created from the DNA specified. This case requires `clone_limit > 0`, otherwise no Cells will ever be created.",
                 "type": "object",
                 "required": [
                   "strategy"
@@ -129,7 +110,7 @@
                   "strategy": {
                     "type": "string",
                     "enum": [
-                      "disabled"
+                      "clone_only"
                     ]
                   }
                 }

@@ -73,7 +73,7 @@ pub enum AppRoleManifestValidated {
         modifiers: DnaModifiersOpt,
         installed_hash: DnaHashB64,
     },
-    /// Install or located the DNA, but never create a Cell for this DNA.
+    /// Install or locate the DNA, but never create a Cell for this DNA.
     /// Only allow clones to be created from the DNA specified.
     /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
     CloneOnly {

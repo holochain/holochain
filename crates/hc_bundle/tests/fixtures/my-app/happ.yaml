@@ -18,7 +18,6 @@ roles:
   - name: role-2
     provisioning:
       strategy: clone_only
-      deferred: true
     dna:
       bundled: dnas/dna2/another dna.dna
       modifiers:
