@@ -234,7 +234,7 @@ where
     Ribosome: RibosomeT + 'static,
 {
     let cascade =
-        holochain_cascade::Cascade::from_workspace_and_network(&workspace, network.clone());
+        holochain_cascade::CascadeImpl::from_workspace_and_network(&workspace, network.clone());
 
     let to_app_validate = {
         // collect all the records we need to validate in wasm
