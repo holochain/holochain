@@ -214,10 +214,12 @@ impl AppManifestV1 {
                         }
                         CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
+                            location: Self::require(location, "roles.dna.(path|url)")?,
                             installed_hash: Self::require(
                                 installed_hash,
                                 "roles.dna.installed_hash",
                             )?,
+                            modifiers,
                         },
                     };
                     AppManifestResult::Ok((name, validated))

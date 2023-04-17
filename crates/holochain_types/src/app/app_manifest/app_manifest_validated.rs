@@ -35,7 +35,7 @@ impl AppManifestValidated {
         for (role_name, role) in roles.iter() {
             if let AppRoleManifestValidated::CloneOnly { clone_limit, .. } = role {
                 if *clone_limit == 0 {
-                    return Err(AppManifestError::InvalidStrategyDisabled(
+                    return Err(AppManifestError::InvalidStrategyCloneOnly(
                         role_name.to_owned(),
                     ));
                 }
@@ -77,7 +77,9 @@ pub enum AppRoleManifestValidated {
     /// Only allow clones to be created from the DNA specified.
     /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
     CloneOnly {
-        installed_hash: DnaHashB64,
         clone_limit: u32,
+        location: DnaLocation,
+        modifiers: DnaModifiersOpt,
+        installed_hash: DnaHashB64,
     },
 }

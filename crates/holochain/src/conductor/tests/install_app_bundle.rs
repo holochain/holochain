@@ -3,14 +3,84 @@ use std::{collections::HashMap, path::PathBuf};
 use crate::{conductor::error::ConductorError, sweettest::*};
 use fixt::prelude::strum_macros;
 use holo_hash::DnaHash;
+use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::{
-    mapvec, AppBundle, AppBundleSource, AppManifestCurrentBuilder, AppRoleDnaManifest,
-    AppRoleManifest, CellProvisioning, DnaBundle, DnaFile, DnaLocation, InstallAppPayload,
+    mapvec, AppBundle, AppBundleError, AppBundleSource, AppManifestCurrentBuilder,
+    AppManifestError, AppRoleDnaManifest, AppRoleManifest, CellProvisioning, DnaBundle, DnaFile,
+    DnaLocation, InstallAppPayload,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CellId, DnaModifiersOpt, Timestamp};
 use matches::assert_matches;
 use tempfile::{tempdir, TempDir};
+
+#[tokio::test(flavor = "multi_thread")]
+async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
+    let conductor = SweetConductor::from_standard_config().await;
+
+    async fn make_payload(keystore: MetaLairClient, clone_limit: u32) -> InstallAppPayload {
+        let alice = SweetAgents::one(keystore).await;
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+        let path = PathBuf::from(format!("{}", dna.dna_hash()));
+        let modifiers = DnaModifiersOpt::none();
+        let installed_dna_hash = DnaHash::with_data_sync(dna.dna_def());
+
+        let roles = vec![AppRoleManifest {
+            name: "name".into(),
+            dna: AppRoleDnaManifest {
+                location: Some(DnaLocation::Bundled(path.clone())),
+                modifiers: modifiers.clone(),
+                installed_hash: Some(installed_dna_hash.into()),
+                clone_limit,
+            },
+            provisioning: Some(CellProvisioning::CloneOnly),
+        }];
+
+        let manifest = AppManifestCurrentBuilder::default()
+            .name("test_app".into())
+            .description(None)
+            .roles(roles)
+            .build()
+            .unwrap();
+        let dna_bundle = DnaBundle::from_dna_file(dna.clone()).await.unwrap();
+        let resources = vec![(path.clone(), dna_bundle)];
+        let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
+            .await
+            .unwrap();
+
+        InstallAppPayload {
+            agent_key: alice.clone(),
+            source: AppBundleSource::Bundle(bundle),
+            installed_app_id: Some("app_1".into()),
+            network_seed: None,
+            membrane_proofs: HashMap::new(),
+        }
+    }
+
+    // Fails due to clone limit of 0
+    assert_matches!(
+        conductor
+            .clone()
+            .install_app_bundle(make_payload(conductor.keystore(), 0).await)
+            .await
+            .unwrap_err(),
+        ConductorError::AppBundleError(AppBundleError::AppManifestError(
+            AppManifestError::InvalidStrategyCloneOnly(_)
+        ))
+    );
+
+    // Succeeds with clone limit of 1
+    let app = conductor
+        .clone()
+        .install_app_bundle(make_payload(conductor.keystore(), 1).await)
+        .await
+        .unwrap();
+
+    // No cells in this app due to CloneOnly provisioning strategy
+    assert_eq!(app.all_cells().count(), 0);
+
+    // TODO: test that the cell can't be provisioned later
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn reject_duplicate_app_for_same_agent() {
