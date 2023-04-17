@@ -229,7 +229,7 @@ impl CascadeImpl<HolochainP2pDna> {
 #[async_trait::async_trait]
 #[mockall::automock]
 pub trait Cascade {
-    /// Retrieve [`Entry`] from either locally or from an authority.
+    /// Retrieve [`Entry`] either locally or from an authority.
     /// Data might not have been validated yet by the authority.
     async fn retrieve_entry(
         &self,
