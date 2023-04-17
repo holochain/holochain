@@ -17,7 +17,7 @@ roles:
       clone_limit: 0
   - name: role-2
     provisioning:
-      strategy: create
+      strategy: clone_only
       deferred: true
     dna:
       bundled: dnas/dna2/another dna.dna
