@@ -31,7 +31,7 @@ thiserror = "1.0"
 tracing = "0.1.29"
 
 [dev-dependencies]
-kitsune_p2p_dht = { path = ".", features = ["test_utils"]}
+kitsune_p2p_dht = { path = ".", features = ["test_utils", "no-deps"]}
 kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"]}
 holochain_serialized_bytes = "0.0.51"
 maplit = "1"
@@ -49,10 +49,8 @@ test_utils = [
 db-encryption = [
   "kitsune_p2p_timestamp/db-encryption",
   "kitsune_p2p_dht_arc/db-encryption",
-  "kitsune_p2p_dht/db-encryption",
 ]
 no-deps = [
   "kitsune_p2p_timestamp/no-deps",
   "kitsune_p2p_dht_arc/no-deps",
-  "kitsune_p2p_dht/no-deps"
 ]

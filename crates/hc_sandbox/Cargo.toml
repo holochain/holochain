@@ -47,13 +47,11 @@ default = ["no-deps"]
 db-encryption = [
     "holochain_conductor_api/db-encryption",
     "holochain_types/db-encryption",
-    "holochain_websocket/db-encryption",
     "holochain_p2p/db-encryption",
 ]
 no-deps = [
     "holochain_conductor_api/no-deps",
     "holochain_types/no-deps",
-    "holochain_websocket/no-deps",
     "holochain_p2p/no-deps"
 ]
 

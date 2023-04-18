@@ -28,7 +28,7 @@ linked-hash-map = "0.5.6"
 human-repr = { version = "1", optional = true}
 
 [dev-dependencies]
-kitsune_p2p_fetch = { path = ".", features = ["test_utils"]}
+kitsune_p2p_fetch = { path = ".", features = ["test_utils", "no-deps"]}
 holochain_serialized_bytes = "0.0.51"
 holochain_trace = { version = "^0.2.0-beta-rc.1", path = "../../holochain_trace" }
 pretty_assertions = "0.7.2"
@@ -41,10 +41,8 @@ default = ["test_utils"]
 db-encryption = [
     "kitsune_p2p_timestamp/db-encryption",
     "kitsune_p2p_types/db-encryption",
-    "kitsune_p2p_fetch/db-encryption",
 ]
 no-deps = [
     "kitsune_p2p_timestamp/no-deps",
     "kitsune_p2p_types/no-deps",
-    "kitsune_p2p_fetch/no-deps",
 ]

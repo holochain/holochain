@@ -56,10 +56,10 @@ mockall = { version = "0.11.3", optional = true }
 
 [dev-dependencies]
 # include self with test_utils feature, to allow integration tests to run properly
-kitsune_p2p = { path = ".", features = ["test_utils"]}
+kitsune_p2p = { path = ".", features = ["test_utils", "no-deps"]}
 
 contrafact = { version = "0.1.0-dev.1" }
-kitsune_p2p_bootstrap = { path = "../bootstrap" }
+kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["no-deps"] }
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now", "arbitrary"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
@@ -95,8 +95,6 @@ db-encryption = [
   "kitsune_p2p_block/db-encryption",
   "kitsune_p2p_transport_quic/db-encryption",
   "kitsune_p2p_types/db-encryption",
-  "kitsune_p2p_bootstrap/db-encryption",
-  "kitsune_p2p_types/db-encryption",
 ]
 no-deps = [
   "kitsune_p2p_fetch/no-deps",
@@ -104,7 +102,5 @@ no-deps = [
   "kitsune_p2p_timestamp/no-deps",
   "kitsune_p2p_block/no-deps",
   "kitsune_p2p_transport_quic/no-deps",
-  "kitsune_p2p_types/no-deps",
-  "kitsune_p2p_bootstrap/no-deps",
   "kitsune_p2p_types/no-deps",
 ]

@@ -45,7 +45,7 @@ webpki = "0.22.0"
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 
 [dev-dependencies]
-kitsune_p2p_types = {path = ".", features = ["test_utils"]}
+kitsune_p2p_types = {path = ".", features = ["test_utils", "no-deps"]}
 criterion = "0.3.4"
 tracing-subscriber = "0.3.16"
 
@@ -71,12 +71,10 @@ db-encryption = [
   "kitsune_p2p_dht_arc/db-encryption",
   "kitsune_p2p_bin_data/db-encryption",
   "kitsune_p2p_block/db-encryption",
-  "kitsune_p2p_types/db-encryption",
 ]
 no-deps = [
   "kitsune_p2p_dht/no-deps",
   "kitsune_p2p_dht_arc/no-deps",
   "kitsune_p2p_bin_data/no-deps",
   "kitsune_p2p_block/no-deps",
-  "kitsune_p2p_types/no-deps",
 ]
