@@ -30,7 +30,9 @@ pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Syn
 /// as easy installation of apps across multiple Conductors and Agents.
 ///
 /// This is intentionally NOT `Clone`, because the drop handle triggers a shutdown of
-/// the conductor handle, which would render all other cloned instances useless.
+/// the conductor handle, which would render all other cloned instances useless,
+/// as well as the fact that the SweetConductor has some extra state which would not
+/// be tracked by cloned instances.
 /// If you need multiple references to a SweetConductor, put it in an Arc
 #[derive(derive_more::From)]
 pub struct SweetConductor {
