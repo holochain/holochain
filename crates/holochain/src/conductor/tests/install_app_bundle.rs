@@ -2,8 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use crate::{conductor::error::ConductorError, sweettest::*};
 use fixt::prelude::strum_macros;
-use holo_hash::DnaHash;
-use holochain_keystore::MetaLairClient;
+use holo_hash::{AgentPubKey, DnaHash};
 use holochain_types::prelude::{
     mapvec, AppBundle, AppBundleError, AppBundleSource, AppManifestCurrentBuilder,
     AppManifestError, AppRoleDnaManifest, AppRoleManifest, CellProvisioning,
@@ -17,9 +16,9 @@ use tempfile::{tempdir, TempDir};
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     let mut conductor = SweetConductor::from_standard_config().await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
 
-    async fn make_payload(keystore: MetaLairClient, clone_limit: u32) -> InstallAppPayload {
-        let alice = SweetAgents::one(keystore).await;
+    async fn make_payload(agent_key: AgentPubKey, clone_limit: u32) -> InstallAppPayload {
         let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
         let path = PathBuf::from(format!("{}", dna.dna_hash()));
         let modifiers = DnaModifiersOpt::none();
@@ -49,7 +48,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .unwrap();
 
         InstallAppPayload {
-            agent_key: alice.clone(),
+            agent_key,
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
@@ -61,7 +60,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
     assert_matches!(
         conductor
             .clone()
-            .install_app_bundle(make_payload(conductor.keystore(), 0).await)
+            .install_app_bundle(make_payload(agent.clone(), 0).await)
             .await
             .unwrap_err(),
         ConductorError::AppBundleError(AppBundleError::AppManifestError(
@@ -69,42 +68,54 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
         ))
     );
 
-    // Succeeds with clone limit of 1
-    let app = conductor
-        .clone()
-        .install_app_bundle(make_payload(conductor.keystore(), 1).await)
-        .await
-        .unwrap();
+    {
+        // Succeeds with clone limit of 1
+        let app = conductor
+            .clone()
+            .install_app_bundle(make_payload(agent.clone(), 1).await)
+            .await
+            .unwrap();
 
-    // No cells in this app due to CloneOnly provisioning strategy
-    assert_eq!(app.all_cells().count(), 0);
+        // No cells in this app due to CloneOnly provisioning strategy
+        assert_eq!(app.all_cells().count(), 0);
+        assert_eq!(app.role_assignments().len(), 1);
+    }
+    {
+        let clone_cell = conductor
+            .create_clone_cell(CreateCloneCellPayload {
+                app_id: "app_1".into(),
+                role_name: "name".into(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
+                membrane_proof: None,
+                name: Some("Johnny".into()),
+            })
+            .await
+            .unwrap();
 
-    conductor
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: "app_1".into(),
-            role_name: "name".into(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
-            membrane_proof: None,
-            name: None,
-        })
-        .await
-        .unwrap();
+        let state = conductor.get_state().await.unwrap();
+        let app = state.get_app(&"app_1".to_string()).unwrap();
 
-    assert_eq!(app.clone_cells().count(), 1);
+        assert_eq!(clone_cell.name, "Johnny".to_string());
+        assert_eq!(*clone_cell.cell_id.agent_pubkey(), agent);
+        assert_eq!(app.role_assignments().len(), 1);
+        assert_eq!(app.clone_cells().count(), 1);
+    }
+    {
+        conductor
+            .create_clone_cell(CreateCloneCellPayload {
+                app_id: "app_1".into(),
+                role_name: "name".into(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
+                membrane_proof: None,
+                name: None,
+            })
+            .await
+            .unwrap_err();
+        let state = conductor.get_state().await.unwrap();
+        let app = state.get_app(&"app_1".to_string()).unwrap();
 
-    conductor
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: "app_1".into(),
-            role_name: "name".into(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
-            membrane_proof: None,
-            name: None,
-        })
-        .await
-        .unwrap_err();
-
-    assert_eq!(app.all_cells().count(), 1);
-
+        assert_eq!(app.all_cells().count(), 1);
+    }
     // TODO: test that the cell can't be provisioned later
 }
 
