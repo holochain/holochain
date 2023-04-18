@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230413.232054
+
+## [holochain\_cli-0.2.0-beta-rc.4](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_cli\_sandbox-0.2.0-beta-rc.3](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.0-beta-rc.3)
+
+## [holochain\_cli\_bundle-0.2.0-beta-rc.3](crates/holochain_cli_bundle/CHANGELOG.md#0.2.0-beta-rc.3)
+
+## [holochain-0.2.0-beta-rc.4](crates/holochain/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_test\_wasm\_common-0.2.0-beta-rc.4](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_conductor\_api-0.2.0-beta-rc.4](crates/holochain_conductor_api/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_wasm\_test\_utils-0.2.0-beta-rc.4](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_cascade-0.2.0-beta-rc.4](crates/holochain_cascade/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_state-0.2.0-beta-rc.4](crates/holochain_state/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_p2p-0.2.0-beta-rc.4](crates/holochain_p2p/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [kitsune\_p2p\_bootstrap-0.1.0-beta-rc.2](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.0-beta-rc.2)
+
+## [holochain\_types-0.2.0-beta-rc.4](crates/holochain_types/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_keystore-0.2.0-beta-rc.4](crates/holochain_keystore/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_sqlite-0.2.0-beta-rc.4](crates/holochain_sqlite/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [kitsune\_p2p-0.2.0-beta-rc.4](crates/kitsune_p2p/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [kitsune\_p2p\_proxy-0.2.0-beta-rc.3](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.0-beta-rc.3)
+
+## [kitsune\_p2p\_transport\_quic-0.2.0-beta-rc.3](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.0-beta-rc.3)
+
+## [kitsune\_p2p\_fetch-0.2.0-beta-rc.3](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.0-beta-rc.3)
+
+## [kitsune\_p2p\_types-0.2.0-beta-rc.3](crates/kitsune_p2p_types/CHANGELOG.md#0.2.0-beta-rc.3)
+
+## [hdk-0.2.0-beta-rc.4](crates/hdk/CHANGELOG.md#0.2.0-beta-rc.4)
+
+## [holochain\_zome\_types-0.2.0-beta-rc.4](crates/holochain_zome_types/CHANGELOG.md#0.2.0-beta-rc.4)
+
 # 20230412.003659
 
 - Adds new functionality to the conductor app API which returns disk storage information. It is possible to query for the storage space being used by one app or all apps. The storage used is broken down by cell to make it easier to identify intensive components of apps.

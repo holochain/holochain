@@ -137,6 +137,13 @@ kitsune_p2p_types::write_codec_enum! {
             peer_list.0: Vec<AgentInfoSigned>,
         },
 
+        /// Nodes can just send peer info without prompting.
+        /// Notably they may want to send their own peer info to prevent being
+        /// inadvertantly blocked.
+        PeerUnsolicited(0x54) {
+            peer_list.0: Vec<AgentInfoSigned>,
+        },
+
         /// Request the peer send op data.
         /// This is sent as a fire-and-forget Notify message.
         /// The "response" is "PushOpData" below.
@@ -173,7 +180,8 @@ impl Wire {
             | Wire::PeerGetResp(_)
             | Wire::PeerQueryResp(_)
             | Wire::FetchOp(_)
-            | Wire::PushOpData(_) => None,
+            | Wire::PushOpData(_)
+            | Wire::PeerUnsolicited(_) => None,
         }
     }
 }

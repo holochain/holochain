@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.2.0-beta-rc.3"
+version = "0.2.0-beta-rc.4"
 description = "Holochain common types"
 license-file = "LICENSE_CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -13,7 +13,7 @@ edition = "2021"
 
 [dependencies]
 wasmer-middlewares = "2"
-holochain_wasmer_host = { git = "https://github.com/Sprillow/holochain-wasmer.git", rev = "b62e66ef1fd7011967ab210fb0dc9ac65794d8d8", features = ["dylib"] } # "=0.0.83"
+holochain_wasmer_host = { version = "0.0.84", features = ["dylib"] }
 anyhow = "1.0.26"
 async-trait = "0.1"
 automap = { version = "0.1", features = ["serde"] }
@@ -28,10 +28,10 @@ flate2 = "1.0.14"
 futures = "0.3"
 one_err = "0.0.8"
 holo_hash = { version = "^0.2.0-beta-rc.3", path = "../holo_hash", features = ["encoding"] }
-holochain_keystore = { version = "^0.2.0-beta-rc.3", path = "../holochain_keystore" }
+holochain_keystore = { version = "^0.2.0-beta-rc.4", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.2.0-beta-rc.3"}
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.2.0-beta-rc.3", features = ["full"] }
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.2.0-beta-rc.4"}
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.2.0-beta-rc.4", features = ["full"] }
 itertools = { version = "0.10" }
 kitsune_p2p_dht = { version = "^0.2.0-beta-rc.1", path = "../kitsune_p2p/dht" }
 lazy_static = "1.4.0"

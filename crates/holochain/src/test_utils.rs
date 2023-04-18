@@ -293,7 +293,10 @@ where
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let dna_network = network.to_dna(dna.clone(), None);
-    network.join(dna.clone(), agent_key, None).await.unwrap();
+    network
+        .join(dna.clone(), agent_key, None, None)
+        .await
+        .unwrap();
     TestNetwork::new(network, respond_task, dna_network, check_op_data_calls)
 }
 

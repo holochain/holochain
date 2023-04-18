@@ -233,7 +233,7 @@ mod tests {
         // Join some agents onto the network
         // Skip the first agent as it has already joined
         for agent in agents.into_iter().skip(1) {
-            HolochainP2pRef::join(&network, dna.clone(), agent, None)
+            HolochainP2pRef::join(&network, dna.clone(), agent, None, None)
                 .await
                 .unwrap();
         }
@@ -606,7 +606,7 @@ mod tests {
                 {
                     let network = test_network.network();
                     for agent in agents {
-                        HolochainP2pRef::join(&network, dna.clone(), agent, None)
+                        HolochainP2pRef::join(&network, dna.clone(), agent, None, None)
                             .await
                             .unwrap()
                     }

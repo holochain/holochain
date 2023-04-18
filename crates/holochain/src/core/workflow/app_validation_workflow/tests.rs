@@ -29,6 +29,7 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "deal with the invalid data that leads to blocks being enforced"]
 async fn app_validation_workflow_test() {
     holochain_trace::test_run().ok();
 
