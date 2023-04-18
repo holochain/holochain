@@ -1063,7 +1063,7 @@ pub mod wasm_test {
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crud]).await;
         let ribosome = super::RealRibosome::new(dna_file).unwrap();
         let module = ribosome
-            .module(&TestWasm::Crud.coordinator_zome_name())
+            .runtime_compiled_module(&TestWasm::Crud.coordinator_zome_name())
             .unwrap();
         assert_eq!(
             vec![
