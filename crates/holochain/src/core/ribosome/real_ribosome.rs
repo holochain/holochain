@@ -417,8 +417,8 @@ impl RealRibosome {
     ) -> RibosomeResult<Arc<Mutex<Instance>>> {
         let module = match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
-                if let Some(path) = &wasm_zome.preserialized_path {
-                    self.precompiled_module(&path)?
+                if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                    self.precompiled_module(path)?
                 } else {
                     self.runtime_compiled_module(zome.zome_name())?
                 }
@@ -801,8 +801,8 @@ impl RibosomeT for RealRibosome {
             extern_fns: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
-                        let module = if let Some(path) = &wasm_zome.preserialized_path {
-                            self.precompiled_module(&path)?
+                        let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                            self.precompiled_module(path)?
                         } else {
                             self.runtime_compiled_module(zome.zome_name())?
                         };
@@ -833,8 +833,8 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(wasm_zome) => {
-                let module = if let Some(path) = &wasm_zome.preserialized_path {
-                    self.precompiled_module(&path)?
+                let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                    self.precompiled_module(path)?
                 } else {
                     self.runtime_compiled_module(zome.zome_name())?
                 };
@@ -862,8 +862,8 @@ impl RibosomeT for RealRibosome {
 
         match zome.zome_def() {
             ZomeDef::Wasm(wasm_zome) => {
-                let module = if let Some(path) = &wasm_zome.preserialized_path {
-                    self.precompiled_module(&path)?
+                let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
+                    self.precompiled_module(path)?
                 } else {
                     self.runtime_compiled_module(zome.zome_name())?
                 };
