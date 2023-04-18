@@ -58,6 +58,5 @@ pub fn build_ios_module(wasm: &[u8]) -> Result<Module, CompileError> {
 pub fn ios_dylib_headless_store() -> Store {
     let ios_target = wasmer_ios_target();
     let engine = Dylib::headless().target(ios_target).engine();
-    let store = Store::new(&engine);
-    store
+    Store::new(&engine)
 }
