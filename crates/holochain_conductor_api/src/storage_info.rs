@@ -14,6 +14,7 @@ pub struct DnaStorageInfo {
 
 /// The type of storage blob
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 pub enum StorageBlob {
     /// Storage blob used by hApps to store data
     Dna(DnaStorageInfo),
