@@ -10,3 +10,7 @@ documentation = "https://docs.rs/holochain_mock_hdi"
 [dependencies]
 hdi = { path = "../hdi" }
 mockall = { version = "0.11.3" }
+
+[features]
+db-encryption = [ "hdi/db-encryption" ]
+no-deps = [ "hdi/no-deps" ]

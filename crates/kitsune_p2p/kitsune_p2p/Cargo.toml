@@ -87,3 +87,24 @@ mock_network = [
 ]
 
 tx2 = [ "kitsune_p2p_types/tx2", "kitsune_p2p_transport_quic" ]
+
+db-encryption = [
+  "kitsune_p2p_fetch/db-encryption",
+  "kitsune_p2p_proxy/db-encryption",
+  "kitsune_p2p_timestamp/db-encryption",
+  "kitsune_p2p_block/db-encryption",
+  "kitsune_p2p_transport_quic/db-encryption",
+  "kitsune_p2p_types/db-encryption",
+  "kitsune_p2p_bootstrap/db-encryption",
+  "kitsune_p2p_types/db-encryption",
+]
+no-deps = [
+  "kitsune_p2p_fetch/no-deps",
+  "kitsune_p2p_proxy/no-deps",
+  "kitsune_p2p_timestamp/no-deps",
+  "kitsune_p2p_block/no-deps",
+  "kitsune_p2p_transport_quic/no-deps",
+  "kitsune_p2p_types/no-deps",
+  "kitsune_p2p_bootstrap/no-deps",
+  "kitsune_p2p_types/no-deps",
+]

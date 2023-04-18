@@ -15,3 +15,13 @@ kitsune_p2p_timestamp = { version = "^0.2.0-beta-rc.0", path = "../timestamp", f
 kitsune_p2p_bin_data = { version = "^0.2.0-beta-rc.1", path = "../bin_data" }
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
+
+[features]
+db-encryption = [
+    "kitsune_p2p_timestamp/db-encryption",
+    "kitsune_p2p_bin_data/db-encryption"
+]
+no-deps = [
+    "kitsune_p2p_timestamp/no-deps",
+    "kitsune_p2p_bin_data/no-deps"
+]

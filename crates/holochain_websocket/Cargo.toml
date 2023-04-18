@@ -37,3 +37,11 @@ criterion = "0.3.4"
 [[bench]]
 name = "bench"
 harness = false
+
+[features]
+db-encryption = [
+    "holochain_types/db-encryption",
+]
+no-deps = [
+    "holochain_types/no-deps",
+]

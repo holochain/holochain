@@ -55,7 +55,7 @@ impl From<i32> for DhtLocation {
     }
 }
 
-#[cfg(feature = "sqlite")]
+#[cfg(any(feature = "no-deps", feature = "db-encryption"))]
 impl rusqlite::ToSql for DhtLocation {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
         Ok(rusqlite::types::ToSqlOutput::Owned(self.0 .0.into()))

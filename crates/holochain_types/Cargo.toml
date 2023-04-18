@@ -87,3 +87,20 @@ test_utils = [
   "mr_bundle/arbitrary",
   "holochain_zome_types/test_utils",
 ]
+
+db-encryption = [
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "holo_hash/db-encryption",
+  "holochain_keystore/db-encryption",
+  "holochain_sqlite/db-encryption",
+  "holochain_zome_types/db-encryption",
+  "kitsune_p2p_dht/db-encryption",
+]
+no-deps = [
+  "rusqlite/bundled",
+  "holo_hash/no-deps",
+  "holochain_keystore/no-deps",
+  "holochain_sqlite/no-deps",
+  "holochain_zome_types/no-deps",
+  "kitsune_p2p_dht/no-deps",
+]

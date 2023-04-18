@@ -36,3 +36,14 @@ crossterm = "0.19"
 [[bench]]
 name = "thru"
 harness = false
+
+[features]
+db-encryption = [
+    "kitsune_p2p_types/db-encryption",
+    "kitsune_p2p_transport_quic/db-encryption",
+]
+no-deps = [
+    "kitsune_p2p_types/no-deps",
+    "kitsune_p2p_transport_quic/no-deps",
+]
+

@@ -46,3 +46,20 @@ test-case = "2.1"
 default = ["test_utils"]
 
 test_utils = ["async-trait", "mockall", "holochain_types/test_utils"]
+
+db-encryption = [
+    "holo_hash/db-encryption",
+    "holochain_sqlite/db-encryption",
+    "holochain_state/db-encryption",
+    "holochain_types/db-encryption",
+    "holochain_zome_types/db-encryption",
+    "kitsune_p2p/db-encryption",
+]
+no-deps = [
+    "holo_hash/no-deps",
+    "holochain_sqlite/no-deps",
+    "holochain_state/no-deps",
+    "holochain_types/no-deps",
+    "holochain_zome_types/no-deps",
+    "kitsune_p2p/no-deps",
+]

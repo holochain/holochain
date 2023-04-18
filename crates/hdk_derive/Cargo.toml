@@ -28,3 +28,10 @@ proc-macro-error = "1.0.4"
 [features]
 default = []
 mock = []
+
+db-encryption = [
+    "holochain_integrity_types/db-encryption",
+]
+no-deps = [
+    "holochain_integrity_types/no-deps",
+]

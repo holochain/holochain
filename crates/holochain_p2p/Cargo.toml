@@ -39,3 +39,16 @@ mock_network = [
   "kitsune_p2p/mock_network",
   "kitsune_p2p/test_utils",
 ]
+
+db-encryption = [
+  "holo_hash/db-encryption",
+  "holochain_keystore/db-encryption",
+  "kitsune_p2p/db-encryption",
+  "kitsune_p2p_types/db-encryption",
+]
+no-deps = [
+  "holo_hash/no-deps",
+  "holochain_keystore/no-deps",
+  "kitsune_p2p/no-deps",
+  "kitsune_p2p_types/no-deps",
+]

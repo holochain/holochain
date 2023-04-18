@@ -33,4 +33,7 @@ serde_yaml = "0.9"
 default = ["chrono"]
 now = ["chrono"]
 
-full = ["now", "rusqlite"]
+full = ["now"]
+
+db-encryption = [ "rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl" ]
+no-deps = [ "rusqlite", "rusqlite/bundled" ]

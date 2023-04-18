@@ -23,3 +23,9 @@ arbitrary = { version = "1.0", features = ["derive"], optional = true}
 test_utils = [
   "arbitrary"
 ]
+db-encryption = [
+  "kitsune_p2p_dht_arc/db-encryption"
+]
+no-deps = [
+  "kitsune_p2p_dht_arc/no-deps"
+]

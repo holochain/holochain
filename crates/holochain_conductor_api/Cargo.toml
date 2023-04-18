@@ -30,3 +30,24 @@ holochain_keystore = { version = "^0.2.0-beta-rc.4", path = "../holochain_keysto
 [dev-dependencies]
 matches = {version = "0.1.8"}
 holochain_trace = { version = "^0.2.0-beta-rc.1", path = "../holochain_trace" }
+
+[features]
+db-encryption = [
+    "holo_hash/db-encryption",
+    "kitsune_p2p/db-encryption",
+    "holochain_p2p/db-encryption",
+    "holochain_state/db-encryption",
+    "holochain_types/db-encryption",
+    "holochain_zome_types/db-encryption",
+    "holochain_keystore/db-encryption",
+]
+no-deps = [
+    "holo_hash/no-deps",
+    "kitsune_p2p/no-deps",
+    "holochain_p2p/no-deps",
+    "holochain_state/no-deps",
+    "holochain_types/no-deps",
+    "holochain_zome_types/no-deps",
+    "holochain_keystore/no-deps",
+]
+

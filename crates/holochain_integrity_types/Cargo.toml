@@ -42,3 +42,12 @@ test_utils = [
   "holo_hash/test_utils",
   "holochain_serialized_bytes/arbitrary",
 ]
+
+db-encryption = [
+  "holo_hash/db-encryption",
+  "kitsune_p2p_timestamp/db-encryption",
+]
+no-deps = [
+  "holo_hash/no-deps",
+  "kitsune_p2p_timestamp/no-deps",
+]
