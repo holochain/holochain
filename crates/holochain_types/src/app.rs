@@ -554,7 +554,7 @@ impl InstalledAppCommon {
             app_role_assignment.agent_key(),
             "A clone cell must use the same agent key as the role it is added to"
         );
-        
+
         if app_role_assignment.is_clone_limit_reached() {
             return Err(AppError::CloneLimitExceeded(
                 app_role_assignment.clone_limit,
