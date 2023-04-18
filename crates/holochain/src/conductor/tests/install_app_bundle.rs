@@ -6,8 +6,8 @@ use holo_hash::DnaHash;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::{
     mapvec, AppBundle, AppBundleError, AppBundleSource, AppManifestCurrentBuilder,
-    AppManifestError, AppRoleDnaManifest, AppRoleManifest, CellProvisioning, DnaBundle, DnaFile,
-    DnaLocation, InstallAppPayload,
+    AppManifestError, AppRoleDnaManifest, AppRoleManifest, CellProvisioning,
+    CreateCloneCellPayload, DnaBundle, DnaFile, DnaLocation, InstallAppPayload,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{CellId, DnaModifiersOpt, Timestamp};
@@ -16,7 +16,7 @@ use tempfile::{tempdir, TempDir};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
-    let conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     async fn make_payload(keystore: MetaLairClient, clone_limit: u32) -> InstallAppPayload {
         let alice = SweetAgents::one(keystore).await;
@@ -78,6 +78,32 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
 
     // No cells in this app due to CloneOnly provisioning strategy
     assert_eq!(app.all_cells().count(), 0);
+
+    conductor
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: "app_1".into(),
+            role_name: "name".into(),
+            modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
+            membrane_proof: None,
+            name: None,
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(app.clone_cells().count(), 1);
+
+    conductor
+        .create_clone_cell(CreateCloneCellPayload {
+            app_id: "app_1".into(),
+            role_name: "name".into(),
+            modifiers: DnaModifiersOpt::none().with_network_seed("1".into()),
+            membrane_proof: None,
+            name: None,
+        })
+        .await
+        .unwrap_err();
+
+    assert_eq!(app.all_cells().count(), 1);
 
     // TODO: test that the cell can't be provisioned later
 }

@@ -155,12 +155,11 @@ impl AppManifestV1 {
     // we know we need it, since this way is substantially simpler.
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for mut role in self.roles.iter_mut() {
-            if !matches!(
-                role.provisioning.clone().unwrap_or_default(),
-                CellProvisioning::UseExisting { .. }
-            ) {
-                // Only update the network seed for roles for which it makes sense to do so
-                role.dna.modifiers.network_seed = Some(network_seed.clone());
+            // Only update the network seed for roles for which it makes sense to do so
+            match role.provisioning.clone().unwrap_or_default() {
+                CellProvisioning::Create { .. } | CellProvisioning::CloneOnly => {
+                    role.dna.modifiers.network_seed = Some(network_seed.clone());
+                }
             }
         }
     }
@@ -197,28 +196,28 @@ impl AppManifestV1 {
                             modifiers,
                             installed_hash,
                         },
-                        CellProvisioning::UseExisting { deferred } => {
-                            AppRoleManifestValidated::UseExisting {
-                                deferred,
-                                clone_limit,
-                                installed_hash: Self::require(
-                                    installed_hash,
-                                    "roles.dna.installed_hash",
-                                )?,
-                            }
-                        }
-                        CellProvisioning::CreateIfNotExists { deferred } => {
-                            AppRoleManifestValidated::CreateIfNotExists {
-                                deferred,
-                                clone_limit,
-                                location: Self::require(location, "roles.dna.(path|url)")?,
-                                installed_hash: Self::require(
-                                    installed_hash,
-                                    "roles.dna.installed_hash",
-                                )?,
-                                modifiers,
-                            }
-                        }
+                        // CellProvisioning::UseExisting { deferred } => {
+                        //     AppRoleManifestValidated::UseExisting {
+                        //         deferred,
+                        //         clone_limit,
+                        //         installed_hash: Self::require(
+                        //             installed_hash,
+                        //             "roles.dna.installed_hash",
+                        //         )?,
+                        //     }
+                        // }
+                        // CellProvisioning::CreateIfNotExists { deferred } => {
+                        //     AppRoleManifestValidated::CreateIfNotExists {
+                        //         deferred,
+                        //         clone_limit,
+                        //         location: Self::require(location, "roles.dna.(path|url)")?,
+                        //         installed_hash: Self::require(
+                        //             installed_hash,
+                        //             "roles.dna.installed_hash",
+                        //         )?,
+                        //         modifiers,
+                        //     }
+                        // }
                         CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
                             location: Self::require(location, "roles.dna.(path|url)")?,
@@ -354,14 +353,14 @@ roles:
         manifest.roles = vec![
             AppRoleManifest::arbitrary(&mut u).unwrap(),
             AppRoleManifest::arbitrary(&mut u).unwrap(),
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
+            // AppRoleManifest::arbitrary(&mut u).unwrap(),
+            // AppRoleManifest::arbitrary(&mut u).unwrap(),
         ];
         manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });
         manifest.roles[1].provisioning = Some(CellProvisioning::Create { deferred: false });
-        manifest.roles[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
-        manifest.roles[3].provisioning =
-            Some(CellProvisioning::CreateIfNotExists { deferred: false });
+        // manifest.roles[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
+        // manifest.roles[3].provisioning =
+        //     Some(CellProvisioning::CreateIfNotExists { deferred: false });
 
         let network_seed = NetworkSeed::from("blabla");
         manifest.set_network_seed(network_seed.clone());
@@ -375,15 +374,15 @@ roles:
             manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
-        assert_eq!(
-            manifest.roles[3].dna.modifiers.network_seed.as_ref(),
-            Some(&network_seed)
-        );
+        // assert_eq!(
+        //     manifest.roles[3].dna.modifiers.network_seed.as_ref(),
+        //     Some(&network_seed)
+        // );
 
-        // - The others do not.
-        assert_ne!(
-            manifest.roles[2].dna.modifiers.network_seed.as_ref(),
-            Some(&network_seed)
-        );
+        // // - The others do not.
+        // assert_ne!(
+        //     manifest.roles[2].dna.modifiers.network_seed.as_ref(),
+        //     Some(&network_seed)
+        // );
     }
 }
