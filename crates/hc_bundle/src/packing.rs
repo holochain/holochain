@@ -7,9 +7,9 @@ use holochain_types::wasmer_types::build_ios_module;
 use holochain_util::ffs;
 use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
-use tracing::info;
 use std::path::Path;
 use std::path::PathBuf;
+use tracing::info;
 
 /// Unpack a DNA bundle into a working directory, returning the directory path used.
 pub async fn unpack<M: Manifest>(
