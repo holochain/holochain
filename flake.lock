@@ -137,6 +137,24 @@
         "type": "github"
       }
     },
+    "flake-utils_2": {
+      "inputs": {
+        "systems": "systems"
+      },
+      "locked": {
+        "lastModified": 1681202837,
+        "narHash": "sha256-H+Rh19JDwRtpVPAWp64F+rlEtxUWBAQW28eAi3SRSzg=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "cfacdce06f30d2b68473a46042957675eebb3401",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
     "holochain": {
       "flake": false,
       "locked": {
@@ -310,17 +328,17 @@
     },
     "rust-overlay_2": {
       "inputs": {
+        "flake-utils": "flake-utils_2",
         "nixpkgs": [
           "nixpkgs"
-        ],
-        "systems": "systems"
+        ]
       },
       "locked": {
-        "lastModified": 1681750108,
-        "narHash": "sha256-5PF33+dVZhvh5Ly5geW6gC8uDKlHQKLqVxesWDBfFps=",
+        "lastModified": 1681756516,
+        "narHash": "sha256-47DFtN5PX05eD8ObImkSu2W0hyyZ5cK1Tl9EvmW2NnU=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "cf102ae729aebb19ee9029ed51bc886a5cf6e056",
+        "rev": "b79de030a6f6cb8628055ca7624979606237d21a",
         "type": "github"
       },
       "original": {
@@ -347,16 +365,18 @@
       }
     },
     "systems": {
-      "flake": false,
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-cyfZqnwhPNzdfQnmUUUVK5fon88TSm/0CwgE7Lf+LDU=",
-        "path": "./systems.nix",
-        "type": "path"
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
       },
       "original": {
-        "path": "./systems.nix",
-        "type": "path"
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
       }
     },
     "versions": {
