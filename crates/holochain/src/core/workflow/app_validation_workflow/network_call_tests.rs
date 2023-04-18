@@ -169,7 +169,7 @@ async fn get_agent_activity_test() {
     let mut record_cache = RecordBuf::cache(alice_call_data.db.clone().into()).unwrap();
     let mut meta_cache = MetadataBuf::cache(alice_call_data.db.clone().into()).unwrap();
     let cache_data = DbPairMut::new(&mut record_cache, &mut meta_cache);
-    let mut cascade = Cascade::empty()
+    let cascade = Cascade::empty()
         .with_cache(cache_data)
         .with_network(alice_call_data.network.clone());
 

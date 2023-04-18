@@ -67,14 +67,14 @@ impl SweetConductorConfig {
         let mut network = KitsuneP2pConfig::default();
         network.bootstrap_service = Some(url2::url2!("rendezvous:"));
 
-        #[cfg(not(feature = "tx5"))]
+        /*#[cfg(not(feature = "tx5"))]
         {
             network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
                 bind_to: None,
                 override_host: None,
                 override_port: None,
             }];
-        }
+        }*/
 
         #[cfg(feature = "tx5")]
         {
