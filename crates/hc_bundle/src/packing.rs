@@ -189,7 +189,7 @@ integrity:
         std::fs::write(tmpdir.path().join("zome-3.wasm"), &[7, 8, 9]).unwrap();
 
         let (bundle_path, bundle) =
-            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string(), true)
+            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string(), false)
                 .await
                 .unwrap();
         // Ensure the bundle path was generated as expected
@@ -226,7 +226,7 @@ integrity:
             &dir,
             Some(dir.parent().unwrap().to_path_buf()),
             "test_dna".to_string(),
-            true,
+            false,
         )
         .await
         .unwrap();
@@ -245,7 +245,7 @@ integrity:
         assert_eq!(dir.read_dir().unwrap().collect::<Vec<_>>().len(), 3);
 
         // Ensure that we get the same bundle after the roundtrip
-        let (_, bundle2) = pack(&dir, None, "test_dna".to_string(), true)
+        let (_, bundle2) = pack(&dir, None, "test_dna".to_string(), false)
             .await
             .unwrap();
         assert_eq!(bundle, bundle2);
