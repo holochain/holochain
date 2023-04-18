@@ -62,8 +62,8 @@
                   }
                 }
               },
-              /*{
-                "description": "Require that a Cell is already installed which matches the DNA version spec, and which has an Agent that's associated with this App's agent via DPKI. If no such Cell exists, *app installation fails*.",
+              {
+                "description": "**NOT YET IMPLEMENTED**: Require that a Cell is already installed which matches the DNA version spec, and which has an Agent that's associated with this App's agent via DPKI. If no such Cell exists, *app installation fails*.",
                 "type": "object",
                 "required": [
                   "deferred",
@@ -82,7 +82,7 @@
                 }
               },
               {
-                "description": "Try `UseExisting`, and if that fails, fallback to `Create`",
+                "description": "**NOT YET IMPLEMENTED**: Try `UseExisting`, and if that fails, fallback to `Create`",
                 "type": "object",
                 "required": [
                   "deferred",
@@ -99,7 +99,7 @@
                     ]
                   }
                 }
-              },*/
+              },
               {
                 "description": "Install or locate the DNA, but never create a Cell for this DNA. Only allow clones to be created from the DNA specified. This case requires `clone_limit > 0`, otherwise no Cells will ever be created.",
                 "type": "object",
