@@ -99,13 +99,13 @@ pub async fn pack<M: Manifest>(
             .parent()
             .expect("target_path should have a parent folder");
         let _write_serialized_result =
-            futures::future::join_all(bundle.bundled_resources().into_iter().map(
+            futures::future::join_all(bundle.bundled_resources().iter().map(
                 |(relative_path, bytes)| async move {
                     // only pre-serialize wasm resources
                     if relative_path.extension() == Some(std::ffi::OsStr::new("wasm")) {
                         let ios_folder_path = target_path_folder.join("ios");
                         let mut resource_path_adjoined = ios_folder_path.join(
-                            &relative_path
+                            relative_path
                                 .file_name()
                                 .expect("wasm resource should have a filename"),
                         );
