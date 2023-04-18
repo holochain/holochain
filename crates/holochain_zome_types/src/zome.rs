@@ -140,11 +140,14 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
-    /// The path to a preserialized wasmer module used as a "dynamic library" (dylib).
-    /// Useful for iOS and other targets.
-    pub preserialized_path: Option<PathBuf>,
+
     /// The zome dependencies
     pub dependencies: Vec<ZomeName>,
+
+    /// The path to a preserialized wasmer module used as a "dynamic library" (dylib).
+    /// Useful for iOS and other targets.
+    #[serde(default)]
+    pub preserialized_path: Option<PathBuf>,
 }
 
 /// Just the definition of a Zome, without the name included. This exists

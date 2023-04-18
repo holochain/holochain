@@ -151,14 +151,15 @@ pub struct ZomeManifest {
     #[serde(flatten)]
     pub location: ZomeLocation,
 
-    /// The location of the wasm dylib for this zome
-    /// Useful for iOS.
-    pub dylib: Option<PathBuf>,
-
     /// The integrity zomes this zome depends on.
     /// The order of these must match the order the types
     /// are used in the zome.
     pub dependencies: Option<Vec<ZomeDependency>>,
+
+    /// The location of the wasm dylib for this zome
+    /// Useful for iOS.
+    #[serde(default)]
+    pub dylib: Option<PathBuf>,
 }
 
 /// Manifest for integrity zomes that another zome
