@@ -430,6 +430,10 @@ impl RealRibosome {
         RibosomeResult::Ok(instance)
     }
 
+    fn next_context_key() -> u64 {
+        CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    }
+
     pub fn instance(
         &self,
         call_context: CallContext,
@@ -483,7 +487,7 @@ impl RealRibosome {
             }
         }
         // We didn't get an instance hit so create a new key.
-        let context_key = CONTEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let context_key = Self::next_context_key();
         let instance = self.build_instance(call_context.zome.zome_name(), context_key)?;
 
         // Update the context.
@@ -504,6 +508,30 @@ impl RealRibosome {
         let mut cranelift = Cranelift::default();
         cranelift.canonicalize_nans(true).push_middleware(metering);
         cranelift
+    }
+
+    pub async fn tooling_imports() -> RibosomeResult<Vec<String>> {
+        let empty_dna_def = DnaDef {
+            name: Default::default(),
+            modifiers: DnaModifiers {
+                network_seed: Default::default(),
+                properties: Default::default(),
+                origin_time: Timestamp(0),
+                quantum_time: Default::default(),
+            },
+            integrity_zomes: Default::default(),
+            coordinator_zomes: Default::default(),
+        };
+        let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
+        let empty_ribosome = RealRibosome::new(empty_dna_file)?;
+        let context_key = RealRibosome::next_context_key();
+        let imports = empty_ribosome.imports(
+            context_key,
+            &Store::new(&Universal::new(Self::cranelift()).engine()),
+        );
+        let mut imports: Vec<String> = imports.into_iter().map(|((_ns, name), _)| name).collect();
+        imports.sort();
+        Ok(imports)
     }
 
     fn imports(&self, context_key: u64, store: &Store) -> ImportObject {
@@ -1038,63 +1066,59 @@ pub mod wasm_test {
     async fn wasm_tooling_test() {
         holochain_trace::test_run().ok();
 
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crud]).await;
-        let ribosome = super::RealRibosome::new(dna_file).unwrap();
-        let module = ribosome
-            .module(&TestWasm::Crud.coordinator_zome_name())
-            .unwrap();
         assert_eq!(
             vec![
-                "__hc__get_agent_activity_1",
-                "__hc__query_1",
-                "__hc__sign_1",
-                "__hc__sign_ephemeral_1",
-                "__hc__create_1",
-                "__hc__update_1",
-                "__hc__delete_1",
-                "__hc__get_1",
-                "__hc__get_details_1",
                 "__hc__accept_countersigning_preflight_request_1",
                 "__hc__agent_info_1",
-                "__hc__call_info_1",
-                "__hc__create_link_1",
-                "__hc__delete_link_1",
-                "__hc__get_links_1",
-                "__hc__get_link_details_1",
                 "__hc__block_agent_1",
-                "__hc__unblock_agent_1",
                 "__hc__call_1",
+                "__hc__call_info_1",
+                "__hc__capability_claims_1",
+                "__hc__capability_grants_1",
+                "__hc__capability_info_1",
+                "__hc__create_1",
+                "__hc__create_link_1",
+                "__hc__create_x25519_keypair_1",
+                "__hc__delete_1",
+                "__hc__delete_link_1",
+                "__hc__dna_info_1",
                 "__hc__emit_signal_1",
-                "__hc__remote_signal_1",
+                "__hc__get_1",
+                "__hc__get_agent_activity_1",
+                "__hc__get_details_1",
+                "__hc__get_link_details_1",
+                "__hc__get_links_1",
+                "__hc__hash_1",
+                "__hc__must_get_action_1",
+                "__hc__must_get_agent_activity_1",
+                "__hc__must_get_entry_1",
+                "__hc__must_get_valid_record_1",
+                "__hc__query_1",
                 "__hc__random_bytes_1",
-                "__hc__sys_time_1",
+                "__hc__remote_signal_1",
                 "__hc__schedule_1",
+                "__hc__sign_1",
+                "__hc__sign_ephemeral_1",
                 "__hc__sleep_1",
+                "__hc__sys_time_1",
+                "__hc__trace_1",
+                "__hc__unblock_agent_1",
+                "__hc__update_1",
+                "__hc__verify_signature_1",
+                "__hc__version_1",
+                "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
+                "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
+                "__hc__x_salsa20_poly1305_decrypt_1",
+                "__hc__x_salsa20_poly1305_encrypt_1",
                 "__hc__x_salsa20_poly1305_shared_secret_create_random_1",
                 "__hc__x_salsa20_poly1305_shared_secret_export_1",
                 "__hc__x_salsa20_poly1305_shared_secret_ingest_1",
-                "__hc__x_salsa20_poly1305_encrypt_1",
-                "__hc__create_x25519_keypair_1",
-                "__hc__x_25519_x_salsa20_poly1305_encrypt_1",
-                "__hc__verify_signature_1",
-                "__hc__hash_1",
-                "__hc__must_get_entry_1",
-                "__hc__must_get_action_1",
-                "__hc__must_get_valid_record_1",
-                "__hc__must_get_agent_activity_1",
-                "__hc__dna_info_1",
-                "__hc__zome_info_1",
-                "__hc__trace_1",
-                "__hc__x_salsa20_poly1305_decrypt_1",
-                "__hc__x_25519_x_salsa20_poly1305_decrypt_1",
+                "__hc__zome_info_1"
             ]
             .into_iter()
             .map(|s| s.to_string())
             .collect::<Vec<String>>(),
-            module
-                .imports()
-                .map(|import| import.name().to_string())
-                .collect::<Vec<String>>()
+            super::RealRibosome::tooling_imports().await.unwrap()
         );
     }
 
