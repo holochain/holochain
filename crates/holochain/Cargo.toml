@@ -199,7 +199,6 @@ db-encryption = [
   "kitsune_p2p/db-encryption",
   "kitsune_p2p_types/db-encryption",
   "kitsune_p2p_block/db-encryption",
-  "hdk/db-encryption",
   "kitsune_p2p_bootstrap/db-encryption",
 ]
 
@@ -220,7 +219,6 @@ no-deps = [
   "kitsune_p2p/no-deps",
   "kitsune_p2p_types/no-deps",
   "kitsune_p2p_block/no-deps",
-  "hdk/no-deps",
   "kitsune_p2p_bootstrap/no-deps",
 ]
 
