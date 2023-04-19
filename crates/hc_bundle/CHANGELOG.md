@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- `hc dna pack` command now takes `--dylib-ios` option, which produces iOS optimized Zomes. These can be utilized by passing `dylib`: `PathBuf` for Zome configurations in `dna.yaml` files and other data structures based on ZomeManifest where Zomes are constructed. [\#2218](https://github.com/holochain/holochain/pull/2218)
+
 ## 0.2.0-beta-rc.4
 
 ## 0.2.0-beta-rc.3
