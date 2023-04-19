@@ -39,13 +39,13 @@ serde_yaml = "0.9.10"
 tempdir = "0.3.7"
 
 [features]
-default = [ "no-deps" ]
+default = [ "sqlite" ]
 
-db-encryption = [
-    "holo_hash/db-encryption",
+sqlite-encrypted = [
+    "holo_hash/sqlite-encrypted",
     "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl",
 ]
-no-deps = [
-    "holo_hash/no-deps",
+sqlite = [
+    "holo_hash/sqlite",
     "lair_keystore/rusqlite-bundled",
 ]

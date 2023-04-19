@@ -41,9 +41,9 @@ jsonschema = "0.17"
 walkdir = "2"
 
 [features]
-db-encryption = [
-    "holochain_types/db-encryption",
+sqlite-encrypted = [
+    "holochain_types/sqlite-encrypted",
 ]
-no-deps = [
-    "holochain_types/no-deps",
+sqlite = [
+    "holochain_types/sqlite",
 ]

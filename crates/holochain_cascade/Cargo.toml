@@ -47,19 +47,19 @@ default = ["test_utils"]
 
 test_utils = ["async-trait", "mockall", "holochain_types/test_utils"]
 
-db-encryption = [
-    "holo_hash/db-encryption",
-    "holochain_sqlite/db-encryption",
-    "holochain_state/db-encryption",
-    "holochain_types/db-encryption",
-    "holochain_zome_types/db-encryption",
-    "kitsune_p2p/db-encryption",
+sqlite-encrypted = [
+    "holo_hash/sqlite-encrypted",
+    "holochain_sqlite/sqlite-encrypted",
+    "holochain_state/sqlite-encrypted",
+    "holochain_types/sqlite-encrypted",
+    "holochain_zome_types/sqlite-encrypted",
+    "kitsune_p2p/sqlite-encrypted",
 ]
-no-deps = [
-    "holo_hash/no-deps",
-    "holochain_sqlite/no-deps",
-    "holochain_state/no-deps",
-    "holochain_types/no-deps",
-    "holochain_zome_types/no-deps",
-    "kitsune_p2p/no-deps",
+sqlite = [
+    "holo_hash/sqlite",
+    "holochain_sqlite/sqlite",
+    "holochain_state/sqlite",
+    "holochain_types/sqlite",
+    "holochain_zome_types/sqlite",
+    "kitsune_p2p/sqlite",
 ]

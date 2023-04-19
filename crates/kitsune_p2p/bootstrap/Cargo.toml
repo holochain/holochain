@@ -27,7 +27,7 @@ tokio = { version = "1", features = ["full"] }
 warp = "0.3"
 
 [dev-dependencies]
-kitsune_p2p = { path = "../kitsune_p2p", features = ["no-deps"] }
+kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite"] }
 fixt = { path = "../../fixt" ,version = "^0.2.0-beta-rc.0"}
 criterion = "0.3"
 reqwest = "0.11.2"
@@ -45,9 +45,9 @@ name = "kitsune-bootstrap"
 path = "src/main.rs"
 
 [features]
-db-encryption = [
-    "kitsune_p2p_types/db-encryption",
+sqlite-encrypted = [
+    "kitsune_p2p_types/sqlite-encrypted",
 ]
-no-deps = [
-    "kitsune_p2p_types/no-deps",
+sqlite = [
+    "kitsune_p2p_types/sqlite",
 ]

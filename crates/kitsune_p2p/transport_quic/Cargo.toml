@@ -25,9 +25,9 @@ tokio = { version = "1.17.0", features = [ "full" ] }
 webpki = "0.22.0"
 
 [features]
-db-encryption = [
-    "kitsune_p2p_types/db-encryption",
+sqlite-encrypted = [
+    "kitsune_p2p_types/sqlite-encrypted",
 ]
-no-deps = [
-    "kitsune_p2p_types/no-deps",
+sqlite = [
+    "kitsune_p2p_types/sqlite",
 ]

@@ -149,7 +149,7 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "glacial_tests", "test_utils", "no-deps", "tx2", "tx5"]
+default = ["slow_tests", "glacial_tests", "test_utils", "sqlite", "tx2", "tx5"]
 
 tx2 = [ "kitsune_p2p/tx2" ]
 tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
@@ -183,43 +183,43 @@ build_wasms = ['holochain_wasm_test_utils/build']
 only_check_wasms = ['holochain_wasm_test_utils/only_check']
 
 # Enables at-rest encryption of the SQLite database.
-# Incompatible with "no-deps".
-db-encryption = [
+# Incompatible with "sqlite".
+sqlite-encrypted = [
   "rusqlite/bundled-sqlcipher-vendored-openssl",
-  "holochain_keystore/db-encryption",
-  "holo_hash/db-encryption",
-  "holochain_cascade/db-encryption",
-  "holochain_conductor_api/db-encryption",
-  "holochain_keystore/db-encryption",
-  "holochain_p2p/db-encryption",
-  "holochain_sqlite/db-encryption",
-  "holochain_state/db-encryption",
-  "holochain_types/db-encryption",
-  "holochain_zome_types/db-encryption",
-  "kitsune_p2p/db-encryption",
-  "kitsune_p2p_types/db-encryption",
-  "kitsune_p2p_block/db-encryption",
-  "kitsune_p2p_bootstrap/db-encryption",
+  "holochain_keystore/sqlite-encrypted",
+  "holo_hash/sqlite-encrypted",
+  "holochain_cascade/sqlite-encrypted",
+  "holochain_conductor_api/sqlite-encrypted",
+  "holochain_keystore/sqlite-encrypted",
+  "holochain_p2p/sqlite-encrypted",
+  "holochain_sqlite/sqlite-encrypted",
+  "holochain_state/sqlite-encrypted",
+  "holochain_types/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p/sqlite-encrypted",
+  "kitsune_p2p_types/sqlite-encrypted",
+  "kitsune_p2p_block/sqlite-encrypted",
+  "kitsune_p2p_bootstrap/sqlite-encrypted",
 ]
 
 # Compile SQLite from source rather than depending on a library.
-# Incompatible with "db-encryption"
-no-deps = [
+# Incompatible with "sqlite-encrypted"
+sqlite = [
   "rusqlite/bundled",
-  "holochain_keystore/no-deps",
-  "holo_hash/no-deps",
-  "holochain_cascade/no-deps",
-  "holochain_conductor_api/no-deps",
-  "holochain_keystore/no-deps",
-  "holochain_p2p/no-deps",
-  "holochain_sqlite/no-deps",
-  "holochain_state/no-deps",
-  "holochain_types/no-deps",
-  "holochain_zome_types/no-deps",
-  "kitsune_p2p/no-deps",
-  "kitsune_p2p_types/no-deps",
-  "kitsune_p2p_block/no-deps",
-  "kitsune_p2p_bootstrap/no-deps",
+  "holochain_keystore/sqlite",
+  "holo_hash/sqlite",
+  "holochain_cascade/sqlite",
+  "holochain_conductor_api/sqlite",
+  "holochain_keystore/sqlite",
+  "holochain_p2p/sqlite",
+  "holochain_sqlite/sqlite",
+  "holochain_state/sqlite",
+  "holochain_types/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p/sqlite",
+  "kitsune_p2p_types/sqlite",
+  "kitsune_p2p_block/sqlite",
+  "kitsune_p2p_bootstrap/sqlite",
 ]
 
 # Extremely verbose wasm memory read/write logging

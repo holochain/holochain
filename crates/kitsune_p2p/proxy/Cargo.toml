@@ -38,12 +38,12 @@ name = "thru"
 harness = false
 
 [features]
-db-encryption = [
-    "kitsune_p2p_types/db-encryption",
-    "kitsune_p2p_transport_quic/db-encryption",
+sqlite-encrypted = [
+    "kitsune_p2p_types/sqlite-encrypted",
+    "kitsune_p2p_transport_quic/sqlite-encrypted",
 ]
-no-deps = [
-    "kitsune_p2p_types/no-deps",
-    "kitsune_p2p_transport_quic/no-deps",
+sqlite = [
+    "kitsune_p2p_types/sqlite",
+    "kitsune_p2p_transport_quic/sqlite",
 ]
 

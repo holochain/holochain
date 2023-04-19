@@ -40,7 +40,7 @@ full = [
     "fixturators",
     "hashing",
     "encoding",
-    "no-deps"
+    "sqlite"
 ]
 
 fixturators = ["fixt", "rand", "hashing", "encoding"]
@@ -49,13 +49,13 @@ serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]
 encoding = ["base64", "blake2b_simd", "derive_more"]
 test_utils = ["fixturators"]
 
-db-encryption = [
+sqlite-encrypted = [
     "rusqlite",
     "rusqlite/bundled-sqlcipher-vendored-openssl",
-    "kitsune_p2p_dht_arc/db-encryption",
+    "kitsune_p2p_dht_arc/sqlite-encrypted",
 ]
-no-deps = [
+sqlite = [
     "rusqlite",
     "rusqlite/bundled",
-    "kitsune_p2p_dht_arc/no-deps",
+    "kitsune_p2p_dht_arc/sqlite",
 ]

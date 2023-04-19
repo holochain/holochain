@@ -72,23 +72,23 @@ pretty_assertions = "0.7.2"
 sqlformat = "0.1.6"
 
 [features]
-default = [ "test_utils", "no-deps" ]
+default = [ "test_utils", "sqlite" ]
 
 test_utils = [ ]
 
 # Use at-rest encryption of databases
-db-encryption = [
+sqlite-encrypted = [
   "rusqlite/bundled-sqlcipher-vendored-openssl",
-  "holo_hash/db-encryption",
-  "holochain_zome_types/db-encryption",
-  "kitsune_p2p/db-encryption",
+  "holo_hash/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p/sqlite-encrypted",
 ]
 
 # Compile SQLite from source rather than depending on a library
-no-deps = [
+sqlite = [
   "rusqlite/bundled",
-  "holo_hash/no-deps",
-  "holochain_zome_types/no-deps",
-  "kitsune_p2p/no-deps",
+  "holo_hash/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p/sqlite",
   "r2d2_sqlite/bundled",
 ]

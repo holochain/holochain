@@ -17,11 +17,11 @@ serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 
 [features]
-db-encryption = [
-    "kitsune_p2p_timestamp/db-encryption",
-    "kitsune_p2p_bin_data/db-encryption"
+sqlite-encrypted = [
+    "kitsune_p2p_timestamp/sqlite-encrypted",
+    "kitsune_p2p_bin_data/sqlite-encrypted"
 ]
-no-deps = [
-    "kitsune_p2p_timestamp/no-deps",
-    "kitsune_p2p_bin_data/no-deps"
+sqlite = [
+    "kitsune_p2p_timestamp/sqlite",
+    "kitsune_p2p_bin_data/sqlite"
 ]

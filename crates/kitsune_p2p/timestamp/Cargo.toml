@@ -35,5 +35,5 @@ now = ["chrono"]
 
 full = ["now"]
 
-db-encryption = [ "rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl" ]
-no-deps = [ "rusqlite", "rusqlite/bundled" ]
+sqlite-encrypted = [ "rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl" ]
+sqlite = [ "rusqlite", "rusqlite/bundled" ]

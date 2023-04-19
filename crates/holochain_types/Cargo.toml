@@ -88,19 +88,19 @@ test_utils = [
   "holochain_zome_types/test_utils",
 ]
 
-db-encryption = [
+sqlite-encrypted = [
   "rusqlite/bundled-sqlcipher-vendored-openssl",
-  "holo_hash/db-encryption",
-  "holochain_keystore/db-encryption",
-  "holochain_sqlite/db-encryption",
-  "holochain_zome_types/db-encryption",
-  "kitsune_p2p_dht/db-encryption",
+  "holo_hash/sqlite-encrypted",
+  "holochain_keystore/sqlite-encrypted",
+  "holochain_sqlite/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p_dht/sqlite-encrypted",
 ]
-no-deps = [
+sqlite = [
   "rusqlite/bundled",
-  "holo_hash/no-deps",
-  "holochain_keystore/no-deps",
-  "holochain_sqlite/no-deps",
-  "holochain_zome_types/no-deps",
-  "kitsune_p2p_dht/no-deps",
+  "holo_hash/sqlite",
+  "holochain_keystore/sqlite",
+  "holochain_sqlite/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p_dht/sqlite",
 ]
