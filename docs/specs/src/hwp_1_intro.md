@@ -201,11 +201,7 @@ self-proving data of various types:
   retrieving data it's possible to have deterministic confidence
   that it hasn't been tampered with by whoever was storing it.
 
--   Monotonicity: The system is structured to be both structurally
-   and logically, monotonic, i.e. that there is a single direction of change.  We use
-   monotnicity to ensure that all state changes are non-repudiable
-   and that once something has happened (i.e. there has been a state change) it won't 
-   subsequently appear to have never happened.   \[TODO: ACB REVIEW\]
+-   Monotonicity: The system is both structurally and logically, monotonic. Structurally, local state is append-only and shared state can only grow. Data can be marked as deleted, but it is never actually removed from the state history. Logically, once a state change has been validated, it should never be able to become invalid.
 
 -   Common Genesis: The Validation Rules and joining criteria of an
   application are the first entry in every chain. This
