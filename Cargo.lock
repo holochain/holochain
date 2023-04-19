@@ -2447,7 +2447,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2549,7 +2549,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2584,7 +2584,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "anyhow",
  "futures",
@@ -2597,7 +2597,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.2.0-beta-rc.3"
+version = "0.2.0-beta-rc.4"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
@@ -2621,7 +2621,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.2.0-beta-rc.3"
+version = "0.2.0-beta-rc.4"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2650,7 +2650,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "derive_more",
  "directories",
@@ -2742,7 +2742,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2871,7 +2871,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2949,7 +2949,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3024,7 +3024,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "holochain_types",
  "holochain_util",
