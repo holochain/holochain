@@ -104,7 +104,7 @@ contrafact = "0.1.0-dev.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
 ed25519-dalek = "1"
 isotest = "0"
-kitsune_p2p_bootstrap = { path = "../kitsune_p2p/bootstrap" }
+kitsune_p2p_bootstrap = { path = "../kitsune_p2p/bootstrap", featues = ["sqlite"] }
 maplit = "1"
 pretty_assertions = "0.6.1"
 rand_dalek = {package = "rand", version = "0.7"}
@@ -192,7 +192,6 @@ sqlite-encrypted = [
   "holochain_zome_types/sqlite-encrypted",
   "kitsune_p2p/sqlite-encrypted",
   "kitsune_p2p_types/sqlite-encrypted",
-  "kitsune_p2p_bootstrap/sqlite-encrypted",
 ]
 db-encryption = ["sqlite-encrypted"]
 
@@ -212,7 +211,6 @@ sqlite = [
   "holochain_zome_types/sqlite",
   "kitsune_p2p/sqlite",
   "kitsune_p2p_types/sqlite",
-  "kitsune_p2p_bootstrap/sqlite",
 ]
 no-deps = ["sqlite"]
 
