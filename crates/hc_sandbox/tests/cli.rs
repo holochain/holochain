@@ -147,7 +147,7 @@ async fn generate_sandbox_and_connect() {
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     // - Make a call to list app info to the port
     call_app_interface(port).await;
 }
@@ -182,7 +182,7 @@ async fn generate_sandbox_and_call_list_dna() {
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     // - Make a call to list app info to the port
     call_app_interface(app_port).await;
 
@@ -204,7 +204,7 @@ async fn generate_sandbox_and_call_list_dna() {
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(6)).await;
 }
 
 fn get_hc_command() -> Command {
