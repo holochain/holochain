@@ -10,12 +10,6 @@ keywords = [ "holochain", "holo", "nacl", "libsodium", "cryptography" ]
 categories = [ "cryptography" ]
 edition = "2021"
 
-[features]
-default = [ "no-deps" ]
-
-db-encryption = [ "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl" ]
-no-deps = [ "lair_keystore/rusqlite-bundled" ]
-
 [dependencies]
 base64 = "0.13.0"
 futures = "0.3.23"
@@ -35,11 +29,19 @@ thiserror = "1.0.22"
 tokio = { version = "1.11", features = [ "full" ] }
 tracing = "0.1"
 
-# This is a redundant dependency.
-# It's included only to set the proper feature flag for database encryption.
-holochain_sqlite = { version = "^0.2.0-beta-rc.4", path = "../holochain_sqlite" }
-
 [dev-dependencies]
 assert_cmd = "2.0.4"
 serde_yaml = "0.9.10"
 tempdir = "0.3.7"
+
+[features]
+default = [ "sqlite" ]
+
+sqlite-encrypted = [
+    "holo_hash/sqlite-encrypted",
+    "lair_keystore/rusqlite-bundled-sqlcipher-vendored-openssl",
+]
+sqlite = [
+    "holo_hash/sqlite",
+    "lair_keystore/rusqlite-bundled",
+]

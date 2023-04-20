@@ -10,14 +10,6 @@ keywords = ["holochain", "holo", "integrity"]
 categories = ["cryptography"]
 edition = "2021"
 
-[features]
-default = []
-trace = ["tracing", "tracing-core", "holochain_integrity_types/tracing"]
-mock = ["hdk_derive/mock", "mockall"]
-test_utils = [
-    "holochain_integrity_types/test_utils"
-]
-
 [dependencies]
 hdk_derive = { version = "^0.2.0-beta-rc.3", path = "../hdk_derive" }
 holo_hash = { version = "^0.2.0-beta-rc.3", path = "../holo_hash" }
@@ -33,9 +25,16 @@ tracing = { version = "0.1", optional = true }
 tracing-core = { version = "0.1", optional = true }
 mockall = { version = "0.11.3", optional = true }
 
-
 [dev-dependencies]
 fixt = { path = "../fixt" }
 test-case = "2.1"
 arbitrary = { version = "1.0", features = ["derive"] }
 subtle-encoding = "0.5"
+
+[features]
+default = []
+trace = ["tracing", "tracing-core", "holochain_integrity_types/tracing"]
+mock = ["hdk_derive/mock", "mockall"]
+test_utils = [
+    "holochain_integrity_types/test_utils"
+]

@@ -3,9 +3,9 @@ name = "holochain_cli_sandbox"
 version = "0.2.0-beta-rc.4"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_sandbox"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo" ]
-categories = [ "command-line-utilities", "development-tools::build-utils", "filesystem" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo"]
+categories = ["command-line-utilities", "development-tools::build-utils", "filesystem"]
 edition = "2021"
 license = "Apache-2.0"
 description = "A library and CLI to help create, run and interact with sandboxed Holochain conductor environments, for testing and development purposes."
@@ -19,18 +19,18 @@ anyhow = "1.0"
 ansi_term = "0.12"
 chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 futures = "0.3"
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.2.0-beta-rc.5"}
-holochain_types = { path = "../holochain_types", version = "^0.2.0-beta-rc.5"}
-holochain_websocket = { path = "../holochain_websocket", version = "^0.2.0-beta-rc.1"}
-holochain_p2p = { path = "../holochain_p2p", version = "^0.2.0-beta-rc.5"}
-holochain_util = { version = "^0.2.0-beta-rc.0", path = "../holochain_util", features = [ "pw" ] }
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.2.0-beta-rc.5", features = ["sqlite"] }
+holochain_types = { path = "../holochain_types", version = "^0.2.0-beta-rc.5", features = ["sqlite"] }
+holochain_websocket = { path = "../holochain_websocket", version = "^0.2.0-beta-rc.1" }
+holochain_p2p = { path = "../holochain_p2p", version = "^0.2.0-beta-rc.5", features = ["sqlite"] }
+holochain_util = { version = "^0.2.0-beta-rc.0", path = "../holochain_util", features = ["pw"] }
 nanoid = "0.3"
 holochain_trace = { version = "^0.2.0-beta-rc.1", path = "../holochain_trace" }
 once_cell = "1.13.0"
-serde = { version = "1.0", features = [ "derive" ] }
+serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 sodoken = "=0.0.7"
-tokio = { version = "1.11", features = [ "full" ] }
+tokio = { version = "1.11", features = ["full"] }
 structopt = "0.3"
 tracing = "0.1"
 url2 = "0.0.6"

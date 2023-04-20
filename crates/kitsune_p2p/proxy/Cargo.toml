@@ -36,3 +36,14 @@ crossterm = "0.19"
 [[bench]]
 name = "thru"
 harness = false
+
+[features]
+sqlite-encrypted = [
+    "kitsune_p2p_types/sqlite-encrypted",
+    "kitsune_p2p_transport_quic/sqlite-encrypted",
+]
+sqlite = [
+    "kitsune_p2p_types/sqlite",
+    "kitsune_p2p_transport_quic/sqlite",
+]
+

@@ -30,3 +30,24 @@ holochain_keystore = { version = "^0.2.0-beta-rc.4", path = "../holochain_keysto
 [dev-dependencies]
 matches = {version = "0.1.8"}
 holochain_trace = { version = "^0.2.0-beta-rc.1", path = "../holochain_trace" }
+
+[features]
+sqlite-encrypted = [
+    "holo_hash/sqlite-encrypted",
+    "kitsune_p2p/sqlite-encrypted",
+    "holochain_p2p/sqlite-encrypted",
+    "holochain_state/sqlite-encrypted",
+    "holochain_types/sqlite-encrypted",
+    "holochain_zome_types/sqlite-encrypted",
+    "holochain_keystore/sqlite-encrypted",
+]
+sqlite = [
+    "holo_hash/sqlite",
+    "kitsune_p2p/sqlite",
+    "holochain_p2p/sqlite",
+    "holochain_state/sqlite",
+    "holochain_types/sqlite",
+    "holochain_zome_types/sqlite",
+    "holochain_keystore/sqlite",
+]
+

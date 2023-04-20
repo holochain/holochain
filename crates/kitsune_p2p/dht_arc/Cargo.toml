@@ -28,6 +28,13 @@ statrs = "0.15"
 tracing = "0.1"
 
 [features]
-sqlite = ["rusqlite"]
+sqlite-encrypted = [
+    "rusqlite",
+    "rusqlite/bundled-sqlcipher-vendored-openssl",
+]
+sqlite = [
+    "rusqlite",
+    "rusqlite/bundled",
+]
 slow_tests = []
 test_utils = []

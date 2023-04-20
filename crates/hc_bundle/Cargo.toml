@@ -39,3 +39,11 @@ tempfile = "3"
 serde_json = "1.0"
 jsonschema = "0.17"
 walkdir = "2"
+
+[features]
+sqlite-encrypted = [
+    "holochain_types/sqlite-encrypted",
+]
+sqlite = [
+    "holochain_types/sqlite",
+]
