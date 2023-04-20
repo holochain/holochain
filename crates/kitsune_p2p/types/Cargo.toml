@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_types"
-version = "0.2.0-beta-rc.3"
+version = "0.2.0-beta-rc.4"
 description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -16,10 +16,10 @@ base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.5"
-kitsune_p2p_dht = { version = "^0.2.0-beta-rc.1", path = "../dht" }
-kitsune_p2p_dht_arc = { version = "^0.2.0-beta-rc.1", path = "../dht_arc" }
-kitsune_p2p_bin_data = { version = "^0.2.0-beta-rc.1", path = "../bin_data" }
-kitsune_p2p_block = { version = "^0.2.0-beta-rc.2", path = "../block" }
+kitsune_p2p_dht = { version = "^0.2.0-beta-rc.2", path = "../dht" }
+kitsune_p2p_dht_arc = { version = "^0.2.0-beta-rc.2", path = "../dht_arc" }
+kitsune_p2p_bin_data = { version = "^0.2.0-beta-rc.2", path = "../bin_data" }
+kitsune_p2p_block = { version = "^0.2.0-beta-rc.3", path = "../block" }
 lru = "0.8.1"
 mockall = { version = "0.11.3", optional = true }
 nanoid = "0.3"
@@ -45,7 +45,7 @@ webpki = "0.22.0"
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 
 [dev-dependencies]
-kitsune_p2p_types = {path = ".", features = ["test_utils"]}
+kitsune_p2p_types = {path = ".", features = ["test_utils", "sqlite"]}
 criterion = "0.3.4"
 tracing-subscriber = "0.3.16"
 
@@ -65,3 +65,16 @@ test_utils = [
 ]
 
 tx2 = []
+
+sqlite-encrypted = [
+  "kitsune_p2p_dht/sqlite-encrypted",
+  "kitsune_p2p_dht_arc/sqlite-encrypted",
+  "kitsune_p2p_bin_data/sqlite-encrypted",
+  "kitsune_p2p_block/sqlite-encrypted",
+]
+sqlite = [
+  "kitsune_p2p_dht/sqlite",
+  "kitsune_p2p_dht_arc/sqlite",
+  "kitsune_p2p_bin_data/sqlite",
+  "kitsune_p2p_block/sqlite",
+]

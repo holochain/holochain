@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_timestamp"
-version = "0.2.0-beta-rc.0"
+version = "0.2.0-beta-rc.1"
 description = "Microsecond-precision timestamp datatype for kitsune_p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -33,4 +33,7 @@ serde_yaml = "0.9"
 default = ["chrono"]
 now = ["chrono"]
 
-full = ["now", "rusqlite"]
+full = ["now"]
+
+sqlite-encrypted = [ "rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl" ]
+sqlite = [ "rusqlite", "rusqlite/bundled" ]
