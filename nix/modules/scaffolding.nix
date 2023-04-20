@@ -21,7 +21,7 @@
 
         buildInputs =
           (with pkgs; [
-            openssl
+            openssl sqlite
           ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
             (with pkgs.darwin.apple_sdk_11_0.frameworks; [
