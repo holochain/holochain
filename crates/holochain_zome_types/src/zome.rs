@@ -134,6 +134,7 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 }
 
 /// A zome defined by Wasm bytecode
+// TODO: move to `holochain_types`
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "test_utils", derive(arbitrary::Arbitrary))]
@@ -161,6 +162,7 @@ pub struct WasmZome {
 /// again.
 ///
 /// In particular, a real-world DnaFile should only ever contain Wasm zomes!
+// TODO: move to `holochain_types`
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 // This can be untagged, since the only valid serialization target is WasmZome
 #[serde(untagged, into = "ZomeDefSerialized")]
