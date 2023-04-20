@@ -114,8 +114,12 @@
             ${disabledTestsArg} \
           '';
 
+          cargoNextestExtraArgs = builtins.getEnv "NEXTEST_EXTRA_ARGS";
+
           dontPatchELF = true;
           dontFixup = true;
+
+          nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ holochain ];
 
           installPhase = ''
             mkdir -p $out
