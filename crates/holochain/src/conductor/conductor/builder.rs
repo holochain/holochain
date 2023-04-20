@@ -58,7 +58,7 @@ impl ConductorBuilder {
             keystore
         } else {
             pub(crate) fn warn_no_encryption() {
-                #[cfg(not(feature = "db-encryption"))]
+                #[cfg(not(feature = "sqlite-encrypted"))]
                 {
                     const MSG: &str = "WARNING: running without local db encryption";
                     eprintln!("{}", MSG);

@@ -104,7 +104,7 @@ contrafact = "0.1.0-dev.1"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
 ed25519-dalek = "1"
 isotest = "0"
-kitsune_p2p_bootstrap = { path = "../kitsune_p2p/bootstrap" }
+kitsune_p2p_bootstrap = { path = "../kitsune_p2p/bootstrap", featues = ["sqlite"] }
 maplit = "1"
 pretty_assertions = "0.6.1"
 rand_dalek = {package = "rand", version = "0.7"}
@@ -177,12 +177,42 @@ build_wasms = ['holochain_wasm_test_utils/build']
 only_check_wasms = ['holochain_wasm_test_utils/only_check']
 
 # Enables at-rest encryption of the SQLite database.
-# Incompatible with "no-deps".
-db-encryption = [ "holochain_keystore/db-encryption", "holochain_sqlite/db-encryption" ]
+# Incompatible with "sqlite".
+sqlite-encrypted = [
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "holochain_keystore/sqlite-encrypted",
+  "holo_hash/sqlite-encrypted",
+  "holochain_cascade/sqlite-encrypted",
+  "holochain_conductor_api/sqlite-encrypted",
+  "holochain_keystore/sqlite-encrypted",
+  "holochain_p2p/sqlite-encrypted",
+  "holochain_sqlite/db-encryption",
+  "holochain_state/sqlite-encrypted",
+  "holochain_types/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p/sqlite-encrypted",
+  "kitsune_p2p_types/sqlite-encrypted",
+]
+db-encryption = ["sqlite-encrypted"]
 
 # Compile SQLite from source rather than depending on a library.
-# Incompatible with "db-encryption"
-no-deps = [ "holochain_keystore/no-deps", "holochain_sqlite/no-deps" ]
+# Incompatible with "sqlite-encrypted"
+sqlite = [
+  "rusqlite/bundled",
+  "holochain_keystore/sqlite",
+  "holo_hash/sqlite",
+  "holochain_cascade/sqlite",
+  "holochain_conductor_api/sqlite",
+  "holochain_keystore/sqlite",
+  "holochain_p2p/sqlite",
+  "holochain_sqlite/no-deps",
+  "holochain_state/sqlite",
+  "holochain_types/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p/sqlite",
+  "kitsune_p2p_types/sqlite",
+]
+no-deps = ["sqlite"]
 
 # Extremely verbose wasm memory read/write logging
 wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]

@@ -61,7 +61,7 @@ default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
 # but used in Holochain
 full-dna-def = ["derive_builder", "kitsune_p2p_dht", "nanoid", "shrinkwraprs"]
 
-full = ["default", "rusqlite", "num_enum", "kitsune_p2p_timestamp/full", "properties"]
+full = ["default", "sqlite", "num_enum", "kitsune_p2p_timestamp/full", "properties"]
 
 fixturators = ["fixt", "rand", "strum", "holo_hash/fixturators", "holochain_integrity_types/test_utils", "full-dna-def"]
 
@@ -73,11 +73,25 @@ test_utils = [
   "once_cell",
   "kitsune_p2p_timestamp/arbitrary",
   "kitsune_p2p_timestamp/now",
-  "kitsune_p2p_timestamp/rusqlite",
   "holo_hash/arbitrary",
   "holo_hash/hashing",
   "holo_hash/test_utils",
   "holochain_serialized_bytes/arbitrary",
   "full-dna-def",
   "holochain_integrity_types/test_utils",
+]
+
+sqlite-encrypted = [
+  "rusqlite",
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "holo_hash/sqlite-encrypted",
+  "kitsune_p2p_dht/sqlite-encrypted",
+  "kitsune_p2p_timestamp/sqlite-encrypted",
+]
+sqlite = [
+  "rusqlite",
+  "rusqlite/bundled",
+  "holo_hash/sqlite",
+  "kitsune_p2p_dht/sqlite",
+  "kitsune_p2p_timestamp/sqlite",
 ]

@@ -26,7 +26,7 @@ tracing = "0.1.29"
 linked-hash-map = "0.5.6"
 
 [dev-dependencies]
-kitsune_p2p_fetch = { path = ".", features = ["test_utils"]}
+kitsune_p2p_fetch = { path = ".", features = ["test_utils", "sqlite"]}
 holochain_serialized_bytes = "0.0.51"
 observability = "0.1"
 pretty_assertions = "0.7.2"
@@ -36,3 +36,11 @@ tokio = { version = "1.11", features = [ "full", "test-util" ] }
 [features]
 test_utils = []
 default = ["test_utils"]
+sqlite-encrypted = [
+    "kitsune_p2p_timestamp/sqlite-encrypted",
+    "kitsune_p2p_types/sqlite-encrypted",
+]
+sqlite = [
+    "kitsune_p2p_timestamp/sqlite",
+    "kitsune_p2p_types/sqlite",
+]
