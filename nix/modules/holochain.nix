@@ -27,7 +27,7 @@
         OPENSSL_LIB_DIR = "${opensslStatic.out}/lib";
         OPENSSL_INCLUDE_DIR = "${opensslStatic.dev}/include";
 
-        buildInputs = (with pkgs; [ openssl opensslStatic sqlcipher sqlite ])
+        buildInputs = (with pkgs; [ openssl opensslStatic sqlcipher ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
@@ -37,7 +37,7 @@
             IOKit
           ]));
 
-        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config go ])
+        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config go sqlite ])
           ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
       };
