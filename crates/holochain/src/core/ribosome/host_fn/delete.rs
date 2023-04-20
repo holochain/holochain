@@ -71,7 +71,7 @@ pub(crate) fn get_original_entry_data(
     let workspace = call_context.host_context.workspace();
 
     tokio_helper::block_forever_on(async move {
-        let mut cascade = Cascade::from_workspace_and_network(&workspace, network);
+        let cascade = Cascade::from_workspace_and_network(&workspace, network);
         let maybe_original_record: Option<SignedActionHashed> = cascade
             .get_details(address.clone().into(), GetOptions::content())
             .await?
@@ -113,7 +113,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_entry_test<'a>() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Crd).await;

@@ -774,7 +774,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_response() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let (handle, mut listener) = WebsocketListener::bind_with_handle(
             url2!("ws://127.0.0.1:0"),
             Arc::new(WebsocketConfig::default()),

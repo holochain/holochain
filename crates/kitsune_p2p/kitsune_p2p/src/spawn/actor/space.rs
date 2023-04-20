@@ -46,6 +46,8 @@ ghost_actor::ghost_chan! {
         /// Update / publish a single agent info
         fn publish_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
 
+        fn get_all_local_joined_agent_infos() -> Vec<AgentInfoSigned>;
+
         /// see if an agent is locally joined
         fn is_agent_local(agent: KAgent) -> bool;
 
@@ -160,7 +162,7 @@ impl SpaceInternalHandler for Space {
         _basis: Arc<KitsuneBasis>,
     ) -> SpaceInternalHandlerResult<HashSet<Arc<KitsuneAgent>>> {
         let mut res: HashSet<Arc<KitsuneAgent>> =
-            self.local_joined_agents.iter().cloned().collect();
+            self.local_joined_agents.keys().cloned().collect();
         let all_peers_fut = self
             .evt_sender
             .query_agents(QueryAgentsEvt::new(self.space.clone()));
@@ -179,7 +181,7 @@ impl SpaceInternalHandler for Space {
         let mut mdns_handles = self.mdns_handles.clone();
         let network_type = self.config.network_type.clone();
         let mut agent_list = Vec::with_capacity(self.local_joined_agents.len());
-        for agent in self.local_joined_agents.iter().cloned() {
+        for agent in self.local_joined_agents.keys().cloned() {
             let arc = self.get_agent_arc(&agent);
             agent_list.push((agent, arc));
         }
@@ -282,33 +284,56 @@ impl SpaceInternalHandler for Space {
         input: PutAgentInfoSignedEvt,
     ) -> SpaceInternalHandlerResult<()> {
         let timeout = self.config.tuning_params.implicit_timeout();
-        let tasks: Vec<_> = input
+        let tasks: Result<Vec<_>, _> = input
             .peer_data
-            .into_iter()
+            .iter()
             .map(|agent_info| {
                 self.handle_broadcast(
                     self.space.clone(),
                     Arc::new(KitsuneBasis::new(agent_info.agent.0.clone())),
                     timeout,
-                    BroadcastData::AgentInfo(agent_info),
+                    BroadcastData::AgentInfo(agent_info.clone()),
                 )
             })
             .collect();
+        let ep_hnd = self.ro_inner.ep_hnd.clone();
         Ok(async move {
-            for f in tasks {
-                f?.await?;
-            }
+            futures::future::join(
+                ep_hnd.broadcast(
+                    &wire::Wire::PeerUnsolicited(crate::wire::PeerUnsolicited {
+                        peer_list: input.peer_data,
+                    }),
+                    timeout,
+                ),
+                futures::future::join_all(tasks?),
+            )
+            .await
+            .0?;
             Ok(())
         }
         .boxed()
         .into())
     }
 
+    fn handle_get_all_local_joined_agent_infos(
+        &mut self,
+    ) -> SpaceInternalHandlerResult<Vec<AgentInfoSigned>> {
+        let agent_infos: Vec<AgentInfoSigned> = self
+            .local_joined_agents
+            .values()
+            .into_iter()
+            .filter_map(|maybe_agent_info| maybe_agent_info.as_ref())
+            .cloned()
+            .collect();
+
+        Ok(async move { Ok(agent_infos) }.boxed().into())
+    }
+
     fn handle_is_agent_local(
         &mut self,
         agent: Arc<KitsuneAgent>,
     ) -> SpaceInternalHandlerResult<bool> {
-        let res = self.local_joined_agents.contains(&agent);
+        let res = self.local_joined_agents.contains_key(&agent);
         Ok(async move { Ok(res) }.boxed().into())
     }
 
@@ -337,7 +362,7 @@ impl SpaceInternalHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match &data {
             BroadcastData::User(data) => {
-                for agent in self.local_joined_agents.iter() {
+                for agent in self.local_joined_agents.keys() {
                     if let Some(arc) = self.agent_arcs.get(agent) {
                         if arc.contains(basis.get_loc()) {
                             let fut =
@@ -764,13 +789,15 @@ impl KitsuneP2pHandler for Space {
         &mut self,
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<DhtArc>,
     ) -> KitsuneP2pHandlerResult<()> {
         tracing::debug!(?space, ?agent, ?initial_arc, "handle_join");
         if let Some(initial_arc) = initial_arc {
             self.agent_arcs.insert(agent.clone(), initial_arc);
         }
-        self.local_joined_agents.insert(agent.clone());
+        self.local_joined_agents
+            .insert(agent.clone(), maybe_agent_info);
         for module in self.gossip_mod.values() {
             module.local_agent_join(agent.clone());
         }
@@ -916,10 +943,10 @@ impl KitsuneP2pHandler for Space {
         let location = input.basis.get_loc();
         let local_agents_holding_basis = self
             .local_joined_agents
-            .iter()
-            .filter(|agent| {
+            .keys()
+            .filter(|agent_key| {
                 self.agent_arcs
-                    .get(*agent)
+                    .get(*agent_key)
                     .map_or(false, |arc| arc.contains(location))
             })
             .cloned()
@@ -944,12 +971,14 @@ impl KitsuneP2pHandler for Space {
         let mut local_agent_info_events = Vec::new();
         match &data {
             BroadcastData::User(data) => {
-                for agent in self.local_joined_agents.iter() {
-                    if let Some(arc) = self.agent_arcs.get(agent) {
+                for (agent_key, _agent_info) in self.local_joined_agents.iter() {
+                    if let Some(arc) = self.agent_arcs.get(agent_key) {
                         if arc.contains(basis.get_loc()) {
-                            let fut =
-                                self.evt_sender
-                                    .notify(space.clone(), agent.clone(), data.clone());
+                            let fut = self.evt_sender.notify(
+                                space.clone(),
+                                agent_key.clone(),
+                                data.clone(),
+                            );
                             local_notify_events.push(async move {
                                 if let Err(err) = fut.await {
                                     tracing::warn!(?err, "failed local broadcast");
@@ -1220,6 +1249,11 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
+    fn handle_dump_network_stats(&mut self) -> KitsuneP2pHandlerResult<serde_json::Value> {
+        // call handled by parent actor and never delegated to spaces
+        unreachable!()
+    }
+
     fn handle_get_diagnostics(
         &mut self,
         _space: KSpace,
@@ -1314,7 +1348,7 @@ pub(crate) struct Space {
     pub(crate) i_s: ghost_actor::GhostSender<SpaceInternal>,
     pub(crate) evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     pub(crate) host_api: HostApi,
-    pub(crate) local_joined_agents: HashSet<Arc<KitsuneAgent>>,
+    pub(crate) local_joined_agents: HashMap<Arc<KitsuneAgent>, Option<AgentInfoSigned>>,
     pub(crate) agent_arcs: HashMap<Arc<KitsuneAgent>, DhtArc>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
@@ -1515,7 +1549,7 @@ impl Space {
             i_s,
             evt_sender,
             host_api,
-            local_joined_agents: HashSet::new(),
+            local_joined_agents: HashMap::new(),
             agent_arcs: HashMap::new(),
             config,
             mdns_handles: HashMap::new(),

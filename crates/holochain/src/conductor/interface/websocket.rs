@@ -223,7 +223,7 @@ where
 
 /// Test items needed by other crates
 #[cfg(any(test, feature = "test_utils"))]
-pub use crate::test_utils::setup_app;
+pub use crate::test_utils::setup_app_in_new_conductor;
 
 #[cfg(test)]
 pub mod test {
@@ -238,12 +238,14 @@ pub mod test {
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
     use crate::test_utils::conductor_setup::ConductorTestData;
+    use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
     use holochain_sqlite::prelude::*;
     use holochain_state::prelude::test_db_dir;
+    use holochain_trace;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_zomes;
@@ -258,7 +260,6 @@ pub mod test {
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
     use matches::assert_matches;
-    use observability;
     use pretty_assertions::assert_eq;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryInto;
@@ -299,7 +300,7 @@ pub mod test {
 
         conductor_handle
             .clone()
-            .install_app("test app".to_string(), cell_data)
+            .install_app_legacy("test app".to_string(), cell_data)
             .await
             .unwrap();
 
@@ -381,7 +382,7 @@ pub mod test {
     #[ignore]
     #[allow(unreachable_code, unused_variables)]
     async fn invalid_request() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let dna_payload = InstallAppDnaPayload::hash_only(fake_dna_hash(1), "".to_string());
@@ -410,7 +411,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn websocket_call_zome_function() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -426,7 +427,12 @@ pub mod test {
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let (_tmpdir, _, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
+        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
+            "test app".to_string(),
+            vec![dna],
+            vec![(installed_cell, None)],
+        )
+        .await;
 
         call_zome(
             handle.clone(),
@@ -449,7 +455,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn gossip_info_request() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -462,12 +468,20 @@ pub mod test {
             .unwrap();
 
         let dna_hash = dna.dna_hash().clone();
-        let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
+        let agent_pub_key = fake_agent_pubkey_1();
+        let cell_id = CellId::from((dna_hash.clone(), agent_pub_key.clone()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
 
-        let (_tmpdir, app_api, handle) = setup_app(vec![dna], vec![(installed_cell, None)]).await;
+        let (_tmpdir, app_api, handle) = setup_app_in_new_conductor(
+            "test app".to_string(),
+            vec![dna],
+            vec![(installed_cell, None)],
+        )
+        .await;
         let request = NetworkInfoRequestPayload {
+            agent_pub_key: agent_pub_key.clone(),
             dnas: vec![dna_hash],
+            last_time_queried: None,
         };
 
         let msg = AppRequest::NetworkInfo(Box::new(request));
@@ -479,7 +493,12 @@ pub mod test {
                     assert_eq!(
                         info,
                         vec![NetworkInfo {
-                            fetch_pool_info: FetchPoolInfo::default()
+                            fetch_pool_info: FetchPoolInfo::default(),
+                            current_number_of_peers: 1,
+                            arc_size: 1.0,
+                            total_network_peers: 1,
+                            bytes_since_last_time_queried: 1844,
+                            completed_rounds_since_last_time_queried: 0,
                         }]
                     )
                 }
@@ -497,8 +516,108 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn storage_info() {
+        holochain_trace::test_run().ok();
+        let uuid_1 = Uuid::new_v4();
+        let dna_1 = fake_dna_zomes(
+            &uuid_1.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+        let uuid_2 = Uuid::new_v4();
+        let dna_2 = fake_dna_zomes(
+            &uuid_2.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+
+        // warm the zome
+        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+
+        let cell_id_1 = CellId::from((dna_1.dna_hash().clone(), fake_agent_pubkey_1()));
+        let installed_cell_1 = InstalledCell::new(cell_id_1.clone(), "handle_1".into());
+
+        let cell_id_2 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_1()));
+        let installed_cell_2 = InstalledCell::new(cell_id_2.clone(), "handle_2".into());
+
+        // Run the same DNA in cell 3 to check that grouping works correctly
+        let cell_id_3 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_2()));
+        let installed_cell_3 = InstalledCell::new(cell_id_3.clone(), "handle_3".into());
+
+        let (_tmpdir, _, handle) = setup_app_in_new_conductor(
+            "test app 1".to_string(),
+            vec![dna_1],
+            vec![(installed_cell_1, None)],
+        )
+        .await;
+
+        install_app_in_conductor(
+            handle.clone(),
+            "test app 2".to_string(),
+            vec![dna_2.clone()],
+            vec![(installed_cell_2, None)],
+        )
+        .await;
+
+        install_app_in_conductor(
+            handle.clone(),
+            "test app 3".to_string(),
+            vec![dna_2.clone()],
+            vec![(installed_cell_3, None)],
+        )
+        .await;
+
+        let msg = AdminRequest::StorageInfo;
+        let msg = msg.try_into().unwrap();
+        let respond = move |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            match response {
+                AdminResponse::StorageInfo(info) => {
+                    assert_eq!(info.blobs.len(), 2);
+
+                    let blob_one: &DnaStorageInfo =
+                        get_app_data_storage_info(&info, "test app 1".to_string());
+
+                    assert_eq!(blob_one.used_by, vec!["test app 1".to_string()]);
+                    assert!(blob_one.authored_data_size > 12000);
+                    assert!(blob_one.authored_data_size_on_disk > 114000);
+                    assert!(blob_one.dht_data_size > 12000);
+                    assert!(blob_one.dht_data_size_on_disk > 114000);
+                    assert!(blob_one.cache_data_size > 7000);
+                    assert!(blob_one.cache_data_size_on_disk > 114000);
+
+                    let blob_two: &DnaStorageInfo =
+                        get_app_data_storage_info(&info, "test app 2".to_string());
+
+                    let mut used_by_two = blob_two.used_by.clone();
+                    used_by_two.sort();
+                    assert_eq!(
+                        used_by_two,
+                        vec!["test app 2".to_string(), "test app 3".to_string()]
+                    );
+                    assert!(blob_two.authored_data_size > 17000);
+                    assert!(blob_two.authored_data_size_on_disk > 114000);
+                    assert!(blob_two.dht_data_size > 17000);
+                    assert!(blob_two.dht_data_size_on_disk > 114000);
+                    assert!(blob_two.cache_data_size > 7000);
+                    assert!(blob_two.cache_data_size_on_disk > 114000);
+                }
+                other => panic!("unexpected response {:?}", other),
+            }
+            async { Ok(()) }.boxed().into()
+        };
+        let respond = Respond::Request(Box::new(respond));
+        let msg = (msg, respond);
+        handle_incoming_message(msg, RealAdminInterfaceApi::new(handle.clone()))
+            .await
+            .unwrap();
+
+        handle.shutdown().await.unwrap().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn enable_disable_enable_app() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let agent_key = fake_agent_pubkey_1();
         let mut dnas = Vec::new();
         for _i in 0..2 as u32 {
@@ -684,7 +803,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn attach_app_interface() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
@@ -702,7 +821,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dump_state() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -768,7 +887,7 @@ pub mod test {
     /// across the admin websocket.
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let test_db_dir = test_db_dir();
         let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
         let dnas = vec![
@@ -898,5 +1017,24 @@ pub mod test {
             .collect::<Vec<_>>();
         results.sort();
         results
+    }
+
+    fn get_app_data_storage_info(
+        info: &StorageInfo,
+        match_app_id: InstalledAppId,
+    ) -> &DnaStorageInfo {
+        info.blobs
+            .iter()
+            .filter_map(|blob| match blob {
+                StorageBlob::Dna(app_data) => {
+                    if app_data.used_by.contains(&match_app_id) {
+                        Some(app_data)
+                    } else {
+                        None
+                    }
+                }
+            })
+            .last()
+            .unwrap()
     }
 }

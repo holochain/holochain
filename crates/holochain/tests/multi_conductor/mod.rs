@@ -24,7 +24,7 @@ async fn test_publish() -> anyhow::Result<()> {
     use holochain::test_utils::{consistency_10s, inline_zomes::simple_create_read_zome};
     use kitsune_p2p::KitsuneP2pConfig;
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut tuning =
@@ -74,7 +74,7 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
     let config = SweetConductorConfig::standard();
@@ -129,9 +129,8 @@ async fn sharded_consistency() {
     use holochain::test_utils::{
         consistency::local_machine_session, inline_zomes::simple_create_read_zome,
     };
-    use kitsune_p2p::KitsuneP2pConfig;
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
     const NUM_CELLS: usize = 5;
 
@@ -140,17 +139,7 @@ async fn sharded_consistency() {
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
-    let mut network = KitsuneP2pConfig::default();
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    network.tuning_params = Arc::new(tuning);
-    let config = ConductorConfig {
-        network: Some(network),
-        ..Default::default()
-    };
+    let config = SweetConductorConfig::standard().tune(Arc::new(tuning));
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
@@ -195,7 +184,7 @@ async fn private_entries_dont_leak() {
     use holochain::test_utils::consistency_10s;
     use holochain_types::inline_zome::InlineZomeSet;
 
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     let mut entry_def = EntryDef::from_id("entrydef");
     entry_def.visibility = EntryVisibility::Private;
 
@@ -294,9 +283,9 @@ async fn private_entries_dont_leak() {
     .await;
 
     check_for_private_entries(alice.dht_db().clone());
-    check_for_private_entries(conductors[0].get_cache_db(alice.cell_id()).unwrap());
+    check_for_private_entries(conductors[0].get_cache_db(alice.cell_id()).await.unwrap());
     check_for_private_entries(bobbo.dht_db().clone());
-    check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).unwrap());
+    check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap());
 }
 
 fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {

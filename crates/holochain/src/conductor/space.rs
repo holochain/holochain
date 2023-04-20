@@ -3,9 +3,26 @@
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use super::{
+    conductor::RwShare,
+    error::ConductorResult,
+    p2p_agent_store::{self, P2pBatch},
+};
+use crate::conductor::{error::ConductorError, state::ConductorState};
+use crate::core::{
+    queue_consumer::QueueConsumerMap,
+    workflow::{
+        countersigning_workflow::{incoming_countersigning, CountersigningWorkspace},
+        incoming_dht_ops_workflow::{
+            incoming_dht_ops_workflow, IncomingOpHashes, IncomingOpsBatch,
+        },
+    },
+};
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::AgentPubKeyExt;
+use holochain_p2p::DnaHashExt;
 use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqBoundsSet},
@@ -34,37 +51,24 @@ use holochain_state::{
     query::{map_sql_dht_op_common, StateQueryError},
     source_chain::{SourceChain, SourceChainResult},
 };
+use holochain_types::db::AsP2pStateTxExt;
+use holochain_types::prelude::CellId;
 use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{DhtOp, DhtOpType},
 };
+use holochain_zome_types::block::Block;
+use holochain_zome_types::block::BlockTargetId;
 use holochain_zome_types::{DnaDef, Entry, EntryVisibility, SignedAction, Timestamp};
 use kitsune_p2p::{
     event::{TimeWindow, TimeWindowInclusive},
     KitsuneP2pConfig,
 };
+use kitsune_p2p_block::NodeId;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rusqlite::{named_params, OptionalExtension};
-use tracing::instrument;
-
-use crate::conductor::{error::ConductorError, state::ConductorState};
-use crate::core::{
-    queue_consumer::QueueConsumerMap,
-    workflow::{
-        countersigning_workflow::{incoming_countersigning, CountersigningWorkspace},
-        incoming_dht_ops_workflow::{
-            incoming_dht_ops_workflow, IncomingOpHashes, IncomingOpsBatch,
-        },
-    },
-};
-use holochain_zome_types::block::Block;
-use holochain_zome_types::block::BlockTargetId;
-
-use super::{
-    conductor::RwShare,
-    error::ConductorResult,
-    p2p_agent_store::{self, P2pBatch},
-};
 use std::convert::TryInto;
+use tracing::instrument;
 
 #[cfg(test)]
 mod tests;
@@ -176,13 +180,88 @@ impl Spaces {
         holochain_state::block::unblock(&self.conductor_db, input).await
     }
 
+    async fn node_agents_in_spaces(
+        &self,
+        node_id: NodeId,
+        dnas: Vec<DnaHash>,
+    ) -> DatabaseResult<Vec<CellId>> {
+        let mut agent_lists: Vec<Vec<AgentInfoSigned>> = vec![];
+        for dna in dnas {
+            // @todo join_all for these awaits
+            agent_lists.push(
+                self.p2p_agents_db(&dna)?
+                    .async_reader(|txn| txn.p2p_list_agents())
+                    .await?,
+            );
+        }
+
+        Ok(agent_lists
+            .into_iter()
+            .flatten()
+            .filter(|agent| {
+                agent.url_list.iter().any(|url| {
+                    kitsune_p2p::dependencies::kitsune_p2p_proxy::ProxyUrl::from(url.as_str())
+                        .digest()
+                        .0
+                        == node_id
+                })
+            })
+            .map(|agent_info| {
+                CellId::new(
+                    DnaHash::from_kitsune(&agent_info.space),
+                    AgentPubKey::from_kitsune(&agent_info.agent),
+                )
+            })
+            .collect())
+    }
+
     /// Check if some target is blocked.
     pub async fn is_blocked(
         &self,
-        input: BlockTargetId,
+        target_id: BlockTargetId,
         timestamp: Timestamp,
-    ) -> StateQueryResult<bool> {
-        holochain_state::block::is_blocked(&self.conductor_db, input, timestamp).await
+    ) -> DatabaseResult<bool> {
+        let cell_ids = match &target_id {
+            BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
+            BlockTargetId::NodeDna(node_id, dna_hash) => {
+                self.node_agents_in_spaces((*node_id).clone(), vec![dna_hash.clone()])
+                    .await?
+            }
+            BlockTargetId::Node(node_id) => {
+                self.node_agents_in_spaces(
+                    (*node_id).clone(),
+                    self.map
+                        .share_ref(|m| m.keys().cloned().collect::<Vec<DnaHash>>()),
+                )
+                .await?
+            }
+            // @todo
+            BlockTargetId::Ip(_) => {
+                vec![]
+            }
+        };
+
+        self.conductor_db
+            .async_reader(move |txn| {
+                Ok(
+                    // If the target_id is directly blocked then we always return true.
+                    holochain_state::block::query_is_blocked(&txn, target_id, timestamp)?
+            // If there are zero unblocked cells then return true.
+            || {
+                let mut all_blocked_cell_ids = true;
+                for cell_id in cell_ids {
+                    if !holochain_state::block::query_is_blocked(
+                        &txn,
+                        BlockTargetId::Cell(cell_id), timestamp)? {
+                            all_blocked_cell_ids = false;
+                            break;
+                        }
+                }
+                all_blocked_cell_ids
+            },
+                )
+            })
+            .await
     }
 
     /// Get the holochain conductor state
@@ -255,11 +334,11 @@ impl Spaces {
     }
 
     /// Get the space if it exists or create it if it doesn't.
-    pub fn get_or_create_space(&self, dna_hash: &DnaHash) -> ConductorResult<Space> {
+    pub fn get_or_create_space(&self, dna_hash: &DnaHash) -> DatabaseResult<Space> {
         self.get_or_create_space_ref(dna_hash, Space::clone)
     }
 
-    fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> ConductorResult<R>
+    fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> DatabaseResult<R>
     where
         F: Fn(&Space) -> R,
     {
@@ -285,27 +364,27 @@ impl Spaces {
     }
 
     /// Get the cache database (this will create the space if it doesn't already exist).
-    pub fn cache(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindCache>> {
+    pub fn cache(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindCache>> {
         self.get_or_create_space_ref(dna_hash, |space| space.cache_db.clone())
     }
 
     /// Get the authored database (this will create the space if it doesn't already exist).
-    pub fn authored_db(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindAuthored>> {
+    pub fn authored_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindAuthored>> {
         self.get_or_create_space_ref(dna_hash, |space| space.authored_db.clone())
     }
 
     /// Get the dht database (this will create the space if it doesn't already exist).
-    pub fn dht_db(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindDht>> {
+    pub fn dht_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindDht>> {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_db.clone())
     }
 
     /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_agents_db(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindP2pAgents>> {
+    pub fn p2p_agents_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pAgents>> {
         self.get_or_create_space_ref(dna_hash, |space| space.p2p_agents_db.clone())
     }
 
     /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_metrics_db(&self, dna_hash: &DnaHash) -> ConductorResult<DbWrite<DbKindP2pMetrics>> {
+    pub fn p2p_metrics_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pMetrics>> {
         self.get_or_create_space_ref(dna_hash, |space| space.p2p_metrics_db.clone())
     }
 
@@ -313,7 +392,7 @@ impl Spaces {
     pub fn p2p_batch_sender(
         &self,
         dna_hash: &DnaHash,
-    ) -> ConductorResult<tokio::sync::mpsc::Sender<P2pBatch>> {
+    ) -> DatabaseResult<tokio::sync::mpsc::Sender<P2pBatch>> {
         self.get_or_create_space_ref(dna_hash, |space| space.p2p_batch_sender.clone())
     }
 
@@ -670,8 +749,7 @@ impl Space {
         dna_hash: Arc<DnaHash>,
         root_db_dir: &DatabaseRootPath,
         db_sync_strategy: DbSyncStrategy,
-    ) -> ConductorResult<Self> {
-        use holochain_p2p::DnaHashExt;
+    ) -> DatabaseResult<Self> {
         let space = dna_hash.to_kitsune();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,

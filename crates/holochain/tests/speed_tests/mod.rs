@@ -24,7 +24,7 @@ use holochain::conductor::api::AdminResponse;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
 use holochain::conductor::api::ZomeCall;
-use holochain::test_utils::setup_app;
+use holochain::test_utils::setup_app_in_new_conductor;
 use holochain_state::nonce::fresh_nonce;
 use holochain_wasm_test_utils::TestZomes;
 use tempfile::TempDir;
@@ -32,12 +32,12 @@ use tempfile::TempDir;
 use super::test_utils::*;
 use holochain::sweettest::*;
 use holochain_test_wasm_common::AnchorInput;
+use holochain_trace;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketResult;
 use holochain_websocket::WebsocketSender;
 use matches::assert_matches;
-use observability;
 use test_case::test_case;
 use tracing::instrument;
 
@@ -53,21 +53,21 @@ async fn speed_test_prep() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed() {
-    let _g = observability::test_run_timed().unwrap();
+    let _g = holochain_trace::test_run_timed().unwrap();
     speed_test(None).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_json() {
-    let _g = observability::test_run_timed_json().unwrap();
+    let _g = holochain_trace::test_run_timed_json().unwrap();
     speed_test(None).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_flame() {
-    let _g = observability::test_run_timed_flame(None).unwrap();
+    let _g = holochain_trace::test_run_timed_flame(None).unwrap();
     speed_test(None).await;
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }
@@ -75,7 +75,7 @@ async fn speed_test_timed_flame() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_ice() {
-    let _g = observability::test_run_timed_ice(None).unwrap();
+    let _g = holochain_trace::test_run_timed_ice(None).unwrap();
     speed_test(None).await;
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }
@@ -83,7 +83,7 @@ async fn speed_test_timed_ice() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_normal() {
-    observability::test_run().unwrap();
+    holochain_trace::test_run().unwrap();
     speed_test(None).await;
 }
 
@@ -92,7 +92,7 @@ async fn speed_test_normal() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_persisted() {
-    observability::test_run().unwrap();
+    holochain_trace::test_run().unwrap();
     let envs = speed_test(None).await;
     let path = envs.path();
     println!("Run the following to see info about the test that just ran,");
@@ -109,7 +109,7 @@ async fn speed_test_persisted() {
 #[test_case(2000)]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 fn speed_test_all(n: usize) {
-    observability::test_run().unwrap();
+    holochain_trace::test_run().unwrap();
     tokio_helper::block_forever_on(speed_test(Some(n)));
 }
 
@@ -169,7 +169,8 @@ async fn speed_test(n: Option<usize>) -> Arc<TempDir> {
     // START CONDUCTOR
     // ///////////////
 
-    let (test_db, _app_api, handle) = setup_app(
+    let (test_db, _app_api, handle) = setup_app_in_new_conductor(
+        "test app".to_string(),
         vec![dna_file],
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
     )

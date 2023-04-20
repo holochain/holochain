@@ -226,6 +226,9 @@ pub mod tuning_params_struct {
         /// [Default: 60]
         tx5_max_conn_init_s: u32 = 60,
 
+        /// Tx5 ban time in seconds.
+        tx5_ban_time_s: u32 = 10,
+
         /// if you would like to be able to use an external tool
         /// to debug the QUIC messages sent and received by kitsune
         /// you'll need the decryption keys.
@@ -271,6 +274,11 @@ pub mod tuning_params_struct {
         /// Get the tx5_max_conn_init_s param as a Duration.
         pub fn tx5_max_conn_init(&self) -> std::time::Duration {
             std::time::Duration::from_secs(self.tx5_max_conn_init_s as u64)
+        }
+
+        /// get the tx5_ban_time_s param as a Duration.
+        pub fn tx5_ban_time(&self) -> std::time::Duration {
+            std::time::Duration::from_secs(self.tx5_ban_time_s as u64)
         }
 
         /// returns true if we should initialize a tls keylog

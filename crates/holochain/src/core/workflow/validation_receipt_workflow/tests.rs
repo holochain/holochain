@@ -16,7 +16,7 @@ use rusqlite::Transaction;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn test_validation_receipt() {
-    let _g = observability::test_run().ok();
+    let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
 
     let mut conductors = SweetConductorBatch::from_standard_config(NUM_CONDUCTORS).await;
@@ -111,7 +111,7 @@ macro_rules! wait_until {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_block_invalid_receipt() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let unit_entry_def = EntryDef::from_id("unit");
     let integrity_name = "integrity";
     let coordinator_name = "coordinator";
@@ -227,7 +227,7 @@ async fn test_block_invalid_receipt() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_not_block_self_receipt() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let unit_entry_def = EntryDef::from_id("unit");
     let zomes = InlineZomeSet::new_single(

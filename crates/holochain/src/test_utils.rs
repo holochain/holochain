@@ -293,7 +293,10 @@ where
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let dna_network = network.to_dna(dna.clone(), None);
-    network.join(dna.clone(), agent_key, None).await.unwrap();
+    network
+        .join(dna.clone(), agent_key, None, None)
+        .await
+        .unwrap();
     TestNetwork::new(network, respond_task, dna_network, check_op_data_calls)
 }
 
@@ -309,7 +312,7 @@ pub async fn install_app(
     }
     conductor_handle
         .clone()
-        .install_app(name.to_string(), cell_data)
+        .install_app_legacy(name.to_string(), cell_data)
         .await
         .unwrap();
 
@@ -331,7 +334,8 @@ pub async fn install_app(
 pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<MembraneProof>)>;
 
 /// One of various ways to setup an app, used somewhere...
-pub async fn setup_app(
+pub async fn setup_app_in_new_conductor(
+    installed_app_id: InstalledAppId,
     dnas: Vec<DnaFile>,
     cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
@@ -342,19 +346,37 @@ pub async fn setup_app(
         .await
         .unwrap();
 
+    install_app_in_conductor(conductor_handle.clone(), installed_app_id, dnas, cell_data).await;
+
+    let handle = conductor_handle.clone();
+
+    (
+        Arc::new(db_dir),
+        RealAppInterfaceApi::new(conductor_handle),
+        handle,
+    )
+}
+
+/// Install an app into an existing conductor instance
+pub async fn install_app_in_conductor(
+    conductor_handle: ConductorHandle,
+    installed_app_id: InstalledAppId,
+    dnas: Vec<DnaFile>,
+    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+) {
     for dna in dnas {
         conductor_handle.register_dna(dna).await.unwrap();
     }
 
     conductor_handle
         .clone()
-        .install_app("test app".to_string(), cell_data)
+        .install_app_legacy(installed_app_id.clone(), cell_data)
         .await
         .unwrap();
 
     conductor_handle
         .clone()
-        .enable_app("test app".to_string())
+        .enable_app(installed_app_id)
         .await
         .unwrap();
 
@@ -365,14 +387,6 @@ pub async fn setup_app(
         .unwrap();
 
     assert!(errors.is_empty());
-
-    let handle = conductor_handle.clone();
-
-    (
-        Arc::new(db_dir),
-        RealAppInterfaceApi::new(conductor_handle),
-        handle,
-    )
 }
 
 /// Setup an app for testing
@@ -820,7 +834,7 @@ async fn display_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor.list_cell_ids(Some(CellStatus::Joined)) {
+    for cell_id in conductor.running_cell_ids(Some(CellStatus::Joined)) {
         let space = cell_id.dna_hash();
         let db = conductor.get_p2p_db(space);
         let info = p2p_agent_store::dump_state(db.into(), Some(cell_id))

@@ -5,10 +5,11 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
+use holo_hash::DnaHashB64;
 use holochain_zome_types::DnaModifiersOpt;
 
 use super::error::{AppManifestError, AppManifestResult};
-use crate::app::app_manifest::current::{DnaLocation, DnaVersionSpec};
+use crate::app::app_manifest::current::DnaLocation;
 use crate::prelude::RoleName;
 use std::collections::HashMap;
 
@@ -32,9 +33,9 @@ impl AppManifestValidated {
         roles: HashMap<RoleName, AppRoleManifestValidated>,
     ) -> AppManifestResult<Self> {
         for (role_name, role) in roles.iter() {
-            if let AppRoleManifestValidated::Disabled { clone_limit, .. } = role {
+            if let AppRoleManifestValidated::CloneOnly { clone_limit, .. } = role {
                 if *clone_limit == 0 {
-                    return Err(AppManifestError::InvalidStrategyDisabled(
+                    return Err(AppManifestError::InvalidStrategyCloneOnly(
                         role_name.to_owned(),
                     ));
                 }
@@ -54,24 +55,15 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        version: Option<DnaVersionSpec>,
+        installed_hash: Option<DnaHashB64>,
     },
-    /// Always create a new Cell when installing the App,
-    /// and use a unique network seed to ensure a distinct DHT network
-    CreateClone {
-        clone_limit: u32,
-        deferred: bool,
-        location: DnaLocation,
-        modifiers: DnaModifiersOpt,
-        version: Option<DnaVersionSpec>,
-    },
-    /// Require that a Cell is already installed which matches the DNA version
-    /// spec, and which has an Agent that's associated with this App's agent
+    /// Require that a Cell is already installed with a specified DNA hash,
+    /// and which has an Agent that's associated with this App's agent
     /// via DPKI. If no such Cell exists, *app installation fails*.
     UseExisting {
         clone_limit: u32,
         deferred: bool,
-        version: DnaVersionSpec,
+        installed_hash: DnaHashB64,
     },
     /// Try `UseExisting`, and if that fails, fallback to `Create`
     CreateIfNotExists {
@@ -79,12 +71,15 @@ pub enum AppRoleManifestValidated {
         deferred: bool,
         location: DnaLocation,
         modifiers: DnaModifiersOpt,
-        version: DnaVersionSpec,
+        installed_hash: DnaHashB64,
     },
-    /// Disallow provisioning altogether. In this case, we expect
-    /// `clone_limit > 0`: otherwise, no cells will ever be created.
-    Disabled {
-        version: DnaVersionSpec,
+    /// Install or locate the DNA, but never create a Cell for this DNA.
+    /// Only allow clones to be created from the DNA specified.
+    /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
+    CloneOnly {
         clone_limit: u32,
+        location: DnaLocation,
+        modifiers: DnaModifiersOpt,
+        installed_hash: DnaHashB64,
     },
 }

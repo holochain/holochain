@@ -17,8 +17,10 @@ mod app_interface;
 pub mod config;
 pub mod signal_subscription;
 pub mod state_dump;
+pub mod storage_info;
 
 pub use admin_interface::*;
 pub use app_interface::*;
 pub use config::*;
 pub use state_dump::*;
+pub use storage_info::*;

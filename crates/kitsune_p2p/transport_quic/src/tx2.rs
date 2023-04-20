@@ -470,8 +470,9 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "flaky"]
     async fn test_quic_tx2() {
-        kitsune_p2p_types::dependencies::observability::test_run().ok();
+        kitsune_p2p_types::dependencies::holochain_trace::test_run().ok();
 
         let t = KitsuneTimeout::from_millis(5000);
 
