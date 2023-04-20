@@ -49,7 +49,7 @@ test_utils = ["async-trait", "mockall", "holochain_types/test_utils"]
 
 sqlite-encrypted = [
     "holo_hash/sqlite-encrypted",
-    "holochain_sqlite/sqlite-encrypted",
+    "holochain_sqlite/db-encryption",
     "holochain_state/sqlite-encrypted",
     "holochain_types/sqlite-encrypted",
     "holochain_zome_types/sqlite-encrypted",
@@ -57,7 +57,7 @@ sqlite-encrypted = [
 ]
 sqlite = [
     "holo_hash/sqlite",
-    "holochain_sqlite/sqlite",
+    "holochain_sqlite/no-deps",
     "holochain_state/sqlite",
     "holochain_types/sqlite",
     "holochain_zome_types/sqlite",

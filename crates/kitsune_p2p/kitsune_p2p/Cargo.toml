@@ -90,7 +90,6 @@ sqlite-encrypted = [
   "kitsune_p2p_fetch/sqlite-encrypted",
   "kitsune_p2p_proxy/sqlite-encrypted",
   "kitsune_p2p_timestamp/sqlite-encrypted",
-  "kitsune_p2p_block/sqlite-encrypted",
   "kitsune_p2p_transport_quic/sqlite-encrypted",
   "kitsune_p2p_types/sqlite-encrypted",
 ]
@@ -98,7 +97,6 @@ sqlite = [
   "kitsune_p2p_fetch/sqlite",
   "kitsune_p2p_proxy/sqlite",
   "kitsune_p2p_timestamp/sqlite",
-  "kitsune_p2p_block/sqlite",
   "kitsune_p2p_transport_quic/sqlite",
   "kitsune_p2p_types/sqlite",
 ]

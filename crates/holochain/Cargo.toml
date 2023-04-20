@@ -186,15 +186,15 @@ sqlite-encrypted = [
   "holochain_conductor_api/sqlite-encrypted",
   "holochain_keystore/sqlite-encrypted",
   "holochain_p2p/sqlite-encrypted",
-  "holochain_sqlite/sqlite-encrypted",
+  "holochain_sqlite/db-encryption",
   "holochain_state/sqlite-encrypted",
   "holochain_types/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
   "kitsune_p2p/sqlite-encrypted",
   "kitsune_p2p_types/sqlite-encrypted",
-  "kitsune_p2p_block/sqlite-encrypted",
   "kitsune_p2p_bootstrap/sqlite-encrypted",
 ]
+db-encryption = ["sqlite-encrypted"]
 
 # Compile SQLite from source rather than depending on a library.
 # Incompatible with "sqlite-encrypted"
@@ -206,15 +206,15 @@ sqlite = [
   "holochain_conductor_api/sqlite",
   "holochain_keystore/sqlite",
   "holochain_p2p/sqlite",
-  "holochain_sqlite/sqlite",
+  "holochain_sqlite/no-deps",
   "holochain_state/sqlite",
   "holochain_types/sqlite",
   "holochain_zome_types/sqlite",
   "kitsune_p2p/sqlite",
   "kitsune_p2p_types/sqlite",
-  "kitsune_p2p_block/sqlite",
   "kitsune_p2p_bootstrap/sqlite",
 ]
+no-deps = ["sqlite"]
 
 # Extremely verbose wasm memory read/write logging
 wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]

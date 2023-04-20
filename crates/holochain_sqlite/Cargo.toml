@@ -83,6 +83,7 @@ sqlite-encrypted = [
   "holochain_zome_types/sqlite-encrypted",
   "kitsune_p2p/sqlite-encrypted",
 ]
+db-encryption = ["sqlite-encrypted"]
 
 # Compile SQLite from source rather than depending on a library
 sqlite = [
@@ -92,3 +93,4 @@ sqlite = [
   "kitsune_p2p/sqlite",
   "r2d2_sqlite/bundled",
 ]
+no-deps = ["sqlite"]

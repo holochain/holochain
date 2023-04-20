@@ -73,7 +73,6 @@ test_utils = [
   "once_cell",
   "kitsune_p2p_timestamp/arbitrary",
   "kitsune_p2p_timestamp/now",
-  "kitsune_p2p_block/sqlite",
   "holo_hash/arbitrary",
   "holo_hash/hashing",
   "holo_hash/test_utils",
@@ -88,8 +87,6 @@ sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "kitsune_p2p_dht/sqlite-encrypted",
   "kitsune_p2p_timestamp/sqlite-encrypted",
-  "kitsune_p2p_block/sqlite-encrypted",
-  "kitsune_p2p_bin_data/sqlite-encrypted",
 ]
 sqlite = [
   "rusqlite",
@@ -97,6 +94,4 @@ sqlite = [
   "holo_hash/sqlite",
   "kitsune_p2p_dht/sqlite",
   "kitsune_p2p_timestamp/sqlite",
-  "kitsune_p2p_block/sqlite",
-  "kitsune_p2p_bin_data/sqlite",
 ]
