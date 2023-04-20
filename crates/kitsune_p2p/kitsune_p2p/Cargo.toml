@@ -54,10 +54,10 @@ mockall = { version = "0.10.2", optional = true }
 
 [dev-dependencies]
 # include self with test_utils feature, to allow integration tests to run properly
-kitsune_p2p = { path = ".", features = ["test_utils"]}
+kitsune_p2p = { path = ".", features = ["test_utils", "sqlite"]}
 
 contrafact = { version = "0.1.0-dev.1" }
-kitsune_p2p_bootstrap = { path = "../bootstrap" }
+kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now", "arbitrary"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
@@ -85,3 +85,20 @@ mock_network = [
 ]
 
 tx2 = [ "kitsune_p2p_types/tx2", "kitsune_p2p_transport_quic" ]
+
+sqlite-encrypted = [
+  "kitsune_p2p_fetch/sqlite-encrypted",
+  "kitsune_p2p_proxy/sqlite-encrypted",
+  "kitsune_p2p_timestamp/sqlite-encrypted",
+  "kitsune_p2p_block/sqlite-encrypted",
+  "kitsune_p2p_transport_quic/sqlite-encrypted",
+  "kitsune_p2p_types/sqlite-encrypted",
+]
+sqlite = [
+  "kitsune_p2p_fetch/sqlite",
+  "kitsune_p2p_proxy/sqlite",
+  "kitsune_p2p_timestamp/sqlite",
+  "kitsune_p2p_block/sqlite",
+  "kitsune_p2p_transport_quic/sqlite",
+  "kitsune_p2p_types/sqlite",
+]

@@ -72,3 +72,22 @@ test_utils = [
     "tempfile",
     "nanoid",
 ]
+
+sqlite-encrypted = [
+    "holo_hash/sqlite-encrypted",
+    "holochain_sqlite/sqlite-encrypted",
+    "holochain_keystore/sqlite-encrypted",
+    "holochain_p2p/sqlite-encrypted",
+    "holochain_types/sqlite-encrypted",
+    "holochain_zome_types/sqlite-encrypted",
+    "kitsune_p2p/sqlite-encrypted",
+]
+sqlite = [
+    "holo_hash/sqlite",
+    "holochain_sqlite/sqlite",
+    "holochain_keystore/sqlite",
+    "holochain_p2p/sqlite",
+    "holochain_types/sqlite",
+    "holochain_zome_types/sqlite",
+    "kitsune_p2p/sqlite",
+]

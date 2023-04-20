@@ -36,3 +36,11 @@ assert_cmd = "1.0"
 matches = "0.1"
 predicates = "1.0"
 tempfile = "3"
+
+[features]
+sqlite-encrypted = [
+    "holochain_types/sqlite-encrypted",
+]
+sqlite = [
+    "holochain_types/sqlite",
+]
