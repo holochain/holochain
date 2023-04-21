@@ -475,15 +475,17 @@ pub fn power_and_count_from_length(dim: &Dimension, len: u64, max_chunks: u32) -
     let mut count = (len / dim.quantum as u64) as f64;
     let max = max_chunks as f64;
 
-    while count.round() > max {
+    // TODO: can change `.ceil()` back to `.round()` once the quantization mismatch is fixed.
+    // For now, it's desired that the rounded arq is always longer than the continuous arc.
+    while count.ceil() > max {
         power += 1;
         count /= 2.0;
     }
-    let count = count.round() as u32;
+    let count = count.ceil() as u32;
     (power, count)
 }
 
-/// Given a center and a length, give Arq which matches most closely given the provided strategy
+/// Given a center and a length, give the Arq which matches most closely given the provided strategy
 pub fn approximate_arq(topo: &Topology, strat: &ArqStrat, start: Loc, len: u64) -> Arq {
     if len == 0 {
         Arq::new(topo.min_space_power(), start, 0.into())
@@ -628,6 +630,16 @@ mod tests {
     }
 
     proptest::proptest! {
+
+        #[test]
+        fn arqs_always_round_up(length in 10000..u32::MAX) {
+            let length = length as u64;
+            let topo = Topology::standard_epoch_full();
+            let (p, c) = power_and_count_from_length(&topo.space, length, 16);
+            let arq = ArqBounds::new(p, 0.into(), c.into());
+            let qlen = arq.absolute_length(&topo);
+            assert!(qlen >= length);
+        }
 
         #[test]
         fn test_to_edge_locs(power in 0u8..16, count in 8u32..16, loc: u32) {
