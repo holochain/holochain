@@ -404,7 +404,10 @@ pub struct InstalledAppCommon {
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
     role_assignments: HashMap<RoleName, AppRoleAssignment>,
     /// The manifest used to install the app.
-    manifest: AppManifest,
+    // NOTE: This is only an Option for deserialization backward compatibility with apps which were installed
+    //       before this field was added. The Option can be safely removed some day (with small refactor).
+    #[serde(default)]
+    manifest: Option<AppManifest>,
 }
 
 impl InstalledAppCommon {
@@ -427,7 +430,7 @@ impl InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             agent_key,
             role_assignments,
-            manifest,
+            manifest: Some(manifest),
         })
     }
 
@@ -751,7 +754,9 @@ impl InstalledAppCommon {
             return Err(AppError::DuplicateRoleNames(installed_app_id, duplicates));
         }
 
-        let manifest = AppManifest::from_legacy(installed_cells.clone().into_iter());
+        let manifest = Some(AppManifest::from_legacy(
+            installed_cells.clone().into_iter(),
+        ));
 
         let role_assignments = installed_cells
             .into_iter()
@@ -777,8 +782,20 @@ impl InstalledAppCommon {
     }
 
     /// Return the manifest if available
-    pub fn manifest(&self) -> &AppManifest {
-        &self.manifest
+    pub fn manifest(&self) -> AppManifest {
+        if let Some(manifest) = &self.manifest {
+            manifest.clone()
+        } else {
+            let cells = self
+                .role_assignments
+                .iter()
+                .filter_map(|(role_name, role)| {
+                    role.provisioned_cell()
+                        .map(|c| InstalledCell::new(c.clone(), role_name.to_string()))
+                })
+                .clone();
+            AppManifest::from_legacy(cells)
+        }
     }
 }
 
