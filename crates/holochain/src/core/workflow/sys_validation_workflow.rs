@@ -436,20 +436,21 @@ pub async fn sys_validate_record(
     cascade: &Cascade,
     conductor_handle: &Conductor,
 ) -> SysValidationOutcome<()> {
-    trace!(?record);
-    let result = match sys_validate_record_inner(record, cascade, conductor_handle).await {
+    match sys_validate_record_inner(record, cascade, conductor_handle).await {
         // Validation succeeded
         Ok(_) => Ok(()),
         // Validation failed so exit with that outcome
         Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
-            error!(msg = "Direct validation failed", ?record);
+            error!(
+                msg = "Direct validation failed",
+                ?validation_outcome,
+                ?record,
+            );
             validation_outcome.into_outcome()
         }
         // An error occurred so return it
         Err(e) => Err(OutcomeOrError::Err(e)),
-    };
-
-    result
+    }
 }
 
 async fn sys_validate_record_inner(
