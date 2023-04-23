@@ -185,7 +185,7 @@ e.  **Generalized Micro-Consensus Consent: Entwined multi-agent state
   With singular actions by any particular agent (and the validation of those actions by a small number of other agents) able to occur simultaneous with singular actions by other agents as well as countersigned actions by particular groups of agents. The network is not updating state globally (as blockchains typically do) but is instead creating, validating, storing and serving changes of the state of particular agents in parallel. 
   c. Multiple networks: In Holochain, each application (DNA) operates on its own independent network, effectively isolating the performance of individual apps. This prevents a high-traffic, data heavy, or processing heavy app from affecting the performance of other lighter apps within the ecosystem. Participants are able to decide for themselves which applications they want to participate in.
   \[TODO: ACB REVIEW could we add in any O(n) notation here?\] 
-  d. Order of Complexity: "Big O" notation is usually only applied to local computation based on `n` number of inputs. However, if we consider a new type of O-notation for decentralized systems which includes two inputs `n` as the number of nodes, and `m` as the number or transactions/inputs/actions. Most blockchain's are some variant of $O\ n^2*m$ in their order of complexity. However, Holochain retains $O\ log(n)/m$ complexity even as the number of nodes in the network grows, because the sharding of storage and validation remains 
+  d. Order of Complexity: "Big O" notation is usually only applied to local computation based on handling `n` number of inputs. However, if we consider a new type of O-notation for decentralized systems which includes two inputs `n` as the number transactions/inputs/actions, and `m` as the number of nodes/peers/agents/users. Most blockchain's are some variant of $O\ n^2*m$ in their order of complexity. Every node must gossip all state changes and perform all validate them all. However, Holochain retains $O\ \frac{log(n)}{m}$ complexity because of sharding storage and validation, as the number of nodes in the network grows, each node performs a smaller portion of the workload.
 
 1.  **Shared-state Finality:** Many blockchains approximate chain
   finality by assuming that the "longest-chain wins." That strategy
@@ -275,20 +275,15 @@ We have already covered how Holochain's agent-centric validation and
 intrinsic data integrity provides security from malicious actors trying
 to introduce invalid or incorrect information into an Application's
 network as every agent can deterministically verify data and thus
-self-secure. It is also important, however, to be able to eject
-malicious actors who generate or propagate such invalid data from
-network participation so as to secure against the resource drain that
-such action could incur.  This is part of acheiving a "O of N" trust model,
-where any node can always validate data for themself independent of what any other nodes say.
+secure itself. It is also important, however, to be able to eject
+malicious actors from network participation who generate or propagate invalid data so as to secure against the resource drain that such actions may incur. 
 
-As agents publish actions to the DHT, validators sign and report
-the results of their validation.  Thus when validation fails (which it can only
-do so deterministically) the system can propigagte these provably invalid attempted
-actions, which serve as warrants for other nodes to stop interacting with the offending
-agent, and which all nodes can confirm for themselves as they are based on deterministic
-validation rules, which all agents have a copy of.  
-\[TODO: ACB REVIEW\] \[expand on: one good apple
-heals the bunch\]
+As agents publish their actions to the DHT, other agents serve as validators. When validation passes, they send a validation receipt back to the authoring agent, so they know the network has seen and stored their data. When validation fails, they send a negative validation receipt, known as a warrant, back to the author and their neighbors so the system can propagate these provably invalid attempted
+actions. This also flags the offending agent as corrupted or malicious so that other nodes can block them and stop interacting with the offending agent. Every node can confirm the warrant for themselves as they are based on the shared deterministic validation rules, which all agents have a copy of.  
+
+This enables a dynamic where any single honest agent can detect and report any invalid actions. So instead of needing a majority consensus to establish reliability of data (an "N/2 of N" trust model), Holochain enables "one good apple to heal the bunch" with a "1 of N" trust model for any data you acquire from agents on the network. 
+
+For even stricter situations, apps can achieve a "0 of N" trust model, where no external agents need to be trusted, because nodes can always validate data for themselves, independent of what any other nodes say.
 
 ### Security from Attack Categories
 
@@ -298,9 +293,9 @@ This whole category of attack starts from the assumption that consensus
 is required for distributed systems. Because Holochain doesn't start
 from that assumption the attack category really doesn't apply, but it's
 worth mentioning because there​ ​are​ ​a​ ​number​ ​of​ ​attacks​ ​on​
-​blockchain​ ​which​ ​disrupt their distributed computing solution by
-having collusion between the majority of the nodes. ​The​ ​usual
-thinking​ ​is​ ​that​ ​it​ ​takes​ ​a​ ​large​ ​number​ ​of​ ​nodes45​
+​blockchain​ ​which​ ​disrupt their distributed computing solution through
+collusion between some majority of nodes. ​The​ ​usual
+thinking​ ​is​ ​that​ ​it​ ​takes​ ​a​ ​large​ ​number​ ​of​ ​nodes 
 ​and​ ​massive​ ​amounts​ ​of​ ​computing​ ​power or financial
 incentives46​ ​to prevent​ ​undue​ ​hijacking​ ​of​ ​consensus.​
 ​However,​ ​since​ ​Holochain's data coherence doesn't derive from all
@@ -310,9 +305,26 @@ validation, nobody​ ​ever​ ​needs​ ​to​ ​trust​ ​a​ ​con
 
 #### Sybil Attacks
 
-Membranes & DPKI \[TODO: ACB\] \[expand on: membrane proofs\] \[expand
-on: Holochain enables​ ​continuity​ ​of​ ​identity​ ​across​
-​application​ ​contexts​ ​with​ ​its​ ​DPKI​ ​app,44​ ​which​ ​can​
+Since Holochain does not rely on any kind of majority consensus, it is already less vulnerable to Sybil Attacks, the creation of lots of fake colluding accounts which are typically used to overwhelm consensus of honest agents. But since Holochain enables "1 of N" and even "0 of N" trust models, Sybils simply cannot overwhem or disrupt honest agents.
+
+Also, since Holochain is not a monolithic environment where every app and transaction run on a single chain in a single network, a Sybil Attack can only be attempted on a single app's network at a time. Also, unlike the absolutes of public vs. blockchains, each hApp can define their own membrane on a spectrum from very open and permissive to closed and strict by the kind of membership proof involved in passing into their network's membrane.
+
+Membership proofs are passed in during the installation process of any Holochain app, so that it can be committed to the agent's chain just ahead of their public key. An agent's public key acts as their address in that applications DHT network, and is created during the genesis process in order to join the network. Other agents can confirm whether an agent's key can join by validating the membership proof.
+
+A large variety of membership proofs are possible, ranging from none at all, loose social triangulation, or an invitation from any current user, to stricter invitation lists, proof of work requirements in generating your keys, or a kind of proof of stake showing you have deposited some value which you lose if your account gets warranted. 
+
+We generally suggest that applications may want to enforce some kind of membrane against Sybils, not because consensus or data integrity is at risk but because carrying a lot of Sybils just makes unnecessary work for honest agents running an application. We cover more about this in the next section.
+
+#### Spamming Attacks
+
+Holochain includes a native rate-limiting on entry creation \[TODO:
+ACB\]
+
+
+\[Arthur thinks this next DPKI stuff is out of scope for Sybil Attacks\]
+
+\[expand on: Holochain enables​ ​continuity​ ​of​ ​identity​ ​across​
+​application​ ​contexts​ ​with​ ​its​ ​DPKI​ ​app,​ ​which​ ​can​
 ​interface with​ ​decentralized​ ​identity​ ​services​ ​of​ ​your​
 ​choosing.\]
 
@@ -329,10 +341,7 @@ application can designate its own boot-strap server, and they can also
 be arbitrarily hardened against denial-of-service to suit the needs of
 the application.
 
-#### Spamming Attacks
 
-Holochain includes a native rate-limiting on entry creation \[TODO:
-ACB\]
 
 #### Eclipse Attacks
 
