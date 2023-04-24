@@ -35,6 +35,10 @@
       packages = {
         build-holochain-build-crates-standalone =
           mkNoIfdPackage "holochain" cargoNix.allWorkspaceMembers;
+
+        # exposed just for manual debugging
+        holochain-crate2nix =
+          mkNoIfdPackage "holochain" cargoNix.workspaceMembers.holochain.build;
       };
     };
 }
