@@ -6,6 +6,74 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230424.185716
+
+## [holochain\_cli-0.1.5-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain\_cli\_sandbox-0.1.5-beta-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain\_cli\_bundle-0.1.5-beta-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain-0.1.5-beta-rc.0](crates/holochain/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain\_websocket-0.1.1-beta-rc.0](crates/holochain_websocket/CHANGELOG.md#0.1.1-beta-rc.0)
+
+## [holochain\_test\_wasm\_common-0.1.3-beta-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [holochain\_conductor\_api-0.1.5-beta-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.1.5-beta-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain\_cascade-0.1.5-beta-rc.0](crates/holochain_cascade/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain\_state-0.1.5-beta-rc.0](crates/holochain_state/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain\_p2p-0.1.5-beta-rc.0](crates/holochain_p2p/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain\_types-0.1.5-beta-rc.0](crates/holochain_types/CHANGELOG.md#0.1.5-beta-rc.0)
+
+- Adds deserialization backward compatibility to `InstalledAppCommon`, for databases which contain apps installed prior to `0.1.4`. Without this fix, older database values can’t be deserialized into more current conductors. [\#2253](https://github.com/holochain/holochain/pull/2253)
+
+## [holochain\_keystore-0.1.5-beta-rc.0](crates/holochain_keystore/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [holochain\_sqlite-0.1.5-beta-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.1.5-beta-rc.0)
+
+## [kitsune\_p2p-0.1.4-beta-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.1.4-beta-rc.0)
+
+## [kitsune\_p2p\_proxy-0.1.3-beta-rc.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [kitsune\_p2p\_transport\_quic-0.1.3-beta-rc.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [kitsune\_p2p\_mdns-0.1.1-beta-rc.0](crates/kitsune_p2p_mdns/CHANGELOG.md#0.1.1-beta-rc.0)
+
+## [kitsune\_p2p\_fetch-0.1.3-beta-rc.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [kitsune\_p2p\_types-0.1.3-beta-rc.0](crates/kitsune_p2p_types/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [mr\_bundle-0.1.1-beta-rc.0](crates/mr_bundle/CHANGELOG.md#0.1.1-beta-rc.0)
+
+## [holochain\_util-0.1.1-beta-rc.0](crates/holochain_util/CHANGELOG.md#0.1.1-beta-rc.0)
+
+## [hdk-0.1.3-beta-rc.0](crates/hdk/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [holochain\_zome\_types-0.1.3-beta-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [kitsune\_p2p\_dht-0.1.1-beta-rc.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.1.1-beta-rc.0)
+
+## [hdi-0.2.3-beta-rc.0](crates/hdi/CHANGELOG.md#0.2.3-beta-rc.0)
+
+## [hdk\_derive-0.1.3-beta-rc.0](crates/hdk_derive/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [holochain\_integrity\_types-0.1.3-beta-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [kitsune\_p2p\_timestamp-0.1.1-beta-rc.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.1.1-beta-rc.0)
+
+## [holo\_hash-0.1.3-beta-rc.0](crates/holo_hash/CHANGELOG.md#0.1.3-beta-rc.0)
+
+## [kitsune\_p2p\_dht\_arc-0.1.1-beta-rc.0](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.1.1-beta-rc.0)
+
+## [fixt-0.1.2-beta-rc.0](crates/fixt/CHANGELOG.md#0.1.2-beta-rc.0)
+
 # 20230413.193011
 
 ## [holochain\_cli-0.1.4](crates/holochain_cli/CHANGELOG.md#0.1.4)

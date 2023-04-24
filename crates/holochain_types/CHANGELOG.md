@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.1.5-beta-rc.0
+
 - Adds deserialization backward compatibility to `InstalledAppCommon`, for databases which contain apps installed prior to `0.1.4`. Without this fix, older database values can’t be deserialized into more current conductors. [\#2253](https://github.com/holochain/holochain/pull/2253)
 
 ## 0.1.4

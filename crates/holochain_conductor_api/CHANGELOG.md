@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.1.5-beta-rc.0
+
 ## 0.1.4
 
 - Various methods may return a `CellMissing` error if an operation is performed on a disabled cell. Now such calls will return `CellDisabled` to differentiate between a truly missing cell and one that’s just disabled. [\#2092](https://github.com/holochain/holochain/pull/2092)
