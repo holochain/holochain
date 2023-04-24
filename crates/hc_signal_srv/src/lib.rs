@@ -38,7 +38,7 @@ impl HcSignalSrv {
         let (driver, addr_list, err_list) = tx5_signal_srv::exec_tx5_signal_srv(config)?;
 
         for err in err_list {
-            tracing::error!(?err);
+            println!("# HC SIGNAL SRV - ERROR: {err:?}");
         }
 
         if let Some(path) = &self.address_list_file_path {
