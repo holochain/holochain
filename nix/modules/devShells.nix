@@ -100,7 +100,6 @@
                               !lib.lists.any (unwantedPackage: nativeBuildInput == unwantedPackage)
                                 [
                                   self'.packages.holochain
-                                  self'.packages.holochain-crate2nix
                                 ]
                             )
                             (testDrvAttrs.nativeBuildInputs or [ ])
