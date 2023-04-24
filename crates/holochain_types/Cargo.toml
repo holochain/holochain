@@ -12,6 +12,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+wasmer-middlewares = "2"
+holochain_wasmer_host = { version = "0.0.84", features = ["dylib"] }
 anyhow = "1.0.26"
 async-trait = "0.1"
 automap = { version = "0.1", features = ["serde"] }
