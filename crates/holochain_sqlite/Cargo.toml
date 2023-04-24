@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -23,11 +23,11 @@ fallible-iterator = "0.2.0"
 failure = "0.1.6"
 fixt = { version = "^0.2.0-beta-rc.0", path = "../fixt" }
 futures = "0.3.1"
-holo_hash = { path = "../holo_hash", features = ["rusqlite"], version = "^0.2.0-beta-rc.3"}
+holo_hash = { path = "../holo_hash", version = "^0.2.0-beta-rc.4"}
 holochain_serialized_bytes = "=0.0.51"
 holochain_util = { version = "^0.2.0-beta-rc.0", path = "../holochain_util", features = ["backtrace"] }
-holochain_zome_types = { version = "^0.2.0-beta-rc.4", path = "../holochain_zome_types" }
-kitsune_p2p = { version = "^0.2.0-beta-rc.4", path = "../kitsune_p2p/kitsune_p2p" }
+holochain_zome_types = { version = "^0.2.0-beta-rc.5", path = "../holochain_zome_types" }
+kitsune_p2p = { version = "^0.2.0-beta-rc.5", path = "../kitsune_p2p/kitsune_p2p" }
 lazy_static = "1.4.0"
 once_cell = "1.4.1"
 must_future = "0.1.1"
@@ -72,12 +72,23 @@ pretty_assertions = "0.7.2"
 sqlformat = "0.1.6"
 
 [features]
-default = [ "test_utils", "no-deps" ]
+default = [ "test_utils", "sqlite" ]
 
 test_utils = [ ]
 
 # Use at-rest encryption of databases
-db-encryption = ["rusqlite/bundled-sqlcipher-vendored-openssl"]
+sqlite-encrypted = [
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "holo_hash/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p/sqlite-encrypted",
+]
 
 # Compile SQLite from source rather than depending on a library
-no-deps = ['rusqlite/bundled']
+sqlite = [
+  "rusqlite/bundled",
+  "holo_hash/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p/sqlite",
+  "r2d2_sqlite/bundled",
+]

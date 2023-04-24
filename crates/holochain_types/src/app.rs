@@ -548,11 +548,13 @@ impl InstalledAppCommon {
     /// Add a clone cell.
     pub fn add_clone(&mut self, role_name: &RoleName, cell_id: &CellId) -> AppResult<CloneId> {
         let app_role_assignment = self.role_mut(role_name)?;
+
         assert_eq!(
             cell_id.agent_pubkey(),
             app_role_assignment.agent_key(),
             "A clone cell must use the same agent key as the role it is added to"
         );
+
         if app_role_assignment.is_clone_limit_reached() {
             return Err(AppError::CloneLimitExceeded(
                 app_role_assignment.clone_limit,
@@ -784,6 +786,11 @@ impl InstalledAppCommon {
     /// Return the manifest if available
     pub fn manifest(&self) -> &AppManifest {
         &self.manifest
+    }
+
+    /// Return the list of role assignments
+    pub fn role_assignments(&self) -> &HashMap<RoleName, AppRoleAssignment> {
+        &self.role_assignments
     }
 }
 
