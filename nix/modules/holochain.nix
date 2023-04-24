@@ -128,7 +128,7 @@
           '';
         });
 
-      build-holochain-tests-unit = craneLib.cargoNextest holochainTestsNextestArgs;
+      build-holochain-tests-unit = lib.makeOverridable craneLib.cargoNextest holochainTestsNextestArgs;
 
       build-holochain-tests-static-fmt = craneLib.cargoFmt (commonArgs // {
         src = flake.config.srcCleanedHolochain;
