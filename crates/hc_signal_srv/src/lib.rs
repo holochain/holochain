@@ -10,7 +10,7 @@ pub struct HcSignalSrv {
     #[structopt(short, long, default_value = "0")]
     port: u16,
 
-    /// A Comma separated list of interfaces on which to run the signal server.
+    /// A comma separated list of interfaces on which to run the signal server.
     #[structopt(short, long, default_value = "127.0.0.1")]
     interfaces: String,
 
