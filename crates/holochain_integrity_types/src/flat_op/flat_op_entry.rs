@@ -1,4 +1,4 @@
-use holochain_integrity_types::{CapClaimEntry, CapGrantEntry};
+use crate::{CapClaimEntry, CapGrantEntry};
 
 use super::*;
 
