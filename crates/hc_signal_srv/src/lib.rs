@@ -23,7 +23,7 @@ pub struct HcSignalSrv {
 impl HcSignalSrv {
     pub async fn run(self) {
         if let Err(err) = self.run_err().await {
-            eprintln!("We were not able to start the signal server.");
+            eprintln!("Unable to start the signal server.");
             eprintln!("{err:#?}");
         }
     }
