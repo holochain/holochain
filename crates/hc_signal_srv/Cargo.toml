@@ -16,7 +16,7 @@ path = "src/bin/hc-signal-srv.rs"
 
 [dependencies]
 holochain_trace = { version = "^0.2.0-beta-rc.1", path = "../holochain_trace" }
-tokio = { version = "1.11", features = ["full"] }
+tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
-tx5-signal-srv = "0.0.1-alpha.5"
+tx5-signal-srv = "0.0.1-alpha.7"
 structopt = "0.3"
