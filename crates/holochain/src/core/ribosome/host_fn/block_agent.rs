@@ -62,4 +62,18 @@ mod test {
         let _response3: ZomeCallResponse = conductor.call(&alice, "try_cap_claim", cap_for).await;
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn zome_call_get_block() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, alice_pubkey, bob, bob_pubkey, ..
+        } = RibosomeTestFixture::new(TestWasm::Create).await;
+
+        let action0: ActionHash = conductor.call(&alice, "create_entry", ()).await;
+
+        let bob_get: Option<Record> = conductor.call(&bob, "get_post", action0).await;
+
+        dbg!(&bob_get);
+    }
+
 }
