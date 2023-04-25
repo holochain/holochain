@@ -178,7 +178,7 @@ mod test {
                 };
             }
 
-            assert_eq!(expected, results.into(),);
+            assert_eq!(expected, results.into(), );
         }
     }
 
@@ -187,7 +187,7 @@ mod test {
         let init_host_access = InitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(HostFnAccess::from(&init_host_access), HostFnAccess::all(),);
+        assert_eq!(HostFnAccess::from(&init_host_access), HostFnAccess::all(), );
     }
 
     #[test]
@@ -195,7 +195,7 @@ mod test {
         let init_invocation = InitInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(ZomesToInvoke::All, init_invocation.zomes(),);
+        assert_eq!(ZomesToInvoke::All, init_invocation.zomes(), );
     }
 
     #[test]
@@ -218,7 +218,7 @@ mod test {
 
         let host_input = init_invocation.clone().host_input().unwrap();
 
-        assert_eq!(host_input, ExternIO::encode(()).unwrap(),);
+        assert_eq!(host_input, ExternIO::encode(()).unwrap(), );
     }
 }
 
@@ -232,7 +232,11 @@ mod slow_tests {
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
+    use holo_hash::AnyLinkableHash;
+    use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::sweettest::SweetCell;
+    use crate::test_utils::consistency_60s;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_init_unimplemented() {
@@ -244,7 +248,7 @@ mod slow_tests {
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome.run_init(host_access, init_invocation).unwrap();
-        assert_eq!(result, InitResult::Pass,);
+        assert_eq!(result, InitResult::Pass, );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -257,7 +261,7 @@ mod slow_tests {
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome.run_init(host_access, init_invocation).unwrap();
-        assert_eq!(result, InitResult::Pass,);
+        assert_eq!(result, InitResult::Pass, );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -291,5 +295,176 @@ mod slow_tests {
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
         );
+    }
+
+    /*#[tokio::test(flavor = "multi_thread")]
+    async fn rpc_multi_error_on_clone() {
+        use crate::sweettest::SweetConductor;
+        use crate::sweettest::SweetDnaFile;
+        use crate::sweettest::SweetZome;
+        use ::fixt::prelude::*;
+        use holochain_wasm_test_utils::TestWasm;
+        use holochain_zome_types::prelude::*;
+
+        observability::test_run().ok();
+
+        let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
+            random_network_seed(),
+            vec![TestWasm::InitCallZomeFn],
+            SerializedBytes::default(),
+        )
+            .await;
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let role_name = "call_zome".to_string();
+        let app = conductor
+            .setup_app_for_agent(
+                "app-",
+                fixt!(AgentPubKey, Predictable, 0),
+                [&(role_name.clone(), dna_file)],
+            )
+            .await
+            .unwrap();
+
+        let alice: SweetZome = app.cells().first().unwrap().zome(TestWasm::InitCallZomeFn);
+
+        let dna_name: String = conductor.call(&alice, "get_dna_name", ()).await;
+        assert_eq!(dna_name, String::from("Generated DnaDef"));
+
+        let cloned = conductor.create_clone_cell(CreateCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            role_name: role_name.clone(),
+            modifiers: DnaModifiersOpt::none().with_network_seed("anything".to_string()),
+            membrane_proof: None,
+            name: Some("cloned".to_string()),
+        }).await.unwrap();
+
+        let zome: SweetZome = SweetZome::new(
+            cloned.cell_id.clone(),
+            TestWasm::InitCallZomeFn.coordinator_zome_name(),
+        );
+        // let dna_name: String = conductor.call(&zome, "get_dna_name", ()).await;
+        // assert_eq!(dna_name, String::from("cloned"));
+        let links: Vec<Link> = conductor.call(&zome, "get_links", ()).await;
+        assert_eq!(1, links.len());
+    }*/
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn rpc_multi_error_on_clone() {
+        use crate::sweettest::SweetConductorBatch;
+        use crate::sweettest::SweetDnaFile;
+        use crate::sweettest::SweetZome;
+        use holochain_wasm_test_utils::TestWasm;
+        use holochain_zome_types::prelude::*;
+        use holo_hash::ActionHash;
+
+        #[derive(Debug, Serialize)]
+        struct Test(String);
+
+        #[derive(Serialize, Debug)]
+        pub struct CreateLinkPayload {
+            from: AnyLinkableHash,
+            to: AnyLinkableHash,
+        }
+
+        #[derive(Serialize, Debug)]
+        pub struct GetLinkPayload {
+            from: AnyLinkableHash,
+        }
+
+        let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
+            random_network_seed(),
+            vec![TestWasm::InitCallZomeFn],
+            SerializedBytes::default(),
+        )
+            .await;
+
+        let num_conductors = 3;
+        let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
+
+        let apps: Vec<_> = futures::future::join_all(conductors.iter_mut().map(|c| async {
+            c.setup_app("app", [&dna_file]).await.unwrap()
+        }))
+            .await;
+
+        let cells: Vec<SweetCell> = apps.iter().map(|a| {
+            let (cells,) = a.clone().into_tuple();
+            cells
+        }).collect();
+
+        let zomes: Vec<_> = cells
+            .iter()
+            .map(|c| c.zome(TestWasm::InitCallZomeFn.coordinator_zome_name()))
+            .collect();
+
+        let mut hashes = vec![];
+        let mut prev: Option<AnyLinkableHash> = None;
+        for i in 0..6 {
+            let current: ActionHash = conductors[i % num_conductors]
+                .call(
+                    &zomes[i % num_conductors],
+                    "create_test",
+                    Test(format!("message - {}", i).to_string()),
+                ).await;
+
+            hashes.push(current.clone());
+
+            if let Some(prev) = prev {
+                let _: ActionHash = conductors[i % num_conductors]
+                    .call(
+                        &zomes[i % num_conductors],
+                        "create_link",
+                        CreateLinkPayload {
+                            from: prev,
+                            to: current.clone().into(),
+                        },
+                    ).await;
+            }
+
+            prev = Some(current.into());
+        }
+
+        conductors.exchange_peer_info().await;
+
+        for i in 0..3 {
+            let x: Vec<Option<Details>> = conductors[i % num_conductors]
+                .call(
+                    &zomes[i % num_conductors],
+                    "get_many",
+                    hashes.clone(),
+                ).await;
+
+            println!("x {:?}", x);
+            assert_eq!(6, x.len());
+        }
+
+        consistency_60s([&cells[0], &cells[1], &cells[2]]).await;
+
+        for i in 0..30 {
+            let cloned = conductors[i % 3].create_clone_cell(CreateCloneCellPayload {
+                app_id: apps[i % 3].installed_app_id().clone(),
+                role_name: dna_file.dna_hash().to_string().clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed(format!("anything-{}", i).to_string()),
+                membrane_proof: None,
+                name: Some(format!("cloned-{}", i).to_string()),
+            }).await.unwrap();
+
+            let zome: SweetZome = SweetZome::new(
+                cloned.cell_id.clone(),
+                TestWasm::InitCallZomeFn.coordinator_zome_name(),
+            );
+
+            let current: ActionHash = conductors[i % num_conductors]
+                .call(
+                    &zome,
+                    "create_test",
+                    Test(format!("clone message - {}", i).to_string()),
+                ).await;
+
+            let links: Vec<Option<Record>> = conductors[i % 3].call(&zome, "get_links", GetLinkPayload {
+                from: current.into(),
+            }).await;
+            println!("{:?}", links);
+        }
     }
 }

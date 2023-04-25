@@ -21,6 +21,7 @@ members = [
     "hdk_extern",
     "init_fail",
     "init_pass",
+    "init_call_zome_fn",
     "integrity_zome",
     "link",
     "migrate_agent_fail",

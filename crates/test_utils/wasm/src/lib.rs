@@ -38,6 +38,7 @@ pub enum TestWasm {
     HdkExtern,
     InitFail,
     InitPass,
+    InitCallZomeFn,
     Link,
     MigrateAgentFail,
     MigrateAgentPass,
@@ -134,6 +135,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
             TestWasm::InitPass => "init_pass",
+            TestWasm::InitCallZomeFn => "init_call_zome_fn",
             TestWasm::Link => "link",
             TestWasm::MigrateAgentFail => "migrate_agent_fail",
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
@@ -201,6 +203,7 @@ impl From<TestWasm> for PathBuf {
             TestWasm::HdkExtern => "wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm",
             TestWasm::InitFail => "wasm32-unknown-unknown/release/test_wasm_init_fail.wasm",
             TestWasm::InitPass => "wasm32-unknown-unknown/release/test_wasm_init_pass.wasm",
+            TestWasm::InitCallZomeFn => "wasm32-unknown-unknown/release/test_wasm_init_call_zome_fn.wasm",
             TestWasm::Link => "wasm32-unknown-unknown/release/test_wasm_link.wasm",
             TestWasm::MigrateAgentFail => {
                 "wasm32-unknown-unknown/release/test_wasm_migrate_agent_fail.wasm"
