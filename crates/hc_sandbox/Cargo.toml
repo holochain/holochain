@@ -29,8 +29,8 @@ holochain_trace = { version = "^0.2.0-beta-rc.1", path = "../holochain_trace" }
 once_cell = "1.13.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
-sodoken = "=0.0.7"
-tokio = { version = "1.11", features = ["full"] }
+sodoken = "=0.0.9"
+tokio = { version = "1.27", features = ["full"] }
 structopt = "0.3"
 tracing = "0.1"
 url2 = "0.0.6"
