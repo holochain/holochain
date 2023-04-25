@@ -285,7 +285,7 @@ async fn validate_op_inner(
     dna_def: DnaDefHashed,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
-    check_not_private(op)?;
+    check_entry_visibility(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
             store_record(action, cascade).await?;

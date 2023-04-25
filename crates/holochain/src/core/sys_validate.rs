@@ -347,7 +347,7 @@ pub async fn check_entry_def(
     conductor: &Conductor,
 ) -> SysValidationResult<()> {
     if let Some((_, entry_type)) = op.entry_data() {
-        if let EntryType::App(app_entry_def) = entry_type {
+        if let EntryType::App(app_entry_def) = dbg!(entry_type) {
             check_app_entry_def(app_entry_def, dna_hash, conductor).await
         } else {
             Ok(())
@@ -392,8 +392,8 @@ pub async fn check_app_entry_def(
     }
 }
 
-/// Check the app entry type isn't private for store entry
-pub fn check_not_private(op: &DhtOp) -> SysValidationResult<()> {
+/// Check that the EntryVisibility is congruous with the presence or absence of entry data
+pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
     match (
         op.action().entry_type().map(|t| t.visibility()),
         op.entry().is_some(),
