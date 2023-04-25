@@ -297,58 +297,6 @@ mod slow_tests {
         );
     }
 
-    /*#[tokio::test(flavor = "multi_thread")]
-    async fn rpc_multi_error_on_clone() {
-        use crate::sweettest::SweetConductor;
-        use crate::sweettest::SweetDnaFile;
-        use crate::sweettest::SweetZome;
-        use ::fixt::prelude::*;
-        use holochain_wasm_test_utils::TestWasm;
-        use holochain_zome_types::prelude::*;
-
-        observability::test_run().ok();
-
-        let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
-            random_network_seed(),
-            vec![TestWasm::InitCallZomeFn],
-            SerializedBytes::default(),
-        )
-            .await;
-
-        let mut conductor = SweetConductor::from_standard_config().await;
-        let role_name = "call_zome".to_string();
-        let app = conductor
-            .setup_app_for_agent(
-                "app-",
-                fixt!(AgentPubKey, Predictable, 0),
-                [&(role_name.clone(), dna_file)],
-            )
-            .await
-            .unwrap();
-
-        let alice: SweetZome = app.cells().first().unwrap().zome(TestWasm::InitCallZomeFn);
-
-        let dna_name: String = conductor.call(&alice, "get_dna_name", ()).await;
-        assert_eq!(dna_name, String::from("Generated DnaDef"));
-
-        let cloned = conductor.create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
-            role_name: role_name.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("anything".to_string()),
-            membrane_proof: None,
-            name: Some("cloned".to_string()),
-        }).await.unwrap();
-
-        let zome: SweetZome = SweetZome::new(
-            cloned.cell_id.clone(),
-            TestWasm::InitCallZomeFn.coordinator_zome_name(),
-        );
-        // let dna_name: String = conductor.call(&zome, "get_dna_name", ()).await;
-        // assert_eq!(dna_name, String::from("cloned"));
-        let links: Vec<Link> = conductor.call(&zome, "get_links", ()).await;
-        assert_eq!(1, links.len());
-    }*/
-
     #[tokio::test(flavor = "multi_thread")]
     async fn rpc_multi_error_on_clone() {
         use crate::sweettest::SweetConductorBatch;
