@@ -103,7 +103,7 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
-use holochain_types::prelude::{test_keystore, wasm, *};
+use holochain_types::prelude::{wasm, *};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::Transaction;
@@ -120,12 +120,15 @@ use crate::core::queue_consumer::QueueTriggers;
 pub use holochain_types::share;
 
 mod builder;
+
 pub use builder::*;
 
 mod chc;
+
 pub use chc::*;
 
 mod conductor_services;
+
 pub use conductor_services::*;
 
 pub use accessor_impls::*;
@@ -354,7 +357,6 @@ mod startup_shutdown_impls {
 
 /// Methods related to conductor interfaces
 mod interface_impls {
-
     use super::*;
 
     impl Conductor {
@@ -449,7 +451,7 @@ mod interface_impls {
                 state.app_interfaces.insert(interface_id, config);
                 Ok(state)
             })
-            .await?;
+                .await?;
             tracing::debug!("App interface added at port: {}", port);
             Ok(port)
         }
@@ -486,7 +488,6 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
-
     use super::*;
 
     impl Conductor {
@@ -557,8 +558,8 @@ mod dna_impls {
         pub(crate) async fn load_wasms_into_dna_files(
             &self,
         ) -> ConductorResult<(
-            impl IntoIterator<Item = (DnaHash, RealRibosome)>,
-            impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
+            impl IntoIterator<Item=(DnaHash, RealRibosome)>,
+            impl IntoIterator<Item=(EntryDefBufferKey, EntryDef)>,
         )> {
             let db = &self.spaces.wasm_db;
 
@@ -686,7 +687,7 @@ mod dna_impls {
         pub(crate) async fn put_wasm_code(
             &self,
             dna: DnaDefHashed,
-            code: impl Iterator<Item = wasm::DnaWasm>,
+            code: impl Iterator<Item=wasm::DnaWasm>,
             zome_defs: Vec<(EntryDefBufferKey, EntryDef)>,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             // TODO: PERF: This loop might be slow
@@ -795,7 +796,7 @@ mod network_impls {
                 Timestamp::now(),
                 expires,
             )
-            .await?)
+                .await?)
         }
 
         /// Block some target.
@@ -864,7 +865,6 @@ mod network_impls {
                 let current_number_of_peers = conn.p2p_count_agents()?;
 
                 // query arc size and extrapolated coverage and estimate total peers
-                let cell_id = CellId::new(dna.as_hash().clone(), agent_pub_key.clone());
                 let (arc_size, total_network_peers) = match conn
                     .p2p_get_agent(&KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()))?
                 {
@@ -898,7 +898,7 @@ mod network_impls {
                         .map_err(DatabaseError::SqliteError)
                 };
                 let dht_db = self
-                    .get_dht_db(dna)
+                    .get_or_create_dht_db(dna)
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let dht_bytes_received = dht_db
                     .async_reader({
@@ -912,9 +912,7 @@ mod network_impls {
                     })
                     .await?;
 
-                let cache_db = self
-                    .get_cache_db(&cell_id)
-                    .await
+                let cache_db = self.get_or_create_cache_db(dna)
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let cache_bytes_received = cache_db
                     .async_reader(move |txn| {
@@ -952,9 +950,9 @@ mod network_impls {
                     completed_rounds_since_last_time_queried,
                 })
             }))
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
         }
 
         pub(crate) async fn storage_info(&self) -> ConductorResult<StorageInfo> {
@@ -979,9 +977,9 @@ mod network_impls {
                 futures::future::join_all(all_dna.iter().map(|(dna_hash, used_by)| async {
                     self.storage_info_for_dna(dna_hash, used_by).await
                 }))
-                .await
-                .into_iter()
-                .collect::<Result<Vec<StorageBlob>, ConductorError>>()?;
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<StorageBlob>, ConductorError>>()?;
 
             Ok(StorageInfo {
                 blobs: app_data_blobs,
@@ -1085,7 +1083,7 @@ mod network_impls {
                         let mut conn = db.with_permit(permit)?;
                         conn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
                     })
-                    .await;
+                        .await;
                     let res = res
                         .map_err(holochain_p2p::HolochainP2pError::other)
                         .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other));
@@ -1105,8 +1103,8 @@ mod network_impls {
                         basis_loc,
                         limit,
                     )
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 QueryPeerDensity {
@@ -1175,8 +1173,8 @@ mod network_impls {
                             .map_err(holochain_p2p::HolochainP2pError::other);
                         respond.respond(Ok(async move { res }.boxed().into()));
                     }
-                    .instrument(debug_span!("handle_publish"))
-                    .await;
+                        .instrument(debug_span!("handle_publish"))
+                        .await;
                 }
                 FetchOpData {
                     respond,
@@ -1192,8 +1190,8 @@ mod network_impls {
                             .map_err(holochain_p2p::HolochainP2pError::other);
                         respond.respond(Ok(async move { res }.boxed().into()));
                     }
-                    .instrument(debug_span!("handle_fetch_op_data"))
-                    .await;
+                        .instrument(debug_span!("handle_fetch_op_data"))
+                        .await;
                 }
 
                 HolochainP2pEvent::QueryOpHashes {
@@ -1248,11 +1246,11 @@ mod network_impls {
             fn_name: F,
             payload: I,
         ) -> ConductorApiResult<O>
-        where
-            FunctionName: From<F>,
-            ZomeName: From<Z>,
-            I: Serialize + std::fmt::Debug,
-            O: serde::de::DeserializeOwned + std::fmt::Debug,
+            where
+                FunctionName: From<F>,
+                ZomeName: From<Z>,
+                I: Serialize + std::fmt::Debug,
+                O: serde::de::DeserializeOwned + std::fmt::Debug,
         {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
@@ -1281,9 +1279,10 @@ mod network_impls {
 
 /// Methods related to app installation and management
 mod app_impls {
-
     use super::*;
+
     impl Conductor {
+        #[cfg(feature = "test_utils")]
         pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
@@ -1296,7 +1295,7 @@ mod app_impls {
                     .map(|(c, p)| (c.as_id().clone(), p.clone()))
                     .collect(),
             )
-            .await?;
+                .await?;
 
             let cell_data = cell_data.into_iter().map(|(c, _)| c);
             let app = InstalledAppCommon::new_legacy(installed_app_id, cell_data)?;
@@ -1507,6 +1506,7 @@ mod app_impls {
 /// Methods related to cell access
 mod cell_impls {
     use super::*;
+
     impl Conductor {
         pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
@@ -1692,7 +1692,7 @@ mod clone_cell_impls {
                     Ok((state, ()))
                 }
             })
-            .await?;
+                .await?;
             self.remove_dangling_cells().await?;
             Ok(())
         }
@@ -1859,31 +1859,31 @@ mod app_status_impls {
             use holochain_p2p::AgentPubKeyExt;
 
             let tasks = self
-            .mark_pending_cells_as_joining()
-            .into_iter()
-            .map(|(cell_id, cell)| async move {
-                let p2p_agents_db = cell.p2p_agents_db().clone();
-                let kagent = cell_id.agent_pubkey().to_kitsune();
-                let maybe_agent_info = match p2p_agents_db.async_reader(move |tx| {
-                    tx.p2p_get_agent(&kagent)
-                }).await {
-                    Ok(maybe_info) => maybe_info,
-                    _ => None,
-                };
-                let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
-                let network = cell.holochain_p2p_dna().clone();
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
-                    Ok(Err(e)) => {
-                        tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
-                        Err(cell_id)
+                .mark_pending_cells_as_joining()
+                .into_iter()
+                .map(|(cell_id, cell)| async move {
+                    let p2p_agents_db = cell.p2p_agents_db().clone();
+                    let kagent = cell_id.agent_pubkey().to_kitsune();
+                    let maybe_agent_info = match p2p_agents_db.async_reader(move |tx| {
+                        tx.p2p_get_agent(&kagent)
+                    }).await {
+                        Ok(maybe_info) => maybe_info,
+                        _ => None,
+                    };
+                    let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
+                    let network = cell.holochain_p2p_dna().clone();
+                    match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
+                        Ok(Err(e)) => {
+                            tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
+                            Err(cell_id)
+                        }
+                        Err(_) => {
+                            tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
+                            Err(cell_id)
+                        }
+                        Ok(Ok(_)) => Ok(cell_id),
                     }
-                    Err(_) => {
-                        tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                        Err(cell_id)
-                    }
-                    Ok(Ok(_)) => Ok(cell_id),
-                }
-            });
+                });
 
             let maybes: Vec<_> = futures::stream::iter(tasks)
                 .buffer_unordered(100)
@@ -1935,7 +1935,7 @@ mod app_status_impls {
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
-                    let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
+                        let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
                         app_ids
                             .as_ref()
                             .map(|ids| ids.contains(&**id))
@@ -2007,8 +2007,8 @@ mod state_impls {
 
         /// Update the internal state with a pure function mapping old state to new
         pub(crate) async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
-        where
-            F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
+            where
+                F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
         {
             self.spaces.update_state(f).await
         }
@@ -2020,9 +2020,9 @@ mod state_impls {
             &self,
             f: F,
         ) -> ConductorResult<(ConductorState, O)>
-        where
-            F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
-            O: Send + 'static,
+            where
+                F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+                O: Send + 'static,
         {
             self.check_running()?;
             self.spaces.update_state_prime(f).await
@@ -2105,13 +2105,13 @@ mod misc_impls {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
             let source_chain = SourceChain::new(
-                self.get_authored_db(cell_id.dna_hash())?,
-                self.get_dht_db(cell_id.dna_hash())?,
-                self.get_dht_db_cache(cell_id.dna_hash())?,
+                self.get_or_create_authored_db(cell_id.dna_hash())?,
+                self.get_or_create_dht_db(cell_id.dna_hash())?,
+                self.get_or_create_space(cell_id.dna_hash())?.dht_query_cache,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
             )
-            .await?;
+                .await?;
 
             let cap_grant_entry = Entry::CapGrant(cap_grant);
             let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
@@ -2148,7 +2148,7 @@ mod misc_impls {
                 authored_db.clone().into(),
                 cell_id.agent_pubkey().clone(),
             )
-            .await?;
+                .await?;
 
             let out = JsonDump {
                 peer_dump,
@@ -2239,7 +2239,7 @@ mod misc_impls {
             graft_records_onto_source_chain::graft_records_onto_source_chain(
                 self, cell_id, validate, records,
             )
-            .await
+                .await
         }
 
         /// Update coordinator zomes on an existing dna.
@@ -2268,7 +2268,7 @@ mod misc_impls {
                 wasms.into_iter(),
                 Vec::with_capacity(0),
             )
-            .await?;
+                .await?;
 
             // Update RibosomeStore.
             self.ribosome_store()
@@ -2331,6 +2331,13 @@ mod accessor_impls {
             self.spaces.dht_db(dna_hash)
         }
 
+        pub(crate) fn get_or_create_cache_db(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> DatabaseResult<DbWrite<DbKindCache>> {
+            self.spaces.cache(dna_hash)
+        }
+
         pub(crate) fn p2p_agents_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pAgents> {
             self.spaces
                 .p2p_agents_db(hash)
@@ -2346,6 +2353,7 @@ mod accessor_impls {
                 .expect("failed to get p2p_batch_sender")
         }
 
+        #[cfg(feature = "test_utils")]
         pub(crate) fn p2p_metrics_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
             self.spaces
                 .p2p_metrics_db(hash)
@@ -2494,11 +2502,11 @@ impl Conductor {
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]
-                .into_iter(),
+                    .into_iter(),
             )
-            .await
-            .into_iter()
-            .collect::<Result<Vec<usize>, _>>()?;
+                .await
+                .into_iter()
+                .collect::<Result<Vec<usize>, _>>()?;
         }
 
         Ok(())
@@ -2530,15 +2538,15 @@ impl Conductor {
             }
             None =>
             // Collect all CellIds across all apps, deduped
-            {
-                state
-                    .installed_apps()
-                    .iter()
-                    .filter(|(_, app)| app.status().is_running())
-                    .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
-                    .cloned()
-                    .collect()
-            }
+                {
+                    state
+                        .installed_apps()
+                        .iter()
+                        .filter(|(_, app)| app.status().is_running())
+                        .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
+                        .cloned()
+                        .collect()
+                }
         };
 
         // calculate the existing cells so we can filter those out, only creating
@@ -2837,11 +2845,11 @@ pub(crate) async fn genesis_cells(
                     proof,
                     chc,
                 )
-                .await
+                    .await
             })
-            .map_err(CellError::from)
-            .and_then(|result| async move { result.map(|_| cell_id) })
-            .await
+                .map_err(CellError::from)
+                .and_then(|result| async move { result.map(|_| cell_id) })
+                .await
         }
     });
     let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
@@ -2882,10 +2890,10 @@ pub async fn integration_dump(
                 |row| row.get(0),
             )?;
             let integration_limbo = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
-            [],
-            |row| row.get(0),
-        )?;
+                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
+                [],
+                |row| row.get(0),
+            )?;
             let validation_limbo = txn.query_row(
                 "
                 SELECT count(hash) FROM DhtOp
@@ -3015,7 +3023,7 @@ async fn p2p_event_task(
                 }
                 num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             }
-            .in_current_span()
+                .in_current_span()
         })
         .await;
 
