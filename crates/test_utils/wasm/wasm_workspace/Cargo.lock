@@ -2781,6 +2781,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_init_call_zome_fn"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_init_fail"
 version = "0.0.1"
 dependencies = [
