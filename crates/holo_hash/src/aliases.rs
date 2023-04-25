@@ -198,7 +198,7 @@ impl TryFrom<AnyLinkableHash> for AnyDhtHash {
     fn try_from(hash: AnyLinkableHash) -> Result<Self, Self::Error> {
         hash.clone()
             .into_any_dht_hash()
-            .ok_or(CompositeHashConversionError(hash, "AnyDht".into()))
+            .ok_or_else(|| CompositeHashConversionError(hash, "AnyDht".into()))
     }
 }
 
