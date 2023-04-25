@@ -337,7 +337,9 @@ use holochain_serialized_bytes::prelude::*;
 pub struct EntryHashes(pub Vec<EntryHash>);
 
 /// Error converting a composite hash into a primitive one, due to type mismatch
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HashConversionError<T: HashType, P: PrimitiveHashType>(HoloHash<T>, P);
 
 /// Error converting a composite hash into a subset composite hash, due to type mismatch
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeHashConversionError<T: HashType>(HoloHash<T>, String);
