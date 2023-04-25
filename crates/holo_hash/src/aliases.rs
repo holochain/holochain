@@ -1,7 +1,9 @@
 //! Type aliases for the various concrete HoloHash types
 
 use crate::hash_type;
+use crate::HashType;
 use crate::HoloHash;
+use crate::PrimitiveHashType;
 
 // NB: These could be macroized, but if we spell it out, we get better IDE
 // support
@@ -81,6 +83,24 @@ impl AnyLinkableHash {
         }
     }
 
+    /// Downcast to AnyDhtHash if this is not an external hash
+    pub fn into_any_dht_hash(self) -> Option<AnyDhtHash> {
+        match self.into_primitive() {
+            AnyLinkableHashPrimitive::Action(hash) => Some(AnyDhtHash::from(hash)),
+            AnyLinkableHashPrimitive::Entry(hash) => Some(AnyDhtHash::from(hash)),
+            AnyLinkableHashPrimitive::External(_) => None,
+        }
+    }
+
+    /// If this hash represents a ActionHash, return it, else None
+    pub fn into_action_hash(self) -> Option<ActionHash> {
+        if *self.hash_type() == hash_type::AnyLinkable::Action {
+            Some(self.retype(hash_type::Action))
+        } else {
+            None
+        }
+    }
+
     /// If this hash represents an EntryHash, return it, else None
     pub fn into_entry_hash(self) -> Option<EntryHash> {
         if *self.hash_type() == hash_type::AnyLinkable::Entry {
@@ -90,10 +110,14 @@ impl AnyLinkableHash {
         }
     }
 
-    /// If this hash represents a ActionHash, return it, else None
-    pub fn into_action_hash(self) -> Option<ActionHash> {
-        if *self.hash_type() == hash_type::AnyLinkable::Action {
-            Some(self.retype(hash_type::Action))
+    /// If this hash represents an EntryHash which is actually an AgentPubKey,
+    /// return it, else None.
+    //
+    // NOTE: this is not completely correct since EntryHash should be a composite type,
+    //       with a fallible conversion to Agent
+    pub fn into_agent_pub_key(self) -> Option<AgentPubKey> {
+        if *self.hash_type() == hash_type::AnyLinkable::Entry {
+            Some(self.retype(hash_type::Agent))
         } else {
             None
         }
@@ -120,6 +144,15 @@ impl AnyDhtHash {
         }
     }
 
+    /// If this hash represents a ActionHash, return it, else None
+    pub fn into_action_hash(self) -> Option<ActionHash> {
+        if *self.hash_type() == hash_type::AnyDht::Action {
+            Some(self.retype(hash_type::Action))
+        } else {
+            None
+        }
+    }
+
     /// If this hash represents an EntryHash, return it, else None
     pub fn into_entry_hash(self) -> Option<EntryHash> {
         if *self.hash_type() == hash_type::AnyDht::Entry {
@@ -129,10 +162,14 @@ impl AnyDhtHash {
         }
     }
 
-    /// If this hash represents a ActionHash, return it, else None
-    pub fn into_action_hash(self) -> Option<ActionHash> {
-        if *self.hash_type() == hash_type::AnyDht::Action {
-            Some(self.retype(hash_type::Action))
+    /// If this hash represents an EntryHash which is actually an AgentPubKey,
+    /// return it, else None.
+    //
+    // NOTE: this is not completely correct since EntryHash should be a composite type,
+    //       with a fallible conversion to Agent
+    pub fn into_agent_pub_key(self) -> Option<AgentPubKey> {
+        if *self.hash_type() == hash_type::AnyDht::Entry {
+            Some(self.retype(hash_type::Agent))
         } else {
             None
         }
@@ -143,7 +180,10 @@ impl AnyDhtHash {
 // - any primitive hash into a composite hash which contains that primitive
 // - any composite hash which is a subset of another composite hash (AnyDht < AnyLinkable)
 // - converting between EntryHash and AgentPubKey
-// We must NOT have any other From impls, viz. any composite hash into a subset.
+// All other conversions, viz. the inverses of the above, are TryFrom conversions, since to
+// go from a superset to a subset is only valid in certain cases.
+
+// AnyDhtHash <-> AnyLinkableHash
 
 impl From<AnyDhtHash> for AnyLinkableHash {
     fn from(hash: AnyDhtHash) -> Self {
@@ -151,6 +191,18 @@ impl From<AnyDhtHash> for AnyLinkableHash {
         hash.retype(t)
     }
 }
+
+impl TryFrom<AnyLinkableHash> for AnyDhtHash {
+    type Error = CompositeHashConversionError<hash_type::AnyLinkable>;
+
+    fn try_from(hash: AnyLinkableHash) -> Result<Self, Self::Error> {
+        hash.clone()
+            .into_any_dht_hash()
+            .ok_or(CompositeHashConversionError(hash, "AnyDht".into()))
+    }
+}
+
+// AnyDhtHash <-> primitives
 
 impl From<ActionHash> for AnyDhtHash {
     fn from(hash: ActionHash) -> Self {
@@ -171,6 +223,40 @@ impl From<AgentPubKey> for AnyDhtHash {
         hash.retype(hash_type::AnyDht::Entry)
     }
 }
+
+impl TryFrom<AnyDhtHash> for ActionHash {
+    type Error = HashConversionError<hash_type::AnyDht, hash_type::Action>;
+
+    fn try_from(hash: AnyDhtHash) -> Result<Self, Self::Error> {
+        hash.clone()
+            .into_action_hash()
+            .ok_or(HashConversionError(hash, hash_type::Action))
+    }
+}
+
+impl TryFrom<AnyDhtHash> for EntryHash {
+    type Error = HashConversionError<hash_type::AnyDht, hash_type::Entry>;
+
+    fn try_from(hash: AnyDhtHash) -> Result<Self, Self::Error> {
+        hash.clone()
+            .into_entry_hash()
+            .ok_or(HashConversionError(hash, hash_type::Entry))
+    }
+}
+
+// Since an AgentPubKey can be treated as an EntryHash, we can also go straight
+// from AnyDhtHash
+impl TryFrom<AnyDhtHash> for AgentPubKey {
+    type Error = HashConversionError<hash_type::AnyDht, hash_type::Agent>;
+
+    fn try_from(hash: AnyDhtHash) -> Result<Self, Self::Error> {
+        hash.clone()
+            .into_agent_pub_key()
+            .ok_or(HashConversionError(hash, hash_type::Agent))
+    }
+}
+
+// AnyLinkableHash <-> primitives
 
 impl From<ActionHash> for AnyLinkableHash {
     fn from(hash: ActionHash) -> Self {
@@ -196,6 +282,50 @@ impl From<ExternalHash> for AnyLinkableHash {
     }
 }
 
+impl TryFrom<AnyLinkableHash> for ActionHash {
+    type Error = HashConversionError<hash_type::AnyLinkable, hash_type::Action>;
+
+    fn try_from(hash: AnyLinkableHash) -> Result<Self, Self::Error> {
+        hash.clone()
+            .into_action_hash()
+            .ok_or(HashConversionError(hash, hash_type::Action))
+    }
+}
+
+impl TryFrom<AnyLinkableHash> for EntryHash {
+    type Error = HashConversionError<hash_type::AnyLinkable, hash_type::Entry>;
+
+    fn try_from(hash: AnyLinkableHash) -> Result<Self, Self::Error> {
+        hash.clone()
+            .into_entry_hash()
+            .ok_or(HashConversionError(hash, hash_type::Entry))
+    }
+}
+
+// Since an AgentPubKey can be treated as an EntryHash, we can also go straight
+// from AnyLinkableHash
+impl TryFrom<AnyLinkableHash> for AgentPubKey {
+    type Error = HashConversionError<hash_type::AnyLinkable, hash_type::Agent>;
+
+    fn try_from(hash: AnyLinkableHash) -> Result<Self, Self::Error> {
+        hash.clone()
+            .into_agent_pub_key()
+            .ok_or(HashConversionError(hash, hash_type::Agent))
+    }
+}
+
+// Since an AgentPubKey can be treated as an EntryHash, we can also go straight
+// from AnyLinkableHash
+impl TryFrom<AnyLinkableHash> for ExternalHash {
+    type Error = HashConversionError<hash_type::AnyLinkable, hash_type::External>;
+
+    fn try_from(hash: AnyLinkableHash) -> Result<Self, Self::Error> {
+        hash.clone()
+            .into_external_hash()
+            .ok_or(HashConversionError(hash, hash_type::External))
+    }
+}
+
 #[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 
@@ -205,3 +335,9 @@ use holochain_serialized_bytes::prelude::*;
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct EntryHashes(pub Vec<EntryHash>);
+
+/// Error converting a composite hash into a primitive one, due to type mismatch
+pub struct HashConversionError<T: HashType, P: PrimitiveHashType>(HoloHash<T>, P);
+
+/// Error converting a composite hash into a subset composite hash, due to type mismatch
+pub struct CompositeHashConversionError<T: HashType>(HoloHash<T>, String);
