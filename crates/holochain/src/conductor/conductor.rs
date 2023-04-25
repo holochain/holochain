@@ -451,7 +451,7 @@ mod interface_impls {
                 state.app_interfaces.insert(interface_id, config);
                 Ok(state)
             })
-                .await?;
+            .await?;
             tracing::debug!("App interface added at port: {}", port);
             Ok(port)
         }
@@ -558,8 +558,8 @@ mod dna_impls {
         pub(crate) async fn load_wasms_into_dna_files(
             &self,
         ) -> ConductorResult<(
-            impl IntoIterator<Item=(DnaHash, RealRibosome)>,
-            impl IntoIterator<Item=(EntryDefBufferKey, EntryDef)>,
+            impl IntoIterator<Item = (DnaHash, RealRibosome)>,
+            impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
         )> {
             let db = &self.spaces.wasm_db;
 
@@ -687,7 +687,7 @@ mod dna_impls {
         pub(crate) async fn put_wasm_code(
             &self,
             dna: DnaDefHashed,
-            code: impl Iterator<Item=wasm::DnaWasm>,
+            code: impl Iterator<Item = wasm::DnaWasm>,
             zome_defs: Vec<(EntryDefBufferKey, EntryDef)>,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             // TODO: PERF: This loop might be slow
@@ -796,7 +796,7 @@ mod network_impls {
                 Timestamp::now(),
                 expires,
             )
-                .await?)
+            .await?)
         }
 
         /// Block some target.
@@ -912,7 +912,8 @@ mod network_impls {
                     })
                     .await?;
 
-                let cache_db = self.get_or_create_cache_db(dna)
+                let cache_db = self
+                    .get_or_create_cache_db(dna)
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let cache_bytes_received = cache_db
                     .async_reader(move |txn| {
@@ -950,9 +951,9 @@ mod network_impls {
                     completed_rounds_since_last_time_queried,
                 })
             }))
-                .await
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
         }
 
         pub(crate) async fn storage_info(&self) -> ConductorResult<StorageInfo> {
@@ -977,9 +978,9 @@ mod network_impls {
                 futures::future::join_all(all_dna.iter().map(|(dna_hash, used_by)| async {
                     self.storage_info_for_dna(dna_hash, used_by).await
                 }))
-                    .await
-                    .into_iter()
-                    .collect::<Result<Vec<StorageBlob>, ConductorError>>()?;
+                .await
+                .into_iter()
+                .collect::<Result<Vec<StorageBlob>, ConductorError>>()?;
 
             Ok(StorageInfo {
                 blobs: app_data_blobs,
@@ -1083,7 +1084,7 @@ mod network_impls {
                         let mut conn = db.with_permit(permit)?;
                         conn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
                     })
-                        .await;
+                    .await;
                     let res = res
                         .map_err(holochain_p2p::HolochainP2pError::other)
                         .and_then(|r| r.map_err(holochain_p2p::HolochainP2pError::other));
@@ -1103,8 +1104,8 @@ mod network_impls {
                         basis_loc,
                         limit,
                     )
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 QueryPeerDensity {
@@ -1173,8 +1174,8 @@ mod network_impls {
                             .map_err(holochain_p2p::HolochainP2pError::other);
                         respond.respond(Ok(async move { res }.boxed().into()));
                     }
-                        .instrument(debug_span!("handle_publish"))
-                        .await;
+                    .instrument(debug_span!("handle_publish"))
+                    .await;
                 }
                 FetchOpData {
                     respond,
@@ -1190,8 +1191,8 @@ mod network_impls {
                             .map_err(holochain_p2p::HolochainP2pError::other);
                         respond.respond(Ok(async move { res }.boxed().into()));
                     }
-                        .instrument(debug_span!("handle_fetch_op_data"))
-                        .await;
+                    .instrument(debug_span!("handle_fetch_op_data"))
+                    .await;
                 }
 
                 HolochainP2pEvent::QueryOpHashes {
@@ -1246,11 +1247,11 @@ mod network_impls {
             fn_name: F,
             payload: I,
         ) -> ConductorApiResult<O>
-            where
-                FunctionName: From<F>,
-                ZomeName: From<Z>,
-                I: Serialize + std::fmt::Debug,
-                O: serde::de::DeserializeOwned + std::fmt::Debug,
+        where
+            FunctionName: From<F>,
+            ZomeName: From<Z>,
+            I: Serialize + std::fmt::Debug,
+            O: serde::de::DeserializeOwned + std::fmt::Debug,
         {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
@@ -1295,7 +1296,7 @@ mod app_impls {
                     .map(|(c, p)| (c.as_id().clone(), p.clone()))
                     .collect(),
             )
-                .await?;
+            .await?;
 
             let cell_data = cell_data.into_iter().map(|(c, _)| c);
             let app = InstalledAppCommon::new_legacy(installed_app_id, cell_data)?;
@@ -1692,7 +1693,7 @@ mod clone_cell_impls {
                     Ok((state, ()))
                 }
             })
-                .await?;
+            .await?;
             self.remove_dangling_cells().await?;
             Ok(())
         }
@@ -1935,7 +1936,7 @@ mod app_status_impls {
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
-                        let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
+                    let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
                         app_ids
                             .as_ref()
                             .map(|ids| ids.contains(&**id))
@@ -2007,8 +2008,8 @@ mod state_impls {
 
         /// Update the internal state with a pure function mapping old state to new
         pub(crate) async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
-            where
-                F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
+        where
+            F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
         {
             self.spaces.update_state(f).await
         }
@@ -2020,9 +2021,9 @@ mod state_impls {
             &self,
             f: F,
         ) -> ConductorResult<(ConductorState, O)>
-            where
-                F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
-                O: Send + 'static,
+        where
+            F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
+            O: Send + 'static,
         {
             self.check_running()?;
             self.spaces.update_state_prime(f).await
@@ -2107,11 +2108,12 @@ mod misc_impls {
             let source_chain = SourceChain::new(
                 self.get_or_create_authored_db(cell_id.dna_hash())?,
                 self.get_or_create_dht_db(cell_id.dna_hash())?,
-                self.get_or_create_space(cell_id.dna_hash())?.dht_query_cache,
+                self.get_or_create_space(cell_id.dna_hash())?
+                    .dht_query_cache,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
             )
-                .await?;
+            .await?;
 
             let cap_grant_entry = Entry::CapGrant(cap_grant);
             let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
@@ -2148,7 +2150,7 @@ mod misc_impls {
                 authored_db.clone().into(),
                 cell_id.agent_pubkey().clone(),
             )
-                .await?;
+            .await?;
 
             let out = JsonDump {
                 peer_dump,
@@ -2239,7 +2241,7 @@ mod misc_impls {
             graft_records_onto_source_chain::graft_records_onto_source_chain(
                 self, cell_id, validate, records,
             )
-                .await
+            .await
         }
 
         /// Update coordinator zomes on an existing dna.
@@ -2268,7 +2270,7 @@ mod misc_impls {
                 wasms.into_iter(),
                 Vec::with_capacity(0),
             )
-                .await?;
+            .await?;
 
             // Update RibosomeStore.
             self.ribosome_store()
@@ -2502,11 +2504,11 @@ impl Conductor {
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]
-                    .into_iter(),
+                .into_iter(),
             )
-                .await
-                .into_iter()
-                .collect::<Result<Vec<usize>, _>>()?;
+            .await
+            .into_iter()
+            .collect::<Result<Vec<usize>, _>>()?;
         }
 
         Ok(())
@@ -2538,15 +2540,15 @@ impl Conductor {
             }
             None =>
             // Collect all CellIds across all apps, deduped
-                {
-                    state
-                        .installed_apps()
-                        .iter()
-                        .filter(|(_, app)| app.status().is_running())
-                        .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
-                        .cloned()
-                        .collect()
-                }
+            {
+                state
+                    .installed_apps()
+                    .iter()
+                    .filter(|(_, app)| app.status().is_running())
+                    .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
+                    .cloned()
+                    .collect()
+            }
         };
 
         // calculate the existing cells so we can filter those out, only creating
@@ -2845,11 +2847,11 @@ pub(crate) async fn genesis_cells(
                     proof,
                     chc,
                 )
-                    .await
-            })
-                .map_err(CellError::from)
-                .and_then(|result| async move { result.map(|_| cell_id) })
                 .await
+            })
+            .map_err(CellError::from)
+            .and_then(|result| async move { result.map(|_| cell_id) })
+            .await
         }
     });
     let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
