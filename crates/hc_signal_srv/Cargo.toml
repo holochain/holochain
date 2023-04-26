@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_signal_srv"
-version = "0.2.0-beta-rc.1"
+version = "0.2.0-beta-rc.2"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_signal_srv"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
@@ -15,7 +15,7 @@ name = "hc-signal-srv"
 path = "src/bin/hc-signal-srv.rs"
 
 [dependencies]
-holochain_trace = { version = "^0.2.0-beta-rc.1", path = "../holochain_trace" }
+holochain_trace = { version = "^0.2.0-beta-rc.2", path = "../holochain_trace" }
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
 tx5-signal-srv = "=0.0.1-alpha.7"

@@ -1860,7 +1860,7 @@ dependencies = [
 name = "fixt"
 version = "0.2.0-beta-rc.0"
 dependencies = [
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "lazy_static",
  "parking_lot 0.10.2",
  "paste",
@@ -2347,7 +2347,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.3.0-beta-rc.4"
+version = "0.3.0-beta-rc.5"
 dependencies = [
  "arbitrary",
  "fixt",
@@ -2367,7 +2367,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0-beta-rc.6"
 dependencies = [
  "fixt",
  "getrandom 0.2.9",
@@ -2388,7 +2388,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -2472,7 +2472,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "arbitrary",
  "base64 0.13.1",
@@ -2480,7 +2480,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "kitsune_p2p_dht_arc",
  "must_future",
  "rand 0.8.5",
@@ -2494,7 +2494,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0-beta-rc.7"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2525,7 +2525,7 @@ dependencies = [
  "holochain_conductor_api",
  "holochain_keystore",
  "holochain_p2p",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_state",
  "holochain_test_wasm_common",
@@ -2596,7 +2596,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0-beta-rc.7"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2609,7 +2609,7 @@ dependencies = [
  "hdk_derive",
  "holo_hash",
  "holochain_p2p",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_state",
  "holochain_trace",
@@ -2631,7 +2631,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0-beta-rc.7"
 dependencies = [
  "anyhow",
  "futures",
@@ -2645,12 +2645,12 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0-beta-rc.6"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
  "futures",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_types",
  "holochain_util",
  "holochain_wasmer_host",
@@ -2672,7 +2672,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0-beta-rc.6"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2703,7 +2703,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_signal_srv"
-version = "0.2.0-beta-rc.1"
+version = "0.2.0-beta-rc.2"
 dependencies = [
  "holochain_trace",
  "structopt",
@@ -2714,14 +2714,14 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0-beta-rc.7"
 dependencies = [
  "derive_more",
  "directories",
  "holo_hash",
  "holochain_keystore",
  "holochain_p2p",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_state",
  "holochain_trace",
  "holochain_types",
@@ -2755,11 +2755,11 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "arbitrary",
  "holo_hash",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "kitsune_p2p_timestamp",
  "paste",
  "serde",
@@ -2771,13 +2771,13 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0-beta-rc.6"
 dependencies = [
  "assert_cmd 2.0.11",
  "base64 0.13.1",
  "futures",
  "holo_hash",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_zome_types",
  "kitsune_p2p_types",
  "lair_keystore",
@@ -2805,7 +2805,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0-beta-rc.7"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2814,7 +2814,7 @@ dependencies = [
  "ghost_actor 0.3.0-alpha.5",
  "holo_hash",
  "holochain_keystore",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_trace",
  "holochain_types",
  "holochain_util",
@@ -2838,22 +2838,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9805b3e01e7b5c144782a0823db4dc895fec18a9ccd45a492ce7c7bf157a9e38"
 dependencies = [
  "arbitrary",
- "holochain_serialized_bytes_derive 0.0.51",
- "rmp-serde 0.15.5",
- "serde",
- "serde-transcode",
- "serde_bytes",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "holochain_serialized_bytes"
-version = "0.0.52"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bac6151d65c9a6f26f1b1068046a98900214030924377a2142f60c279b091f51"
-dependencies = [
- "holochain_serialized_bytes_derive 0.0.52",
+ "holochain_serialized_bytes_derive",
  "rmp-serde 0.15.5",
  "serde",
  "serde-transcode",
@@ -2873,18 +2858,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_serialized_bytes_derive"
-version = "0.0.52"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17cec0d0c2317fcb87772d0a8b5b5e88c7276aef93bf3496931e89cb9231c129"
-dependencies = [
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "holochain_sqlite"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0-beta-rc.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2900,7 +2875,7 @@ dependencies = [
  "futures",
  "getrandom 0.2.9",
  "holo_hash",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_trace",
  "holochain_util",
  "holochain_zome_types",
@@ -2934,7 +2909,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0-beta-rc.7"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2955,7 +2930,7 @@ dependencies = [
  "holo_hash",
  "holochain_keystore",
  "holochain_p2p",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_trace",
  "holochain_types",
@@ -2982,7 +2957,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0-beta-rc.6"
 dependencies = [
  "hdk",
  "serde",
@@ -2990,11 +2965,11 @@ dependencies = [
 
 [[package]]
 name = "holochain_trace"
-version = "0.2.0-beta-rc.1"
+version = "0.2.0-beta-rc.2"
 dependencies = [
  "chrono",
  "derive_more",
- "holochain_serialized_bytes 0.0.52",
+ "holochain_serialized_bytes",
  "inferno",
  "once_cell",
  "serde",
@@ -3012,7 +2987,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0-beta-rc.7"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3031,7 +3006,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain_keystore",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_trace",
  "holochain_types",
@@ -3050,7 +3025,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.7.2",
+ "pretty_assertions 0.6.1",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3073,7 +3048,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.2.0-beta-rc.0"
+version = "0.2.0-beta-rc.1"
 dependencies = [
  "backtrace",
  "cfg-if 0.1.10",
@@ -3089,7 +3064,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0-beta-rc.7"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3105,7 +3080,7 @@ version = "0.0.84"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "223daec7ca62d4e36841a99d8799b29cc616f5976ad0e2975e6ca6810de8f14f"
 dependencies = [
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "serde",
  "serde_bytes",
  "test-fuzz",
@@ -3120,7 +3095,7 @@ version = "0.0.84"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92b2026e44595cb16108464973622577936605582aa22932933a5130ad32ce42"
 dependencies = [
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "parking_lot 0.12.1",
  "paste",
@@ -3135,7 +3110,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65912ef579fa53ca4ad7713f13379fae53a0d79ef2d91b87670201044eae0d5e"
 dependencies = [
  "bimap",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "once_cell",
  "parking_lot 0.12.1",
@@ -3147,12 +3122,12 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.2.0-beta-rc.2"
+version = "0.2.0-beta-rc.3"
 dependencies = [
  "criterion",
  "futures",
  "ghost_actor 0.4.0-alpha.5",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_trace",
  "holochain_types",
  "linefeed",
@@ -3175,7 +3150,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0-beta-rc.6"
 dependencies = [
  "arbitrary",
  "contrafact",
@@ -3183,7 +3158,7 @@ dependencies = [
  "fixt",
  "holo_hash",
  "holochain_integrity_types",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
@@ -3594,7 +3569,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0-beta-rc.6"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -3646,7 +3621,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.2.0-beta-rc.2"
+version = "0.2.0-beta-rc.3"
 dependencies = [
  "arbitrary",
  "base64 0.13.1",
@@ -3659,7 +3634,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.2.0-beta-rc.3"
+version = "0.2.0-beta-rc.4"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -3669,7 +3644,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap"
-version = "0.1.0-beta-rc.3"
+version = "0.1.0-beta-rc.4"
 dependencies = [
  "clap 3.2.23",
  "criterion",
@@ -3691,14 +3666,14 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.2.0-beta-rc.2"
+version = "0.2.0-beta-rc.3"
 dependencies = [
  "colored 1.9.3",
  "derivative",
  "derive_more",
  "futures",
  "gcollections",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_trace",
  "intervallum",
  "kitsune_p2p_dht",
@@ -3720,7 +3695,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.2.0-beta-rc.2"
+version = "0.2.0-beta-rc.3"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -3738,11 +3713,11 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_fetch"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "derive_more",
  "futures",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "holochain_trace",
  "human-repr",
  "kitsune_p2p_fetch",
@@ -3762,7 +3737,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_mdns"
-version = "0.2.0-beta-rc.0"
+version = "0.2.0-beta-rc.1"
 dependencies = [
  "async-stream",
  "base64 0.13.1",
@@ -3777,7 +3752,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_proxy"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "base64 0.13.1",
  "blake2b_simd 0.5.11",
@@ -3802,12 +3777,12 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.2.0-beta-rc.1"
+version = "0.2.0-beta-rc.2"
 dependencies = [
  "arbitrary",
  "chrono",
  "derive_more",
- "holochain_serialized_bytes 0.0.51",
+ "holochain_serialized_bytes",
  "rusqlite",
  "serde",
  "serde_yaml",
@@ -3815,7 +3790,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_transport_quic"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "blake2b_simd 1.0.1",
  "futures",
@@ -3833,7 +3808,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0-beta-rc.5"
 dependencies = [
  "arbitrary",
  "base64 0.13.1",
@@ -4383,7 +4358,7 @@ dependencies = [
 
 [[package]]
 name = "mr_bundle"
-version = "0.2.0-beta-rc.0"
+version = "0.2.0-beta-rc.1"
 dependencies = [
  "anyhow",
  "arbitrary",
