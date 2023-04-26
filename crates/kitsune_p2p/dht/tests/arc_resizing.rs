@@ -39,7 +39,7 @@ fn test_shrink_towards_empty() {
     let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
     // start with a full arq at max power
-    let mut arq = Arq::new_full(&topo, 0u32.into(), topo.max_space_power(&strat));
+    let mut arq = Arq::new_full(&topo, &strat, 0u32.into());
     resize_to_equilibrium(&view, &mut arq);
     // test that the arc gets reduced in power to match those of its peers
     assert!(
@@ -205,7 +205,7 @@ fn test_scenario() {
 
     {
         // start with a full arq
-        let mut arq = Arq::new_full(&topo, Loc::new(0x0), topo.max_space_power(&strat));
+        let mut arq = Arq::new_full(&topo, &strat, Loc::new(0x0));
         // create 10 peers, all with full arcs, fully covering the DHT
         let peers: Vec<_> = generate_ideal_coverage(&topo, &mut rng, &strat, None, 10, jitter);
         let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
@@ -219,7 +219,7 @@ fn test_scenario() {
 
     {
         // start with a full arq again
-        let mut arq = Arq::new_full(&topo, Loc::new(0x0), topo.max_space_power(&strat));
+        let mut arq = Arq::new_full(&topo, &strat, Loc::new(0x0));
         // create 100 peers, with arcs at about 10%,
         // covering a bit more than they need to
         let peers = generate_ideal_coverage(&topo, &mut rng, &strat, Some(13.0), 100, jitter);

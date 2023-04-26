@@ -10,7 +10,7 @@ use super::{ribosome_store::RibosomeStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
 use holochain_p2p::{
-    dht::{spacetime::Topology, ArqStrat},
+    dht::{prelude::ArqBoundsSet, spacetime::Topology, ArqStrat},
     DnaHashExt,
 };
 use holochain_sqlite::prelude::AsP2pStateTxExt;
@@ -163,14 +163,14 @@ impl KitsuneHost for KitsuneHostImpl {
     fn query_region_set(
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
-        dht_arc_set: Arc<holochain_p2p::dht_arc::DhtArcSet>,
+        arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<holochain_p2p::dht::region_set::RegionSetLtcs> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
-            let topology = self.get_topology(space.clone()).await?;
+            let topology = self.topology(space.clone()).await?;
             let db = self.spaces.dht_db(&dna_hash)?;
             let region_set =
-                query_region_set::query_region_set(db, topology.clone(), &self.strat, dht_arc_set)
+                query_region_set::query_region_set(db, topology.clone(), &self.strat, arq_set)
                     .await?;
             Ok(region_set)
         }
@@ -186,7 +186,7 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<Vec<holochain_p2p::dht::region::Region>> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
-            let topology = self.get_topology(space).await?;
+            let topology = self.topology(space).await?;
             let db = self.spaces.dht_db(&dna_hash)?;
             Ok(query_size_limited_regions::query_size_limited_regions(
                 db, topology, regions, size_limit,
@@ -205,7 +205,7 @@ impl KitsuneHost for KitsuneHostImpl {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
             let db = self.spaces.dht_db(&dna_hash)?;
-            let topology = self.get_topology(space).await?;
+            let topology = self.topology(space).await?;
             let bounds = region.to_bounds(&topology);
             Ok(query_region_op_hashes::query_region_op_hashes(db.clone(), bounds).await?)
         }
@@ -213,7 +213,7 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
-    fn get_topology(&self, space: Arc<kitsune_p2p::KitsuneSpace>) -> KitsuneHostResult<Topology> {
+    fn topology(&self, space: Arc<kitsune_p2p::KitsuneSpace>) -> KitsuneHostResult<Topology> {
         let dna_hash = DnaHash::from_kitsune(&space);
         let dna_def = self
             .ribosome_store

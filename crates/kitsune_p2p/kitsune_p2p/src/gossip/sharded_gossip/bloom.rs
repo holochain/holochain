@@ -1,3 +1,5 @@
+use kitsune_p2p_types::dht::prelude::CommonArqs;
+
 use crate::gossip::sharded_gossip::store::TimeChunk;
 
 use super::*;
@@ -15,11 +17,11 @@ impl ShardedGossipLocal {
         &self,
         state: RoundState,
     ) -> KitsuneResult<Option<BloomFilter>> {
-        let RoundState { common_arc_set, .. } = state;
+        let RoundState { common_arqs, .. } = state;
         // Get the time range for this gossip.
         // Get all the agent info that is within the common arc set.
         let agents_within_arc: Vec<_> =
-            get_agent_info(&self.evt_sender, &self.space, common_arc_set).await?;
+            get_agent_info(&self.evt_sender, &self.space, common_arqs).await?;
 
         // There was no agents so we don't create a bloom.
         if agents_within_arc.is_empty() {
@@ -48,7 +50,7 @@ impl ShardedGossipLocal {
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
     pub(super) async fn generate_op_blooms_for_time_window(
         &self,
-        common_arc_set: &Arc<DhtArcSet>,
+        common_arc_set: &ArqBoundsSet,
         search_time_window: TimeWindow,
     ) -> KitsuneResult<Batch<TimedBloomFilter>> {
         use futures::TryStreamExt;
@@ -65,7 +67,7 @@ impl ShardedGossipLocal {
         let stream = store::hash_chunks_query(
             self.evt_sender.clone(),
             self.space.clone(),
-            (**common_arc_set).clone(),
+            common_arc_set.clone(),
             search_time_window.clone(),
             true,
         );
@@ -166,7 +168,7 @@ impl ShardedGossipLocal {
     /// - The expected performance per op is average 10ms and worst 100 ms.
     pub(super) async fn check_op_bloom(
         &self,
-        common_arc_set: DhtArcSet,
+        common_arc_set: CommonArqs,
         remote_bloom: &TimedBloomFilter,
     ) -> KitsuneResult<Batch<Arc<KitsuneOpHash>>> {
         use futures::TryStreamExt;
@@ -233,7 +235,7 @@ impl ShardedGossipLocal {
 async fn get_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    arc_set: Arc<DhtArcSet>,
+    arc_set: Arc<ArqBoundsSet>,
 ) -> KitsuneResult<Vec<AgentInfoSigned>> {
     Ok(store::agent_info_within_arc_set(evt_sender, space, arc_set)
         .await?

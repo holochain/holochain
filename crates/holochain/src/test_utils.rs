@@ -280,7 +280,7 @@ where
                 QueryPeerDensity { respond, .. } => {
                     respond.r(ok_fut(Ok(PeerViewQ::new(
                         Topology::standard_epoch(cutoff),
-                        ArqStrat::default(),
+                        ArqStrat::standard(),
                         vec![],
                     )
                     .into())));

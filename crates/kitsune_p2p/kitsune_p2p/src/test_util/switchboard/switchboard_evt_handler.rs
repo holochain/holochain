@@ -99,7 +99,7 @@ impl KitsuneHost for SwitchboardEventHandler {
     fn peer_extrapolated_coverage(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: dht_arc::DhtArcSet,
+        _arq_set: ArqBoundsSet,
     ) -> crate::KitsuneHostResult<Vec<f64>> {
         unimplemented!()
     }
@@ -126,12 +126,10 @@ impl KitsuneHost for SwitchboardEventHandler {
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<dht_arc::DhtArcSet>,
+        arq_set: ArqBoundsSet,
     ) -> crate::KitsuneHostResult<dht::region_set::RegionSetLtcs> {
         async move {
-            let topo = self.get_topology(space).await?;
-            let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
-                .expect("an arq could not be quantized");
+            let topo = self.topology(space);
 
             // NOTE: If this were implemented correctly, it would take the recent_threshold
             //       (default 1 hour) into account, so that historical gossip doesn't overlap
@@ -195,11 +193,8 @@ impl KitsuneHost for SwitchboardEventHandler {
         .into()
     }
 
-    fn get_topology(
-        &self,
-        _space: Arc<KitsuneSpace>,
-    ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
-        box_fut(Ok(self.sb.topology.clone()))
+    fn topology(&self, _space: Arc<KitsuneSpace>) -> dht::spacetime::Topology {
+        self.sb.topology.clone()
     }
 
     fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
@@ -242,7 +237,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
             space,
             agents,
             window,
-            arc_set,
+            arq_set: arc_set,
             near_basis,
             limit,
         }: QueryAgentsEvt,
@@ -264,7 +259,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_query_peer_density(
         &mut self,
         space: Arc<KitsuneSpace>,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        arq: kitsune_p2p_types::dht::Arq,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
         todo!()
     }
@@ -324,13 +319,14 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
     fn handle_query_op_hashes(
         &mut self,
         QueryOpHashesEvt {
-            space: _,
+            space,
             arc_set,
             window,
             max_ops,
             include_limbo,
         }: QueryOpHashesEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<(Vec<Arc<KitsuneOpHash>>, TimeWindowInclusive)>> {
+        let topo = self.topology(space);
         ok_fut(Ok(self.sb.share(|sb| {
             let (ops, timestamps): (Vec<_>, Vec<_>) = sb
                 .get_ops_loc8(&self.node)
@@ -342,7 +338,7 @@ impl KitsuneP2pEventHandler for SwitchboardEventHandler {
                         window.contains(&op.timestamp)
                         // Does the op fall within one of the specified arcsets
                         // with the correct integration/limbo criteria?
-                        && arc_set.contains((*op_loc8).into())
+                        && arc_set.contains(&topo, (*op_loc8).into())
                     )
                     .then(|| op)
                 })

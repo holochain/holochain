@@ -412,8 +412,10 @@ async fn mock_network_sharded_gossip() {
     // We are pretending that all simulated agents have all other agents (except the real agent)
     // for this test.
 
+    let topo = Topology::standard_epoch_full();
+
     // Create the one agent bloom.
-    let agent_bloom = create_agent_bloom(data.agent_info(), None);
+    let agent_bloom = create_agent_bloom(&topo, data.agent_info(), None);
 
     // Create the simulated network.
     let (from_kitsune_tx, to_kitsune_rx, mut channel) = HolochainP2pMockChannel::channel(
@@ -565,7 +567,11 @@ async fn mock_network_sharded_gossip() {
                                         if let Some(alice) = &alice {
                                             let a = alice.storage_arc;
                                             let b = interval.clone();
-                                            debug!("{}\n{}", a.to_ascii(10), b.to_ascii(10));
+                                            debug!(
+                                                "{}\n{}",
+                                                a.to_ascii(&topo, 10),
+                                                b.to_ascii(&topo, 10)
+                                            );
                                             let a: DhtArcSet = a.inner().into();
                                             let b: DhtArcSet = b.inner().into();
                                             if !a.overlap(&b) {
@@ -983,6 +989,36 @@ async fn mock_network_sharding() {
     let num_gets = Arc::new(AtomicUsize::new(0));
     let num_misses = Arc::new(AtomicUsize::new(0));
 
+    // Create the mock network.
+    let mock_network =
+        kitsune_p2p::test_util::mock_network::mock_network(from_kitsune_tx, to_kitsune_rx);
+    let mock_network: AdapterFactory = Arc::new(mock_network);
+
+    // Setup the bootstrap.
+    let (bootstrap, _shutdown) = run_bootstrap(data.agent_to_info.values().cloned()).await;
+    // Setup the network.
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.gossip_strategy = "sharded-gossip".to_string();
+    tuning.gossip_dynamic_arcs = true;
+
+    let mut network = KitsuneP2pConfig::default();
+    network.bootstrap_service = Some(bootstrap);
+    network.transport_pool = vec![TransportConfig::Mock {
+        mock_network: mock_network.into(),
+    }];
+    network.tuning_params = Arc::new(tuning);
+    let mut config = ConductorConfig::default();
+    config.network = Some(network);
+
+    // Add it to the conductor builder.
+    let builder = ConductorBuilder::new().config(config);
+    let mut conductor = SweetConductor::from_builder(builder).await;
+
+    let topo = dna_file
+        .dna_def()
+        .topology(tuning.danger_gossip_recent_threshold());
+
     // Spawn the task that will simulate the network.
     tokio::task::spawn({
         let data = data.clone();
@@ -1164,6 +1200,7 @@ async fn mock_network_sharding() {
 
                                         // Create an agent bloom and send it.
                                         let agent_bloom = create_agent_bloom(
+                                            &topo,
                                             data.agent_info(),
                                             Some(&data.agent_to_info[&agent]),
                                         );
@@ -1269,32 +1306,6 @@ async fn mock_network_sharding() {
         }
     });
 
-    // Create the mock network.
-    let mock_network =
-        kitsune_p2p::test_util::mock_network::mock_network(from_kitsune_tx, to_kitsune_rx);
-    let mock_network: AdapterFactory = Arc::new(mock_network);
-
-    // Setup the bootstrap.
-    let (bootstrap, _shutdown) = run_bootstrap(data.agent_to_info.values().cloned()).await;
-    // Setup the network.
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.gossip_strategy = "sharded-gossip".to_string();
-    tuning.gossip_dynamic_arcs = true;
-
-    let mut network = KitsuneP2pConfig::default();
-    network.bootstrap_service = Some(bootstrap);
-    network.transport_pool = vec![TransportConfig::Mock {
-        mock_network: mock_network.into(),
-    }];
-    network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
-    config.network = Some(network);
-
-    // Add it to the conductor builder.
-    let builder = ConductorBuilder::new().config(config);
-    let mut conductor = SweetConductor::from_builder(builder).await;
-
     // Install the real agent alice.
     let apps = conductor
         .setup_app("app", &[dna_file.clone()])
@@ -1314,7 +1325,7 @@ async fn mock_network_sharding() {
                     let info = txn.p2p_get_agent(&alice_kit).unwrap();
                     {
                         if let Some(info) = &info {
-                            eprintln!("Alice coverage {:.2}", info.storage_arc.coverage());
+                            eprintln!("Alice coverage {:.2}", info.storage_arc.coverage(&topo));
                         }
                         *alice_info.lock() = info;
                     }

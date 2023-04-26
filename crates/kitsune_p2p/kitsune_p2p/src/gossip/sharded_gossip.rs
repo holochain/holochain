@@ -16,8 +16,11 @@ use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
+use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, CommonArqs};
 use kitsune_p2p_types::dht::region::{Region, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
+use kitsune_p2p_types::dht::spacetime::Topology;
+use kitsune_p2p_types::dht::{ArqBounds, ArqStrat};
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -625,7 +628,7 @@ pub struct RoundState {
     /// The remote agents hosted by the remote node, used for metrics tracking
     pub(crate) remote_agent_list: Vec<AgentInfoSigned>,
     /// The common ground with our gossip partner for the purposes of this round
-    common_arc_set: Arc<DhtArcSet>,
+    common_arqs: Arc<CommonArqs>,
     /// We've received the last op bloom filter from our partner
     /// (the one with `finished` == true)
     received_all_incoming_op_blooms: bool,
@@ -663,13 +666,13 @@ impl RoundState {
     /// Constructor
     pub fn new(
         remote_agent_list: Vec<AgentInfoSigned>,
-        common_arc_set: Arc<DhtArcSet>,
+        common_arqs: Arc<ArqBoundsSet>,
         region_set_sent: Option<Arc<RegionSetLtcs<RegionData>>>,
         round_timeout: Duration,
     ) -> Self {
         RoundState {
             remote_agent_list,
-            common_arc_set,
+            common_arqs,
             received_all_incoming_op_blooms: false,
             has_pending_historical_op_data: false,
             regions_are_queued: false,
@@ -730,12 +733,12 @@ impl ShardedGossipLocal {
     fn new_state(
         &self,
         remote_agent_list: Vec<AgentInfoSigned>,
-        common_arc_set: Arc<DhtArcSet>,
+        common_arqs: ArqBoundsSet,
         region_set_sent: Option<RegionSetLtcs>,
     ) -> KitsuneResult<RoundState> {
         Ok(RoundState::new(
             remote_agent_list,
-            common_arc_set,
+            Arc::new(common_arqs),
             region_set_sent.map(Arc::new),
             ROUND_TIMEOUT,
         ))
@@ -825,6 +828,10 @@ impl ShardedGossipLocal {
         })
     }
 
+    fn topology(&self) -> Topology {
+        self.host_api.topology(self.space.clone())
+    }
+
     async fn process_incoming(
         &self,
         peer_cert: StateKey,
@@ -853,19 +860,15 @@ impl ShardedGossipLocal {
         // If we don't have the state for a message then the other node will need to timeout.
         let r = match msg {
             ShardedGossipWire::Initiate(Initiate {
-                intervals,
+                arqs,
                 id,
                 agent_list,
             }) => {
-                self.incoming_initiate(peer_cert, intervals, id, agent_list)
+                self.incoming_initiate(peer_cert, arqs, id, agent_list)
                     .await?
             }
-            ShardedGossipWire::Accept(Accept {
-                intervals,
-                agent_list,
-            }) => {
-                self.incoming_accept(peer_cert, intervals, agent_list)
-                    .await?
+            ShardedGossipWire::Accept(Accept { arqs, agent_list }) => {
+                self.incoming_accept(peer_cert, arqs, agent_list).await?
             }
             ShardedGossipWire::Agents(Agents { filter }) => {
                 if let Some(state) = self.get_state(&peer_cert)? {
@@ -1162,9 +1165,9 @@ kitsune_p2p_types::write_codec_enum! {
     codec ShardedGossipWire {
         /// Initiate a round of gossip with a remote node
         Initiate(0x10) {
-            /// The list of arc intervals (equivalent to a [`DhtArcSet`])
+            /// The list of arc intervals (equivalent to a [`ArqBoundsSet`])
             /// for all local agents
-            intervals.0: Vec<DhtArcRange>,
+            arqs.0: Vec<ArqBounds>,
             /// A random number to resolve concurrent initiates.
             id.1: u32,
             /// List of active local agents represented by this node.
@@ -1173,9 +1176,9 @@ kitsune_p2p_types::write_codec_enum! {
 
         /// Accept an incoming round of gossip from a remote node
         Accept(0x20) {
-            /// The list of arc intervals (equivalent to a [`DhtArcSet`])
+            /// The list of arc intervals (equivalent to a [`ArqBoundsSet`])
             /// for all local agents
-            intervals.0: Vec<DhtArcRange>,
+            arqs.0: Vec<ArqBounds>,
             /// List of active local agents represented by this node.
             agent_list.1: Vec<AgentInfoSigned>,
         },

@@ -1,3 +1,5 @@
+use kitsune_p2p_types::dht::prelude::ArqSet;
+
 use super::*;
 
 impl ShardedGossipLocal {
@@ -9,11 +11,11 @@ impl ShardedGossipLocal {
         remote_bloom: BloomFilter,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         // Unpack this rounds state.
-        let RoundState { common_arc_set, .. } = state;
+        let RoundState { common_arqs, .. } = state;
 
         // Get all agents within common arc and filter out
         // the ones in the remote bloom.
-        let missing: Vec<_> = get_agent_info(&self.evt_sender, &self.space, common_arc_set)
+        let missing: Vec<_> = get_agent_info(&self.evt_sender, &self.space, common_arqs)
             .await?
             .filter(|info| {
                 // Check them against the bloom
@@ -49,7 +51,7 @@ impl ShardedGossipLocal {
 async fn get_agent_info(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    arc_set: Arc<DhtArcSet>,
+    arqs: Arc<ArqBoundsSet>,
 ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
-    store::agent_info_within_arc_set(evt_sender, space, arc_set).await
+    store::agent_info_within_arc_set(evt_sender, space, arqs).await
 }

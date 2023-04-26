@@ -13,13 +13,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = "0.4.24"
 colored = { version = "1", optional = true }
 derivative = "2.2.0"
 derive_more = "0.99"
 futures = "0.3"
 gcollections = "1.5"
 kitsune_p2p_dht_arc = { version = "^0.2.0-beta-rc.2", path = "../dht_arc"}
-kitsune_p2p_timestamp = { version = "^0.2.0-beta-rc.1", path = "../timestamp", features = ["now"]}
+kitsune_p2p_timestamp = { version = "^0.2.0-beta-rc.1", path = "../timestamp", features = ["now", "chrono"]}
 intervallum = "1.4"
 must_future = "0.1"
 num-traits = "0.2.14"

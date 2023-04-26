@@ -27,9 +27,9 @@ async fn fullsync_3way_recent() {
     let a3 = SwitchboardAgent::full(3);
 
     sb.share(|sb| {
-        sb.add_local_agent(&n1, &a1);
-        sb.add_local_agent(&n2, &a2);
-        sb.add_local_agent(&n3, &a3);
+        sb.add_local_agent(&topo, &n1, &a1);
+        sb.add_local_agent(&topo, &n2, &a2);
+        sb.add_local_agent(&topo, &n3, &a3);
 
         sb.add_ops_now(&n1, true, [10, 20, 30]);
         sb.add_ops_now(&n2, true, [-10, -20, -30]);
@@ -74,25 +74,25 @@ async fn sharded_3way_recent() {
     let a2 = SwitchboardAgent::from_bounds(-90, 30);
     let a3 = SwitchboardAgent::from_bounds(60, -60);
 
-    sb.share(|sb| {
-        sb.add_local_agent(&n1, &a1);
-        sb.add_local_agent(&n2, &a2);
-        sb.add_local_agent(&n3, &a3);
+    sb.share(|s| {
+        s.add_local_agent(&topo, &n1, &a1);
+        s.add_local_agent(&topo, &n2, &a2);
+        s.add_local_agent(&topo, &n3, &a3);
 
-        sb.add_ops_now(&n1, true, [10, 20, 30, 40, 50, 60, 70, 80]);
-        sb.add_ops_now(&n2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
-        sb.add_ops_now(&n3, true, [90, 120, -120, -90]);
+        s.add_ops_now(&n1, true, [10, 20, 30, 40, 50, 60, 70, 80]);
+        s.add_ops_now(&n2, true, [-10, -20, -30, -40, -50, -60, -70, -80]);
+        s.add_ops_now(&n3, true, [90, 120, -120, -90]);
 
-        sb.print_ascii_arcs(64, true);
+        s.print_ascii_arcs(&sb.topology, 64, true);
 
-        sb.exchange_all_peer_info();
+        s.exchange_all_peer_info();
     });
 
     // let gossip do its thing
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
     sb.share(|sb| {
-        sb.print_ascii_arcs(64, true);
+        sb.print_ascii_arcs(&sb.topology, 64, true);
         assert_eq!(
             (
                 sb.get_ops_loc8(&n1),
@@ -121,19 +121,19 @@ async fn transitive_peer_gossip() {
     let a3 = SwitchboardAgent::from_start_and_len(&topo, 128, 128);
     let a4 = SwitchboardAgent::from_start_and_len(&topo, 192, 128);
 
-    sb.share(|sb| {
-        sb.add_local_agent(&n1, &a1);
-        sb.add_local_agent(&n2, &a2);
-        sb.add_local_agent(&n3, &a3);
-        sb.add_local_agent(&n4, &a4);
+    sb.share(|s| {
+        s.add_local_agent(&topo, &n1, &a1);
+        s.add_local_agent(&topo, &n2, &a2);
+        s.add_local_agent(&topo, &n3, &a3);
+        s.add_local_agent(&topo, &n4, &a4);
 
         // 1 -> 2 -> 3 -> 4
         // (but 4 does not know about 1 and relies on transitive gossip)
-        sb.inject_peer_info(&n1, [&a2]);
-        sb.inject_peer_info(&n2, [&a3]);
-        sb.inject_peer_info(&n3, [&a4]);
+        s.inject_peer_info(&n1, [&a2]);
+        s.inject_peer_info(&n2, [&a3]);
+        s.inject_peer_info(&n3, [&a4]);
 
-        sb.print_peer_lists();
+        s.print_peer_lists();
     });
 
     // let gossip do its thing
@@ -161,15 +161,15 @@ async fn transitive_peer_gossip() {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    sb.share(|sb| {
-        sb.print_peer_lists();
-        sb.print_ascii_arcs(32, false);
+    sb.share(|s| {
+        s.print_peer_lists();
+        s.print_ascii_arcs(&sb.topology, 32, false);
         assert_eq!(
             (
-                &sb.all_peers(&n1),
-                &sb.all_peers(&n2),
-                &sb.all_peers(&n3),
-                &sb.all_peers(&n4)
+                &s.all_peers(&n1),
+                &s.all_peers(&n2),
+                &s.all_peers(&n3),
+                &s.all_peers(&n4)
             ),
             (&agent_locs, &agent_locs, &agent_locs, &agent_locs)
         );
@@ -194,10 +194,10 @@ async fn sharded_4way_recent() {
     let ops: Vec<_> = (0..256).step_by(8).map(|u| Loc8::from(u)).collect();
 
     sb.share(|sb| {
-        sb.add_local_agent(&n1, &a1);
-        sb.add_local_agent(&n2, &a2);
-        sb.add_local_agent(&n3, &a3);
-        sb.add_local_agent(&n4, &a4);
+        sb.add_local_agent(&topo, &n1, &a1);
+        sb.add_local_agent(&topo, &n2, &a2);
+        sb.add_local_agent(&topo, &n3, &a3);
+        sb.add_local_agent(&topo, &n4, &a4);
 
         sb.add_ops_now(&n1, true, ops[0..8].to_vec());
         sb.add_ops_now(&n2, true, ops[8..16].to_vec());
@@ -224,14 +224,14 @@ async fn sharded_4way_recent() {
         sb.inject_peer_info(&n3, [&a4]);
         sb.inject_peer_info(&n4, [&a1]);
 
-        sb.print_ascii_arcs(64, true);
+        sb.print_ascii_arcs(&sb.topology, 64, true);
     });
 
     // let gossip do its thing
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
     sb.share(|sb| {
-        sb.print_ascii_arcs(64, true);
+        sb.print_ascii_arcs(&sb.topology, 64, true);
 
         let mut agent_locs: Vec<_> = vec![a1, a2, a3, a4].into_iter().map(|a| a.loc).collect();
         agent_locs.sort();
@@ -292,25 +292,25 @@ async fn sharded_4way_historical() {
         })
         .collect();
 
-    sb.share(|sb| {
+    sb.share(|s| {
         // - add agents
-        sb.add_local_agent(&n1, &a1);
-        sb.add_local_agent(&n2, &a2);
-        sb.add_local_agent(&n3, &a3);
-        sb.add_local_agent(&n4, &a4);
+        s.add_local_agent(&topo, &n1, &a1);
+        s.add_local_agent(&topo, &n2, &a2);
+        s.add_local_agent(&topo, &n3, &a3);
+        s.add_local_agent(&topo, &n4, &a4);
 
         // - add disjoint sets of ops to each node
-        sb.add_ops_timed(&n1, true, ops_timed[0..8].to_vec());
-        sb.add_ops_timed(&n2, true, ops_timed[8..16].to_vec());
-        sb.add_ops_timed(&n3, true, ops_timed[16..24].to_vec());
-        sb.add_ops_timed(&n4, true, ops_timed[24..32].to_vec());
+        s.add_ops_timed(&n1, true, ops_timed[0..8].to_vec());
+        s.add_ops_timed(&n2, true, ops_timed[8..16].to_vec());
+        s.add_ops_timed(&n3, true, ops_timed[16..24].to_vec());
+        s.add_ops_timed(&n4, true, ops_timed[24..32].to_vec());
 
         assert_eq!(
             (
-                sb.get_ops_loc8(&n1),
-                sb.get_ops_loc8(&n2),
-                sb.get_ops_loc8(&n3),
-                sb.get_ops_loc8(&n4),
+                s.get_ops_loc8(&n1),
+                s.get_ops_loc8(&n2),
+                s.get_ops_loc8(&n3),
+                s.get_ops_loc8(&n4),
             ),
             (
                 Loc8::set(ops_only[0..8].to_vec()),
@@ -320,26 +320,26 @@ async fn sharded_4way_historical() {
             )
         );
 
-        sb.exchange_all_peer_info();
+        s.exchange_all_peer_info();
 
-        sb.print_ascii_arcs(64, true);
+        s.print_ascii_arcs(&sb.topology, 64, true);
     });
 
     // let gossip do its thing
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
 
-    sb.share(|sb| {
-        sb.print_ascii_arcs(64, true);
+    sb.share(|s| {
+        s.print_ascii_arcs(&sb.topology, 64, true);
 
         let mut agent_locs: Vec<_> = vec![a1, a2, a3, a4].into_iter().map(|a| a.loc).collect();
         agent_locs.sort();
 
         assert_eq!(
             (
-                &sb.all_peers(&n1),
-                &sb.all_peers(&n2),
-                &sb.all_peers(&n3),
-                &sb.all_peers(&n4),
+                &s.all_peers(&n1),
+                &s.all_peers(&n2),
+                &s.all_peers(&n3),
+                &s.all_peers(&n4),
             ),
             (&agent_locs, &agent_locs, &agent_locs, &agent_locs)
         );
@@ -358,10 +358,10 @@ async fn sharded_4way_historical() {
 
         assert_eq!(
             (
-                sb.get_ops_loc8(&n1),
-                sb.get_ops_loc8(&n2),
-                sb.get_ops_loc8(&n3),
-                sb.get_ops_loc8(&n4),
+                s.get_ops_loc8(&n1),
+                s.get_ops_loc8(&n2),
+                s.get_ops_loc8(&n3),
+                s.get_ops_loc8(&n4),
             ),
             (
                 // NB: in the similar test for recent gossip above, these ranges are

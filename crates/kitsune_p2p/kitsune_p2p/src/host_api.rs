@@ -7,6 +7,7 @@ use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
     dependencies::lair_keystore_api,
     dht::{
+        prelude::ArqBoundsSet,
         region::{Region, RegionCoords},
         region_set::RegionSetLtcs,
         spacetime::Topology,
@@ -50,14 +51,14 @@ pub trait KitsuneHost: 'static + Send + Sync {
     fn peer_extrapolated_coverage(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: DhtArcSet,
+        arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<Vec<f64>>;
 
     /// Query aggregate dht op data to form an LTCS set of region data.
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
+        arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<RegionSetLtcs>;
 
     /// Given an input list of regions, return a list of equal or greater length
@@ -85,7 +86,7 @@ pub trait KitsuneHost: 'static + Send + Sync {
     ) -> KitsuneHostResult<()>;
 
     /// Get the quantum Topology associated with this Space.
-    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology>;
+    fn topology(&self, space: Arc<KitsuneSpace>) -> Topology;
 
     /// Hashing function to get an op_hash from op_data.
     fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash>;

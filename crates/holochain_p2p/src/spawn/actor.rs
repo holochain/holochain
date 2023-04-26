@@ -599,7 +599,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             space,
             agents,
             window,
-            arc_set,
+            arq_set,
             near_basis,
             limit,
         } = input;

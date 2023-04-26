@@ -543,13 +543,7 @@ impl KitsuneP2pActor {
                                                 }) => {
                                                     for (space, key_list) in fetch_list {
                                                         let mut hashes = Vec::new();
-                                                        let topo = match host
-                                                            .get_topology(space.clone())
-                                                            .await
-                                                        {
-                                                            Err(_) => continue,
-                                                            Ok(topo) => topo,
-                                                        };
+                                                        let topo = host.topology(space.clone());
                                                         let mut regions = Vec::new();
 
                                                         for key in key_list {
@@ -1005,9 +999,9 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_query_peer_density(
         &mut self,
         space: Arc<KitsuneSpace>,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        arq: kitsune_p2p_types::dht::Arq,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
-        Ok(self.evt_sender.query_peer_density(space, dht_arc))
+        Ok(self.evt_sender.query_peer_density(space, arq))
     }
 
     fn handle_call(
@@ -1074,7 +1068,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arc: Option<crate::dht_arc::DhtArc>,
+        initial_arq: Option<crate::dht::Arq>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
@@ -1112,7 +1106,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .join(space, agent, maybe_agent_info, initial_arc)
+                .join(space, agent, maybe_agent_info, initial_arq)
                 .await
         }
         .boxed()
@@ -1326,7 +1320,7 @@ mockall::mock! {
         fn handle_query_peer_density(
             &mut self,
             space: Arc<KitsuneSpace>,
-            dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+            arq: kitsune_p2p_types::dht::Arq,
         ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView>;
 
         fn handle_call(

@@ -60,7 +60,7 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
     fn peer_extrapolated_coverage(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: DhtArcSet,
+        _arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<Vec<f64>> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
@@ -86,7 +86,7 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
     fn query_region_set(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: Arc<DhtArcSet>,
+        _arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<RegionSetLtcs> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
@@ -113,13 +113,8 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
         .into()))
     }
 
-    fn get_topology(&self, _space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
-        box_fut(Err(format!(
-            "error for unimplemented KitsuneHost test behavior: method {} of {}",
-            "get_topology",
-            Self::NAME
-        )
-        .into()))
+    fn get_topology(&self, _space: Arc<KitsuneSpace>) -> Topology {
+        unimplemented!()
     }
 
     fn op_hash(&self, _op_data: KOpData) -> KitsuneHostResult<KOpHash> {
@@ -180,9 +175,9 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
     fn peer_extrapolated_coverage(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: DhtArcSet,
+        arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<Vec<f64>> {
-        KitsuneHostDefaultError::peer_extrapolated_coverage(self, space, dht_arc_set)
+        KitsuneHostDefaultError::peer_extrapolated_coverage(self, space, arq_set)
     }
 
     fn record_metrics(
@@ -205,12 +200,12 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
+        arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<RegionSetLtcs> {
-        KitsuneHostDefaultError::query_region_set(self, space, dht_arc_set)
+        KitsuneHostDefaultError::query_region_set(self, space, arq_set)
     }
 
-    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
+    fn topology(&self, space: Arc<KitsuneSpace>) -> Topology {
         KitsuneHostDefaultError::get_topology(self, space)
     }
 

@@ -12,12 +12,13 @@ use super::*;
 
 /// Create an agent bloom for testing.
 pub fn create_agent_bloom<'a>(
+    topo: &Topology,
     agents: impl Iterator<Item = &'a AgentInfoSigned>,
     filter: Option<&AgentInfoSigned>,
 ) -> Option<PoolBuf> {
     let agents: Vec<_> = match filter {
         Some(filter) => agents
-            .filter(|a| filter.storage_arc.contains(a.agent.get_loc()))
+            .filter(|a| filter.storage_arc.contains(topo, a.agent.get_loc()))
             .collect(),
         None => agents.collect(),
     };

@@ -10,7 +10,10 @@ use crate::event::{
 use crate::types::event::KitsuneP2pEventSender;
 use crate::HostApi;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::agent_info::AgentArq;
+use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, ArqSet};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
+use kitsune_p2p_types::dht::Arq;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneOpHash, KitsuneSpace},
@@ -49,7 +52,7 @@ pub(super) async fn local_agent_arcs(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
+) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, Arq)>> {
     Ok(query_agent_info(evt_sender, space, local_agents)
         .await?
         .into_iter()
@@ -62,7 +65,7 @@ pub(super) async fn local_arcs(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
     local_agents: &HashSet<Arc<KitsuneAgent>>,
-) -> KitsuneResult<Vec<DhtArc>> {
+) -> KitsuneResult<Vec<Arq>> {
     Ok(local_agent_arcs(evt_sender, space, local_agents)
         .await?
         .into_iter()
@@ -74,9 +77,9 @@ pub(super) async fn local_arcs(
 pub(super) async fn agent_info_within_arc_set(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    arc_set: Arc<DhtArcSet>,
+    arqs: Arc<ArqBoundsSet>,
 ) -> KitsuneResult<impl Iterator<Item = AgentInfoSigned>> {
-    let set: HashSet<_> = agents_within_arcset(evt_sender, space, arc_set)
+    let set: HashSet<_> = agents_within_arcset(evt_sender, space, arqs)
         .await?
         .into_iter()
         .map(|(a, _)| a)
@@ -91,10 +94,10 @@ pub(super) async fn agent_info_within_arc_set(
 pub(super) async fn agents_within_arcset(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    arc_set: Arc<DhtArcSet>,
-) -> KitsuneResult<Vec<(Arc<KitsuneAgent>, DhtArc)>> {
+    arqs: Arc<ArqBoundsSet>,
+) -> KitsuneResult<Vec<AgentArq>> {
     Ok(evt_sender
-        .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arc_set))
+        .query_agents(QueryAgentsEvt::new(space.clone()).by_arc_set(arqs))
         .await
         .map_err(KitsuneError::other)?
         .iter()
@@ -106,7 +109,7 @@ pub(super) async fn agents_within_arcset(
 pub(super) async fn all_op_hashes_within_arcset(
     evt_sender: &EventSender,
     space: &Arc<KitsuneSpace>,
-    common_arc_set: DhtArcSet,
+    common_arc_set: ArqBoundsSet,
     window: TimeWindow,
     max_ops: usize,
     include_limbo: bool,
@@ -165,7 +168,7 @@ pub struct TimeChunk {
 pub(super) fn hash_chunks_query(
     evt_sender: EventSender,
     space: Arc<KitsuneSpace>,
-    common_arc_set: DhtArcSet,
+    common_arc_set: ArqBoundsSet,
     search_time_window: TimeWindow,
     include_limbo: bool,
 ) -> impl futures::stream::TryStream<Ok = TimeChunk, Error = KitsuneError> + Unpin {
@@ -263,10 +266,10 @@ pub(super) fn hash_chunks_query(
 pub(super) async fn query_region_set<'a>(
     host_api: HostApi,
     space: Arc<KitsuneSpace>,
-    common_arc_set: Arc<DhtArcSet>,
+    arq_set: ArqBoundsSet,
 ) -> KitsuneResult<RegionSetLtcs> {
     host_api
-        .query_region_set(space, common_arc_set)
+        .query_region_set(space, arq_set)
         .await
         .map_err(KitsuneError::other)
 }

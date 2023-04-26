@@ -1,7 +1,8 @@
 use super::*;
 use crate::wire::MetricExchangeMsg;
-use kitsune_p2p_types::config::KitsuneP2pTuningParams;
+use kitsune_p2p_types::dht::ArqBounds;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
+use kitsune_p2p_types::{config::KitsuneP2pTuningParams, dht::prelude::ArqBoundsSet};
 use tokio::time::{Duration, Instant};
 
 struct ShouldTrigger {
@@ -51,7 +52,7 @@ pub(crate) struct MetricExchange {
     #[allow(dead_code)]
     metrics: MetricsSync,
     remote_refs: HashMap<String, RemoteRef>,
-    arc_set: DhtArcSet,
+    arq_set: ArqBoundsSet,
 }
 
 impl MetricExchange {
@@ -59,6 +60,7 @@ impl MetricExchange {
         space: Arc<KitsuneSpace>,
         tuning_params: KitsuneP2pTuningParams,
         metrics: MetricsSync,
+        topology: Topology,
     ) -> Self {
         Self {
             space,
@@ -67,7 +69,11 @@ impl MetricExchange {
             extrap_cov: 0.0,
             metrics,
             remote_refs: HashMap::new(),
-            arc_set: DhtArcSet::new_full(),
+            arq_set: ArqBoundsSet::new(vec![ArqBounds::new_full(
+                &topology,
+                &ArqStrat::standard(),
+                0.into(),
+            )]),
         }
     }
 
@@ -95,8 +101,8 @@ impl MetricExchange {
         }
     }
 
-    pub fn update_arcset(&mut self, arc_set: DhtArcSet) {
-        self.arc_set = arc_set;
+    pub fn update_arcset(&mut self, arc_set: ArqBoundsSet) {
+        self.arq_set = arc_set;
     }
 
     pub fn new_con(&mut self, url: String, con: MetaNetCon) {
@@ -162,6 +168,7 @@ impl MetricExchangeSync {
             space.clone(),
             tuning_params,
             metrics.clone(),
+            host.topology(space.clone()),
         ))));
 
         {
@@ -173,7 +180,7 @@ impl MetricExchangeSync {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
                     if last_extrap_cov.should_trigger() {
-                        let arc_set = mx.read().arc_set.clone();
+                        let arc_set = mx.read().arq_set.clone();
                         if let Ok(res) = host
                             .peer_extrapolated_coverage(space.clone(), arc_set)
                             .await

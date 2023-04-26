@@ -4,8 +4,8 @@ use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     bin_types::KOp,
-    dht::region::RegionBounds,
-    dht_arc::{DhtArcSet, DhtLocation},
+    dht::{prelude::ArqBoundsSet, region::RegionBounds},
+    dht_arc::DhtLocation,
 };
 use std::{collections::HashSet, sync::Arc};
 
@@ -16,8 +16,8 @@ use std::{collections::HashSet, sync::Arc};
 pub struct QueryOpHashesEvt {
     /// The "space" context.
     pub space: KSpace,
-    /// The DhtArcSet to filter by.
-    pub arc_set: DhtArcSet,
+    /// The ArqBoundsSet to filter by.
+    pub arc_set: ArqBoundsSet,
     /// The time window to search within.
     pub window: TimeWindow,
     /// Maximum number of ops to return.
@@ -91,7 +91,7 @@ pub struct QueryAgentsEvt {
     /// Optional time range to filter by.
     pub window: Option<TimeWindow>,
     /// Optional arcset to intersect by.
-    pub arc_set: Option<Arc<DhtArcSet>>,
+    pub arq_set: Option<Arc<ArqBoundsSet>>,
     /// If set, results are ordered by proximity to the specified location
     pub near_basis: Option<DhtLocation>,
     /// Limit to the number of results returned
@@ -109,7 +109,7 @@ impl QueryAgentsEvt {
             space,
             agents: None,
             window: None,
-            arc_set: None,
+            arq_set: None,
             near_basis: None,
             limit: None,
         }
@@ -128,8 +128,8 @@ impl QueryAgentsEvt {
     }
 
     /// Add in an an arcset query
-    pub fn by_arc_set(mut self, arc_set: Arc<DhtArcSet>) -> Self {
-        self.arc_set = Some(arc_set);
+    pub fn by_arc_set(mut self, arc_set: Arc<ArqBoundsSet>) -> Self {
+        self.arq_set = Some(arc_set);
         self
     }
 
@@ -247,8 +247,8 @@ ghost_actor::ghost_chan! {
         /// We need to get previously stored agent info.
         fn query_agents(input: QueryAgentsEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
-        /// Query the peer density of a space for a given [`DhtArc`].
-        fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht::PeerView;
+        /// Query the peer density of a space for a given [`Arq`].
+        fn query_peer_density(space: KSpace, arq: kitsune_p2p_types::dht::Arq) -> kitsune_p2p_types::dht::PeerView;
 
         /// We are receiving a request from a remote node.
         fn call(space: KSpace, to_agent: KAgent, payload: Payload) -> Vec<u8>;

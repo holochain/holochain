@@ -1,6 +1,9 @@
 //! Types representing a set of Arqs all of the same "power".
 
-use kitsune_p2p_dht_arc::DhtArcSet;
+use std::sync::atomic::{AtomicI64, Ordering};
+
+use kitsune_p2p_dht_arc::{DhtArcRange, DhtArcSet};
+use kitsune_p2p_timestamp::Timestamp;
 
 use crate::{
     arq::ArqBounds,
@@ -15,6 +18,45 @@ pub type ArqSet = ArqSetImpl<Loc>;
 /// Alias for a set of [`ArqBounds`]
 pub type ArqBoundsSet = ArqSetImpl<SpaceOffset>;
 
+/// Alias, common (intersected) arqs are always in terms of bounds
+pub type CommonArqs = ArqBoundsSet;
+
+static LAST_LOG_MS: AtomicI64 = AtomicI64::new(0);
+const LOG_RATE_MS: i64 = 1000;
+
+/// Helper to emit a warning whenever a continuous arc is rounded during quantization.
+/// Currently this is happening in some cases, and we need to ensure it never happens.
+pub fn emit_quantization_warning<L: ArqStart>(
+    context: &str,
+    continuous: &DhtArcSet,
+    quantized: &ArqSetImpl<L>,
+) {
+    // If an arq was rounded, emit a warning, but throttle it to once every LOG_RATE_MS
+    // so we don't get slammed.
+    let it_is_time = LAST_LOG_MS
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |t| {
+            let now = Timestamp::now();
+            // If the difference is greater than the logging interval,
+            // produce a Some so that the atomic val gets updated, which
+            // will trigger a log after the update.
+            now.checked_difference_signed(&Timestamp::from_micros(t * 1000))
+                .map(|d| d > chrono::Duration::milliseconds(LOG_RATE_MS))
+                .unwrap_or(false)
+                .then(|| now.as_millis())
+        })
+        .is_ok();
+    if it_is_time {
+        tracing::warn!(
+            "A continuous arc set could not be properly quantized. context: {}
+                Original:  {:?}
+                Quantized: {:?}",
+            context,
+            continuous,
+            quantized
+        );
+    }
+}
+
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
 /// (the lowest common power).
@@ -25,6 +67,7 @@ pub type ArqBoundsSet = ArqSetImpl<SpaceOffset>;
     Eq,
     derive_more::Deref,
     derive_more::DerefMut,
+    derive_more::Into,
     derive_more::IntoIterator,
     derive_more::Index,
     derive_more::IndexMut,
@@ -32,6 +75,7 @@ pub type ArqBoundsSet = ArqSetImpl<SpaceOffset>;
     serde::Deserialize,
 )]
 pub struct ArqSetImpl<S: ArqStart> {
+    #[into]
     #[into_iterator]
     #[deref]
     #[deref_mut]
@@ -61,8 +105,12 @@ impl<S: ArqStart> ArqSetImpl<S> {
         }
     }
 
+    pub fn new_full(topo: &Topology, strat: &ArqStrat) -> Self {
+        Self::new(vec![Arq::<S>::new_full(topo, strat, S::zero())])
+    }
+
     /// Empty set
-    pub fn empty() -> Self {
+    pub fn new_empty() -> Self {
         Self::new(vec![])
     }
 
@@ -115,6 +163,10 @@ impl<S: ArqStart> ArqSetImpl<S> {
                 .collect(),
             power,
         }
+    }
+
+    pub fn contains(&self, topo: &Topology, loc: Loc) -> bool {
+        todo!()
     }
 
     /// View ascii for all arq bounds
@@ -177,7 +229,11 @@ impl ArqBoundsSet {
                 a
             })
             .collect::<Vec<_>>();
-        (Self::new(arqs), rounded)
+        let arqs = Self::new(arqs);
+        if rounded {
+            emit_quantization_warning("from_dht_arc_set_rounded", dht_arc_set, &arqs);
+        }
+        (arqs, rounded)
     }
 }
 

@@ -1,3 +1,5 @@
+use kitsune_p2p_types::dht::{Arq, ArqBounds};
+
 use super::*;
 
 impl ShardedGossipLocal {
@@ -7,7 +9,7 @@ impl ShardedGossipLocal {
     pub(super) async fn incoming_accept(
         &self,
         peer_cert: Arc<[u8; 32]>,
-        remote_arc_set: Vec<DhtArcRange>,
+        remote_arc_set: Vec<ArqBounds>,
         remote_agent_list: Vec<AgentInfoSigned>,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         let (local_agents, when_initiated, accept_is_from_target) =
@@ -46,12 +48,15 @@ impl ShardedGossipLocal {
             return Ok(vec![ShardedGossipWire::no_agents()]);
         }
 
+        let topo = self.topology();
+        let strat = ArqStrat::standard();
+
         // Get the local intervals.
         let local_agent_arcs: Vec<_> =
             store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents)
                 .await?
                 .into_iter()
-                .map(|(_, a)| a.into())
+                .map(|(_, a)| a.to_bounds(&topo))
                 .collect();
 
         let mut gossip = Vec::new();

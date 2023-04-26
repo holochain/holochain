@@ -17,7 +17,7 @@ use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use kitsune_p2p_types::dht::prelude::power_and_count_from_length;
 use kitsune_p2p_types::dht::spacetime::Topology;
-use kitsune_p2p_types::dht::{ArqBounds, ArqStrat};
+use kitsune_p2p_types::dht::{Arq, ArqBounds, ArqStrat};
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtLocation};
 use kitsune_p2p_types::metrics::metric_task;
@@ -73,7 +73,7 @@ impl Switchboard {
     //   multiple loops will be created internally.
     pub fn new(topology: Topology, gossip_type: GossipType) -> Self {
         Self {
-            strat: ArqStrat::default(),
+            strat: ArqStrat::standard(),
             topology,
             inner: Share::new(SwitchboardState::default()),
             gossip_type,
@@ -225,17 +225,18 @@ impl Default for SwitchboardState {
 
 impl SwitchboardState {
     /// Add a local agent to the specified node.
-    pub fn add_local_agent(&mut self, node_ep: &NodeEp, agent: &SwitchboardAgent) {
+    pub fn add_local_agent(&mut self, topo: &Topology, node_ep: &NodeEp, agent: &SwitchboardAgent) {
         let SwitchboardAgent {
             loc: loc8,
             initial_arc,
         } = agent.clone();
         let agent = agent_from_loc(loc8);
+        let dht_arc = DhtArc::from_parts(initial_arc.canonical(), loc8.into());
         let info = fake_agent_info(
             self.space.clone(),
             node_ep,
             agent.clone(),
-            DhtArc::from_parts(initial_arc.canonical(), loc8.into()),
+            Arq::from_dht_arc_approximate(topo, &ArqStrat::standard(), &dht_arc),
         );
         if let Some(existing) = self.local_agent_by_loc8(loc8) {
             panic!(
@@ -258,7 +259,7 @@ impl SwitchboardState {
 
     /// Helpful ascii visualization of each agent's storage arc coverage
     /// across all nodes.
-    pub fn print_ascii_arcs(&self, width: usize, with_ops: bool) {
+    pub fn print_ascii_arcs(&self, topo: &Topology, width: usize, with_ops: bool) {
         const NUM_TICKS: usize = 4;
 
         // Add numbers at every quarter mark
@@ -299,14 +300,14 @@ impl SwitchboardState {
             );
             for (agent_loc8, agent) in node.local_agents.iter() {
                 let interval = &agent.info.storage_arc;
-                let ascii = interval.to_ascii(width);
+                let ascii = interval.to_ascii(topo, width);
                 println!(
                     "{:>4} {:>+5} |{:^width$}| {:>+4} {:?}",
                     "",
                     agent_loc8,
                     ascii,
                     interval.start_loc().as_loc8(),
-                    interval.map(|b| DhtLocation::as_loc8(&b)),
+                    interval,
                     width = width
                 );
             }
@@ -697,17 +698,10 @@ fn op_hash_from_loc<L: Into<DhtLocation>>(loc8: L) -> KOpHash {
     Arc::new(KitsuneOpHash::new(loc.to_representative_test_bytes_36()))
 }
 
-fn fake_agent_info(
-    space: KSpace,
-    node: &NodeEp,
-    agent: KAgent,
-    interval: DhtArc,
-) -> AgentInfoSigned {
+fn fake_agent_info(space: KSpace, node: &NodeEp, agent: KAgent, arq: Arq) -> AgentInfoSigned {
     use crate::fixt::*;
     let url_list = vec![node.local_addr().unwrap()];
-    let meta_info = AgentMetaInfoEncode {
-        dht_storage_arc_half_length: 0,
-    };
+    let meta_info = AgentMetaInfoEncode { arcsize: 0.into() };
     let mut buf = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut buf, meta_info).unwrap();
     let meta_info = buf.into_boxed_slice();
@@ -726,7 +720,7 @@ fn fake_agent_info(
     let state = AgentInfoInner {
         space,
         agent,
-        storage_arc: interval,
+        storage_arc: arq,
         url_list,
         signed_at_ms: 0,
         expires_at_ms: u64::MAX,

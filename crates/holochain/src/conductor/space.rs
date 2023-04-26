@@ -508,7 +508,7 @@ impl Spaces {
         dht_arc_set: DhtArcSet,
     ) -> ConductorResult<RegionSetLtcs> {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
-        let max_chunks = ArqStrat::default().max_chunks();
+        let max_chunks = ArqStrat::standard().max_chunks();
         let arq_set = ArqBoundsSet::new(
             dht_arc_set
                 .intervals()

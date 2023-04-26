@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 use super::*;
-use kitsune_p2p_types::{agent_info::AgentInfoSigned, dht_arc::DhtLocation};
+use kitsune_p2p_types::{
+    agent_info::AgentInfoSigned, dht::spacetime::Topology, dht_arc::DhtLocation,
+};
 use std::future::Future;
 
 /// This enum represents the outcomes from peer discovery
@@ -15,6 +17,7 @@ pub(crate) enum PeerDiscoverResult {
 
 /// search for / discover / and open a connection to a specific remote agent
 pub(crate) fn search_and_discover_peer_connect(
+    topo: Topology,
     inner: Arc<SpaceReadOnlyInner>,
     to_agent: Arc<KitsuneAgent>,
     timeout: KitsuneTimeout,
@@ -49,8 +52,13 @@ pub(crate) fn search_and_discover_peer_connect(
             }
 
             // let's do some discovery
-            if let Ok(nodes) =
-                search_remotes_covering_basis(inner.clone(), to_agent.get_loc(), timeout).await
+            if let Ok(nodes) = search_remotes_covering_basis(
+                topo.clone(),
+                inner.clone(),
+                to_agent.get_loc(),
+                timeout,
+            )
+            .await
             {
                 for node in nodes {
                     // try connecting to the returned nodes
@@ -150,6 +158,7 @@ pub(crate) fn peer_connect(
 /// looping search for agents covering basis_loc
 /// by requesting closer agents from remote nodes
 pub(crate) fn search_remotes_covering_basis(
+    topo: Topology,
     inner: Arc<SpaceReadOnlyInner>,
     basis_loc: DhtLocation,
     timeout: KitsuneTimeout,
@@ -173,7 +182,7 @@ pub(crate) fn search_remotes_covering_basis(
                 .await
                 .unwrap_or_else(|_| Vec::new())
             {
-                if node.storage_arc.contains(basis_loc) {
+                if node.storage_arc.contains(&topo, basis_loc) {
                     cover_nodes.push(node);
                 } else {
                     near_nodes.push(node);

@@ -9,43 +9,13 @@ use rusqlite::named_params;
 
 use crate::conductor::error::ConductorResult;
 
-static LAST_LOG_MS: AtomicI64 = AtomicI64::new(0);
-const LOG_RATE_MS: i64 = 1000;
-
 /// The network module needs info about various groupings ("regions") of ops
 pub async fn query_region_set(
     db: DbWrite<DbKindDht>,
     topology: Topology,
     strat: &ArqStrat,
-    dht_arc_set: Arc<DhtArcSet>,
+    arq_set: ArqBoundsSet,
 ) -> ConductorResult<RegionSetLtcs> {
-    let (arq_set, rounded) = ArqBoundsSet::from_dht_arc_set_rounded(&topology, strat, &dht_arc_set);
-    if rounded {
-        // If an arq was rounded, emit a warning, but throttle it to once every LOG_RATE_MS
-        // so we don't get slammed.
-        let it_is_time = LAST_LOG_MS
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |t| {
-                let now = Timestamp::now();
-                // If the difference is greater than the logging interval,
-                // produce a Some so that the atomic val gets updated, which
-                // will trigger a log after the update.
-                now.checked_difference_signed(&Timestamp::from_micros(t * 1000))
-                    .map(|d| d > chrono::Duration::milliseconds(LOG_RATE_MS))
-                    .unwrap_or(false)
-                    .then(|| now.as_millis())
-            })
-            .is_ok();
-        if it_is_time {
-            tracing::warn!(
-                "A continuous arc set could not be properly quantized.
-            Original:  {:?}
-            Quantized: {:?}",
-                dht_arc_set,
-                arq_set
-            );
-        }
-    }
-
     let times = TelescopingTimes::historical(&topology);
     let coords = RegionCoordSetLtcs::new(times, arq_set);
 
@@ -110,7 +80,7 @@ mod tests {
     async fn query_region_set_diff_size() {
         let db = test_dht_db();
         let topo = Topology::standard(Timestamp::now(), Duration::ZERO);
-        let strat = ArqStrat::default();
+        let strat = ArqStrat::standard();
         let arcset = Arc::new(DhtArcSet::Full);
 
         let regions_empty = query_region_set(db.to_db(), topo.clone(), &strat, arcset.clone())

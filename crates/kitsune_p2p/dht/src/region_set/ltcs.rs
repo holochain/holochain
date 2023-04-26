@@ -87,7 +87,7 @@ impl RegionCoordSetLtcs {
     pub fn empty() -> Self {
         Self {
             times: TelescopingTimes::empty(),
-            arq_set: ArqBoundsSet::empty(),
+            arq_set: ArqBoundsSet::new_empty(),
         }
     }
 

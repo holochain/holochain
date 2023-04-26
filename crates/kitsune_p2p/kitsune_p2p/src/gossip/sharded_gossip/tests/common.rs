@@ -64,7 +64,7 @@ impl KitsuneHost for StandardResponsesHostApi {
     fn peer_extrapolated_coverage(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: DhtArcSet,
+        _arq_set: ArqBoundsSet,
     ) -> crate::KitsuneHostResult<Vec<f64>> {
         todo!()
     }
@@ -83,15 +83,9 @@ impl KitsuneHost for StandardResponsesHostApi {
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
+        arqs: ArqBoundsSet,
     ) -> crate::KitsuneHostResult<RegionSetLtcs> {
         async move {
-            let arqs = ArqBoundsSet::from_dht_arc_set(
-                &self.get_topology(space).await?,
-                &self.strat,
-                &dht_arc_set,
-            )
-            .expect("an arc in the set could not be quantized");
             let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(1.into()), arqs);
             let region_set = if self.with_data {
                 // XXX: this is very fake, and completely wrong!
@@ -120,11 +114,8 @@ impl KitsuneHost for StandardResponsesHostApi {
         box_fut(Ok(()))
     }
 
-    fn get_topology(
-        &self,
-        _space: Arc<KitsuneSpace>,
-    ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
-        box_fut(Ok(self.topology.clone()))
+    fn topology(&self, _space: Arc<KitsuneSpace>) -> dht::spacetime::Topology {
+        self.topology.clone()
     }
 
     fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
@@ -150,7 +141,7 @@ async fn standard_responses(
     let host_api = StandardResponsesHostApi {
         infos: infos.clone(),
         topology: Topology::standard_epoch_full(),
-        strat: ArqStrat::default(),
+        strat: ArqStrat::standard(),
         with_data,
     };
     evt_handler.expect_handle_query_agents().returning({

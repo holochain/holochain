@@ -5,21 +5,25 @@ use crate::dht_arc::DhtArc;
 use crate::tx2::tx2_utils::TxUrl;
 use crate::*;
 use agent_info_helper::*;
+use dht::prelude::ArqSize;
+use dht::Arq;
 
 /// A list of Urls.
 pub type UrlList = Vec<TxUrl>;
 
 /// An agent paired with its storage arc in interval form
-pub type AgentArc = (Arc<KitsuneAgent>, DhtArc);
+pub type AgentArq = (Arc<KitsuneAgent>, Arq);
 
 /// agent_info helper types
 pub mod agent_info_helper {
+    use dht::prelude::ArqSize;
+
     use super::*;
 
     #[allow(missing_docs)]
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     pub struct AgentMetaInfoEncode {
-        pub dht_storage_arc_half_length: u32,
+        pub arcsize: ArqSize,
     }
 
     #[allow(missing_docs)]
@@ -65,7 +69,7 @@ pub struct AgentInfoInner {
     pub agent: Arc<KitsuneAgent>,
 
     /// The storage arc currently being published by this agent.
-    pub storage_arc: DhtArc,
+    pub storage_arc: Arq,
 
     /// List of urls the agent can be reached at, in the agent's own preference order.
     pub url_list: UrlList,
@@ -164,8 +168,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
         }
 
         let start_loc = agent.get_loc();
-        let storage_arc =
-            DhtArc::from_start_and_half_len(start_loc, meta.dht_storage_arc_half_length);
+        let storage_arc = Arq::from_arcsize(start_loc, meta.arcsize);
 
         let AgentInfoEncode {
             space,
@@ -193,10 +196,10 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
 
 impl AgentInfoSigned {
     /// Construct and sign a new AgentInfoSigned instance.
-    pub async fn sign<'a, R, F>(
+    pub async fn sign<'a, R, F, S>(
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
-        dht_storage_arc_half_length: u32,
+        arcsize: S,
         url_list: UrlList,
         signed_at_ms: u64,
         expires_at_ms: u64,
@@ -205,10 +208,10 @@ impl AgentInfoSigned {
     where
         R: std::future::Future<Output = KitsuneResult<Arc<KitsuneSignature>>>,
         F: FnOnce(&[u8]) -> R,
+        ArqSize: From<S>,
     {
-        let meta = AgentMetaInfoEncode {
-            dht_storage_arc_half_length,
-        };
+        let arcsize = arcsize.into();
+        let meta = AgentMetaInfoEncode { arcsize };
         let mut buf = Vec::new();
         crate::codec::rmp_encode(&mut buf, meta).map_err(KitsuneError::other)?;
         let meta = buf.into_boxed_slice();
@@ -231,7 +234,7 @@ impl AgentInfoSigned {
         let inner = AgentInfoInner {
             space,
             agent,
-            storage_arc: DhtArc::from_start_and_half_len(start_loc, dht_storage_arc_half_length),
+            storage_arc: Arq::from_arcsize(start_loc, arcsize),
             url_list,
             signed_at_ms,
             expires_at_ms,
@@ -256,7 +259,7 @@ impl AgentInfoSigned {
     }
 
     /// get just the agent and its storage arc
-    pub fn to_agent_arc(&self) -> AgentArc {
+    pub fn to_agent_arc(&self) -> AgentArq {
         (self.agent.clone(), self.storage_arc)
     }
 

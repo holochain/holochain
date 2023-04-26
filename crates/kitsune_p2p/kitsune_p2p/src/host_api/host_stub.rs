@@ -82,9 +82,9 @@ impl KitsuneHost for HostStub {
     fn peer_extrapolated_coverage(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: DhtArcSet,
+        arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<Vec<f64>> {
-        KitsuneHostDefaultError::peer_extrapolated_coverage(&self.err, space, dht_arc_set)
+        KitsuneHostDefaultError::peer_extrapolated_coverage(&self.err, space, arq_set)
     }
 
     fn record_metrics(
@@ -107,12 +107,12 @@ impl KitsuneHost for HostStub {
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,
-        dht_arc_set: Arc<DhtArcSet>,
+        _arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<RegionSetLtcs> {
-        KitsuneHostDefaultError::query_region_set(&self.err, space, dht_arc_set)
+        KitsuneHostDefaultError::query_region_set(&self.err, space, _arq_set)
     }
 
-    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
+    fn topology(&self, space: Arc<KitsuneSpace>) -> Topology {
         KitsuneHostDefaultError::get_topology(&self.err, space)
     }
 

@@ -43,7 +43,7 @@ impl KitsuneHostDefaultError for HarnessHost {
     fn peer_extrapolated_coverage(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: DhtArcSet,
+        _arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<Vec<f64>> {
         box_fut(Ok(vec![]))
     }
@@ -51,7 +51,7 @@ impl KitsuneHostDefaultError for HarnessHost {
     fn query_region_set(
         &self,
         _space: Arc<KitsuneSpace>,
-        _dht_arc_set: Arc<DhtArcSet>,
+        _arq_set: ArqBoundsSet,
     ) -> KitsuneHostResult<RegionSetLtcs> {
         box_fut(Ok(RegionSetLtcs::empty()))
     }
@@ -100,9 +100,9 @@ use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
-use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
+use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionSetLtcs};
 use kitsune_p2p_types::dht::spacetime::Topology;
-use kitsune_p2p_types::dht::PeerStrat;
+use kitsune_p2p_types::dht::{Arq, PeerStrat};
 use kitsune_p2p_types::dht_arc::DhtArcSet;
 
 struct AgentHarness {
@@ -206,12 +206,11 @@ impl KitsuneP2pEventHandler for AgentHarness {
             space: _,
             agents,
             window,
-            arc_set,
+            arq_set,
             near_basis: _,
             limit,
         }: QueryAgentsEvt,
     ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        let arc_set = arc_set.unwrap_or_else(|| Arc::new(DhtArcSet::Full));
         let window = window.unwrap_or_else(full_time_window);
         // TODO - sort by near_basis if set
         let out = self
@@ -223,7 +222,12 @@ impl KitsuneP2pEventHandler for AgentHarness {
                     .map(|agents| agents.contains(*a))
                     .unwrap_or(true)
             })
-            .filter(|(_, i)| arc_set.contains(i.agent.get_loc()))
+            .filter(|(_, i)| {
+                arq_set
+                    .as_ref()
+                    .map(|a| a.contains(&self.topology, i.agent.get_loc()))
+                    .unwrap_or(true)
+            })
             .filter(|(_, i)| window.contains(&Timestamp::from_micros(i.signed_at_ms as i64 * 1000)))
             .take(limit.unwrap_or(u32::MAX) as usize)
             .map(|(_, i)| (**i).clone())
@@ -234,13 +238,13 @@ impl KitsuneP2pEventHandler for AgentHarness {
     fn handle_query_peer_density(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        arq: kitsune_p2p_types::dht::Arq,
     ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
         let strat = PeerStrat::default();
         let arcs: Vec<_> = self.agent_store.values().map(|v| v.storage_arc).collect();
 
         // contains is already checked in the iterator
-        let view = strat.view(self.topology.clone(), dht_arc, arcs.as_slice());
+        let view = strat.view(self.topology.clone(), arq, arcs.as_slice());
 
         Ok(async move { Ok(view) }.boxed().into())
     }

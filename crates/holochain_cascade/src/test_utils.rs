@@ -10,7 +10,7 @@ use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holochain_p2p::actor;
-use holochain_p2p::dht_arc::DhtArc;
+use holochain_p2p::dht_arc::Arq;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::ChcImpl;
 use holochain_p2p::HolochainP2pDnaT;
@@ -266,7 +266,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         &self,
         _agent: AgentPubKey,
         _maybe_agent_info: Option<AgentInfoSigned>,
-        _initial_arc: Option<DhtArc>,
+        _initial_arc: Option<Arq>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -469,7 +469,7 @@ impl HolochainP2pDnaT for MockNetwork {
         &self,
         _agent: AgentPubKey,
         _agent_info: Option<AgentInfoSigned>,
-        _initial_arc: Option<DhtArc>,
+        _initial_arc: Option<Arq>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }

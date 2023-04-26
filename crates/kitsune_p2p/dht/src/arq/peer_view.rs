@@ -21,14 +21,9 @@ pub enum PeerView {
 impl PeerView {
     /// Given the current view of a peer and the peer's current coverage,
     /// this returns the next step to take in reaching the ideal coverage.
-    pub fn update_arc(&self, dht_arc: &mut DhtArc) -> bool {
+    pub fn update_arc(&self, arq: &mut Arq) -> bool {
         match self {
-            Self::Quantized(v) => {
-                let mut arq = Arq::from_dht_arc_approximate(&v.topo, &v.strat, dht_arc);
-                let updated = v.update_arq(&v.topo, &mut arq);
-                *dht_arc = arq.to_dht_arc(&v.topo);
-                updated
-            }
+            Self::Quantized(v) => v.update_arq(&v.topo, arq),
         }
     }
 }
@@ -326,7 +321,7 @@ impl PeerViewQ {
         }
 
         if is_full(topo, arq.power(), arq.count()) {
-            *arq = Arq::new_full(topo, arq.start_loc(), arq.power());
+            *arq = Arq::new_full(topo, &self.strat, arq.start_loc());
         }
 
         // check if anything changed

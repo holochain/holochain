@@ -232,7 +232,7 @@ pub async fn query_peer_density(
     env: DbRead<DbKindP2pAgents>,
     topology: Topology,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
-    dht_arc: DhtArc,
+    arq: Arq,
 ) -> ConductorResult<PeerView> {
     let now = now();
     let arcs = run_query(env, move |mut conn| Ok(conn.p2p_list_agents()?)).await?;
@@ -248,7 +248,7 @@ pub async fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    Ok(PeerStrat::default().view(topology, dht_arc, arcs.as_slice()))
+    Ok(PeerStrat::default().view(topology, arq, arcs.as_slice()))
 }
 
 /// Put single agent info into store
