@@ -1566,7 +1566,6 @@ mod cell_impls {
 /// Methods related to clone cell management
 mod clone_cell_impls {
     use holochain_conductor_api::ClonedCell;
-    use itertools::Itertools;
 
     use super::*;
 
@@ -1593,22 +1592,6 @@ mod clone_cell_impls {
                         .to_string(),
                 ));
             }
-            let state = self.get_state().await?;
-            let app = state.get_app(&app_id)?;
-
-            app.provisioned_cells()
-                .find(|(app_role_name, _)| **app_role_name == role_name)
-                .ok_or_else(|| {
-                    let role_names = app
-                        .provisioned_cells()
-                        .map(|(role_name, _)| format!("'{}'", role_name))
-                        .join(", ");
-
-                    ConductorError::CloneCellError(format!(
-                        "no base cell found for provided role name. Available role names are: ({})",
-                        role_names
-                    ))
-                })?;
 
             // add cell to app
             let clone_cell = self
