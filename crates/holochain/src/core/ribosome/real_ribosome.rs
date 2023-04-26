@@ -504,16 +504,6 @@ impl RealRibosome {
         Ok((instance, context_key))
     }
 
-    // pub fn cranelift() -> Cranelift {
-    //     let cost_function = |_operator: &WasmOperator| -> u64 { 1 };
-    //     // @todo 100 giga-ops is totally arbitrary cutoff so we probably
-    //     // want to make the limit configurable somehow.
-    //     let metering = Arc::new(Metering::new(WASM_METERING_LIMIT, cost_function));
-    //     let mut cranelift = Cranelift::default();
-    //     cranelift.canonicalize_nans(true).push_middleware(metering);
-    //     cranelift
-    // }
-
     pub async fn tooling_imports() -> RibosomeResult<Vec<String>> {
         let empty_dna_def = DnaDef {
             name: Default::default(),
@@ -531,7 +521,7 @@ impl RealRibosome {
         let context_key = RealRibosome::next_context_key();
         let imports = empty_ribosome.imports(
             context_key,
-            &Store::new(&Universal::new(Self::cranelift()).engine()),
+            &Store::new(&Universal::new(Cranelift::default()).engine()),
         );
         let mut imports: Vec<String> = imports.into_iter().map(|((_ns, name), _)| name).collect();
         imports.sort();
@@ -1098,14 +1088,6 @@ pub mod wasm_test {
     async fn wasm_tooling_test() {
         holochain_trace::test_run().ok();
 
-<<<<<<< HEAD
-=======
-        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crud]).await;
-        let ribosome = super::RealRibosome::new(dna_file).unwrap();
-        let module = ribosome
-            .runtime_compiled_module(&TestWasm::Crud.coordinator_zome_name())
-            .unwrap();
->>>>>>> e79d158dfa3afab3c0c097f22a30cc4f72cd76ae
         assert_eq!(
             vec![
                 "__hc__accept_countersigning_preflight_request_1",
