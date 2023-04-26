@@ -1,10 +1,10 @@
-//! Definitions of StructOpt options for use in the CLI
+//! Definitions of Parser options for use in the CLI
 
 use crate::cmds::*;
+use clap::{ArgAction, Parser};
 use holochain_types::prelude::InstalledAppId;
 use std::path::Path;
 use std::path::PathBuf;
-use structopt::StructOpt;
 
 const DEFAULT_APP_ID: &str = "test-app";
 
@@ -14,30 +14,35 @@ const DEFAULT_APP_ID: &str = "test-app";
 /// with a single Holochain app installed in the conductor:
 /// Everything you need to quickly run your app in Holochain,
 /// or create complex multi-conductor setups for testing.
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct HcSandbox {
-    #[structopt(subcommand)]
-    command: HcSandboxSubcommand,
+    #[command(subcommand)]
+    subcommand: HcSandboxSubcommand,
 
     /// Instead of the normal "interactive" passphrase mode,
     /// collect the passphrase by reading stdin to the end.
-    #[structopt(long)]
+    #[arg(long)]
     piped: bool,
 
     /// Force the admin port that hc uses to talk to Holochain to a specific value.
     /// For example `hc -f=9000,9001 run`
     /// This must be set on each run or the port will change if it's in use.
-    #[structopt(short, long, value_delimiter = ",")]
+    #[arg(short, long, value_delimiter = ',')]
     force_admin_ports: Vec<u16>,
 
     /// Set the path to the holochain binary.
-    #[structopt(short, long, env = "HC_HOLOCHAIN_PATH", default_value = "holochain")]
+    #[arg(
+        short = 'H',
+        long,
+        env = "HC_HOLOCHAIN_PATH",
+        default_value = "holochain"
+    )]
     holochain_path: PathBuf,
 }
 
 /// The list of subcommands for `hc sandbox`.
-#[derive(Debug, StructOpt)]
-#[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
+#[derive(Debug, Parser)]
+#[command(infer_subcommands = true)]
 pub enum HcSandboxSubcommand {
     /// Generate one or more new Holochain Conductor sandbox(es) for later use.
     ///
@@ -45,11 +50,11 @@ pub enum HcSandboxSubcommand {
     Generate {
         /// ID for the installed app.
         /// This is just a string to identify the app by.
-        #[structopt(short, long, default_value = DEFAULT_APP_ID)]
+        #[arg(short, long, default_value = DEFAULT_APP_ID)]
         app_id: InstalledAppId,
 
         /// (flattened)
-        #[structopt(flatten)]
+        #[command(flatten)]
         create: Create,
 
         /// Automatically run the sandbox(es) that were created.
@@ -59,7 +64,7 @@ pub enum HcSandboxSubcommand {
         /// For example, `hc sandbox generate -r=0,9000,0` will create three app interfaces.
         /// Or, use `hc sandbox generate -r` to run without attaching any app interfaces.
         /// This follows the same structure as `hc sandbox run --ports`.
-        #[structopt(short, long, value_delimiter = ",")]
+        #[arg(short, long, value_delimiter = ',')]
         run: Option<Vec<u16>>,
 
         /// A hApp bundle to install.
@@ -75,8 +80,8 @@ pub enum HcSandboxSubcommand {
     /// List sandboxes found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
-        #[structopt(short, long, parse(from_occurrences))]
-        verbose: usize,
+        #[arg(short, long, action = ArgAction::SetTrue)]
+        verbose: bool,
     },
 
     /// Clean (completely remove) sandboxes that are listed in the `$(pwd)/.hc` file.
@@ -87,18 +92,18 @@ pub enum HcSandboxSubcommand {
 }
 
 /// Options for running a sandbox
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct Run {
     /// Optionally specifies app interface ports to bind when running.
     /// This allows your UI to talk to the conductor.
     /// For example, `hc -p=0,9000,0` will create three app interfaces.
     /// Important: Interfaces are persistent. If you add an interface
     /// it will be there next time you run the conductor.
-    #[structopt(short, long, value_delimiter = ",")]
+    #[arg(short, long, value_delimiter = ',')]
     ports: Vec<u16>,
 
     /// (flattened)
-    #[structopt(flatten)]
+    #[command(flatten)]
     existing: Existing,
 }
 
@@ -106,7 +111,7 @@ impl HcSandbox {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         holochain_util::pw::pw_set_piped(self.piped);
-        match self.command {
+        match self.subcommand {
             HcSandboxSubcommand::Generate {
                 app_id,
                 create,

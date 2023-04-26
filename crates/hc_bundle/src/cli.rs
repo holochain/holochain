@@ -1,13 +1,13 @@
 #![forbid(missing_docs)]
 //! Binary `hc-dna` command executable.
 
+use clap::{Parser, Subcommand};
 use holochain_types::prelude::{AppManifest, DnaManifest, ValidatedDnaManifest};
 use holochain_types::web_app::WebAppManifest;
 use holochain_util::ffs;
 use mr_bundle::{Location, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
-use structopt::StructOpt;
 
 use crate::error::HcBundleResult;
 
@@ -21,8 +21,15 @@ pub const APP_BUNDLE_EXT: &str = "happ";
 pub const WEB_APP_BUNDLE_EXT: &str = "webhapp";
 
 /// Work with Holochain DNA bundles.
-#[derive(Debug, StructOpt)]
-pub enum HcDnaBundle {
+#[derive(Debug, Parser)]
+pub struct HcDnaBundle {
+    /// The `hc dna` subcommand to run.
+    #[command(subcommand)]
+    pub subcommand: HcDnaBundleSubcommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HcDnaBundleSubcommand {
     /// Create a new, empty Holochain DNA bundle working directory and create a new
     /// sample `dna.yaml` manifest inside.
     Init {
@@ -48,7 +55,7 @@ pub enum HcDnaBundle {
         ///
         /// If not specified, the `[name].dna` bundle will be placed inside the
         /// provided working directory.
-        #[structopt(short = "o", long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
     },
 
@@ -60,7 +67,7 @@ pub enum HcDnaBundle {
     ///
     /// creates a new directory `./some/dir/my-dna`, containining a new `dna.yaml`
     /// manifest.
-    // #[structopt(short = "u", long)]
+    // #[arg(short = 'u', long)]
     Unpack {
         /// The path to the bundle to unpack.
         path: std::path::PathBuf,
@@ -69,24 +76,31 @@ pub enum HcDnaBundle {
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
-        #[structopt(short = "o", long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Don't attempt to parse the manifest. Useful if you have a manifest
         /// of an outdated format. This command will allow you to unpack the
         /// manifest so that it may be modified and repacked into a valid bundle.
-        #[structopt(short = "r", long)]
+        #[arg(short = 'r', long)]
         raw: bool,
 
         /// Overwrite an existing directory, if one exists.
-        #[structopt(short = "f", long)]
+        #[arg(short = 'f', long)]
         force: bool,
     },
 }
 
 /// Work with Holochain hApp bundles.
-#[derive(Debug, StructOpt)]
-pub enum HcAppBundle {
+#[derive(Debug, Parser)]
+pub struct HcAppBundle {
+    /// The `hc app` subcommand to run.
+    #[command(subcommand)]
+    pub subcommand: HcAppBundleSubcommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HcAppBundleSubcommand {
     /// Create a new, empty Holochain app (hApp) working directory and create a new
     /// sample `happ.yaml` manifest inside.
     Init {
@@ -112,14 +126,14 @@ pub enum HcAppBundle {
         ///
         /// If not specified, the `[name].happ` bundle will be placed inside the
         /// provided working directory.
-        #[structopt(short = "o", long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Also run `dna pack` on all DNA manifests
         /// to be bundled into this hApp.
         /// There must exist a `dna.yaml` file in the same directory
         /// as each of the DNA files specified in the manifest.
-        #[structopt(short, long)]
+        #[arg(short, long)]
         recursive: bool,
     },
 
@@ -131,7 +145,7 @@ pub enum HcAppBundle {
     ///
     /// creates a new directory `./some/dir/my-app`, containining a new `happ.yaml`
     /// manifest.
-    // #[structopt(short = "u", long)]
+    // #[arg(short = 'u', long)]
     Unpack {
         /// The path to the bundle to unpack.
         path: std::path::PathBuf,
@@ -140,24 +154,31 @@ pub enum HcAppBundle {
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
-        #[structopt(short = "o", long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Don't attempt to parse the manifest. Useful if you have a manifest
         /// of an outdated format. This command will allow you to unpack the
         /// manifest so that it may be modified and repacked into a valid bundle.
-        #[structopt(short = "r", long)]
+        #[arg(short = 'r', long)]
         raw: bool,
 
         /// Overwrite an existing directory, if one exists.
-        #[structopt(short = "f", long)]
+        #[arg(short = 'f', long)]
         force: bool,
     },
 }
 
 /// Work with Holochain web-hApp bundles.
-#[derive(Debug, StructOpt)]
-pub enum HcWebAppBundle {
+#[derive(Debug, Parser)]
+pub struct HcWebAppBundle {
+    /// The `hc web-app` subcommand to run.
+    #[command(subcommand)]
+    pub subcommand: HcWebAppBundleSubcommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HcWebAppBundleSubcommand {
     /// Create a new, empty Holochain web app working directory and create a new
     /// sample `web-happ.yaml` manifest inside.
     Init {
@@ -183,7 +204,7 @@ pub enum HcWebAppBundle {
         ///
         /// If not specified, the `[name].webhapp` bundle will be placed inside the
         /// provided working directory.
-        #[structopt(short = "o", long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Also run `app pack` and `dna pack` on all app and DNA manifests
@@ -192,7 +213,7 @@ pub enum HcWebAppBundle {
         /// as the hApp file specified in the manifest,
         /// as well as `dna.yaml` files in the same directories
         /// as each of the DNA files specified in the hApps' manifests.
-        #[structopt(short, long)]
+        #[arg(short, long)]
         recursive: bool,
     },
 
@@ -204,7 +225,7 @@ pub enum HcWebAppBundle {
     ///
     /// creates a new directory `./some/dir/my-app`, containining a new `web-happ.yaml`
     /// manifest.
-    // #[structopt(short = "u", long)]
+    // #[arg(short = 'u', long)]
     Unpack {
         /// The path to the bundle to unpack.
         path: std::path::PathBuf,
@@ -213,22 +234,50 @@ pub enum HcWebAppBundle {
         ///
         /// If not specified, the directory will be placed alongside the
         /// bundle file, with the same name as the bundle file name.
-        #[structopt(short = "o", long)]
+        #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
         /// Don't attempt to parse the manifest. Useful if you have a manifest
         /// of an outdated format. This command will allow you to unpack the
         /// manifest so that it may be modified and repacked into a valid bundle.
-        #[structopt(short = "r", long)]
+        #[arg(short = 'r', long)]
         raw: bool,
 
         /// Overwrite an existing directory, if one exists.
-        #[structopt(short = "f", long)]
+        #[arg(short = 'f', long)]
         force: bool,
     },
 }
 
+// These impls are here to make the code for the three `Hc_Bundle` subcommand wrappers
+// somewhat consistent with the main subcommand wrapper and that of `hc-sandbox`,
+// in which it's the wrapper struct that contains the `run` function.
+// The reason the `run` function is on these subcommands' sub-subcommand enums
+// is that the recursive packing functions call them directly on the variants
+// and don't want to bother instantiating a wrapper just for that.
+
 impl HcDnaBundle {
+    /// Run this subcommand, passing off all the work to the sub-sub-command enum
+    pub async fn run(self) -> anyhow::Result<()> {
+        self.subcommand.run().await
+    }
+}
+
+impl HcAppBundle {
+    /// Run this subcommand, passing off all the work to the sub-sub-command enum
+    pub async fn run(self) -> anyhow::Result<()> {
+        self.subcommand.run().await
+    }
+}
+
+impl HcWebAppBundle {
+    /// Run this subcommand, passing off all the work to the sub-sub-command enum
+    pub async fn run(self) -> anyhow::Result<()> {
+        self.subcommand.run().await
+    }
+}
+
+impl HcDnaBundleSubcommand {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
@@ -272,7 +321,7 @@ impl HcDnaBundle {
     }
 }
 
-impl HcAppBundle {
+impl HcAppBundleSubcommand {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
@@ -320,7 +369,7 @@ impl HcAppBundle {
     }
 }
 
-impl HcWebAppBundle {
+impl HcWebAppBundleSubcommand {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
@@ -418,7 +467,7 @@ async fn web_app_pack_recursive(web_app_workdir_path: &PathBuf) -> anyhow::Resul
             .join(bundled_app_location);
 
         // Pack all the bundled DNAs and the app's manifest
-        HcAppBundle::Pack {
+        HcAppBundleSubcommand::Pack {
             path: ffs::canonicalize(app_workdir_location).await?,
             output: None,
             recursive: true,
@@ -443,7 +492,7 @@ async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
         bundled_dnas_workdir_locations(&app_manifest_path, &manifest).await?;
 
     for dna_workdir_location in dnas_workdir_locations {
-        HcDnaBundle::Pack {
+        HcDnaBundleSubcommand::Pack {
             path: dna_workdir_location,
             output: None,
         }

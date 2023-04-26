@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Improved documentation in README, code comments, help text, and error messages.
+- Updated CLI builder from structopt 0.3 to clap 4. [#2125](https://github.com/holochain/holochain/pull/2125)
 
 ## 0.2.0-beta-rc.0
 

@@ -15,7 +15,7 @@ fn init_logger() {
 }
 
 #[test]
-fn detect_changed_files() {
+fn detect_changed_crates() {
     let workspace_mocker = example_workspace_1().unwrap();
     workspace_mocker.add_or_replace_file(
         "README",
@@ -47,33 +47,14 @@ fn workspace_members() {
         .map(|crt| crt.name())
         .collect::<HashSet<_>>();
 
-    let expected_result = ["crate_a", "crate_b", "crate_c", "crate_e", "crate_f"]
-        .iter()
-        .map(std::string::ToString::to_string)
-        .collect::<HashSet<_>>();
+    let expected_result = [
+        "crate_g", "crate_a", "crate_b", "crate_c", "crate_e", "crate_f",
+    ]
+    .iter()
+    .map(std::string::ToString::to_string)
+    .collect::<HashSet<_>>();
 
     assert_eq!(expected_result, result);
-}
-
-#[test]
-fn detect_changed_crates() {
-    let workspace_mocker = example_workspace_1().unwrap();
-    workspace_mocker.add_or_replace_file(
-        "README",
-        r#"# Example
-
-            Some changes
-        "#,
-    );
-    let before = workspace_mocker.head().unwrap();
-    let after = workspace_mocker.commit(None);
-
-    let workspace = ReleaseWorkspace::try_new(workspace_mocker.root()).unwrap();
-
-    assert_eq!(
-        vec![PathBuf::from(workspace.root()).join("README")],
-        changed_files(workspace.root(), &before, &after).unwrap()
-    );
 }
 
 #[test]
@@ -91,13 +72,15 @@ fn release_selection() {
     let workspace =
         ReleaseWorkspace::try_new_with_criteria(workspace_mocker.root(), criteria).unwrap();
 
+    // TODO: verify that a crate can be selected by being an unmatched, changed crate that's a dependency of a matched, unchanged crate.
+
     let selection = workspace
         .release_selection()
         .unwrap()
         .into_iter()
         .map(|c| c.name())
         .collect::<Vec<_>>();
-    let expected_selection = vec!["crate_b", "crate_a", "crate_e"];
+    let expected_selection = vec!["crate_g", "crate_b", "crate_a", "crate_e"];
 
     assert_eq!(expected_selection, selection);
 }
@@ -180,10 +163,12 @@ fn members_sorted_ws1() {
         .map(|crt| crt.name())
         .collect::<Vec<_>>();
 
-    let expected_result = ["crate_b", "crate_a", "crate_c", "crate_e", "crate_f"]
-        .iter()
-        .map(std::string::ToString::to_string)
-        .collect::<Vec<_>>();
+    let expected_result = [
+        "crate_g", "crate_b", "crate_a", "crate_c", "crate_e", "crate_f",
+    ]
+    .iter()
+    .map(std::string::ToString::to_string)
+    .collect::<Vec<_>>();
 
     assert_eq!(expected_result, result);
 }

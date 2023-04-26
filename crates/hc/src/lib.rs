@@ -6,12 +6,12 @@
 //! or make a PR.
 //!
 //! ## CLI
-//! 
+//!
 //! The `hc` CLI makes it easy to create, modify, and run hApps that
 //! you are working on or someone has sent you.
 //! It has been designed to use sensible defaults but still give you
 //! the configurability when that's required.
-//! 
+//!
 //! Setups are stored in tmp directories by default and the paths are
 //! persisted in a `.hc` file which is created wherever you are using
 //! the CLI.
@@ -19,17 +19,26 @@
 use std::process::Command;
 
 // Useful to have this public when using this as a library.
+use clap::{crate_version, Parser, Subcommand};
 pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
-use structopt::{lazy_static::lazy_static, StructOpt};
+use lazy_static::lazy_static;
 
 mod external_subcommands;
 
+// TODO: change this so it inherits clap's formatting.
+// Clap 3 and 4 format helptext using colours and bold/underline respectively.
+// https://github.com/clap-rs/clap/pull/4765 introduces the ability to style your own help text
+// using a library like `color_print`.
+// https://github.com/clap-rs/clap/issues/4786 requests that the styler's built-in helper methods
+// be exposed to consumers, thereby allowing us to durably make our styling consistent
+// with whatever clap's happens to be at the moment.
+// I'd prefer the latter approach, if it lands.
 lazy_static! {
     static ref HELP: &'static str = {
         let extensions = external_subcommands::list_external_subcommands()
             .into_iter()
-            .map(|s| format!("    hc {}\t  Run \"hc {} help\" to see its help", s, s))
+            .map(|s| format!("  {}\t  Run \"hc {} help\" to see its help", s, s))
             .collect::<Vec<String>>()
             .join("\n");
 
@@ -37,7 +46,7 @@ lazy_static! {
             0 => String::from(""),
             _ => format!(
                 r#"
-EXTENSIONS:
+Extensions:
 {extensions}"#
             ),
         };
@@ -59,12 +68,20 @@ fn builtin_commands() -> Vec<String> {
         .collect()
 }
 
-/// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`.
+/// The main entry-point for the command.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, StructOpt)]
-#[structopt(setting = structopt::clap::AppSettings::InferSubcommands)]
-#[structopt(long_about = *HELP)]
-pub enum Opt {
+#[derive(Debug, Parser)]
+#[command(about = *HELP, infer_subcommands = true, allow_external_subcommands = true, version = crate_version!())]
+pub struct Cli {
+    /// The `hc` subcommand to run.
+    #[command(subcommand)]
+    pub subcommand: CliSubcommand,
+}
+
+/// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`.
+#[derive(Debug, Subcommand)]
+#[warn(clippy::large_enum_variant)]
+pub enum CliSubcommand {
     /// Work with DNA bundles.
     Dna(hc_bundle::HcDnaBundle),
     /// Work with hApp bundles.
@@ -74,19 +91,19 @@ pub enum Opt {
     /// Work with sandboxed environments for testing and development.
     Sandbox(hc_sandbox::HcSandbox),
     /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`).
-    #[structopt(external_subcommand)]
+    #[command(external_subcommand)]
     External(Vec<String>),
 }
 
-impl Opt {
+impl CliSubcommand {
     /// Run this command.
     pub async fn run(self) -> anyhow::Result<()> {
         match self {
-            Self::Dna(cmd) => cmd.run().await?,
-            Self::App(cmd) => cmd.run().await?,
-            Self::WebApp(cmd) => cmd.run().await?,
-            Self::Sandbox(cmd) => cmd.run().await?,
-            Self::External(args) => {
+            CliSubcommand::App(cmd) => cmd.run().await?,
+            CliSubcommand::Dna(cmd) => cmd.run().await?,
+            CliSubcommand::WebApp(cmd) => cmd.run().await?,
+            CliSubcommand::Sandbox(cmd) => cmd.run().await?,
+            CliSubcommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
                 Command::new(format!("hc-{}", command_suffix))
                     .args(&args[1..])
