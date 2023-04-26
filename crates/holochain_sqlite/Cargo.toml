@@ -38,7 +38,7 @@ page_size = "0.4.2"
 parking_lot = "0.10"
 rand = "0.8.5"
 r2d2 = "0.8"
-r2d2_sqlite = "0.21"
+r2d2_sqlite = { version = "0.1", package = "r2d2_sqlite_neonphog" }
 rmp-serde = "0.15"
 scheduled-thread-pool = "0.2"
 serde = "1.0"
@@ -47,12 +47,12 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 shrinkwraprs = "0.3.0"
 tempfile = "3.3"
 thiserror = "1.0.22"
-tokio = { version = "1.11", features = [ "macros", "rt-multi-thread", "io-util", "sync" ] }
+tokio = { version = "1.27", features = [ "macros", "rt-multi-thread", "io-util", "sync" ] }
 tracing = "0.1.18"
 tracing-futures = "0.2"
 getrandom = "0.2.7"
 
-rusqlite = { version = "0.28", features = [
+rusqlite = { version = "0.29", features = [
   "blob",        # better integration with blob types (Read, Write, etc)
   "backup",
   "trace",

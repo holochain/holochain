@@ -37,6 +37,7 @@ pub mod share;
 pub mod signal;
 #[warn(missing_docs)]
 pub mod sql;
+pub mod wasmer_types;
 pub mod web_app;
 pub mod zome_types;
 
