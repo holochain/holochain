@@ -35,6 +35,10 @@ mod test {
     use holochain_types::prelude::ZomeCallResponse;
     use holo_hash::ActionHash;
     use crate::conductor::api::error::ConductorApiResult;
+    use holochain_types::prelude::Record;
+    use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::SweetDnaFile;
+    use crate::test_utils::consistency_10s;
 
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
     pub struct CapFor(CapSecret, AgentPubKey);
@@ -66,14 +70,64 @@ mod test {
     async fn zome_call_get_block() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
-            conductor, alice, alice_pubkey, bob, bob_pubkey, ..
+            conductor, alice, bob, bob_pubkey, ..
         } = RibosomeTestFixture::new(TestWasm::Create).await;
 
-        let action0: ActionHash = conductor.call(&alice, "create_entry", ()).await;
+        let (dna_file, _, _) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        let bob_get: Option<Record> = conductor.call(&bob, "get_post", action0).await;
+        let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+        let apps = conductors
+            .setup_app("create", &[dna_file.clone()])
+            .await
+            .unwrap();
 
-        dbg!(&bob_get);
+        // let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
+        let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
+
+        let alice = alice_cell.zome(TestWasm::Create);
+        let bob = bob_cell.zome(TestWasm::Create);
+        // let carol = carol_cell.zome(TestWasm::Create);
+
+        let alice_pubkey = alice_cell.cell_id().agent_pubkey();
+        let bob_pubkey = bob_cell.cell_id().agent_pubkey();
+
+        conductors.reveal_peer_info(0, 1).await;
+        conductors.reveal_peer_info(1, 0).await;
+
+        let alice_conductor = conductors.get(0).unwrap();
+        let bob_conductor = conductors.get(1).unwrap();
+
+        let action0: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
+
+        consistency_10s([&alice_cell, &bob_cell]).await;
+
+        // Before bob is blocked he can get posts just fine.
+        let bob_get0: Option<Record> = bob_conductor.call(&bob, "get_post", action0).await;
+        assert!(bob_get0.is_some());
+
+        // Bob gets blocked by alice.
+        let _block: () = alice_conductor.call(&alice, "block_agent", bob_pubkey).await;
+
+        let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
+
+        // Now that bob is blocked by alice he cannot get data from alice.
+        consistency_10s([&alice_cell, &bob_cell]).await;
+        let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
+
+        assert!(bob_get1.is_none());
+
+        // // If carol joins the party but DOES NOT block bob then she will
+        // // give access to data once more for bob.
+
+        // conductors.reveal_peer_info(0, 2).await;
+        // conductors.reveal_peer_info(1, 2).await;
+
+        // consistency_10s([&alice_cell, &bob_cell]).await;
+
+        // // Bob can get data from alice via. carol.
+        // let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
+        // assert!(bob_get2.is_some());
     }
 
 }
