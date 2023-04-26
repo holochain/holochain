@@ -30,12 +30,13 @@ rusqlite = { version = "0.28", optional = true }
 serde = { version = "1", optional = true }
 serde_bytes = { version = "0.11", optional = true }
 tracing = { version = "0.1", optional = true }
+holochain_wasmer_common = { version = "=0.0.84", optional = true }
 
 [dev-dependencies]
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
 
 [features]
-default = ["serialization"]
+default = ["serialization", "holochain-wasmer"]
 full = [
     "fixturators",
     "hashing",
@@ -48,6 +49,7 @@ hashing = ["futures", "must_future", "blake2b_simd", "serialization"]
 serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]
 encoding = ["base64", "blake2b_simd", "derive_more"]
 test_utils = ["fixturators"]
+holochain-wasmer = ["holochain_wasmer_common"]
 
 sqlite-encrypted = [
     "rusqlite",

@@ -2446,6 +2446,7 @@ dependencies = [
  "fixt",
  "futures",
  "holochain_serialized_bytes 0.0.51",
+ "holochain_wasmer_common",
  "kitsune_p2p_dht_arc",
  "must_future",
  "rand 0.8.5",

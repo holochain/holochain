@@ -182,6 +182,8 @@ impl AnyDhtHash {
 // - converting between EntryHash and AgentPubKey
 // All other conversions, viz. the inverses of the above, are TryFrom conversions, since to
 // go from a superset to a subset is only valid in certain cases.
+//
+// TODO: DRY up with macros
 
 // AnyDhtHash <-> AnyLinkableHash
 
@@ -343,3 +345,20 @@ pub struct HashConversionError<T: HashType, P: PrimitiveHashType>(HoloHash<T>, P
 /// Error converting a composite hash into a subset composite hash, due to type mismatch
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompositeHashConversionError<T: HashType>(HoloHash<T>, String);
+
+#[cfg(feature = "holochain-wasmer")]
+use holochain_wasmer_common::WasmErrorInner;
+
+#[cfg(feature = "holochain-wasmer")]
+impl<T: HashType, P: PrimitiveHashType> From<HashConversionError<T, P>> for WasmErrorInner {
+    fn from(err: HashConversionError<T, P>) -> Self {
+        WasmErrorInner::Guest(format!("{:?}", err))
+    }
+}
+
+#[cfg(feature = "holochain-wasmer")]
+impl<T: HashType> From<CompositeHashConversionError<T>> for WasmErrorInner {
+    fn from(err: CompositeHashConversionError<T>) -> Self {
+        WasmErrorInner::Guest(format!("{:?}", err))
+    }
+}
