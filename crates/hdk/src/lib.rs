@@ -6,7 +6,7 @@
 //! [Read more on Holochain's architecture.](https://developer.holochain.org/concepts/2_application_architecture)
 //!
 //! Functions of a hApp are organized into reusable components. In Holochain terminology these components are called "zomes".
-//! One or multiple zomes are compiled into a WebAssembly (WASM) binary, referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
+//! One or multiple zomes are compiled into WebAssembly (WASM) binaries and bundled into a file referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
 //! In short, the structure is __hApp -> DNA -> zome -> function__.
 //!
 //! hApps can be developed using the HDK. See the [Holochain Quick Start Guide](https://developer.holochain.org/quick-start)
@@ -93,7 +93,7 @@
 //! Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is abstracted by the HDK.
 //! Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
 //!
-//! ## Extern callbacks = Zome functions
+//! ## External callbacks = Zome functions
 //!
 //! To extend a Rust function so that it can be called by the host, add the [`hdk_extern!`](macro@crate::prelude::hdk_extern) attribute.
 //!
