@@ -53,6 +53,15 @@ pub struct Crate<'a> {
     dependants_in_workspace: OnceCell<Vec<&'a Crate<'a>>>,
 }
 
+#[cfg(test)]
+impl PartialEq for Crate<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.package == other.package
+            && self.dependencies_in_workspace == other.dependencies_in_workspace
+            && self.dependants_in_workspace == other.dependants_in_workspace
+    }
+}
+
 impl<'a> Crate<'a> {
     /// Instantiate a new Crate with the given CargoPackage.
     pub fn with_cargo_package(
@@ -328,47 +337,38 @@ impl<'a> Crate<'a> {
     }
 
     /// Returns a reference to all workspace crates that depend on this crate.
-    // todo: write a unit test for this
     pub fn dependants_in_workspace(&'a self) -> Fallible<&'a Vec<&'a Crate<'a>>> {
-        self.dependants_in_workspace_filtered(|_| true)
+        self.dependants_in_workspace
+            .get_or_try_init(|| -> Fallible<_> { self.dependants_in_workspace_filtered(|_| true) })
     }
 
     /// Returns a reference to all workspace crates that depend on this crate.
     /// Features filtering by applying a filter function to the dependant's dependencies.
-    // todo: write a unit test for this
     pub fn dependants_in_workspace_filtered<F>(
         &'a self,
         filter_fn: F,
-    ) -> Fallible<&'a Vec<&'a Crate<'a>>>
+    ) -> Fallible<Vec<&'a Crate<'a>>>
     where
         F: Fn(&(&String, &Vec<Dependency>)) -> bool,
         F: Copy,
     {
-        self.dependants_in_workspace.get_or_try_init(|| {
-            let members_dependants = self.workspace.members()?.iter().try_fold(
-                LinkedHashMap::<String, &'a Crate<'a>>::new(),
-                |mut acc, member| -> Fallible<_> {
-                    if member
-                        .dependencies_in_workspace()?
-                        .iter()
-                        // FIXME: applying the filter here is incorrect, because
-                        // it persists the return value for the first call and
-                        // returns that for every subsequent call, regardless of
-                        // the filter function that's passed
-                        .filter(filter_fn)
-                        .map(|(dep_name, _)| dep_name)
-                        .collect::<LinkedHashSet<_>>()
-                        .contains(&self.name())
-                    {
-                        acc.insert(member.name(), *member);
-                    };
+        let members_dependants = self.workspace.members()?.iter().try_fold(
+            LinkedHashMap::<String, &'a Crate<'a>>::new(),
+            |mut acc, member| -> Fallible<_> {
+                if member
+                    .dependencies_in_workspace()?
+                    .iter()
+                    .filter(filter_fn)
+                    .any(|(dep_name, _)| dep_name == &self.name())
+                {
+                    acc.insert(member.name(), *member);
+                };
 
-                    Ok(acc)
-                },
-            )?;
+                Ok(acc)
+            },
+        )?;
 
-            Ok(members_dependants.values().cloned().collect())
-        })
+        Ok(members_dependants.values().cloned().collect())
     }
 
     pub fn root(&self) -> &Path {

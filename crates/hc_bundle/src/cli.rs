@@ -57,6 +57,11 @@ pub enum HcDnaBundleSubcommand {
         /// provided working directory.
         #[arg(short = 'o', long)]
         output: Option<PathBuf>,
+
+        /// Output shared object "dylib" files
+        /// that can be used to run this happ on iOS
+        #[structopt(long)]
+        dylib_ios: bool,
     },
 
     /// Unpack parts of the `.dna` bundle file into a specific directory.
@@ -89,6 +94,9 @@ pub enum HcDnaBundleSubcommand {
         #[arg(short = 'f', long)]
         force: bool,
     },
+
+    /// Print the schema for a DNA manifest
+    Schema,
 }
 
 /// Work with Holochain hApp bundles.
@@ -167,6 +175,9 @@ pub enum HcAppBundleSubcommand {
         #[arg(short = 'f', long)]
         force: bool,
     },
+
+    /// Print the schema for a hApp manifest
+    Schema,
 }
 
 /// Work with Holochain web-hApp bundles.
@@ -247,6 +258,9 @@ pub enum HcWebAppBundleSubcommand {
         #[arg(short = 'f', long)]
         force: bool,
     },
+
+    /// Print the schema for a web hApp manifest
+    Schema,
 }
 
 // These impls are here to make the code for the three `Hc_Bundle` subcommand wrappers
@@ -284,10 +298,15 @@ impl HcDnaBundleSubcommand {
             Self::Init { path } => {
                 crate::init::init_dna(path).await?;
             }
-            Self::Pack { path, output } => {
+            Self::Pack {
+                path,
+                output,
+                dylib_ios,
+            } => {
                 let name = get_dna_name(&path).await?;
                 let (bundle_path, _) =
-                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name).await?;
+                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name, dylib_ios)
+                        .await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -316,6 +335,9 @@ impl HcDnaBundleSubcommand {
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
+            Self::Schema => {
+                println!("{}", include_str!("../schema/dna-manifest.schema.json"));
+            }
         }
         Ok(())
     }
@@ -340,7 +362,7 @@ impl HcAppBundleSubcommand {
                 }
 
                 let (bundle_path, _) =
-                    crate::packing::pack::<AppManifest>(&path, output, name).await?;
+                    crate::packing::pack::<AppManifest>(&path, output, name, false).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -363,6 +385,9 @@ impl HcAppBundleSubcommand {
                         .await?
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
+            }
+            Self::Schema => {
+                println!("{}", include_str!("../schema/happ-manifest.schema.json"));
             }
         }
         Ok(())
@@ -388,7 +413,7 @@ impl HcWebAppBundleSubcommand {
                 }
 
                 let (bundle_path, _) =
-                    crate::packing::pack::<WebAppManifest>(&path, output, name).await?;
+                    crate::packing::pack::<WebAppManifest>(&path, output, name, false).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -416,6 +441,12 @@ impl HcWebAppBundleSubcommand {
                     .await?
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
+            }
+            Self::Schema => {
+                println!(
+                    "{}",
+                    include_str!("../schema/web-happ-manifest.schema.json")
+                );
             }
         }
         Ok(())
@@ -495,6 +526,7 @@ async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
         HcDnaBundleSubcommand::Pack {
             path: dna_workdir_location,
             output: None,
+            dylib_ios: false,
         }
         .run()
         .await?;

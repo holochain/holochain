@@ -3,11 +3,13 @@
 //! Defines the CLI commands for packing/unpacking DNA, hApp, and web-hApp bundles.
 
 use crate::error::{HcBundleError, HcBundleResult};
+use holochain_types::wasmer_types::build_ios_module;
 use holochain_util::ffs;
 use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
+use tracing::info;
 
 /// Unpack a bundle into a working directory, returning the directory path used.
 pub async fn unpack<M: Manifest>(
@@ -70,12 +72,13 @@ fn bundle_path_to_dir(path: &Path, extension: &'static str) -> HcBundleResult<Pa
         .join(stem))
 }
 
-/// Pack a directory containing a DNA manifest into a DnaBundle, returning
+/// Pack a directory containing a YAML manifest (DNA, hApp, Web hApp) into a bundle, returning
 /// the path to which the bundle file was written.
 pub async fn pack<M: Manifest>(
     dir_path: &std::path::Path,
     target_path: Option<PathBuf>,
     name: String,
+    serialize_wasm: bool,
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
     let manifest_path = dir_path.join(M::path());
@@ -91,6 +94,47 @@ pub async fn pack<M: Manifest>(
         None => dir_to_bundle_path(&dir_path, name, M::bundle_extension())?,
     };
     bundle.write_to_file(&target_path).await?;
+    if serialize_wasm {
+        let target_path_folder = target_path
+            .parent()
+            .expect("target_path should have a parent folder");
+        let _write_serialized_result =
+            futures::future::join_all(bundle.bundled_resources().iter().map(
+                |(relative_path, bytes)| async move {
+                    // only pre-serialize wasm resources
+                    if relative_path.extension() == Some(std::ffi::OsStr::new("wasm")) {
+                        let ios_folder_path = target_path_folder.join("ios");
+                        let mut resource_path_adjoined = ios_folder_path.join(
+                            relative_path
+                                .file_name()
+                                .expect("wasm resource should have a filename"),
+                        );
+                        // see this code for rationale
+                        // https://github.com/wasmerio/wasmer/blob/447c2e3a152438db67be9ef649327fabcad6f5b8/lib/engine-dylib/src/artifact.rs#L722-L756
+                        resource_path_adjoined.set_extension("dylib");
+                        ffs::create_dir_all(ios_folder_path).await?;
+                        ffs::write(&resource_path_adjoined, vec![].as_slice()).await?;
+                        let resource_path = ffs::canonicalize(resource_path_adjoined).await?;
+                        match build_ios_module(bytes.as_slice()) {
+                            Ok(module) => match module.serialize_to_file(resource_path.clone()) {
+                                Ok(()) => {
+                                    info!("wrote ios dylib to {:?}", resource_path);
+                                    Ok(())
+                                }
+                                Err(e) => Err(HcBundleError::SerializedModuleError(e)),
+                            },
+                            Err(e) => Err(HcBundleError::ModuleCompileError(e)),
+                        }
+                    } else {
+                        Ok(())
+                    }
+                },
+            ))
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+    }
+
     Ok((target_path, bundle))
 }
 
@@ -145,7 +189,7 @@ integrity:
         std::fs::write(tmpdir.path().join("zome-3.wasm"), &[7, 8, 9]).unwrap();
 
         let (bundle_path, bundle) =
-            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string())
+            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string(), false)
                 .await
                 .unwrap();
         // Ensure the bundle path was generated as expected
@@ -182,6 +226,7 @@ integrity:
             &dir,
             Some(dir.parent().unwrap().to_path_buf()),
             "test_dna".to_string(),
+            false,
         )
         .await
         .unwrap();
@@ -200,7 +245,9 @@ integrity:
         assert_eq!(dir.read_dir().unwrap().collect::<Vec<_>>().len(), 3);
 
         // Ensure that we get the same bundle after the roundtrip
-        let (_, bundle2) = pack(&dir, None, "test_dna".to_string()).await.unwrap();
+        let (_, bundle2) = pack(&dir, None, "test_dna".to_string(), false)
+            .await
+            .unwrap();
         assert_eq!(bundle, bundle2);
     }
 }

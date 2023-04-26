@@ -34,6 +34,11 @@ pub struct Create {
     /// will create three sandboxes with directories named "first", "second", and "third".
     #[arg(short, long, value_delimiter = ',')]
     pub directories: Vec<PathBuf>,
+
+    /// Launch holochain with an embedded lair server instead of a standalone process.
+    /// Use this option to run the sand-boxed conductors when you don't have access to the lair binary.
+    #[structopt(long)]
+    pub in_process_lair: bool,
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -66,10 +71,10 @@ pub struct Network {
 pub enum NetworkType {
     /// A transport that uses the local memory transport protocol.
     Mem,
-    /// A transport that uses the QUIC protocol.
-    Quic(Quic),
-    /// A transport that uses the MDNS protocol.
-    Mdns,
+    // /// A transport that uses the QUIC protocol.
+    // Quic(Quic),
+    // /// A transport that uses the MDNS protocol.
+    // Mdns,
     /// A transport that uses the WebRTC protocol.
     #[command(name = "webrtc")]
     WebRTC {
@@ -102,6 +107,7 @@ pub struct Quic {
     #[arg(short, value_parser = try_parse_url2)]
     pub proxy: Option<Url2>,
 }
+*/
 
 #[derive(Debug, Parser, Clone)]
 pub struct Existing {
@@ -193,6 +199,7 @@ impl From<Network> for KitsuneP2pConfig {
 
         match transport {
             NetworkType::Mem => (),
+            /*
             NetworkType::Mdns => {
                 kit.network_type = holochain_p2p::kitsune_p2p::NetworkType::QuicMdns;
                 kit.transport_pool = vec![TransportConfig::Quic {
@@ -231,6 +238,7 @@ impl From<Network> for KitsuneP2pConfig {
                     },
                 }];
             }
+            */
             NetworkType::WebRTC { signal_url } => {
                 let transport = TransportConfig::WebRTC { signal_url };
                 kit.transport_pool = vec![transport];
@@ -247,6 +255,7 @@ impl Default for Create {
             network: None,
             root: None,
             directories: Vec::with_capacity(0),
+            in_process_lair: false,
         }
     }
 }

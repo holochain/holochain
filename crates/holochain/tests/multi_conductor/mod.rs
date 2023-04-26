@@ -129,7 +129,6 @@ async fn sharded_consistency() {
     use holochain::test_utils::{
         consistency::local_machine_session, inline_zomes::simple_create_read_zome,
     };
-    use kitsune_p2p::KitsuneP2pConfig;
 
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 3;
@@ -140,17 +139,7 @@ async fn sharded_consistency() {
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
-    let mut network = KitsuneP2pConfig::default();
-    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
-        bind_to: None,
-        override_host: None,
-        override_port: None,
-    }];
-    network.tuning_params = Arc::new(tuning);
-    let config = ConductorConfig {
-        network: Some(network),
-        ..Default::default()
-    };
+    let config = SweetConductorConfig::standard().tune(Arc::new(tuning));
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =

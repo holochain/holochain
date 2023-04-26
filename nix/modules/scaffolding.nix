@@ -21,7 +21,8 @@
 
         buildInputs =
           (with pkgs; [
-            openssl
+            # TODO: remove sqlite package once https://github.com/holochain/holochain/pull/2248 is released
+            openssl sqlite
           ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
             (with pkgs.darwin.apple_sdk_11_0.frameworks; [

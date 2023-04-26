@@ -54,6 +54,7 @@ pub struct DnaModifiers {
     pub quantum_time: Duration,
 }
 
+#[allow(dead_code)]
 const fn standard_quantum_time() -> Duration {
     kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME
 }
@@ -298,6 +299,18 @@ impl DnaDef {
                 } else {
                     Err(ZomeError::NonWasmZome(zome_name.clone()))
                 }
+            })
+    }
+
+    /// Return the Wasm Hash for Zome, error if not a Wasm type Zome
+    pub fn get_wasm_zome_hash(&self, zome_name: &ZomeName) -> Result<WasmHash, ZomeError> {
+        self.all_zomes()
+            .find(|(name, _)| *name == zome_name)
+            .map(|(_, def)| def)
+            .ok_or_else(|| ZomeError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+            .and_then(|def| match def {
+                ZomeDef::Wasm(wasm_zome) => Ok(wasm_zome.wasm_hash.clone()),
+                _ => Err(ZomeError::NonWasmZome(zome_name.clone())),
             })
     }
 

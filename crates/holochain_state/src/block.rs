@@ -1,5 +1,4 @@
 use crate::mutations;
-use crate::prelude::StateQueryResult;
 use crate::query::prelude::named_params;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::prelude::DbWrite;
@@ -20,11 +19,11 @@ pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseRes
         .await
 }
 
-fn query_is_blocked(
+pub fn query_is_blocked(
     txn: &Transaction<'_>,
     target_id: BlockTargetId,
     timestamp: Timestamp,
-) -> StateQueryResult<bool> {
+) -> DatabaseResult<bool> {
     Ok(txn.query_row(
         sql_conductor::IS_BLOCKED,
         named_params! {
@@ -33,15 +32,6 @@ fn query_is_blocked(
         },
         |row| row.get(0),
     )?)
-}
-
-pub async fn is_blocked(
-    db: &DbWrite<DbKindConductor>,
-    target_id: BlockTargetId,
-    timestamp: Timestamp,
-) -> StateQueryResult<bool> {
-    db.async_reader(move |txn| query_is_blocked(&txn, target_id, timestamp))
-        .await
 }
 
 #[cfg(test)]
@@ -145,16 +135,25 @@ mod test {
             }
 
             for (check, expected) in checks {
-                assert!(
-                    !super::is_blocked(&db, control.clone().into(), Timestamp(check))
-                        .await
-                        .unwrap()
-                );
+                let control0 = control.clone();
+                assert!(!db
+                    .async_reader(move |txn| super::query_is_blocked(
+                        &txn,
+                        control0.into(),
+                        Timestamp(check)
+                    ))
+                    .await
+                    .unwrap());
+                let target0 = target.clone();
                 assert_eq!(
                     expected,
-                    super::is_blocked(&db, target.clone().into(), Timestamp(check))
-                        .await
-                        .unwrap(),
+                    db.async_reader(move |txn| super::query_is_blocked(
+                        &txn,
+                        target0.into(),
+                        Timestamp(check)
+                    ))
+                    .await
+                    .unwrap(),
                     "setup {:?} check {} expected {}",
                     setup,
                     check,
@@ -173,17 +172,20 @@ mod test {
         let target0 = BlockTarget::Cell(cell_id.clone(), CellBlockReason::BadCrypto);
         let target1 = BlockTarget::Cell(cell_id, CellBlockReason::App(vec![1, 2, 3]));
 
+        let target00 = target0.clone();
         super::block(
             &db,
             Block::new(
-                target0.clone(),
+                target00,
                 InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX).unwrap(),
             ),
         )
         .await
         .unwrap();
 
-        assert!(super::is_blocked(&db, target0.clone().into(), Timestamp(0))
+        let target01 = target0.clone();
+        assert!(db
+            .async_reader(move |txn| super::query_is_blocked(&txn, target01.into(), Timestamp(0)))
             .await
             .unwrap());
 
@@ -197,7 +199,9 @@ mod test {
         .await
         .unwrap();
 
-        assert!(super::is_blocked(&db, target0.clone().into(), Timestamp(0))
+        let target02 = target0.clone();
+        assert!(db
+            .async_reader(move |txn| super::query_is_blocked(&txn, target02.into(), Timestamp(0)))
             .await
             .unwrap());
 
@@ -213,7 +217,12 @@ mod test {
         .unwrap();
 
         // Even though the app block was unblocked the bad crypto block remains.
-        assert!(super::is_blocked(&db, target0.clone().into(), Timestamp(0))
+        assert!(db
+            .async_reader(move |txn| super::query_is_blocked(
+                &txn,
+                target0.clone().into(),
+                Timestamp(0)
+            ))
             .await
             .unwrap());
     }
@@ -236,16 +245,24 @@ mod test {
             let control = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
             let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
-            assert!(
-                !super::is_blocked(&db, control.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
-            assert!(
-                !super::is_blocked(&db, target.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
+            let control0 = control.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    control0.into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
+            let target0 = target.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    target0.into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
 
             super::block(
                 &db,
@@ -275,15 +292,24 @@ mod test {
             .await
             .unwrap();
 
+            let control0 = control.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    control0.into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
+            let target0 = target.clone();
             assert!(
-                !super::is_blocked(&db, control.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
-            assert!(
-                super::is_blocked(&db, target.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap(),
+                db.async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    target0.into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap(),
                 "block_start {} block_end {} unblock_start {} unblock_end {}",
                 block_start,
                 block_end,
@@ -321,16 +347,24 @@ mod test {
             let control = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
             let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
-            assert!(
-                !super::is_blocked(&db, control.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
-            assert!(
-                !super::is_blocked(&db, target.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
+            let control0 = control.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    control0.into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
+            let target0 = target.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    target0.into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
 
             super::block(
                 &db,
@@ -360,15 +394,22 @@ mod test {
             .await
             .unwrap();
 
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    control.clone().into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
             assert!(
-                !super::is_blocked(&db, control.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
-            assert!(
-                !super::is_blocked(&db, target.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap(),
+                !db.async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    target.clone().into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap(),
                 "block_start {} block_end {} unblock_start {} unblock_end {}",
                 block_start,
                 block_end,
@@ -384,11 +425,14 @@ mod test {
         let db = test_conductor_db();
         let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
-        assert!(
-            !super::is_blocked(&db, target.into(), fixt::fixt!(Timestamp))
-                .await
-                .unwrap()
-        );
+        assert!(!db
+            .async_reader(move |txn| super::query_is_blocked(
+                &txn,
+                target.into(),
+                fixt::fixt!(Timestamp)
+            ))
+            .await
+            .unwrap());
     }
 
     // Blocks only block their span.
@@ -405,16 +449,24 @@ mod test {
             let control = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
             let target = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
-            assert!(
-                !super::is_blocked(&db, control.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
-            assert!(
-                !super::is_blocked(&db, target.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
+            let control0 = control.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    control0.into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
+            let target0 = target.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    target0.into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
 
             super::block(
                 &db,
@@ -426,16 +478,23 @@ mod test {
             .await
             .unwrap();
 
-            assert!(
-                !super::is_blocked(&db, control.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
-            assert!(
-                !super::is_blocked(&db, target.clone().into(), Timestamp(check))
-                    .await
-                    .unwrap()
-            );
+            let control0 = control.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    control0.into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    target.clone().into(),
+                    Timestamp(check)
+                ))
+                .await
+                .unwrap());
         }
     }
 
@@ -460,16 +519,24 @@ mod test {
             // to block
             let target1 = BlockTarget::Cell(fixt::fixt!(CellId), CellBlockReason::BadCrypto);
 
-            assert!(
-                !super::is_blocked(&db, BlockTargetId::from(target0.clone()), Timestamp(mid))
-                    .await
-                    .unwrap()
-            );
-            assert!(
-                !super::is_blocked(&db, BlockTargetId::from(target1.clone()), Timestamp(mid))
-                    .await
-                    .unwrap()
-            );
+            let target00 = target0.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    BlockTargetId::from(target00),
+                    Timestamp(mid)
+                ))
+                .await
+                .unwrap());
+            let target10 = target1.clone();
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    BlockTargetId::from(target10),
+                    Timestamp(mid)
+                ))
+                .await
+                .unwrap());
 
             super::block(
                 &db,
@@ -481,15 +548,22 @@ mod test {
             .await
             .unwrap();
 
+            assert!(!db
+                .async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    BlockTargetId::from(target0),
+                    Timestamp(mid)
+                ))
+                .await
+                .unwrap());
             assert!(
-                !super::is_blocked(&db, BlockTargetId::from(target0), Timestamp(mid))
-                    .await
-                    .unwrap()
-            );
-            assert!(
-                super::is_blocked(&db, BlockTargetId::from(target1), Timestamp(mid))
-                    .await
-                    .unwrap(),
+                db.async_reader(move |txn| super::query_is_blocked(
+                    &txn,
+                    BlockTargetId::from(target1),
+                    Timestamp(mid)
+                ))
+                .await
+                .unwrap(),
                 "start {}, mid {}, end {}",
                 start,
                 mid,
