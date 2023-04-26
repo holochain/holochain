@@ -92,7 +92,7 @@ impl AnyLinkableHash {
         }
     }
 
-    /// If this hash represents a ActionHash, return it, else None
+    /// If this hash represents an ActionHash, return it, else None
     pub fn into_action_hash(self) -> Option<ActionHash> {
         if *self.hash_type() == hash_type::AnyLinkable::Action {
             Some(self.retype(hash_type::Action))
@@ -144,7 +144,7 @@ impl AnyDhtHash {
         }
     }
 
-    /// If this hash represents a ActionHash, return it, else None
+    /// If this hash represents an ActionHash, return it, else None
     pub fn into_action_hash(self) -> Option<ActionHash> {
         if *self.hash_type() == hash_type::AnyDht::Action {
             Some(self.retype(hash_type::Action))
