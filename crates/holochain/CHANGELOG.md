@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.2.0-beta-rc.7
+
+## 0.2.0-beta-rc.6
+
+- Feature renaming from `no-deps` to `sqlite` and `db-encryption` to `sqlite-encrypted`. It should not be necessary to configure these unless you are packaging `holochain` or have imported it as a dependency without default features. In the latter case, please update any references to the old feature names.
+
+## 0.2.0-beta-rc.5
+
+- Implements the `clone_only` cell provisioning strategy, desgined for situations where no cell should be installed upon app installation but clones may be created later, via `roles[].provisioning.strategy` in the app manifest [\#2243](https://github.com/holochain/holochain/pull/2243)
+
+## 0.2.0-beta-rc.4
+
+## 0.2.0-beta-rc.3
+
+- BREAKING CHANGE - Removes conductor networking types “Proxy” (“proxy”) and “Quic” (“quic”). Please transition to “WebRTC” (“webrtc”). [\#2208](https://github.com/holochain/holochain/pull/2208)
+- Adds `DumpNetworkStats` api to admin websocket [\#2182](https://github.com/holochain/holochain/pull/2182).
+- System validation now ensures that all records in a source chain are by the same author [\#2189](https://github.com/holochain/holochain/pull/2189)
+
+## 0.2.0-beta-rc.2
+
+- Fixes bug where supplying a `network_seed` during an `InstallApp` call does not actually update the network seed for roles whose `provisioning` is set to `None` in the manifest. Now the network seed is correctly updated. [\#2102](https://github.com/holochain/holochain/pull/2102)
+- If AppManifest specifies an `installed_hash` for a DNA, it will check the conductor for an already-registered DNA at that hash, ignoring the DNA passed in as part of the bundle. Note that this means you can install apps without passing in any DNA, if the DNAs are already installed in the conductor. [\#2157](https://github.com/holochain/holochain/pull/2157)
+
+## 0.2.0-beta-rc.1
+
 ## 0.2.0-beta-rc.0
 
 - When uninstalling an app, local data is now cleaned up where appropriate. [\#1805](https://github.com/holochain/holochain/pull/1805)

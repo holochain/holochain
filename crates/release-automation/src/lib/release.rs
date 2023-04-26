@@ -170,7 +170,6 @@ fn bump_release_versions<'a>(
     };
 
     // check the workspace and determine the release selection
-    // todo: double-check that we select matching cratese that had their dependencies change
     let selection = crate::common::selection_check(&cmd_args.check_args, ws)?;
 
     if selection.is_empty() {

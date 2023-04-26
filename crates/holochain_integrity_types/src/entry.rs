@@ -153,10 +153,7 @@ impl HashableContent for Entry {
                 // We must retype this AgentPubKey as an EntryHash so that the
                 // prefix bytes match the Entry prefix
                 HashableContentBytes::Prehashed39(
-                    agent_pubkey
-                        .clone()
-                        .retype(holo_hash::hash_type::Entry)
-                        .into_inner(),
+                    EntryHash::from(agent_pubkey.clone()).into_inner(),
                 )
             }
             entry => HashableContentBytes::Content(

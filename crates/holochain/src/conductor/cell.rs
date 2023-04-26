@@ -29,7 +29,6 @@ use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 use error::CellError;
 use futures::future::FutureExt;
-use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_conductor_api::ZomeCall;
@@ -597,13 +596,13 @@ impl Cell {
         // we can just have these defaults depending on whether or not
         // the hash is an entry or action.
         // In the future we should use GetOptions to choose which get to run.
-        let mut r = match *dht_hash.hash_type() {
-            AnyDht::Entry => self
-                .handle_get_entry(dht_hash.into(), options)
+        let mut r = match dht_hash.into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self
+                .handle_get_entry(hash, options)
                 .await
                 .map(WireOps::Entry),
-            AnyDht::Action => self
-                .handle_get_record(dht_hash.into(), options)
+            AnyDhtHashPrimitive::Action(hash) => self
+                .handle_get_record(hash, options)
                 .await
                 .map(WireOps::Record),
         };

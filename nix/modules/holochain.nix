@@ -114,8 +114,12 @@
             ${disabledTestsArg} \
           '';
 
+          cargoNextestExtraArgs = builtins.getEnv "NEXTEST_EXTRA_ARGS";
+
           dontPatchELF = true;
           dontFixup = true;
+
+          nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ holochain ];
 
           installPhase = ''
             mkdir -p $out
@@ -124,7 +128,7 @@
           '';
         });
 
-      build-holochain-tests-unit = craneLib.cargoNextest holochainTestsNextestArgs;
+      build-holochain-tests-unit = lib.makeOverridable craneLib.cargoNextest holochainTestsNextestArgs;
 
       build-holochain-tests-static-fmt = craneLib.cargoFmt (commonArgs // {
         src = flake.config.srcCleanedHolochain;

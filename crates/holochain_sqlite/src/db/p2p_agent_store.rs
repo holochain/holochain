@@ -21,6 +21,9 @@ pub trait AsP2pAgentStoreConExt {
     /// List all AgentInfoSigned records within a space in the p2p_agent_store
     fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
+    /// Count agent records within a space in the p2p_agent_store
+    fn p2p_count_agents(&mut self) -> DatabaseResult<u32>;
+
     /// Query agent list for gossip
     fn p2p_gossip_query_agents(
         &mut self,
@@ -52,6 +55,9 @@ pub trait AsP2pStateTxExt {
     /// List all AgentInfoSigned records within a space in the p2p_agent_store
     fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>>;
 
+    /// Count agent records within a space in the p2p_agent_store
+    fn p2p_count_agents(&self) -> DatabaseResult<u32>;
+
     /// Query agent list for gossip
     fn p2p_gossip_query_agents(
         &self,
@@ -78,6 +84,10 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
 
     fn p2p_list_agents(&mut self) -> DatabaseResult<Vec<AgentInfoSigned>> {
         self.with_reader(move |reader| reader.p2p_list_agents())
+    }
+
+    fn p2p_count_agents(&mut self) -> DatabaseResult<u32> {
+        self.with_reader(move |reader| reader.p2p_count_agents())
     }
 
     fn p2p_gossip_query_agents(
@@ -231,6 +241,11 @@ impl AsP2pStateTxExt for Transaction<'_> {
             out.push(r?);
         }
         Ok(out)
+    }
+
+    fn p2p_count_agents(&self) -> DatabaseResult<u32> {
+        let count = self.query_row_and_then(sql_p2p_agent_store::COUNT, [], |row| row.get(0))?;
+        Ok(count)
     }
 
     fn p2p_gossip_query_agents(

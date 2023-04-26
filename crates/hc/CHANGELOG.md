@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.2.0-beta-rc.7
+
+- Adds a new `hc signal-srv` command to run a local holochain webrtc signal server that can be passed into a command like `hc sandbox generate network webrtc ws://127.0.0.1:xxx`. [\#2265](https://github.com/holochain/holochain/pull/2265)
+
+## 0.2.0-beta-rc.6
+
+## 0.2.0-beta-rc.5
+
+## 0.2.0-beta-rc.4
+
+## 0.2.0-beta-rc.3
+
+- Adds new commands to the `hc` CLI which print out JSON schemas for DNA, hApp and web hApps. Use `hc dna schema`, `hc app schema` and `hc web-app schema` to print schemas which can be saved and used as editing aids in your IDE.
+
+## 0.2.0-beta-rc.2
+
+## 0.2.0-beta-rc.1
+
 ## 0.2.0-beta-rc.0
 
 ## 0.1.0

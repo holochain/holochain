@@ -51,6 +51,11 @@ pub enum HcDnaBundle {
         /// provided working directory.
         #[structopt(short = "o", long)]
         output: Option<PathBuf>,
+
+        /// Output shared object "dylib" files
+        /// that can be used to run this happ on iOS
+        #[structopt(long)]
+        dylib_ios: bool,
     },
 
     /// Unpack parts of the `.dna` bundle file into a specific directory.
@@ -83,6 +88,9 @@ pub enum HcDnaBundle {
         #[structopt(short = "f", long)]
         force: bool,
     },
+
+    /// Print the schema for a DNA manifest
+    Schema,
 }
 
 /// Work with Holochain hApp bundles
@@ -152,6 +160,9 @@ pub enum HcAppBundle {
         #[structopt(short = "f", long)]
         force: bool,
     },
+
+    /// Print the schema for a hApp manifest
+    Schema,
 }
 
 /// Work with Holochain Web-hApp bundles
@@ -221,6 +232,9 @@ pub enum HcWebAppBundle {
         #[structopt(short = "f", long)]
         force: bool,
     },
+
+    /// Print the schema for a web hApp manifest
+    Schema,
 }
 
 impl HcDnaBundle {
@@ -230,10 +244,15 @@ impl HcDnaBundle {
             Self::Init { path } => {
                 crate::init::init_dna(path).await?;
             }
-            Self::Pack { path, output } => {
+            Self::Pack {
+                path,
+                output,
+                dylib_ios,
+            } => {
                 let name = get_dna_name(&path).await?;
                 let (bundle_path, _) =
-                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name).await?;
+                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name, dylib_ios)
+                        .await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -262,6 +281,9 @@ impl HcDnaBundle {
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
+            Self::Schema => {
+                println!("{}", include_str!("../schema/dna-manifest.schema.json"));
+            }
         }
         Ok(())
     }
@@ -286,7 +308,7 @@ impl HcAppBundle {
                 }
 
                 let (bundle_path, _) =
-                    crate::packing::pack::<AppManifest>(&path, output, name).await?;
+                    crate::packing::pack::<AppManifest>(&path, output, name, false).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -309,6 +331,9 @@ impl HcAppBundle {
                         .await?
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
+            }
+            Self::Schema => {
+                println!("{}", include_str!("../schema/happ-manifest.schema.json"));
             }
         }
         Ok(())
@@ -334,7 +359,7 @@ impl HcWebAppBundle {
                 }
 
                 let (bundle_path, _) =
-                    crate::packing::pack::<WebAppManifest>(&path, output, name).await?;
+                    crate::packing::pack::<WebAppManifest>(&path, output, name, false).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -362,6 +387,12 @@ impl HcWebAppBundle {
                     .await?
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
+            }
+            Self::Schema => {
+                println!(
+                    "{}",
+                    include_str!("../schema/web-happ-manifest.schema.json")
+                );
             }
         }
         Ok(())
@@ -441,6 +472,7 @@ async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
         HcDnaBundle::Pack {
             path: dna_workdir_location,
             output: None,
+            dylib_ios: false,
         }
         .run()
         .await?;
