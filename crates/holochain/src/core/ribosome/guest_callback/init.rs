@@ -233,8 +233,10 @@ mod slow_tests {
     use crate::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
     use holo_hash::AnyLinkableHash;
+    use holochain_types::app::{CloneCellId, DisableCloneCellPayload, EnableCloneCellPayload};
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
+    use crate::conductor::{Conductor, ConductorHandle};
     use crate::sweettest::SweetCell;
     use crate::test_utils::consistency_60s;
 
@@ -305,6 +307,7 @@ mod slow_tests {
         use holochain_wasm_test_utils::TestWasm;
         use holochain_zome_types::prelude::*;
         use holo_hash::ActionHash;
+        use std::sync::Arc;
 
         #[derive(Debug, Serialize)]
         struct Test(String);
@@ -334,6 +337,8 @@ mod slow_tests {
             c.setup_app("app", [&dna_file]).await.unwrap()
         }))
             .await;
+
+        // let conductors: Vec<Arc<Conductor>> = conductors.into_inner().into_iter().map(|c| Arc::new(c)).collect();
 
         let cells: Vec<SweetCell> = apps.iter().map(|a| {
             let (cells,) = a.clone().into_tuple();
@@ -395,6 +400,16 @@ mod slow_tests {
                 modifiers: DnaModifiersOpt::none().with_network_seed(format!("anything-{}", i).to_string()),
                 membrane_proof: None,
                 name: Some(format!("cloned-{}", i).to_string()),
+            }).await.unwrap();
+
+            conductors[i % 3].disable_clone_cell(&DisableCloneCellPayload {
+                app_id: apps[i % 3].installed_app_id().clone(),
+                clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
+            }).await.unwrap();
+
+            conductors[i % 3].raw_handle().enable_clone_cell(&EnableCloneCellPayload {
+                app_id: apps[i % 3].installed_app_id().clone(),
+                clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
             }).await.unwrap();
 
             let zome: SweetZome = SweetZome::new(
