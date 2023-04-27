@@ -5,15 +5,10 @@ use kitsune_p2p_dht_arc::DhtArcSet;
 use crate::{
     arq::ArqBounds,
     spacetime::{SpaceOffset, Topology},
-    ArqStrat, Loc,
+    ArqStrat,
 };
 
 use super::{power_and_count_from_length, Arq, ArqStart};
-
-/// Alias for a set of [`Arq`]
-pub type ArqSet = ArqSetImpl<Loc>;
-/// Alias for a set of [`ArqBounds`]
-pub type ArqBoundsSet = ArqSetImpl<SpaceOffset>;
 
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
@@ -31,7 +26,7 @@ pub type ArqBoundsSet = ArqSetImpl<SpaceOffset>;
     serde::Serialize,
     serde::Deserialize,
 )]
-pub struct ArqSetImpl<S: ArqStart> {
+pub struct ArqSet<S: ArqStart = SpaceOffset> {
     #[into_iterator]
     #[deref]
     #[deref_mut]
@@ -42,7 +37,7 @@ pub struct ArqSetImpl<S: ArqStart> {
     power: u8,
 }
 
-impl<S: ArqStart> ArqSetImpl<S> {
+impl<S: ArqStart> ArqSet<S> {
     /// Normalize all arqs to be of the same power (use the minimum power)
     pub fn new(arqs: Vec<Arq<S>>) -> Self {
         if let Some(pow) = arqs.iter().map(|a| a.power()).min() {
@@ -101,11 +96,11 @@ impl<S: ArqStart> ArqSetImpl<S> {
     }
 
     /// Intersection of all arqs contained within
-    pub fn intersection(&self, topo: &Topology, other: &Self) -> ArqSetImpl<SpaceOffset> {
+    pub fn intersection(&self, topo: &Topology, other: &Self) -> ArqSet<SpaceOffset> {
         let power = self.power.min(other.power());
         let a1 = self.requantize(power).unwrap().to_dht_arc_set(topo);
         let a2 = other.requantize(power).unwrap().to_dht_arc_set(topo);
-        ArqSetImpl {
+        ArqSet {
             arqs: DhtArcSet::intersection(&a1, &a2)
                 .intervals()
                 .into_iter()
@@ -133,7 +128,7 @@ impl<S: ArqStart> ArqSetImpl<S> {
     }
 }
 
-impl ArqBoundsSet {
+impl ArqSet {
     /// Convert back from a continuous arc set to a quantized one.
     /// If any information is lost (the match is not exact), return None.
     pub fn from_dht_arc_set(
@@ -240,12 +235,12 @@ mod tests {
         let sb2 = (20 * pow2(pow - 1)).into();
 
         let a = ArqSet::new(vec![
-            Arq::new(pow, sa1, 8.into()),
-            Arq::new(pow - 1, sa2, 8.into()),
+            Arq::new(pow, sa1, 8.into()).to_bounds(&topo),
+            Arq::new(pow - 1, sa2, 8.into()).to_bounds(&topo),
         ]);
         let b = ArqSet::new(vec![
-            Arq::new(pow, sb1, 8.into()),
-            Arq::new(pow - 1, sb2, 8.into()),
+            Arq::new(pow, sb1, 8.into()).to_bounds(&topo),
+            Arq::new(pow - 1, sb2, 8.into()).to_bounds(&topo),
         ]);
 
         let c = a.intersection(&topo, &b);
@@ -266,7 +261,7 @@ mod tests {
 
     #[test]
     fn normalize_arqs() {
-        let s = ArqSetImpl::new(vec![
+        let s = ArqSet::new(vec![
             ArqBounds {
                 start: 0.into(),
                 power: 10,
@@ -309,6 +304,8 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn rounded_arcset_intersections(p1 in 0u8..15, s1: u32, c1 in 8u32..64, p2 in 0u8..15, s2: u32, c2 in 8u32..64) {
+            use crate::Loc;
+
             let topo = Topology::standard_epoch_full();
             let arq1 = Arq::new(p1, Loc::from(s1), c1.into());
             let arq2 = Arq::new(p2, Loc::from(s2), c2.into());
