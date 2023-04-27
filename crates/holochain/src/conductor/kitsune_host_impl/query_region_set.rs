@@ -19,7 +19,7 @@ pub async fn query_region_set(
     strat: &ArqStrat,
     dht_arc_set: Arc<DhtArcSet>,
 ) -> ConductorResult<RegionSetLtcs> {
-    let (arq_set, rounded) = ArqBoundsSet::from_dht_arc_set_rounded(&topology, strat, &dht_arc_set);
+    let (arq_set, rounded) = ArqSet::from_dht_arc_set_rounded(&topology, strat, &dht_arc_set);
     if rounded {
         // If an arq was rounded, emit a warning, but throttle it to once every LOG_RATE_MS
         // so we don't get slammed.
