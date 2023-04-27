@@ -12,29 +12,6 @@ All subcommands are very similar and have nearly identical flags and options.
 
 This crate also defines standalone binaries for each subcommand, `hc-dna`, `hc-app`, and `hc-web-app`.
 
-Usage instructions from the `-h` flag:
-
-```sh
-$ hc dna -h
-holochain_cli_bundle 0.1.3
-Work with Holochain DNA bundles
-
-USAGE:
-    hc-dna <SUBCOMMAND>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-SUBCOMMANDS:
-    help      Prints this message or the help of the given subcommand(s)
-    init      Create a new, empty Holochain DNA bundle working directory and create a new sample `dna.yaml` manifest
-              inside. 
-    pack      Pack into the `[name].dna` bundle according to the `dna.yaml` manifest, found inside the working
-              directory. The `[name]` is taken from the `name` property of the manifest file
-    unpack    Unpack parts of the `.dna` bundle file into a specific directory
-```
-
 `hc app` and `hc web-app` are very similar, only differing by the addition of a `--recursive` flag.
 If used, this flag attempts to first pack all the assets to be included in the bundle being packed.
 If it doesn't find the bundled DNA or hApp asset specified, it will by convention look for a

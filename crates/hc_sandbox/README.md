@@ -2,9 +2,6 @@
 
 A library and CLI to help create, run, and interact with sandboxed Holochain conductor environments,
 for testing and development purposes.
-**Warning: this is still WIP and subject to change**
-There's probably a few bugs. If you find one please open an [issue](https://github.com/holochain/holochain/issues)
-or make a PR.
 
 ## CLI
 
