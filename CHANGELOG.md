@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # 20230426.003734
 
+This release features  more secure version of Holochain that incorporates advanced network security protocols using WebRTC End-to-End Encryption and addresses known Holochain security vulnerabilities.
+
+It also introduces new functionality and improves some of the existing:
+* app-level blocking, for when an application wants to allow agents to block each other for reasons other than validation failures
+* user experience improvements that provide better network information
+* and improved system validation to make the network more secure and reliable.
+
 ## [holochain\_cli-0.2.0-beta-rc.7](crates/holochain_cli/CHANGELOG.md#0.2.0-beta-rc.7)
 
 - Adds a new `hc signal-srv` command to run a local holochain webrtc signal server that can be passed into a command like `hc sandbox generate network webrtc ws://127.0.0.1:xxx`. [\#2265](https://github.com/holochain/holochain/pull/2265)
