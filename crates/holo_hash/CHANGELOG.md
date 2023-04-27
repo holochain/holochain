@@ -1,5 +1,4 @@
 ---
-semver_increment_mode: minor
 default_semver_increment_mode: !pre_patch beta-dev
 ---
 # Changelog
@@ -7,6 +6,8 @@ default_semver_increment_mode: !pre_patch beta-dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.2.0
 
 - Adds more ways to convert between different hash types [\#2283](https://github.com/holochain/holochain/pull/2283)
   - Adds `.into_agent_pub_key() -> Option<AgentPubKey>` for `AnyDhtHash` and `AnyLinkableHash`
