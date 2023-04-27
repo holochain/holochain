@@ -99,6 +99,9 @@ ghost_actor::ghost_chan! {
 
         /// Get all local joined agent infos across all spaces.
         fn get_all_local_joined_agent_infos() -> Vec<AgentInfoSigned>;
+
+        /// Every 5 seconds
+        fn five_second_tick() -> ();
     }
 }
 
@@ -132,6 +135,13 @@ impl KitsuneP2pActor {
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         host: HostApi,
     ) -> KitsuneP2pResult<Self> {
+        let i_s = internal_sender.clone();
+        tokio::task::spawn(async move {
+            while i_s.five_second_tick().await.is_ok() {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
+        });
+
         crate::types::metrics::init();
 
         let metrics = Tx2ApiMetrics::default().set_write_len(|d, l| {
@@ -979,6 +989,30 @@ impl InternalHandler for KitsuneP2pActor {
                 .flatten()
                 .collect();
             Ok(agent_infos)
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_five_second_tick(&mut self) -> InternalHandlerResult<()> {
+        let spaces = self.spaces.keys().cloned().collect::<Vec<_>>();
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let mut known_peers = std::collections::HashSet::new();
+            for space in spaces {
+                let q = crate::event::QueryAgentsEvt::new(space);
+                if let Ok(agent_list) = evt_sender.query_agents(q).await {
+                    for agent in agent_list {
+                        for url in agent.url_list.iter() {
+                            let url = kitsune_p2p_proxy::ProxyUrl::from(url.as_str());
+                            let digest = url.digest();
+                            known_peers.insert(digest);
+                        }
+                    }
+                }
+            }
+            tracing::debug!(target: "NDBG", ?known_peers);
+            Ok(())
         }
         .boxed()
         .into())

@@ -719,6 +719,8 @@ async fn update_single_agent_info(
 
     tracing::debug!(?agent_info_signed);
 
+    tracing::debug!(target: "NDBG", ?agent_info_signed);
+
     // Push to the network as well
     match network_type {
         NetworkType::QuicMdns => {

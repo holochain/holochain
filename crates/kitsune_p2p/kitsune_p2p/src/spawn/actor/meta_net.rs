@@ -7,6 +7,7 @@
 #![allow(unreachable_patterns)]
 #![allow(clippy::needless_return)]
 #![allow(clippy::blocks_in_if_conditions)]
+#![allow(clippy::field_reassign_with_default)]
 //! Networking abstraction to handle feature flipping.
 
 use crate::wire::WireData;
@@ -290,7 +291,7 @@ impl MetaNetCon {
 
         let elapsed_s = start.elapsed().as_secs_f64();
 
-        tracing::trace!(%elapsed_s, %msg_id, ?payload, ?result, "sent notify");
+        tracing::trace!(%elapsed_s, %msg_id, ?result, "sent notify");
 
         result
     }
@@ -303,7 +304,7 @@ impl MetaNetCon {
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
 
-        tracing::trace!(?payload, "initiating request");
+        tracing::trace!("initiating request");
 
         let result = (move || async move {
             #[cfg(feature = "tx2")]
@@ -348,7 +349,7 @@ impl MetaNetCon {
 
         let elapsed_s = start.elapsed().as_secs_f64();
 
-        tracing::trace!(%elapsed_s, %msg_id, ?payload, ?result, "sent request");
+        tracing::trace!(%elapsed_s, %msg_id, ?result, "sent request");
 
         result
     }
@@ -734,7 +735,7 @@ impl MetaNet {
                             Ok(WireWrap::Notify(Notify { msg_id, data })) => {
                                 match wire::Wire::decode_ref(&data) {
                                     Ok((_, data)) => {
-                                        tracing::trace!(%msg_id, ?data, "received notify");
+                                        tracing::trace!(%msg_id, "received notify");
                                         if evt_send
                                             .send(MetaNetEvt::Notify {
                                                 remote_url: rem_cli_url.to_string(),
@@ -832,15 +833,82 @@ impl MetaNet {
             }
         });
 
-        Ok((
-            MetaNet::Tx5 {
-                ep: ep_hnd,
-                url: cli_url,
-                res: res_store,
-                tun: tuning_params,
-            },
-            evt_recv,
-        ))
+        let this = MetaNet::Tx5 {
+            ep: ep_hnd,
+            url: cli_url,
+            res: res_store,
+            tun: tuning_params,
+        };
+
+        {
+            let this = this.clone();
+            tokio::task::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+                    let stats = this.dump_network_stats().await?;
+                    let stats = stats.as_object().unwrap();
+
+                    #[derive(Default, serde::Serialize)]
+                    struct Conn {
+                        id: String,
+                        #[serde(rename = "msgSnd")]
+                        m_snd: u64,
+                        #[serde(rename = "msgRcv")]
+                        m_rcv: u64,
+                        #[serde(rename = "bytesSnd")]
+                        b_snd: u64,
+                        #[serde(rename = "bytesRcv")]
+                        b_rcv: u64,
+                        #[serde(rename = "ageSeconds")]
+                        age_s: f64,
+                    }
+
+                    #[derive(Default, serde::Serialize)]
+                    struct Stats {
+                        backend: String,
+                        #[serde(rename = "thisId")]
+                        this_id: String,
+                        connections: Vec<Conn>,
+                    }
+
+                    let mut s = Stats::default();
+
+                    for (k, v) in stats.iter() {
+                        if k == "backend" {
+                            s.backend = v.as_str().unwrap().to_string();
+                        } else if k == "thisId" {
+                            s.this_id = v.as_str().unwrap().to_string();
+                            s.this_id.replace_range(6..s.this_id.len() - 6, "..");
+                        } else {
+                            let v = v.as_object().unwrap();
+                            let mut c = Conn::default();
+                            c.id = k.to_string();
+                            c.id.replace_range(6..c.id.len() - 6, "..");
+                            c.age_s = v.get("ageSeconds").unwrap().as_f64().unwrap();
+
+                            for (ck, cv) in v.iter() {
+                                if ck.starts_with("DataChannel-") {
+                                    let cv = cv.as_object().unwrap();
+                                    c.m_snd += cv.get("messagesSent").unwrap().as_u64().unwrap();
+                                    c.m_rcv +=
+                                        cv.get("messagesReceived").unwrap().as_u64().unwrap();
+                                    c.b_snd += cv.get("bytesSent").unwrap().as_u64().unwrap();
+                                    c.b_rcv += cv.get("bytesReceived").unwrap().as_u64().unwrap();
+                                }
+                            }
+
+                            s.connections.push(c);
+                        }
+                    }
+
+                    tracing::debug!(target: "NDBG", "stats: {}", serde_json::to_string_pretty(&s).unwrap());
+                }
+                KitsuneResult::Ok(())
+            });
+        }
+
+        Ok((this, evt_recv))
     }
 
     pub fn local_addr(&self) -> KitsuneResult<String> {
