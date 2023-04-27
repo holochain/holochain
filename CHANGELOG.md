@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
-This release features  more secure version of Holochain that incorporates advanced network security protocols using WebRTC End-to-End Encryption and addresses known Holochain security vulnerabilities.
+This release features a more secure version of Holochain that incorporates advanced network security protocols using WebRTC End-to-End Encryption and addresses known Holochain security vulnerabilities.
 
 It also introduces new functionality and improves some of the existing:
 * app-level blocking, for when an application wants to allow agents to block each other for reasons other than validation failures
