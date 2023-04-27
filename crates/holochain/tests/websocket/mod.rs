@@ -245,7 +245,25 @@ async fn call_zome() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
-async fn remote_signals() -> anyhow::Result<()> {
+async fn remote_signals_multi() -> anyhow::Result<()> {
+    let mut tasks = vec![];
+    for _ in [0..100] {
+        tasks.push(remote_signals_inner());
+    }
+    let results: anyhow::Result<Vec<()>> = futures::future::join_all(tasks).await.into_iter().collect();
+    match results {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "slow_tests")]
+async fn remote_signals_single() -> anyhow::Result<()> {
+    remote_signals_inner().await
+}
+
+async fn remote_signals_inner() -> anyhow::Result<()> {
     holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
