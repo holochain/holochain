@@ -250,7 +250,8 @@ async fn remote_signals_multi() -> anyhow::Result<()> {
     for _ in [0..100] {
         tasks.push(remote_signals_inner());
     }
-    let results: anyhow::Result<Vec<()>> = futures::future::join_all(tasks).await.into_iter().collect();
+    let results: anyhow::Result<Vec<()>> =
+        futures::future::join_all(tasks).await.into_iter().collect();
     match results {
         Ok(_) => Ok(()),
         Err(e) => Err(e),
