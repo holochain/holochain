@@ -172,6 +172,7 @@ pub enum CellStatus {
 pub type CellStatusFilter = CellStatus;
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
+#[derive(Debug, Clone)]
 struct CellItem {
     cell: Arc<Cell>,
     status: CellStatus,
@@ -1150,7 +1151,7 @@ mod network_impls {
                 | ValidationReceiptReceived { .. } => {
                     let cell_id =
                         CellId::new(event.dna_hash().clone(), event.target_agents().clone());
-                    let cell = self.cell_by_id(&cell_id).await?;
+                    let cell = self.cell_by_id(&cell_id, true).await?;
                     cell.handle_holochain_p2p_event(event).await?;
                 }
                 Publish {
@@ -1223,7 +1224,7 @@ mod network_impls {
 
         /// Invoke a zome function on a Cell
         pub async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-            let cell = self.cell_by_id(&call.cell_id).await?;
+            let cell = self.cell_by_id(&call.cell_id, true).await?;
             Ok(cell.call_zome(call, None).await?)
         }
 
@@ -1233,7 +1234,7 @@ mod network_impls {
             workspace_lock: SourceChainWorkspace,
         ) -> ConductorApiResult<ZomeCallResult> {
             debug!(cell_id = ?call.cell_id);
-            let cell = self.cell_by_id(&call.cell_id).await?;
+            let cell = self.cell_by_id(&call.cell_id, true).await?;
             Ok(cell.call_zome(call, Some(workspace_lock)).await?)
         }
 
@@ -1509,13 +1510,17 @@ mod cell_impls {
     use super::*;
 
     impl Conductor {
-        pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
+        pub(crate) async fn cell_by_id(&self, cell_id: &CellId, require_network_ready: bool) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
             if let Some(cell) = self
                 .running_cells
-                .share_ref(|c| c.get(cell_id).map(|i| i.cell.clone()))
+                .share_ref(|c| c.get(cell_id).cloned())
             {
-                Ok(cell)
+                if require_network_ready && cell.status != CellStatus::Joined {
+                    Err(ConductorError::CellNetworkNotReady(cell.status))
+                } else {
+                    Ok(cell.cell.clone())
+                }
             } else {
                 // If not in running_cells list, check if the cell id is registered at all,
                 // to give a different error message for disabled vs missing.
@@ -2076,7 +2081,7 @@ mod scheduler_impls {
             let cell_arcs = {
                 let mut cell_arcs = vec![];
                 for cell_id in self.live_cell_ids() {
-                    if let Ok(cell_arc) = self.cell_by_id(&cell_id).await {
+                    if let Ok(cell_arc) = self.cell_by_id(&cell_id, true).await {
                         cell_arcs.push(cell_arc);
                     }
                 }
@@ -2130,7 +2135,7 @@ mod misc_impls {
                 )
                 .await?;
 
-            let cell = self.cell_by_id(&cell_id).await?;
+            let cell = self.cell_by_id(&cell_id, false).await?;
             source_chain.flush(cell.holochain_p2p_dna()).await?;
 
             Ok(())
@@ -2138,7 +2143,7 @@ mod misc_impls {
 
         /// Create a JSON dump of the cell's state
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
-            let cell = self.cell_by_id(cell_id).await?;
+            let cell = self.cell_by_id(cell_id, false).await?;
             let authored_db = cell.authored_db();
             let dht_db = cell.dht_db();
             let space = cell_id.dna_hash();
@@ -2786,7 +2791,7 @@ mod test_utils_impls {
             &self,
             cell_id: &CellId,
         ) -> ConductorApiResult<DbWrite<DbKindCache>> {
-            let cell = self.cell_by_id(cell_id).await?;
+            let cell = self.cell_by_id(cell_id, false).await?;
             Ok(cell.cache().clone())
         }
 
@@ -2806,7 +2811,7 @@ mod test_utils_impls {
             &self,
             cell_id: &CellId,
         ) -> ConductorApiResult<QueueTriggers> {
-            let cell = self.cell_by_id(cell_id).await?;
+            let cell = self.cell_by_id(cell_id, false).await?;
             Ok(cell.triggers().clone())
         }
     }

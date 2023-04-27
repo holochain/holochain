@@ -8,6 +8,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
+use crate::conductor::conductor::CellStatus;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
@@ -30,6 +31,9 @@ pub enum ConductorError {
 
     #[error("Cell is not initialized.")]
     CellNotInitialized,
+
+    #[error("Cell network is not ready. Status: {0:?}")]
+    CellNetworkNotReady(CellStatus),
 
     #[error("Cell was referenced, but is currently disabled. CellId: {0:?}")]
     CellDisabled(CellId),

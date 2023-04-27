@@ -232,13 +232,17 @@ mod slow_tests {
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
-    use holo_hash::AnyLinkableHash;
-    use holochain_types::app::{CloneCellId, DisableCloneCellPayload, EnableCloneCellPayload};
+    use holochain_types::app::{CloneCellId, DisableCloneCellPayload};
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::conductor::{Conductor, ConductorHandle};
-    use crate::sweettest::SweetCell;
-    use crate::test_utils::consistency_60s;
+    use crate::conductor::api::error::ConductorApiResult;
+    use crate::conductor::conductor::CellStatus;
+    use crate::sweettest::SweetConductor;
+    use crate::test_utils::host_fn_caller::Post;
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetZome;
+    use holochain_zome_types::prelude::*;
+    use holo_hash::ActionHash;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_init_unimplemented() {
@@ -300,134 +304,73 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn rpc_multi_error_on_clone() {
-        use crate::sweettest::SweetConductorBatch;
-        use crate::sweettest::SweetDnaFile;
-        use crate::sweettest::SweetZome;
-        use holochain_wasm_test_utils::TestWasm;
-        use holochain_zome_types::prelude::*;
-        use holo_hash::ActionHash;
-        use std::sync::Arc;
-
-        #[derive(Debug, Serialize)]
-        struct Test(String);
-
-        #[derive(Serialize, Debug)]
-        pub struct CreateLinkPayload {
-            from: AnyLinkableHash,
-            to: AnyLinkableHash,
-        }
-
-        #[derive(Serialize, Debug)]
-        pub struct GetLinkPayload {
-            from: AnyLinkableHash,
-        }
-
+    async fn conductor_will_not_accept_zome_calls_before_the_network_is_initialised() {
         let (dna_file, _, _) = SweetDnaFile::from_test_wasms(
             random_network_seed(),
-            vec![TestWasm::InitCallZomeFn],
+            vec![TestWasm::Create],
             SerializedBytes::default(),
         )
             .await;
 
-        let num_conductors = 3;
-        let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
+        let mut conductor = SweetConductor::from_standard_config().await;
 
-        let apps: Vec<_> = futures::future::join_all(conductors.iter_mut().map(|c| async {
-            c.setup_app("app", [&dna_file]).await.unwrap()
-        }))
-            .await;
+        let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
 
-        // let conductors: Vec<Arc<Conductor>> = conductors.into_inner().into_iter().map(|c| Arc::new(c)).collect();
+        let cloned = conductor.create_clone_cell(CreateCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            role_name: dna_file.dna_hash().to_string().clone(),
+            modifiers: DnaModifiersOpt::none().with_network_seed("anything else".to_string()),
+            membrane_proof: None,
+            name: Some("cloned".to_string()),
+        }).await.unwrap();
 
-        let cells: Vec<SweetCell> = apps.iter().map(|a| {
-            let (cells,) = a.clone().into_tuple();
-            cells
-        }).collect();
+        let enable_or_disable_payload = DisableCloneCellPayload {
+            app_id: app.installed_app_id().clone(),
+            clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
+        };
+        conductor.disable_clone_cell(&enable_or_disable_payload).await.unwrap();
 
-        let zomes: Vec<_> = cells
-            .iter()
-            .map(|c| c.zome(TestWasm::InitCallZomeFn.coordinator_zome_name()))
-            .collect();
+        let zome: SweetZome = SweetZome::new(
+            cloned.cell_id.clone(),
+            TestWasm::Create.coordinator_zome_name(),
+        );
 
-        let mut hashes = vec![];
-        let mut prev: Option<AnyLinkableHash> = None;
-        for i in 0..6 {
-            let current: ActionHash = conductors[i % num_conductors]
-                .call(
-                    &zomes[i % num_conductors],
-                    "create_test",
-                    Test(format!("message - {}", i).to_string()),
-                ).await;
+        // Run the cell enable in parallel. If we wait for it then we shouldn't see the error we're looking for
+        let conductor_handle = conductor.raw_handle().clone();
+        tokio::spawn(async move {
+            conductor_handle.enable_clone_cell(&enable_or_disable_payload).await.unwrap();
+        });
 
-            hashes.push(current.clone());
+        // conductor.raw_handle().enable_clone_cell(&enable_or_disable_payload).await.unwrap();
 
-            if let Some(prev) = prev {
-                let _: ActionHash = conductors[i % num_conductors]
-                    .call(
-                        &zomes[i % num_conductors],
-                        "create_link",
-                        CreateLinkPayload {
-                            from: prev,
-                            to: current.clone().into(),
-                        },
-                    ).await;
-            }
-
-            prev = Some(current.into());
-        }
-
-        conductors.exchange_peer_info().await;
-
-        for i in 0..3 {
-            let x: Vec<Option<Details>> = conductors[i % num_conductors]
-                .call(
-                    &zomes[i % num_conductors],
-                    "get_many",
-                    hashes.clone(),
-                ).await;
-
-            println!("x {:?}", x);
-            assert_eq!(6, x.len());
-        }
-
-        consistency_60s([&cells[0], &cells[1], &cells[2]]).await;
-
-        for i in 0..30 {
-            let cloned = conductors[i % 3].create_clone_cell(CreateCloneCellPayload {
-                app_id: apps[i % 3].installed_app_id().clone(),
-                role_name: dna_file.dna_hash().to_string().clone(),
-                modifiers: DnaModifiersOpt::none().with_network_seed(format!("anything-{}", i).to_string()),
-                membrane_proof: None,
-                name: Some(format!("cloned-{}", i).to_string()),
-            }).await.unwrap();
-
-            conductors[i % 3].disable_clone_cell(&DisableCloneCellPayload {
-                app_id: apps[i % 3].installed_app_id().clone(),
-                clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
-            }).await.unwrap();
-
-            conductors[i % 3].raw_handle().enable_clone_cell(&EnableCloneCellPayload {
-                app_id: apps[i % 3].installed_app_id().clone(),
-                clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
-            }).await.unwrap();
-
-            let zome: SweetZome = SweetZome::new(
-                cloned.cell_id.clone(),
-                TestWasm::InitCallZomeFn.coordinator_zome_name(),
-            );
-
-            let current: ActionHash = conductors[i % num_conductors]
-                .call(
+        let mut network_not_ready_error_seen = false;
+        let mut had_successful_zome_call = false;
+        for _ in 0..15 {
+            let create_post_result: ConductorApiResult<ActionHash> = conductor
+                .call_fallible(
                     &zome,
-                    "create_test",
-                    Test(format!("clone message - {}", i).to_string()),
+                    "create_post",
+                    Post(format!("clone message").to_string()),
                 ).await;
 
-            let links: Vec<Option<Record>> = conductors[i % 3].call(&zome, "get_links", GetLinkPayload {
-                from: current.into(),
-            }).await;
-            println!("{:?}", links);
+            match create_post_result {
+                Err(crate::conductor::api::error::ConductorApiError::ConductorError(crate::conductor::error::ConductorError::CellNetworkNotReady(CellStatus::Joining))) => {
+                    network_not_ready_error_seen = true
+                }
+                Ok(_) => {
+                    // Should only be true after we've had an error of the right type, to order the two operations
+                    had_successful_zome_call = network_not_ready_error_seen;
+
+                    // Stop trying after the first successful zome call
+                    break;
+                }
+                Err(_) => {
+                    // Some other kind of error, not important to this test, ignore it
+                }
+            }
         }
+
+        assert!(network_not_ready_error_seen, "Should have seen a cell network not ready error");
+        assert!(had_successful_zome_call, "Should have seen a clone cell join the network and allow calls");
     }
 }
