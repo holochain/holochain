@@ -39,7 +39,7 @@ impl TestNode {
     }
 
     /// Get the RegionSet for this node, suitable for gossiping
-    pub fn region_set(&self, arq_set: ArqBoundsSet, now: TimeQuantum) -> RegionSet {
+    pub fn region_set(&self, arq_set: ArqSet, now: TimeQuantum) -> RegionSet {
         let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(now), arq_set);
         coords
             .into_region_set_infallible(|(_, coords)| self.query_region_data(&coords))
@@ -102,8 +102,8 @@ impl AccessPeerStore for TestNode {
         *self.arqs.get(agent).unwrap()
     }
 
-    fn get_arq_set(&self) -> ArqBoundsSet {
-        ArqBoundsSet::new(
+    fn get_arq_set(&self) -> ArqSet {
+        ArqSet::new(
             self.arqs
                 .values()
                 .map(|arq| arq.to_bounds(&self.store.topo))
