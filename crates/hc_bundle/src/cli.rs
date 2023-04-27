@@ -60,7 +60,7 @@ pub enum HcDnaBundleSubcommand {
 
         /// Output shared object "dylib" files
         /// that can be used to run this happ on iOS
-        #[structopt(long)]
+        #[arg(long)]
         dylib_ios: bool,
     },
 
