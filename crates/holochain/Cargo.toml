@@ -231,5 +231,5 @@ chc = [
   "reqwest"
 ]
 
-# Transitional feature flag for code that is only ready when DPKI integration lands. 
+# Transitional feature flag for code that is only ready when DPKI integration lands.
 dpki = []
