@@ -2,44 +2,15 @@
 
 Provides the `hc` binary, a helpful CLI tool for working with Holochain.
 
-```shell
-$ hc -h
-holochain_cli 0.1.3
-Holochain CLI
-
-Work with DNA, hApp and web-hApp bundle files, set up sandbox environments for testing and development purposes, make
-direct admin calls to running conductors, and more.
-
-EXTENSIONS:
-    hc launch	  Run "hc launch --help" to see its help
-    hc scaffold	  Run "hc scaffold --help" to see its help
-
-USAGE:
-    hc <SUBCOMMAND>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-SUBCOMMANDS:
-    app        Work with hApp bundles
-    dna        Work with DNA bundles
-    help       Prints this message or the help of the given subcommand(s)
-    sandbox    Work with sandboxed environments for testing and development
-    web-app    Work with Web-hApp bundles
-```
-
 ## Docs
 
-Some top-level subcommands are implemented as separate crates. See:
+This command gives you a suite of tools for developing, inspecting, executing, and testing your Holochain apps. Some top-level subcommands are implemented as separate crates, and others are separate binaries -- commands whose names start with `hc-` and are automatically made available as subcommands if they exist in your shell's path. Here is a list of all available subcommands:
 
-- [holochain_cli_bundle](https://github.com/holochain/holochain/tree/develop/crates/hc_bundle) for more info on the `hc app` and `hc dna` commands
-- [holochain_cli_sandbox](https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox) for more info on the `hc sandbox` command
-
-This tool also supports 'extensions', commands whose names start with `hc-`, which are automatically made available as their own subcommands. See:
-
-- [holochain/scaffolding](https://github.com/holochain/scaffolding) for more info on the `hc scaffold` extension
-- [hc_launch in holochain/launcher](https://github.com/holochain/launcher/tree/main/crates/hc_launch) for more info on the `hc launch` extension
+- `hc dna`, `hc app`, and `hc web-app` scaffold, bundle, and unbundle DNAs, hApps and web hApps respectively. See [holochain_cli_bundle](https://github.com/holochain/holochain/tree/develop/crates/hc_bundle) for more info.
+- `hc sandbox` creates and executes temporary or persistent conductor configurations for you to run test instances of your hApp with. See [holochain_cli_sandbox](https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox) for more info.
+- `hc signal-srv` runs a local WebRTC signal server for peers to establish connections with each other. See [holochain_cli_signal_srv](https://github.com/holochain/holochain/tree/develop/crates/hc_signal_srv) for more info.
+- `hc scaffold` generates integrity, coordinator, UI, and test code for hApps using interactive prompts. See [holochain/scaffolding](https://github.com/holochain/scaffolding).
+- `hc launch` runs sandboxed hApp instances with live-reloading UI windows. See [hc_launch in holochain/launcher](https://github.com/holochain/launcher/tree/main/crates/hc_launch) for more info.
 
 ## Installation
 
