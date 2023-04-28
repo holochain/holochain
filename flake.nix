@@ -7,6 +7,10 @@
     empty.url = "github:steveej/empty";
     empty.flake = false;
 
+    # workaround to getting passing the `.git` directory into the release-automation tests
+    repo-git.url = "file+file:/dev/null";
+    repo-git.flake = false;
+
     # nix packages pointing to the github repo
     nixpkgs.url = "nixpkgs/nixos-unstable";
 
