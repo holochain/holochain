@@ -375,6 +375,50 @@ impl HashableContent for DnaDef {
     }
 }
 
+/// Construct a legacy DnaDef hash for backward compatibility
+#[cfg(feature = "full-dna-def")]
+pub fn legacy_dna_def_hash(dna_def: &DnaDef) -> HoloHashed<DnaDef> {
+    #[derive(Serialize, Debug, PartialEq, Eq)]
+    struct LegacyDnaDefHash<'a> {
+        name: &'a str,
+        modifiers: &'a DnaModifiers,
+        integrity_zomes: &'a IntegrityZomes,
+    }
+
+    type LegacyDnaDefHashed<'a> = HoloHashed<LegacyDnaDefHash<'a>>;
+
+    impl HashableContent for LegacyDnaDefHash<'_> {
+        type HashType = holo_hash::hash_type::Dna;
+
+        fn hash_type(&self) -> Self::HashType {
+            holo_hash::hash_type::Dna::new()
+        }
+
+        fn hashable_content(&self) -> HashableContentBytes {
+            HashableContentBytes::Content(
+                holochain_serialized_bytes::UnsafeBytes::from(
+                    holochain_serialized_bytes::encode(&self)
+                        .expect("Could not serialize HashableContent"),
+                )
+                    .into(),
+            )
+        }
+    }
+
+    let hash = LegacyDnaDefHash {
+        name: &dna_def.name,
+        modifiers: &dna_def.modifiers,
+        integrity_zomes: &dna_def.integrity_zomes,
+    };
+
+    let hash = LegacyDnaDefHashed::from_content_sync(hash).hash.retype(holo_hash::hash_type::Dna::new());
+
+    HoloHashed {
+        content: dna_def.clone(),
+        hash,
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

@@ -59,3 +59,13 @@ pub fn contains(txn: &Transaction<'_>, hash: &DnaHash) -> StateQueryResult<bool>
 pub fn put(txn: &mut Transaction, dna_def: DnaDef) -> StateMutationResult<()> {
     mutations::insert_dna_def(txn, &DnaDefHashed::from_content_sync(dna_def))
 }
+
+pub fn migrate_dna_hash(txn: &Transaction<'_>, old_hash: &DnaHash, new_hash: &DnaHash) -> StateQueryResult<bool> {
+    Ok(txn.execute(
+        "UPDATE DnaDef SET hash = :new_hash WHERE hash = :old_hash",
+        named_params! {
+            ":old_hash": old_hash,
+            ":new_hash": new_hash,
+        }
+    )? == 1)
+}

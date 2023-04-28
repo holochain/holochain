@@ -16,7 +16,7 @@ pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
 use derive_more::{Display, Into};
-use holo_hash::{AgentPubKey, DnaHash};
+use holo_hash::{AgentPubKey, DnaHash, HoloHashed};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
 use holochain_zome_types::cell::CloneId;
@@ -281,6 +281,20 @@ impl InstalledApp {
     /// Accessor
     pub fn id(&self) -> &InstalledAppId {
         &self.app.installed_app_id
+    }
+
+    /// Migration from old to new DNA hashes
+    pub fn migrate_usages_of_dna_hash(&mut self, old_hash: &HoloHashed<DnaDef>, new_hash: &HoloHashed<DnaDef>) -> AppResult<()> {
+        let role_names = self.app.roles().clone();
+        for role in role_names.keys() {
+            let role = self.app.role_mut(role)?;
+            let current_hash = role.dna_hash();
+            if current_hash == &old_hash.hash {
+                role.replace_dna_hash(new_hash);
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -1083,6 +1097,11 @@ impl AppRoleAssignment {
         } else {
             None
         }
+    }
+
+    /// Transformer
+    pub fn replace_dna_hash(&mut self, new_dna_hash: &HoloHashed<DnaDef>) {
+        self.base_cell_id = CellId::new(new_dna_hash.hash.clone(), self.agent_key().clone());
     }
 }
 
