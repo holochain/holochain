@@ -108,6 +108,9 @@ pub enum ConductorApiError {
     #[error(transparent)]
     ChcError(#[from] ChcError),
 
+    #[error(transparent)]
+    RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

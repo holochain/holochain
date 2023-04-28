@@ -70,6 +70,13 @@ pub enum AppRequest {
 
     /// Info about networking processes
     NetworkInfo(Box<NetworkInfoRequestPayload>),
+
+    /// List all host functions available to wasm on this conductor.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::ListWasmHostFunctions`]
+    ListWasmHostFunctions,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -112,6 +119,9 @@ pub enum AppResponse {
 
     /// NetworkInfo is returned
     NetworkInfo(Vec<NetworkInfo>),
+
+    /// All the wasm host functions supported by this conductor.
+    ListWasmHostFunctions(Vec<String>),
 }
 
 /// The data provided over an app interface in order to make a zome call

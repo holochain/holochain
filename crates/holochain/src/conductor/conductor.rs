@@ -1217,6 +1217,11 @@ mod network_impls {
             Ok(())
         }
 
+        /// List all host functions provided by this conductor for wasms.
+        pub async fn list_wasm_host_functions(&self) -> ConductorApiResult<Vec<String>> {
+            Ok(RealRibosome::tooling_imports().await?)
+        }
+
         /// Invoke a zome function on a Cell
         pub async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
             let cell = self.cell_by_id(&call.cell_id).await?;
