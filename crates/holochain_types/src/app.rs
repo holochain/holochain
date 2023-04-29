@@ -16,7 +16,7 @@ pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
 use derive_more::{Display, Into};
-use holo_hash::{AgentPubKey, DnaHash, HoloHashed};
+use holo_hash::{AgentPubKey, DnaHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
 use holochain_zome_types::cell::CloneId;
@@ -284,13 +284,27 @@ impl InstalledApp {
     }
 
     /// Migration from old to new DNA hashes
-    pub fn migrate_usages_of_dna_hash(&mut self, old_hash: &HoloHashed<DnaDef>, new_hash: &HoloHashed<DnaDef>) -> AppResult<()> {
+    pub fn migrate_dna_hashes(&mut self, dna_def_map: &HashMap<Vec<u8>, DnaDefHashed>) -> AppResult<()> {
+        // migrate roles
         let role_names = self.app.roles().clone();
         for role in role_names.keys() {
             let role = self.app.role_mut(role)?;
-            let current_hash = role.dna_hash();
-            if current_hash == &old_hash.hash {
-                role.replace_dna_hash(new_hash);
+            role.migrate_dna_hashes(&dna_def_map);
+        }
+
+        // migrate app manifests
+        if let Some(ref mut manifest) = self.app.manifest {
+            match manifest {
+                AppManifest::V1(v1_manifest) => {
+                    for role in &mut v1_manifest.roles {
+                        if let Some(installed_hash) = &role.dna.installed_hash {
+                            let dna_hash: DnaHash = installed_hash.clone().into();
+                            if let Some(new_dna_def) = dna_def_map.get(&dna_hash.into_inner()) {
+                                role.dna.installed_hash = Some(new_dna_def.hash.clone().into());
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -1100,8 +1114,24 @@ impl AppRoleAssignment {
     }
 
     /// Transformer
-    pub fn replace_dna_hash(&mut self, new_dna_hash: &HoloHashed<DnaDef>) {
-        self.base_cell_id = CellId::new(new_dna_hash.hash.clone(), self.agent_key().clone());
+    pub fn migrate_dna_hashes(&mut self, dna_def_map: &HashMap<Vec<u8>, DnaDefHashed>) {
+        if let Some(new_dna_def) = dna_def_map.get(&self.base_cell_id.dna_hash().clone().into_inner()) {
+            self.base_cell_id = CellId::new(new_dna_def.hash.clone(), self.agent_key().clone());
+        }
+
+        let update_clone_cell_hashes = |clones: &mut HashMap<CloneId, CellId>| {
+            let keys: Vec<CloneId> = clones.keys().cloned().collect();
+            for clone_id in keys {
+                clones.entry(clone_id).and_modify(|clone_cell_id| {
+                    if let Some(new_dna_def) = dna_def_map.get(&clone_cell_id.dna_hash().clone().into_inner()) {
+                        *clone_cell_id = CellId::new(new_dna_def.hash.clone(), clone_cell_id.agent_pubkey().clone());
+                    }
+                });
+            }
+        };
+
+        update_clone_cell_hashes(&mut self.clones);
+        update_clone_cell_hashes(&mut self.disabled_clones);
     }
 }
 

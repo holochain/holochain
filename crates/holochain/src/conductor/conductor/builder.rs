@@ -220,6 +220,8 @@ impl ConductorBuilder {
         outcome_receiver: OutcomeReceiver,
         no_print_setup: bool,
     ) -> ConductorResult<ConductorHandle> {
+        conductor.migrate_dna_hashes().await?;
+
         conductor
             .clone()
             .start_scheduler(holochain_zome_types::schedule::SCHEDULER_INTERVAL)

@@ -320,6 +320,56 @@ mod startup_shutdown_impls {
             })
         }
 
+        pub(crate) async fn migrate_dna_hashes(&self) -> ConductorResult<()> {
+            let db = &self.spaces.wasm_db;
+
+            // Migrate DNA hashes in the WASM db
+            let dna_def_map = db
+                .async_reader(move |txn| -> ConductorResult<HashMap<Vec<u8>, DnaDefHashed>> {
+                    let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?;
+
+                    let mut dna_def_map = HashMap::new();
+                    for current_dna_def in dna_defs {
+                        let new_dna_def = DnaDefHashed::from_content_sync(current_dna_def.content.clone());
+
+                        // Only migrate hashes which are recognised as legacy hashes
+                        if current_dna_def.hash == legacy_dna_def_hash(&new_dna_def.content).hash {
+                            dna_def_map.insert(current_dna_def.hash.into_inner(), new_dna_def);
+                        }
+                    }
+
+                    Ok(dna_def_map)
+                }).await?;
+
+            let dna_def_map_copy = dna_def_map.clone();
+            self.update_state(move |mut conductor_state| {
+                let keys: Vec<InstalledAppId> = conductor_state.installed_apps().keys().cloned().collect();
+                for installed_app_id in keys {
+                    conductor_state.get_app_mut(&installed_app_id)?.migrate_dna_hashes(&dna_def_map_copy)?;
+                }
+
+                Ok(conductor_state)
+            }).await?;
+
+            db.async_commit(move |txn| -> ConductorResult<()> {
+                let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?;
+
+                for current_dna_def in dna_defs {
+                    if let Some(new_dna_def) = dna_def_map.get(&current_dna_def.hash.clone().into_inner()) {
+                        if migrate_dna_hash(&txn, current_dna_def.hash.as_hash(), new_dna_def.hash.as_hash())? {
+                            tracing::info!("Migrated stored DNA hash from [{}] to [{}]", current_dna_def.hash, new_dna_def.hash);
+                        } else {
+                            panic!("Failed to migrate store DNA hash from [{}] to [{}]", current_dna_def.hash, new_dna_def.hash);
+                        }
+                    }
+                }
+
+                Ok(())
+            }).await?;
+
+            Ok(())
+        }
+
         pub(crate) async fn initialize_conductor(
             self: Arc<Self>,
             outcome_rx: OutcomeReceiver,
@@ -556,39 +606,13 @@ mod dna_impls {
         )> {
             let db = &self.spaces.wasm_db;
 
-            let verify_integrity_of_loaded_dna_defs = |txn: &Transaction, dna_defs: &Vec<DnaDefHashed>| -> StateQueryResult<Vec<(DnaDefHashed, DnaDefHashed)>> {
-                let mut migrated_hashes: Vec<(DnaDefHashed, DnaDefHashed)> = vec![];
-
-                for dna_def in dna_defs {
-                    let new_dna_def = DnaDefHashed::from_content_sync(dna_def.content.clone());
-
-                    if new_dna_def.hash != dna_def.hash {
-                        if dna_def == &legacy_dna_def_hash(&dna_def.content) {
-                            if migrate_dna_hash(txn, dna_def.hash.as_hash(), new_dna_def.hash.as_hash())? {
-                                tracing::info!("Migrated stored DNA hash from [{}] to [{}]", dna_def.hash, new_dna_def.hash);
-
-                                migrated_hashes.push((dna_def.clone(), new_dna_def));
-                            } else {
-                                panic!("Failed to migrate store DNA hash from [{}] to [{}]", dna_def.hash, new_dna_def.hash);
-                            }
-                        } else {
-                            panic!("The stored DNA hash [{}] does not match the expected value [{}] and do not know what migration action to take", dna_def.hash, new_dna_def.hash);
-                        }
-                    }
-                }
-
-                Ok(migrated_hashes)
-            };
-
             // Load out all dna defs
-            let (wasms, defs, migrated_hashes) = db
+            let (wasms, defs) = db
                 .async_reader(move |txn| {
                     // Get all the dna defs.
                     let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
                         .into_iter()
                         .collect();
-
-                    let migrated_hashes = verify_integrity_of_loaded_dna_defs(&txn, &dna_defs)?;
 
                     // Gather all the unique wasms.
                     let unique_wasms = dna_defs
@@ -625,21 +649,9 @@ mod dna_impls {
                         // This needs to happen due to the environment not being Send
                         .collect::<Vec<_>>();
                     let defs = holochain_state::entry_def::get_all(&txn)?;
-                    ConductorResult::Ok((wasms, defs, migrated_hashes))
+                    ConductorResult::Ok((wasms, defs))
                 })
                 .await?;
-
-            self.update_state(move |mut conductor_state| {
-                for (old_hash, new_hash) in migrated_hashes {
-                    let keys: Vec<InstalledAppId> = conductor_state.installed_apps().keys().cloned().collect();
-                    for installed_app_id in keys {
-                        // TODO does the manifest need migrating too?
-                        conductor_state.get_app_mut(&installed_app_id)?.migrate_usages_of_dna_hash(&old_hash, &new_hash)?;
-                    }
-                }
-
-                Ok(conductor_state)
-            }).await?;
 
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
@@ -2386,6 +2398,7 @@ impl Conductor {
 
                     // TODO: This should probably be emitted over the admin interface
                     if !errors.is_empty() {
+                        errors.get(0).unwrap();
                         error!(msg = "Errors when trying to start app(s)", ?errors);
                     }
 
