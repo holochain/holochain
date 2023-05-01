@@ -581,7 +581,9 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
 {
     let mut expected_count = 0;
     for (author, db) in all_cell_dbs.iter().map(|(author, a, _)| (author, a)) {
-        let count = get_published_ops(*db, author).len();
+        let ops = get_published_ops(*db, author);
+        let count = ops.len();
+
         expected_count += count;
     }
     for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
@@ -651,6 +653,7 @@ fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
             WHERE
             Action.author = :author
             AND (DhtOp.type != :store_entry OR Action.private_entry = 0)
+            ORDER BY DhtOp.rowid ASC
         ",
         )
         .unwrap()

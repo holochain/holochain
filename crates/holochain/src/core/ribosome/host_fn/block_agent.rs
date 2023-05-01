@@ -38,7 +38,7 @@ mod test {
     use holochain_types::prelude::Record;
     use crate::sweettest::SweetConductorBatch;
     use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::consistency_10s;
+    use crate::test_utils::{consistency_10s_advanced, consistency_10s};
 
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
     pub struct CapFor(CapSecret, AgentPubKey);
@@ -92,10 +92,10 @@ mod test {
         let alice_pubkey = alice_cell.cell_id().agent_pubkey();
         let bob_pubkey = bob_cell.cell_id().agent_pubkey();
 
-        conductors.exchange_peer_info().await;
+        // conductors.exchange_peer_info().await;
 
-        // conductors.reveal_peer_info(0, 1).await;
-        // conductors.reveal_peer_info(1, 0).await;
+        conductors.reveal_peer_info(0, 1).await;
+        conductors.reveal_peer_info(1, 0).await;
 
         // conductors.reveal_peer_info(0, 2).await;
         // conductors.reveal_peer_info(1, 2).await;
@@ -107,7 +107,7 @@ mod test {
 
         let action0: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        consistency_10s_advanced([(&alice_cell, true), (&bob_cell, true), (&carol_cell, false)]).await;
 
         // Before bob is blocked he can get posts just fine.
         let bob_get0: Option<Record> = bob_conductor.call(&bob, "get_post", action0).await;
@@ -119,22 +119,21 @@ mod test {
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
         // Now that bob is blocked by alice he cannot get data from alice.
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        consistency_10s_advanced([(&alice_cell, true), (&bob_cell, true), (&carol_cell, false)]).await;
         let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
 
         assert!(bob_get1.is_none());
 
-        // // If carol joins the party but DOES NOT block bob then she will
-        // // give access to data once more for bob.
+        // If carol joins the party but DOES NOT block bob then she will
+        // give access to data once more for bob.
 
-        // conductors.reveal_peer_info(0, 2).await;
-        // conductors.reveal_peer_info(1, 2).await;
+        conductors.exchange_peer_info().await;
 
-        // consistency_10s([&alice_cell, &bob_cell]).await;
+        consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
 
-        // // Bob can get data from alice via. carol.
-        // let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
-        // assert!(bob_get2.is_some());
+        // Bob can get data from alice via. carol.
+        let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
+        assert!(bob_get2.is_some());
     }
 
 }
