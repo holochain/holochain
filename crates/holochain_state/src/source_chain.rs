@@ -73,6 +73,8 @@ use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
+use holochain_zome_types::EntryType;
+use holochain_sqlite::rusqlite;
 
 mod error;
 
@@ -207,7 +209,7 @@ impl SourceChain {
                 Some(entry),
                 chain_top_ordering,
             )
-            .await
+                .await
         } else {
             // The caller MUST guard against this case.
             unreachable!("Put countersigned called with the wrong entry type");
@@ -218,7 +220,7 @@ impl SourceChain {
     /// for an action type which has no weight data.
     /// If needing to `put` an action with weight data, use
     /// [`SourceChain::put_weighed`] instead.
-    pub async fn put<U: ActionUnweighed<Weight = ()>, B: ActionBuilder<U>>(
+    pub async fn put<U: ActionUnweighed<Weight=()>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
         maybe_entry: Option<Entry>,
@@ -230,7 +232,7 @@ impl SourceChain {
 
     /// Put a new record at the end of the source chain, using a ActionBuilder
     /// and the specified weight for rate limiting.
-    pub async fn put_weighed<W, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
+    pub async fn put_weighed<W, U: ActionUnweighed<Weight=W>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
         maybe_entry: Option<Entry>,
@@ -266,11 +268,11 @@ impl SourceChain {
             maybe_entry,
             chain_top_ordering,
         )
-        .await
+            .await
     }
 
     #[cfg(feature = "test_utils")]
-    pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
+    pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight=W>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
         maybe_entry: Option<Entry>,
@@ -282,7 +284,7 @@ impl SourceChain {
             chain_top_ordering,
             Default::default(),
         )
-        .await
+            .await
     }
 
     #[async_recursion]
@@ -416,7 +418,7 @@ impl SourceChain {
                         keystore.clone(),
                         (*self.author).clone(),
                     )
-                    .await?;
+                        .await?;
                     let rebased_actions =
                         rebase_actions_on(&keystore, actions, new_head_info).await?;
                     child_chain.scratch.apply(move |scratch| {
@@ -445,7 +447,7 @@ impl SourceChain {
                     &self.dht_db,
                     &self.dht_db_cache,
                 )
-                .await?;
+                    .await?;
                 SourceChainResult::Ok(actions)
             }
             result => result,
@@ -454,9 +456,9 @@ impl SourceChain {
 }
 
 impl<AuthorDb, DhtDb> SourceChain<AuthorDb, DhtDb>
-where
-    AuthorDb: ReadAccess<DbKindAuthored>,
-    DhtDb: ReadAccess<DbKindDht>,
+    where
+        AuthorDb: ReadAccess<DbKindAuthored>,
+        DhtDb: ReadAccess<DbKindDht>,
 {
     pub async fn new(
         vault: AuthorDb,
@@ -571,7 +573,7 @@ where
             return Ok(true);
         }
         let query_filter = ChainQueryFilter {
-            action_type: Some(ActionType::InitZomesComplete),
+            action_type: Some(vec![ActionType::InitZomesComplete]),
             ..QueryFilter::default()
         };
         let init_zomes_complete_actions = self.query(query_filter).await?;
@@ -669,7 +671,7 @@ where
                             params![cap_secret_blob, agent_pubkey],
                             query_row_fn,
                         )
-                        .optional()?
+                            .optional()?
                     } else {
                         // unrestricted cap grant must exist
                         // that has not been updated or deleted
@@ -678,7 +680,7 @@ where
                             params![CapAccess::Unrestricted.as_sql(), agent_pubkey],
                             query_row_fn,
                         )
-                        .optional()?
+                            .optional()?
                     };
 
                     Ok(maybe_entry)
@@ -721,9 +723,9 @@ where
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
         if query.sequence_range != ChainQueryFilterRange::Unbounded
             && (query.action_type.is_some()
-                || query.entry_type.is_some()
-                || query.entry_hashes.is_some()
-                || query.include_entries)
+            || query.entry_type.is_some()
+            || query.entry_hashes.is_some()
+            || query.include_entries)
         {
             return Err(SourceChainError::UnsupportedQuery(query));
         }
@@ -738,7 +740,7 @@ where
                 SELECT DISTINCT
                 Action.hash AS action_hash, Action.blob AS action_blob
             "
-                    .to_string();
+                        .to_string();
                     if query.include_entries {
                         sql.push_str(
                             "
@@ -788,45 +790,74 @@ where
                         )",
                     });
                     sql.push_str(
-                        "
+                        format!("
                         )
                         AND
-                        (:entry_type IS NULL OR Action.entry_type = :entry_type)
+                        (:entry_type IS NULL OR Action.entry_type IN ({}))
                         AND
-                        (:action_type IS NULL OR Action.type = :action_type)
-                        ORDER BY Action.seq 
-                        ",
+                        (:action_type IS NULL OR Action.type IN ({}))
+                        ORDER BY Action.seq
+                        ", named_param_seq("entry_type", query.entry_type.as_ref().map_or(0, |t| t.len())), named_param_seq("action_type", query.action_type.as_ref().map_or(0, |t| t.len()))).as_str(),
                     );
-                    sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
+                    sql.push_str(if query.order_descending { " DESC" } else { " ASC" });
                     let mut stmt = txn.prepare(&sql)?;
+
+                    let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(6 + query.entry_type.as_ref().map_or(0, |t| t.len()) + query.action_type.as_ref().map_or(0, |t| t.len()));
+                    args.push((":author".to_string(), Box::new(author)));
+
+                    match &query.entry_type {
+                        None => {
+                            args.push((":entry_type".to_string(), Box::new(None::<EntryType>.as_sql())))
+                        }
+                        Some(types) => {
+                            // Value should not be 'Some' until it has at least one value
+                            args.push((":entry_type".to_string(), Box::new(types.get(0).unwrap().as_sql())));
+                            for i in 1..types.len() {
+                                args.push((format!(":entry_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                            }
+                        }
+                    }
+
+                    match &query.action_type {
+                        None => args.push((":action_type".to_string(), Box::new(None::<EntryType>.as_sql()))),
+                        Some(types) => {
+                            // Value should not be 'Some' until it has at least one value
+                            args.push((":action_type".to_string(), Box::new(types.get(0).as_ref().unwrap().as_sql())));
+                            for i in 1..types.len() {
+                                args.push((format!(":action_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                            }
+                        }
+                    }
+
+                    args.push((":range_start".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
+                        _ => None,
+                    })));
+
+                    args.push((":range_end".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
+                        _ => None,
+                    })));
+
+                    args.push((":range_start_hash".to_string(), Box::new(match &query.sequence_range {
+                        ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
+                        _ => None,
+                    })));
+
+                    args.push((":range_end_hash".to_string(), Box::new(match &query.sequence_range {
+                        ChainQueryFilterRange::ActionHashRange(_, end_hash)
+                        | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
+                        _ => None,
+                    })));
+
+                    args.push((":range_prior_count".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
+                        _ => None,
+                    })));
+
                     let records = stmt
                         .query_and_then(
-                        named_params! {
-                                ":author": author.as_ref(),
-                                ":entry_type": query.entry_type.as_sql(),
-                                ":action_type": query.action_type.as_sql(),
-                                ":range_start": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
-                                    _ => None,
-                                },
-                                ":range_end": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
-                                    _ => None,
-                                },
-                                ":range_start_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
-                                    _ => None,
-                                },
-                                ":range_end_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashRange(_, end_hash)
-                                    | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
-                                    _ => None,
-                                },
-                                ":range_prior_count": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
-                                    _ => None,
-                                },
-                            },
+                            args.iter().map(|a| (a.0.as_str(), a.1.as_ref())).collect::<Vec<(&str, &dyn rusqlite::ToSql)>>().as_slice(),
                             |row| {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                                 let SignedAction(action, signature) = action;
@@ -907,6 +938,19 @@ where
         })?;
         Ok(r)
     }
+}
+
+fn named_param_seq(base_name: &str, repeat: usize) -> String {
+    if repeat == 0 {
+        return String::new();
+    }
+
+    let mut seq = format!(":{}", base_name);
+    for i in 1..repeat {
+        seq.push_str(format!(", :{}_{}", base_name, i).as_str());
+    }
+
+    seq
 }
 
 pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
@@ -1049,8 +1093,8 @@ pub async fn genesis(
         chc.add_entries(vec![EntryHashed::from_content_sync(Entry::Agent(
             agent_pubkey,
         ))])
-        .await
-        .map_err(SourceChainError::other)?;
+            .await
+            .map_err(SourceChainError::other)?;
         match chc
             .add_actions(vec![
                 dna_action.clone(),
@@ -1345,8 +1389,8 @@ pub mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
         let chain_1 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1354,7 +1398,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-        .await?;
+            .await?;
         let chain_2 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1362,7 +1406,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-        .await?;
+            .await?;
         let chain_3 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1370,7 +1414,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-        .await?;
+            .await?;
 
         let action_builder = builder::CloseChain {
             new_dna_hash: fixt!(DnaHash),
@@ -1439,8 +1483,8 @@ pub mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         let chain_1 = SourceChain::new(
             db.clone().into(),
@@ -1449,7 +1493,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-        .await?;
+            .await?;
         let chain_2 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1457,7 +1501,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-        .await?;
+            .await?;
         let chain_3 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1465,7 +1509,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-        .await?;
+            .await?;
 
         let entry_1 = Entry::App(fixt!(AppEntryBytes));
         let eh1 = EntryHash::with_data_sync(&entry_1);
@@ -1588,8 +1632,8 @@ pub mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         let chain = SourceChain::new(
             db.clone(),
@@ -1598,7 +1642,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-        .await?;
+            .await?;
         // alice as chain author always has a valid cap grant; provided secrets
         // are ignored
         assert_eq!(
@@ -1678,7 +1722,7 @@ pub mod tests {
                 keystore.clone(),
                 alice.clone(),
             )
-            .await?;
+                .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
             let action_builder = builder::Update {
@@ -1751,7 +1795,7 @@ pub mod tests {
                 keystore.clone(),
                 alice.clone(),
             )
-            .await?;
+                .await?;
             let action_builder = builder::Delete {
                 deletes_address: updated_action_hash,
                 deletes_entry_address: updated_entry_hash,
@@ -1805,7 +1849,7 @@ pub mod tests {
                 keystore.clone(),
                 alice.clone(),
             )
-            .await?;
+                .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(unrestricted_grant.clone()))
                     .into_inner();
@@ -1845,7 +1889,7 @@ pub mod tests {
                 keystore.clone(),
                 alice.clone(),
             )
-            .await?;
+                .await?;
             let action_builder = builder::Delete {
                 deletes_address: original_action_address,
                 deletes_entry_address: original_entry_address,
@@ -1937,8 +1981,8 @@ pub mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         let source_chain = SourceChain::new(
             vault.clone().into(),
@@ -1947,8 +1991,8 @@ pub mod tests {
             keystore.clone(),
             (*author).clone(),
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryDef)),
@@ -1996,8 +2040,8 @@ pub mod tests {
             keystore.clone(),
             (*author).clone(),
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
         let res = source_chain.query(QueryFilter::new()).await.unwrap();
         assert_eq!(res.len(), 5);
         assert_eq!(*res[3].action_address(), h1);
@@ -2024,8 +2068,8 @@ pub mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         let json = dump_state(vault.clone().into(), author.clone()).await?;
         let json = serde_json::to_string_pretty(&json)?;
@@ -2066,8 +2110,8 @@ pub mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         genesis(
             vault.clone().into(),
@@ -2079,8 +2123,8 @@ pub mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         // test_db.dump_tmp();
 
@@ -2105,15 +2149,15 @@ pub mod tests {
         let cases = [
             ((None, None, vec![], false), 3),
             ((None, None, vec![], true), 3),
-            ((Some(ActionType::Dna), None, vec![], false), 1),
-            ((None, Some(EntryType::AgentPubKey), vec![], false), 1),
-            ((None, Some(EntryType::AgentPubKey), vec![], true), 1),
-            ((Some(ActionType::Create), None, vec![], false), 1),
-            ((Some(ActionType::Create), None, vec![], true), 1),
+            ((Some(vec![ActionType::Dna]), None, vec![], false), 1),
+            ((None, Some(vec![EntryType::AgentPubKey]), vec![], false), 1),
+            ((None, Some(vec![EntryType::AgentPubKey]), vec![], true), 1),
+            ((Some(vec![ActionType::Create]), None, vec![], false), 1),
+            ((Some(vec![ActionType::Create]), None, vec![], true), 1),
             (
                 (
-                    Some(ActionType::Create),
-                    Some(EntryType::AgentPubKey),
+                    Some(vec![ActionType::Create]),
+                    Some(vec![EntryType::AgentPubKey]),
                     vec![],
                     false,
                 ),
@@ -2121,9 +2165,28 @@ pub mod tests {
             ),
             (
                 (
-                    Some(ActionType::Create),
-                    Some(EntryType::AgentPubKey),
+                    Some(vec![ActionType::Create]),
+                    Some(vec![EntryType::AgentPubKey]),
                     vec![records[2].action().entry_hash().unwrap().clone()],
+                    true,
+                ),
+                1,
+            ),
+            (
+                (
+                    Some(vec![ActionType::Create, ActionType::Dna]),
+                    None,
+                    vec![],
+                    true,
+                ),
+                2,
+            ),
+            (
+                (
+                    None,
+                    // Redundant but covers the code that constructs the IN query
+                    Some(vec![EntryType::AgentPubKey, EntryType::AgentPubKey]),
+                    vec![],
                     true,
                 ),
                 1,
@@ -2149,9 +2212,9 @@ pub mod tests {
                 };
                 if sequence_range != ChainQueryFilterRange::Unbounded
                     && (action_type.is_some()
-                        || entry_type.is_some()
-                        || entry_hashes.is_some()
-                        || include_entries)
+                    || entry_type.is_some()
+                    || entry_hashes.is_some()
+                    || include_entries)
                 {
                     assert!(matches!(
                         chain.query(query.clone()).await,
@@ -2191,8 +2254,8 @@ pub mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
             .await
@@ -2232,8 +2295,8 @@ pub mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
 
         let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
             .await
