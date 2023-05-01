@@ -4,7 +4,7 @@ use kitsune_p2p_dht_arc::DhtArcRange;
 
 use crate::{spacetime::Topology, Loc};
 
-use super::{Arq, ArqStart};
+use super::{ArqImpl, ArqLoc, ArqStart, Topo};
 
 /// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
 /// The number to scale can be negative, which is wrapped to a positive value via modulo
@@ -42,10 +42,10 @@ pub fn add_location_ascii(mut s: String, locs: Vec<Loc>) -> String {
     s
 }
 
-impl<S: ArqStart> Arq<S> {
+impl<S: ArqStart> ArqImpl<S, Topo> {
     /// Handy ascii representation of an arc, especially useful when
     /// looking at several arcs at once to get a sense of their overlap
-    pub fn to_ascii(&self, topo: &Topology, len: usize) -> String {
+    pub fn to_ascii(&self, len: usize) -> String {
         let empty = || " ".repeat(len);
         let full = || "-".repeat(len);
 
@@ -66,7 +66,7 @@ impl<S: ArqStart> Arq<S> {
             }
         };
 
-        match self.to_dht_arc_range(topo) {
+        match self.to_dht_arc_range() {
             DhtArcRange::Full => full(),
             DhtArcRange::Empty => empty(),
             DhtArcRange::Bounded(lo0, hi0) => {

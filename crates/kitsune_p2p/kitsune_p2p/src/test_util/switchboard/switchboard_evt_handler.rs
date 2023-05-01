@@ -13,7 +13,7 @@ use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::dht::hash::RegionHash;
 use kitsune_p2p_types::dht::prelude::{
-    array_xor, ArqSet, RegionBounds, RegionCoordSetLtcs, RegionData,
+    array_xor, ArqSet, RegionBounds, RegionCoordSetLtcs, RegionData, Topo,
 };
 use kitsune_p2p_types::dht::region::RegionCoords;
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, TimeQuantum};
@@ -129,8 +129,8 @@ impl KitsuneHost for SwitchboardEventHandler {
         dht_arc_set: Arc<dht_arc::DhtArcSet>,
     ) -> crate::KitsuneHostResult<dht::region_set::RegionSetLtcs> {
         async move {
-            let topo = self.get_topology(space).await?;
-            let arq_set = ArqSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
+            let topo = self.get_topology(space)?;
+            let arq_set = ArqSet::from_dht_arc_set(topo, &self.sb.strat, &dht_arc_set)
                 .expect("an arq could not be quantized");
 
             // NOTE: If this were implemented correctly, it would take the recent_threshold
@@ -195,11 +195,8 @@ impl KitsuneHost for SwitchboardEventHandler {
         .into()
     }
 
-    fn get_topology(
-        &self,
-        _space: Arc<KitsuneSpace>,
-    ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
-        box_fut(Ok(self.sb.topology.clone()))
+    fn get_topology(&self, _space: Arc<KitsuneSpace>) -> Result<Topo, crate::KitsuneHostError> {
+        Ok(self.sb.topology.clone())
     }
 
     fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {

@@ -1,6 +1,6 @@
 //! Defines DnaDef struct
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use super::zome;
 use crate::prelude::*;
@@ -10,6 +10,7 @@ use crate::zome::error::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
 
+use kitsune_p2p_dht::prelude::Topo;
 #[cfg(feature = "full-dna-def")]
 use kitsune_p2p_dht::spacetime::Dimension;
 
@@ -330,13 +331,13 @@ impl DnaDef {
     }
 
     /// Get the topology to use for kitsune gossip
-    pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
-        kitsune_p2p_dht::spacetime::Topology {
+    pub fn topology(&self, cutoff: std::time::Duration) -> Topo {
+        Arc::new(kitsune_p2p_dht::spacetime::Topology {
             space: Dimension::standard_space(),
             time: Dimension::time(self.modifiers.quantum_time),
             time_origin: self.modifiers.origin_time,
             time_cutoff: cutoff,
-        }
+        })
     }
 }
 

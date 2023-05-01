@@ -3,7 +3,7 @@ pub use crate::test_util::spawn_handler;
 use crate::{HostStub, KitsuneHost};
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
-use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};
+use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData, Topo};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
 use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
 use num_traits::Zero;
@@ -12,7 +12,7 @@ use super::*;
 
 pub struct StandardResponsesHostApi {
     infos: Vec<AgentInfoSigned>,
-    topology: Topology,
+    topo: Topo,
     strat: ArqStrat,
     with_data: bool,
 }
@@ -86,12 +86,9 @@ impl KitsuneHost for StandardResponsesHostApi {
         dht_arc_set: Arc<DhtArcSet>,
     ) -> crate::KitsuneHostResult<RegionSetLtcs> {
         async move {
-            let arqs = ArqSet::from_dht_arc_set(
-                &self.get_topology(space).await?,
-                &self.strat,
-                &dht_arc_set,
-            )
-            .expect("an arc in the set could not be quantized");
+            let arqs =
+                ArqSet::from_dht_arc_set(self.get_topology(space)?, &self.strat, &dht_arc_set)
+                    .expect("an arc in the set could not be quantized");
             let coords = RegionCoordSetLtcs::new(TelescopingTimes::new(1.into()), arqs);
             let region_set = if self.with_data {
                 // XXX: this is very fake, and completely wrong!
@@ -120,11 +117,8 @@ impl KitsuneHost for StandardResponsesHostApi {
         box_fut(Ok(()))
     }
 
-    fn get_topology(
-        &self,
-        _space: Arc<KitsuneSpace>,
-    ) -> crate::KitsuneHostResult<dht::spacetime::Topology> {
-        box_fut(Ok(self.topology.clone()))
+    fn get_topology(&self, _space: Arc<KitsuneSpace>) -> Result<Topo, crate::KitsuneHostError> {
+        Ok(self.topo.clone())
     }
 
     fn op_hash(&self, _op_data: KOpData) -> crate::KitsuneHostResult<KOpHash> {
@@ -149,7 +143,7 @@ async fn standard_responses(
     let infos = agents.iter().map(|(_, i)| i.clone()).collect::<Vec<_>>();
     let host_api = StandardResponsesHostApi {
         infos: infos.clone(),
-        topology: Topology::standard_epoch_full(),
+        topo: Topology::standard_epoch_full(),
         strat: ArqStrat::default(),
         with_data,
     };

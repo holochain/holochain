@@ -97,9 +97,9 @@ mod tests {
     use crate::{
         op::*,
         persistence::*,
-        prelude::{ArqLocated, ArqSet, ArqStart},
+        prelude::{ArqBoundsSans, ArqImpl, ArqLocTopo, ArqSet, ArqStart, Topo},
         test_utils::{Op, OpData, OpStore},
-        Arq, ArqBounds, Loc,
+        ArqBounds, ArqLoc, Loc,
     };
 
     use super::*;
@@ -110,11 +110,10 @@ mod tests {
     ///
     /// Only works for arqs that don't span `u32::MAX / 2`
     fn op_grid<S: ArqStart>(
-        topo: &Topology,
-        arq: &Arq<S>,
+        arq: &ArqImpl<S, Topo>,
         trange: impl Iterator<Item = i64> + Clone,
     ) -> Vec<Op> {
-        let (left, right) = arq.to_edge_locs(topo);
+        let (left, right) = arq.to_edge_locs();
         let left = left.as_u32();
         let right = right.as_u32();
         let mid = u32::MAX / 2;
@@ -122,13 +121,13 @@ mod tests {
             !(left < mid && right > mid),
             "This hacky logic does not work for arqs which span `u32::MAX / 2`"
         );
-        let xstep = (arq.absolute_length(topo) / arq.count() as u64) as usize;
+        let xstep = (arq.absolute_length() / arq.count() as u64) as usize;
         (left as i32..=right as i32)
             .step_by(xstep)
             .flat_map(|x| {
                 trange.clone().map(move |t| {
-                    let x = SpaceQuantum::from(x as u32).to_loc_bounds(topo).0;
-                    let t = TimeQuantum::from(t as u32).to_timestamp_bounds(topo).0;
+                    let x = SpaceQuantum::from(x as u32).to_loc_bounds(&arq.topo).0;
+                    let t = TimeQuantum::from(t as u32).to_timestamp_bounds(&arq.topo).0;
                     OpData::fake(x, t, 10)
                 })
             })
@@ -138,11 +137,15 @@ mod tests {
     #[test]
     fn test_count() {
         use num_traits::Zero;
-        let arqs = ArqSet::new(vec![
-            ArqBounds::new(12, 11.into(), 8.into()),
-            ArqBounds::new(12, 11.into(), 7.into()),
-            ArqBounds::new(12, 11.into(), 5.into()),
-        ]);
+        let topo = Topology::standard_zero();
+        let arqs = ArqSet::new(
+            topo,
+            vec![
+                ArqBoundsSans::new(12, 11.into(), 8.into()),
+                ArqBoundsSans::new(12, 11.into(), 7.into()),
+                ArqBoundsSans::new(12, 11.into(), 5.into()),
+            ],
+        );
         let tt = TelescopingTimes::new(TimeQuantum::from(11));
         let nt = tt.segments().len();
         let expected = (8 + 7 + 5) * nt;
@@ -156,11 +159,8 @@ mod tests {
     fn test_regions() {
         let topo = Topology::unit(Timestamp::from_micros(1000));
         let pow = 8;
-        let arq = Arq::new(pow, 0u32.into(), 4.into());
-        assert_eq!(
-            arq.to_edge_locs(&topo),
-            (Loc::from(0u32), Loc::from(1023u32))
-        );
+        let arq = ArqLocTopo::new(topo.clone(), pow, 0u32.into(), 4.into());
+        assert_eq!(arq.to_edge_locs(), (Loc::from(0u32), Loc::from(1023u32)));
 
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
 
@@ -168,8 +168,7 @@ mod tests {
         let nx = 8;
         let nt = 10;
         let ops = op_grid(
-            &topo,
-            &ArqLocated::new(pow, 0u32.into(), 8.into()),
+            &ArqLocTopo::new(topo, pow, 0u32.into(), 8.into()),
             (1000..11000 as i64).step_by(1000),
         );
         assert_eq!(ops.len(), nx * nt);
@@ -179,7 +178,7 @@ mod tests {
         // The total count should be half of what's in the op store,
         // since the arq covers exactly half of the ops
         let times = TelescopingTimes::new(TimeQuantum::from(11000));
-        let coords = RegionCoordSetLtcs::new(times, ArqSet::single(arq.to_bounds(&topo)));
+        let coords = RegionCoordSetLtcs::new(times, ArqSet::single(arq.to_bounds()));
         let rset = RegionSetLtcs::from_store(&store, coords);
         assert_eq!(
             rset.data()
@@ -195,9 +194,9 @@ mod tests {
     #[test]
     fn test_rectify() {
         let topo = Topology::unit_zero();
-        let arq = Arq::new(8, 0u32.into(), 4.into()).to_bounds(&topo);
+        let arq = ArqLocTopo::new(topo.clone(), 8, 0u32.into(), 4.into()).to_bounds();
         let mut store = OpStore::new(topo.clone(), GossipParams::zero());
-        store.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
+        store.integrate_ops(op_grid(&arq, 10..20).into_iter());
 
         let tt_a = TelescopingTimes::new(TimeQuantum::from(20));
         let tt_b = TelescopingTimes::new(TimeQuantum::from(30));
@@ -235,11 +234,11 @@ mod tests {
     #[test]
     fn test_diff() {
         let topo = Topology::unit_zero();
-        let arq = Arq::new(8, Loc::from(-512i32 as u32), 4.into()).to_bounds(&topo);
-        dbg!(&arq, arq.to_dht_arc_range(&topo));
+        let arq = ArqLocTopo::new(topo.clone(), 8, Loc::from(-512i32 as u32), 4.into()).to_bounds();
+        dbg!(&arq, arq.to_dht_arc_range());
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
-        store1.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
+        store1.integrate_ops(op_grid(&arq, 10..20).into_iter());
 
         let extra_ops = [
             OpData::fake(Loc::from(-300i32), Timestamp::from_micros(18), 4),
@@ -288,11 +287,11 @@ mod tests {
         let pow: u8 = 4;
         // This arq goes from -2^17 to 2^17, with a chunk size of 2^16
         let left_edge = Loc::from(-(2i32.pow(pow as u32 + 12 + 1)));
-        let arq = Arq::new(pow, left_edge, 4.into()).to_bounds(&topo);
-        dbg!(&arq, arq.to_dht_arc_range(&topo));
+        let arq = ArqLocTopo::new(topo.clone(), pow, left_edge, 4.into()).to_bounds();
+        dbg!(&arq, arq.to_dht_arc_range());
 
         let mut store1 = OpStore::new(topo.clone(), GossipParams::zero());
-        store1.integrate_ops(op_grid(&topo, &arq, 10..20).into_iter());
+        store1.integrate_ops(op_grid(&arq, 10..20).into_iter());
 
         let extra_ops = [
             OpData::fake(

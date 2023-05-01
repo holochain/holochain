@@ -44,10 +44,10 @@ fn full_len() -> f64 {
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
 /// Your peers just look like a bunch of Arqs
-pub type Peers = Vec<Arq>;
+pub type Peers = Vec<ArqLoc>;
 
 /// Construct an arq from start and length specified in the interval [0, 1]
-pub fn unit_arq(topo: &Topology, strat: &ArqStrat, unit_start: f64, unit_len: f64) -> Arq {
+pub fn unit_arq(topo: &Topo, strat: &ArqStrat, unit_start: f64, unit_len: f64) -> ArqLoc {
     assert!(
         (0.0..1.0).contains(&unit_start),
         "center out of bounds {}",
@@ -60,7 +60,7 @@ pub fn unit_arq(topo: &Topology, strat: &ArqStrat, unit_start: f64, unit_len: f6
     );
 
     approximate_arq(
-        topo,
+        topo.clone(),
         strat,
         Loc::from((unit_start * full_len()) as u32),
         (unit_len * full_len()) as u64,
@@ -70,7 +70,7 @@ pub fn unit_arq(topo: &Topology, strat: &ArqStrat, unit_start: f64, unit_len: f6
 /// Each agent is perfectly evenly spaced around the DHT (+/- some jitter),
 /// with stable arc lengths that are sized to meet the minimum coverage target
 pub fn generate_ideal_coverage(
-    topo: &Topology,
+    topo: &Topo,
     rng: &mut StdRng,
     strat: &ArqStrat,
     cov: Option<f64>,
@@ -93,7 +93,7 @@ pub fn generate_ideal_coverage(
         })
         .collect();
 
-    let cov = actual_coverage(topo, peers.iter());
+    let cov = actual_coverage(peers.iter());
     // this equation for min is derived from solving for min in terms of buf and target, using
     // the system of equations:
     //     max = min * (buf + 1)
@@ -118,7 +118,7 @@ pub fn generate_ideal_coverage(
 /// Generates arqs with lengths according to a standard distribution, to test
 /// wildly unbalanced initial conditions
 pub fn generate_messy_coverage(
-    topo: &Topology,
+    topo: &Topo,
     rng: &mut StdRng,
     strat: &ArqStrat,
     len_mean: f64,
@@ -287,8 +287,8 @@ mod tests {
             };
             let a = unit_arq(&topo, &strat, center, len);
             let target_len = (len * 2f64.powf(32.0)) as i64;
-            let true_len = a.to_dht_arc_range(&topo).length() as i64;
-            assert!((true_len - target_len).abs() < a.absolute_chunk_width(&topo) as i64);
+            let true_len = a.to_dht_arc_range().length() as i64;
+            assert!((true_len - target_len).abs() < a.absolute_chunk_width() as i64);
         }
     }
 }

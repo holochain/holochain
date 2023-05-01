@@ -21,7 +21,7 @@ use crate::{
     region_set::*,
     spacetime::{GossipParams, TelescopingTimes, TimeQuantum, Topology},
     test_utils::OpData,
-    Arq,
+    ArqLoc,
 };
 
 /// All methods involved in accessing the op store, to be implemented by the host.
@@ -66,7 +66,7 @@ pub trait AccessOpStore<O: OpRegion<D>, D: RegionDataConstraints = RegionData>: 
 // TODO: make async
 pub trait AccessPeerStore {
     /// Get the arq for an agent
-    fn get_agent_arq(&self, agent: &AgentKey) -> Arq;
+    fn get_agent_arq(&self, agent: &AgentKey) -> ArqLoc;
 
     /// Get the set of all arqs for this node
     fn get_arq_set(&self) -> ArqSet;

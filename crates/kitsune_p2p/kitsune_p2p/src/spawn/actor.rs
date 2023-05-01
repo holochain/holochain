@@ -543,12 +543,10 @@ impl KitsuneP2pActor {
                                                 }) => {
                                                     for (space, key_list) in fetch_list {
                                                         let mut hashes = Vec::new();
-                                                        let topo = match host
-                                                            .get_topology(space.clone())
-                                                            .await
-                                                        {
-                                                            Err(_) => continue,
-                                                            Ok(topo) => topo,
+                                                        let topo = if let Ok(topo) = host.get_topology(space.clone()) {
+                                                            topo
+                                                        } else {
+                                                            continue
                                                         };
                                                         let mut regions = Vec::new();
 

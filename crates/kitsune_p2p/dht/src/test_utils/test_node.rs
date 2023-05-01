@@ -19,20 +19,20 @@ use super::{
 
 /// A "node", with test-worthy implementation of the host interface
 pub struct TestNode {
-    arqs: HashMap<AgentKey, Arq>,
+    arqs: HashMap<AgentKey, ArqLoc>,
     store: OpStore,
 }
 
 impl TestNode {
     /// Constructor
-    pub fn new(topo: Topology, gopa: GossipParams, arqs: HashMap<AgentKey, Arq>) -> Self {
+    pub fn new(topo: Topo, gopa: GossipParams, arqs: HashMap<AgentKey, ArqLoc>) -> Self {
         Self {
             arqs,
             store: OpStore::new(topo, gopa),
         }
     }
     /// Constructor
-    pub fn new_single(topo: Topology, gopa: GossipParams, arq: Arq) -> (Self, AgentKey) {
+    pub fn new_single(topo: Topo, gopa: GossipParams, arq: ArqLoc) -> (Self, AgentKey) {
         let agent_key = AgentKey::fake();
         let node = Self::new(topo, gopa, [(agent_key.clone(), arq)].into_iter().collect());
         (node, agent_key)
@@ -47,7 +47,7 @@ impl TestNode {
     }
 
     /// Print an ascii representation of the node's arq and all ops held
-    pub fn ascii_arqs_and_ops(&self, topo: &Topology, len: usize) -> String {
+    pub fn ascii_arqs_and_ops(&self, len: usize) -> String {
         self.arqs
             .iter()
             .enumerate()
@@ -56,7 +56,7 @@ impl TestNode {
                     "{:>3}: |{}| {}/{} @ {}\n",
                     i,
                     add_location_ascii(
-                        arq.to_ascii(topo, len),
+                        arq.to_ascii(len),
                         self.store.ops.iter().map(|o| o.loc).collect()
                     ),
                     arq.power(),
@@ -98,15 +98,16 @@ impl AccessOpStore<OpData> for TestNode {
 }
 
 impl AccessPeerStore for TestNode {
-    fn get_agent_arq(&self, agent: &AgentKey) -> crate::arq::Arq {
-        *self.arqs.get(agent).unwrap()
+    fn get_agent_arq(&self, agent: &AgentKey) -> crate::arq::ArqLoc {
+        self.arqs.get(agent).unwrap().clone()
     }
 
     fn get_arq_set(&self) -> ArqSet {
         ArqSet::new(
+            self.store.topo.clone(),
             self.arqs
                 .values()
-                .map(|arq| arq.to_bounds(&self.store.topo))
+                .map(|arq| arq.to_bounds().sans())
                 .collect(),
         )
     }
@@ -126,7 +127,7 @@ mod tests {
     fn integrate_and_query_ops() {
         let topo = Topology::unit_zero();
         let gopa = GossipParams::zero();
-        let arq = Arq::new(8, 0u32.into(), 4.into());
+        let arq = ArqLoc::new(topo.clone(), 8, 0u32.into(), 4.into());
         let (mut node, _) = TestNode::new_single(topo.clone(), gopa, arq);
 
         node.integrate_ops(
@@ -173,7 +174,7 @@ mod tests {
     fn integrate_and_query_ops_standard_topo() {
         let topo = Topology::standard_epoch_full();
         let gopa = GossipParams::zero();
-        let arq = Arq::new(8, 0u32.into(), 4.into());
+        let arq = ArqLocTopo::new(topo.clone(), 8, 0u32.into(), 4.into());
         let (mut node, _) = TestNode::new_single(topo.clone(), gopa, arq);
 
         let p = pow2(12);

@@ -26,7 +26,7 @@ pub const DETAIL: u8 = 1;
 
 type DataVec = statrs::statistics::Data<Vec<f64>>;
 
-pub type Peers = Vec<Arq>;
+pub type Peers = Vec<ArqLoc>;
 
 fn full_len() -> f64 {
     2f64.powi(32)
@@ -103,7 +103,7 @@ where
 /// dynamic_peer_indices: Indices of peers who should be updated. If None, all peers will be updated.
 /// detail: Level of output detail. More is more verbose. detail: u8,
 pub fn run_one_epoch(
-    topo: &Topology,
+    topo: &Topo,
     strat: &ArqStrat,
     mut peers: Peers,
     dynamic_peer_indices: Option<&HashSet<usize>>,
@@ -140,12 +140,12 @@ pub fn run_one_epoch(
             }
         }
         let mut arq = peers.get_mut(i).unwrap();
-        let before = arq.absolute_length(topo) as f64;
+        let before = arq.absolute_length() as f64;
         let before_pow = arq.power();
 
-        let stats = view.update_arq_with_stats(topo, &mut arq);
+        let stats = view.update_arq_with_stats(&mut arq);
 
-        let after = arq.absolute_length(topo) as f64;
+        let after = arq.absolute_length() as f64;
         let delta = (after - before) / topo.space.quantum as f64;
 
         if detail {
@@ -182,7 +182,7 @@ pub fn run_one_epoch(
                 .unwrap_or("??".magenta());
             println!(
                 "|{}| #{:<3} {:>3} {:>3} {:>3} {} {} {: >3} {}",
-                arq.to_dht_arc_range(topo).to_ascii(64),
+                arq.to_dht_arc_range().to_ascii(64),
                 i,
                 arq.count(),
                 arq.power(),
@@ -222,7 +222,7 @@ pub fn run_one_epoch(
     }
 
     let tot = peers.len() as f64;
-    let min_redundancy = calc_min_redundancy(topo, peers.clone());
+    let min_redundancy = calc_min_redundancy(peers.clone());
     let stats = EpochStats {
         net_delta_avg: delta_net / tot / full_len(),
         gross_delta_avg: delta_gross / tot / full_len(),

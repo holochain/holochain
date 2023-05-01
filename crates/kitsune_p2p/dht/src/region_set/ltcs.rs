@@ -15,14 +15,35 @@ use super::{Region, RegionCoords, RegionData, RegionDataConstraints};
 /// [`SpaceSegment`]s are implied by the [`ArqBoundsSet`].
 ///
 /// LTCS stands for Logarithmic Time, Constant Space.
-#[derive(Debug, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
-pub struct RegionCoordSetLtcs {
+pub struct RegionCoordSetLtcs<T = Topo> {
     pub(super) times: TelescopingTimes,
-    pub(super) arq_set: ArqSet,
+    pub(super) arq_set: ArqSet<T>,
 }
 
-impl RegionCoordSetLtcs {
+impl RegionCoordSetLtcs<()> {
+    /// An empty set of coords
+    pub fn empty() -> Self {
+        Self {
+            times: TelescopingTimes::empty(),
+            arq_set: ArqSet::empty(()),
+        }
+    }
+
+    pub fn topo(mut self, topo: Topo) -> RegionCoordSetLtcs<Topo> {
+        RegionCoordSetLtcs {
+            times: self.times,
+            arq_set: self.arq_set.topo(topo),
+        }
+    }
+}
+
+impl<T: Clone + PartialEq> RegionCoordSetLtcs<T> {
+    pub fn new(times: TelescopingTimes, arq_set: ArqSet<T>) -> Self {
+        Self { times, arq_set }
+    }
+
     /// Generate the LTCS region coords given the generating parameters.
     /// Each RegionCoords is paired with the relative spacetime coords, which
     /// can be used to pair the generated coords with stored data.
@@ -43,7 +64,7 @@ impl RegionCoordSetLtcs {
     ) -> impl Iterator<
         Item = impl Iterator<Item = impl Iterator<Item = ((usize, usize, usize), RegionCoords)>> + '_,
     > + '_ {
-        let arqs = self.arq_set.arqs();
+        let arqs = self.arq_set.arqs_sans();
         arqs.iter().enumerate().map(move |(ia, arq)| {
             arq.segments().enumerate().map(move |(ix, x)| {
                 self.times
@@ -56,7 +77,7 @@ impl RegionCoordSetLtcs {
     }
 
     /// Generate data for each coord in the set, creating the corresponding [`RegionSetLtcs`].
-    pub fn into_region_set<D, F, E>(self, mut f: F) -> Result<RegionSetLtcs<D>, E>
+    pub fn into_region_set<D, F, E>(self, mut f: F) -> Result<RegionSetLtcs<D, T>, E>
     where
         D: RegionDataConstraints,
         F: FnMut(((usize, usize, usize), RegionCoords)) -> Result<D, E>,
@@ -74,7 +95,7 @@ impl RegionCoordSetLtcs {
 
     /// Generate data for each coord in the set, creating the corresponding [`RegionSetLtcs`],
     /// using a mapping function which cannot fail.
-    pub fn into_region_set_infallible<D, F>(self, mut f: F) -> RegionSetLtcs<D>
+    pub fn into_region_set_infallible<D, F>(self, mut f: F) -> RegionSetLtcs<D, T>
     where
         D: RegionDataConstraints,
         F: FnMut(((usize, usize, usize), RegionCoords)) -> D,
@@ -83,25 +104,31 @@ impl RegionCoordSetLtcs {
             .unwrap()
     }
 
-    /// An empty set of coords
-    pub fn empty() -> Self {
-        Self {
-            times: TelescopingTimes::empty(),
-            arq_set: ArqSet::empty(),
-        }
-    }
-
     /// Return the number of chunks in the arq set
     pub fn num_space_chunks(&self) -> usize {
-        self.arq_set.arqs().len()
+        self.arq_set.arqs_sans().len()
     }
 
     /// The total number of coords represented here.
     pub fn count(&self) -> usize {
         let nt = self.times.segments().len();
-        self.arq_set.arqs().iter().map(|a| a.count()).sum::<u32>() as usize * nt
+        self.arq_set
+            .arqs_sans()
+            .iter()
+            .map(|a| a.count())
+            .sum::<u32>() as usize
+            * nt
+    }
+
+    pub fn sans(self) -> RegionCoordSetLtcs<()> {
+        RegionCoordSetLtcs {
+            arq_set: self.arq_set.sans(),
+            times: self.times,
+        }
     }
 }
+
+pub type RegionSetLtcsSans<D: RegionDataConstraints = RegionData> = RegionSetLtcs<D, ()>;
 
 /// Implementation for the compact LTCS region set format which gets sent over the wire.
 /// The coordinates for the regions are specified by a few values.
@@ -110,9 +137,9 @@ impl RegionCoordSetLtcs {
 #[derive(serde::Serialize, serde::Deserialize, Derivative)]
 #[derivative(PartialEq, Eq)]
 #[cfg_attr(feature = "test_utils", derive(Clone))]
-pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
+pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData, T = Topo> {
     /// The generator for the coordinates
-    pub coords: RegionCoordSetLtcs,
+    pub coords: RegionCoordSetLtcs<T>,
 
     /// the actual coordinates as generated
     #[derivative(PartialEq = "ignore")]
@@ -126,7 +153,7 @@ pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
     data: Vec<Vec<Vec<D>>>,
 }
 
-impl<D: RegionDataConstraints> std::fmt::Debug for RegionSetLtcs<D> {
+impl<D: RegionDataConstraints, T: Clone + PartialEq> std::fmt::Debug for RegionSetLtcs<D, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RegionSetLtcs")
             .field(
@@ -137,7 +164,7 @@ impl<D: RegionDataConstraints> std::fmt::Debug for RegionSetLtcs<D> {
     }
 }
 
-impl<D: RegionDataConstraints> RegionSetLtcs<D> {
+impl<D: RegionDataConstraints> RegionSetLtcs<D, ()> {
     /// An empty LTCS region set
     pub fn empty() -> Self {
         Self {
@@ -147,9 +174,29 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
         }
     }
 
+    /// Attach a Topology
+    pub fn topo(self, topo: Topo) -> RegionSetLtcs<D, Topo> {
+        RegionSetLtcs {
+            coords: self.coords.topo(topo),
+            _region_coords: self._region_coords,
+            data: self.data,
+        }
+    }
+}
+
+impl<D: RegionDataConstraints, T: Clone + PartialEq> RegionSetLtcs<D, T> {
+    /// Erase topology info
+    pub fn sans(self) -> RegionSetLtcsSans<D> {
+        RegionSetLtcsSans {
+            coords: self.coords.sans(),
+            _region_coords: self._region_coords,
+            data: self.data,
+        }
+    }
+
     /// Construct the region set from existing data.
     /// The data must match the coords!
-    pub fn from_data(coords: RegionCoordSetLtcs, data: Vec<Vec<Vec<D>>>) -> Self {
+    pub fn from_data(coords: RegionCoordSetLtcs<T>, data: Vec<Vec<Vec<D>>>) -> Self {
         Self {
             coords,
             data,
@@ -242,12 +289,12 @@ impl<D: RegionDataConstraints> RegionSetLtcs<D> {
 }
 
 #[cfg(feature = "test_utils")]
-impl<D: RegionDataConstraints> RegionSetLtcs<D> {
+impl<D: RegionDataConstraints, T: Clone + PartialEq> RegionSetLtcs<D, T> {
     /// Query the specified OpStore for each coord in the set, constructing
     /// the full RegionSet. Purely for convenience.
     pub fn from_store<O: OpRegion<D>, S: crate::persistence::AccessOpStore<O, D>>(
         store: &S,
-        coords: RegionCoordSetLtcs,
+        coords: RegionCoordSetLtcs<T>,
     ) -> Self {
         coords.into_region_set_infallible(|(_, coords)| store.query_region_data(&coords))
     }

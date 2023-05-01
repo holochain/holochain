@@ -2,6 +2,7 @@ use super::*;
 use crate::KitsuneHostDefaultError;
 use kitsune_p2p_fetch::*;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::dht::prelude::Topo;
 
 /// Signature for check_op_data_impl
 pub type CheckOpDataImpl = Box<
@@ -112,7 +113,7 @@ impl KitsuneHost for HostStub {
         KitsuneHostDefaultError::query_region_set(&self.err, space, dht_arc_set)
     }
 
-    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
+    fn get_topology(&self, space: Arc<KitsuneSpace>) -> Result<Topo, KitsuneHostError> {
         KitsuneHostDefaultError::get_topology(&self.err, space)
     }
 

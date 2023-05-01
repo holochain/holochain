@@ -10,7 +10,7 @@ use super::{ribosome_store::RibosomeStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
 use holochain_p2p::{
-    dht::{spacetime::Topology, ArqStrat},
+    dht::{prelude::Topo, spacetime::Topology, ArqStrat},
     DnaHashExt,
 };
 use holochain_sqlite::prelude::AsP2pStateTxExt;
@@ -186,7 +186,7 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<Vec<holochain_p2p::dht::region::Region>> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
-            let topology = self.get_topology(space).await?;
+            let topology = self.get_topology(space)?;
             let db = self.spaces.dht_db(&dna_hash)?;
             Ok(query_size_limited_regions::query_size_limited_regions(
                 db, topology, regions, size_limit,
@@ -205,7 +205,7 @@ impl KitsuneHost for KitsuneHostImpl {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
             let db = self.spaces.dht_db(&dna_hash)?;
-            let topology = self.get_topology(space).await?;
+            let topology = self.get_topology(space)?;
             let bounds = region.to_bounds(&topology);
             Ok(query_region_op_hashes::query_region_op_hashes(db.clone(), bounds).await?)
         }
@@ -213,14 +213,17 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
-    fn get_topology(&self, space: Arc<kitsune_p2p::KitsuneSpace>) -> KitsuneHostResult<Topology> {
+    fn get_topology(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+    ) -> Result<Topo, KitsuneHostError> {
         let dna_hash = DnaHash::from_kitsune(&space);
         let dna_def = self
             .ribosome_store
             .share_mut(|ds| ds.get_dna_def(&dna_hash))
             .ok_or(DnaError::DnaMissing(dna_hash));
         let cutoff = self.tuning_params.danger_gossip_recent_threshold();
-        async move { Ok(dna_def?.topology(cutoff)) }.boxed().into()
+        Ok(dna_def?.topology(cutoff))
     }
 
     fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash> {

@@ -23,8 +23,8 @@ fn test_basic() {
     let gopa = GossipParams::new(1.into(), 0);
     let ts = |t: u32| TimeQuantum::from(t).to_timestamp_bounds(&topo).0;
 
-    let alice_arq = Arq::new(8, (-128i32 as u32).into(), 4.into());
-    let bobbo_arq = Arq::new(8, 0u32.into(), 4.into());
+    let alice_arq = ArqLoc::new(topo.clone(), 8, (-128i32 as u32).into(), 4.into());
+    let bobbo_arq = ArqLoc::new(topo.clone(), 8, 0u32.into(), 4.into());
     let (mut alice, _) = TestNode::new_single(topo.clone(), gopa, alice_arq);
     let (mut bobbo, _) = TestNode::new_single(topo.clone(), gopa, bobbo_arq);
 
@@ -62,12 +62,12 @@ fn test_multi() {
     let sb2 = (20 * pow2(pow - 1)).into();
 
     let alice_arqs = hashmap! {
-        AgentKey::fake() => Arq::new(pow, sa1, 8.into()),
-        AgentKey::fake() => Arq::new(pow - 1, sa2, 8.into()),
+        AgentKey::fake() => ArqLoc::new(topo.clone(), pow, sa1, 8.into()),
+        AgentKey::fake() => ArqLoc::new(topo.clone(), pow - 1, sa2, 8.into()),
     };
     let bobbo_arqs = hashmap! {
-        AgentKey::fake() => Arq::new(pow, sb1, 8.into()),
-        AgentKey::fake() => Arq::new(pow - 1, sb2, 8.into()),
+        AgentKey::fake() => ArqLoc::new(topo.clone(), pow, sb1, 8.into()),
+        AgentKey::fake() => ArqLoc::new(topo.clone(), pow - 1, sb2, 8.into()),
     };
     let mut alice = TestNode::new(topo.clone(), gopa, alice_arqs);
     let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arqs);
@@ -77,8 +77,8 @@ fn test_multi() {
     alice.integrate_op(OpData::fake(sb2, ts(25), 345));
     bobbo.integrate_op(OpData::fake(sb1 + (pow2(pow) * 2).into(), ts(29), 456));
 
-    println!("{}", alice.ascii_arqs_and_ops(&topo, 64));
-    println!("{}", bobbo.ascii_arqs_and_ops(&topo, 64));
+    println!("{}", alice.ascii_arqs_and_ops(64));
+    println!("{}", bobbo.ascii_arqs_and_ops(64));
 
     let tq = TimeQuantum::from(30);
     let nt = TelescopingTimes::new(tq).segments().len() as u32;
@@ -87,8 +87,8 @@ fn test_multi() {
     let info = gossip_direct_at(&mut alice, &mut bobbo, tq).unwrap();
 
     let common = info.common_arqs;
-    common.print_arqs(&topo, 64);
-    assert_eq!(common.arqs().len(), 3);
+    common.print_arqs(64);
+    assert_eq!(common.arqs_sans().len(), 3);
 
     // There are 3 arqs in the common set, and they have 8, 3, and 1 segments
     // respectively. Therefore, the total number of segments is 12, and the total
@@ -115,10 +115,10 @@ fn test_mismatched_powers() {
     let sb = 0u32.into();
 
     let alice_arqs = hashmap! {
-        AgentKey::fake() => Arq::new(pow, sa, 8.into()),
+        AgentKey::fake() => ArqLoc::new(topo.clone(), pow, sa, 8.into()),
     };
     let bobbo_arqs = hashmap! {
-        AgentKey::fake() => Arq::new(pow - 1, sb, 8.into()),
+        AgentKey::fake() => ArqLoc::new(topo.clone(), pow - 1, sb, 8.into()),
     };
     let mut alice = TestNode::new(topo.clone(), gopa, alice_arqs);
     let mut bobbo = TestNode::new(topo.clone(), gopa, bobbo_arqs);
@@ -126,8 +126,8 @@ fn test_mismatched_powers() {
     alice.integrate_op(OpData::fake(sb, ts(10), 123));
     bobbo.integrate_op(OpData::fake(sb + (pow2(pow) * 2).into(), ts(11), 234));
 
-    println!("{}", alice.ascii_arqs_and_ops(&topo, 64));
-    println!("{}", bobbo.ascii_arqs_and_ops(&topo, 64));
+    println!("{}", alice.ascii_arqs_and_ops(64));
+    println!("{}", bobbo.ascii_arqs_and_ops(64));
 
     let tq = TimeQuantum::from(30);
     let nt = TelescopingTimes::new(tq).segments().len() as u32;
@@ -136,8 +136,8 @@ fn test_mismatched_powers() {
     let info = gossip_direct_at(&mut alice, &mut bobbo, tq).unwrap();
 
     let common = info.common_arqs;
-    common.print_arqs(&topo, 64);
-    assert_eq!(common.arqs().len(), 1);
+    common.print_arqs(64);
+    assert_eq!(common.arqs_sans().len(), 1);
 
     // There are 3 arqs in the common set, and they have 8, 3, and 1 segments
     // respectively. Therefore, the total number of segments is 12, and the total
@@ -190,7 +190,7 @@ fn gossip_scenario_full_sync() {
         .iter()
         .map(|a| {
             assert_eq!(a.count(), expected_num_space_chunks);
-            TestNode::new_single(topo.clone(), gopa, *a).0
+            TestNode::new_single(topo.clone(), gopa, a.clone()).0
         })
         .collect();
 
@@ -220,7 +220,7 @@ fn gossip_scenario_full_sync() {
             .iter()
             .map(|n| {
                 let ops = n.query_op_data(&full_region);
-                println!("{}", n.ascii_arqs_and_ops(&topo, 64));
+                println!("{}", n.ascii_arqs_and_ops(64));
                 ops.len()
             })
             .collect::<Vec<_>>(),
@@ -255,7 +255,7 @@ fn gossip_scenario_full_sync() {
     }
 
     for n in nodes.iter() {
-        println!("{}", n.ascii_arqs_and_ops(&topo, 64));
+        println!("{}", n.ascii_arqs_and_ops(64));
     }
 
     assert_eq!(nodes[0].query_op_data(&full_region).len(), num_ops);

@@ -2,6 +2,7 @@ mod common;
 
 use common::quantized::*;
 use kitsune_p2p_dht::{
+    prelude::Topo,
     spacetime::Topology,
     test_utils::{generate_ideal_coverage, generate_messy_coverage, seeded_rng},
     *,
@@ -109,7 +110,7 @@ proptest::proptest! {
     }
 }
 
-fn parameterized_stability_test(topo: &Topology, strat: &ArqStrat, peers: Vec<Arq>, detail: bool) {
+fn parameterized_stability_test(topo: &Topo, strat: &ArqStrat, peers: Vec<ArqLoc>, detail: bool) {
     println!("{}", strat.summary());
 
     if detail {
@@ -117,7 +118,7 @@ fn parameterized_stability_test(topo: &Topology, strat: &ArqStrat, peers: Vec<Ar
         for (i, arq) in peers.iter().enumerate() {
             println!(
                 "|{}| #{:<3} {:>3} {:>3}",
-                arq.to_dht_arc_range(topo).to_ascii(64),
+                arq.to_dht_arc_range().to_ascii(64),
                 i,
                 arq.count(),
                 arq.power()
@@ -135,7 +136,7 @@ fn parameterized_stability_test(topo: &Topology, strat: &ArqStrat, peers: Vec<Ar
     report.log();
     pass_report(&report, strat.min_coverage);
 
-    let actual_cov = actual_coverage(topo, eq.runs()[0].peers.iter());
+    let actual_cov = actual_coverage(eq.runs()[0].peers.iter());
     assert!(
         actual_cov >= strat.min_coverage,
         "{} < {}",

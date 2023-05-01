@@ -7,9 +7,9 @@ use kitsune_p2p_types::{
     bin_types::KitsuneSpace,
     dependencies::lair_keystore_api,
     dht::{
+        prelude::Topo,
         region::{Region, RegionCoords},
         region_set::RegionSetLtcs,
-        spacetime::Topology,
     },
     dht_arc::DhtArcSet,
     KOpData, KOpHash,
@@ -17,9 +17,11 @@ use kitsune_p2p_types::{
 
 use crate::event::{GetAgentInfoSignedEvt, MetricRecord};
 
+/// The plain error type
+pub type KitsuneHostError = Box<dyn Send + Sync + std::error::Error>;
+
 /// A boxed future result with dynamic error type
-pub type KitsuneHostResult<'a, T> =
-    MustBoxFuture<'a, Result<T, Box<dyn Send + Sync + std::error::Error>>>;
+pub type KitsuneHostResult<'a, T> = MustBoxFuture<'a, Result<T, KitsuneHostError>>;
 
 /// The interface to be implemented by the host, which handles various requests
 /// for data
@@ -85,7 +87,7 @@ pub trait KitsuneHost: 'static + Send + Sync {
     ) -> KitsuneHostResult<()>;
 
     /// Get the quantum Topology associated with this Space.
-    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology>;
+    fn get_topology(&self, space: Arc<KitsuneSpace>) -> Result<Topo, KitsuneHostError>;
 
     /// Hashing function to get an op_hash from op_data.
     fn op_hash(&self, op_data: KOpData) -> KitsuneHostResult<KOpHash>;

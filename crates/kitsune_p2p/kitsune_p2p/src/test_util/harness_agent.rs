@@ -53,7 +53,7 @@ impl KitsuneHostDefaultError for HarnessHost {
         _space: Arc<KitsuneSpace>,
         _dht_arc_set: Arc<DhtArcSet>,
     ) -> KitsuneHostResult<RegionSetLtcs> {
-        box_fut(Ok(RegionSetLtcs::empty()))
+        box_fut(Ok(RegionSetLtcs::empty().topo(Topology::standard_zero())))
     }
 }
 
@@ -68,7 +68,7 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
-    let topology = Topology::standard_epoch_full();
+    let topology = Topology::standard_zero();
     let host = HarnessHost::new();
     let (p2p, evt) = spawn_kitsune_p2p(
         config,
@@ -100,7 +100,8 @@ use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
-use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
+use kitsune_p2p_types::dht::prelude::{RegionSetLtcs, Topo};
+use kitsune_p2p_types::dht::region_set::RegionSetLtcsSans;
 use kitsune_p2p_types::dht::spacetime::Topology;
 use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::dht_arc::DhtArcSet;
@@ -111,13 +112,13 @@ struct AgentHarness {
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
-    topology: Topology,
+    topology: Topo,
 }
 
 impl AgentHarness {
     pub async fn new(
         harness_chan: HarnessEventChannel,
-        topology: Topology,
+        topology: Topo,
     ) -> Result<Self, KitsuneP2pError> {
         let pub_key = sodoken::BufWriteSized::new_no_lock();
         let priv_key = sodoken::BufWriteSized::new_no_lock();

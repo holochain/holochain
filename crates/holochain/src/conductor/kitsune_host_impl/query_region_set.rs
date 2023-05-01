@@ -15,11 +15,11 @@ const LOG_RATE_MS: i64 = 1000;
 /// The network module needs info about various groupings ("regions") of ops
 pub async fn query_region_set(
     db: DbWrite<DbKindDht>,
-    topology: Topology,
+    topo: Topo,
     strat: &ArqStrat,
     dht_arc_set: Arc<DhtArcSet>,
 ) -> ConductorResult<RegionSetLtcs> {
-    let (arq_set, rounded) = ArqSet::from_dht_arc_set_rounded(&topology, strat, &dht_arc_set);
+    let (arq_set, rounded) = ArqSet::from_dht_arc_set_rounded(topo.clone(), strat, &dht_arc_set);
     if rounded {
         // If an arq was rounded, emit a warning, but throttle it to once every LOG_RATE_MS
         // so we don't get slammed.
@@ -46,7 +46,7 @@ pub async fn query_region_set(
         }
     }
 
-    let times = TelescopingTimes::historical(&topology);
+    let times = TelescopingTimes::historical(&topo);
     let coords = RegionCoordSetLtcs::new(times, arq_set);
 
     let region_set = db
@@ -54,7 +54,7 @@ pub async fn query_region_set(
             let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
             let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
             let regions = coords
-                .into_region_set(|(_, coords)| query_region_data(&mut stmt, &topology, coords))?;
+                .into_region_set(|(_, coords)| query_region_data(&mut stmt, &topo, coords))?;
             DatabaseResult::Ok(regions)
         })
         .await?;

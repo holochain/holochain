@@ -103,7 +103,7 @@ impl ShardedGossipLocal {
         &self,
         peer_cert: &Arc<[u8; 32]>,
         state: RoundState,
-        region_set: RegionSetLtcs,
+        region_set: RegionSetLtcsSans,
     ) -> KitsuneResult<Vec<ShardedGossipWire>> {
         if let Some(sent) = state.region_set_sent.as_ref().map(|r| (**r).clone()) {
             // because of the order of arguments, the diff regions will contain the data

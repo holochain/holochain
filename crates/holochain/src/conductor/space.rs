@@ -21,8 +21,8 @@ use crate::core::{
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::{ConductorConfig, DatabaseRootPath};
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
+use holochain_p2p::{dht::prelude::Topo, AgentPubKeyExt};
 use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqSet},
@@ -504,30 +504,31 @@ impl Spaces {
     pub async fn handle_fetch_op_regions(
         &self,
         dna_hash: &DnaHash,
-        topology: Topology,
+        topo: Topo,
         dht_arc_set: DhtArcSet,
     ) -> ConductorResult<RegionSetLtcs> {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
         let max_chunks = ArqStrat::default().max_chunks();
         let arq_set = ArqSet::new(
+            topo.clone(),
             dht_arc_set
                 .intervals()
                 .into_iter()
                 .map(|i| {
                     let len = i.length();
-                    let (pow, _) = power_and_count_from_length(&topology.space, len, max_chunks);
-                    ArqBounds::from_interval_rounded(&topology, pow, i).0
+                    let (pow, _) = power_and_count_from_length(&topo.space, len, max_chunks);
+                    ArqBounds::from_interval_rounded(topo.clone(), pow, i).0
                 })
                 .collect(),
         );
-        let times = TelescopingTimes::historical(&topology);
+        let times = TelescopingTimes::historical(&topo);
         let coords = RegionCoordSetLtcs::new(times, arq_set);
         let coords_clone = coords.clone();
         let db = self.dht_db(dna_hash)?;
         db.async_reader(move |txn| {
             let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
             Ok(coords_clone.into_region_set(|(_, coords)| {
-                let bounds = coords.to_bounds(&topology);
+                let bounds = coords.to_bounds(&topo);
                 let (x0, x1) = bounds.x;
                 let (t0, t1) = bounds.t;
                 stmt.query_row(

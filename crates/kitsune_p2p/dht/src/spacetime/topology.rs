@@ -1,3 +1,7 @@
+use std::sync::Arc;
+
+use crate::prelude::Topo;
+
 use super::*;
 
 /// Quantum time used in the standard topology
@@ -34,49 +38,49 @@ pub struct Topology {
 impl Topology {
     /// Unit dimensions with the given time origin
     #[cfg(feature = "test_utils")]
-    pub fn unit(time_origin: Timestamp) -> Self {
-        Self {
+    pub fn unit(time_origin: Timestamp) -> Topo {
+        Arc::new(Self {
             space: Dimension::unit(),
             time: Dimension::unit(),
             time_origin,
             time_cutoff: Duration::ZERO,
-        }
+        })
     }
 
     /// Unit dimensions with a zero time origin
     #[cfg(feature = "test_utils")]
-    pub fn unit_zero() -> Self {
-        Self {
+    pub fn unit_zero() -> Topo {
+        Arc::new(Self {
             space: Dimension::unit(),
             time: Dimension::unit(),
             time_origin: Timestamp::from_micros(0),
             time_cutoff: Duration::ZERO,
-        }
+        })
     }
 
     /// Standard dimensions with the given time origin
-    pub fn standard(time_origin: Timestamp, time_cutoff: Duration) -> Self {
-        Self {
+    pub fn standard(time_origin: Timestamp, time_cutoff: Duration) -> Topo {
+        Arc::new(Self {
             space: Dimension::standard_space(),
             time: Dimension::standard_time(),
             time_origin,
             time_cutoff,
-        }
+        })
     }
 
     /// Standard dimensions with the [`HOLOCHAIN_EPOCH`](Timestamp::HOLOCHAIN_EPOCH) as the time origin
-    pub fn standard_epoch(time_cutoff: Duration) -> Self {
+    pub fn standard_epoch(time_cutoff: Duration) -> Topo {
         Self::standard(Timestamp::HOLOCHAIN_EPOCH, time_cutoff)
     }
 
     /// Standard dimensions with the [`HOLOCHAIN_EPOCH`](Timestamp::HOLOCHAIN_EPOCH) as the time origin
-    pub fn standard_epoch_full() -> Self {
+    pub fn standard_epoch_full() -> Topo {
         Self::standard(Timestamp::HOLOCHAIN_EPOCH, Duration::ZERO)
     }
 
     /// Standard dimensions with a zero time origin
     #[cfg(feature = "test_utils")]
-    pub fn standard_zero() -> Self {
+    pub fn standard_zero() -> Topo {
         Self::standard(Timestamp::ZERO, Duration::ZERO)
     }
 

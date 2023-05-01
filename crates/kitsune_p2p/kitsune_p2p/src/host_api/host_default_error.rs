@@ -1,6 +1,7 @@
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
+use kitsune_p2p_types::dht::prelude::Topo;
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
 
 use super::*;
@@ -113,13 +114,13 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
         .into()))
     }
 
-    fn get_topology(&self, _space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
-        box_fut(Err(format!(
+    fn get_topology(&self, _space: Arc<KitsuneSpace>) -> Result<Topo, KitsuneHostError> {
+        Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
             "get_topology",
             Self::NAME
         )
-        .into()))
+        .into())
     }
 
     fn op_hash(&self, _op_data: KOpData) -> KitsuneHostResult<KOpHash> {
@@ -210,7 +211,7 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         KitsuneHostDefaultError::query_region_set(self, space, dht_arc_set)
     }
 
-    fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
+    fn get_topology(&self, space: Arc<KitsuneSpace>) -> Result<Topo, KitsuneHostError> {
         KitsuneHostDefaultError::get_topology(self, space)
     }
 

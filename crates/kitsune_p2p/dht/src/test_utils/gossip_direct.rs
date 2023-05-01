@@ -27,7 +27,6 @@ pub fn gossip_direct<Peer: HostAccessTest>(
     if left.topo() != right.topo() {
         return Err(GossipError::TopologyMismatch);
     }
-    let topo = left.topo();
 
     let common_arqs = {
         // ROUND I: Initial handshake, exchange ArqSets and as-at timestamps
@@ -47,14 +46,14 @@ pub fn gossip_direct<Peer: HostAccessTest>(
         // - calculate common arqset
         let al = left.get_arq_set();
         let ar = right.get_arq_set();
-        al.print_arqs(topo, 64);
-        ar.print_arqs(topo, 64);
-        if (al.power() as i8 - ar.power() as i8).unsigned_abs()
+        al.print_arqs(64);
+        ar.print_arqs(64);
+        if (al.power().unwrap() as i8 - ar.power().unwrap() as i8).unsigned_abs()
             > u8::min(gpl.max_space_power_offset, gpr.max_space_power_offset)
         {
             return Err(GossipError::ArqPowerDiffTooLarge);
         }
-        al.intersection(topo, &ar)
+        al.intersection(&ar)
     };
 
     {

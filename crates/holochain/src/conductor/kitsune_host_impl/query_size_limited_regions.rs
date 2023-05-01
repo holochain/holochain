@@ -14,7 +14,7 @@ use super::query_region_set::query_region_data;
 #[tracing::instrument(skip(db, topology))]
 pub async fn query_size_limited_regions(
     db: DbWrite<DbKindDht>,
-    topology: Topology,
+    topology: Topo,
     regions: Vec<Region>,
     size_limit: u32,
 ) -> ConductorResult<Vec<Region>> {

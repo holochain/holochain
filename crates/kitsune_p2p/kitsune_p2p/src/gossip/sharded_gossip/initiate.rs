@@ -209,14 +209,18 @@ impl ShardedGossipLocal {
                 common_arc_set.clone(),
             )
             .await?;
-            gossip.push(ShardedGossipWire::op_regions(region_set.clone()));
+            gossip.push(ShardedGossipWire::op_regions(region_set.clone().sans()));
             Some(region_set)
         } else {
             None
         };
 
         // Generate the new state.
-        let mut state = self.new_state(remote_agent_list, common_arc_set, region_set)?;
+        let mut state = self.new_state(
+            remote_agent_list,
+            common_arc_set,
+            region_set.map(RegionSetLtcs::sans),
+        )?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {

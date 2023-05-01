@@ -15,7 +15,7 @@ use kitsune_p2p_types::agent_info::agent_info_helper::{AgentInfoEncode, AgentMet
 use kitsune_p2p_types::agent_info::{AgentInfoInner, AgentInfoSigned};
 use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::config::KitsuneP2pTuningParams;
-use kitsune_p2p_types::dht::prelude::power_and_count_from_length;
+use kitsune_p2p_types::dht::prelude::{power_and_count_from_length, Topo};
 use kitsune_p2p_types::dht::spacetime::Topology;
 use kitsune_p2p_types::dht::{ArqBounds, ArqStrat};
 use kitsune_p2p_types::dht_arc::loc8::Loc8;
@@ -58,7 +58,7 @@ static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
 #[derive(Clone)]
 pub struct Switchboard {
     pub(super) strat: ArqStrat,
-    pub(super) topology: Topology,
+    pub(super) topology: Topo,
     inner: Share<SwitchboardState>,
     gossip_type: GossipType,
 }
@@ -71,7 +71,7 @@ impl Switchboard {
     //   both gossip loops to share the same state.
     //   Or, this could be modified to take a list of GossipTypes, so that
     //   multiple loops will be created internally.
-    pub fn new(topology: Topology, gossip_type: GossipType) -> Self {
+    pub fn new(topology: Topo, gossip_type: GossipType) -> Self {
         Self {
             strat: ArqStrat::default(),
             topology,
@@ -567,7 +567,7 @@ impl SwitchboardAgent {
 
     /// Construct an agent from arc bounds.
     /// The agent's location is taken as the midpoint of the arc.
-    pub fn from_start_and_len<L: Into<Loc8>>(topo: &Topology, start: L, len: u8) -> Self {
+    pub fn from_start_and_len<L: Into<Loc8>>(topo: &Topo, start: L, len: u8) -> Self {
         let start: Loc8 = start.into();
         let initial_arc = if len == 0 {
             DhtArcRange::Empty
@@ -579,7 +579,7 @@ impl SwitchboardAgent {
         {
             let canonical = initial_arc.canonical();
             let (power, _count) = power_and_count_from_length(&topo.space, canonical.length(), 16);
-            ArqBounds::from_interval(topo, power, canonical)
+            ArqBounds::from_interval(topo.clone(), power, canonical)
                 .unwrap_or_else(|| panic!("Arc is not quantizable. Power is {}", power));
         }
 

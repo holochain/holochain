@@ -4,6 +4,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_conductor_api::AgentInfoDump;
 use holochain_conductor_api::P2pAgentsDump;
+use holochain_p2p::dht::prelude::Topo;
 use holochain_p2p::dht::spacetime::Topology;
 use holochain_p2p::dht::PeerStrat;
 use holochain_p2p::dht::PeerView;
@@ -230,7 +231,7 @@ pub async fn list_all_agent_info_signed_near_basis(
 /// a given [`DhtArc`]
 pub async fn query_peer_density(
     env: DbRead<DbKindP2pAgents>,
-    topology: Topology,
+    topology: Topo,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerView> {

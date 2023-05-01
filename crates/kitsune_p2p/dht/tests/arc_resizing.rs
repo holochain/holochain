@@ -5,6 +5,8 @@
 mod common;
 
 use kitsune_p2p_dht::arq::print_arq;
+use kitsune_p2p_dht::prelude::ArqLocTopo;
+use kitsune_p2p_dht::prelude::Topo;
 use kitsune_p2p_dht::spacetime::Topology;
 use kitsune_p2p_dht::*;
 
@@ -12,8 +14,8 @@ use kitsune_p2p_dht::test_utils::generate_ideal_coverage;
 use kitsune_p2p_dht::test_utils::seeded_rng;
 use kitsune_p2p_dht_arc::DhtArcRange;
 
-fn resize_to_equilibrium(view: &PeerViewQ, arq: &mut Arq) {
-    while view.update_arq(&view.topo, arq) {}
+fn resize_to_equilibrium(view: &PeerViewQ, arq: &mut ArqLoc) {
+    while view.update_arq(arq) {}
 }
 
 #[test]
@@ -39,7 +41,7 @@ fn test_shrink_towards_empty() {
     let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
     // start with a full arq at max power
-    let mut arq = Arq::new_full(&topo, 0u32.into(), topo.max_space_power(&strat));
+    let mut arq = ArqLoc::new_full(topo.clone(), 0u32.into(), topo.max_space_power(&strat));
     resize_to_equilibrium(&view, &mut arq);
     // test that the arc gets reduced in power to match those of its peers
     assert!(
@@ -75,9 +77,9 @@ fn test_grow_towards_full() {
     let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
     // start with an arq comparable to one's peers
-    let mut arq = Arq::new(peer_power, 0u32.into(), 12.into());
+    let mut arq = ArqLocTopo::new(topo, peer_power, 0u32.into(), 12.into());
     loop {
-        let stats = view.update_arq_with_stats(&topo, &mut arq);
+        let stats = view.update_arq_with_stats(&mut arq);
         if !stats.changed {
             break;
         }
@@ -111,10 +113,10 @@ fn test_grow_to_full() {
     let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
     // start with an arq comparable to one's peers
-    let mut arq = Arq::new(peer_power, 0u32.into(), 12.into());
-    print_arq(&topo, &arq, 64);
-    while view.update_arq(&topo, &mut arq) {
-        print_arq(&topo, &arq, 64);
+    let mut arq = ArqLoc::new(topo.clone(), peer_power, 0u32.into(), 12.into());
+    print_arq(&arq, 64);
+    while view.update_arq(&mut arq) {
+        print_arq(&arq, 64);
     }
     // ensure that the arq grows to full size
     assert_eq!(arq.power(), topo.max_space_power(&strat));
@@ -145,9 +147,9 @@ fn test_grow_by_multiple_chunks() {
     let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
     let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
 
-    let arq = Arq::new(peer_power - 1, 0u32.into(), 6.into());
+    let arq = ArqLoc::new(topo, peer_power - 1, 0u32.into(), 6.into());
     let mut resized = arq.clone();
-    view.update_arq(&topo, &mut resized);
+    view.update_arq(&mut resized);
     assert!(resized.power() > arq.power() || resized.count() > arq.count() + 1);
 }
 
@@ -160,9 +162,9 @@ fn test_grow_by_multiple_chunks() {
 fn test_degenerate_asymmetrical_coverage() {
     holochain_trace::test_run().ok();
     let topo = Topology::unit_zero();
-    let other = ArqBounds::from_interval(&topo, 4, DhtArcRange::from_bounds(0x0u32, 0x80))
+    let other = ArqBounds::from_interval(topo.clone(), 4, DhtArcRange::from_bounds(0x0u32, 0x80))
         .unwrap()
-        .to_arq(&topo, |l| l);
+        .to_arq(|l| l);
     let others = vec![other; 10];
     // aim for coverage between 5 and 6.
     let strat = ArqStrat {
@@ -172,7 +174,8 @@ fn test_degenerate_asymmetrical_coverage() {
     };
     let view = PeerViewQ::new(topo.clone(), strat, others);
 
-    let arq = Arq::new(
+    let arq = ArqLoc::new(
+        topo.clone(),
         4, // log2 of 0x10
         Loc::new(0),
         0x10.into(),
@@ -182,7 +185,7 @@ fn test_degenerate_asymmetrical_coverage() {
     assert_eq!(extrapolated, 5.0);
     let old = arq.clone();
     let mut new = arq.clone();
-    let resized = view.update_arq(&topo, &mut new);
+    let resized = view.update_arq(&mut new);
     assert_eq!(old, new);
     assert!(!resized);
 }
@@ -205,7 +208,7 @@ fn test_scenario() {
 
     {
         // start with a full arq
-        let mut arq = Arq::new_full(&topo, Loc::new(0x0), topo.max_space_power(&strat));
+        let mut arq = ArqLoc::new_full(topo.clone(), Loc::new(0x0), topo.max_space_power(&strat));
         // create 10 peers, all with full arcs, fully covering the DHT
         let peers: Vec<_> = generate_ideal_coverage(&topo, &mut rng, &strat, None, 10, jitter);
         let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
@@ -213,13 +216,13 @@ fn test_scenario() {
         assert_eq!(extrapolated, 10.0);
 
         // expect that the arq remains full under these conditions
-        let resized = view.update_arq(&topo, &mut arq);
+        let resized = view.update_arq(&mut arq);
         assert!(!resized);
     }
 
     {
         // start with a full arq again
-        let mut arq = Arq::new_full(&topo, Loc::new(0x0), topo.max_space_power(&strat));
+        let mut arq = ArqLoc::new_full(topo.clone(), Loc::new(0x0), topo.max_space_power(&strat));
         // create 100 peers, with arcs at about 10%,
         // covering a bit more than they need to
         let peers = generate_ideal_coverage(&topo, &mut rng, &strat, Some(13.0), 100, jitter);
@@ -234,7 +237,7 @@ fn test_scenario() {
             // assert!(strat.min_coverage <= extrapolated && extrapolated <= strat.max_coverage());
 
             // update the arq until there is no change
-            while view.update_arq(&topo, &mut arq) {}
+            while view.update_arq(&mut arq) {}
 
             // expect that the arq shrinks to at least the ballpark of the peers
             assert_eq!(arq.power(), peer_power);
@@ -253,10 +256,10 @@ fn test_scenario() {
                 .collect();
             let peer_power = peers.iter().map(|p| p.power()).min().unwrap();
             let view = PeerViewQ::new(topo.clone(), strat.clone(), peers);
-            print_arq(&topo, &arq, 64);
+            print_arq(&arq, 64);
             // assert that our arc will grow as large as it can to pick up the slack.
-            while view.update_arq(&topo, &mut arq) {
-                print_arq(&topo, &arq, 64);
+            while view.update_arq(&mut arq) {
+                print_arq(&arq, 64);
             }
             assert_eq!(arq.power(), peer_power + strat.max_power_diff);
             assert!(arq.count() == strat.max_chunks());

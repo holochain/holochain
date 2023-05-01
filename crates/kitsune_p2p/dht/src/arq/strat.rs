@@ -2,7 +2,7 @@ use kitsune_p2p_dht_arc::DhtArc;
 
 use crate::spacetime::Topology;
 
-use super::{Arq, PeerView, PeerViewQ};
+use super::{ArqLoc, PeerView, PeerViewQ, Topo};
 
 /// A Strategy for generating PeerViews.
 /// The enum allows us to add new strategies over time.
@@ -21,12 +21,12 @@ impl Default for PeerStrat {
 impl PeerStrat {
     /// Generate a view using this strategy.
     /// Ensures that only peers which are visible from `arc` are included.
-    pub fn view(&self, topo: Topology, _arc: DhtArc, peers: &[DhtArc]) -> PeerView {
+    pub fn view(&self, topo: Topo, _arc: DhtArc, peers: &[DhtArc]) -> PeerView {
         match self {
             Self::Quantized(s) => {
                 let peers = peers
                     .iter()
-                    .map(|p| Arq::from_dht_arc_approximate(&topo, s, p))
+                    .map(|p| ArqLoc::from_dht_arc_approximate(topo.clone(), s, p))
                     .collect();
                 PeerViewQ::new(topo, s.clone(), peers).into()
             }

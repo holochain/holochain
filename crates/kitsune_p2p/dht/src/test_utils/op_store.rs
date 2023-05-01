@@ -1,37 +1,38 @@
 use crate::{
     op::OpRegion,
     persistence::AccessOpStore,
-    prelude::{RegionCoords, RegionSet, RegionSetLtcs},
+    prelude::{RegionCoords, RegionSet, RegionSetLtcs, Topo},
     region::{RegionData, RegionDataConstraints},
     spacetime::{GossipParams, Topology},
 };
 use futures::future::FutureExt;
+use num_traits::Zero;
 use std::{collections::BTreeSet, ops::Bound, sync::Arc};
 
 use super::op_data::OpData;
 
 /// An in-memory implementation of a node's op store
 #[derive(Clone)]
-pub struct OpStore<O: OpRegion<D> = OpData, D: RegionDataConstraints = RegionData> {
-    pub(crate) topo: Topology,
+pub struct OpStore<O: OpRegion = OpData /* , D: RegionDataConstraints = RegionData */> {
+    pub(crate) topo: Topo,
     pub(crate) ops: BTreeSet<Arc<O>>,
-    pub(crate) _region_set: RegionSet<D>,
+    // pub(crate) _region_set: RegionSet<D>,
     pub(crate) gossip_params: GossipParams,
 }
 
-impl<D: RegionDataConstraints, O: OpRegion<D>> OpStore<O, D> {
+impl<O: OpRegion> OpStore<O> {
     /// Construct an empty store
-    pub fn new(topo: Topology, gossip_params: GossipParams) -> Self {
+    pub fn new(topo: Topo, gossip_params: GossipParams) -> Self {
         Self {
             topo,
             ops: Default::default(),
-            _region_set: RegionSetLtcs::empty().into(),
+            // _region_set: RegionSetLtcs::empty().into(),
             gossip_params,
         }
     }
 }
 
-impl<D: RegionDataConstraints, O: OpRegion<D>> AccessOpStore<O, D> for OpStore<O, D> {
+impl<O: OpRegion> AccessOpStore<O> for OpStore<O> {
     fn query_op_data(&self, region: &RegionCoords) -> Vec<Arc<O>> {
         let region = region.to_bounds(self.topo());
         let (x0, x1) = region.x;
@@ -45,17 +46,17 @@ impl<D: RegionDataConstraints, O: OpRegion<D>> AccessOpStore<O, D> for OpStore<O
             .collect()
     }
 
-    fn query_region_data(&self, region: &RegionCoords) -> D {
+    fn query_region_data(&self, region: &RegionCoords) -> RegionData {
         self.query_op_data(region)
             .into_iter()
             .map(|o| o.region_data())
-            .fold(D::zero(), |d, o| d + o)
+            .fold(RegionData::zero(), |d, o| d + o)
     }
 
     fn fetch_region_set(
         &self,
         coords: crate::prelude::RegionCoordSetLtcs,
-    ) -> must_future::MustBoxFuture<Result<crate::prelude::RegionSetLtcs<D>, ()>> {
+    ) -> must_future::MustBoxFuture<Result<crate::prelude::RegionSetLtcs<RegionData>, ()>> {
         async move { coords.into_region_set(|(_, coords)| Ok(self.query_region_data(&coords))) }
             .boxed()
             .into()

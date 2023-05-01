@@ -3,7 +3,7 @@ use num_traits::Zero;
 
 use crate::spacetime::{SpaceOffset, Topology};
 
-use super::{is_full, Arq, ArqStrat};
+use super::{is_full, ArqLoc, ArqStrat, Topo};
 
 /// A "view" of the peers in a neighborhood. The view consists of a few
 /// observations about the distribution of peers within a particular arc, used
@@ -24,9 +24,9 @@ impl PeerView {
     pub fn update_arc(&self, dht_arc: &mut DhtArc) -> bool {
         match self {
             Self::Quantized(v) => {
-                let mut arq = Arq::from_dht_arc_approximate(&v.topo, &v.strat, dht_arc);
-                let updated = v.update_arq(&v.topo, &mut arq);
-                *dht_arc = arq.to_dht_arc(&v.topo);
+                let mut arq = ArqLoc::from_dht_arc_approximate(v.topo.clone(), &v.strat, dht_arc);
+                let updated = v.update_arq(&mut arq);
+                *dht_arc = arq.to_dht_arc();
                 updated
             }
         }
@@ -39,10 +39,10 @@ pub struct PeerViewQ {
     strat: ArqStrat,
 
     /// The topology of the network space
-    pub topo: Topology,
+    pub topo: Topo,
 
     /// The peers in this view (TODO: replace with calculated values)
-    peers: Vec<Arq>,
+    peers: Vec<ArqLoc>,
 
     #[cfg(feature = "test_utils")]
     /// Omit the arq at this index from all peer considerations.
@@ -53,7 +53,7 @@ pub struct PeerViewQ {
 
 impl PeerViewQ {
     /// Constructor
-    pub fn new(topo: Topology, strat: ArqStrat, peers: Vec<Arq>) -> Self {
+    pub fn new(topo: Topo, strat: ArqStrat, peers: Vec<ArqLoc>) -> Self {
         Self {
             strat,
             topo,
@@ -68,11 +68,11 @@ impl PeerViewQ {
     ///       So, it's more useful for testing. Probably want to tease out some
     ///       concept of a test DHT from this.
     pub fn actual_coverage(&self) -> f64 {
-        actual_coverage(&self.topo, self.peers.iter())
+        actual_coverage(self.peers.iter())
     }
 
     /// Extrapolate the coverage of the entire network from our local view.
-    pub fn extrapolated_coverage(&self, filter: &Arq) -> f64 {
+    pub fn extrapolated_coverage(&self, filter: &ArqLoc) -> f64 {
         self.extrapolated_coverage_and_filtered_count(filter).0
     }
 
@@ -82,8 +82,8 @@ impl PeerViewQ {
     ///
     /// TODO: this probably will be rewritten when PeerView is rewritten to
     /// have the filter baked in.
-    pub fn extrapolated_coverage_and_filtered_count(&self, filter: &Arq) -> (f64, usize) {
-        let filter = filter.to_dht_arc(&self.topo);
+    pub fn extrapolated_coverage_and_filtered_count(&self, filter: &ArqLoc) -> (f64, usize) {
+        let filter = filter.to_dht_arc();
         if filter.is_empty() {
             // More accurately this would be 0, but it's handy to not have
             // divide-by-zero crashes
@@ -104,21 +104,21 @@ impl PeerViewQ {
         let (sum, count) = self
             .filtered_arqs(filter)
             .fold(initial, |(sum, count), arq| {
-                (sum + arq.absolute_length(&self.topo), count + 1)
+                (sum + arq.absolute_length(), count + 1)
             });
         let cov = sum as f64 / filter_len as f64;
         (cov, count)
     }
 
     /// Compute the total coverage observed within the filter interval.
-    pub fn raw_coverage(&self, filter: &Arq) -> f64 {
-        self.extrapolated_coverage(filter) * filter.to_dht_arc_range(&self.topo).length() as f64
+    pub fn raw_coverage(&self, filter: &ArqLoc) -> f64 {
+        self.extrapolated_coverage(filter) * filter.to_dht_arc_range().length() as f64
             / 2f64.powf(32.0)
     }
 
     /// Mutate the arq to its ideal target
-    pub fn update_arq(&self, topo: &Topology, arq: &mut Arq) -> bool {
-        self.update_arq_with_stats(topo, arq).changed
+    pub fn update_arq(&self, arq: &mut ArqLoc) -> bool {
+        self.update_arq_with_stats(arq).changed
     }
 
     fn is_slacking(&self, cov: f64, num_peers: usize) -> bool {
@@ -221,13 +221,13 @@ impl PeerViewQ {
     /// More detail on these assumptions here:
     /// <https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g>
     /// TODO: make the above link to something publicly available, preferably in the repo
-    pub fn update_arq_with_stats(&self, topo: &Topology, arq: &mut Arq) -> UpdateArqStats {
+    pub fn update_arq_with_stats(&self, arq: &mut ArqLoc) -> UpdateArqStats {
         let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(arq);
 
         let old_count = arq.count();
         let old_power = arq.power();
 
-        let power_stats = self.power_stats(topo, arq);
+        let power_stats = self.power_stats(arq);
         let PowerStats {
             median: median_power,
             ..
@@ -245,7 +245,7 @@ impl PeerViewQ {
         };
 
         if new_count != old_count {
-            let mut tentative = *arq;
+            let mut tentative = arq.clone();
             tentative.count = SpaceOffset(new_count);
 
             // If shrinking caused us to go below the target coverage,
@@ -273,7 +273,7 @@ impl PeerViewQ {
 
         let power_above_min = |pow| {
             // not already at the minimum
-            pow > topo.min_space_power()
+            pow > self.topo.min_space_power()
              // don't power down if power is already too low
              && (median_power as i8 - pow as i8) < self.strat.max_power_diff as i8
         };
@@ -295,7 +295,7 @@ impl PeerViewQ {
 
         let power_below_max = |pow| {
             // not already at the maximum
-            pow < topo.max_space_power(&self.strat)
+            pow < self.topo.max_space_power(&self.strat)
             // don't power up if power is already too high
             && (pow as i8 - median_power as i8) < self.strat.max_power_diff as i8
         };
@@ -325,8 +325,8 @@ impl PeerViewQ {
             }
         }
 
-        if is_full(topo, arq.power(), arq.count()) {
-            *arq = Arq::new_full(topo, arq.start_loc(), arq.power());
+        if is_full(&self.topo, arq.power(), arq.count()) {
+            *arq = ArqLoc::new_full(self.topo.clone(), arq.start_loc(), arq.power());
         }
 
         // check if anything changed
@@ -342,10 +342,10 @@ impl PeerViewQ {
 
     /// Gather statistics about the power levels of all arqs in this view.
     /// Used to make inferences about what your neighbors are up to.
-    pub fn power_stats(&self, topo: &Topology, filter: &Arq) -> PowerStats {
+    pub fn power_stats(&self, filter: &ArqLoc) -> PowerStats {
         use statrs::statistics::*;
         let mut powers: Vec<_> = self
-            .filtered_arqs(filter.to_dht_arc(topo))
+            .filtered_arqs(filter.to_dht_arc())
             .filter(|a| *a.count > 0)
             .map(|a| a.power as f64)
             .collect();
@@ -359,7 +359,7 @@ impl PeerViewQ {
         PowerStats { median, std_dev }
     }
 
-    fn filtered_arqs(&self, filter: DhtArc) -> impl Iterator<Item = &Arq> {
+    fn filtered_arqs(&self, filter: DhtArc) -> impl Iterator<Item = &ArqLoc> {
         let it = self.peers.iter();
 
         #[cfg(feature = "test_utils")]
@@ -387,9 +387,9 @@ pub struct UpdateArqStats {
 
 /// The actual coverage provided by these peers. Assumes that this is the
 /// entire view of the DHT, all peers are accounted for here.
-pub fn actual_coverage<'a, P: Iterator<Item = &'a Arq>>(topo: &Topology, peers: P) -> f64 {
+pub fn actual_coverage<'a, P: Iterator<Item = &'a ArqLoc>>(peers: P) -> f64 {
     peers
-        .map(|a| a.absolute_length(topo) as f64 / 2f64.powf(32.0))
+        .map(|a| a.absolute_length() as f64 / 2f64.powf(32.0))
         .sum()
 }
 
@@ -416,7 +416,7 @@ mod tests {
 
     use super::*;
 
-    fn make_arq(topo: &Topology, pow: u8, lo: u32, hi: u32) -> Arq {
+    fn make_arq(topo: Topo, pow: u8, lo: u32, hi: u32) -> ArqLoc {
         let (a, _) = ArqBounds::from_interval_rounded(
             topo,
             pow,
@@ -425,30 +425,36 @@ mod tests {
                 ((pow2(pow) as u64 * hi as u64) as u32).wrapping_sub(1),
             ),
         );
-        a.to_arq(topo, identity)
+        a.to_arq(identity)
     }
 
     #[test]
     fn test_filtered_arqs() {
         let topo = Topology::unit_zero();
         let pow = 25;
-        let a = make_arq(&topo, pow, 0, 0x20);
-        let b = make_arq(&topo, pow, 0x10, 0x30);
-        let c = make_arq(&topo, pow, 0x20, 0x40);
+        let a = make_arq(topo.clone(), pow, 0, 0x20);
+        let b = make_arq(topo.clone(), pow, 0x10, 0x30);
+        let c = make_arq(topo.clone(), pow, 0x20, 0x40);
 
-        let arqs = vec![a, b, c];
-        print_arqs(&topo, &arqs, 64);
+        let arqs = vec![a.clone(), b.clone(), c.clone()];
+        print_arqs(&arqs, 64);
         let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
 
-        let get = |b: Arq| {
-            view.filtered_arqs(b.to_dht_arc(&topo))
+        let get = |b: ArqLoc| {
+            view.filtered_arqs(b.to_dht_arc())
                 .cloned()
                 .collect::<Vec<_>>()
         };
-        assert_eq!(get(make_arq(&topo, pow, 0, 0x10)), vec![a]);
-        assert_eq!(get(make_arq(&topo, pow, 0, 0x20)), vec![a, b]);
-        assert_eq!(get(make_arq(&topo, pow, 0, 0x40)), vec![a, b, c]);
-        assert_eq!(get(make_arq(&topo, pow, 0x10, 0x20)), vec![b]);
+        assert_eq!(get(make_arq(topo.clone(), pow, 0, 0x10)), vec![a.clone()]);
+        assert_eq!(
+            get(make_arq(topo.clone(), pow, 0, 0x20)),
+            vec![a.clone(), b.clone()]
+        );
+        assert_eq!(
+            get(make_arq(topo.clone(), pow, 0, 0x40)),
+            vec![a.clone(), b.clone(), c.clone()]
+        );
+        assert_eq!(get(make_arq(topo.clone(), pow, 0x10, 0x20)), vec![b]);
     }
 
     #[test]
@@ -457,27 +463,27 @@ mod tests {
         let pow = 24;
         let arqs: Vec<_> = (0..0x100)
             .step_by(0x10)
-            .map(|x| make_arq(&topo, pow, x, x + 0x20))
+            .map(|x| make_arq(topo.clone(), pow, x, x + 0x20))
             .collect();
-        print_arqs(&topo, &arqs, 64);
+        print_arqs(&arqs, 64);
         let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(&topo, pow, 0, 0x10)),
+            view.extrapolated_coverage_and_filtered_count(&make_arq(topo.clone(), pow, 0, 0x10)),
             (2.0, 1)
         );
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(&topo, pow, 0, 0x20)),
+            view.extrapolated_coverage_and_filtered_count(&make_arq(topo.clone(), pow, 0, 0x20)),
             (2.0, 2)
         );
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(&topo, pow, 0, 0x40)),
+            view.extrapolated_coverage_and_filtered_count(&make_arq(topo.clone(), pow, 0, 0x40)),
             (2.0, 4)
         );
 
         // TODO: when changing PeerView logic to bake in the filter,
         // this will probably change
         assert_eq!(
-            view.extrapolated_coverage_and_filtered_count(&make_arq(&topo, pow, 0x10, 0x20)),
+            view.extrapolated_coverage_and_filtered_count(&make_arq(topo.clone(), pow, 0x10, 0x20)),
             (2.0, 1)
         );
     }

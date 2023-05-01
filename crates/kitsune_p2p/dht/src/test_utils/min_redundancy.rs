@@ -8,7 +8,7 @@ const ERROR_MARGIN: f64 = 0.0000000001;
 /// Check a set of peers the actual redundancy across all peers.
 /// This can tell if there is bad distribution.
 /// Note this function is only used for verification in tests at this time.
-pub fn calc_min_redundancy(topo: &Topology, peers: Vec<Arq>) -> u32 {
+pub fn calc_min_redundancy(peers: Vec<ArqLoc>) -> u32 {
     use std::collections::HashSet;
     #[derive(Clone, Copy, Debug)]
     enum Side {
@@ -25,8 +25,8 @@ pub fn calc_min_redundancy(topo: &Topology, peers: Vec<Arq>) -> u32 {
     // Turn each arc into a side with a unique id that is
     // shared by both sides.
     let mut id = 0;
-    let mut sides = |arq: &Arq| {
-        let (left, right) = arq.to_edge_locs(topo);
+    let mut sides = |arq: &ArqLoc| {
+        let (left, right) = arq.to_edge_locs();
         let i = id;
         let l = Arm {
             id: i,
@@ -48,7 +48,7 @@ pub fn calc_min_redundancy(topo: &Topology, peers: Vec<Arq>) -> u32 {
     let peers: Vec<_> = peers
         .into_iter()
         .filter(|a| {
-            if (a.coverage(topo) - 1.0).abs() < ERROR_MARGIN {
+            if (a.coverage() - 1.0).abs() < ERROR_MARGIN {
                 full_r += 1;
                 false
             } else {
