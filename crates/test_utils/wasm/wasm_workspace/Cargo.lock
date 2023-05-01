@@ -743,7 +743,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.2.0-beta-rc.0"
+version = "0.2.0"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -942,7 +942,7 @@ dependencies = [
 
 [[package]]
 name = "hdi"
-version = "0.3.0-beta-rc.5"
+version = "0.3.0"
 dependencies = [
  "hdk_derive",
  "holo_hash",
@@ -957,7 +957,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0"
 dependencies = [
  "getrandom",
  "hdi",
@@ -976,7 +976,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0"
 dependencies = [
  "darling 0.14.4",
  "heck 0.4.1",
@@ -1035,7 +1035,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "holo_hash"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0"
 dependencies = [
  "arbitrary",
  "base64",
@@ -1044,6 +1044,7 @@ dependencies = [
  "fixt",
  "futures",
  "holochain_serialized_bytes",
+ "holochain_wasmer_common",
  "kitsune_p2p_dht_arc",
  "must_future",
  "rand 0.8.5",
@@ -1054,7 +1055,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.2.0-beta-rc.5"
+version = "0.2.0"
 dependencies = [
  "arbitrary",
  "holo_hash",
@@ -1103,7 +1104,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0"
 dependencies = [
  "hdk",
  "serde",
@@ -1140,7 +1141,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.2.0-beta-rc.6"
+version = "0.2.0"
 dependencies = [
  "derive_builder",
  "fixt",
@@ -1289,7 +1290,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bin_data"
-version = "0.2.0-beta-rc.3"
+version = "0.2.0"
 dependencies = [
  "base64",
  "derive_more",
@@ -1301,7 +1302,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_block"
-version = "0.2.0-beta-rc.4"
+version = "0.2.0"
 dependencies = [
  "kitsune_p2p_bin_data",
  "kitsune_p2p_timestamp",
@@ -1311,7 +1312,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht"
-version = "0.2.0-beta-rc.3"
+version = "0.2.0"
 dependencies = [
  "colored",
  "derivative",
@@ -1333,7 +1334,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_dht_arc"
-version = "0.2.0-beta-rc.3"
+version = "0.2.0"
 dependencies = [
  "derive_more",
  "gcollections",
@@ -1344,7 +1345,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_timestamp"
-version = "0.2.0-beta-rc.2"
+version = "0.2.0"
 dependencies = [
  "arbitrary",
  "chrono",

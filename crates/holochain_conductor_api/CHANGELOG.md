@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor beta-rc
+default_semver_increment_mode: !pre_minor beta-dev
 ---
 # Changelog
 
@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - Add links to concepts documentation to the conductor API module.
+
+## 0.2.0
 
 ## 0.2.0-beta-rc.7
 
