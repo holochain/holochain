@@ -27,7 +27,6 @@ use holochain_p2p::{
     dht::{
         arq::{power_and_count_from_length, ArqSet},
         hash::RegionHash,
-        prelude::Topology,
         region::{RegionBounds, RegionData},
         region_set::{RegionCoordSetLtcs, RegionSetLtcs},
         spacetime::TelescopingTimes,

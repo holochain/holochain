@@ -31,7 +31,8 @@ impl RegionCoordSetLtcs<()> {
         }
     }
 
-    pub fn topo(mut self, topo: Topo) -> RegionCoordSetLtcs<Topo> {
+    /// Attach a topology
+    pub fn topo(self, topo: Topo) -> RegionCoordSetLtcs<Topo> {
         RegionCoordSetLtcs {
             times: self.times,
             arq_set: self.arq_set.topo(topo),
@@ -40,6 +41,7 @@ impl RegionCoordSetLtcs<()> {
 }
 
 impl<T: Clone + PartialEq> RegionCoordSetLtcs<T> {
+    /// Constructor
     pub fn new(times: TelescopingTimes, arq_set: ArqSet<T>) -> Self {
         Self { times, arq_set }
     }
@@ -120,6 +122,7 @@ impl<T: Clone + PartialEq> RegionCoordSetLtcs<T> {
             * nt
     }
 
+    /// Erase topology info
     pub fn sans(self) -> RegionCoordSetLtcs<()> {
         RegionCoordSetLtcs {
             arq_set: self.arq_set.sans(),
@@ -128,7 +131,8 @@ impl<T: Clone + PartialEq> RegionCoordSetLtcs<T> {
     }
 }
 
-pub type RegionSetLtcsSans<D: RegionDataConstraints = RegionData> = RegionSetLtcs<D, ()>;
+/// Region set with no topology attached
+pub type RegionSetLtcsSans<D = RegionData> = RegionSetLtcs<D, ()>;
 
 /// Implementation for the compact LTCS region set format which gets sent over the wire.
 /// The coordinates for the regions are specified by a few values.

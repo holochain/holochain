@@ -6,7 +6,6 @@ mod common;
 
 use kitsune_p2p_dht::arq::print_arq;
 use kitsune_p2p_dht::prelude::ArqLocTopo;
-use kitsune_p2p_dht::prelude::Topo;
 use kitsune_p2p_dht::spacetime::Topology;
 use kitsune_p2p_dht::*;
 

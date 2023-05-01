@@ -16,7 +16,7 @@ use kitsune_p2p_fetch::{FetchPool, FetchPoolReader, FetchSource, OpHashSized};
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
-use kitsune_p2p_types::dht::region::{Region, RegionData};
+use kitsune_p2p_types::dht::region::Region;
 use kitsune_p2p_types::dht::region_set::{RegionSetLtcs, RegionSetLtcsSans};
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;

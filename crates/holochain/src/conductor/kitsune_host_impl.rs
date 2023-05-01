@@ -10,7 +10,7 @@ use super::{ribosome_store::RibosomeStore, space::Spaces};
 use futures::FutureExt;
 use holo_hash::DnaHash;
 use holochain_p2p::{
-    dht::{prelude::Topo, spacetime::Topology, ArqStrat},
+    dht::{prelude::Topo, ArqStrat},
     DnaHashExt,
 };
 use holochain_sqlite::prelude::AsP2pStateTxExt;
@@ -22,7 +22,7 @@ use holochain_types::{
 use holochain_zome_types::Timestamp;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
-    event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
+    event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostError, KitsuneHostResult,
 };
 use kitsune_p2p_types::{
     config::KitsuneP2pTuningParams, dependencies::lair_keystore_api, KOpData, KOpHash,
@@ -167,7 +167,7 @@ impl KitsuneHost for KitsuneHostImpl {
     ) -> KitsuneHostResult<holochain_p2p::dht::region_set::RegionSetLtcs> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
-            let topology = self.get_topology(space.clone()).await?;
+            let topology = self.get_topology(space.clone())?;
             let db = self.spaces.dht_db(&dna_hash)?;
             let region_set =
                 query_region_set::query_region_set(db, topology.clone(), &self.strat, dht_arc_set)

@@ -2,13 +2,9 @@
 
 use kitsune_p2p_dht_arc::DhtArcSet;
 
-use crate::{
-    arq::ArqBounds,
-    spacetime::{SpaceOffset, Topology},
-    ArqStrat,
-};
+use crate::{arq::ArqBounds, ArqStrat};
 
-use super::{power_and_count_from_length, ArqBoundsSans, ArqImpl, ArqLoc, ArqStart, Topo};
+use super::{power_and_count_from_length, ArqBoundsSans, ArqImpl, ArqStart, Topo};
 
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
@@ -38,9 +34,12 @@ pub struct NonEmptyArqSet<T = Topo> {
     topo: T,
 }
 
+/// A set of Arqs with the same topology and same power level
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
 pub enum ArqSet<T = Topo> {
+    /// An empty set (contains no power info)
     Empty([ArqBoundsSans; 0], T),
+    /// A non-empty set
     NonEmpty(NonEmptyArqSet<T>),
 }
 
@@ -97,6 +96,7 @@ impl NonEmptyArqSet<Topo> {
         )
     }
 
+    /// Accessor for topology
     pub fn topo(&self) -> Topo {
         self.topo.clone()
     }
@@ -131,7 +131,7 @@ impl<T: Clone + PartialEq> ArqSet<T> {
     /// Map over the nonempty variant
     pub fn nonempty<R>(&self, f: impl FnOnce(&NonEmptyArqSet<T>) -> R) -> Option<R> {
         match self {
-            Self::Empty(_, t) => None,
+            Self::Empty(_, _) => None,
             Self::NonEmpty(set) => Some(f(set)),
         }
     }
@@ -139,7 +139,7 @@ impl<T: Clone + PartialEq> ArqSet<T> {
     /// Erase topology info
     pub fn sans(self) -> ArqSet<()> {
         match self {
-            Self::Empty(v, t) => ArqSet::Empty(v, ()),
+            Self::Empty(v, _) => ArqSet::Empty(v, ()),
             Self::NonEmpty(s) => ArqSet::NonEmpty(NonEmptyArqSet {
                 arqs: s.arqs,
                 power: s.power,
@@ -150,6 +150,7 @@ impl<T: Clone + PartialEq> ArqSet<T> {
 }
 
 impl ArqSet<()> {
+    /// Attach a topology
     pub fn topo(self, topo: Topo) -> ArqSet<Topo> {
         match self {
             Self::Empty(v, ()) => ArqSet::Empty(v, topo),
@@ -171,7 +172,7 @@ impl ArqSet {
     /// Get a reference to the arq set's arqs.
     pub fn arqs(&self) -> Vec<ArqBounds> {
         match self {
-            Self::Empty(_, t) => vec![],
+            Self::Empty(_, _) => vec![],
             Self::NonEmpty(s) => s.iter().map(|a| a.topo(s.topo.clone())).collect(),
         }
     }
@@ -199,6 +200,7 @@ impl ArqSet {
         .unwrap_or_else(|| Some(self.clone()))
     }
 
+    /// Accessor for topology
     pub fn topo(&self) -> Topo {
         match self {
             ArqSet::Empty(_, topo) => topo.clone(),
@@ -251,7 +253,7 @@ impl ArqSet {
                     );
                 }
             }
-            ArqSet::Empty(_, t) => println!("[empty ArqSet]"),
+            ArqSet::Empty(_, _) => println!("[empty ArqSet]"),
         }
     }
 
@@ -321,7 +323,7 @@ pub fn print_arqs<S: ArqStart>(arqs: &[ArqImpl<S, Topo>], len: usize) {
 #[cfg(test)]
 mod tests {
 
-    use crate::prelude::{pow2, ArqLocTopo};
+    use crate::prelude::{pow2, ArqLocTopo, SpaceOffset, Topology};
 
     use super::*;
 

@@ -3,7 +3,6 @@
 
 use kitsune_p2p_dht::arq::PeerStrat;
 use kitsune_p2p_dht::prelude::Topo;
-use kitsune_p2p_dht::spacetime::Topology;
 use kitsune_p2p_dht::test_utils::get_input;
 use kitsune_p2p_dht_arc::*;
 use rand::prelude::StdRng;

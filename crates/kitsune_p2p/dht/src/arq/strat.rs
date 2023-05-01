@@ -1,7 +1,5 @@
 use kitsune_p2p_dht_arc::DhtArc;
 
-use crate::spacetime::Topology;
-
 use super::{ArqLoc, PeerView, PeerViewQ, Topo};
 
 /// A Strategy for generating PeerViews.

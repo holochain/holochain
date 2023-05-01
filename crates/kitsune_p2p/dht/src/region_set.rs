@@ -99,7 +99,7 @@ mod tests {
         persistence::*,
         prelude::{ArqBoundsSans, ArqImpl, ArqLocTopo, ArqSet, ArqStart, Topo},
         test_utils::{Op, OpData, OpStore},
-        ArqBounds, ArqLoc, Loc,
+        Loc,
     };
 
     use super::*;

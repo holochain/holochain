@@ -1,7 +1,7 @@
 use kitsune_p2p_dht_arc::DhtArc;
 use num_traits::Zero;
 
-use crate::spacetime::{SpaceOffset, Topology};
+use crate::spacetime::SpaceOffset;
 
 use super::{is_full, ArqLoc, ArqStrat, Topo};
 

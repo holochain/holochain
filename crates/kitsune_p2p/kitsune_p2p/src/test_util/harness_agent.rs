@@ -101,7 +101,6 @@ use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
 use kitsune_p2p_types::dht::prelude::{RegionSetLtcs, Topo};
-use kitsune_p2p_types::dht::region_set::RegionSetLtcsSans;
 use kitsune_p2p_types::dht::spacetime::Topology;
 use kitsune_p2p_types::dht::PeerStrat;
 use kitsune_p2p_types::dht_arc::DhtArcSet;

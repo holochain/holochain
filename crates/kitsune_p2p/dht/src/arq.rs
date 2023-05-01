@@ -134,16 +134,23 @@ pub struct ArqImpl<S, T> {
     pub topo: T,
 }
 
+/// Alias
 pub type Topo = Arc<Topology>;
 
+/// An Arq with a definite specified start DhtLocation, and Topology attached
 pub type ArqLoc = ArqImpl<Loc, Topo>;
+/// An Arq with an indefinite start DhtLocation, and Topology attached
 pub type ArqBounds<T = Topo> = ArqImpl<SpaceOffset, T>;
 
-pub type ArqLocTopo = ArqImpl<Loc, Topo>;
-pub type ArqBoundsTopo = ArqImpl<SpaceOffset, Topo>;
-
+/// An Arq with a definite specified start DhtLocation, and no Topology attached
 pub type ArqLocSans = ArqImpl<Loc, ()>;
+/// An Arq with an indefinite start DhtLocation, and no Topology attached
 pub type ArqBoundsSans = ArqImpl<SpaceOffset, ()>;
+
+/// Alias for ArqLoc
+pub type ArqLocTopo = ArqImpl<Loc, Topo>;
+/// Alias for ArqBounds
+pub type ArqBoundsTopo = ArqImpl<SpaceOffset, Topo>;
 
 //
 //  █████  █████             ███                                                   ████

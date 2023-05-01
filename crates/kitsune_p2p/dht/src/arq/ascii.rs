@@ -2,9 +2,9 @@
 
 use kitsune_p2p_dht_arc::DhtArcRange;
 
-use crate::{spacetime::Topology, Loc};
+use crate::Loc;
 
-use super::{ArqImpl, ArqLoc, ArqStart, Topo};
+use super::{ArqImpl, ArqStart, Topo};
 
 /// Scale a number in a smaller space (specified by `len`) up into the `u32` space.
 /// The number to scale can be negative, which is wrapped to a positive value via modulo

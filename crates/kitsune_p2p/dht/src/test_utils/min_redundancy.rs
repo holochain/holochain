@@ -1,6 +1,6 @@
 use std::num::Wrapping;
 
-use crate::{arq::*, spacetime::Topology};
+use crate::arq::*;
 
 /// Margin of error for floating point comparisons
 const ERROR_MARGIN: f64 = 0.0000000001;

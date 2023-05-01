@@ -13,7 +13,6 @@ pub use op_store::*;
 pub use test_node::*;
 
 use crate::arq::*;
-use crate::spacetime::Topology;
 
 use kitsune_p2p_dht_arc::DhtLocation as Loc;
 use rand::prelude::StdRng;
@@ -149,6 +148,8 @@ pub fn generate_messy_coverage(
 
 #[test]
 fn test_unit_arc() {
+    use crate::prelude::Topology;
+
     let topo = Topology::unit_zero();
     let strat = ArqStrat {
         min_coverage: 10.0,
@@ -197,6 +198,7 @@ fn test_unit_arc() {
 #[cfg(test)]
 mod tests {
     use crate::arq::PeerViewQ;
+    use crate::prelude::Topology;
 
     use super::*;
     use proptest::proptest;
