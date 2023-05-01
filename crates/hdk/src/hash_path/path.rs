@@ -261,11 +261,12 @@ impl From<String> for Path {
 impl TryInto<String> for Path {
     type Error = SerializedBytesError;
     fn try_into(self) -> Result<String, Self::Error> {
-        let s = self.as_ref()
-            .into_iter()
-            .map(|c| String::try_from(c))
+        let s = self
+            .as_ref()
+            .iter()
+            .map(String::try_from)
             .collect::<Result<Vec<String>, Self::Error>>()?;
-        
+
         Ok(s.join(DELIMITER))
     }
 }
@@ -599,8 +600,5 @@ fn hash_path_path() {
     }
 
     let path_to_string: String = Path::from("foo.a.b.c.abcdef.bar").try_into().unwrap();
-    assert_eq!(
-        String::from("foo.a.b.c.abcdef.bar"),
-        path_to_string,
-    );
+    assert_eq!(String::from("foo.a.b.c.abcdef.bar"), path_to_string,);
 }
