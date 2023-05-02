@@ -685,7 +685,7 @@ impl MetaNet {
                 let evt = match evt {
                     Ok(evt) => evt,
                     Err(err) => {
-                        tracing::debug!(?err, "tx5 err event");
+                        tracing::error!(?err, "tx5 err event");
                         continue;
                     }
                 };
