@@ -103,7 +103,7 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
-use holochain_types::prelude::{test_keystore, wasm, *};
+use holochain_types::prelude::{wasm, *};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::Transaction;
@@ -120,12 +120,15 @@ use crate::core::queue_consumer::QueueTriggers;
 pub use holochain_types::share;
 
 mod builder;
+
 pub use builder::*;
 
 mod chc;
+
 pub use chc::*;
 
 mod conductor_services;
+
 pub use conductor_services::*;
 
 pub use accessor_impls::*;
@@ -354,7 +357,6 @@ mod startup_shutdown_impls {
 
 /// Methods related to conductor interfaces
 mod interface_impls {
-
     use super::*;
 
     impl Conductor {
@@ -486,7 +488,6 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
-
     use super::*;
 
     impl Conductor {
@@ -864,7 +865,6 @@ mod network_impls {
                 let current_number_of_peers = conn.p2p_count_agents()?;
 
                 // query arc size and extrapolated coverage and estimate total peers
-                let cell_id = CellId::new(dna.as_hash().clone(), agent_pub_key.clone());
                 let (arc_size, total_network_peers) = match conn
                     .p2p_get_agent(&KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()))?
                 {
@@ -898,7 +898,7 @@ mod network_impls {
                         .map_err(DatabaseError::SqliteError)
                 };
                 let dht_db = self
-                    .get_dht_db(dna)
+                    .get_or_create_dht_db(dna)
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let dht_bytes_received = dht_db
                     .async_reader({
@@ -913,8 +913,7 @@ mod network_impls {
                     .await?;
 
                 let cache_db = self
-                    .get_cache_db(&cell_id)
-                    .await
+                    .get_or_create_cache_db(dna)
                     .map_err(|err| ConductorError::Other(Box::new(err)))?;
                 let cache_bytes_received = cache_db
                     .async_reader(move |txn| {
@@ -1281,9 +1280,10 @@ mod network_impls {
 
 /// Methods related to app installation and management
 mod app_impls {
-
     use super::*;
+
     impl Conductor {
+        #[cfg(feature = "test_utils")]
         pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
@@ -1507,6 +1507,7 @@ mod app_impls {
 /// Methods related to cell access
 mod cell_impls {
     use super::*;
+
     impl Conductor {
         pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
@@ -1859,31 +1860,31 @@ mod app_status_impls {
             use holochain_p2p::AgentPubKeyExt;
 
             let tasks = self
-            .mark_pending_cells_as_joining()
-            .into_iter()
-            .map(|(cell_id, cell)| async move {
-                let p2p_agents_db = cell.p2p_agents_db().clone();
-                let kagent = cell_id.agent_pubkey().to_kitsune();
-                let maybe_agent_info = match p2p_agents_db.async_reader(move |tx| {
-                    tx.p2p_get_agent(&kagent)
-                }).await {
-                    Ok(maybe_info) => maybe_info,
-                    _ => None,
-                };
-                let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
-                let network = cell.holochain_p2p_dna().clone();
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
-                    Ok(Err(e)) => {
-                        tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
-                        Err(cell_id)
+                .mark_pending_cells_as_joining()
+                .into_iter()
+                .map(|(cell_id, cell)| async move {
+                    let p2p_agents_db = cell.p2p_agents_db().clone();
+                    let kagent = cell_id.agent_pubkey().to_kitsune();
+                    let maybe_agent_info = match p2p_agents_db.async_reader(move |tx| {
+                        tx.p2p_get_agent(&kagent)
+                    }).await {
+                        Ok(maybe_info) => maybe_info,
+                        _ => None,
+                    };
+                    let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
+                    let network = cell.holochain_p2p_dna().clone();
+                    match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
+                        Ok(Err(e)) => {
+                            tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
+                            Err(cell_id)
+                        }
+                        Err(_) => {
+                            tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
+                            Err(cell_id)
+                        }
+                        Ok(Ok(_)) => Ok(cell_id),
                     }
-                    Err(_) => {
-                        tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                        Err(cell_id)
-                    }
-                    Ok(Ok(_)) => Ok(cell_id),
-                }
-            });
+                });
 
             let maybes: Vec<_> = futures::stream::iter(tasks)
                 .buffer_unordered(100)
@@ -2105,9 +2106,10 @@ mod misc_impls {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
             let source_chain = SourceChain::new(
-                self.get_authored_db(cell_id.dna_hash())?,
-                self.get_dht_db(cell_id.dna_hash())?,
-                self.get_dht_db_cache(cell_id.dna_hash())?,
+                self.get_or_create_authored_db(cell_id.dna_hash())?,
+                self.get_or_create_dht_db(cell_id.dna_hash())?,
+                self.get_or_create_space(cell_id.dna_hash())?
+                    .dht_query_cache,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
             )
@@ -2331,6 +2333,13 @@ mod accessor_impls {
             self.spaces.dht_db(dna_hash)
         }
 
+        pub(crate) fn get_or_create_cache_db(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> DatabaseResult<DbWrite<DbKindCache>> {
+            self.spaces.cache(dna_hash)
+        }
+
         pub(crate) fn p2p_agents_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pAgents> {
             self.spaces
                 .p2p_agents_db(hash)
@@ -2346,6 +2355,7 @@ mod accessor_impls {
                 .expect("failed to get p2p_batch_sender")
         }
 
+        #[cfg(feature = "test_utils")]
         pub(crate) fn p2p_metrics_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
             self.spaces
                 .p2p_metrics_db(hash)
@@ -2882,10 +2892,10 @@ pub async fn integration_dump(
                 |row| row.get(0),
             )?;
             let integration_limbo = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
-            [],
-            |row| row.get(0),
-        )?;
+                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
+                [],
+                |row| row.get(0),
+            )?;
             let validation_limbo = txn.query_row(
                 "
                 SELECT count(hash) FROM DhtOp
@@ -3015,7 +3025,7 @@ async fn p2p_event_task(
                 }
                 num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             }
-            .in_current_span()
+                .in_current_span()
         })
         .await;
 
