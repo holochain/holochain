@@ -23,7 +23,7 @@ the tests the same way the CI does.
 
 ### Verifying changes and reproducing issues
 
-If you are able to create a [sweettest](https://github.com/holochain/holochain/tree/develop/crates/holochain/src/sweettest) test case that reproduces an issue then that is a great way to make sure the issue stays fixed.
+If you are able to create a [sweettest](https://github.com/holochain/holochain/tree/develop/crates/holochain/src/sweettest) test case that reproduces an issue, then that is a great way to make sure the issue stays fixed.
 There are many tests written with this harness, so take a look at what's already there as a guide for writing new tests.
 
 Otherwise, you can test your changes or try to reproduce an issue manually using the `hc sandbox`. This tool is used to launch a `holochain` instance (conductor) that
