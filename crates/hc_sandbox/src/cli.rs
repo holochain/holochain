@@ -23,7 +23,7 @@ pub struct HcSandbox {
     #[structopt(long)]
     piped: bool,
     /// Force the admin port that hc uses to talk to holochain to a specific value.
-    /// For example `hc -f=9000,9001 run`
+    /// For example `hc sandbox -f=9000,9001 run`
     /// This must be set on each run or the port will change if it's in use.
     #[structopt(short, long, value_delimiter = ",")]
     force_admin_ports: Vec<u16>,
