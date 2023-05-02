@@ -998,7 +998,6 @@ impl InternalHandler for KitsuneP2pActor {
         let spaces = self.spaces.keys().cloned().collect::<Vec<_>>();
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
-            let mut known_peers = std::collections::HashSet::new();
             for space in spaces {
                 let q = crate::event::QueryAgentsEvt::new(space);
                 if let Ok(agent_list) = evt_sender.query_agents(q).await {
@@ -1006,12 +1005,11 @@ impl InternalHandler for KitsuneP2pActor {
                         for url in agent.url_list.iter() {
                             let url = kitsune_p2p_proxy::ProxyUrl::from(url.as_str());
                             let digest = url.digest();
-                            known_peers.insert(digest);
+                            tracing::debug!(target: "NDBG", ?digest, %url);
                         }
                     }
                 }
             }
-            tracing::debug!(target: "NDBG", ?known_peers);
             Ok(())
         }
         .boxed()
