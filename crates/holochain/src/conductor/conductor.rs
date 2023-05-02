@@ -127,10 +127,6 @@ mod chc;
 
 pub use chc::*;
 
-mod conductor_services;
-
-pub use conductor_services::*;
-
 pub use accessor_impls::*;
 pub use app_impls::*;
 pub use app_status_impls::*;
@@ -2075,13 +2071,6 @@ mod accessor_impls {
             dna_hash: &DnaHash,
         ) -> ConductorResult<DbWrite<DbKindDht>> {
             self.spaces.dht_db(dna_hash)
-        }
-
-        pub(crate) fn get_or_create_cache_db(
-            &self,
-            dna_hash: &DnaHash,
-        ) -> ConductorResult<DbWrite<DbKindCache>> {
-            self.spaces.cache(dna_hash)
         }
 
         pub(crate) fn p2p_agents_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pAgents> {
