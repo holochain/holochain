@@ -83,7 +83,7 @@ impl NonEmptyArqSet<Topo> {
             .iter()
             .map(|a| a.topo(self.topo.clone()).requantize(power))
             .collect::<Option<Vec<_>>>()
-            .map(|arqs| Self::new(arqs))
+            .map(Self::new)
     }
 
     /// Convert to a set of "continuous" arcs
@@ -185,7 +185,7 @@ impl ArqSet {
     /// Convert to a set of "continuous" arcs
     pub fn to_dht_arc_set(&self) -> DhtArcSet {
         self.nonempty(|s| s.to_dht_arc_set())
-            .unwrap_or_else(|| DhtArcSet::new_empty())
+            .unwrap_or_else(DhtArcSet::new_empty)
     }
 
     /// Requantize each arq in the set.
