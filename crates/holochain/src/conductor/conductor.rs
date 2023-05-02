@@ -103,7 +103,7 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
-use holochain_types::prelude::{test_keystore, wasm, *};
+use holochain_types::prelude::{wasm, *};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::Transaction;
@@ -120,10 +120,16 @@ use crate::core::queue_consumer::QueueTriggers;
 pub use holochain_types::share;
 
 mod builder;
+
 pub use builder::*;
 
 mod chc;
+
 pub use chc::*;
+
+mod conductor_services;
+
+pub use conductor_services::*;
 
 pub use accessor_impls::*;
 pub use app_impls::*;
@@ -347,7 +353,6 @@ mod startup_shutdown_impls {
 
 /// Methods related to conductor interfaces
 mod interface_impls {
-
     use super::*;
 
     impl Conductor {
@@ -479,7 +484,6 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
-
     use super::*;
 
     impl Conductor {
@@ -1012,9 +1016,10 @@ mod network_impls {
 
 /// Methods related to app installation and management
 mod app_impls {
-
     use super::*;
+
     impl Conductor {
+        #[cfg(feature = "test_utils")]
         pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
@@ -1238,6 +1243,7 @@ mod app_impls {
 /// Methods related to cell access
 mod cell_impls {
     use super::*;
+
     impl Conductor {
         pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
@@ -1853,9 +1859,10 @@ mod misc_impls {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
             let source_chain = SourceChain::new(
-                self.get_authored_db(cell_id.dna_hash())?,
-                self.get_dht_db(cell_id.dna_hash())?,
-                self.get_dht_db_cache(cell_id.dna_hash())?,
+                self.get_or_create_authored_db(cell_id.dna_hash())?,
+                self.get_or_create_dht_db(cell_id.dna_hash())?,
+                self.get_or_create_space(cell_id.dna_hash())?
+                    .dht_query_cache,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
             )
@@ -2070,6 +2077,13 @@ mod accessor_impls {
             self.spaces.dht_db(dna_hash)
         }
 
+        pub(crate) fn get_or_create_cache_db(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> ConductorResult<DbWrite<DbKindCache>> {
+            self.spaces.cache(dna_hash)
+        }
+
         pub(crate) fn p2p_agents_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pAgents> {
             self.spaces
                 .p2p_agents_db(hash)
@@ -2085,6 +2099,7 @@ mod accessor_impls {
                 .expect("failed to get p2p_batch_sender")
         }
 
+        #[cfg(feature = "test_utils")]
         pub(crate) fn p2p_metrics_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
             self.spaces
                 .p2p_metrics_db(hash)
@@ -2621,10 +2636,10 @@ pub async fn integration_dump(
                 |row| row.get(0),
             )?;
             let integration_limbo = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
-            [],
-            |row| row.get(0),
-        )?;
+                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
+                [],
+                |row| row.get(0),
+            )?;
             let validation_limbo = txn.query_row(
                 "
                 SELECT count(hash) FROM DhtOp
@@ -2754,7 +2769,7 @@ async fn p2p_event_task(
                 }
                 num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             }
-            .in_current_span()
+                .in_current_span()
         })
         .await;
 
