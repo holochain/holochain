@@ -89,18 +89,21 @@ mod test {
         let bob = bob_cell.zome(TestWasm::Create);
         // let carol = carol_cell.zome(TestWasm::Create);
 
+        use crate::prelude::KitsuneAgent;
         let alice_pubkey = alice_cell.cell_id().agent_pubkey();
         let bob_pubkey = bob_cell.cell_id().agent_pubkey();
+        let carol_pubkey = carol_cell.cell_id().agent_pubkey();
+
+        let alice_agent = KitsuneAgent(alice_pubkey.get_raw_32().to_vec());
+        let bob_agent = KitsuneAgent(bob_pubkey.get_raw_32().to_vec());
+        let carol_agent = KitsuneAgent(carol_pubkey.get_raw_32().to_vec());
+
+        dbg!(&alice_agent, bob_agent, carol_agent);
 
         // conductors.exchange_peer_info().await;
 
         conductors.reveal_peer_info(0, 1).await;
         conductors.reveal_peer_info(1, 0).await;
-
-        // conductors.reveal_peer_info(0, 2).await;
-        // conductors.reveal_peer_info(1, 2).await;
-        // conductors.reveal_peer_info(2, 0).await;
-        // conductors.reveal_peer_info(2, 1).await;
 
         let alice_conductor = conductors.get(0).unwrap();
         let bob_conductor = conductors.get(1).unwrap();
