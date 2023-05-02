@@ -23,14 +23,8 @@ pub struct HcSandbox {
     /// collect the passphrase by reading stdin to the end.
     #[arg(long)]
     piped: bool,
-<<<<<<< HEAD
-
-    /// Force the admin port that hc uses to talk to Holochain to a specific value.
-    /// For example `hc -f=9000,9001 run`
-=======
-    /// Force the admin port that hc uses to talk to holochain to a specific value.
+    /// Force the admin port(s) that hc uses to talk to Holochain to a specific value.
     /// For example `hc sandbox -f=9000,9001 run`
->>>>>>> develop
     /// This must be set on each run or the port will change if it's in use.
     #[arg(short, long, value_delimiter = ',')]
     force_admin_ports: Vec<u16>,

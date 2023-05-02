@@ -35,9 +35,9 @@ pub struct Create {
     #[arg(short, long, value_delimiter = ',')]
     pub directories: Vec<PathBuf>,
 
-    /// Launch holochain with an embedded lair server instead of a standalone process.
-    /// Use this option to run the sand-boxed conductors when you don't have access to the lair binary.
-    #[structopt(long)]
+    /// Launch Holochain with an embedded lair server instead of a standalone process.
+    /// Use this option to run the sandboxed conductors when you don't have access to the lair binary.
+    #[arg(long)]
     pub in_process_lair: bool,
 }
 
