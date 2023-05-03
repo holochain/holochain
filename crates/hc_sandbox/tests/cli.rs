@@ -6,7 +6,6 @@ use holochain_websocket::{
 };
 use matches::assert_matches;
 use once_cell::sync::Lazy;
-use portpicker::pick_unused_port;
 use proc_ctl::{PortQuery, ProcQuery, ProtocolPort};
 use std::future::Future;
 use std::path::PathBuf;
@@ -130,7 +129,6 @@ async fn generate_sandbox_and_connect() {
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run().ok();
-    let app_port: u16 = pick_unused_port().expect("No ports free");
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -140,7 +138,7 @@ async fn generate_sandbox_and_connect() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg(format!("--run={}", app_port))
+        .arg("--run=0")
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
@@ -167,7 +165,6 @@ async fn generate_sandbox_and_call_list_dna() {
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run().ok();
-    let app_port: u16 = pick_unused_port().expect("No ports free");
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -177,7 +174,7 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg(format!("--run={}", app_port))
+        .arg("--run=0")
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
@@ -257,7 +254,7 @@ async fn get_holochain_pid_from_sandbox(hc_pid: u32) -> u32 {
     ProcQuery::new()
         .process_id(hc_pid)
         .expect_min_num_children(1)
-        .children_with_retry(Duration::from_millis(1000), 10)
+        .children_with_retry(Duration::from_millis(1000), 30)
         .await
         .unwrap()
         .into_iter()
