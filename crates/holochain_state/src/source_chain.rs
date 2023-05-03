@@ -73,8 +73,8 @@ use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
-use holochain_zome_types::EntryType;
 use holochain_sqlite::rusqlite;
+use holochain_zome_types::EntryType;
 
 mod error;
 
@@ -209,7 +209,7 @@ impl SourceChain {
                 Some(entry),
                 chain_top_ordering,
             )
-                .await
+            .await
         } else {
             // The caller MUST guard against this case.
             unreachable!("Put countersigned called with the wrong entry type");
@@ -220,7 +220,7 @@ impl SourceChain {
     /// for an action type which has no weight data.
     /// If needing to `put` an action with weight data, use
     /// [`SourceChain::put_weighed`] instead.
-    pub async fn put<U: ActionUnweighed<Weight=()>, B: ActionBuilder<U>>(
+    pub async fn put<U: ActionUnweighed<Weight = ()>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
         maybe_entry: Option<Entry>,
@@ -232,7 +232,7 @@ impl SourceChain {
 
     /// Put a new record at the end of the source chain, using a ActionBuilder
     /// and the specified weight for rate limiting.
-    pub async fn put_weighed<W, U: ActionUnweighed<Weight=W>, B: ActionBuilder<U>>(
+    pub async fn put_weighed<W, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
         maybe_entry: Option<Entry>,
@@ -268,11 +268,11 @@ impl SourceChain {
             maybe_entry,
             chain_top_ordering,
         )
-            .await
+        .await
     }
 
     #[cfg(feature = "test_utils")]
-    pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight=W>, B: ActionBuilder<U>>(
+    pub async fn put_weightless<W: Default, U: ActionUnweighed<Weight = W>, B: ActionBuilder<U>>(
         &self,
         action_builder: B,
         maybe_entry: Option<Entry>,
@@ -284,7 +284,7 @@ impl SourceChain {
             chain_top_ordering,
             Default::default(),
         )
-            .await
+        .await
     }
 
     #[async_recursion]
@@ -418,7 +418,7 @@ impl SourceChain {
                         keystore.clone(),
                         (*self.author).clone(),
                     )
-                        .await?;
+                    .await?;
                     let rebased_actions =
                         rebase_actions_on(&keystore, actions, new_head_info).await?;
                     child_chain.scratch.apply(move |scratch| {
@@ -447,7 +447,7 @@ impl SourceChain {
                     &self.dht_db,
                     &self.dht_db_cache,
                 )
-                    .await?;
+                .await?;
                 SourceChainResult::Ok(actions)
             }
             result => result,
@@ -456,9 +456,9 @@ impl SourceChain {
 }
 
 impl<AuthorDb, DhtDb> SourceChain<AuthorDb, DhtDb>
-    where
-        AuthorDb: ReadAccess<DbKindAuthored>,
-        DhtDb: ReadAccess<DbKindDht>,
+where
+    AuthorDb: ReadAccess<DbKindAuthored>,
+    DhtDb: ReadAccess<DbKindDht>,
 {
     pub async fn new(
         vault: AuthorDb,
@@ -671,7 +671,7 @@ impl<AuthorDb, DhtDb> SourceChain<AuthorDb, DhtDb>
                             params![cap_secret_blob, agent_pubkey],
                             query_row_fn,
                         )
-                            .optional()?
+                        .optional()?
                     } else {
                         // unrestricted cap grant must exist
                         // that has not been updated or deleted
@@ -680,7 +680,7 @@ impl<AuthorDb, DhtDb> SourceChain<AuthorDb, DhtDb>
                             params![CapAccess::Unrestricted.as_sql(), agent_pubkey],
                             query_row_fn,
                         )
-                            .optional()?
+                        .optional()?
                     };
 
                     Ok(maybe_entry)
@@ -723,9 +723,9 @@ impl<AuthorDb, DhtDb> SourceChain<AuthorDb, DhtDb>
     pub async fn query(&self, query: QueryFilter) -> SourceChainResult<Vec<Record>> {
         if query.sequence_range != ChainQueryFilterRange::Unbounded
             && (query.action_type.is_some()
-            || query.entry_type.is_some()
-            || query.entry_hashes.is_some()
-            || query.include_entries)
+                || query.entry_type.is_some()
+                || query.entry_hashes.is_some()
+                || query.include_entries)
         {
             return Err(SourceChainError::UnsupportedQuery(query));
         }
@@ -1093,8 +1093,8 @@ pub async fn genesis(
         chc.add_entries(vec![EntryHashed::from_content_sync(Entry::Agent(
             agent_pubkey,
         ))])
-            .await
-            .map_err(SourceChainError::other)?;
+        .await
+        .map_err(SourceChainError::other)?;
         match chc
             .add_actions(vec![
                 dna_action.clone(),
@@ -1389,8 +1389,8 @@ pub mod tests {
             None,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
         let chain_1 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1398,7 +1398,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-            .await?;
+        .await?;
         let chain_2 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1406,7 +1406,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-            .await?;
+        .await?;
         let chain_3 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1414,7 +1414,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-            .await?;
+        .await?;
 
         let action_builder = builder::CloseChain {
             new_dna_hash: fixt!(DnaHash),
@@ -1483,8 +1483,8 @@ pub mod tests {
             None,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         let chain_1 = SourceChain::new(
             db.clone().into(),
@@ -1493,7 +1493,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-            .await?;
+        .await?;
         let chain_2 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1501,7 +1501,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-            .await?;
+        .await?;
         let chain_3 = SourceChain::new(
             db.clone().into(),
             dht_db.to_db(),
@@ -1509,7 +1509,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-            .await?;
+        .await?;
 
         let entry_1 = Entry::App(fixt!(AppEntryBytes));
         let eh1 = EntryHash::with_data_sync(&entry_1);
@@ -1632,8 +1632,8 @@ pub mod tests {
             None,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         let chain = SourceChain::new(
             db.clone(),
@@ -1642,7 +1642,7 @@ pub mod tests {
             keystore.clone(),
             alice.clone(),
         )
-            .await?;
+        .await?;
         // alice as chain author always has a valid cap grant; provided secrets
         // are ignored
         assert_eq!(
@@ -1722,7 +1722,7 @@ pub mod tests {
                 keystore.clone(),
                 alice.clone(),
             )
-                .await?;
+            .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
             let action_builder = builder::Update {
@@ -1795,7 +1795,7 @@ pub mod tests {
                 keystore.clone(),
                 alice.clone(),
             )
-                .await?;
+            .await?;
             let action_builder = builder::Delete {
                 deletes_address: updated_action_hash,
                 deletes_entry_address: updated_entry_hash,
@@ -1849,7 +1849,7 @@ pub mod tests {
                 keystore.clone(),
                 alice.clone(),
             )
-                .await?;
+            .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(unrestricted_grant.clone()))
                     .into_inner();
@@ -1889,7 +1889,7 @@ pub mod tests {
                 keystore.clone(),
                 alice.clone(),
             )
-                .await?;
+            .await?;
             let action_builder = builder::Delete {
                 deletes_address: original_action_address,
                 deletes_entry_address: original_entry_address,
@@ -1981,8 +1981,8 @@ pub mod tests {
             None,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         let source_chain = SourceChain::new(
             vault.clone().into(),
@@ -1991,8 +1991,8 @@ pub mod tests {
             keystore.clone(),
             (*author).clone(),
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let create = builder::Create {
             entry_type: EntryType::App(fixt!(AppEntryDef)),
@@ -2040,8 +2040,8 @@ pub mod tests {
             keystore.clone(),
             (*author).clone(),
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
         let res = source_chain.query(QueryFilter::new()).await.unwrap();
         assert_eq!(res.len(), 5);
         assert_eq!(*res[3].action_address(), h1);
@@ -2068,8 +2068,8 @@ pub mod tests {
             None,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         let json = dump_state(vault.clone().into(), author.clone()).await?;
         let json = serde_json::to_string_pretty(&json)?;
@@ -2110,8 +2110,8 @@ pub mod tests {
             None,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         genesis(
             vault.clone().into(),
@@ -2123,8 +2123,8 @@ pub mod tests {
             None,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         // test_db.dump_tmp();
 
@@ -2212,9 +2212,9 @@ pub mod tests {
                 };
                 if sequence_range != ChainQueryFilterRange::Unbounded
                     && (action_type.is_some()
-                    || entry_type.is_some()
-                    || entry_hashes.is_some()
-                    || include_entries)
+                        || entry_type.is_some()
+                        || entry_hashes.is_some()
+                        || include_entries)
                 {
                     assert!(matches!(
                         chain.query(query.clone()).await,
@@ -2254,8 +2254,8 @@ pub mod tests {
             None,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
             .await
@@ -2295,8 +2295,8 @@ pub mod tests {
             None,
             None,
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
             .await

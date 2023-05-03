@@ -312,7 +312,12 @@ impl ChainQueryFilter {
                     && self
                         .entry_type
                         .as_ref()
-                        .map(|entry_types| action.entry_type().map(|entry_type| entry_types.contains(entry_type)).unwrap_or(false))
+                        .map(|entry_types| {
+                            action
+                                .entry_type()
+                                .map(|entry_type| entry_types.contains(entry_type))
+                                .unwrap_or(false)
+                        })
                         .unwrap_or(true)
                     && self
                         .entry_hashes
