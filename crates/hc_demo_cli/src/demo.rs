@@ -47,6 +47,12 @@ impl RunOpts {
     }
 }
 
+/// The default configured signal server url.
+pub const DEF_SIGNAL_URL: &str = "wss://signal.holotest.net";
+
+/// The default configured bootstrap server url.
+pub const DEF_BOOTSTRAP_URL: &str = "https://bootstrap.holo.host";
+
 /// hc_demo_cli run command.
 #[derive(Debug, clap::Subcommand, serde::Serialize, serde::Deserialize)]
 pub enum RunCmd {
@@ -65,11 +71,11 @@ pub enum RunCmd {
         inbox: std::path::PathBuf,
 
         /// The signal server URL.
-        #[arg(long, default_value = "wss://signal.holotest.net")]
+        #[arg(long, default_value = DEF_SIGNAL_URL)]
         signal_url: String,
 
         /// The bootstrap server URL.
-        #[arg(long, default_value = "https://bootstrap.holo.host")]
+        #[arg(long, default_value = DEF_BOOTSTRAP_URL)]
         bootstrap_url: String,
     },
 
@@ -108,8 +114,8 @@ pub async fn run_test_demo(
 ) {
     tracing::info!(?opts);
     match opts.command {
-        RunCmd::Run { dna, outbox, inbox } => {
-            run(dna, outbox, inbox, Some(ready), Some(rendezvous)).await;
+        RunCmd::Run { dna, outbox, inbox, signal_url, bootstrap_url } => {
+            run(dna, outbox, inbox, signal_url, bootstrap_url, Some(ready), Some(rendezvous)).await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
