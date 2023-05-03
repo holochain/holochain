@@ -144,7 +144,7 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = ["slow_tests", "glacial_tests", "test_utils", "no-deps", "tx2"]
+default = ["slow_tests", "glacial_tests", "no-deps", "tx2"]
 
 tx2 = [ "kitsune_p2p/tx2" ]
 tx5 = [ "kitsune_p2p/tx5" ]
@@ -221,4 +221,9 @@ wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 chc = [
   "bytes",
   "reqwest"
+]
+
+sweetest = [
+  "test_utils",
+  "no-deps",
 ]
