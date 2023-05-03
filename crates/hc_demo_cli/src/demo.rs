@@ -114,8 +114,23 @@ pub async fn run_test_demo(
 ) {
     tracing::info!(?opts);
     match opts.command {
-        RunCmd::Run { dna, outbox, inbox, signal_url, bootstrap_url } => {
-            run(dna, outbox, inbox, signal_url, bootstrap_url, Some(ready), Some(rendezvous)).await;
+        RunCmd::Run {
+            dna,
+            outbox,
+            inbox,
+            signal_url,
+            bootstrap_url,
+        } => {
+            run(
+                dna,
+                outbox,
+                inbox,
+                signal_url,
+                bootstrap_url,
+                Some(ready),
+                Some(rendezvous),
+            )
+            .await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
