@@ -39,16 +39,48 @@
         export DEFAULT_VERSIONS_DIR="$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.path')"
 
         (
-          cd "$VERSIONS_DIR"
-          nix flake update --tarball-ttl 0
+          cd "''${VERSIONS_DIR}"
+          nix flake update
+          jq . < flake.lock | grep -v revCount | grep -v lastModified > flake.lock.new
+          mv flake.lock{.new,}
+
+          nix eval --impure --json --expr "
+            let
+              lib = (import ${pkgs.path} {}).lib;
+              lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+              lock_updated = lib.recursiveUpdate lock { nodes.lair.original.ref = \"main\"; };
+            in lock_updated
+          " | ${pkgs.jq}/bin/jq --raw-output . > flake.lock.new
+          mv flake.lock{.new,}
         )
 
-        if [[ $(git diff -- "$VERSIONS_DIR"/flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
-          echo got no actual source changes, reverting modifications..
-          git checkout $VERSIONS_DIR/flake.lock
+        if [[ $(${pkgs.git}/bin/git diff -- ''${VERSIONS_DIR}/flake.lock | grep -E '^[+-]\s+"' --count) -eq 0 ]]; then
+          echo got no actual source changes, reverting modifications..;
+          ${pkgs.git}/bin/git checkout ''${VERSIONS_DIR}/flake.lock
           exit 0
         else
-          git add "$VERSIONS_DIR"/flake.lock
+          ${pkgs.git}/bin/git commit ''${VERSIONS_DIR}/flake.lock -m "updating ''${VERSIONS_DIR} flake"
+        fi
+
+        nix flake lock --update-input versions --override-input versions "git+file:.?rev=$(git rev-parse HEAD)&dir=versions/0_1"
+        jq . < flake.lock | grep -v revCount | grep -v lastModified > flake.lock.new
+        mv flake.lock{.new,}
+
+        # replace the URL of the versions flake with the github URL
+        nix eval --impure --json --expr "
+          let
+            lib = (import ${pkgs.path} {}).lib;
+            lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+            lock_updated = lib.recursiveUpdate lock { nodes.versions.locked.url = \"github:holochain/holochain?dir=versions/0_1\"; };
+          in lock_updated
+        " | ${pkgs.jq}/bin/jq --raw-output . > flake.lock.new
+        mv flake.lock{.new,}
+
+        if [[ $(${pkgs.git}/bin/git diff -- flake.lock | grep -E '^[+-]\s+"' --count) -eq 0 ]]; then
+          echo got no actual source changes, reverting modifications..;
+          ${pkgs.git}/bin/git checkout flake.lock
+        else
+          ${pkgs.git}/bin/git commit flake.lock -m "updating toplevel flake"
         fi
 
         if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
@@ -62,7 +94,7 @@
           git add flake.lock
         fi
 
-        git commit -m "chore(flakes): update $VERSIONS_DIR"
+        git commit -m "chore(flakes): update ''${VERSIONS_DIR}"
       '';
 
       scripts-release-automation-check-and-bump = pkgs.writeShellScriptBin "scripts-release-automation-check-and-bump" ''

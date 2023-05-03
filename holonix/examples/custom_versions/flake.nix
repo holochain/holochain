@@ -1,27 +1,24 @@
 {
   description = "Template for Holochain app development that uses a specific versions set";
 
-  # this example is equivalent to the following CLI invocation:
-  #
-  # nix develop \
-  #   github:holochain/holochain#holonix \
-  #   --override-input versions 'github:holochain/holochain/?dir=versions/0_1' \
-  #   --override-input versions/holochain 'github:holochain/holochain/holochain-0.1.5-beta-rc.0'
-
   inputs = {
-    versions.url = "github:holochain/holochain?dir=versions/0_1";
-    versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.5-beta-rc.0";
+    holochain-flake.url = "github:holochain/holochain/experiment_flake_lock_mangling";
 
-    holochain-flake.url = "github:holochain/holochain";
-    holochain-flake.inputs.versions.follows = "versions";
+    holochain-versions.url = "github:holochain/holochain/experiment_flake_lock_mangling?dir=versions/0_1";
+
+    holochain-flake.inputs.holochain.follows = "holochain-versions/holochain";
+    holochain-flake.inputs.lair.follows = "holochain-versions/lair";
+    holochain-flake.inputs.launcher.follows = "holochain-versions/launcher";
+    holochain-flake.inputs.scaffolding.follows = "holochain-versions/scaffolding";
 
     nixpkgs.follows = "holochain-flake/nixpkgs";
     flake-parts.follows = "holochain-flake/flake-parts";
   };
 
-  outputs = inputs:
+  outputs = inputs @ { ... }:
     inputs.flake-parts.lib.mkFlake { inherit inputs; }
       {
+        flake.inputs = inputs;
         systems = builtins.attrNames inputs.holochain-flake.devShells;
 
         perSystem =
@@ -34,8 +31,7 @@
 
             devShells.default = pkgs.mkShell {
               inputsFrom = [ inputs'.holochain-flake.devShells.holonix ];
-              packages = [
-                pkgs.nodejs-18_x
+              packages = with pkgs; [
                 # more packages go here
               ];
             };
