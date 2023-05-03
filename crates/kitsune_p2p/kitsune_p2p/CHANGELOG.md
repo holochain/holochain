@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Removes the experimental `gossip_single_storage_arc_per_space` tuning param
+
 ## 0.2.0
 
 ## 0.2.0-beta-rc.6
