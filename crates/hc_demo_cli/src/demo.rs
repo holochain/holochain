@@ -63,6 +63,14 @@ pub enum RunCmd {
         /// The inbox path.
         #[arg(long, default_value = "hc-demo-cli-inbox")]
         inbox: std::path::PathBuf,
+
+        /// The signal server URL.
+        #[arg(long, default_value = "wss://signal.holotest.net")]
+        signal_url: String,
+
+        /// The bootstrap server URL.
+        #[arg(long, default_value = "https://bootstrap.holo.host")]
+        bootstrap_url: String,
     },
 
     /// Generate a dna file that can be used with hc demo-cli.
@@ -77,8 +85,14 @@ pub enum RunCmd {
 pub async fn run_demo(opts: RunOpts) {
     tracing::info!(?opts);
     match opts.command {
-        RunCmd::Run { dna, outbox, inbox } => {
-            run(dna, outbox, inbox, None, None).await;
+        RunCmd::Run {
+            dna,
+            outbox,
+            inbox,
+            signal_url,
+            bootstrap_url,
+        } => {
+            run(dna, outbox, inbox, signal_url, bootstrap_url, None, None).await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
@@ -169,6 +183,8 @@ async fn run(
     dna: std::path::PathBuf,
     outbox: std::path::PathBuf,
     inbox: std::path::PathBuf,
+    signal_url: String,
+    bootstrap_url: String,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     rendezvous: Option<holochain::sweettest::DynSweetRendezvous>,
 ) {
@@ -199,19 +215,20 @@ async fn run(
     let rendezvous = match rendezvous {
         Some(rendezvous) => rendezvous,
         None => {
-            struct PubRendezvous;
+            struct PubRendezvous(String, String);
 
             impl holochain::sweettest::SweetRendezvous for PubRendezvous {
                 fn bootstrap_addr(&self) -> &str {
-                    "https://bootstrap.holo.host"
+                    self.1.as_str()
                 }
 
                 fn sig_addr(&self) -> &str {
-                    "wss://holotest.net"
+                    self.0.as_str()
                 }
             }
 
-            let rendezvous: holochain::sweettest::DynSweetRendezvous = Arc::new(PubRendezvous);
+            let rendezvous: holochain::sweettest::DynSweetRendezvous =
+                Arc::new(PubRendezvous(signal_url, bootstrap_url));
             rendezvous
         }
     };
