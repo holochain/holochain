@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230503.003735
+
+## [holochain\_cli-0.3.0-beta-dev.0](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.0)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.0)
+
+- updated comment in src/cli.rs to clarify use of –force-admin-ports
+
+## [holochain-0.3.0-beta-dev.0](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.0)
+
+- The feature `test_utils` is no longer a default feature. To consume `sweetest` from this crate please now use `default-features = false` and the feature `sweetest`.
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.0)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.0](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.0)
+
+- Add links to concepts documentation to the conductor API module.
+
+## [holochain\_cascade-0.3.0-beta-dev.0](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.0)
+
+## [hdk-0.3.0-beta-dev.0](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.0)
+
 # 20230427.171927
 
 This release features a more secure version of Holochain that incorporates advanced network security protocols using WebRTC End-to-End Encryption and addresses known Holochain security vulnerabilities.
