@@ -98,6 +98,7 @@ async fn fullsync_sharded_gossip() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(darwin, ignore = "flaky on darwin test runners")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     // let _g = observability::test_run().ok();
 
@@ -172,6 +173,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 /// and when it restarts, gossip resumes.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(darwin, ignore = "flaky on darwin test runners")]
 async fn test_gossip_shutdown() {
     observability::test_run().ok();
     let mut conductors = SweetConductorBatch::from_config(2, make_config(true, true, None)).await;

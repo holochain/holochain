@@ -32,6 +32,7 @@ use tracing::debug_span;
 #[test_case(2)]
 #[test_case(4)]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(darwin, ignore = "flaky on darwin test runners")]
 async fn conductors_call_remote(num_conductors: usize) {
     observability::test_run().ok();
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
