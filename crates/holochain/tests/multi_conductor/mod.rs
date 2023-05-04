@@ -70,7 +70,7 @@ async fn test_publish() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(darwin, ignore = "flaky on darwin test runners")]
+#[cfg_attr(target_os = "macos", ignore = "flaky on darwin test runners")]
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
@@ -121,7 +121,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(darwin, ignore = "flaky on darwin test runners")]
+#[cfg_attr(target_os = "macos", ignore = "flaky on darwin test runners")]
 async fn sharded_consistency() {
     use std::sync::Arc;
 

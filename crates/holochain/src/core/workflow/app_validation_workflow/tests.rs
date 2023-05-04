@@ -29,7 +29,7 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(darwin, ignore = "flaky on darwin test runners")]
+#[cfg_attr(target_os = "macos", ignore = "flaky on darwin test runners")]
 async fn app_validation_workflow_test() {
     observability::test_run().ok();
 
