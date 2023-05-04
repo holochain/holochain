@@ -713,7 +713,7 @@ impl KitsuneP2pActor {
                         }
                     })
                     .await;
-                tracing::warn!("KitsuneP2p tx2:ep poll shutdown");
+                panic!("KitsuneP2p: networking poll shutdown");
             }
         });
 
