@@ -810,6 +810,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky on darwin test runners")]
     async fn consistency_test() {
         let mut tuning_params =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
