@@ -1510,14 +1510,15 @@ mod cell_impls {
     use super::*;
 
     impl Conductor {
-        pub(crate) async fn cell_by_id(&self, cell_id: &CellId, require_network_ready: bool) -> ConductorResult<Arc<Cell>> {
+        pub(crate) async fn cell_by_id(
+            &self,
+            cell_id: &CellId,
+            require_network_ready: bool,
+        ) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
-            if let Some(cell) = self
-                .running_cells
-                .share_ref(|c| c.get(cell_id).cloned())
-            {
+            if let Some(cell) = self.running_cells.share_ref(|c| c.get(cell_id)) {
                 if require_network_ready && cell.status != CellStatus::Joined {
-                    Err(ConductorError::CellNetworkNotReady(cell.status))
+                    Err(ConductorError::CellNetworkNotReady(cell.status.clone()))
                 } else {
                     Ok(cell.cell.clone())
                 }
@@ -2081,7 +2082,7 @@ mod scheduler_impls {
             let cell_arcs = {
                 let mut cell_arcs = vec![];
                 for cell_id in self.live_cell_ids() {
-                    if let Ok(cell_arc) = self.cell_by_id(&cell_id, true).await {
+                    if let Ok(cell_arc) = self.cell_by_id(&cell_id, false).await {
                         cell_arcs.push(cell_arc);
                     }
                 }
