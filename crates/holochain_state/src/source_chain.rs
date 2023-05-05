@@ -799,7 +799,7 @@ where
                         ORDER BY Action.seq
                         ", named_param_seq("entry_type", query.entry_type.as_ref().map_or(0, |t| t.len())), named_param_seq("action_type", query.action_type.as_ref().map_or(0, |t| t.len()))).as_str(),
                     );
-                    sql.push_str(if query.order_descending { " DESC" } else { " ASC" });
+                    sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
 
                     let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(6 + query.entry_type.as_ref().map_or(0, |t| t.len()) + query.action_type.as_ref().map_or(0, |t| t.len()));
