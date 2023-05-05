@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Reverts the below change so that `name` in DnaDef does effect on the DNA hash. Holochain does not support the DNA hash changing
+  so this change will remain in `0.2` but be removed from the `0.1` stream.
+
 ## 0.1.3-beta-rc.0
 
 ## 0.1.2

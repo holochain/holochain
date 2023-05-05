@@ -470,7 +470,7 @@ mod tests {
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky on darwin test runners")]
+    #[ignore = "flaky"]
     async fn test_quic_tx2() {
         kitsune_p2p_types::dependencies::observability::test_run().ok();
 

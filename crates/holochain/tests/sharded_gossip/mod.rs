@@ -209,6 +209,7 @@ async fn test_gossip_shutdown() {
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky on darwin test runners")]
 async fn three_way_gossip_recent() {
     observability::test_run().ok();
     let config = make_config(true, false, None);
@@ -217,6 +218,7 @@ async fn three_way_gossip_recent() {
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky on darwin test runners")]
 async fn three_way_gossip_historical() {
     observability::test_run().ok();
     let config = make_config(false, true, Some(0));

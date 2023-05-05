@@ -65,12 +65,7 @@ impl SweetApp {
 
 /// A collection of installed apps
 #[derive(
-    Clone,
-    derive_more::From,
-    derive_more::Into,
-    derive_more::AsRef,
-    derive_more::IntoIterator,
-    derive_more::Index,
+    Clone, derive_more::From, derive_more::Into, derive_more::AsRef, derive_more::IntoIterator,
 )]
 pub struct SweetAppBatch(pub(super) Vec<SweetApp>);
 
