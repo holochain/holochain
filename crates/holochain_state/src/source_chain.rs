@@ -740,7 +740,7 @@ where
                 SELECT DISTINCT
                 Action.hash AS action_hash, Action.blob AS action_blob
             "
-                        .to_string();
+                    .to_string();
                     if query.include_entries {
                         sql.push_str(
                             "
