@@ -1516,9 +1516,9 @@ mod cell_impls {
             require_network_ready: bool,
         ) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
-            if let Some(cell) = self.running_cells.share_ref(|c| c.get(cell_id)) {
+            if let Some(cell) = self.running_cells.share_ref(|c| c.get(cell_id).cloned()) {
                 if require_network_ready && cell.status != CellStatus::Joined {
-                    Err(ConductorError::CellNetworkNotReady(cell.status.clone()))
+                    Err(ConductorError::CellNetworkNotReady(cell.status))
                 } else {
                     Ok(cell.cell.clone())
                 }
