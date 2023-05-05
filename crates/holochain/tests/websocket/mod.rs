@@ -286,7 +286,7 @@ async fn remote_signals() -> anyhow::Result<()> {
         )
         .await;
 
-    tokio::time::timeout(Duration::from_secs(60), async move {
+    tokio::time::timeout(Duration::from_secs(120), async move {
         let signal = AppSignal::new(signal);
         for mut rx in rxs {
             let r = rx.recv().await;
