@@ -607,6 +607,7 @@ mod tests {
     fn filter_by_multiple_action_types() {
         let actions = fixtures();
 
+        // Filter for create and update actions
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
@@ -616,12 +617,22 @@ mod tests {
             ),
             [true, true, false, true, true, true, false].to_vec()
         );
+
+        // Filter for create actions only
+        assert_eq!(
+            map_query(
+                &ChainQueryFilter::new().action_type(actions[0].action_type()),
+                &actions
+            ),
+            [true, false, false, true, true, false, false].to_vec()
+        );
     }
 
     #[test]
     fn filter_by_multiple_entry_types() {
         let actions = fixtures();
 
+        // Filter for app entries and agent public keys
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
@@ -630,6 +641,15 @@ mod tests {
                 &actions
             ),
             [true, true, false, true, true, true, false].to_vec()
+        );
+
+        // Filter for app entries only
+        assert_eq!(
+            map_query(
+                &ChainQueryFilter::new().entry_type(actions[0].entry_type().unwrap().clone()),
+                &actions
+            ),
+            [true, false, false, false, true, true, false].to_vec()
         );
     }
 }

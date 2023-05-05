@@ -802,6 +802,8 @@ where
                     sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
 
+                    // This type is similar to what `named_params!` from rusqlite creates, escept for the use of boxing to allow references to be passed to the query.
+                    // The reserved capacity here should account for the number of parameters inserted below, including the variable inputs like entry_types and actions_types.
                     let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(6 + query.entry_type.as_ref().map_or(0, |t| t.len()) + query.action_type.as_ref().map_or(0, |t| t.len()));
                     args.push((":author".to_string(), Box::new(author)));
 
