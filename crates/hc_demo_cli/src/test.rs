@@ -105,6 +105,8 @@ async fn run(
             dna: std::path::PathBuf::from(DNA),
             outbox: std::path::PathBuf::from(format!("{name}-out")),
             inbox: std::path::PathBuf::from(format!("{name}-in")),
+            signal_url: DEF_SIGNAL_URL.into(),
+            bootstrap_url: DEF_BOOTSTRAP_URL.into(),
         },
     };
 
