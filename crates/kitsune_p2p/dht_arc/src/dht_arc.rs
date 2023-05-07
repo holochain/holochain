@@ -419,6 +419,16 @@ impl DhtArcRange<DhtLocation> {
         s
     }
 
+    pub fn print(&self, len: usize) {
+        println!(
+            // "{:>3}: |{}| {}/{} @ {:?}",
+            "     |{}| {} {:?}",
+            self.to_ascii(len),
+            self.length(),
+            self.to_bounds_grouped(),
+        );
+    }
+
     pub fn canonical(self) -> DhtArcRange {
         self
     }

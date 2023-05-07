@@ -8,7 +8,7 @@ use crate::{
     ArqStrat,
 };
 
-use super::{power_and_count_from_length, Arq, ArqStart};
+use super::{power_and_count_from_length, power_and_count_from_length_exact, Arq, ArqStart};
 
 /// A collection of ArqBounds.
 /// All bounds are guaranteed to be quantized to the same power
@@ -117,9 +117,10 @@ impl<S: ArqStart> ArqSet<S> {
         println!("{} arqs, power: {}", self.arqs().len(), self.power());
         for (i, arq) in self.arqs().iter().enumerate() {
             println!(
-                "{:>3}: |{}| {}/{} @ {:?}",
+                "{:>3}: |{}| {} {}/{} @ {:?}",
                 i,
                 arq.to_ascii(topo, len),
+                arq.absolute_length(topo),
                 arq.power(),
                 arq.count(),
                 arq.start
@@ -131,19 +132,31 @@ impl<S: ArqStart> ArqSet<S> {
 impl ArqSet {
     /// Convert back from a continuous arc set to a quantized one.
     /// If any information is lost (the match is not exact), return None.
-    pub fn from_dht_arc_set(
+    /// This is necessary because an arcset which is the union of many agents'
+    /// arcs may much longer than any one agent's arcs, which would not quantize
+    /// properly to an arq that fits the bounds of the ArqStrat (num chunks between
+    /// 8 and 16), so if we want an exact match (which we often do!) we need to
+    /// allow the power to be lower and the chunk size to be greater to provide
+    /// the exact match.
+    //
+    // TODO: XXX: revisit this when power levels really matter, because this
+    //   does entail a loss of info about the original power levels of the original
+    //   arqs, or even of the original arqset minimum power level. For instance we
+    //   may need to refactor agent info to include power level so as not to lose
+    //   this info.
+    pub fn from_dht_arc_set_exact(
         topo: &Topology,
         strat: &ArqStrat,
         dht_arc_set: &DhtArcSet,
     ) -> Option<Self> {
-        let max_chunks = strat.max_chunks();
         Some(Self::new(
             dht_arc_set
                 .intervals()
                 .into_iter()
                 .map(|i| {
                     let len = i.length();
-                    let (pow, _) = power_and_count_from_length(&topo.space, len, max_chunks);
+                    let (pow, _) =
+                        power_and_count_from_length_exact(&topo.space, len, strat.min_chunks())?;
                     ArqBounds::from_interval(topo, pow, i)
                 })
                 .collect::<Option<Vec<_>>>()?,
@@ -151,7 +164,7 @@ impl ArqSet {
     }
 
     /// Convert back from a continuous arc set to a quantized one.
-    /// If the match is not exact, return the nearest possible quantized arc.
+    /// If the match is not exact, return the nearest possible quantized arcs.
     pub fn from_dht_arc_set_rounded(
         topo: &Topology,
         strat: &ArqStrat,
@@ -302,6 +315,59 @@ mod tests {
     }
 
     proptest::proptest! {
+
+    /// Test that arqs maintain their resolution when the power factor is lost
+    #[test]
+    fn rounded_arcset(
+        p1 in 12u8..17, s1: u32, c1: u32,
+        p2 in 12u8..17, s2: u32, c2: u32,
+        // p3 in 12u8..17, s3: u32, c3: u32,
+    ) {
+        use crate::Loc;
+
+        let topo = Topology::standard_epoch_full();
+        let strat = ArqStrat::default();
+
+        let c1 = strat.min_chunks() + c1 % (strat.max_chunks() - strat.min_chunks());
+        let c2 = strat.min_chunks() + c2 % (strat.max_chunks() - strat.min_chunks());
+        // let c3 = strat.min_chunks() + c3 % (strat.max_chunks() - strat.min_chunks());
+
+        let arq1 = Arq::new(p1, Loc::from(s1), c1.into());
+        let arq2 = Arq::new(p2, Loc::from(s2), c2.into());
+        // let arq3 = Arq::new(p3, Loc::from(s3), c3.into());
+
+        println!("...");
+        println!("### arqs ###");
+        println!("     |{}| {} {}", arq1.to_ascii(&topo, 64), arq1.power, *arq1.count);
+        println!("     |{}| {} {}", arq2.to_ascii(&topo, 64), arq2.power, *arq2.count);
+
+        let arc1 = arq1.to_dht_arc_range(&topo);
+        let arc2 = arq2.to_dht_arc_range(&topo);
+
+        println!("### arc conversion ###");
+        arc1.print(64);
+        arc2.print(64);
+
+        let arcset: DhtArcSet = vec![
+            arq1.to_bounds(&topo).to_dht_arc_range(&topo),
+            arq2.to_bounds(&topo).to_dht_arc_range(&topo),
+            // arq3.to_bounds(&topo).to_dht_arc_range(&topo)
+        ].into();
+
+        println!("### arcset ###");
+        arcset.print_arcs(64);
+
+        println!("### roundtrip arcset ###");
+        let (arqs, rounded) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &arcset);
+        arqs.to_dht_arc_set(&topo).print_arcs(64);
+
+        println!("### roundtrip arqset ###");
+        arqs.print_arqs(&topo, 64);
+
+        // The actual test
+        assert!(!rounded);
+    }
+
     #[test]
     fn rounded_arcset_intersections(
         p1 in 12u8..17, s1: u32, c1: u32,
@@ -342,11 +408,11 @@ mod tests {
             arq6.to_bounds(&topo).to_dht_arc_range(&topo)
         ].into();
 
-        println!("> original");
+        println!("### original ###");
         arcset1.print_arcs(64);
         arcset2.print_arcs(64);
 
-        println!("> individual roundtrips");
+        println!("### individual roundtrips ###");
         let (arqs1, rounded1) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &arcset1);
         let (arqs2, rounded2) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &arcset2);
         arqs1.to_dht_arc_set(&topo).print_arcs(64);
@@ -354,12 +420,12 @@ mod tests {
         arqs2.to_dht_arc_set(&topo).print_arcs(64);
         assert!(!rounded2);
 
-        println!("> common");
+        println!("### common ###");
         let common = arcset1.intersection(&arcset2);
         common.print_arcs(64);
         let (arqs, rounded) = ArqSet::from_dht_arc_set_rounded(&topo, &strat, &common);
 
-        println!("> common roundtrip");
+        println!("### common roundtrip ###");
         let roundtrip = arqs.to_dht_arc_set(&topo);
         roundtrip.print_arcs(64);
 

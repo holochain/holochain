@@ -130,7 +130,7 @@ impl KitsuneHost for SwitchboardEventHandler {
     ) -> crate::KitsuneHostResult<dht::region_set::RegionSetLtcs> {
         async move {
             let topo = self.get_topology(space).await?;
-            let arq_set = ArqSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
+            let arq_set = ArqSet::from_dht_arc_set_exact(&topo, &self.sb.strat, &dht_arc_set)
                 .expect("an arq could not be quantized");
 
             // NOTE: If this were implemented correctly, it would take the recent_threshold

@@ -86,7 +86,7 @@ impl KitsuneHost for StandardResponsesHostApi {
         dht_arc_set: Arc<DhtArcSet>,
     ) -> crate::KitsuneHostResult<RegionSetLtcs> {
         async move {
-            let arqs = ArqSet::from_dht_arc_set(
+            let arqs = ArqSet::from_dht_arc_set_exact(
                 &self.get_topology(space).await?,
                 &self.strat,
                 &dht_arc_set,
