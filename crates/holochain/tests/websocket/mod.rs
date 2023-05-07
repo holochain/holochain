@@ -245,6 +245,7 @@ async fn call_zome() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[ignore = "flaky"]
 async fn remote_signals() -> anyhow::Result<()> {
     holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;

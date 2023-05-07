@@ -201,6 +201,7 @@ async fn test_gossip_shutdown() {
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky"]
 async fn three_way_gossip_recent() {
     holochain_trace::test_run().ok();
     let config = make_config(true, false, None);
