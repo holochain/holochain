@@ -1,4 +1,4 @@
-{ self, lib, inputs, ... }:
+{ self, lib, inputs, config, ... }:
 
 let
   includeCommon =
@@ -15,7 +15,7 @@ in
   options.srcCleanedHolochain = lib.mkOption { type = lib.types.raw; };
   config.srcCleanedHolochain = inputs.nix-filter.lib {
     include = includeCommon;
-    root = inputs.holochain;
+    root = config.reconciledInputs.holochain;
   };
 
   options.srcCleanedReleaseAutomationRepo = lib.mkOption { type = lib.types.raw; };
@@ -34,5 +34,4 @@ in
     ];
     root = self;
   };
-
 }
