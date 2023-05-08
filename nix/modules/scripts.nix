@@ -64,35 +64,6 @@
 
         git commit -m "chore(flakes): update $VERSIONS_DIR"
       '';
-
-      scripts-release-automation-check-and-bump = pkgs.writeShellScriptBin "scripts-release-automation-check-and-bump" ''
-        set -xeuo pipefail
-
-        ${self'.packages.release-automation}/bin/release-automation \
-            --workspace-path=$PWD \
-            --log-level=debug \
-            crate detect-missing-releaseheadings
-
-        ${self'.packages.release-automation}/bin/release-automation \
-          --workspace-path=''${1} \
-          --log-level=debug \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
-          release \
-            --no-verify \
-            --force-tag-creation \
-            --force-branch-creation \
-            --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-            --allowed-semver-increment-modes="!pre_minor beta-dev" \
-            --steps=CreateReleaseBranch,BumpReleaseVersions
-
-        ${self'.packages.release-automation}/bin/release-automation \
-            --workspace-path=''${1} \
-            --log-level=debug \
-            release \
-              --dry-run \
-              --no-verify \
-              --steps=PublishToCratesIo
-      '';
     };
   };
 }
