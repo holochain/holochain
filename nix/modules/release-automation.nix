@@ -1,10 +1,30 @@
+# { self, inputs, lib, ... }@flake: {
+#   perSystem = { config, self', inputs', system, pkgs, ... }: {
+#     packages = {
+#       release-automation =
+#         pkgs.callPackage ../../crates/release-automation/default.nix {
+#           crate2nixSrc = inputs.crate2nix;
+#         };
+
+#       release-automation-regenerate-readme =
+#         pkgs.writeShellScriptBin "release-automation-regenerate-readme" ''
+#           set -x
+#           ${pkgs.cargo-readme}/bin/cargo-readme readme --project-root=crates/release-automation/ --output=README.md;
+#         '';
+#     };
+#   };
+# }
+
 # Definitions can be imported from a separate file like this one
 
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
 
-      rustToolchain = config.rustHelper.mkRust { };
+      rustToolchain = config.rust.mkRust {
+        track = "stable";
+        version = "latest";
+      };
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
@@ -85,50 +105,76 @@
       packages = {
         release-automation = package;
 
-        build-release-automation-tests-unit = tests;
+        build-release-automation-tests = tests;
 
         # check the state of the repository
-        # this is using a dummy input like this:
+        # TODO: to get the actual .git repo we could be something like this:
+        # using a dummy input like this:
         # ```nix
         #     repo-git.url = "file+file:/dev/null";
         #     repo-git.flake = false;
         # ```
-        # and then the test derivation is built it relies on that input being the local repo path. see the "holochain-build-and-test.yml" workflow.
-        build-release-automation-tests-repo =
-          let
-            script = self'.packages.scripts-release-automation-check-and-bump;
-          in
-          pkgs.runCommand
-            "release-automation-tests-repo"
-            {
-              __noChroot = pkgs.stdenv.isLinux;
-              nativeBuildInputs = self'.packages.holochain.nativeBuildInputs ++ [
-                pkgs.coreutils
-                pkgs.gitFull
-              ];
-              buildInputs = self'.packages.holochain.buildInputs ++ [
-                pkgs.cacert
-              ];
-            } ''
-            set -euo pipefail
+        # and then when i run the test derivations that rely on that input, i can temporarily lock that input to a local path like this:
+        # ```
+        # tmpgit=$(mktemp -d)
+        # git clone --bare --single-branch . $tmpgit
+        # nix flake lock --update-input repo-git --override-input repo-git "path:$tmpdir"
+        # rm -rf $tmpgit
+        # ```
+        build-release-automation-tests-repo = pkgs.runCommand
+          "release-automation-tests-repo"
+          {
+            __noChroot = pkgs.stdenv.isLinux;
+            nativeBuildInputs = self'.packages.holochain.nativeBuildInputs ++ [
+              package
 
-            export HOME="$(mktemp -d)"
-            export TEST_WORKSPACE="''${HOME:?}/src"
+              pkgs.coreutils
+              pkgs.gitFull
+            ];
+            buildInputs = self'.packages.holochain.buildInputs ++ [
+              pkgs.cacert
+            ];
+          } ''
+          set -euo pipefail
 
-            git config --global user.email "devcore@holochain.org"
-            git config --global user.name "Holochain Core Dev Team";
+          export HOME="$(mktemp -d)"
+          export TEST_WORKSPACE="''${HOME:?}/src"
 
-            git clone --single-branch ${inputs.dummy} ''${TEST_WORKSPACE:?}
-            cd ''${TEST_WORKSPACE:?}
-            git status
+          cp -r --no-preserve=mode,ownership ${flake.config.srcCleanedRepo} ''${TEST_WORKSPACE:?}
+          cp --no-preserve=mode,ownership ${self}/CHANGELOG.md ''${TEST_WORKSPACE:?}/CHANGELOG.md
+          cd ''${TEST_WORKSPACE:?}
 
-            ${script}/bin/${script.name} ''${TEST_WORKSPACE:?}
+          git init
+          git switch -c main
+          git add .
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
+          git commit -am "main"
 
-            set +e
-            git clean -ffdx
-            mv ''${TEST_WORKSPACE:?} $out
-            echo use "nix-store --realise $out" to retrieve the result.
-          '';
+          release-automation \
+            --workspace-path=''${TEST_WORKSPACE:?} \
+            --log-level=debug \
+            --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+            release \
+              --no-verify \
+              --force-tag-creation \
+              --force-branch-creation \
+              --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
+              --disallowed-version-reqs=">=0.4" \
+              --steps=CreateReleaseBranch,BumpReleaseVersions
+
+          release-automation \
+              --workspace-path=''${TEST_WORKSPACE:?} \
+              --log-level=debug \
+              release \
+                --dry-run \
+                --no-verify \
+                --steps=PublishToCratesIo
+
+
+          rm -rf target
+          mv ''${TEST_WORKSPACE:?} $out
+        '';
       };
     };
 }
