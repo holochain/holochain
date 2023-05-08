@@ -123,7 +123,7 @@ async fn clean_sandboxes() {
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO: greg please have a look"]
+#[ignore = "TODO: @ThetaSinner please have a look"]
 async fn generate_sandbox_and_connect() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
@@ -159,7 +159,7 @@ async fn generate_sandbox_and_connect() {
 
 /// Generates a new sandbox with a single app deployed and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO: greg please have a look"]
+#[ignore = "TODO: @ThetaSinner please have a look"]
 async fn generate_sandbox_and_call_list_dna() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
