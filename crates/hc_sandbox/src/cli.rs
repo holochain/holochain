@@ -3,6 +3,7 @@
 use crate::cmds::*;
 use clap::{ArgAction, Parser};
 use holochain_types::prelude::InstalledAppId;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -193,26 +194,51 @@ impl HcSandbox {
     }
 }
 
+/// Details about a conductor launched by the sandbox
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LaunchInfo {
+    /// The admin port that was bound. This is not known when admin ports are not forced because the
+    /// default is 0 so the system will choose a port.
+    pub admin_port: u16,
+    /// The app ports that were attached to the conductor.
+    pub app_ports: Vec<u16>,
+}
+
+impl LaunchInfo {
+    pub(crate) fn from_admin_port(admin_port: u16) -> Self {
+        LaunchInfo {
+            admin_port,
+            app_ports: vec![],
+        }
+    }
+}
+
 async fn run_n(
     holochain_path: &Path,
     paths: Vec<PathBuf>,
     app_ports: Vec<u16>,
     force_admin_ports: Vec<u16>,
 ) -> anyhow::Result<()> {
-    let run_holochain = |holochain_path: PathBuf, path: PathBuf, ports, force_admin_port| async move {
-        crate::run::run(&holochain_path, path, ports, force_admin_port).await?;
+    let run_holochain = |holochain_path: PathBuf,
+                         path: PathBuf,
+                         index: usize,
+                         ports,
+                         force_admin_port| async move {
+        crate::run::run(&holochain_path, path, index, ports, force_admin_port).await?;
         Result::<_, anyhow::Error>::Ok(())
     };
     let mut force_admin_ports = force_admin_ports.into_iter();
     let mut app_ports = app_ports.into_iter();
     let jhs = paths
         .into_iter()
+        .enumerate()
         .zip(std::iter::repeat_with(|| force_admin_ports.next()))
         .zip(std::iter::repeat_with(|| app_ports.next()))
-        .map(|((path, force_admin_port), app_port)| {
+        .map(|(((index, path), force_admin_port), app_port)| {
             let f = run_holochain(
                 holochain_path.to_path_buf(),
                 path,
+                index,
                 app_port.map(|p| vec![p]).unwrap_or_default(),
                 force_admin_port,
             );

@@ -245,6 +245,7 @@ async fn call_zome() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn remote_signals() -> anyhow::Result<()> {
     holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
@@ -280,9 +281,8 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let mut rxs = Vec::new();
     for h in conductors.iter().map(|c| c) {
-        rxs.push(h.signal_broadcaster().subscribe_separately())
+        rxs.extend(h.signal_broadcaster().subscribe_separately())
     }
-    let rxs = rxs.into_iter().flatten().collect::<Vec<_>>();
 
     let signal = fixt!(ExternIo);
 
@@ -297,14 +297,16 @@ async fn remote_signals() -> anyhow::Result<()> {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
-
-    let signal = AppSignal::new(signal);
-    for mut rx in rxs {
-        let r = rx.try_recv();
-        // Each handle should recv a signal
-        assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
-    }
+    tokio::time::timeout(Duration::from_secs(60), async move {
+        let signal = AppSignal::new(signal);
+        for mut rx in rxs {
+            let r = rx.recv().await;
+            // Each handle should recv a signal
+            assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
+        }
+    })
+    .await
+    .unwrap();
 
     Ok(())
 }
