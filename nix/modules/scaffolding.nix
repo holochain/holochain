@@ -25,7 +25,7 @@
             # TODO: remove sqlite package once https://github.com/holochain/holochain/pull/2248 is released
             sqlite
           ]) ++ (lib.optionals pkgs.stdenv.isDarwin
-            (with config.rustHelper.apple_sdk.frameworks; [
+            (with self'.packages.apple_sdk'.frameworks; [
               AppKit
               Foundation
               Security
