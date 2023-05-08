@@ -31,7 +31,7 @@
             gtk3
           ]))
         ++ lib.optionals pkgs.stdenv.isDarwin
-          (with self'.packages.apple_sdk'.frameworks; [
+          (with self'.legacyPackages.apple_sdk'.frameworks; [
             AppKit
             CoreFoundation
             Foundation

@@ -8,7 +8,7 @@
     , pkgs
     , ...
     }: {
-      packages.apple_sdk' = lib.attrsets.optionalAttrs pkgs.stdenv.isDarwin
+      legacyPackages.apple_sdk' = lib.attrsets.optionalAttrs pkgs.stdenv.isDarwin
         (
           # aarch64 only uses 11.0 and x86_64 mixes them
           if system == "x86_64-darwin"
