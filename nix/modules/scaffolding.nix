@@ -3,7 +3,10 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-      rustToolchain = config.rustHelper.mkRust { };
+      rustToolchain = config.rust.mkRust {
+        track = "stable";
+        version = "latest";
+      };
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
@@ -58,33 +61,10 @@
             --prefix PATH : ${rustToolchain}/bin
         '';
       });
-
-      rustPkgs = config.rustHelper.mkRustPkgs {
-        track = "stable";
-        version = "1.69.0";
-      };
-
-      cargoNix = config.rustHelper.mkCargoNix {
-        name = "hc-scaffold-generated-crate2nix";
-        src = inputs.scaffolding;
-        pkgs = rustPkgs;
-      };
-
     in
     {
       packages = {
         hc-scaffold = package;
-
-        hc-scaffold-crate2nix =
-          config.rustHelper.mkNoIfdPackage
-            "hc-scaffold"
-            (cargoNix.workspaceMembers.holochain_scaffolding_cli.build.overrideAttrs
-              (attrs: {
-                preFixup = ''
-                  wrapProgram $out/bin/hc-scaffold \
-                    --prefix PATH : ${rustPkgs.cargo}/bin
-                '';
-              }));
       };
     };
 }

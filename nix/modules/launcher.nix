@@ -81,46 +81,10 @@
         '';
       });
 
-      rustPkgs = config.rustHelper.mkRustPkgs { };
-
-      cargoNix = config.rustHelper.mkCargoNix {
-        name = "hc-launch-generated-crate2nix";
-        src = inputs.launcher;
-        pkgs = rustPkgs;
-      };
-
     in
     {
       packages = {
         hc-launch = package;
-
-        hc-launch-crate2nix =
-          config.rustHelper.mkNoIfdPackage
-            "hc-launch"
-            cargoNix.workspaceMembers.holochain_cli_launch.build
-        ;
-
-        _debug-build-crate2nix =
-          let
-            cargoNix = config.rustHelper.mkCargoNix {
-              name = "debug-build";
-              src = flake.config.srcCleanedDebugBuild;
-              pkgs = rustPkgs;
-            };
-          in
-          cargoNix.allWorkspaceMembers;
-
-        _debug-build =
-          craneLib.buildPackage
-            (lib.attrsets.recursiveUpdate commonArgs {
-              cargoArtifacts = null;
-
-              pname = "debug-build";
-              cargoExtraArgs = "";
-              CARGO_PROFILE = "release";
-              src = flake.config.srcCleanedDebugBuild;
-              doCheck = false;
-            });
       };
     };
 }

@@ -3,7 +3,11 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-      rustToolchain = config.rustHelper.mkRust { };
+      rustToolchain = config.rust.mkRust {
+        track = "stable";
+        version = "latest";
+      };
+
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
