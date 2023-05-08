@@ -8,31 +8,26 @@ on:
         required: false
         type: string
         default: "."
-      fail_fast:
-        description: "whether all tests will be stopped on first failure occurence or run to completion"
-        required: false
-        type: boolean
-        default: false
 
 jobs:
-  test:
+  "test":
     strategy:
-      fail-fast: ${{ inputs.fail_fast }}
+      fail-fast: false
       matrix:
         cmd:
           # ensure functionality on multiple platforms
           - pkgs:
               - build-holochain-tests-unit-all
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions 'path:./versions/0_2' --override-input holochain ${{ inputs.repo_path }}"
+            extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
 
-          # ensures to keep the cache populated for all stable versions on multiple platforms
+          # ensures to keep the cache populated for the supported versions on multiple platforms
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions 'path:./versions/0_1'"
+            extra_arg: "--override-input versions ./versions/0_2"
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions 'path:./versions/0_2'"
+            extra_arg: "--override-input versions ./versions/0_1"
         platform:
           - system: x86_64-darwin
           - system: aarch64-darwin
@@ -43,17 +38,10 @@ jobs:
           - cmd:
               pkgs:
                 - build-holochain-build-crates-standalone
-                - build-holochain-tests-static-all
-                - build-release-automation-tests-unit
-              extra_arg: "--override-input versions 'path:./versions/0_2' --override-input holochain ${{ inputs.repo_path }}"
-            platform:
-              system: x86_64-linux
-
-          # FIXME: this can be skipped during a release run because it duplicates the release-prepare job
-          - cmd:
-              pkgs:
+                - build-release-automation-tests
                 - build-release-automation-tests-repo
-              extra_arg: "--override-input dummy 'path:.git'"
+                - build-holochain-tests-static-all
+              extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux
 
@@ -73,7 +61,6 @@ jobs:
       - name: "Test command ${{ matrix.nixCommand }}"
         env:
           system: ${{ matrix.platform.system }}
-          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         run: |
           set -xe
 
@@ -82,8 +69,14 @@ jobs:
             nix-store --realise ${{inputs.repo_path }}
           fi
 
-          git checkout -b "${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-develop}}"
-
-          nix build --no-link -L --show-trace \
+          # first build all derivations. this could be enough for test derivations.
+          nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
+
+          # TODO: remove this once we've implemented all tests and know that we don't need it
+          # if there's something to run we generate separate commands
+          # if [[ ${{ matrix.cmd.verb }} == "run" ]]; then
+          #   export basecmd="nix run -L --show-trace .#packages.${system}."
+          #   ${basecmd}${{ join(matrix.cmd.pkgs, '; ${basecmd}') }}
+          # fi
