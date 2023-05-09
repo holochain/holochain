@@ -29,6 +29,7 @@
         };
 
         holochainBinaries = pkgs.mkShell {
+          inputsFrom = [ self'.devShells.rustDev ];
           packages = [ self'.packages.holochain self'.packages.lair-keystore ];
         };
 
