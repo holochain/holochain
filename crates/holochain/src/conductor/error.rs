@@ -1,6 +1,7 @@
 use super::interface::error::InterfaceError;
 use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
+use crate::conductor::conductor::CellStatus;
 use crate::core::workflow::error::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_sqlite::error::DatabaseError;
@@ -8,7 +9,6 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
-use crate::conductor::conductor::CellStatus;
 
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
