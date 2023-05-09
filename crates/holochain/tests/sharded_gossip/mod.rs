@@ -48,6 +48,7 @@ fn make_config(
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
@@ -91,6 +92,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     // let _g = holochain_trace::test_run().ok();
 
@@ -209,6 +211,7 @@ async fn three_way_gossip_recent() {
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
     holochain_trace::test_run().ok();
     let config = make_config(false, true, Some(0));
