@@ -1,4 +1,4 @@
-{ self, lib, inputs, config, ... }:
+{ self, lib, inputs, config, ... }@flake:
 
 let
   includeCommon =
@@ -15,7 +15,7 @@ in
   options.srcCleanedHolochain = lib.mkOption { type = lib.types.raw; };
   config.srcCleanedHolochain = inputs.nix-filter.lib {
     include = includeCommon;
-    root = config.reconciledInputs.holochain;
+    root = flake.config.reconciledInputs.holochain;
   };
 
   options.srcCleanedReleaseAutomationRepo = lib.mkOption { type = lib.types.raw; };
