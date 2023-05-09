@@ -123,10 +123,7 @@ async fn clean_sandboxes() {
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
 #[tokio::test(flavor = "multi_thread")]
-// #[ignore = "TODO: @ThetaSinner please have a look"]
 async fn generate_sandbox_and_connect() {
-    println!("started test 1");
-
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
@@ -144,7 +141,7 @@ async fn generate_sandbox_and_connect() {
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        //.stderr(Stdio::null())
+        .stderr(Stdio::null())
         .kill_on_drop(true);
 
     let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
@@ -162,9 +159,7 @@ async fn generate_sandbox_and_connect() {
 
 /// Generates a new sandbox with a single app deployed and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
-// #[ignore = "TODO: @ThetaSinner please have a look"]
 async fn generate_sandbox_and_call_list_dna() {
-    println!("started test 2");
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
@@ -182,7 +177,7 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        //.stderr(Stdio::null())
+        .stderr(Stdio::null())
         .kill_on_drop(true);
 
     let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
@@ -199,7 +194,7 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg(format!("--running={}", launch_info.admin_port))
         .arg("list-dnas")
         .stdin(Stdio::piped())
-        //.stdout(Stdio::null())
+        .stdout(Stdio::null())
         .stderr(Stdio::inherit());
     let mut hc_call = cmd.spawn().expect("Failed to spawn holochain");
 
@@ -233,10 +228,8 @@ fn get_sandbox_command() -> Command {
 async fn get_launch_info(stdout: &mut ChildStdout) -> LaunchInfo {
     let mut lines = BufReader::new(stdout).lines();
     while let Ok(Some(line)) = lines.next_line().await {
-        println!("{}", line);
         if let Some(index) = line.find("#!0") {
             let launch_info_str = &line[index + 3..].trim();
-            println!("found output line");
             return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
         }
     }
