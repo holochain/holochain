@@ -1520,7 +1520,7 @@ mod cell_impls {
                 if require_network_ready && cell.status != CellStatus::Joined {
                     Err(ConductorError::CellNetworkNotReady(cell.status))
                 } else {
-                    Ok(cell.cell.clone())
+                    Ok(cell.cell)
                 }
             } else {
                 // If not in running_cells list, check if the cell id is registered at all,
