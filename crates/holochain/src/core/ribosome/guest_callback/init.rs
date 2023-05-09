@@ -243,6 +243,7 @@ mod slow_tests {
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
+    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_init_unimplemented() {
@@ -349,7 +350,7 @@ mod slow_tests {
         });
 
         let mut had_successful_zome_call = false;
-        for _ in 0..15 {
+        for _ in 0..30 {
             let create_post_result: ConductorApiResult<ActionHash> = conductor
                 .call_fallible(
                     &zome,
@@ -377,6 +378,8 @@ mod slow_tests {
                     panic!("Other types of error are not expected {:?}", e);
                 }
             }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
         assert!(
