@@ -200,8 +200,6 @@ async fn generate_sandbox_and_call_list_dna() {
 
     let exit_code = hc_call.wait().await.unwrap();
     assert!(exit_code.success());
-
-    hc_admin.kill().await.unwrap();
 }
 
 fn get_hc_command() -> Command {
