@@ -789,6 +789,10 @@ where
                             (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
                         )",
                     });
+
+                    let entry_type_filters_count = query.entry_type.as_ref().map_or(0, |t| t.len());
+                    let action_type_filters_count = query.action_type.as_ref().map_or(0, |t| t.len());
+
                     sql.push_str(
                         format!("
                         )
@@ -797,14 +801,14 @@ where
                         AND
                         (:action_type IS NULL OR Action.type IN ({}))
                         ORDER BY Action.seq
-                        ", named_param_seq("entry_type", query.entry_type.as_ref().map_or(0, |t| t.len())), named_param_seq("action_type", query.action_type.as_ref().map_or(0, |t| t.len()))).as_str(),
+                        ", named_param_seq("entry_type", entry_type_filters_count), named_param_seq("action_type", action_type_filters_count)).as_str(),
                     );
                     sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
 
                     // This type is similar to what `named_params!` from rusqlite creates, escept for the use of boxing to allow references to be passed to the query.
                     // The reserved capacity here should account for the number of parameters inserted below, including the variable inputs like entry_types and actions_types.
-                    let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(6 + query.entry_type.as_ref().map_or(0, |t| t.len()) + query.action_type.as_ref().map_or(0, |t| t.len()));
+                    let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(6 + entry_type_filters_count + action_type_filters_count);
                     args.push((":author".to_string(), Box::new(author)));
 
                     match &query.entry_type {
