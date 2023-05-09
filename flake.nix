@@ -37,17 +37,15 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    versions = {
-      url = "github:holochain/holochain?dir=versions/0_1";
-    };
+    versions.url = "github:holochain/holochain?dir=versions/0_1";
 
-    holochain.follows = "versions/holochain";
+    holochain.url = "file:///dev/null";
     holochain.flake = false;
-    lair.follows = "versions/lair";
+    lair.url = "file:///dev/null";
     lair.flake = false;
-    launcher.follows = "versions/launcher";
+    launcher.url = "file:///dev/null";
     launcher.flake = false;
-    scaffolding.follows = "versions/scaffolding";
+    scaffolding.url = "file:///dev/null";
     scaffolding.flake = false;
 
     cargo-chef = {
