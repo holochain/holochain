@@ -28,6 +28,10 @@
           '';
         };
 
+        holochainBinaries = pkgs.mkShell {
+          packages = [ self'.packages.holochain self'.packages.lair-keystore ];
+        };
+
         release = pkgs.mkShell {
           inputsFrom = [ self'.devShells.rustDev ];
 
