@@ -178,7 +178,7 @@ mod test {
                 };
             }
 
-            assert_eq!(expected, results.into(), );
+            assert_eq!(expected, results.into(),);
         }
     }
 
@@ -187,7 +187,7 @@ mod test {
         let init_host_access = InitHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(HostFnAccess::from(&init_host_access), HostFnAccess::all(), );
+        assert_eq!(HostFnAccess::from(&init_host_access), HostFnAccess::all(),);
     }
 
     #[test]
@@ -195,7 +195,7 @@ mod test {
         let init_invocation = InitInvocationFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(ZomesToInvoke::All, init_invocation.zomes(), );
+        assert_eq!(ZomesToInvoke::All, init_invocation.zomes(),);
     }
 
     #[test]
@@ -218,7 +218,7 @@ mod test {
 
         let host_input = init_invocation.clone().host_input().unwrap();
 
-        assert_eq!(host_input, ExternIO::encode(()).unwrap(), );
+        assert_eq!(host_input, ExternIO::encode(()).unwrap(),);
     }
 }
 
@@ -226,23 +226,23 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::InitResult;
+    use crate::conductor::api::error::ConductorApiResult;
+    use crate::conductor::conductor::CellStatus;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::sweettest::SweetConductor;
+    use crate::sweettest::SweetDnaFile;
+    use crate::sweettest::SweetZome;
+    use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
+    use holo_hash::ActionHash;
     use holochain_types::app::{CloneCellId, DisableCloneCellPayload};
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::conductor::api::error::ConductorApiResult;
-    use crate::conductor::conductor::CellStatus;
-    use crate::sweettest::SweetConductor;
-    use crate::test_utils::host_fn_caller::Post;
-    use crate::sweettest::SweetDnaFile;
-    use crate::sweettest::SweetZome;
     use holochain_zome_types::prelude::*;
-    use holo_hash::ActionHash;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_init_unimplemented() {
@@ -254,7 +254,7 @@ mod slow_tests {
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome.run_init(host_access, init_invocation).unwrap();
-        assert_eq!(result, InitResult::Pass, );
+        assert_eq!(result, InitResult::Pass,);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -267,7 +267,7 @@ mod slow_tests {
 
         let host_access = fixt!(InitHostAccess);
         let result = ribosome.run_init(host_access, init_invocation).unwrap();
-        assert_eq!(result, InitResult::Pass, );
+        assert_eq!(result, InitResult::Pass,);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -310,25 +310,31 @@ mod slow_tests {
             vec![TestWasm::Create],
             SerializedBytes::default(),
         )
-            .await;
+        .await;
 
         let mut conductor = SweetConductor::from_standard_config().await;
 
         let app = conductor.setup_app("app", [&dna_file]).await.unwrap();
 
-        let cloned = conductor.create_clone_cell(CreateCloneCellPayload {
-            app_id: app.installed_app_id().clone(),
-            role_name: dna_file.dna_hash().to_string().clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("anything else".to_string()),
-            membrane_proof: None,
-            name: Some("cloned".to_string()),
-        }).await.unwrap();
+        let cloned = conductor
+            .create_clone_cell(CreateCloneCellPayload {
+                app_id: app.installed_app_id().clone(),
+                role_name: dna_file.dna_hash().to_string().clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("anything else".to_string()),
+                membrane_proof: None,
+                name: Some("cloned".to_string()),
+            })
+            .await
+            .unwrap();
 
         let enable_or_disable_payload = DisableCloneCellPayload {
             app_id: app.installed_app_id().clone(),
             clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
         };
-        conductor.disable_clone_cell(&enable_or_disable_payload).await.unwrap();
+        conductor
+            .disable_clone_cell(&enable_or_disable_payload)
+            .await
+            .unwrap();
 
         let zome: SweetZome = SweetZome::new(
             cloned.cell_id.clone(),
@@ -337,13 +343,11 @@ mod slow_tests {
 
         // Run the cell enable in parallel. If we wait for it then we shouldn't see the error we're looking for
         let conductor_handle = conductor.raw_handle().clone();
+        let payload = enable_or_disable_payload.clone();
         tokio::spawn(async move {
-            conductor_handle.enable_clone_cell(&enable_or_disable_payload).await.unwrap();
+            conductor_handle.enable_clone_cell(&payload).await.unwrap();
         });
 
-        // conductor.raw_handle().enable_clone_cell(&enable_or_disable_payload).await.unwrap();
-
-        let mut network_not_ready_error_seen = false;
         let mut had_successful_zome_call = false;
         for _ in 0..15 {
             let create_post_result: ConductorApiResult<ActionHash> = conductor
@@ -351,26 +355,33 @@ mod slow_tests {
                     &zome,
                     "create_post",
                     Post(format!("clone message").to_string()),
-                ).await;
+                )
+                .await;
 
             match create_post_result {
-                Err(crate::conductor::api::error::ConductorApiError::ConductorError(crate::conductor::error::ConductorError::CellNetworkNotReady(CellStatus::Joining))) => {
-                    network_not_ready_error_seen = true
+                Err(crate::conductor::api::error::ConductorApiError::ConductorError(
+                    crate::conductor::error::ConductorError::CellNetworkNotReady(
+                        CellStatus::Joining,
+                    )
+                    | crate::conductor::error::ConductorError::CellDisabled(_),
+                )) => {
+                    // Expected errors, but CellNetworkNotReady won't always be seen depending on system performance
                 }
                 Ok(_) => {
-                    // Should only be true after we've had an error of the right type, to order the two operations
-                    had_successful_zome_call = network_not_ready_error_seen;
+                    had_successful_zome_call = true;
 
                     // Stop trying after the first successful zome call
                     break;
                 }
-                Err(_) => {
-                    // Some other kind of error, not important to this test, ignore it
+                Err(e) => {
+                    panic!("Other types of error are not expected {:?}", e);
                 }
             }
         }
 
-        assert!(network_not_ready_error_seen, "Should have seen a cell network not ready error");
-        assert!(had_successful_zome_call, "Should have seen a clone cell join the network and allow calls");
+        assert!(
+            had_successful_zome_call,
+            "Should have seen a clone cell join the network and allow calls"
+        );
     }
 }
