@@ -133,7 +133,7 @@ impl ArqSet {
     /// Convert back from a continuous arc set to a quantized one.
     /// If any information is lost (the match is not exact), return None.
     /// This is necessary because an arcset which is the union of many agents'
-    /// arcs may much longer than any one agent's arcs, which would not quantize
+    /// arcs may be much longer than any one agent's arcs, which would not quantize
     /// properly to an arq that fits the bounds of the ArqStrat (num chunks between
     /// 8 and 16), so if we want an exact match (which we often do!) we need to
     /// allow the power to be lower and the chunk size to be greater to provide

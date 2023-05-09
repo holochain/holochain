@@ -421,7 +421,6 @@ impl DhtArcRange<DhtLocation> {
 
     pub fn print(&self, len: usize) {
         println!(
-            // "{:>3}: |{}| {}/{} @ {:?}",
             "     |{}| {} {:?}",
             self.to_ascii(len),
             self.length(),

@@ -171,7 +171,6 @@ impl DhtArcSet {
         println!("{} arcs", arcs.len());
         for (i, arc) in arcs.iter().enumerate() {
             println!(
-                // "{:>3}: |{}| {}/{} @ {:?}",
                 "{:>3}: |{}| {} {:?}",
                 i,
                 arc.to_ascii(len),
