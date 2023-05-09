@@ -13,7 +13,7 @@
       commonArgs = {
 
         pname = "lair-keystore";
-        src = inputs.lair;
+        src = flake.config.reconciledInputs.lair;
 
         CARGO_PROFILE = "release";
 

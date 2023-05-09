@@ -12,7 +12,7 @@
       commonArgs = {
 
         pname = "hc-scaffold";
-        src = inputs.scaffolding;
+        src = flake.config.reconciledInputs.scaffolding;
 
         CARGO_PROFILE = "release";
 
