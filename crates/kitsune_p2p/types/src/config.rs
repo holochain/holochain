@@ -3,9 +3,6 @@
 /// How long kitsune should wait before timing out when joining the network.
 pub const JOIN_NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
-/// Fifteen minutes
-pub const RECENT_THRESHOLD_DEFAULT: std::time::Duration = std::time::Duration::from_secs(60 * 15);
-
 /// Wrapper for the actual KitsuneP2pTuningParams struct
 /// so the widely used type def can be an Arc<>
 pub mod tuning_params_struct {
@@ -229,15 +226,6 @@ pub mod tuning_params_struct {
         /// it is not set, or is not writable.
         danger_tls_keylog: String = "no_keylog".to_string(),
 
-        /// Set the cutoff time when gossip switches over from recent
-        /// to historical gossip.
-        ///
-        /// This is dangerous to change, because gossip may not be
-        /// possible with nodes using a different setting for this threshold.
-        /// Do not change this except in testing environments.
-        /// [Default: 15 minutes]
-        danger_gossip_recent_threshold_secs: u64 = super::RECENT_THRESHOLD_DEFAULT.as_secs(),
-
         /// Don't publish ops, only rely on gossip. Useful for testing the efficacy of gossip.
         disable_publish: bool = false,
 
@@ -255,11 +243,6 @@ pub mod tuning_params_struct {
         /// based on the tuning parameter tx2_implicit_timeout_ms
         pub fn implicit_timeout(&self) -> crate::KitsuneTimeout {
             crate::KitsuneTimeout::from_millis(self.tx2_implicit_timeout_ms as u64)
-        }
-
-        /// Get the gossip recent threshold param as a proper Duration
-        pub fn danger_gossip_recent_threshold(&self) -> std::time::Duration {
-            std::time::Duration::from_secs(self.danger_gossip_recent_threshold_secs)
         }
 
         /// Get the tx5_max_conn_init_s param as a Duration.

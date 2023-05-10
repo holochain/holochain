@@ -24,6 +24,7 @@ use holochain_serialized_bytes::prelude::SerializedBytes;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub use holo_hash::fixt::*;
 
@@ -749,6 +750,7 @@ fixturator!(
                 .next()
                 .unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            recent_threshold: Duration::ZERO,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
@@ -771,6 +773,7 @@ fixturator!(
                 .next()
                 .unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            recent_threshold: Duration::ZERO,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
@@ -793,6 +796,7 @@ fixturator!(
                 .next()
                 .unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            recent_threshold: Duration::ZERO,
             quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())

@@ -18,6 +18,7 @@ use kitsune_p2p_types::codec::Codec;
 use kitsune_p2p_types::config::*;
 use kitsune_p2p_types::dht::region::{Region, RegionData};
 use kitsune_p2p_types::dht::region_set::RegionSetLtcs;
+use kitsune_p2p_types::dht::spacetime::Topology;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::metrics::*;
 use kitsune_p2p_types::tx2::tx2_utils::*;
@@ -187,12 +188,16 @@ impl ShardedGossip {
         #[cfg(not(feature = "test"))]
         let state = Default::default();
 
+        let topo = todo!("This will work after arq refactor");
+        // let topo = host_api.get_topology(space.clone())?;
+
         let this = Arc::new(Self {
             ep_hnd,
             state: Share::new(state),
             gossip: ShardedGossipLocal {
                 tuning_params,
                 space,
+                topo,
                 evt_sender,
                 host_api,
                 inner: Share::new(ShardedGossipLocalState::new(metrics)),
@@ -427,6 +432,7 @@ pub struct ShardedGossipLocal {
     gossip_type: GossipType,
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
+    topo: Topology, // TODO: remove after arq refactor
     evt_sender: EventSender,
     host_api: HostApi,
     inner: Share<ShardedGossipLocalState>,
@@ -708,7 +714,7 @@ impl ShardedGossipLocal {
     /// Calculate the time range for a gossip round.
     fn calculate_time_range(&self) -> TimeWindow {
         const NOW: Duration = Duration::from_secs(0);
-        let threshold = Duration::from_secs(self.tuning_params.danger_gossip_recent_threshold_secs);
+        let threshold = self.topo.recent_threshold;
         match self.gossip_type {
             GossipType::Recent => time_range(threshold, NOW),
             GossipType::Historical => {

@@ -412,6 +412,7 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
             properties,
             network_seed,
             origin_time,
+            recent_threshold: None,
             quantum_time: None,
         },
         source,

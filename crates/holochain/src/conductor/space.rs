@@ -1,7 +1,7 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 
 use super::{
     conductor::RwShare,
@@ -734,13 +734,6 @@ impl Spaces {
             incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
         }
         Ok(())
-    }
-
-    /// Get the recent_threshold based on the kitsune network config
-    pub fn recent_threshold(&self) -> Duration {
-        self.network_config
-            .tuning_params
-            .danger_gossip_recent_threshold()
     }
 }
 

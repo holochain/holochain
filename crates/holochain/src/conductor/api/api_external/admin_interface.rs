@@ -81,7 +81,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // network seed and properties from the register call will override any in the bundle
                 let dna = match source {
                     DnaSource::Hash(ref hash) => {
-                        if !modifiers.has_some_option_set() {
+                        if modifiers.is_none() {
                             return Err(ConductorApiError::DnaReadError(
                                 "DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
                                     .to_string(),

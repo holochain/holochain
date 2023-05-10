@@ -191,6 +191,7 @@ async fn test_multi_integrity() {
             network_seed: "00000000-0000-0000-0000-000000000000".into(),
             properties: ().try_into().unwrap(),
             origin_time,
+            recent_threshold: RECENT_THRESHOLD_DEFAULT,
             quantum_time: Duration::from_secs(5 * 60),
         },
         integrity_zomes: vec![

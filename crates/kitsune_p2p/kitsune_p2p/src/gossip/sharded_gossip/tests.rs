@@ -25,10 +25,13 @@ impl ShardedGossipLocal {
         let space = Arc::new(space);
         let fetch_pool = FetchPool::new_bitwise_or();
 
+        let topo = todo!("this will work after arq refactor");
+
         Self {
             gossip_type,
             tuning_params: Default::default(),
             space,
+            topo,
             evt_sender,
             host_api: host,
             inner: Share::new(inner),

@@ -120,6 +120,7 @@ impl DnaBundle {
                             manifest.integrity.properties.clone().unwrap_or_default(),
                         )?,
                         origin_time: manifest.integrity.origin_time.into(),
+                        recent_threshold: RECENT_THRESHOLD_DEFAULT,
                         quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
                     },
                     integrity_zomes,

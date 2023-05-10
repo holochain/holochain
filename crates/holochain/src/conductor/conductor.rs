@@ -1115,17 +1115,10 @@ mod network_impls {
                     respond,
                     ..
                 } => {
-                    let cutoff = self
-                        .get_config()
-                        .network
-                        .clone()
-                        .unwrap_or_default()
-                        .tuning_params
-                        .danger_gossip_recent_threshold();
                     let topo = self
                         .get_dna_def(&dna_hash)
                         .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))?
-                        .topology(cutoff);
+                        .topology();
                     let db = { self.p2p_agents_db(&dna_hash) };
                     let res = query_peer_density(db.into(), topo, kitsune_space, dht_arc)
                         .await
@@ -1593,7 +1586,7 @@ mod clone_cell_impls {
                 membrane_proof,
                 name,
             } = payload;
-            if !modifiers.has_some_option_set() {
+            if modifiers.is_none() {
                 return Err(ConductorError::CloneCellError(
                     "neither network_seed nor properties nor origin_time provided for clone cell"
                         .to_string(),

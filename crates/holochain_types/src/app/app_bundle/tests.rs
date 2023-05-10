@@ -43,6 +43,7 @@ async fn provisioning_1_create() {
         properties: Some(app_manifest_properties_fixture()),
         network_seed: Some("network_seed".into()),
         origin_time: None,
+        recent_threshold: None,
         quantum_time: None,
     };
     let (bundle, dna) = app_bundle_fixture(modifiers).await;

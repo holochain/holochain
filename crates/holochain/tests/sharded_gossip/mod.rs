@@ -18,7 +18,6 @@ use holochain_sqlite::db::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
-use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
 fn make_config(
     recent: bool,
@@ -31,8 +30,6 @@ fn make_config(
     tuning.disable_publish = true;
     tuning.disable_recent_gossip = !recent;
     tuning.disable_historical_gossip = !historical;
-    tuning.danger_gossip_recent_threshold_secs =
-        recent_threshold.unwrap_or(RECENT_THRESHOLD_DEFAULT.as_secs());
 
     tuning.gossip_inbound_target_mbps = 10000.0;
     tuning.gossip_outbound_target_mbps = 10000.0;

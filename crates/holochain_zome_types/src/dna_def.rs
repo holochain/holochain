@@ -12,6 +12,7 @@ use holo_hash::*;
 
 #[cfg(feature = "full-dna-def")]
 use kitsune_p2p_dht::spacetime::Dimension;
+use kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME;
 
 /// Ordered list of integrity zomes in this DNA.
 pub type IntegrityZomes = Vec<(ZomeName, zome::IntegrityZomeDef)>;
@@ -21,6 +22,9 @@ pub type CoordinatorZomes = Vec<(ZomeName, zome::CoordinatorZomeDef)>;
 
 /// Placeholder for a real network seed type. See [`DnaDef`].
 pub type NetworkSeed = String;
+
+/// Fifteen minutes
+pub const RECENT_THRESHOLD_DEFAULT: std::time::Duration = std::time::Duration::from_secs(60 * 15);
 
 /// Modifiers of this DNA - the network seed, properties and origin time - as
 /// opposed to the actual DNA code. These modifiers are included in the DNA
@@ -42,21 +46,51 @@ pub struct DnaModifiers {
     pub properties: SerializedBytes,
 
     /// The time used to denote the origin of the network, used to calculate
-    /// time windows during gossip.
-    /// All Action timestamps must come after this time.
+    /// time windows during gossip. All Action timestamps must come after this time.
+    ///
+    /// It is best for this value to be as late as possible to prevent backdated actions.
+    /// Gossip performance will also be improved if this value is later rather than earlier.
     #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
     pub origin_time: Timestamp,
 
+    /// Defines the "recent" time window as any time up to this long ago from `now`.
+    /// Anything older than this threshold is considered "historical" for gossip purposes.
+    /// Default: 15 minutes
+    #[cfg_attr(
+        feature = "full-dna-def",
+        builder(default = "recent_threshold_default()")
+    )]
+    #[serde(default = "recent_threshold_default")]
+    pub recent_threshold: Duration,
+
     /// The smallest unit of time used for gossip time windows.
     /// You probably don't need to change this.
+    /// Default: 5 minutes
     #[cfg_attr(feature = "full-dna-def", builder(default = "standard_quantum_time()"))]
-    #[cfg_attr(feature = "full-dna-def", serde(default = "standard_quantum_time"))]
+    #[serde(default = "standard_quantum_time")]
     pub quantum_time: Duration,
+}
+
+impl Default for DnaModifiers {
+    fn default() -> Self {
+        Self {
+            network_seed: Default::default(),
+            properties: Default::default(),
+            origin_time: Timestamp::now(),
+            recent_threshold: RECENT_THRESHOLD_DEFAULT,
+            quantum_time: STANDARD_QUANTUM_TIME,
+        }
+    }
 }
 
 #[allow(dead_code)]
 const fn standard_quantum_time() -> Duration {
     kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME
+}
+
+#[allow(dead_code)]
+const fn recent_threshold_default() -> Duration {
+    RECENT_THRESHOLD_DEFAULT
 }
 
 impl DnaModifiers {
@@ -66,6 +100,7 @@ impl DnaModifiers {
         self.network_seed = modifiers.network_seed.unwrap_or(self.network_seed);
         self.properties = modifiers.properties.unwrap_or(self.properties);
         self.origin_time = modifiers.origin_time.unwrap_or(self.origin_time);
+        self.recent_threshold = modifiers.recent_threshold.unwrap_or(self.recent_threshold);
         self.quantum_time = modifiers.quantum_time.unwrap_or(self.quantum_time);
         self
     }
@@ -82,10 +117,12 @@ pub struct DnaModifiersOpt<P = SerializedBytes> {
     /// see [`DnaModifiers`]
     pub origin_time: Option<Timestamp>,
     /// see [`DnaModifiers`]
+    pub recent_threshold: Option<Duration>,
+    /// see [`DnaModifiers`]
     pub quantum_time: Option<Duration>,
 }
 
-impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> Default
+impl<P: PartialEq + TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> Default
     for DnaModifiersOpt<P>
 {
     fn default() -> Self {
@@ -93,13 +130,16 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> Defa
     }
 }
 
-impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaModifiersOpt<P> {
+impl<P: PartialEq + TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>>
+    DnaModifiersOpt<P>
+{
     /// Constructor with all fields set to `None`
     pub fn none() -> Self {
         Self {
             network_seed: None,
             properties: None,
             origin_time: None,
+            recent_threshold: None,
             quantum_time: None,
         }
     }
@@ -110,6 +150,7 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
             network_seed,
             properties,
             origin_time,
+            recent_threshold,
             quantum_time,
         } = self;
         let properties = if let Some(p) = properties {
@@ -121,6 +162,7 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
             network_seed,
             properties,
             origin_time,
+            recent_threshold,
             quantum_time,
         })
     }
@@ -143,15 +185,21 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
         self
     }
 
+    /// Return a modified form with the `recent_threshold` field set
+    pub fn with_recent_threshold(mut self, recent_threshold: Duration) -> Self {
+        self.recent_threshold = Some(recent_threshold);
+        self
+    }
+
     /// Return a modified form with the `quantum_time` field set
     pub fn with_quantum_time(mut self, quantum_time: Duration) -> Self {
         self.quantum_time = Some(quantum_time);
         self
     }
 
-    /// Check if at least one of the options is set.
-    pub fn has_some_option_set(&self) -> bool {
-        self.network_seed.is_some() || self.properties.is_some() || self.origin_time.is_some()
+    /// Check if none of the options are set.
+    pub fn is_none(&self) -> bool {
+        *self == Self::none()
     }
 }
 
@@ -330,12 +378,12 @@ impl DnaDef {
     }
 
     /// Get the topology to use for kitsune gossip
-    pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
+    pub fn topology(&self) -> kitsune_p2p_dht::spacetime::Topology {
         kitsune_p2p_dht::spacetime::Topology {
             space: Dimension::standard_space(),
             time: Dimension::time(self.modifiers.quantum_time),
             time_origin: self.modifiers.origin_time,
-            time_cutoff: cutoff,
+            recent_threshold: self.modifiers.recent_threshold,
         }
     }
 }
@@ -406,6 +454,7 @@ mod tests {
             network_seed: "seed".into(),
             properties: ().try_into().unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
+            recent_threshold: Duration::ZERO,
             quantum_time: STANDARD_QUANTUM_TIME,
         };
 
@@ -413,6 +462,7 @@ mod tests {
             network_seed: None,
             properties: Some(props.clone()),
             origin_time: Some(now),
+            recent_threshold: Some(Duration::ZERO),
             quantum_time: Some(Duration::from_secs(60)),
         };
 
@@ -420,6 +470,7 @@ mod tests {
             network_seed: "seed".into(),
             properties: props.clone(),
             origin_time: now,
+            recent_threshold: Duration::ZERO,
             quantum_time: Duration::from_secs(60),
         };
 

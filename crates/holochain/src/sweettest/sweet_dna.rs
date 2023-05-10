@@ -1,4 +1,3 @@
-use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
@@ -21,7 +20,7 @@ impl SweetDnaFile {
         modifiers: DnaModifiersOpt<P>,
     ) -> DnaResult<DnaFile>
     where
-        P: TryInto<SerializedBytes, Error = E>,
+        P: PartialEq + TryInto<SerializedBytes, Error = E>,
         SerializedBytesError: From<E>,
     {
         Ok(DnaBundle::read_from_file(path)
@@ -63,7 +62,7 @@ impl SweetDnaFile {
                 network_seed,
                 properties: properties.clone(),
                 origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                quantum_time: STANDARD_QUANTUM_TIME,
+                ..Default::default()
             })
             .integrity_zomes(iz)
             .coordinator_zomes(cz)

@@ -141,8 +141,6 @@ impl SweetConductorConfig {
         if let Some(c) = self.0.network.as_mut() {
             *c = c.clone().tune(|mut tp| {
                 tp.disable_publish = true;
-                // keep recent gossip for agent gossip, but gossip no ops.
-                tp.danger_gossip_recent_threshold_secs = 0;
                 tp
             });
         }

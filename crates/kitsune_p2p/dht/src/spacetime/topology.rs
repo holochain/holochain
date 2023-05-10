@@ -25,10 +25,10 @@ pub struct Topology {
     pub time: Dimension,
     /// The origin of time, meaning the 0th quantum contains this Timestamp.
     pub time_origin: Timestamp,
-    /// Ignore any data which lies after `Timestamp::now() - time_cutoff`.
+    /// Ignore any data which lies after `Timestamp::now() - recent_threshold`.
     /// This is so that historical quantized gossip does not overlap with
     /// recent gossip.
-    pub time_cutoff: Duration,
+    pub recent_threshold: Duration,
 }
 
 impl Topology {
@@ -39,7 +39,7 @@ impl Topology {
             space: Dimension::unit(),
             time: Dimension::unit(),
             time_origin,
-            time_cutoff: Duration::ZERO,
+            recent_threshold: Duration::ZERO,
         }
     }
 
@@ -50,7 +50,7 @@ impl Topology {
             space: Dimension::unit(),
             time: Dimension::unit(),
             time_origin: Timestamp::from_micros(0),
-            time_cutoff: Duration::ZERO,
+            recent_threshold: Duration::ZERO,
         }
     }
 
@@ -60,7 +60,7 @@ impl Topology {
             space: Dimension::standard_space(),
             time: Dimension::standard_time(),
             time_origin,
-            time_cutoff,
+            recent_threshold: time_cutoff,
         }
     }
 

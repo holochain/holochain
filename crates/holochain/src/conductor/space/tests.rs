@@ -54,10 +54,9 @@ async fn test_region_queries() {
     // - The origin time is five time quanta ago
     dna_def.modifiers.origin_time = five_quanta_ago.clone();
     dna_def.modifiers.quantum_time = STANDARD_QUANTUM_TIME;
-
     // Cutoff duration is 2 quanta, meaning historic gossip goes up to 1 quantum ago
-    let cutoff = Duration::from_micros(q_us * 2);
-    let topo = dna_def.topology(cutoff);
+    dna_def.modifiers.recent_threshold = Duration::from_micros(q_us * 2);
+    let topo = dna_def.topology();
 
     // Builds an arbitrary valid op at the given timestamp
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
