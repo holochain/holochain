@@ -454,7 +454,7 @@ mod tests {
 
         let arqs = vec![a, b, c];
         print_arqs(&topo, &arqs, 64);
-        let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
+        let view = PeerViewQ::new(topo.clone(), ArqStrat::default(), arqs);
 
         let get = |b: Arq| {
             view.filtered_arqs(b.to_dht_arc(&topo))
@@ -476,7 +476,7 @@ mod tests {
             .map(|x| make_arq(&topo, pow, x, x + 0x20))
             .collect();
         print_arqs(&topo, &arqs, 64);
-        let view = PeerViewQ::new(topo.clone(), Default::default(), arqs);
+        let view = PeerViewQ::new(topo.clone(), ArqStrat::default(), arqs);
         assert_eq!(
             view.extrapolated_coverage_and_filtered_count(&make_arq(&topo, pow, 0, 0x10)),
             (2.0, 1)

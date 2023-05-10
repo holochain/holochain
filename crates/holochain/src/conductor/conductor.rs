@@ -1126,10 +1126,17 @@ mod network_impls {
                         .get_dna_def(&dna_hash)
                         .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))?
                         .topology(cutoff);
+                    let tuning = self.get_config().kitsune_tuning_params();
                     let db = { self.p2p_agents_db(&dna_hash) };
-                    let res = query_peer_density(db.into(), topo, kitsune_space, dht_arc)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    let res = query_peer_density(
+                        db.into(),
+                        topo,
+                        tuning.to_arq_strat().into(),
+                        kitsune_space,
+                        dht_arc,
+                    )
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 SignNetworkData {

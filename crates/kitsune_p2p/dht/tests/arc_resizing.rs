@@ -31,7 +31,7 @@ fn test_shrink_towards_empty() {
         min_coverage: 10.0,
         buffer: 0.2,
         max_power_diff: 2,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     let jitter = 0.01;
 
@@ -65,7 +65,7 @@ fn test_grow_towards_full() {
         min_coverage: 10.0,
         buffer: 0.2,
         max_power_diff: 2,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     println!("{}", strat.summary());
     strat.max_chunks();
@@ -102,7 +102,7 @@ fn test_grow_to_full() {
         min_coverage: 10.0,
         buffer: 0.2,
         max_power_diff: 32,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     let jitter = 0.01;
     dbg!(strat.max_chunks());
@@ -136,7 +136,7 @@ fn test_clamp_empty() {
         min_coverage: cov,
         buffer: 0.2,
         max_power_diff: 2,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     let jitter = 0.0;
     dbg!(strat.max_chunks());
@@ -228,7 +228,7 @@ fn test_grow_by_multiple_chunks() {
     let strat = ArqStrat {
         min_coverage: 10.0,
         buffer: 0.2,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     let jitter = 0.01;
 
@@ -260,7 +260,7 @@ fn test_degenerate_asymmetrical_coverage() {
     let strat = ArqStrat {
         min_coverage: 5.0,
         buffer: 0.1,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     let view = PeerViewQ::new(topo.clone(), strat, others);
 
@@ -291,7 +291,7 @@ fn test_scenario() {
         min_coverage: 10.0,
         buffer: 0.2,
         max_power_diff: 2,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     let jitter = 0.000;
 

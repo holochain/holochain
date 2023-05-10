@@ -230,6 +230,7 @@ pub async fn list_all_agent_info_signed_near_basis(
 pub async fn query_peer_density(
     env: DbRead<DbKindP2pAgents>,
     topology: Topology,
+    strat: PeerStrat,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerView> {
@@ -247,7 +248,7 @@ pub async fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    Ok(PeerStrat::default().view(topology, dht_arc, arcs.as_slice()))
+    Ok(strat.view(topology, dht_arc, arcs.as_slice()))
 }
 
 /// Put single agent info into store

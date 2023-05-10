@@ -24,15 +24,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::{
-    dht::{
-        arq::{power_and_count_from_length, ArqSet},
-        hash::RegionHash,
-        prelude::Topology,
-        region::{RegionBounds, RegionData},
-        region_set::{RegionCoordSetLtcs, RegionSetLtcs},
-        spacetime::TelescopingTimes,
-        ArqBounds, ArqStrat,
-    },
+    dht::region::RegionBounds,
     dht_arc::{DhtArcRange, DhtArcSet},
     event::FetchOpDataQuery,
 };
@@ -42,7 +34,7 @@ use holochain_sqlite::{
         DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents, DbKindP2pMetrics,
         DbKindWasm, DbWrite, ReadAccess,
     },
-    prelude::{DatabaseError, DatabaseResult},
+    prelude::DatabaseResult,
 };
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
@@ -491,67 +483,6 @@ impl Spaces {
             .await?;
 
         Ok(results)
-    }
-
-    /// The network module needs info about various groupings ("regions") of ops
-    ///
-    /// Note that this always includes all ops regardless of integration status.
-    /// This is to avoid the degenerate case of freshly joining a network, and
-    /// having several new peers gossiping with you at once about the same regions.
-    /// If we calculate our region hash only by integrated ops, we will experience
-    /// mismatches for a large number of ops repeatedly until we have integrated
-    /// those ops. Note that when *sending* ops we filter out ops in limbo.
-    pub async fn handle_fetch_op_regions(
-        &self,
-        dna_hash: &DnaHash,
-        topology: Topology,
-        dht_arc_set: DhtArcSet,
-    ) -> ConductorResult<RegionSetLtcs> {
-        let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
-        let max_chunks = ArqStrat::default().max_chunks();
-        let arq_set = ArqSet::new(
-            dht_arc_set
-                .intervals()
-                .into_iter()
-                .map(|i| {
-                    let len = i.length();
-                    let (pow, _) = power_and_count_from_length(&topology.space, len, max_chunks);
-                    ArqBounds::from_interval_rounded(&topology, pow, i).0
-                })
-                .collect(),
-        );
-        let times = TelescopingTimes::historical(&topology);
-        let coords = RegionCoordSetLtcs::new(times, arq_set);
-        let coords_clone = coords.clone();
-        let db = self.dht_db(dna_hash)?;
-        db.async_reader(move |txn| {
-            let mut stmt = txn.prepare_cached(sql).map_err(DatabaseError::from)?;
-            Ok(coords_clone.into_region_set(|(_, coords)| {
-                let bounds = coords.to_bounds(&topology);
-                let (x0, x1) = bounds.x;
-                let (t0, t1) = bounds.t;
-                stmt.query_row(
-                    named_params! {
-                        ":storage_start_loc": x0,
-                        ":storage_end_loc": x1,
-                        ":timestamp_min": t0,
-                        ":timestamp_max": t1,
-                    },
-                    |row| {
-                        let total_action_size: f64 = row.get("total_action_size")?;
-                        let total_entry_size: f64 = row.get("total_entry_size")?;
-                        let size = total_action_size + total_entry_size;
-                        Ok(RegionData {
-                            hash: RegionHash::from_vec(row.get("xor_hash")?)
-                                .expect("region hash must be 32 bytes"),
-                            size: size.min(u32::MAX as f64) as u32,
-                            count: row.get("count")?,
-                        })
-                    },
-                )
-            })?)
-        })
-        .await
     }
 
     #[instrument(skip(self, query))]
