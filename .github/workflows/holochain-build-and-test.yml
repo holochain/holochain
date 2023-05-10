@@ -61,6 +61,7 @@ jobs:
       - name: "Test command ${{ matrix.nixCommand }}"
         env:
           system: ${{ matrix.platform.system }}
+          NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
         run: |
           set -xe
 
