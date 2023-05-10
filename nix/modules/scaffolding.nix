@@ -13,7 +13,7 @@
       commonArgs = {
 
         pname = "hc-scaffold";
-        src = inputs.scaffolding;
+        src = flake.config.reconciledInputs.scaffolding;
 
         CARGO_PROFILE = "release";
 
@@ -22,7 +22,8 @@
         buildInputs =
           (with pkgs; [
             # TODO: remove sqlite package once https://github.com/holochain/holochain/pull/2248 is released
-            openssl sqlite
+            openssl
+            sqlite
           ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
             (with pkgs.darwin.apple_sdk_11_0.frameworks; [
