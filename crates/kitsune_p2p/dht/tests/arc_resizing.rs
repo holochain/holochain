@@ -173,8 +173,8 @@ fn test_clamp_empty() {
         // print_arqs(&topo, &peers, 64);
         rounds += 1;
     }
-    dbg!(rounds);
     print_arqs(&topo, &peers, 64);
+    dbg!(rounds);
 
     // let view_half = PeerViewQ::new(
     //     topo.clone(),
