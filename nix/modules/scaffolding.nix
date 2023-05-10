@@ -24,9 +24,9 @@
           ]) ++ (lib.optionals pkgs.stdenv.isDarwin
             (with self'.legacyPackages.apple_sdk'.frameworks; [
               AppKit
-              Foundation
+              CoreFoundation
+              CoreServices
               Security
-              WebKit
             ])
           )
         ;

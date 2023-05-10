@@ -31,10 +31,10 @@
           (with self'.legacyPackages.apple_sdk'.frameworks; [
             AppKit
             CoreFoundation
-            Foundation
+            CoreServices
             Security
-            WebKit
             IOKit
+            WebKit
           ])
         ;
 
