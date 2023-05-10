@@ -25,7 +25,7 @@ use holochain_p2p::AgentPubKeyExt;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::{
     dht::{
-        arq::{power_and_count_from_length, ArqBoundsSet},
+        arq::{power_and_count_from_length, ArqSet},
         hash::RegionHash,
         prelude::Topology,
         region::{RegionBounds, RegionData},
@@ -509,7 +509,7 @@ impl Spaces {
     ) -> ConductorResult<RegionSetLtcs> {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OP_REGION;
         let max_chunks = ArqStrat::default().max_chunks();
-        let arq_set = ArqBoundsSet::new(
+        let arq_set = ArqSet::new(
             dht_arc_set
                 .intervals()
                 .into_iter()
