@@ -31,6 +31,9 @@
         holochainBinaries = pkgs.mkShell {
           inputsFrom = [ self'.devShells.rustDev ];
           packages = [ self'.packages.holochain self'.packages.lair-keystore ];
+          shellHook = ''
+            export PS1='\n\[\033[1;34m\][holochainBinaries:\w]\$\[\033[0m\] '
+          '';
         };
 
         release = pkgs.mkShell {
