@@ -177,7 +177,7 @@ jobs:
           set -exu
           cd "${HOLOCHAIN_REPO}"
 
-          nix develop ${GITHUB_WORKSPACE}#release --ignore-environment --command release-automation \
+          nix develop .#release --ignore-environment --command release-automation \
               --workspace-path=$PWD \
               --log-level=debug \
               crate detect-missing-releaseheadings
@@ -188,7 +188,7 @@ jobs:
           HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
         run: |
           cd "${HOLOCHAIN_REPO}"
-          nix develop ${GITHUB_WORKSPACE}#release --ignore-environment --command bash ./scripts/generate_readmes.sh
+          nix develop .#release --ignore-environment --command bash ./scripts/generate_readmes.sh
 
       - name: Bump the crate versions for the release
         id: bump-versions
@@ -201,7 +201,7 @@ jobs:
 
           cd ${HOLOCHAIN_REPO}
 
-          nix develop ${GITHUB_WORKSPACE}#release --ignore-environment --command bash -c '
+          nix develop .#release --ignore-environment --command bash -c '
             set -e
             cargo sweep -s
 
