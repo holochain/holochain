@@ -36,7 +36,7 @@
         trap "cd $PWD" EXIT
 
         export VERSIONS_DIR="./versions/''${1}"
-        export DEFAULT_VERSIONS_DIR="$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.path')"
+        export DEFAULT_VERSIONS_DIR="./$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.path')"
 
         (
           cd "$VERSIONS_DIR"
@@ -52,7 +52,7 @@
         fi
 
         if [[ "$VERSIONS_DIR" = "$DEFAULT_VERSIONS_DIR" ]]; then
-          nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR" 
+          nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR"
         fi
 
         if [[ $(${pkgs.git}/bin/git diff -- flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
