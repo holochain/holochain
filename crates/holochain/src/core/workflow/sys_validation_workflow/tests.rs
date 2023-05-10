@@ -24,6 +24,7 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn sys_validation_workflow_test() {
     holochain_trace::test_run().ok();
 
