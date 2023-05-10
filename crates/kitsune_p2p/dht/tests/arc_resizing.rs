@@ -131,20 +131,18 @@ fn test_clamp_empty() {
     let topo = Topology::unit_zero();
     let mut rng = seeded_rng(None);
 
-    // aim for coverage between 10 and 12, with no limit on power diff
+    let cov = 50.0;
     let strat = ArqStrat {
-        min_coverage: 10.0,
+        min_coverage: cov,
         buffer: 0.2,
-        max_power_diff: 32,
+        max_power_diff: 2,
         ..Default::default()
     };
     let jitter = 0.0;
-    let cov = 10.0;
     dbg!(strat.max_chunks());
 
     // generate peers with deficient coverage
-    let mut peers: Vec<_> =
-        generate_ideal_coverage(&topo, &mut rng, &strat, Some(cov), 100, jitter);
+    let mut peers: Vec<_> = generate_ideal_coverage(&topo, &mut rng, &strat, None, 200, jitter);
     let num_peers = peers.len();
     dbg!(num_peers);
 
@@ -153,14 +151,15 @@ fn test_clamp_empty() {
 
     let mut changed = true;
     let mut rounds = 0;
+    let clamp_every = 4;
+    let do_clamp = |i| i % clamp_every == 0;
+    // let clamp_after = num_peers;
+
     while changed {
         let view = PeerViewQ::new(topo.clone(), strat.clone(), peers.clone());
         changed = false;
         for (i, mut arq) in peers.iter_mut().enumerate() {
-            let clamp = i >= num_peers / 2;
-            // let clamp = false;
-
-            if clamp {
+            if do_clamp(i) {
                 // *arq = Arq::new_full(&topo, arq.start, topo.max_space_power(&strat));
                 *arq.count_mut() = 0;
             } else {
@@ -176,14 +175,23 @@ fn test_clamp_empty() {
     print_arqs(&topo, &peers, 64);
     dbg!(rounds);
 
-    // let view_half = PeerViewQ::new(
-    //     topo.clone(),
-    //     strat.clone(),
-    //     peers.clone().into_iter().take(50).collect(),
-    // );
+    let view_unclamped = PeerViewQ::new(
+        topo.clone(),
+        strat.clone(),
+        peers
+            .clone()
+            .into_iter()
+            .enumerate()
+            .filter_map(|(i, a)| (!do_clamp(i)).then_some(a))
+            .collect(),
+    );
     let view_full = PeerViewQ::new(topo.clone(), strat.clone(), peers);
+    dbg!(view_unclamped.actual_coverage());
     dbg!(view_full.actual_coverage());
-    assert!(view_full.actual_coverage() > cov - 1.0);
+
+    assert!(view_unclamped.actual_coverage() * 2.0 > strat.min_coverage);
+    assert!(view_full.actual_coverage() > strat.min_coverage);
+    assert!(view_full.actual_coverage() < strat.max_coverage());
 }
 
 #[test]
