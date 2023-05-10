@@ -19,7 +19,7 @@ use super::{Region, RegionCoords, RegionData, RegionDataConstraints};
 #[cfg_attr(feature = "test_utils", derive(Clone))]
 pub struct RegionCoordSetLtcs {
     pub(super) times: TelescopingTimes,
-    pub(super) arq_set: ArqBoundsSet,
+    pub(super) arq_set: ArqSet,
 }
 
 impl RegionCoordSetLtcs {
@@ -87,7 +87,7 @@ impl RegionCoordSetLtcs {
     pub fn empty() -> Self {
         Self {
             times: TelescopingTimes::empty(),
-            arq_set: ArqBoundsSet::empty(),
+            arq_set: ArqSet::empty(),
         }
     }
 
