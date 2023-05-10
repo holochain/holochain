@@ -20,9 +20,6 @@
 
         buildInputs = (with pkgs; [
           openssl
-
-          # TODO: remove this once the features have been rearranged to use vendored sqlite
-          sqlite
         ])
         ++ (lib.optionals pkgs.stdenv.isLinux
           (with pkgs; [
