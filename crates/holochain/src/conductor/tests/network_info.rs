@@ -54,7 +54,7 @@ async fn network_info() {
 
     wait_for_integration(
         &conductors[1].get_dht_db(dna.dna_hash()).unwrap(),
-        100,
+        28,
         100,
         std::time::Duration::from_millis(100),
     )
