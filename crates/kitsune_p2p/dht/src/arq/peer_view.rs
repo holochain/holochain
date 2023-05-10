@@ -3,7 +3,7 @@ use num_traits::Zero;
 
 use crate::spacetime::{SpaceOffset, Topology};
 
-use super::{is_full, Arq, ArqStrat};
+use super::{is_full, Arq, ArqClamping, ArqStrat};
 
 /// A "view" of the peers in a neighborhood. The view consists of a few
 /// observations about the distribution of peers within a particular arc, used
@@ -25,7 +25,7 @@ impl PeerView {
         match self {
             Self::Quantized(v) => {
                 let mut arq = Arq::from_dht_arc_approximate(&v.topo, &v.strat, dht_arc);
-                let updated = v.update_arq(&v.topo, &mut arq);
+                let updated = v.update_arq(&mut arq);
                 *dht_arc = arq.to_dht_arc(&v.topo);
                 updated
             }
@@ -117,8 +117,22 @@ impl PeerViewQ {
     }
 
     /// Mutate the arq to its ideal target
-    pub fn update_arq(&self, topo: &Topology, arq: &mut Arq) -> bool {
-        self.update_arq_with_stats(topo, arq).changed
+    pub fn update_arq(&self, arq: &mut Arq) -> bool {
+        let topo = &self.topo;
+        let strat = &self.strat;
+        match strat.local_storage.arc_clamping {
+            Some(ArqClamping::Empty) => {
+                let changed = arq.is_empty();
+                *arq.count_mut() = 0;
+                changed
+            }
+            Some(ArqClamping::Full) => {
+                let changed = arq.is_full(&topo);
+                *arq = Arq::new_full(topo, arq.start, topo.max_space_power(strat));
+                changed
+            }
+            None => self.update_arq_with_stats(topo, arq).changed,
+        }
     }
 
     fn is_slacking(&self, cov: f64, num_peers: usize) -> bool {

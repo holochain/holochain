@@ -1,11 +1,9 @@
 use kitsune_p2p_types::config::{tuning_params_struct, KitsuneP2pTuningParams};
+use kitsune_p2p_types::dht::prelude::LocalStorageConfig;
 use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
 use url2::Url2;
-
-mod storage;
-pub use storage::*;
 
 // TODO - FIXME - holochain bootstrap should not be encoded in kitsune
 /// The default production bootstrap service url.
@@ -65,7 +63,7 @@ pub struct KitsuneP2pConfig {
 
     /// Config for arc storage
     #[serde(default)]
-    pub storage: StorageConfig,
+    pub storage: LocalStorageConfig,
 }
 
 impl Default for KitsuneP2pConfig {
@@ -75,6 +73,7 @@ impl Default for KitsuneP2pConfig {
             bootstrap_service: None,
             tuning_params: KitsuneP2pTuningParams::default(),
             network_type: NetworkType::QuicBootstrap,
+            storage: LocalStorageConfig::default(),
         }
     }
 }
