@@ -5,7 +5,6 @@ use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
-use holochain_types::prelude::test_keystore;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 #[derive(Default)]
@@ -299,7 +298,9 @@ impl ConductorBuilder {
         env_path: &std::path::Path,
         extra_dnas: &[DnaFile],
     ) -> ConductorResult<ConductorHandle> {
-        let keystore = self.keystore.unwrap_or_else(test_keystore);
+        let keystore = self
+            .keystore
+            .unwrap_or_else(holochain_types::prelude::test_keystore);
         self.config.environment_path = env_path.to_path_buf().into();
 
         let spaces = Spaces::new(&self.config)?;
