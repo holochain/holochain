@@ -131,7 +131,7 @@ impl PeerViewQ {
                 *arq = Arq::new_full(topo, arq.start, topo.max_space_power(strat));
                 changed
             }
-            None => self.update_arq_with_stats(topo, arq).changed,
+            None => self.update_arq_with_stats(arq).changed,
         }
     }
 
@@ -235,7 +235,8 @@ impl PeerViewQ {
     /// More detail on these assumptions here:
     /// <https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g>
     /// TODO: make the above link to something publicly available, preferably in the repo
-    pub fn update_arq_with_stats(&self, topo: &Topology, arq: &mut Arq) -> UpdateArqStats {
+    pub fn update_arq_with_stats(&self, arq: &mut Arq) -> UpdateArqStats {
+        let topo = &self.topo;
         let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(arq);
 
         let old_count = arq.count();
@@ -373,6 +374,7 @@ impl PeerViewQ {
         PowerStats { median, std_dev }
     }
 
+    /// Filter to return only **non-zero** arcs whose start lies in the filtering arc
     fn filtered_arqs(&self, filter: DhtArc) -> impl Iterator<Item = &Arq> {
         let it = self.peers.iter();
 
@@ -382,7 +384,7 @@ impl PeerViewQ {
             .filter(|(i, _)| self.skip_index.as_ref() != Some(i))
             .map(|(_, arq)| arq);
 
-        it.filter(move |arq| filter.contains(arq.start_loc()))
+        it.filter(move |arq| !arq.is_empty() && filter.contains(arq.start_loc()))
     }
 }
 

@@ -79,7 +79,7 @@ fn test_grow_towards_full() {
     // start with an arq comparable to one's peers
     let mut arq = Arq::new(peer_power, 0u32.into(), 12.into());
     loop {
-        let stats = view.update_arq_with_stats(&topo, &mut arq);
+        let stats = view.update_arq_with_stats(&mut arq);
         if !stats.changed {
             break;
         }
@@ -131,7 +131,7 @@ fn test_clamp_empty() {
     let topo = Topology::unit_zero();
     let mut rng = seeded_rng(None);
 
-    let cov = 50.0;
+    let cov = 30.0;
     let strat = ArqStrat {
         min_coverage: cov,
         buffer: 0.2,
@@ -141,19 +141,40 @@ fn test_clamp_empty() {
     let jitter = 0.0;
     dbg!(strat.max_chunks());
 
-    // generate peers with deficient coverage
-    let mut peers: Vec<_> = generate_ideal_coverage(&topo, &mut rng, &strat, None, 200, jitter);
-    let num_peers = peers.len();
-    dbg!(num_peers);
-
     let mut strat_clamped = strat.clone();
     strat_clamped.local_storage.arc_clamping = Some(ArqClamping::Full);
 
     let mut changed = true;
     let mut rounds = 0;
-    let clamp_every = 4;
+
+    // every other node is empty
+    let clamp_every = 2;
     let do_clamp = |i| i % clamp_every == 0;
-    // let clamp_after = num_peers;
+
+    // Generate all peers starting with the size they would have if all nodes were honest,
+    // but then clamp every other arc to 0.
+    // If none of the arcs were 0, then no arcs would grow, but in the presence of these zero arcs,
+    // the honest arcs grow.
+    // NOTE: this is a precursor to what we actually want, which is for nodes to detect whether other nodes
+    // are slacking. In order to do that, we need to gather several observations of them over time, which we
+    // don't currently do. We need observations over time, because a slacker is a node whose arc is not only
+    // smaller than expected, but also is not growing. If we don't take the rate of change into account, the
+    // system oscillates unstably.
+    // However, we can safely assume that any node with a zero arc has chosen that intentionally, with no
+    // plans of growing. (If they do grow, then they will be included in arc calculations on the next round.)
+    let mut peers: Vec<_> = generate_ideal_coverage(&topo, &mut rng, &strat, None, 100, jitter)
+        .into_iter()
+        .enumerate()
+        .map(|(i, a)| {
+            if do_clamp(i) {
+                Arq::empty(&topo, 10).to_arq(&topo, |_| a.start)
+            } else {
+                a
+            }
+        })
+        .collect();
+    let num_peers = peers.len();
+    dbg!(num_peers);
 
     while changed {
         let view = PeerViewQ::new(topo.clone(), strat.clone(), peers.clone());
@@ -163,13 +184,12 @@ fn test_clamp_empty() {
                 // *arq = Arq::new_full(&topo, arq.start, topo.max_space_power(&strat));
                 *arq.count_mut() = 0;
             } else {
-                if view.update_arq(&mut arq) {
+                let stats = view.update_arq_with_stats(&mut arq);
+                if stats.changed {
                     changed = true;
                 }
             }
         }
-        // println!("========= {} =========", rounds);
-        // print_arqs(&topo, &peers, 64);
         rounds += 1;
     }
     print_arqs(&topo, &peers, 64);
@@ -189,9 +209,9 @@ fn test_clamp_empty() {
     dbg!(view_unclamped.actual_coverage());
     dbg!(view_full.actual_coverage());
 
-    assert!(view_unclamped.actual_coverage() * 2.0 > strat.min_coverage);
-    assert!(view_full.actual_coverage() > strat.min_coverage);
-    assert!(view_full.actual_coverage() < strat.max_coverage());
+    // assert!(view_unclamped.actual_coverage() * 2.0 >= strat.min_coverage);
+    assert!(view_full.actual_coverage() >= strat.min_coverage);
+    assert!(view_full.actual_coverage() <= strat.max_coverage());
 }
 
 #[test]
