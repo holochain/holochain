@@ -89,9 +89,10 @@ impl HcRunLocalServices {
         if !self.disable_bootstrap {
             let bs_ip: std::net::IpAddr = self.bootstrap_interface.parse().map_err(Error::err)?;
             let bs_addr = std::net::SocketAddr::from((bs_ip, self.bootstrap_port));
-            let (bs_driver, bs_addr, _shutdown) = kitsune_p2p_bootstrap::run(bs_addr, vec![])
+            let (bs_driver, bs_addr, shutdown) = kitsune_p2p_bootstrap::run(bs_addr, vec![])
                 .await
                 .map_err(Error::str)?;
+            std::mem::forget(shutdown);
             task_list.push(bs_driver);
 
             let mut a_out = AOut::new(&self.bootstrap_address_path).await?;
