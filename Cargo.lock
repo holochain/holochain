@@ -2402,7 +2402,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.2.0"
+version = "0.3.0-beta-dev.0"
 dependencies = [
  "fixt",
  "getrandom 0.2.9",
@@ -2530,7 +2530,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.2.0"
+version = "0.3.0-beta-dev.0"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -2632,7 +2632,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.2.0"
+version = "0.3.0-beta-dev.0"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2667,7 +2667,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.2.0"
+version = "0.3.0-beta-dev.0"
 dependencies = [
  "anyhow",
  "futures",
@@ -2708,7 +2708,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.2.0"
+version = "0.3.0-beta-dev.0"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -2750,7 +2750,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.2.0"
+version = "0.3.0-beta-dev.0"
 dependencies = [
  "derive_more",
  "directories",
@@ -3018,7 +3018,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.2.0"
+version = "0.3.0-beta-dev.0"
 dependencies = [
  "hdk",
  "serde",

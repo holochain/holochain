@@ -4,33 +4,19 @@
 
 The Holochain Development Kit (HDK) provides high and low level functions for writing Holochain applications.
 
-Functions of a Holochain application (hApp) can be organized into reusable components. In Holochain terminology these components are called "zomes".
-One or multiple zomes are compiled into a WebAssembly (WASM) binary, referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
-In short, that structure is __hApp -> DNA -> zome -> function__.
+Holochain is built as a client-server architecture. The Conductor, Holochain's runtime, acts as the server.
+Its [Conductor API](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api) can be queried
+by a client to manage hApps and send requests to hApp functions.
+[Read more on Holochain's architecture.](https://developer.holochain.org/concepts/2_application_architecture)
 
-hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
-data model is defined in integrity zomes and the domain logic is written in coordinator zomes. See Integrity zomes and Coordinator zomes further down and
-Holochain Deterministic Integrity (HDI) for more information.
+Functions of a hApp are organized into reusable components. In Holochain terminology these components are called "zomes".
+One or multiple zomes are compiled into WebAssembly (WASM) binaries and bundled into a file referred to as a DNA. All of the DNAs of an application are bundled to a hApp.
+In short, the structure is __hApp -> DNA -> zome -> function__.
 
-Since hApps are run as a binary on the hosting system, they must be sandboxed to prevent execution of insecure commands.
-Instead of writing and maintaining a custom format and specification for these artifacts as well as a runtime environment to execute them,
-Holochain makes use of WASM as the format of its applications. WASM binaries meet the aforementioned requirements as per the
-[WebAssembly specification](https://webassembly.github.io/spec/core).
-
-hApps can be installed on a device that's running a so-called conductor, Holochain's runtime. Clients can then call each zome's functions via Remote Procedure Calls (RPC).
-Holochain employs websocket ports for these RPCs, served by the conductor. Calls are made either from a client on localhost or from other nodes on the network.
-The zome function to be executed must be specified in each call. Every zome function defines the response it returns to the client.
-[More info on Holochain's architecture](https://developer.holochain.org/concepts/2_application_architecture)
-
-Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is encapsulated by the HDK.
-Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
-
-See the [Holochain Learning Resources](https://developer.holochain.org/learning) to get started with hApp development.
+hApps can be developed using the HDK. See the [Holochain Quick Start Guide](https://developer.holochain.org/quick-start)
+to get started with hApp development.
 
 ## Example zomes 🍭
-
-The HDK is used in all the WASMs used to test Holochain itself.
-As they are used directly by tests in CI they are guaranteed to compile and work for at least the tests we define against them.
 
 There are numerous example/test WASMs on many aspects of hApp development that can be browsed
 [on Github](https://github.com/holochain/holochain/tree/develop/crates/test_utils/wasm/wasm_workspace).
@@ -38,17 +24,24 @@ There are numerous example/test WASMs on many aspects of hApp development that c
 Each example WASM is a minimal demonstration of specific HDK functionality, such as generating random data, creating entries or defining validation callbacks.
 Some of the examples are very contrived, none are intended as production grade hApp examples, but do highlight key functionality.
 
-## Integrity zomes 📐
+## Zomes are separated into data model and domain logic
+
+hApps are required to produce and validate data deterministically. There's a data model and a domain logic part to each hApp. In Holochain, the
+data model is defined in integrity zomes and the domain logic is written in coordinator zomes.
+
+### Integrity zomes 📐
 
 Integrity zomes describe a hApp's domain model by defining a set of entry and link types and providing a validation callback
 function that checks the integrity of any operations that manipulate data of those types.
+Additionally, a genesis self-check callback can be implemented for basic verification
+of the data that allows an agent to join a network before they attempt to join it.
 
 The wasm workspace contains examples of integrity zomes like this:
 <https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/integrity_zome/src/lib.rs>
 
 Refer to the HDI crate for more information on the integrity layer.
 
-## Coordinator zomes 🐜
+### Coordinator zomes 🐜
 
 Coordinator zomes are the counterpart of integrity zomes in a DNA. They contain the domain logic of how data is read and written.
 Whereas data is defined and validated in integrity zomes, functions to manipulate data are implemented in coordinator zomes.
@@ -81,14 +74,14 @@ Generally these features are structured logically into modules but there are som
 
 ## HDK is based on callbacks 👂
 
-The only way to execute logic inside WASM is by having the host (conductor) call a function that is marked as an `extern` by the guest (WASM).
+The only way to execute logic inside WASM is by having the conductor (host) call a function that is marked as an `extern` by the zome (guest).
 
 > Note: From the perspective of hApp development in WASM, the "guest" is the WASM and the "host" is the running Holochain conductor.
 The host is _not_ the "host operating system" in this context.
 
-Similarly, the only way for the guest to do anything other than process data and calculations is to call functions the host provides to the guest at runtime.
+Similarly, the only way for the guest to do anything other than process data and calculations is to call functions the host provides to it at runtime.
 
-The latter are all defined by the Holochain conductor and implemented by HDK for you, but the former need to all be defined by your application.
+Host functions are all defined by the Holochain conductor and implemented by HDK for you, but the guest functions need to all be defined by your application.
 
 > Any WASM that does _not_ use the HDK will need to define placeholders for and the interface to the host functions.
 
@@ -101,7 +94,10 @@ let _output: HDK.with(|h| h.borrow().host_fn(input));
 
 And every host function defined by Holochain has a convenience wrapper in HDK that does the type juggling for you.
 
-### Extern callbacks
+Low-level communication between the conductor and WASM binaries, like typing and serialization of data, is abstracted by the HDK.
+Using the HDK, hApp developers can focus on their application's logic. [Learn more about WASM in Holochain.](https://github.com/holochain/holochain/blob/develop/crates/hdk/ON-WASM.md)
+
+### External callbacks = Zome functions
 
 To extend a Rust function so that it can be called by the host, add the [`hdk_extern!`](macro@crate::prelude::hdk_extern) attribute.
 
@@ -134,15 +130,17 @@ The external process only needs to ensure the input and output data is handled c
 
 ### Internal callbacks
 
-Some externs function as callbacks the host will call at key points in Holochain internal system workflows.
-These callbacks allow the guest to define how the host proceeds at those decision points.
+Some externs act as callbacks the host will call at key points in Holochain internal system workflows.
+These callbacks allow the guest to define how the host proceeds at those decision points. They are defined in zomes like
+extern callbacks above, but have reserved names listed below.
+
 Callbacks are simply called by name and they are "sparse" in that they are matched incrementally from the most specific
 name to the least specific name. For example, the `validate_{{ create|update|delete }}_{{ agent|entry }}` callbacks will
 all match and all run during validation. All function components with multiple options are optional, e.g. `validate` will execute and so will `validate_create`.
 
 Holochain will merge multiple callback results for the same callback in a context sensitive manner. For example, the host will consider initialization failed if _any_ init callback fails.
 
-The callbacks are:
+The callbacks are (see above for examples):
 
 - `fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult>`:
   - Typically implemented automatically by macros in the HDK so does NOT
@@ -204,6 +202,8 @@ You cannot change this but you can reimplement it in your language of choice (e.
 
 
 ## HDK is atomic on the source chain ⚛
+
+[Read up on what the source chain is in Holochain.](https://developer.holochain.org/concepts/3_source_chain)
 
 All writes to the source chain are atomic within a single extern/callback call.
 
