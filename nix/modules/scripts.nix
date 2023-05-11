@@ -36,14 +36,14 @@
         trap "cd $PWD" EXIT
 
         export VERSIONS_DIR="./versions/''${1}"
-        export DEFAULT_VERSIONS_DIR="./$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.path')"
+        export DEFAULT_VERSIONS_DIR="$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.path')"
 
         (
           cd "$VERSIONS_DIR"
           nix flake update --tarball-ttl 0
         )
 
-        if [[ git diff -- "$VERSIONS_DIR"/flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
+        if [[ $(git diff -- "$VERSIONS_DIR"/flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
           echo got no actual source changes, reverting modifications..
           git checkout $VERSIONS_DIR/flake.lock
           exit 0
