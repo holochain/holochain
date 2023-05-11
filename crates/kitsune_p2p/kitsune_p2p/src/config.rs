@@ -1,5 +1,4 @@
 use kitsune_p2p_types::config::{tuning_params_struct, KitsuneP2pTuningParams};
-use kitsune_p2p_types::dht::prelude::LocalStorageConfig;
 use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
 use kitsune_p2p_types::tx2::tx2_utils::*;
 use kitsune_p2p_types::*;
@@ -60,10 +59,6 @@ pub struct KitsuneP2pConfig {
 
     /// The network used for connecting to other peers
     pub network_type: NetworkType,
-
-    /// Config for arc storage
-    #[serde(default)]
-    pub storage: LocalStorageConfig,
 }
 
 impl Default for KitsuneP2pConfig {
@@ -73,7 +68,6 @@ impl Default for KitsuneP2pConfig {
             bootstrap_service: None,
             tuning_params: KitsuneP2pTuningParams::default(),
             network_type: NetworkType::QuicBootstrap,
-            storage: LocalStorageConfig::default(),
         }
     }
 }
