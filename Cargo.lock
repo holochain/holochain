@@ -815,6 +815,7 @@ dependencies = [
  "anstyle",
  "bitflags 1.3.2",
  "clap_lex 0.4.1",
+ "once_cell",
  "strsim 0.10.0",
  "terminal_size",
 ]
@@ -2670,12 +2671,13 @@ name = "holochain_cli"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "clap 4.2.7",
  "futures",
  "holochain_cli_bundle",
  "holochain_cli_run_local_services",
  "holochain_cli_sandbox",
  "holochain_trace",
- "structopt",
+ "lazy_static",
  "tokio",
 ]
 
@@ -2685,6 +2687,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
+ "clap 4.2.7",
  "futures",
  "holochain_serialized_bytes 0.0.51",
  "holochain_types",
@@ -2698,7 +2701,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_yaml",
- "structopt",
  "tempfile",
  "thiserror",
  "tokio",
@@ -2710,11 +2712,11 @@ dependencies = [
 name = "holochain_cli_run_local_services"
 version = "0.2.0"
 dependencies = [
+ "clap 4.2.7",
  "futures",
  "holochain_trace",
  "if-addrs 0.10.1",
  "kitsune_p2p_bootstrap",
- "structopt",
  "tokio",
  "tracing",
  "tx5-signal-srv",
@@ -2728,6 +2730,7 @@ dependencies = [
  "anyhow",
  "assert_cmd 1.0.8",
  "chrono",
+ "clap 4.2.7",
  "escargot",
  "futures",
  "holochain_conductor_api",
@@ -2743,7 +2746,6 @@ dependencies = [
  "serde",
  "serde_yaml",
  "sodoken",
- "structopt",
  "tokio",
  "tracing",
  "url2",

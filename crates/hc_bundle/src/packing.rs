@@ -1,6 +1,6 @@
 #![forbid(missing_docs)]
 
-//! Defines the CLI commands for packing/unpacking both DNA and hApp bundles
+//! Defines the CLI commands for packing/unpacking DNA, hApp, and web-hApp bundles.
 
 use crate::error::{HcBundleError, HcBundleResult};
 use holochain_types::wasmer_types::build_ios_module;
@@ -11,7 +11,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use tracing::info;
 
-/// Unpack a DNA bundle into a working directory, returning the directory path used.
+/// Unpack a bundle into a working directory, returning the directory path used.
 pub async fn unpack<M: Manifest>(
     extension: &'static str,
     bundle_path: &std::path::Path,
@@ -32,7 +32,7 @@ pub async fn unpack<M: Manifest>(
     Ok(target_dir)
 }
 
-/// Unpack a DNA bundle into a working directory, returning the directory path used.
+/// Unpack a bundle into a working directory, returning the directory path used.
 pub async fn unpack_raw(
     extension: &'static str,
     bundle_path: &std::path::Path,
@@ -72,8 +72,8 @@ fn bundle_path_to_dir(path: &Path, extension: &'static str) -> HcBundleResult<Pa
         .join(stem))
 }
 
-/// Pack a directory containing a yaml Manifest (Dna, Happ, WebHapp) into a Bundle, returning
-/// the path to which the bundle file was written
+/// Pack a directory containing a YAML manifest (DNA, hApp, Web hApp) into a bundle, returning
+/// the path to which the bundle file was written.
 pub async fn pack<M: Manifest>(
     dir_path: &std::path::Path,
     target_path: Option<PathBuf>,

@@ -1,7 +1,9 @@
 //! # Manage persistence of sandboxes
+//!
 //! This module gives basic helpers to save / load your sandboxes
-//! in a `.hc` file.
+//! to / from a `.hc` file.
 //! This is very much WIP and subject to change.
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -88,13 +90,13 @@ pub fn load(mut hc_dir: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
 }
 
 /// Print out the sandboxes contained in the `.hc` file.
-pub fn list(hc_dir: PathBuf, verbose: usize) -> anyhow::Result<()> {
+pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
     let out = load(hc_dir)?.into_iter().enumerate().try_fold(
         "\nSandboxes contained in `.hc`\n".to_string(),
         |out, (i, path)| {
             let r = match verbose {
-                0 => format!("{}{}: {}\n", out, i, path.display()),
-                _ => {
+                false => format!("{}{}: {}\n", out, i, path.display()),
+                true => {
                     let config = config::read_config(path.clone())?;
                     format!(
                         "{}{}: {}\nConductor Config:\n{:?}\n",
@@ -115,7 +117,7 @@ pub fn list(hc_dir: PathBuf, verbose: usize) -> anyhow::Result<()> {
 static FILE_LOCKS: Lazy<tokio::sync::Mutex<Vec<usize>>> =
     Lazy::new(|| tokio::sync::Mutex::new(Vec::new()));
 
-/// Lock this setup as running live and advertise the port
+/// Lock this setup as running live and advertise the port.
 pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::Result<()> {
     use std::io::Write;
     std::fs::create_dir_all(&hc_dir)?;
@@ -146,7 +148,7 @@ pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::R
 
 /// For each registered setup, if it has a lockfile, return the port of the running conductor,
 /// otherwise return None.
-/// The resulting Vec has the same number of elements as lines in the `.hc` file
+/// The resulting Vec has the same number of elements as lines in the `.hc` file.
 pub fn load_ports(hc_dir: PathBuf) -> anyhow::Result<Vec<Option<u16>>> {
     let mut ports = Vec::new();
     let paths = load(hc_dir.clone())?;
@@ -164,7 +166,7 @@ pub fn load_ports(hc_dir: PathBuf) -> anyhow::Result<Vec<Option<u16>>> {
     Ok(ports)
 }
 
-/// Same as load ports but only returns ports for paths passed in.
+/// Same as load_ports but only returns ports for paths passed in.
 pub fn find_ports(hc_dir: PathBuf, paths: &[PathBuf]) -> anyhow::Result<Vec<Option<u16>>> {
     let mut ports = Vec::new();
     let all_paths = load(hc_dir.clone())?;
@@ -188,7 +190,7 @@ pub fn find_ports(hc_dir: PathBuf, paths: &[PathBuf]) -> anyhow::Result<Vec<Opti
     Ok(ports)
 }
 
-/// Remove all lockfiles, releasing all locked ports
+/// Remove all lockfiles, releasing all locked ports.
 pub async fn release_ports(hc_dir: PathBuf) -> anyhow::Result<()> {
     let files = FILE_LOCKS.lock().await;
     for file in files.iter() {
