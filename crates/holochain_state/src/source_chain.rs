@@ -73,6 +73,8 @@ use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
 pub use error::*;
+use holochain_sqlite::rusqlite;
+use holochain_zome_types::EntryType;
 
 mod error;
 
@@ -571,7 +573,7 @@ where
             return Ok(true);
         }
         let query_filter = ChainQueryFilter {
-            action_type: Some(ActionType::InitZomesComplete),
+            action_type: Some(vec![ActionType::InitZomesComplete]),
             ..QueryFilter::default()
         };
         let init_zomes_complete_actions = self.query(query_filter).await?;
@@ -787,46 +789,81 @@ where
                             (SELECT Action.seq from Action WHERE Action.hash = :range_end_hash)
                         )",
                     });
+
+                    let entry_type_filters_count = query.entry_type.as_ref().map_or(0, |t| t.len());
+                    let action_type_filters_count = query.action_type.as_ref().map_or(0, |t| t.len());
+
                     sql.push_str(
-                        "
+                        format!("
                         )
                         AND
-                        (:entry_type IS NULL OR Action.entry_type = :entry_type)
+                        (:entry_type IS NULL OR Action.entry_type IN ({}))
                         AND
-                        (:action_type IS NULL OR Action.type = :action_type)
-                        ORDER BY Action.seq 
-                        ",
+                        (:action_type IS NULL OR Action.type IN ({}))
+                        ORDER BY Action.seq
+                        ", named_param_seq("entry_type", entry_type_filters_count), named_param_seq("action_type", action_type_filters_count)).as_str(),
                     );
                     sql.push_str(if query.order_descending {" DESC"} else {" ASC"});
                     let mut stmt = txn.prepare(&sql)?;
+
+                    // This type is similar to what `named_params!` from rusqlite creates, escept for the use of boxing to allow references to be passed to the query.
+                    // The reserved capacity here should account for the number of parameters inserted below, including the variable inputs like entry_types and actions_types.
+                    let mut args: Vec<(String, Box<dyn rusqlite::ToSql>)> = Vec::with_capacity(6 + entry_type_filters_count + action_type_filters_count);
+                    args.push((":author".to_string(), Box::new(author)));
+
+                    match &query.entry_type {
+                        None => {
+                            args.push((":entry_type".to_string(), Box::new(None::<EntryType>.as_sql())))
+                        }
+                        Some(types) => {
+                            // Value should not be 'Some' until it has at least one value
+                            args.push((":entry_type".to_string(), Box::new(types.get(0).unwrap().as_sql())));
+                            for i in 1..types.len() {
+                                args.push((format!(":entry_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                            }
+                        }
+                    }
+
+                    match &query.action_type {
+                        None => args.push((":action_type".to_string(), Box::new(None::<EntryType>.as_sql()))),
+                        Some(types) => {
+                            // Value should not be 'Some' until it has at least one value
+                            args.push((":action_type".to_string(), Box::new(types.get(0).as_ref().unwrap().as_sql())));
+                            for i in 1..types.len() {
+                                args.push((format!(":action_type_{}", i), Box::new(types.get(i).unwrap().as_sql())));
+                            }
+                        }
+                    }
+
+                    args.push((":range_start".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
+                        _ => None,
+                    })));
+
+                    args.push((":range_end".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
+                        _ => None,
+                    })));
+
+                    args.push((":range_start_hash".to_string(), Box::new(match &query.sequence_range {
+                        ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
+                        _ => None,
+                    })));
+
+                    args.push((":range_end_hash".to_string(), Box::new(match &query.sequence_range {
+                        ChainQueryFilterRange::ActionHashRange(_, end_hash)
+                        | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
+                        _ => None,
+                    })));
+
+                    args.push((":range_prior_count".to_string(), Box::new(match query.sequence_range {
+                        ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
+                        _ => None,
+                    })));
+
                     let records = stmt
                         .query_and_then(
-                        named_params! {
-                                ":author": author.as_ref(),
-                                ":entry_type": query.entry_type.as_sql(),
-                                ":action_type": query.action_type.as_sql(),
-                                ":range_start": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionSeqRange(start, _) => Some(start),
-                                    _ => None,
-                                },
-                                ":range_end": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionSeqRange(_, end) => Some(end),
-                                    _ => None,
-                                },
-                                ":range_start_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashRange(start_hash, _) => Some(start_hash.clone()),
-                                    _ => None,
-                                },
-                                ":range_end_hash": match &query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashRange(_, end_hash)
-                                    | ChainQueryFilterRange::ActionHashTerminated(end_hash, _) => Some(end_hash.clone()),
-                                    _ => None,
-                                },
-                                ":range_prior_count": match query.sequence_range {
-                                    ChainQueryFilterRange::ActionHashTerminated(_, prior_count) => Some(prior_count),
-                                    _ => None,
-                                },
-                            },
+                            args.iter().map(|a| (a.0.as_str(), a.1.as_ref())).collect::<Vec<(&str, &dyn rusqlite::ToSql)>>().as_slice(),
                             |row| {
                                 let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
                                 let SignedAction(action, signature) = action;
@@ -907,6 +944,19 @@ where
         })?;
         Ok(r)
     }
+}
+
+fn named_param_seq(base_name: &str, repeat: usize) -> String {
+    if repeat == 0 {
+        return String::new();
+    }
+
+    let mut seq = format!(":{}", base_name);
+    for i in 1..repeat {
+        seq.push_str(format!(", :{}_{}", base_name, i).as_str());
+    }
+
+    seq
 }
 
 pub fn lock_for_entry(entry: Option<&Entry>) -> SourceChainResult<Vec<u8>> {
@@ -2105,15 +2155,15 @@ pub mod tests {
         let cases = [
             ((None, None, vec![], false), 3),
             ((None, None, vec![], true), 3),
-            ((Some(ActionType::Dna), None, vec![], false), 1),
-            ((None, Some(EntryType::AgentPubKey), vec![], false), 1),
-            ((None, Some(EntryType::AgentPubKey), vec![], true), 1),
-            ((Some(ActionType::Create), None, vec![], false), 1),
-            ((Some(ActionType::Create), None, vec![], true), 1),
+            ((Some(vec![ActionType::Dna]), None, vec![], false), 1),
+            ((None, Some(vec![EntryType::AgentPubKey]), vec![], false), 1),
+            ((None, Some(vec![EntryType::AgentPubKey]), vec![], true), 1),
+            ((Some(vec![ActionType::Create]), None, vec![], false), 1),
+            ((Some(vec![ActionType::Create]), None, vec![], true), 1),
             (
                 (
-                    Some(ActionType::Create),
-                    Some(EntryType::AgentPubKey),
+                    Some(vec![ActionType::Create]),
+                    Some(vec![EntryType::AgentPubKey]),
                     vec![],
                     false,
                 ),
@@ -2121,9 +2171,28 @@ pub mod tests {
             ),
             (
                 (
-                    Some(ActionType::Create),
-                    Some(EntryType::AgentPubKey),
+                    Some(vec![ActionType::Create]),
+                    Some(vec![EntryType::AgentPubKey]),
                     vec![records[2].action().entry_hash().unwrap().clone()],
+                    true,
+                ),
+                1,
+            ),
+            (
+                (
+                    Some(vec![ActionType::Create, ActionType::Dna]),
+                    None,
+                    vec![],
+                    true,
+                ),
+                2,
+            ),
+            (
+                (
+                    None,
+                    // Redundant but covers the code that constructs the IN query
+                    Some(vec![EntryType::AgentPubKey, EntryType::AgentPubKey]),
+                    vec![],
                     true,
                 ),
                 1,
