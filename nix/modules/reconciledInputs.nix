@@ -10,7 +10,7 @@
           then inputs."${name}"
           else
             inputs.versions.inputs."${name}";
-        rev = input.rev or self.rev;
+        rev = input.rev or (self.rev or "unknown");
       in
       (input // { inherit rev; })
     );
