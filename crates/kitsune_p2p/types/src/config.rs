@@ -149,13 +149,19 @@ pub mod tuning_params_struct {
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = true,
 
-        /// Option to clamp all arcs in all spaces to "empty" or "full".
-        /// Choosing "empty" makes you are a freeloader contributing nothing to the network.
-        /// Please don't do this unless you are on a mobile device!
-        /// Choosing "full" indicates that you commit to serve and hold all data from all
-        /// agents and be a potential target for all get requests.
-        /// Don't take this responsibility lightly.
-        /// If you are reading this, you really shouldn't mess with this setting.
+        /// By default, Holochain adjusts the gossip_arc to match the
+        /// the current network conditions for the given DNA.
+        /// If unsure, please keep this setting at the default "none",
+        /// meaning no arc clamping. Setting options are:
+        /// - "none" - Keep the default auto-adjust behavior.
+        /// - "empty" - Makes you a freeloader, contributing nothing
+        ///   to the network. Please don't choose this option without
+        ///   a good reason, such as being on a bandwidth constrained
+        ///   mobile device!
+        /// - "full" - Indicates that you commit to serve and hold all
+        ///   all data from all agents, and be a potential target for all
+        ///   get requests. This could be a significant investment of
+        ///   bandwidth. Don't take this responsibility lightly.
         gossip_arc_clamping: String = "none".to_string(),
 
         /// Default timeout for rpc single. [Default: 60s]
