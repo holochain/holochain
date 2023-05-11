@@ -91,7 +91,7 @@ pub enum CliSubcommand {
     WebApp(hc_bundle::HcWebAppBundle),
     /// Work with sandboxed environments for testing and development.
     Sandbox(hc_sandbox::HcSandbox),
-    /// Run local services
+    /// Run a local bootstrap and WebRTC signalling server.
     RunLocalServices(hc_run_local_services::HcRunLocalServices),
     /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`).
     #[command(external_subcommand)]
