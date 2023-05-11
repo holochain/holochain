@@ -127,7 +127,7 @@ impl PeerViewQ {
                 changed
             }
             Some(ArqClamping::Full) => {
-                let changed = arq.is_full(&topo);
+                let changed = arq.is_full(topo);
                 *arq = Arq::new_full(topo, arq.start, topo.max_space_power(strat));
                 changed
             }
