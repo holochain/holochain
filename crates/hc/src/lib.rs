@@ -21,8 +21,8 @@ use std::process::Command;
 // Useful to have this public when using this as a library.
 use clap::{crate_version, Parser, Subcommand};
 pub use holochain_cli_bundle as hc_bundle;
+use holochain_cli_run_local_services as hc_run_local_services;
 use holochain_cli_sandbox as hc_sandbox;
-use holochain_cli_signal_srv as hc_signal_srv;
 use lazy_static::lazy_static;
 
 mod external_subcommands;
@@ -91,8 +91,8 @@ pub enum CliSubcommand {
     WebApp(hc_bundle::HcWebAppBundle),
     /// Work with sandboxed environments for testing and development.
     Sandbox(hc_sandbox::HcSandbox),
-    /// Run a signal server
-    SignalSrv(hc_signal_srv::HcSignalSrv),
+    /// Run local services
+    RunLocalServices(hc_run_local_services::HcRunLocalServices),
     /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`).
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -106,7 +106,7 @@ impl CliSubcommand {
             CliSubcommand::Dna(cmd) => cmd.run().await?,
             CliSubcommand::WebApp(cmd) => cmd.run().await?,
             CliSubcommand::Sandbox(cmd) => cmd.run().await?,
-            CliSubcommand::SignalSrv(cmd) => cmd.run().await,
+            CliSubcommand::RunLocalServices(cmd) => cmd.run().await,
             CliSubcommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
                 Command::new(format!("hc-{}", command_suffix))

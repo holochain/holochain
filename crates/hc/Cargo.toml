@@ -25,6 +25,6 @@ futures = "0.3"
 lazy_static = "1.4"
 holochain_cli_bundle = { path = "../hc_bundle", version = "^0.2.0"}
 holochain_cli_sandbox = { path = "../hc_sandbox", version = "^0.2.0"}
-holochain_cli_signal_srv = { path = "../hc_signal_srv", version = "^0.2.0"}
+holochain_cli_run_local_services = { path = "../hc_run_local_services", version = "^0.2.0"}
 holochain_trace = { version = "^0.2.0", path = "../holochain_trace" }
 tokio = { version = "1.27", features = ["full"] }
