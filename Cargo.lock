@@ -2672,8 +2672,8 @@ dependencies = [
  "anyhow",
  "futures",
  "holochain_cli_bundle",
+ "holochain_cli_run_local_services",
  "holochain_cli_sandbox",
- "holochain_cli_signal_srv",
  "holochain_trace",
  "structopt",
  "tokio",
@@ -2707,6 +2707,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_cli_run_local_services"
+version = "0.2.0"
+dependencies = [
+ "futures",
+ "holochain_trace",
+ "if-addrs 0.10.1",
+ "kitsune_p2p_bootstrap",
+ "structopt",
+ "tokio",
+ "tracing",
+ "tx5-signal-srv",
+]
+
+[[package]]
 name = "holochain_cli_sandbox"
 version = "0.2.0"
 dependencies = [
@@ -2735,17 +2749,6 @@ dependencies = [
  "url2",
  "walkdir",
  "which",
-]
-
-[[package]]
-name = "holochain_cli_signal_srv"
-version = "0.2.0"
-dependencies = [
- "holochain_trace",
- "structopt",
- "tokio",
- "tracing",
- "tx5-signal-srv",
 ]
 
 [[package]]
