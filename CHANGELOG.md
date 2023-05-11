@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- Nix: adds a new dev shell that contains only Holochain binaries and Rust, named `holochainBinaries`.
+
 # 20230427.171927
 
 This release features a more secure version of Holochain that incorporates advanced network security protocols using WebRTC End-to-End Encryption and addresses known Holochain security vulnerabilities.
