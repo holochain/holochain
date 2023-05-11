@@ -21,5 +21,5 @@ if-addrs = "0.10.1"
 kitsune_p2p_bootstrap = { version = "0.1.0", path = "../kitsune_p2p/bootstrap" }
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
-tx5-signal-srv = "=0.0.1-alpha.7"
+tx5-signal-srv = "=0.0.1-alpha.9"
 structopt = "0.3"
