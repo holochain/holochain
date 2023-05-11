@@ -3,7 +3,6 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-
       rustToolchain = config.rust.mkRust {
         track = "stable";
         version = "1.66.1";
@@ -21,24 +20,23 @@
 
         buildInputs =
           (with pkgs; [
-            # TODO: remove sqlite package once https://github.com/holochain/holochain/pull/2248 is released
             openssl
-            sqlite
-          ])
-          ++ (lib.optionals pkgs.stdenv.isDarwin
-            (with pkgs.darwin.apple_sdk_11_0.frameworks; [
+          ]) ++ (lib.optionals pkgs.stdenv.isDarwin
+            (with self'.legacyPackages.apple_sdk'.frameworks; [
               AppKit
               CoreFoundation
               CoreServices
               Security
             ])
-          );
+          )
+        ;
 
         nativeBuildInputs =
           (with pkgs; [
             perl
             pkg-config
             makeBinaryWrapper
+            self'.packages.goWrapper
           ])
           ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs; [
             xcbuild
@@ -60,7 +58,6 @@
             --prefix PATH : ${rustToolchain}/bin
         '';
       });
-
     in
     {
       packages = {
