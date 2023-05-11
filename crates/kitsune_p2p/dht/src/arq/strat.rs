@@ -197,6 +197,7 @@ pub struct LocalStorageConfig {
     pub arc_clamping: Option<ArqClamping>,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for LocalStorageConfig {
     fn default() -> Self {
         Self { arc_clamping: None }
