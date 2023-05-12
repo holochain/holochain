@@ -6,6 +6,90 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230512.103252
+
+## [holochain\_cli-0.2.1-beta-dev.0](crates/holochain_cli/CHANGELOG.md#0.2.1-beta-dev.0)
+
+- `hc signal-srv` is now `hc run-local-services` and runs both a webrtc signaling server, and the holochain bootstrap server locally. [\#2353](https://github.com/holochain/holochain/pull/2353)
+
+## [holochain\_cli\_sandbox-0.2.1-beta-dev.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_cli\_run\_local\_services-0.2.1-beta-dev.0](crates/holochain_cli_run_local_services/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_cli\_bundle-0.2.1-beta-dev.0](crates/holochain_cli_bundle/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain-0.2.1-beta-dev.0](crates/holochain/CHANGELOG.md#0.2.1-beta-dev.0)
+
+- The feature `test_utils` is no longer a default feature. To consume `sweetest` from this crate please now use `default-features = false` and the feature `sweetest`.
+
+## [holochain\_websocket-0.2.1-beta-dev.0](crates/holochain_websocket/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_test\_wasm\_common-0.2.1-beta-dev.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_conductor\_api-0.2.1-beta-dev.0](crates/holochain_conductor_api/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_wasm\_test\_utils-0.2.1-beta-dev.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_cascade-0.2.1-beta-dev.0](crates/holochain_cascade/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_state-0.2.1-beta-dev.0](crates/holochain_state/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_p2p-0.2.1-beta-dev.0](crates/holochain_p2p/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_bootstrap-0.1.1-beta-dev.0](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.1.1-beta-dev.0)
+
+## [holochain\_types-0.2.1-beta-dev.0](crates/holochain_types/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_sqlite-0.2.1-beta-dev.0](crates/holochain_sqlite/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p-0.2.1-beta-dev.0](crates/kitsune_p2p/CHANGELOG.md#0.2.1-beta-dev.0)
+
+- Bump tx5 to include https://github.com/holochain/tx5/pull/31 which should fix the network loop halting on certain error types, like Ban on data send. [\#2315](https://github.com/holochain/holochain/pull/2315)
+- Removes the experimental `gossip_single_storage_arc_per_space` tuning param
+- Fixes sharded gossip issue where storage arcs are not properly quantized in multi-agent-per-node sharded scenarios. [\#2332](https://github.com/holochain/holochain/pull/2332)
+
+## [kitsune\_p2p\_proxy-0.2.1-beta-dev.0](crates/kitsune_p2p_proxy/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_transport\_quic-0.2.1-beta-dev.0](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_mdns-0.2.1-beta-dev.0](crates/kitsune_p2p_mdns/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_fetch-0.2.1-beta-dev.0](crates/kitsune_p2p_fetch/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_keystore-0.2.1-beta-dev.0](crates/holochain_keystore/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_types-0.2.1-beta-dev.0](crates/kitsune_p2p_types/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [mr\_bundle-0.2.1-beta-dev.0](crates/mr_bundle/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_util-0.2.1-beta-dev.0](crates/holochain_util/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [hdk-0.2.1-beta-dev.0](crates/hdk/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_zome\_types-0.2.1-beta-dev.0](crates/holochain_zome_types/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_dht-0.2.1-beta-dev.0](crates/kitsune_p2p_dht/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_block-0.2.1-beta-dev.0](crates/kitsune_p2p_block/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_bin\_data-0.2.1-beta-dev.0](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [hdi-0.3.1-beta-dev.0](crates/hdi/CHANGELOG.md#0.3.1-beta-dev.0)
+
+## [hdk\_derive-0.2.1-beta-dev.0](crates/hdk_derive/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_integrity\_types-0.2.1-beta-dev.0](crates/holochain_integrity_types/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_timestamp-0.2.1-beta-dev.0](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holo\_hash-0.2.1-beta-dev.0](crates/holo_hash/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [kitsune\_p2p\_dht\_arc-0.2.1-beta-dev.0](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [holochain\_trace-0.2.1-beta-dev.0](crates/holochain_trace/CHANGELOG.md#0.2.1-beta-dev.0)
+
+## [fixt-0.2.1-beta-dev.0](crates/fixt/CHANGELOG.md#0.2.1-beta-dev.0)
+
 # 20230427.171927
 
 This release features a more secure version of Holochain that incorporates advanced network security protocols using WebRTC End-to-End Encryption and addresses known Holochain security vulnerabilities.
