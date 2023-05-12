@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
@@ -15,6 +15,7 @@ use holochain::{
 };
 use holochain_p2p::*;
 use holochain_sqlite::db::*;
+use holochain_types::prelude::NetworkInfoRequestPayload;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
@@ -374,7 +375,6 @@ async fn test_gossip_shutdown() {
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
     holochain_trace::test_run().ok();
     let config = make_config(false, true, false, None);
@@ -383,7 +383,6 @@ async fn three_way_gossip_recent() {
 
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
     holochain_trace::test_run().ok();
     let config = make_config(false, false, true, Some(0));
@@ -460,6 +459,10 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
 
     conductors.add_conductor(conductor);
     conductors.exchange_peer_info().await;
+
+    conductors[2]
+        .require_initial_gossip_activity_for_cell(&cell)
+        .await;
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],

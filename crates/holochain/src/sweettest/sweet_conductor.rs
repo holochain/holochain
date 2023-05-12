@@ -14,6 +14,7 @@ use crate::conductor::{
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
+use holochain_conductor_api::NetworkInfo;
 use holochain_keystore::MetaLairClient;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::test_utils::TestDir;
@@ -22,6 +23,7 @@ use holochain_websocket::*;
 use rand::Rng;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
@@ -541,6 +543,42 @@ impl SweetConductor {
         }
         let connectivity = covering(rng, all.len(), s);
         crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
+    }
+
+    /// Wait for at least one gossip round to have completed for the given cell
+    ///
+    /// Note that this is really a crutch. If gossip starts fast enough then this is unnecessary
+    /// but that doesn't necessarily happen. Waiting for gossip to have started before, for example,
+    /// waiting for something else like consistency is useful to ensure that communication has
+    /// actually started.
+    pub async fn require_initial_gossip_activity_for_cell(&self, cell: &SweetCell) {
+        let handle = self.raw_handle();
+
+        let wait_start = Instant::now();
+        loop {
+            let completed_rounds = handle
+                .network_info(&NetworkInfoRequestPayload {
+                    agent_pub_key: cell.agent_pubkey().clone(),
+                    dnas: vec![cell.cell_id.dna_hash().clone()],
+                    last_time_queried: None, // Just care about seeing the first data
+                })
+                .await
+                .expect("Could not get network info")
+                .first()
+                .map_or(0, |info| info.completed_rounds_since_last_time_queried);
+
+            if completed_rounds > 0 {
+                tracing::info!(
+                    "Took {}s for cell {} to complete {} gossip rounds",
+                    wait_start.elapsed().as_secs(),
+                    cell.cell_id(),
+                    completed_rounds
+                );
+                return;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
     }
 }
 
