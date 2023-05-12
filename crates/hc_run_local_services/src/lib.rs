@@ -29,7 +29,7 @@ pub struct HcRunLocalServices {
     signal_address_path: Option<std::path::PathBuf>,
 
     /// A comma-separated list of interfaces on which to run the signal server.
-    #[arg(long, default_value = "127.0.0.1", value_delimiter = ',')]
+    #[arg(long, default_value = "127.0.0.1")]
     signal_interfaces: String,
 
     /// The port to use for the signal server. You probably want
