@@ -1,4 +1,5 @@
 //! Helpers for creating, reading and writing [`ConductorConfig`]s.
+
 use std::path::PathBuf;
 
 use holochain_conductor_api::config::conductor::ConductorConfig;
@@ -7,8 +8,8 @@ use holochain_conductor_api::config::conductor::KeystoreConfig;
 /// Name of the file that conductor config is written to.
 pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
 
-/// Create a new default [`ConductorConfig`] with environment path
-/// and keystore all in the same directory.
+/// Create a new default [`ConductorConfig`] with environment path,
+/// keystore, and database all in the same directory.
 pub fn create_config(environment_path: PathBuf, con_url: Option<url2::Url2>) -> ConductorConfig {
     let mut conductor_config = ConductorConfig {
         environment_path: environment_path.clone().into(),
@@ -34,7 +35,7 @@ pub fn create_config(environment_path: PathBuf, con_url: Option<url2::Url2>) -> 
     conductor_config
 }
 
-/// Write [`ConductorConfig`] to [`CONDUCTOR_CONFIG`]
+/// Write [`ConductorConfig`] to [`CONDUCTOR_CONFIG`].
 pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
     path.push(CONDUCTOR_CONFIG);
     std::fs::write(path.clone(), serde_yaml::to_string(&config).unwrap()).unwrap();

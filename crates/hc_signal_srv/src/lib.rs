@@ -1,22 +1,21 @@
-use structopt::StructOpt;
+use clap::Parser;
 use tokio::io::AsyncWriteExt;
 use tx5_signal_srv::Result;
 
-#[derive(Debug, StructOpt)]
-/// Helper for running a holochain webrtc signal server.
+#[derive(Debug, Parser)]
+/// Run a Holochain WebRTC signal server.
 pub struct HcSignalSrv {
-    /// The port to use for the signal server. You probably want
-    /// to leave this as 0 (zero) to be assigned an available port.
-    #[structopt(short, long, default_value = "0")]
+    /// The port to use for the signal server. Defaults to 0, which autoselects an available high-range port.
+    #[arg(short, long, default_value = "0")]
     port: u16,
 
-    /// A comma separated list of interfaces on which to run the signal server.
-    #[structopt(short, long, default_value = "127.0.0.1")]
+    /// A comma separated list of interfaces to which to bind the signal server.
+    #[arg(short, long, default_value = "127.0.0.1", value_delimiter = ',')]
     interfaces: String,
 
-    /// If set, write the bound address list to a new file, separated by
+    /// If set, write the bound interface list to a new file, separated by
     /// newlines. If the file exists, an error will be returned.
-    #[structopt(long)]
+    #[arg(long)]
     address_list_file_path: Option<std::path::PathBuf>,
 }
 
