@@ -8,7 +8,7 @@ This command gives you a suite of tools for developing, inspecting, executing, a
 
 - `hc dna`, `hc app`, and `hc web-app` scaffold, bundle, and unbundle DNAs, hApps and web hApps respectively. See [holochain_cli_bundle](https://github.com/holochain/holochain/tree/develop/crates/hc_bundle) for more info.
 - `hc sandbox` creates and executes temporary or persistent conductor configurations for you to run test instances of your hApp with. See [holochain_cli_sandbox](https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox) for more info.
-- `hc signal-srv` runs a local WebRTC signal server for peers to establish connections with each other. See [holochain_cli_signal_srv](https://github.com/holochain/holochain/tree/develop/crates/hc_signal_srv) for more info.
+- `hc run-local-services` runs local bootstrap and WebRTC signal servers for peers to establish connections with each other. This is useful for running tests. See [holochain_cli_run_local_services](https://github.com/holochain/holochain/tree/develop/crates/hc_run_local_services) for more info.
 - `hc scaffold` generates integrity, coordinator, UI, and test code for hApps using interactive prompts. See [holochain/scaffolding](https://github.com/holochain/scaffolding).
 - `hc launch` runs sandboxed hApp instances with live-reloading UI windows. See [hc_launch in holochain/launcher](https://github.com/holochain/launcher/tree/main/crates/hc_launch) for more info.
 
