@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
@@ -15,7 +15,6 @@ use holochain::{
 };
 use holochain_p2p::*;
 use holochain_sqlite::db::*;
-use holochain_types::prelude::NetworkInfoRequestPayload;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
@@ -104,7 +103,6 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     // let _g = holochain_trace::test_run().ok();
 
@@ -125,6 +123,10 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
+
+    conductors
+        .require_initial_gossip_activity_for_cell(&alice)
+        .await;
 
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<ActionHash> = conductors[0]
