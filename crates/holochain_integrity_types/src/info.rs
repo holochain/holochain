@@ -49,7 +49,7 @@ impl ZomeInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 /// Information about the current DNA.
-pub struct DnaInfo {
+pub struct DnaInfoV1 {
     /// The name of this DNA.
     pub name: String,
     /// The hash of this DNA.
@@ -60,6 +60,23 @@ pub struct DnaInfo {
     /// The zomes in this DNA.
     pub zome_names: Vec<ZomeName>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+/// Information about the current DNA.
+pub struct DnaInfoV2 {
+    /// The name of this DNA.
+    pub name: String,
+    /// The hash of this DNA.
+    pub hash: DnaHash,
+    /// The modifiers for this DNA.
+    pub modifiers: DnaModifiers,
+    // In ZomeIndex order as to match corresponding `ZomeInfo` for each.
+    /// The zomes in this DNA.
+    pub zome_names: Vec<ZomeName>,
+}
+
+/// Convenience alias to the latest `DnaInfoN`.
+pub type DnaInfo = DnaInfoV2;
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
 /// The set of [`EntryDefIndex`] and [`LinkType`]s in scope for the calling zome.

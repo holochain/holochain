@@ -12,7 +12,7 @@ pub fn dna_info(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<DnaInfo, RuntimeError> {
+) -> Result<DnaInfoV2, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             bindings_deterministic: Permission::Allow,
