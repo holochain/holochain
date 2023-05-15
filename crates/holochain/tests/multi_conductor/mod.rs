@@ -45,6 +45,10 @@ async fn test_publish() -> anyhow::Result<()> {
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
+    conductors
+        .require_initial_gossip_activity_for_cell(&alice)
+        .await;
+
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
