@@ -64,6 +64,14 @@ impl SweetConductorConfig {
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();
 
+        // This allows attempting to contact an offline node to timeout quickly,
+        // so we can fallback to the next one
+        tuning.default_rpc_single_timeout_ms = 3_000;
+        // Quickly gossip again so that tests which create data multiple times will behave as expected
+        tuning.gossip_peer_on_success_next_gossip_delay_ms = 10_000;
+        // Similar for errors, retry quickly
+        tuning.gossip_peer_on_error_next_gossip_delay_ms = 10_000;
+
         let mut network = KitsuneP2pConfig::default();
         network.bootstrap_service = Some(url2::url2!("rendezvous:"));
 
