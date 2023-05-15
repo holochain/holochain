@@ -161,7 +161,7 @@ impl Cell {
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
     pub async fn genesis<Ribosome>(
-        id: CellId,
+        cell_id: CellId,
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
@@ -175,10 +175,10 @@ impl Cell {
     {
         // get the dna
         let dna_file = conductor_handle
-            .get_dna_file(id.dna_hash())
-            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
+            .get_dna_file(cell_id.dna_hash())
+            .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
 
-        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
+        let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
         let workspace = GenesisWorkspace::new(authored_db, dht_db)
@@ -186,13 +186,13 @@ impl Cell {
             .map_err(Box::new)?;
 
         // exit early if genesis has already run
-        if workspace.has_genesis(id.agent_pubkey().clone()).await? {
+        if workspace.has_genesis(cell_id.agent_pubkey().clone()).await? {
             return Ok(());
         }
 
         let args = GenesisWorkflowArgs::new(
             dna_file,
-            id.agent_pubkey().clone(),
+            cell_id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
             dht_db_cache,
@@ -206,7 +206,7 @@ impl Cell {
 
         if let Some(trigger) = conductor_handle
             .get_queue_consumer_workflows()
-            .integration_trigger(Arc::new(id.dna_hash().clone()))
+            .integration_trigger(Arc::new(cell_id.dna_hash().clone()))
         {
             trigger.trigger(&"genesis");
         }

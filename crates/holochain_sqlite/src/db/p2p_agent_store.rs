@@ -2,6 +2,7 @@
 
 use crate::prelude::*;
 use crate::sql::*;
+use holochain_zome_types::many_bytes_string;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dht_arc::DhtArcRange;
 use kitsune_p2p::dht_arc::DhtArcSet;
@@ -146,6 +147,7 @@ pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> Da
 }
 
 fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
+    // dbg!(&record);
     txn.execute(
         sql_p2p_agent_store::INSERT,
         named_params! {
@@ -235,7 +237,6 @@ impl AsP2pStateTxExt for Transaction<'_> {
             let r = r.as_blob()?;
             let signed = AgentInfoSigned::decode(r)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-
             Ok(signed)
         })? {
             out.push(r?);
@@ -348,7 +349,6 @@ impl AsP2pStateTxExt for Transaction<'_> {
 }
 
 /// Owned data dealing with a full p2p_agent_store record.
-#[derive(Debug)]
 struct P2pRecord {
     agent: Arc<KitsuneAgent>,
 
@@ -407,6 +407,21 @@ impl P2pRecord {
             storage_start_loc,
             storage_end_loc,
         })
+    }
+}
+
+impl std::fmt::Debug for P2pRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("P2pRecord")
+            .field("agent", &self.agent)
+            .field("encoded", &many_bytes_string(&self.encoded))
+            .field("signed_at_ms", &self.signed_at_ms)
+            .field("expires_at_ms", &self.expires_at_ms)
+            .field("storage_center_loc", &self.storage_center_loc)
+            .field("is_active", &self.is_active)
+            .field("storage_start_loc", &self.storage_start_loc)
+            .field("storage_end_loc", &self.storage_end_loc)
+            .finish()
     }
 }
 

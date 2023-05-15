@@ -556,6 +556,7 @@ pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, boo
     )> = all_cells
         .into_iter()
         .map(|(c, online)| {
+            // dbg!(&c);
             (
                 c.agent_pubkey().clone(),
                 c.authored_db().clone().into(),
@@ -704,7 +705,7 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
         tokio::time::sleep(delay).await;
     }
 
-    panic!("Database not integrated after {} attempts", num_attempts);
+    panic!("Consistency not achieved after {} attempts", num_attempts);
 }
 
 /// Same as wait for integration but can print other states at the same time

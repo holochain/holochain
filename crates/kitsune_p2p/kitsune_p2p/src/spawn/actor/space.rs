@@ -7,6 +7,7 @@ use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::dht::prelude::ArqClamping;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
@@ -680,7 +681,7 @@ async fn update_single_agent_info(
     let agent_info_signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        arc.half_length(),
+        dbg!(arc.half_length()),
         urls.clone(),
         signed_at_ms,
         expires_at_ms,
@@ -703,6 +704,16 @@ async fn update_single_agent_info(
     .await?;
 
     tracing::debug!(?agent_info_signed);
+
+    // Write to the local peer store. The agent info will also be stored via a local broadcast,
+    // except in the case of a zero arc where it gets filtered out, so we store it here too
+    // to be sure it makes it into the local store.
+    evt_sender
+        .put_agent_info_signed(PutAgentInfoSignedEvt {
+            space: space.clone(),
+            peer_data: vec![agent_info_signed.clone()],
+        })
+        .await?;
 
     // Push to the network as well
     match network_type {
@@ -1383,51 +1394,58 @@ impl Space {
             metrics.clone(),
         );
 
-        let gossip_mod = config
-            .tuning_params
-            .gossip_strategy
-            .split(',')
-            .flat_map(|module| match module {
-                "sharded-gossip" => {
-                    let mut gossips = vec![];
-                    if !config.tuning_params.disable_recent_gossip {
-                        gossips.push((
-                            GossipModuleType::ShardedRecent,
-                            crate::gossip::sharded_gossip::recent_factory(
-                                bandwidth_throttles.recent(),
-                            ),
-                        ));
+        let gossip_mod = if config.tuning_params.arc_clamping() == Some(ArqClamping::Empty) {
+            // If arcs are clamped to zero, then completely disable gossip for this node.
+            // Gossip will never resume
+            tracing::info!("Gossip is disabled due to arc_clamping setting");
+            HashMap::new()
+        } else {
+            config
+                .tuning_params
+                .gossip_strategy
+                .split(',')
+                .flat_map(|module| match module {
+                    "sharded-gossip" => {
+                        let mut gossips = vec![];
+                        if !config.tuning_params.disable_recent_gossip {
+                            gossips.push((
+                                GossipModuleType::ShardedRecent,
+                                crate::gossip::sharded_gossip::recent_factory(
+                                    bandwidth_throttles.recent(),
+                                ),
+                            ));
+                        }
+                        if !config.tuning_params.disable_historical_gossip {
+                            gossips.push((
+                                GossipModuleType::ShardedHistorical,
+                                crate::gossip::sharded_gossip::historical_factory(
+                                    bandwidth_throttles.historical(),
+                                ),
+                            ));
+                        }
+                        gossips
                     }
-                    if !config.tuning_params.disable_historical_gossip {
-                        gossips.push((
-                            GossipModuleType::ShardedHistorical,
-                            crate::gossip::sharded_gossip::historical_factory(
-                                bandwidth_throttles.historical(),
-                            ),
-                        ));
+                    "none" => vec![],
+                    _ => {
+                        panic!("unknown gossip strategy: {}", module);
                     }
-                    gossips
-                }
-                "none" => vec![],
-                _ => {
-                    panic!("unknown gossip strategy: {}", module);
-                }
-            })
-            .map(|(module, factory)| {
-                (
-                    module,
-                    factory.spawn_gossip_task(
-                        config.tuning_params.clone(),
-                        space.clone(),
-                        ep_hnd.clone(),
-                        evt_sender.clone(),
-                        host_api.clone(),
-                        metrics.clone(),
-                        fetch_pool.clone(),
-                    ),
-                )
-            })
-            .collect();
+                })
+                .map(|(module, factory)| {
+                    (
+                        module,
+                        factory.spawn_gossip_task(
+                            config.tuning_params.clone(),
+                            space.clone(),
+                            ep_hnd.clone(),
+                            evt_sender.clone(),
+                            host_api.clone(),
+                            metrics.clone(),
+                            fetch_pool.clone(),
+                        ),
+                    )
+                })
+                .collect()
+        };
 
         let i_s_c = i_s.clone();
         let agent_info_update_interval_ms =
@@ -1628,9 +1646,11 @@ impl Space {
         //
         // In the case an initial_arc is passend into the join request,
         // handle_join will initialize this agent_arcs map to that value.
-        self.agent_arcs
-            .get(agent)
-            .cloned()
-            .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
+        self.agent_arcs.get(agent).cloned().unwrap_or_else(|| {
+            match dbg!(self.config.tuning_params.arc_clamping()) {
+                Some(ArqClamping::Empty) => DhtArc::empty(agent.get_loc()),
+                Some(ArqClamping::Full) | None => DhtArc::full(agent.get_loc()),
+            }
+        })
     }
 }

@@ -5,7 +5,7 @@ use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
 use holochain_types::db::DbWrite;
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SweetCell {
     pub(super) cell_id: CellId,
     pub(super) cell_authored_db: DbWrite<DbKindAuthored>,
@@ -44,10 +44,10 @@ impl SweetCell {
     }
 }
 
-impl std::fmt::Debug for SweetCell {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SweetCell")
-            .field("cell_id", &self.cell_id)
-            .finish()
-    }
-}
+// impl std::fmt::Debug for SweetCell {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("SweetCell")
+//             .field("cell_id", &self.cell_id)
+//             .finish()
+//     }
+// }

@@ -124,11 +124,22 @@ pub async fn get_single_agent_info(
 pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     for (i, a) in envs.iter().enumerate() {
         let infos_a = all_agent_infos(a.clone().into()).await.unwrap();
+        // dbg!(a.path());
+        // dbg!(infos_a
+        //     .iter()
+        //     .map(|i| (i.agent.clone(), i.storage_arc.is_full()))
+        //     .collect::<Vec<_>>());
+
         for (j, b) in envs.iter().enumerate() {
             if i == j {
                 continue;
             }
             let infos_b = all_agent_infos(b.clone().into()).await.unwrap();
+            // dbg!(b.path());
+            // dbg!(infos_b
+            //     .iter()
+            //     .map(|i| (i.agent.clone(), i.storage_arc.is_full()))
+            //     .collect::<Vec<_>>());
 
             inject_agent_infos(a.clone(), infos_b.iter()).await.unwrap();
             inject_agent_infos(b.clone(), infos_a.iter()).await.unwrap();
@@ -249,14 +260,6 @@ pub async fn query_peer_density(
 
     // contains is already checked in the iterator
     Ok(strat.view(topology, dht_arc, arcs.as_slice()))
-}
-
-/// Put single agent info into store
-pub async fn put_agent_info_signed(
-    environ: DbWrite<DbKindP2pAgents>,
-    agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
-) -> ConductorResult<()> {
-    Ok(p2p_put(&environ, &agent_info_signed).await?)
 }
 
 fn now() -> u64 {

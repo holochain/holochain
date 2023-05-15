@@ -61,6 +61,35 @@ impl From<AppEntryBytes> for SerializedBytes {
 
 /// Helpful pattern for debug formatting many bytes.
 /// If the size is > 32 bytes, only the first 8 and last 8 bytes will be displayed.
+pub fn many_bytes_string(bytes: &[u8]) -> String {
+    if bytes.len() <= 32 {
+        format!("{:?}", bytes)
+    } else {
+        let l = bytes.len();
+        format!(
+            "[{},{},{},{},{},{},{},{},...,{},{},{},{},{},{},{},{}]",
+            bytes[0],
+            bytes[1],
+            bytes[2],
+            bytes[3],
+            bytes[4],
+            bytes[5],
+            bytes[6],
+            bytes[7],
+            bytes[l - 1],
+            bytes[l - 2],
+            bytes[l - 3],
+            bytes[l - 4],
+            bytes[l - 5],
+            bytes[l - 6],
+            bytes[l - 7],
+            bytes[l - 8],
+        )
+    }
+}
+
+/// Helpful pattern for debug formatting many bytes.
+/// If the size is > 32 bytes, only the first 8 and last 8 bytes will be displayed.
 pub fn fmt_many_bytes(
     name: &str,
     f: &mut std::fmt::Formatter<'_>,
@@ -73,28 +102,6 @@ pub fn fmt_many_bytes(
         let mut t = f.debug_struct(name);
         let l = bytes.len();
         t.field("length", &l);
-        t.field(
-            "bytes",
-            &format!(
-                "[{},{},{},{},{},{},{},{},...,{},{},{},{},{},{},{},{}]",
-                bytes[0],
-                bytes[1],
-                bytes[2],
-                bytes[3],
-                bytes[4],
-                bytes[5],
-                bytes[6],
-                bytes[7],
-                bytes[l - 1],
-                bytes[l - 2],
-                bytes[l - 3],
-                bytes[l - 4],
-                bytes[l - 5],
-                bytes[l - 6],
-                bytes[l - 7],
-                bytes[l - 8],
-            ),
-        )
-        .finish()
+        t.field("bytes", &many_bytes_string(&bytes)).finish()
     }
 }
