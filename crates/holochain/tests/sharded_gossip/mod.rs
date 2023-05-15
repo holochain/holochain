@@ -43,7 +43,7 @@ fn make_tuning(
     // This allows attempting to contact an offline node to timeout quickly,
     // so we can fallback to the next one
     tuning.default_rpc_single_timeout_ms = 3_000;
-    tuning.gossip_round_timeout_ms = 5_000;
+    tuning.gossip_round_timeout_ms = 10_000;
 
     tuning
 }
