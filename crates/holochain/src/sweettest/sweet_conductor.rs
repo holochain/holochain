@@ -154,6 +154,11 @@ impl SweetConductor {
         let config = config.into().into_conductor_config(&*rendezvous).await;
         tracing::info!(?config);
         let dir = TestDir::new(test_db_dir());
+        assert!(
+            dir.read_dir().unwrap().next().is_none(),
+            "Test dir not empty - {:?}",
+            dir.to_path_buf()
+        );
         let handle = Self::handle_from_existing(&dir, keystore, &config, &[]).await;
         Self::new(handle, dir, config, Some(rendezvous)).await
     }
