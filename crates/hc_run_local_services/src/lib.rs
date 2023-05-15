@@ -1,44 +1,44 @@
-use structopt::StructOpt;
+use clap::Parser;
 use tokio::io::AsyncWriteExt;
 use tx5_signal_srv::{Error, Result};
 
-#[derive(Debug, StructOpt)]
-/// Helper for running a holochain webrtc signal server.
+#[derive(Debug, Parser)]
+/// Helper for running local Holochain bootstrap and WebRTC signal servers.
 pub struct HcRunLocalServices {
     /// If set, write the bound address list to a new file, separated by
     /// newlines. If the file exists, an error will be returned.
-    #[structopt(long)]
+    #[arg(long)]
     bootstrap_address_path: Option<std::path::PathBuf>,
 
     /// A single interface on which to run the bootstrap server.
-    #[structopt(long, default_value = "127.0.0.1")]
+    #[arg(long, default_value = "127.0.0.1")]
     bootstrap_interface: String,
 
     /// The port to use for the bootstrap server. You probably want
     /// to leave this as 0 (zero) to be assigned an available port.
-    #[structopt(short, long, default_value = "0")]
+    #[arg(short, long, default_value = "0")]
     bootstrap_port: u16,
 
     /// Disable running a bootstrap server.
-    #[structopt(long)]
+    #[arg(long)]
     disable_bootstrap: bool,
 
     /// If set, write the bound address list to a new file, separated by
     /// newlines. If the file exists, an error will be returned.
-    #[structopt(long)]
+    #[arg(long)]
     signal_address_path: Option<std::path::PathBuf>,
 
-    /// A comma separated list of interfaces on which to run the signal server.
-    #[structopt(long, default_value = "127.0.0.1")]
+    /// A comma-separated list of interfaces on which to run the signal server.
+    #[arg(long, default_value = "127.0.0.1")]
     signal_interfaces: String,
 
     /// The port to use for the signal server. You probably want
     /// to leave this as 0 (zero) to be assigned an available port.
-    #[structopt(short, long, default_value = "0")]
+    #[arg(short, long, default_value = "0")]
     signal_port: u16,
 
     /// Disable running a signal server.
-    #[structopt(long)]
+    #[arg(long)]
     disable_signal: bool,
 }
 

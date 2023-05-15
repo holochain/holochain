@@ -22,6 +22,7 @@ path = "src/bin/hc-dna.rs"
 holochain_wasmer_host = "=0.0.84"
 futures = "0.3"
 anyhow = "1.0"
+clap = { version = "4.0", features = [ "derive" ] }
 holochain_util = { path = "../holochain_util", features = ["backtrace"], version = "^0.2.1-beta-dev.0"}
 holochain_serialized_bytes = "=0.0.51"
 holochain_types = { version = "^0.2.1-beta-dev.0", path = "../holochain_types" }
@@ -29,7 +30,6 @@ mr_bundle = {version = "^0.2.1-beta-dev.0", path = "../mr_bundle"}
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_yaml = "0.9"
-structopt = "0.3.11"
 thiserror = "1.0.22"
 tracing = "0.1"
 tokio = { version = "1.27", features = [ "full" ] }
