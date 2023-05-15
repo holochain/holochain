@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Improved documentation in README, code comments, help text, and error messages.
 - Updated from structopt 0.3 to clap 4. [#2125](https://github.com/holochain/holochain/pull/2125)
+
+## 0.2.1-beta-dev.0
+
 - `hc signal-srv` is now `hc run-local-services` and runs both a webrtc signaling server, and the holochain bootstrap server locally. [\#2353](https://github.com/holochain/holochain/pull/2353)
 
 ## 0.2.0
