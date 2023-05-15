@@ -51,7 +51,7 @@
           git add "$VERSIONS_DIR"/flake.lock
         fi
 
-        if [[ "$VERSIONS_DIR" = "$DEFAULT_VERSIONS_DIR" ]]; then
+        if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
           nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR"
         fi
 
