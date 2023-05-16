@@ -72,7 +72,6 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
@@ -125,7 +124,6 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .setup_app("app", &[dna_file.clone()])
         .await
         .unwrap();
-    conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
@@ -427,7 +425,6 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         hashes.push(hash);
     }
 
-    conductors.exchange_peer_info().await;
     consistency_60s([&cells[0], &cells[1]]).await;
 
     println!(
@@ -464,6 +461,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
+    // TODO should this just join the rendezvous? Rather than having to exchange peer info?
     conductors.add_conductor(conductor);
     conductors.exchange_peer_info().await;
 
