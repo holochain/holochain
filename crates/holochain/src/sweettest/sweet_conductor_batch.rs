@@ -99,7 +99,7 @@ impl SweetConductorBatch {
         C: Into<SweetConductorConfig>,
     {
         let conductor =
-            if let Some(rendezvous) = self.0.first().map(|c| c.get_rendezvous_config()).flatten() {
+            if let Some(rendezvous) = self.0.first().and_then(|c| c.get_rendezvous_config()) {
                 SweetConductor::from_config_rendezvous(c, rendezvous).await
             } else {
                 SweetConductor::from_config(c).await
