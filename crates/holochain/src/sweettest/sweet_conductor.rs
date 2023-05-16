@@ -192,6 +192,11 @@ impl SweetConductor {
         Self::from_config(standard_config()).await
     }
 
+    /// Get the rendezvous config that this conductor is using, if any
+    pub fn get_rendezvous_config(&self) -> Option<DynSweetRendezvous> {
+        self._rendezvous.clone()
+    }
+
     /// Access the database path for this conductor
     pub fn db_path(&self) -> &Path {
         &self.db_dir

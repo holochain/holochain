@@ -93,6 +93,21 @@ impl SweetConductorBatch {
         self.0.push(c);
     }
 
+    /// Create and add a new conductor to this batch
+    pub async fn add_conductor_from_config<C>(&mut self, c: C)
+    where
+        C: Into<SweetConductorConfig>,
+    {
+        let conductor =
+            if let Some(rendezvous) = self.0.first().map(|c| c.get_rendezvous_config()).flatten() {
+                SweetConductor::from_config_rendezvous(c, rendezvous).await
+            } else {
+                SweetConductor::from_config(c).await
+            };
+
+        self.0.push(conductor);
+    }
+
     /// Opinionated app setup.
     /// Creates one app on each Conductor in this batch, creating a new AgentPubKey for each.
     /// The created AgentPubKeys can be retrieved via each SweetApp.

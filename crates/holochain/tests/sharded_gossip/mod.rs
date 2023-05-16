@@ -453,17 +453,14 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     conductors[0].shutdown().await;
 
     // Bring a third conductor online
-    let mut conductor = SweetConductor::from_config(config).await;
-    let (cell,) = conductor
+    conductors.add_conductor_from_config(config).await;
+
+    let (cell,) = conductors[2]
         .setup_app("app", [&dna_file])
         .await
         .unwrap()
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
-
-    // TODO should this just join the rendezvous? Rather than having to exchange peer info?
-    conductors.add_conductor(conductor);
-    conductors.exchange_peer_info().await;
 
     conductors[2]
         .require_initial_gossip_activity_for_cell(&cell)
