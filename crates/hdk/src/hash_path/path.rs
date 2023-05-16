@@ -599,6 +599,7 @@ fn hash_path_path() {
         assert_eq!(Path::from(input), Path::from(output),);
     }
 
-    let path_to_string: String = Path::from("foo.a.b.c.abcdef.bar").try_into().unwrap();
-    assert_eq!(String::from("foo.a.b.c.abcdef.bar"), path_to_string,);
+    let path = "foo.a.b.c.abcdef.bar";
+    let path_to_string: String = Path::from(path).try_into().unwrap();
+    assert_eq!(path.to_string(), path_to_string,);
 }
