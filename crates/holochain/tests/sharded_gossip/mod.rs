@@ -178,7 +178,52 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
-async fn test_zero_arc_no_gossip() {
+async fn test_zero_arc_no_gossip_2way() {
+    holochain_trace::test_run().ok();
+
+    // Standard config
+    let config_0 = make_config(true, true, true, None);
+
+    // Standard config with arc clamped to zero and publishing off
+    // This should result in no publishing or gossip
+    let mut tuning_1 = make_tuning(false, true, true, None);
+    tuning_1.gossip_arc_clamping = "empty".into();
+    let config_1 = SweetConductorConfig::standard().tune(Arc::new(tuning_1));
+
+    let mut conductors = SweetConductorBatch::from_configs([config_0, config_1]).await;
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let ((cell_0,), (cell_1,)) = apps.into_tuples();
+
+    conductors.exchange_peer_info().await;
+
+    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
+    let hash_0: ActionHash = conductors[0]
+        .call(&zome_0, "create_string", "hi".to_string())
+        .await;
+
+    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
+    let hash_1: ActionHash = conductors[1]
+        .call(&zome_1, "create_string", "hi".to_string())
+        .await;
+
+    // can't await consistency because one node is neither publishing nor gossiping, and is relying only on `get`
+
+    let record_01: Option<Record> = conductors[0].call(&zome_0, "read", hash_1.clone()).await;
+    let record_10: Option<Record> = conductors[1].call(&zome_1, "read", hash_0.clone()).await;
+
+    // 1 is not a valid target for the get, and 0 did not publish, so 0 can't get 1's data.
+    assert!(record_01.is_none());
+
+    // 1 can get 0's data, though.
+    assert!(record_10.is_some());
+}
+
+/// Test that conductors with arcs clamped to zero do not gossip.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zero_arc_no_gossip_4way() {
     holochain_trace::test_run().ok();
 
     // Standard config
@@ -240,23 +285,19 @@ async fn test_zero_arc_no_gossip() {
     }
 
     let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
-    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
-    let zome_2 = cell_2.zome(SweetInlineZomes::COORDINATOR);
-
     let hash_0: ActionHash = conductors[0]
         .call(&zome_0, "create_string", "hi".to_string())
         .await;
 
+    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
     let hash_1: ActionHash = conductors[1]
         .call(&zome_1, "create_string", "hi".to_string())
         .await;
 
+    let zome_2 = cell_2.zome(SweetInlineZomes::COORDINATOR);
     let hash_2: ActionHash = conductors[2]
         .call(&zome_2, "create_string", "hi".to_string())
         .await;
-
-    // tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-    consistency_60s([&cell_0, &cell_1]).await;
 
     let record_01: Option<Record> = conductors[0].call(&zome_0, "read", hash_1.clone()).await;
     let record_02: Option<Record> = conductors[0].call(&zome_0, "read", hash_2.clone()).await;
@@ -272,15 +313,14 @@ async fn test_zero_arc_no_gossip() {
     dbg!(record_20.is_some());
     dbg!(record_21.is_some());
 
-    // Nodes 0 and 1 should not be able to get any data from node 2, because it isn't publishing
-    // or gossiping (this whole test is to ensure that node 2 isn't gossiping.)
-    // All other requests should succeed.
-    assert!(record_01.is_some());
-    assert!(record_02.is_none());
+    // 1 and 2 can get data from 0.
     assert!(record_10.is_some());
-    assert!(record_12.is_none());
     assert!(record_20.is_some());
-    assert!(record_21.is_some());
+
+    assert!(record_01.is_none());
+    assert!(record_02.is_none());
+    assert!(record_12.is_none());
+    assert!(record_21.is_none());
 }
 
 /// Test that when the conductor shuts down, gossip does not continue,
