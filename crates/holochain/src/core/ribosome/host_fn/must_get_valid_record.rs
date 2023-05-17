@@ -46,7 +46,8 @@ pub fn must_get_valid_record<'a>(
                     }) => Ok(record),
                     _ => match call_context.host_context {
                         HostContext::EntryDefs(_)
-                        | HostContext::GenesisSelfCheck(_)
+                        | HostContext::GenesisSelfCheckV1(_)
+                        | HostContext::GenesisSelfCheckV2(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(

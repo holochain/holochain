@@ -46,6 +46,8 @@ use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
 use std::iter::Iterator;
 use std::sync::Arc;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
 
 use self::guest_callback::{
     entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
@@ -98,7 +100,8 @@ impl CallContext {
 #[derive(Clone, Debug)]
 pub enum HostContext {
     EntryDefs(EntryDefsHostAccess),
-    GenesisSelfCheck(GenesisSelfCheckHostAccess),
+    GenesisSelfCheckV1(GenesisSelfCheckHostAccessV1),
+    GenesisSelfCheckV2(GenesisSelfCheckHostAccessV2),
     Init(InitHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
@@ -110,7 +113,8 @@ impl From<&HostContext> for HostFnAccess {
     fn from(host_access: &HostContext) -> Self {
         match host_access {
             HostContext::ZomeCall(access) => access.into(),
-            HostContext::GenesisSelfCheck(access) => access.into(),
+            HostContext::GenesisSelfCheckV1(access) => access.into(),
+            HostContext::GenesisSelfCheckV2(access) => access.into(),
             HostContext::Validate(access) => access.into(),
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),

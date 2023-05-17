@@ -9,26 +9,17 @@ use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 
-#[derive(Clone)]
-pub struct GenesisSelfCheckInvocationV1 {
-    pub payload: Arc<GenesisSelfCheckDataV1>,
-}
-
 #[derive(Clone, Constructor, Debug)]
 pub struct GenesisSelfCheckHostAccessV1;
+
+#[derive(Clone)]
+pub struct GenesisSelfCheckInvocationV1 {
+    pub payload: Arc<GenesisSelfCheckDataV1>
+}
 
 impl From<GenesisSelfCheckHostAccessV1> for HostContext {
     fn from(host_access: GenesisSelfCheckHostAccessV1) -> Self {
         Self::GenesisSelfCheckV1(host_access)
-    }
-}
-
-impl From<&GenesisSelfCheckHostAccessV1> for HostFnAccess {
-    fn from(_: &GenesisSelfCheckHostAccessV1) -> Self {
-        let mut access = Self::none();
-        access.keystore_deterministic = Permission::Allow;
-        access.bindings_deterministic = Permission::Allow;
-        access
     }
 }
 
@@ -39,7 +30,7 @@ impl Invocation for GenesisSelfCheckInvocationV1 {
     fn fn_components(&self) -> FnComponents {
         // Backwards compatibility for callbacks implemented pre-versioning, as
         // well as support for explicit v1 extern.
-        vec!["genesis_self_check".into(), "1"].into()
+        vec!["genesis_self_check".into(), "1".into()].into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.payload)
@@ -66,7 +57,7 @@ impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResultV1 {
         callback_results.into_iter().fold(Self::Valid, |acc, x| {
             match x {
                 // validation is invalid if any x is invalid
-                ValidateCallbackResult::Invalid(i) => GenesisSelfCheckResult::Invalid(i),
+                ValidateCallbackResult::Invalid(i) => Self::Invalid(i),
 
                 // valid x allows validation to continue
                 ValidateCallbackResult::Valid => acc,
@@ -74,7 +65,7 @@ impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResultV1 {
                 // this can't happen because self check has no DHT access.
                 // don't want to panic so i guess it is invalid.
                 ValidateCallbackResult::UnresolvedDependencies(_) => {
-                    GenesisSelfCheckResult::Invalid(format!("{:?}", x))
+                    Self::Invalid(format!("{:?}", x))
                 }
             }
         })

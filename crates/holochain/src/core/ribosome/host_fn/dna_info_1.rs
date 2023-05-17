@@ -8,7 +8,7 @@ use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::info::DnaInfoV1;
 use std::sync::Arc;
 
-pub fn dna_info(
+pub fn dna_info_1(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),

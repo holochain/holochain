@@ -600,7 +600,8 @@ impl RealRibosome {
                 x_25519_x_salsa20_poly1305_decrypt,
             )
             .with_host_function(&mut ns, "__hc__zome_info_1", zome_info)
-            .with_host_function(&mut ns, "__hc__dna_info_1", dna_info)
+            .with_host_function(&mut ns, "__hc__dna_info_1", dna_info_1)
+            .with_host_function(&mut ns, "__hc__dna_info_2", dna_info_2)
             .with_host_function(&mut ns, "__hc__call_info_1", call_info)
             .with_host_function(&mut ns, "__hc__random_bytes_1", random_bytes)
             .with_host_function(&mut ns, "__hc__sys_time_1", sys_time)
@@ -951,7 +952,7 @@ impl RibosomeT for RealRibosome {
         &self,
         host_access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
-    ) -> RibosomeResult<GenesisSelfCheckResultV1> {
+    ) -> RibosomeResult<GenesisSelfCheckResult> {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 

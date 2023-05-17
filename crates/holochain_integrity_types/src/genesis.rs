@@ -5,7 +5,7 @@
 //! joining to ensure that they can catch any problems they can before being
 //! subject to the scrutiny of their peers and facing possible rejection.
 
-use crate::DnaInfo;
+use crate::DnaInfoV1;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
@@ -17,7 +17,7 @@ pub type MembraneProof = std::sync::Arc<SerializedBytes>;
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct GenesisSelfCheckDataV1 {
     /// The Dna action (1st record)
-    pub dna_info: DnaInfo,
+    pub dna_info: DnaInfoV1,
 
     /// The proof of membership provided by the AgentValidationPkg (2nd record)
     pub membrane_proof: Option<MembraneProof>,
