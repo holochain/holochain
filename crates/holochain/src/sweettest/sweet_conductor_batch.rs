@@ -68,6 +68,14 @@ impl SweetConductorBatch {
         Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num)).await
     }
 
+    /// Create the given number of new SweetConductors, each with its own new TestEnvironments.
+    /// No network infrastructure will be created, these are just local conductors that can discover each other through `exchange_peer_info`
+    pub async fn from_standard_local_config(num: usize) -> SweetConductorBatch {
+        future::join_all(std::iter::repeat_with(SweetConductor::from_standard_config).take(num))
+            .await
+            .into()
+    }
+
     /// Iterate over the SweetConductors
     pub fn iter(&self) -> impl Iterator<Item = &SweetConductor> {
         self.0.iter()
