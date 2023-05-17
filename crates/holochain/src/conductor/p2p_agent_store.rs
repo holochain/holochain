@@ -124,22 +124,12 @@ pub async fn get_single_agent_info(
 pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     for (i, a) in envs.iter().enumerate() {
         let infos_a = all_agent_infos(a.clone().into()).await.unwrap();
-        // dbg!(a.path());
-        // dbg!(infos_a
-        //     .iter()
-        //     .map(|i| (i.agent.clone(), i.storage_arc.is_full()))
-        //     .collect::<Vec<_>>());
 
         for (j, b) in envs.iter().enumerate() {
             if i == j {
                 continue;
             }
             let infos_b = all_agent_infos(b.clone().into()).await.unwrap();
-            // dbg!(b.path());
-            // dbg!(infos_b
-            //     .iter()
-            //     .map(|i| (i.agent.clone(), i.storage_arc.is_full()))
-            //     .collect::<Vec<_>>());
 
             inject_agent_infos(a.clone(), infos_b.iter()).await.unwrap();
             inject_agent_infos(b.clone(), infos_a.iter()).await.unwrap();

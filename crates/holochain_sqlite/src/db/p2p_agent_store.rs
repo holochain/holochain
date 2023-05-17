@@ -147,7 +147,6 @@ pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> Da
 }
 
 fn tx_p2p_put(txn: &mut Transaction, record: P2pRecord) -> DatabaseResult<()> {
-    // dbg!(&record);
     txn.execute(
         sql_p2p_agent_store::INSERT,
         named_params! {

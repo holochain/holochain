@@ -681,7 +681,6 @@ impl Space {
         root_db_dir: &DatabaseRootPath,
         db_sync_strategy: DbSyncStrategy,
     ) -> DatabaseResult<Self> {
-        // dbg!(&root_db_dir);
         let space = dna_hash.to_kitsune();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,

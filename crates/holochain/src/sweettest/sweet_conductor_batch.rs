@@ -157,7 +157,6 @@ impl SweetConductorBatch {
 
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
-        dbg!();
         SweetConductor::exchange_peer_info(&self.0).await
     }
 

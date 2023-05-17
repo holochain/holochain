@@ -556,7 +556,6 @@ pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, boo
     )> = all_cells
         .into_iter()
         .map(|(c, online)| {
-            // dbg!(&c);
             (
                 c.agent_pubkey().clone(),
                 c.authored_db().clone().into(),
