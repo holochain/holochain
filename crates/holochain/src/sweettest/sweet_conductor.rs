@@ -520,9 +520,8 @@ impl SweetConductor {
     pub async fn exchange_peer_info(conductors: impl IntoIterator<Item = &Self>) {
         let mut all = Vec::new();
         for c in conductors.into_iter() {
-            dbg!(&c.spaces.db_dir);
             for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(dbg!(env.clone()));
+                all.push(env.clone());
             }
         }
         crate::conductor::p2p_agent_store::exchange_peer_info(all).await;

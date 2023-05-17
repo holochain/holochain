@@ -8,7 +8,7 @@ use hdk::prelude::*;
 use holochain_types::prelude::*;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
-#[derive(derive_more::Into, derive_more::IntoIterator)]
+#[derive(derive_more::Into, derive_more::IntoIterator, derive_more::Deref)]
 pub struct SweetConductorBatch(Vec<SweetConductor>);
 
 impl SweetConductorBatch {

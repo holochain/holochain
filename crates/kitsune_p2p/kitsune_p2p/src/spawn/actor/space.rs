@@ -681,7 +681,7 @@ async fn update_single_agent_info(
     let agent_info_signed = AgentInfoSigned::sign(
         space.clone(),
         agent.clone(),
-        dbg!(arc.half_length()),
+        arc.half_length(),
         urls.clone(),
         signed_at_ms,
         expires_at_ms,
@@ -1647,7 +1647,7 @@ impl Space {
         // In the case an initial_arc is passend into the join request,
         // handle_join will initialize this agent_arcs map to that value.
         self.agent_arcs.get(agent).cloned().unwrap_or_else(|| {
-            match dbg!(self.config.tuning_params.arc_clamping()) {
+            match self.config.tuning_params.arc_clamping() {
                 Some(ArqClamping::Empty) => DhtArc::empty(agent.get_loc()),
                 Some(ArqClamping::Full) | None => DhtArc::full(agent.get_loc()),
             }

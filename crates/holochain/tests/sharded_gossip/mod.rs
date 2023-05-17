@@ -9,7 +9,7 @@ use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
-use holochain::test_utils::{consistency_10s, consistency_60s, consistency_advanced};
+use holochain::test_utils::{consistency_10s, consistency_60s, consistency_advanced, WaitFor};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
@@ -224,34 +224,43 @@ async fn test_zero_arc_no_gossip_2way() {
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zero_arc_no_gossip_4way() {
+    use futures::future::join_all;
+
     holochain_trace::test_run().ok();
 
-    // Standard config
-    let config_0 = make_config(true, true, true, None);
+    let configs = [
+        // Standard config
+        make_config(true, true, true, None),
+        // Publishing turned off
+        make_config(false, true, true, None),
+        {
+            // Standard config with arc clamped to zero
+            let mut tuning = make_tuning(true, true, true, None);
+            tuning.gossip_arc_clamping = "empty".into();
+            SweetConductorConfig::standard().tune(Arc::new(tuning))
+        },
+        {
+            // Publishing turned off, arc clamped to zero
+            let mut tuning = make_tuning(false, true, true, None);
+            tuning.gossip_arc_clamping = "empty".into();
+            SweetConductorConfig::standard().tune(Arc::new(tuning))
+        },
+    ];
 
-    // Standard config with arc clamped to zero
-    let mut tuning_1 = make_tuning(true, true, true, None);
-    tuning_1.gossip_arc_clamping = "empty".into();
-    let config_1 = SweetConductorConfig::standard().tune(Arc::new(tuning_1));
-
-    // Publishing turned off, arc clamped to zero
-    let mut tuning_2 = make_tuning(false, true, true, None);
-    tuning_2.gossip_arc_clamping = "empty".into();
-    let config_2 = SweetConductorConfig::standard().tune(Arc::new(tuning_2));
-
-    let mut conductors = SweetConductorBatch::from_configs([config_0, config_1, config_2]).await;
-
-    // tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-    // return;
+    let mut conductors = SweetConductorBatch::from_configs(configs).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let dna_hash = dna_file.dna_hash().clone();
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    let ((cell_0,), (cell_1,), (cell_2,)) = apps.into_tuples();
+    let cells = apps.cells_flattened();
+    let zomes: Vec<_> = cells
+        .iter()
+        .map(|c| c.zome(SweetInlineZomes::COORDINATOR))
+        .collect();
 
     // Ensure that each node has one agent in its peer store, for the single app installed.
-    for (i, cell) in [&cell_0, &cell_1, &cell_2].iter().enumerate() {
+    for (i, cell) in cells.iter().enumerate() {
         let stored_agents = holochain::conductor::p2p_agent_store::all_agent_infos(
             conductors[i]
                 .get_spaces()
@@ -270,57 +279,58 @@ async fn test_zero_arc_no_gossip_4way() {
     conductors.exchange_peer_info().await;
 
     // Ensure that each node has all agents in their local p2p store.
-    for i in 0..=2 {
+    for c in conductors.iter() {
         let stored_agents = holochain::conductor::p2p_agent_store::all_agent_infos(
-            conductors[i]
-                .get_spaces()
-                .p2p_agents_db(&dna_hash)
-                .unwrap()
-                .into(),
+            c.get_spaces().p2p_agents_db(&dna_hash).unwrap().into(),
         )
         .await
         .unwrap()
         .len();
-        assert_eq!(stored_agents, 3);
+        assert_eq!(stored_agents, conductors.len());
     }
 
-    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
-    let hash_0: ActionHash = conductors[0]
-        .call(&zome_0, "create_string", "hi".to_string())
-        .await;
+    // Have each conductor create an entry
+    let hashes: Vec<ActionHash> = join_all(
+        conductors
+            .iter()
+            .enumerate()
+            .map(|(i, c)| c.call(&zomes[i], "create_string", format!("{}", i))),
+    )
+    .await;
 
-    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
-    let hash_1: ActionHash = conductors[1]
-        .call(&zome_1, "create_string", "hi".to_string())
-        .await;
-
-    let zome_2 = cell_2.zome(SweetInlineZomes::COORDINATOR);
-    let hash_2: ActionHash = conductors[2]
-        .call(&zome_2, "create_string", "hi".to_string())
-        .await;
-
-    let record_01: Option<Record> = conductors[0].call(&zome_0, "read", hash_1.clone()).await;
-    let record_02: Option<Record> = conductors[0].call(&zome_0, "read", hash_2.clone()).await;
-    let record_10: Option<Record> = conductors[1].call(&zome_1, "read", hash_0.clone()).await;
-    let record_12: Option<Record> = conductors[1].call(&zome_1, "read", hash_2).await;
-    let record_20: Option<Record> = conductors[2].call(&zome_2, "read", hash_0).await;
-    let record_21: Option<Record> = conductors[2].call(&zome_2, "read", hash_1).await;
-
-    dbg!(record_01.is_some());
-    dbg!(record_02.is_some());
-    dbg!(record_10.is_some());
-    dbg!(record_12.is_some());
-    dbg!(record_20.is_some());
-    dbg!(record_21.is_some());
-
-    // 1 and 2 can get data from 0.
-    assert!(record_10.is_some());
-    assert!(record_20.is_some());
-
-    assert!(record_01.is_none());
-    assert!(record_02.is_none());
-    assert!(record_12.is_none());
-    assert!(record_21.is_none());
+    // Have each conductor attempt to get every other conductor's entry,
+    // retrying for a certain amount of time until the entry could be successfully retrieved,
+    // then testing for success.
+    //
+    // Nobody should be able to get conductor 3's entry, because it is not publishing
+    // and not gossiping due to zero arc.
+    let _: Vec<()> = join_all(conductors.iter().enumerate().flat_map(|(i, c)| {
+        hashes
+            .iter()
+            .enumerate()
+            .map(|(j, hash)| {
+                let zome = zomes[i].clone();
+                async move {
+                    let assertion = |x: bool| {
+                        if j == 3 && i != j {
+                            assert!(!x, "Node 3's data should not be accessible by anyone but itself. i={}, j={}", i, j);
+                        } else {
+                            assert!(x, "All nodes should be able to get all data except for node 3's. i={}, j={}", i, j);
+                        }
+                    };
+                    holochain::wait_for!(
+                        WaitFor::new(std::time::Duration::from_secs(5), 10),
+                        c.call::<_, Option<Record>, _>(&zome, "read", hash.clone())
+                            .await
+                            .is_some(),
+                        |x: &bool| *x,
+                        assertion
+                    );
+                }
+            })
+            .collect::<Vec<_>>()
+    }))
+    .await;
 }
 
 /// Test that when the conductor shuts down, gossip does not continue,
