@@ -22,7 +22,7 @@ use holochain_websocket::*;
 use rand::Rng;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
@@ -560,7 +560,11 @@ impl SweetConductor {
     /// but that doesn't necessarily happen. Waiting for gossip to have started before, for example,
     /// waiting for something else like consistency is useful to ensure that communication has
     /// actually started.
-    pub async fn require_initial_gossip_activity_for_cell(&self, cell: &SweetCell) {
+    pub async fn require_initial_gossip_activity_for_cell(
+        &self,
+        cell: &SweetCell,
+        timeout: Duration,
+    ) {
         let handle = self.raw_handle();
 
         let wait_start = Instant::now();
@@ -587,6 +591,13 @@ impl SweetConductor {
             }
 
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+            if wait_start.elapsed() > timeout {
+                panic!(
+                    "Timed out waiting for gossip to start for cell {}",
+                    cell.cell_id()
+                );
+            }
         }
     }
 }

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
@@ -76,7 +76,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
     conductors
-        .require_initial_gossip_activity_for_cell(&alice)
+        .require_initial_gossip_activity_for_cell(&alice, Duration::from_secs(90))
         .await;
 
     // Call the "create" zome fn on Alice's app
@@ -128,7 +128,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
     conductors
-        .require_initial_gossip_activity_for_cell(&alice)
+        .require_initial_gossip_activity_for_cell(&alice, Duration::from_secs(90))
         .await;
 
     // Call the "create" zome fn on Alice's app
@@ -463,7 +463,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
     conductors[2]
-        .require_initial_gossip_activity_for_cell(&cell)
+        .require_initial_gossip_activity_for_cell(&cell, Duration::from_secs(90))
         .await;
 
     consistency_advanced(
