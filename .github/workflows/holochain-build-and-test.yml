@@ -62,6 +62,7 @@ jobs:
         env:
           system: ${{ matrix.platform.system }}
           NIX_CONFIG: "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}"
+          RUST_LOG: "warn"
         run: |
           set -xe
 
