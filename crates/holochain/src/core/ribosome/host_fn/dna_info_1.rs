@@ -5,7 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::info::DnaInfo;
+use holochain_zome_types::info::DnaInfoV1;
 use std::sync::Arc;
 
 pub fn dna_info(
@@ -17,7 +17,7 @@ pub fn dna_info(
         HostFnAccess {
             bindings_deterministic: Permission::Allow,
             ..
-        } => Ok(DnaInfo {
+        } => Ok(DnaInfoV1 {
             name: ribosome.dna_def().name.clone(),
             hash: ribosome.dna_def().as_hash().clone(),
             properties: ribosome.dna_def().modifiers.properties.clone(),

@@ -35,7 +35,8 @@ use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::create_x25519_keypair::create_x25519_keypair;
 use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
-use crate::core::ribosome::host_fn::dna_info::dna_info;
+use crate::core::ribosome::host_fn::dna_info_1::dna_info_1;
+use crate::core::ribosome::host_fn::dna_info_2::dna_info_2;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
@@ -950,7 +951,7 @@ impl RibosomeT for RealRibosome {
         &self,
         host_access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
-    ) -> RibosomeResult<GenesisSelfCheckResult> {
+    ) -> RibosomeResult<GenesisSelfCheckResultV1> {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 

@@ -15,7 +15,7 @@ pub type MembraneProof = std::sync::Arc<SerializedBytes>;
 /// Data passed into the genesis_self_check callback for verifying the initial
 /// chain entries
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
-pub struct GenesisSelfCheckData {
+pub struct GenesisSelfCheckDataV1 {
     /// The Dna action (1st record)
     pub dna_info: DnaInfo,
 
@@ -25,3 +25,10 @@ pub struct GenesisSelfCheckData {
     /// The 3rd record of the chain, the agent key
     pub agent_key: AgentPubKey,
 }
+
+/// Data passed into the genesis_self_check callback for verifying the initial
+/// chain entries
+/// The proof of membership provided by the AgentValidationPkg is the 2nd record
+/// in the chain, but is provided as an argument to the callback for convenience.
+#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+pub struct GenesisSelfCheckDataV2(pub Option<MembraneProof>);

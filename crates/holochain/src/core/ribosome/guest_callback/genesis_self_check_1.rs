@@ -10,21 +10,21 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 
 #[derive(Clone)]
-pub struct GenesisSelfCheckInvocation {
-    pub payload: Arc<GenesisSelfCheckData>,
+pub struct GenesisSelfCheckInvocationV1 {
+    pub payload: Arc<GenesisSelfCheckDataV1>,
 }
 
 #[derive(Clone, Constructor, Debug)]
-pub struct GenesisSelfCheckHostAccess;
+pub struct GenesisSelfCheckHostAccessV1;
 
-impl From<GenesisSelfCheckHostAccess> for HostContext {
-    fn from(host_access: GenesisSelfCheckHostAccess) -> Self {
-        Self::GenesisSelfCheck(host_access)
+impl From<GenesisSelfCheckHostAccessV1> for HostContext {
+    fn from(host_access: GenesisSelfCheckHostAccessV1) -> Self {
+        Self::GenesisSelfCheckV1(host_access)
     }
 }
 
-impl From<&GenesisSelfCheckHostAccess> for HostFnAccess {
-    fn from(_: &GenesisSelfCheckHostAccess) -> Self {
+impl From<&GenesisSelfCheckHostAccessV1> for HostFnAccess {
+    fn from(_: &GenesisSelfCheckHostAccessV1) -> Self {
         let mut access = Self::none();
         access.keystore_deterministic = Permission::Allow;
         access.bindings_deterministic = Permission::Allow;
@@ -32,12 +32,14 @@ impl From<&GenesisSelfCheckHostAccess> for HostFnAccess {
     }
 }
 
-impl Invocation for GenesisSelfCheckInvocation {
+impl Invocation for GenesisSelfCheckInvocationV1 {
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::AllIntegrity
     }
     fn fn_components(&self) -> FnComponents {
-        vec!["genesis_self_check".into()].into()
+        // Backwards compatibility for callbacks implemented pre-versioning, as
+        // well as support for explicit v1 extern.
+        vec!["genesis_self_check".into(), "1"].into()
     }
     fn host_input(self) -> Result<ExternIO, SerializedBytesError> {
         ExternIO::encode(self.payload)
@@ -48,18 +50,18 @@ impl Invocation for GenesisSelfCheckInvocation {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub enum GenesisSelfCheckResult {
+pub enum GenesisSelfCheckResultV1 {
     Valid,
     Invalid(String),
 }
 
-impl From<Vec<(ZomeName, ValidateCallbackResult)>> for GenesisSelfCheckResult {
+impl From<Vec<(ZomeName, ValidateCallbackResult)>> for GenesisSelfCheckResultV1 {
     fn from(a: Vec<(ZomeName, ValidateCallbackResult)>) -> Self {
         a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
     }
 }
 
-impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResult {
+impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResultV1 {
     fn from(callback_results: Vec<ValidateCallbackResult>) -> Self {
         callback_results.into_iter().fold(Self::Valid, |acc, x| {
             match x {

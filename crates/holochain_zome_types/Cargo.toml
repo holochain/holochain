@@ -61,7 +61,7 @@ default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
 
 # Extra impls for DnaDef, including InlineZome, which are not used in Wasm
 # but used in Holochain
-full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs"]
+full-dna-def = ["derive_builder", "nanoid", "shrinkwraprs", "holochain_integrity_types/full-dna-def"]
 
 full = ["default", "sqlite", "num_enum", "kitsune_p2p_timestamp/full", "properties"]
 
