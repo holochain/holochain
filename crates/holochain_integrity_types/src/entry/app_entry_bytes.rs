@@ -102,6 +102,6 @@ pub fn fmt_many_bytes(
         let mut t = f.debug_struct(name);
         let l = bytes.len();
         t.field("length", &l);
-        t.field("bytes", &many_bytes_string(&bytes)).finish()
+        t.field("bytes", &many_bytes_string(bytes)).finish()
     }
 }
