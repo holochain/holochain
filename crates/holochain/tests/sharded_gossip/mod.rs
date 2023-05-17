@@ -44,6 +44,7 @@ fn make_tuning(
     // so we can fallback to the next one
     tuning.default_rpc_single_timeout_ms = 3_000;
     tuning.gossip_round_timeout_ms = 10_000;
+    tuning.bootstrap_check_delay_backoff_multiplier = 1;
 
     tuning
 }

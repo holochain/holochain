@@ -271,6 +271,10 @@ pub mod tuning_params_struct {
         /// Disable historical gossip. Useful for testing Recent gossip in isolation.
         disable_historical_gossip: bool = false,
 
+        /// Control the backoff multiplier for the time delay between checking in with the bootstrap server.
+        /// The default value of `2` causes the delay to grow quickly up to the max time of 1 hour.
+        /// For testing consider using `1` to prevent the delay from growing.
+        bootstrap_check_delay_backoff_multiplier: u32 = 2,
     }
 
     impl KitsuneP2pTuningParams {
