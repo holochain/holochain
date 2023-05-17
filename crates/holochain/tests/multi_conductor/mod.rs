@@ -35,7 +35,7 @@ async fn test_publish() -> anyhow::Result<()> {
     network.tuning_params = Arc::new(tuning);
     let mut config = ConductorConfig::default();
     config.network = Some(network);
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+    let mut conductors = SweetConductorBatch::from_config_local(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
