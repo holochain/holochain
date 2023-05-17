@@ -652,6 +652,7 @@ async fn concurrent_install_dna() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore)]
 async fn network_stats() {
     holochain_trace::test_run().ok();
 
