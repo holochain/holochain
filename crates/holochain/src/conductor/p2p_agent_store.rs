@@ -16,6 +16,7 @@ use holochain_state::prelude::StateQueryResult;
 use holochain_zome_types::CellId;
 use std::sync::Arc;
 use thiserror::Error;
+use std::collections::HashSet;
 
 use super::error::ConductorResult;
 
