@@ -1,4 +1,5 @@
 //! Helpers for running the conductor.
+
 use std::path::Path;
 use std::{path::PathBuf, process::Stdio};
 
@@ -10,6 +11,7 @@ use tokio::sync::oneshot;
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
+use crate::cli::LaunchInfo;
 use crate::config::*;
 use crate::ports::random_admin_port;
 use crate::ports::set_admin_port;
@@ -23,25 +25,25 @@ const HC_START_2: &str = "HOLOCHAIN_SANDBOX_END";
 
 /// Run a conductor and wait for it to finish.
 /// Use [`run_async`] to run in the background.
-/// Requires the holochain binary is available
+/// Requires the holochain binary to be available
 /// on the `holochain_path`.
 /// Uses the sandbox provided by the `sandbox_path`.
-/// Adds an app interface in the `app_ports`.
+/// Adds an app interface specified in the `app_ports`.
 /// Can optionally force the admin port used. Otherwise
 /// the port in the config will be used if it's free or
 /// a random free port will be chosen.
 pub async fn run(
     holochain_path: &Path,
     sandbox_path: PathBuf,
+    conductor_index: usize,
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    let (port, mut holochain, lair) =
+    let (admin_port, mut holochain, lair) =
         run_async(holochain_path, sandbox_path.clone(), force_admin_port).await?;
-    msg!("Running conductor on admin port {}", port);
+    let mut launch_info = LaunchInfo::from_admin_port(admin_port);
     for app_port in app_ports {
-        msg!("Attaching app port {}", app_port);
-        let mut cmd = CmdRunner::try_new(port).await?;
+        let mut cmd = CmdRunner::try_new(admin_port).await?;
         let port = attach_app_interface(
             &mut cmd,
             AddAppWs {
@@ -49,9 +51,16 @@ pub async fn run(
             },
         )
         .await?;
-        msg!("App port attached at {}", port);
+        launch_info.app_ports.push(port);
     }
-    crate::save::lock_live(std::env::current_dir()?, &sandbox_path, port).await?;
+
+    msg!(
+        "Conductor launched #!{} {}",
+        conductor_index,
+        serde_json::to_string(&launch_info)?
+    );
+
+    crate::save::lock_live(std::env::current_dir()?, &sandbox_path, admin_port).await?;
     msg!("Connected successfully to a running holochain");
     let e = format!("Failed to run holochain at {}", sandbox_path.display());
 
@@ -65,7 +74,7 @@ pub async fn run(
 }
 
 /// Run a conductor in the background.
-/// Requires the holochain binary is available
+/// Requires the holochain binary to be available
 /// on the `holochain_path`.
 /// Uses the sandbox provided by the `sandbox_path`.
 /// Can optionally force the admin port used. Otherwise

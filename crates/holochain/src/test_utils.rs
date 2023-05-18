@@ -706,6 +706,8 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
         }
         tokio::time::sleep(delay).await;
     }
+
+    panic!("Database not integrated after {} attempts", num_attempts);
 }
 
 /// Same as wait for integration but can print other states at the same time
@@ -784,6 +786,11 @@ pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
         }
         tokio::time::sleep(delay).await;
     }
+
+    panic!(
+        "Integration with others not complete after {} attempts",
+        num_attempts
+    );
 }
 
 #[tracing::instrument(skip(envs))]

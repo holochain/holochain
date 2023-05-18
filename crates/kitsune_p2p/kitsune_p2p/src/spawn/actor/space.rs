@@ -191,10 +191,6 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
-        let single_storage_arc_per_space = self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space;
         let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
@@ -213,7 +209,6 @@ impl SpaceInternalHandler for Space {
                     mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
                     dynamic_arcs,
-                    single_storage_arc_per_space,
                 };
                 peer_data.push(update_single_agent_info(input).await?);
             }
@@ -243,10 +238,6 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
-        let single_storage_arc_per_space = self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space;
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
@@ -264,7 +255,6 @@ impl SpaceInternalHandler for Space {
                 mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
                 dynamic_arcs,
-                single_storage_arc_per_space,
             };
             let peer_data = vec![update_single_agent_info(input).await?];
             internal_sender
@@ -637,7 +627,6 @@ struct UpdateAgentInfoInput<'borrow> {
     mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
     dynamic_arcs: bool,
-    single_storage_arc_per_space: bool,
 }
 
 async fn update_arc_length(
@@ -676,13 +665,9 @@ async fn update_single_agent_info(
         mdns_handles,
         bootstrap_service,
         dynamic_arcs,
-        single_storage_arc_per_space,
     } = input;
 
-    // If there is only a single agent per space don't update the empty arcs.
-    let should_not_update_arc_length = single_storage_arc_per_space && arc.is_empty();
-
-    if dynamic_arcs && !should_not_update_arc_length {
+    if dynamic_arcs {
         update_arc_length(evt_sender, space.clone(), &mut arc).await?;
     }
 
@@ -1638,32 +1623,14 @@ impl Space {
 
     /// Get the existing agent storage arc or create a new one.
     fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
-        if self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space
-        {
-            let arc = self.agent_arcs.get(agent).cloned();
-            match arc {
-                Some(arc) => arc,
-                None => {
-                    if self.agent_arcs.is_empty() {
-                        DhtArc::full(agent.get_loc())
-                    } else {
-                        DhtArc::empty(agent.get_loc())
-                    }
-                }
-            }
-        } else {
-            // TODO: We are simply setting the initial arc to full.
-            // In the future we may want to do something more intelligent.
-            //
-            // In the case an initial_arc is passend into the join request,
-            // handle_join will initialize this agent_arcs map to that value.
-            self.agent_arcs
-                .get(agent)
-                .cloned()
-                .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
-        }
+        // TODO: We are simply setting the initial arc to full.
+        // In the future we may want to do something more intelligent.
+        //
+        // In the case an initial_arc is passend into the join request,
+        // handle_join will initialize this agent_arcs map to that value.
+        self.agent_arcs
+            .get(agent)
+            .cloned()
+            .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
     }
 }
