@@ -2,11 +2,12 @@
 use std::time::Duration;
 
 #[macro_export]
-macro_rules! wait_for_any {
+macro_rules! wait_for {
     ($wait:expr, $test:expr, $check:expr, $assert:expr) => {{
+        let mut w = $wait;
         loop {
             let o = $test;
-            if !$wait.wait_any().await || $check(&o) {
+            if !w.wait_any().await || $check(&o) {
                 $assert(o);
                 break;
             }
@@ -15,39 +16,39 @@ macro_rules! wait_for_any {
 }
 
 #[macro_export]
-macro_rules! wait_for_any_10s {
+macro_rules! wait_for_10s {
     ($test:expr, $check:expr, $assert:expr) => {
-        let mut wait_for = $crate::test_utils::WaitForAny::ten_s();
-        $crate::wait_for_any!(wait_for, $test, $check, $assert)
+        let wait_for = $crate::test_utils::WaitFor::ten_s();
+        $crate::wait_for!(wait_for, $test, $check, $assert)
     };
 }
 
 #[macro_export]
-macro_rules! wait_for_any_1m {
+macro_rules! wait_for_1m {
     ($test:expr, $check:expr, $assert:expr) => {
-        let mut wait_for = $crate::test_utils::WaitForAny::one_m();
-        $crate::wait_for_any!(wait_for, $test, $check, $assert)
+        let wait_for = $crate::test_utils::WaitFor::one_m();
+        $crate::wait_for!(wait_for, $test, $check, $assert)
     };
 }
 
 #[macro_export]
 macro_rules! assert_retry {
     ($wait:expr, $test:expr, $check:expr $(, $reason:literal)?) => {
-        $crate::wait_for_any!($wait, $test, $check, |x| assert!(x $(, $reason)?))
+        $crate::wait_for!($wait, $test, $check, |x| assert!(x $(, $reason)?))
     };
 }
 
 #[macro_export]
 macro_rules! assert_eq_retry {
     ($wait:expr, $test:expr, $check:expr $(, $reason:literal)?) => {
-        $crate::wait_for_any!($wait, $test, |x| x == &$check, |x| assert_eq!(x, $check $(, $reason)?))
+        $crate::wait_for!($wait, $test, |x| x == &$check, |x| assert_eq!(x, $check $(, $reason)?))
     };
 }
 
 #[macro_export]
 macro_rules! assert_retry_10s {
     ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
-        let mut wait_for = $crate::test_utils::WaitForAny::ten_s();
+        let wait_for = $crate::test_utils::WaitFor::ten_s();
         $crate::assert_retry!(wait_for, $test, $check  $(, $reason:literal)?)
     };
 }
@@ -55,7 +56,7 @@ macro_rules! assert_retry_10s {
 #[macro_export]
 macro_rules! assert_eq_retry_10s {
     ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
-        let mut wait_for = $crate::test_utils::WaitForAny::ten_s();
+        let wait_for = $crate::test_utils::WaitFor::ten_s();
         $crate::assert_eq_retry!(wait_for, $test, $check  $(, $reason:literal)?)
     };
 }
@@ -63,7 +64,7 @@ macro_rules! assert_eq_retry_10s {
 #[macro_export]
 macro_rules! assert_retry_1m {
     ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
-        let mut wait_for = $crate::test_utils::WaitForAny::one_m();
+        let wait_for = $crate::test_utils::WaitFor::one_m();
         $crate::assert_retry!(wait_for, $test, $check  $(, $reason:literal)?)
     };
 }
@@ -71,7 +72,7 @@ macro_rules! assert_retry_1m {
 #[macro_export]
 macro_rules! assert_eq_retry_1m {
     ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
-        let mut wait_for = $crate::test_utils::WaitForAny::one_m();
+        let wait_for = $crate::test_utils::WaitFor::one_m();
         $crate::assert_eq_retry!(wait_for, $test, $check  $(, $reason:literal)?)
     };
 }
@@ -79,7 +80,7 @@ macro_rules! assert_eq_retry_1m {
 #[macro_export]
 macro_rules! assert_eq_retry_5m {
     ($test:expr, $check:expr $(, $reason:literal)? $(,)?) => {
-        let mut wait_for = $crate::test_utils::WaitForAny::five_m();
+        let wait_for = $crate::test_utils::WaitFor::five_m();
         $crate::assert_eq_retry!(wait_for, $test, $check  $(, $reason:literal)?)
     };
 }
@@ -89,38 +90,40 @@ macro_rules! assert_eq_retry_5m {
 /// be true. This allows early exit from waiting when
 /// the condition becomes true but will wait up to a
 /// maximum if the condition is not true.
-pub struct WaitForAny {
-    num_attempts: usize,
-    attempt: usize,
+pub struct WaitFor {
+    num_attempts: u32,
+    attempt: u32,
     delay: Duration,
 }
 
-impl WaitForAny {
+impl WaitFor {
     /// Create a new wait for from a number of attempts and delay in between attempts
-    pub fn new(num_attempts: usize, delay: Duration) -> Self {
+    pub fn new(total: Duration, num_attempts: u32) -> Self {
         Self {
             num_attempts,
             attempt: 0,
-            delay,
+            delay: total / num_attempts,
         }
+    }
+
+    /// Wait for 1s checking every 100ms.
+    pub fn one_s() -> Self {
+        Self::new(std::time::Duration::from_secs(1), 10)
     }
 
     /// Wait for 10s checking every 100ms.
     pub fn ten_s() -> Self {
-        const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-        Self::new(100, DELAY_PER_ATTEMPT)
+        Self::new(std::time::Duration::from_secs(10), 100)
     }
 
     /// Wait for 1 minute checking every 500ms.
     pub fn one_m() -> Self {
-        const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
-        Self::new(120, DELAY_PER_ATTEMPT)
+        Self::new(std::time::Duration::from_secs(60), 120)
     }
 
     /// Wait for 5 minutes checking every 1000ms.
     pub fn five_m() -> Self {
-        const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(1000);
-        Self::new(60 * 5, DELAY_PER_ATTEMPT)
+        Self::new(std::time::Duration::from_secs(5 * 60), 5 * 60)
     }
 
     /// Wait for some time before trying again.
@@ -135,4 +138,10 @@ impl WaitForAny {
         tokio::time::sleep(self.delay).await;
         true
     }
+}
+
+#[tokio::test]
+async fn wait_for_tests() {
+    wait_for!(WaitFor::one_s(), true, |&x| x, |x: bool| assert!(x));
+    wait_for!(WaitFor::one_s(), false, |&x| x, |x: bool| assert!(!x));
 }

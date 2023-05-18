@@ -108,6 +108,17 @@ pub struct DbRead<Kind: DbKindT> {
     num_readers: Arc<AtomicUsize>,
 }
 
+impl<Kind: DbKindT> std::fmt::Debug for DbRead<Kind> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DbRead")
+            .field("kind", &self.kind)
+            .field("path", &self.path)
+            .field("max_readers", &self.max_readers)
+            .field("num_readers", &self.num_readers)
+            .finish()
+    }
+}
+
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable)]
 pub struct PConnGuard(#[shrinkwrap(main_field)] pub PConn, OwnedSemaphorePermit);
@@ -202,7 +213,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
 /// The canonical representation of a (singleton) database.
 /// The wrapper contains methods for managing transactions
 /// and database connections,
-#[derive(Clone, Shrinkwrap, Into)]
+#[derive(Clone, Debug, Shrinkwrap, Into)]
 pub struct DbWrite<Kind: DbKindT>(DbRead<Kind>);
 
 impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
@@ -400,7 +411,7 @@ pub enum DbKind {
     /// Metrics for peers on p2p network (one per space).
     P2pMetrics(Arc<KitsuneSpace>),
 }
-pub trait DbKindT: Clone + Send + Sync + 'static {
+pub trait DbKindT: Clone + std::fmt::Debug + Send + Sync + 'static {
     fn kind(&self) -> DbKind;
     /// Constuct a partial Path based on the kind
     fn filename(&self) -> PathBuf {
