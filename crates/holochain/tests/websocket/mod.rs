@@ -660,7 +660,7 @@ async fn network_stats() {
 
     let dna_file = SweetDnaFile::unique_empty().await;
 
-    let apps = batch.setup_app("app", &[dna_file]).await.unwrap();
+    let _ = batch.setup_app("app", &[dna_file]).await.unwrap();
     batch.exchange_peer_info().await;
 
     let (mut client, _) = batch.get(0).unwrap().admin_ws_client().await;
