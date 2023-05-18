@@ -20,6 +20,9 @@
 
         buildInputs = (with pkgs; [
           openssl
+
+          # this is required for glib-networking
+          glib
         ])
         ++ (lib.optionals pkgs.stdenv.isLinux
           (with pkgs; [

@@ -708,12 +708,7 @@ async fn update_single_agent_info(
     // Write to the local peer store. The agent info will also be stored via a local broadcast,
     // except in the case of a zero arc where it gets filtered out, so we store it here too
     // to be sure it makes it into the local store.
-    evt_sender
-        .put_agent_info_signed(PutAgentInfoSignedEvt {
-            space: space.clone(),
-            peer_data: vec![agent_info_signed.clone()],
-        })
-        .await?;
+    put_local_agent_info(evt_sender.clone(), space.clone(), agent_info_signed.clone()).await?;
 
     // Push to the network as well
     match network_type {
@@ -990,12 +985,11 @@ impl KitsuneP2pHandler for Space {
                     .values()
                     .any(|arc| arc.contains(basis.get_loc()))
                 {
-                    let fut = self
-                        .evt_sender
-                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space: self.space.clone(),
-                            peer_data: vec![agent_info.clone()],
-                        });
+                    let fut = put_local_agent_info(
+                        self.evt_sender.clone(),
+                        self.space.clone(),
+                        agent_info.clone(),
+                    );
                     local_agent_info_events.push(async move {
                         if let Err(err) = fut.await {
                             tracing::warn!(?err, "failed local broadcast");
@@ -1653,4 +1647,21 @@ impl Space {
             }
         })
     }
+}
+
+/// Function to add local agent info to the store.
+/// There's nothing special about this method, it's just helpful to
+/// semantically see the situations where local info is being added.
+async fn put_local_agent_info(
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    space: KSpace,
+    agent_info: AgentInfoSigned,
+) -> KitsuneP2pResult<()> {
+    evt_sender
+        .put_agent_info_signed(PutAgentInfoSignedEvt {
+            space,
+            peer_data: vec![agent_info],
+        })
+        .await?;
+    Ok(())
 }
