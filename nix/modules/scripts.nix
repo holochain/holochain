@@ -51,11 +51,11 @@
           git add "$VERSIONS_DIR"/flake.lock
         fi
 
-        if [[ "$VERSIONS_DIR" = "$DEFAULT_VERSIONS_DIR" ]]; then
+        if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
           nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR"
         fi
 
-        if [[ git diff -- flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
+        if [[ $(git diff -- flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
           echo got no actual source changes in the toplevel flake.lock, reverting modifications..
           git checkout flake.lock
         else
