@@ -186,7 +186,10 @@ impl Cell {
             .map_err(Box::new)?;
 
         // exit early if genesis has already run
-        if workspace.has_genesis(cell_id.agent_pubkey().clone()).await? {
+        if workspace
+            .has_genesis(cell_id.agent_pubkey().clone())
+            .await?
+        {
             return Ok(());
         }
 
