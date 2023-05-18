@@ -109,7 +109,6 @@
           cargoExtraArgs = ''
             --profile ci \
             --config-file ${../../.config/nextest.toml} \
-            --nocapture \
             ${import ../../.config/test-args.nix} \
             ${import ../../.config/nextest-args.nix} \
             ${disabledTestsArg} \
