@@ -259,7 +259,9 @@ async fn run(
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 
     let mut conductor = holochain::sweettest::SweetConductor::create_with_defaults(
-        config, Some(keystore), Some(rendezvous),
+        config,
+        Some(keystore),
+        Some(rendezvous),
     )
     .await;
 
