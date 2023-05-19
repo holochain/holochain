@@ -65,9 +65,11 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
-    let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, make_config(false, true, true, None))
-            .await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        NUM_CONDUCTORS,
+        make_config(false, true, true, None),
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -114,9 +116,11 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
 
-    let mut conductors =
-        SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, make_config(false, false, true, Some(0)))
-            .await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        NUM_CONDUCTORS,
+        make_config(false, false, true, Some(0)),
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome())).await;
@@ -500,7 +504,11 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 
     let _g = holochain_trace::test_run().ok();
 
-    let mut conductor = SweetConductor::from_config_rendezvous(make_config(false, true, true, None), SweetLocalRendezvous::new().await).await;
+    let mut conductor = SweetConductor::from_config_rendezvous(
+        make_config(false, true, true, None),
+        SweetLocalRendezvous::new().await,
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;

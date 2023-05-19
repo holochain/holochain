@@ -585,7 +585,12 @@ impl SweetConductor {
                 .await
                 .expect("Could not get network info")
                 .first()
-                .map_or((0, 0), |info| (info.current_number_of_peers, info.completed_rounds_since_last_time_queried));
+                .map_or((0, 0), |info| {
+                    (
+                        info.current_number_of_peers,
+                        info.completed_rounds_since_last_time_queried,
+                    )
+                });
 
             if number_of_peers >= min_peers && completed_rounds > 0 {
                 tracing::info!(
