@@ -220,7 +220,7 @@ impl SweetConductorBatch {
         cell: &SweetCell,
         timeout: Duration,
     ) {
-        SweetConductor::require_initial_gossip_activity_for_cell(&self.0[0], cell, timeout).await;
+        SweetConductor::require_initial_gossip_activity_for_cell(&self.0[0], cell, self.0.len() as u32, timeout).await;
     }
 }
 

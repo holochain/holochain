@@ -464,7 +464,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
     conductors[2]
-        .require_initial_gossip_activity_for_cell(&cell, Duration::from_secs(90))
+        .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(90))
         .await;
 
     consistency_advanced(

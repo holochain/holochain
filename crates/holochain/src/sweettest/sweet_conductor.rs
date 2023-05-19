@@ -569,13 +569,14 @@ impl SweetConductor {
     pub async fn require_initial_gossip_activity_for_cell(
         &self,
         cell: &SweetCell,
+        min_peers: u32,
         timeout: Duration,
     ) {
         let handle = self.raw_handle();
 
         let wait_start = Instant::now();
         loop {
-            let completed_rounds = handle
+            let (number_of_peers, completed_rounds) = handle
                 .network_info(&NetworkInfoRequestPayload {
                     agent_pub_key: cell.agent_pubkey().clone(),
                     dnas: vec![cell.cell_id.dna_hash().clone()],
@@ -584,9 +585,9 @@ impl SweetConductor {
                 .await
                 .expect("Could not get network info")
                 .first()
-                .map_or(0, |info| info.completed_rounds_since_last_time_queried);
+                .map_or((0, 0), |info| (info.current_number_of_peers, info.completed_rounds_since_last_time_queried));
 
-            if completed_rounds > 0 {
+            if number_of_peers >= min_peers && completed_rounds > 0 {
                 tracing::info!(
                     "Took {}s for cell {} to complete {} gossip rounds",
                     wait_start.elapsed().as_secs(),
