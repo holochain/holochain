@@ -153,7 +153,7 @@ fn test_unit_arc() {
     let strat = ArqStrat {
         min_coverage: 10.0,
         buffer: 0.2,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     let expected_chunks = 8;
 
@@ -210,7 +210,7 @@ mod tests {
         let strat = ArqStrat {
             min_coverage,
             buffer,
-            ..Default::default()
+            ..ArqStrat::default()
         };
 
         let mut rng = seeded_rng(None);
@@ -237,7 +237,7 @@ mod tests {
             let strat = ArqStrat {
                 min_coverage,
                 buffer,
-                ..Default::default()
+                ..ArqStrat::default()
             };
             let mut rng = seeded_rng(None);
             let peers = generate_ideal_coverage(&topo, &mut rng, &strat, None, num_peers, 0.0);
@@ -256,7 +256,7 @@ mod tests {
             let strat = ArqStrat {
                 min_coverage: 10.0,
                 buffer: 0.144,
-                ..Default::default()
+                ..ArqStrat::default()
             };
             let a = unit_arq(&topo, &strat, center, len);
 
@@ -270,7 +270,7 @@ mod tests {
             let strat = ArqStrat {
                 min_coverage: 10.0,
                 buffer: 0.144,
-                ..Default::default()
+                ..ArqStrat::default()
             };
             let a = unit_arq(&topo, &strat, center, len);
             assert!(a.power() >= topo.min_space_power());
@@ -283,7 +283,7 @@ mod tests {
             let strat = ArqStrat {
                 min_coverage: 10.0,
                 buffer: 0.144,
-                ..Default::default()
+                ..ArqStrat::default()
             };
             let a = unit_arq(&topo, &strat, center, len);
             let target_len = (len * 2f64.powf(32.0)) as i64;

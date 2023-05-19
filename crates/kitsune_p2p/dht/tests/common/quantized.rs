@@ -143,7 +143,7 @@ pub fn run_one_epoch(
         let before = arq.absolute_length(topo) as f64;
         let before_pow = arq.power();
 
-        let stats = view.update_arq_with_stats(topo, &mut arq);
+        let stats = view.update_arq_with_stats(&mut arq);
 
         let after = arq.absolute_length(topo) as f64;
         let delta = (after - before) / topo.space.quantum as f64;
