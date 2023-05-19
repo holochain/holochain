@@ -124,6 +124,7 @@ pub async fn get_single_agent_info(
 pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     for (i, a) in envs.iter().enumerate() {
         let infos_a = all_agent_infos(a.clone().into()).await.unwrap();
+
         for (j, b) in envs.iter().enumerate() {
             if i == j {
                 continue;
@@ -230,6 +231,7 @@ pub async fn list_all_agent_info_signed_near_basis(
 pub async fn query_peer_density(
     env: DbRead<DbKindP2pAgents>,
     topology: Topology,
+    strat: PeerStrat,
     kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
     dht_arc: DhtArc,
 ) -> ConductorResult<PeerView> {
@@ -247,15 +249,7 @@ pub async fn query_peer_density(
         .collect();
 
     // contains is already checked in the iterator
-    Ok(PeerStrat::default().view(topology, dht_arc, arcs.as_slice()))
-}
-
-/// Put single agent info into store
-pub async fn put_agent_info_signed(
-    environ: DbWrite<DbKindP2pAgents>,
-    agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
-) -> ConductorResult<()> {
-    Ok(p2p_put(&environ, &agent_info_signed).await?)
+    Ok(strat.view(topology, dht_arc, arcs.as_slice()))
 }
 
 fn now() -> u64 {

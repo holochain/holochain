@@ -55,8 +55,8 @@ pub mod host_fn_caller;
 pub mod inline_zomes;
 pub mod network_simulation;
 
-mod wait_for_any;
-pub use wait_for_any::*;
+mod wait_for;
+pub use wait_for::*;
 
 pub use crate::sweettest::sweet_consistency::*;
 
@@ -597,6 +597,8 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
         }
         tokio::time::sleep(delay).await;
     }
+
+    panic!("Consistency not achieved after {} attempts", num_attempts);
 }
 
 /// Same as wait for integration but can print other states at the same time
@@ -675,6 +677,11 @@ pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
         }
         tokio::time::sleep(delay).await;
     }
+
+    panic!(
+        "Integration with others not complete after {} attempts",
+        num_attempts
+    );
 }
 
 #[tracing::instrument(skip(envs))]

@@ -46,14 +46,17 @@ pub(crate) struct KitsuneP2pTx2Config {
 pub struct KitsuneP2pConfig {
     /// List of sub-transports to be included in this pool
     pub transport_pool: Vec<TransportConfig>,
+
     /// The service used for peers to discover each before they are peers.
     pub bootstrap_service: Option<Url2>,
+
     /// Network tuning parameters. These are managed loosely,
     /// as they are subject to change. If you specify a tuning parameter
     /// that no longer exists, or a value that does not parse,
     /// a warning will be printed in the tracing log.
     #[serde(default)]
     pub tuning_params: KitsuneP2pTuningParams,
+
     /// The network used for connecting to other peers
     pub network_type: NetworkType,
 }
