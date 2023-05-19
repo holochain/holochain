@@ -665,8 +665,11 @@ async fn initiate_times_out() {
         })
         .unwrap();
 
-    // Wait slightly longer then the timeout.
-    tokio::time::sleep(ROUND_TIMEOUT + std::time::Duration::from_millis(1)).await;
+    // Wait slightly longer than the timeout.
+    tokio::time::sleep(
+        alice.tuning_params.gossip_round_timeout() + std::time::Duration::from_millis(1),
+    )
+    .await;
 
     let (tgt2_cert, _, alice_initiate) = alice
         .try_initiate()
@@ -709,7 +712,7 @@ async fn initiate_times_out() {
         .unwrap();
 
     // Wait slightly longer then the timeout but touch the round in between.
-    tokio::time::sleep(ROUND_TIMEOUT / 2).await;
+    tokio::time::sleep(DEFAULT_ROUND_TIMEOUT / 2).await;
 
     // Get the map so the round doesn't timeout
     alice
@@ -720,7 +723,7 @@ async fn initiate_times_out() {
         })
         .unwrap();
 
-    tokio::time::sleep(ROUND_TIMEOUT / 2 + std::time::Duration::from_millis(1)).await;
+    tokio::time::sleep(DEFAULT_ROUND_TIMEOUT / 2 + std::time::Duration::from_millis(1)).await;
 
     // Check that initiating again doesn't do anything.
 

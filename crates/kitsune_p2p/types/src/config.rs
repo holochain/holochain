@@ -132,6 +132,10 @@ pub mod tuning_params_struct {
         /// [Default: 5 minutes]
         gossip_agent_info_update_interval_ms: u32 = 1000 * 60 * 5,
 
+        /// The timeout for a gossip round if there is no contact.
+        /// [Default: 1 minute]
+        gossip_round_timeout_ms: u64 = 1000 * 60,
+
         /// The target redundancy is the number of peers we expect to hold any
         /// given Op.
         gossip_redundancy_target: f64 = DEFAULT_MIN_PEERS as f64,
@@ -295,6 +299,11 @@ pub mod tuning_params_struct {
         /// based on the `SSLKEYLOGFILE` environment variable
         pub fn use_env_tls_keylog(&self) -> bool {
             self.danger_tls_keylog == "env_keylog"
+        }
+
+        /// The timeout for a gossip round if there is no contact.
+        pub fn gossip_round_timeout(&self) -> std::time::Duration {
+            std::time::Duration::from_millis(self.gossip_round_timeout_ms)
         }
 
         /// Parse the gossip_arc_clamping string as a proper type

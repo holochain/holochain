@@ -43,6 +43,8 @@ fn make_tuning(
     // This allows attempting to contact an offline node to timeout quickly,
     // so we can fallback to the next one
     tuning.default_rpc_single_timeout_ms = 3_000;
+    tuning.gossip_round_timeout_ms = 5_000;
+
     tuning
 }
 
@@ -53,7 +55,7 @@ fn make_config(
     recent_threshold: Option<u64>,
 ) -> SweetConductorConfig {
     let tuning = make_tuning(publish, recent, historical, recent_threshold);
-    SweetConductorConfig::standard().tune(Arc::new(tuning))
+    SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
 }
 
 #[cfg(feature = "test_utils")]
