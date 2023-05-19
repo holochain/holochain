@@ -195,9 +195,9 @@ async fn test_zero_arc_no_gossip_2way() {
     // This should result in no publishing or gossip
     let mut tuning_1 = make_tuning(false, true, true, None);
     tuning_1.gossip_arc_clamping = "empty".into();
-    let config_1 = SweetConductorConfig::standard().tune(Arc::new(tuning_1));
+    let config_1 = SweetConductorConfig::rendezvous().tune(Arc::new(tuning_1));
 
-    let mut conductors = SweetConductorBatch::from_configs([config_0, config_1]).await;
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
@@ -244,17 +244,17 @@ async fn test_zero_arc_no_gossip_4way() {
             // Standard config with arc clamped to zero
             let mut tuning = make_tuning(true, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::standard().tune(Arc::new(tuning))
+            SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
         },
         {
             // Publishing turned off, arc clamped to zero
             let mut tuning = make_tuning(false, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::standard().tune(Arc::new(tuning))
+            SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
         },
     ];
 
-    let mut conductors = SweetConductorBatch::from_configs(configs).await;
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous(configs).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let dna_hash = dna_file.dna_hash().clone();
