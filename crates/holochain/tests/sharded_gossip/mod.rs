@@ -66,7 +66,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, true, true, None))
+        SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, make_config(false, true, true, None))
             .await;
 
     let (dna_file, _, _) =
@@ -115,7 +115,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     const NUM_OPS: usize = 100;
 
     let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, false, true, Some(0)))
+        SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, make_config(false, false, true, Some(0)))
             .await;
 
     let (dna_file, _, _) =
@@ -348,7 +348,7 @@ async fn test_zero_arc_no_gossip_4way() {
 async fn test_gossip_shutdown() {
     holochain_trace::test_run().ok();
     let mut conductors =
-        SweetConductorBatch::from_config(2, make_config(false, true, true, None)).await;
+        SweetConductorBatch::from_config_rendezvous(2, make_config(false, true, true, None)).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -400,7 +400,7 @@ async fn three_way_gossip_historical() {
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
 async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
-    let mut conductors = SweetConductorBatch::from_config(2, config.clone()).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
     let start = Instant::now();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -500,7 +500,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 
     let _g = holochain_trace::test_run().ok();
 
-    let mut conductor = SweetConductor::from_config(make_config(false, true, true, None)).await;
+    let mut conductor = SweetConductor::from_config_rendezvous(make_config(false, true, true, None), SweetLocalRendezvous::new().await).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;

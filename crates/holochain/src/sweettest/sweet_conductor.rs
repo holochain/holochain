@@ -3,7 +3,7 @@
 
 use super::{
     DynSweetRendezvous, SweetAgents, SweetApp, SweetAppBatch, SweetCell, SweetConductorConfig,
-    SweetConductorHandle, SweetLocalRendezvous,
+    SweetConductorHandle,
 };
 use crate::conductor::state::AppInterfaceId;
 use crate::conductor::ConductorHandle;
@@ -44,7 +44,7 @@ pub struct SweetConductor {
     config: ConductorConfig,
     dnas: Vec<DnaFile>,
     signal_stream: Option<SignalStream>,
-    _rendezvous: Option<DynSweetRendezvous>,
+    rendezvous: Option<DynSweetRendezvous>,
 }
 
 /// Standard config for SweetConductors
@@ -84,7 +84,7 @@ impl SweetConductor {
         handle: ConductorHandle,
         env_dir: TestDir,
         config: ConductorConfig,
-        _rendezvous: Option<DynSweetRendezvous>,
+        rendezvous: Option<DynSweetRendezvous>,
     ) -> SweetConductor {
         // Automatically add a test app interface
         handle
@@ -117,7 +117,7 @@ impl SweetConductor {
             config,
             dnas: Vec::new(),
             signal_stream: Some(Box::new(signal_stream)),
-            _rendezvous,
+            rendezvous,
         }
     }
 
@@ -126,32 +126,36 @@ impl SweetConductor {
     where
         C: Into<SweetConductorConfig>,
     {
-        let rendezvous = SweetLocalRendezvous::new().await;
-        Self::from_config_rendezvous(config, rendezvous).await
+        Self::create_with_defaults(config, None, None::<DynSweetRendezvous>).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_config_rendezvous<C, R>(config: C, rendezvous: R) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
-        R: Into<DynSweetRendezvous>,
+        R: Into<DynSweetRendezvous> + Clone,
     {
-        let keystore = test_keystore();
-        Self::from_config_rendezvous_keystore(config, rendezvous, keystore).await
+        Self::create_with_defaults(config, None, Some(rendezvous)).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
-    pub async fn from_config_rendezvous_keystore<C, R>(
+    pub async fn create_with_defaults<C, R>(
         config: C,
-        rendezvous: R,
-        keystore: holochain_keystore::MetaLairClient,
+        keystore: Option<MetaLairClient>,
+        rendezvous: Option<R>,
     ) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
-        R: Into<DynSweetRendezvous>,
+        R: Into<DynSweetRendezvous> + Clone,
     {
-        let rendezvous = rendezvous.into();
-        let config = config.into().into_conductor_config(&*rendezvous).await;
+        let rendezvous = rendezvous.map(|r| r.into());
+
+        let config: ConductorConfig = if let Some(r) = rendezvous.clone() {
+            config.into().into_conductor_config(&*r).await
+        } else {
+            config.into().into()
+        };
+
         tracing::info!(?config);
         let dir = TestDir::new(test_db_dir());
         assert!(
@@ -159,8 +163,10 @@ impl SweetConductor {
             "Test dir not empty - {:?}",
             dir.to_path_buf()
         );
-        let handle = Self::handle_from_existing(&dir, keystore, &config, &[]).await;
-        Self::new(handle, dir, config, Some(rendezvous)).await
+        let handle =
+            Self::handle_from_existing(&dir, keystore.unwrap_or_else(test_keystore), &config, &[])
+                .await;
+        Self::new(handle, dir, config, rendezvous).await
     }
 
     /// Create a SweetConductor from a partially-configured ConductorBuilder
@@ -194,7 +200,7 @@ impl SweetConductor {
 
     /// Get the rendezvous config that this conductor is using, if any
     pub fn get_rendezvous_config(&self) -> Option<DynSweetRendezvous> {
-        self._rendezvous.clone()
+        self.rendezvous.clone()
     }
 
     /// Access the database path for this conductor

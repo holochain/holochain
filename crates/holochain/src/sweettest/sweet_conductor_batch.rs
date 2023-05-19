@@ -34,25 +34,24 @@ impl SweetConductorBatch {
         C: Into<SweetConductorConfig>,
         I: IntoIterator<Item = C>,
     {
-        let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
-        Self::from_configs_rendezvous(configs, rendezvous).await
+        future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c)))
+            .await
+            .into()
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
-    pub async fn from_configs_rendezvous<C, I, R>(configs: I, rendezvous: R) -> SweetConductorBatch
+    pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
     where
-        C: Into<SweetConductorConfig>,
-        I: IntoIterator<Item = C>,
-        R: Into<crate::sweettest::DynSweetRendezvous>,
+        C: Into<SweetConductorConfig> + Clone,
     {
-        let rendezvous = rendezvous.into();
+        let rendezvous = crate::sweettest::SweetLocalRendezvous::new().await;
         Self::new(
             future::join_all(
-                configs
-                    .into_iter()
+                std::iter::repeat(config)
+                    .take(num)
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
-            .await,
+                .await,
         )
     }
 
@@ -64,32 +63,9 @@ impl SweetConductorBatch {
         Self::from_configs(std::iter::repeat(config).take(num)).await
     }
 
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments.
-    /// No network infrastructure will be created, these are just local conductors that can discover each other through `exchange_peer_info`
-    pub async fn from_config_local<C: Clone + Into<SweetConductorConfig>>(
-        num: usize,
-        config: C,
-    ) -> SweetConductorBatch {
-        future::join_all(
-            std::iter::repeat(config)
-                .take(num)
-                .map(|config| SweetConductor::from_config(config)),
-        )
-        .await
-        .into()
-    }
-
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
     pub async fn from_standard_config(num: usize) -> SweetConductorBatch {
         Self::from_configs(std::iter::repeat_with(SweetConductorConfig::standard).take(num)).await
-    }
-
-    /// Create the given number of new SweetConductors, each with its own new TestEnvironments.
-    /// No network infrastructure will be created, these are just local conductors that can discover each other through `exchange_peer_info`
-    pub async fn from_standard_local_config(num: usize) -> SweetConductorBatch {
-        future::join_all(std::iter::repeat_with(SweetConductor::from_standard_config).take(num))
-            .await
-            .into()
     }
 
     /// Iterate over the SweetConductors
