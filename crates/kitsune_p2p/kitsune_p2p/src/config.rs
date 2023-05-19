@@ -240,9 +240,42 @@ pub enum TransportConfig {
     #[cfg(feature = "tx5")]
     #[serde(rename = "webrtc", alias = "web_r_t_c", alias = "web_rtc")]
     WebRTC {
-        /// The url of the signal server to connect to for addressability.
-        signal_url: String,
+        /// The urls of the signal servers to connect to for addressability.
+        #[serde(alias = "signal_url")]
+        signal_urls: OneOrMany<String>,
     },
+}
+
+/// Support a config with a single value, or a list of values.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    /// Single value
+    One(T),
+
+    /// Array of values
+    Many(Vec<T>),
+}
+
+impl<T> From<T> for OneOrMany<T> {
+    fn from(from: T) -> Self {
+        OneOrMany::One(from)
+    }
+}
+
+impl<T> From<Vec<T>> for OneOrMany<T> {
+    fn from(from: Vec<T>) -> Self {
+        OneOrMany::Many(from)
+    }
+}
+
+impl<T> From<OneOrMany<T>> for Vec<T> {
+    fn from(from: OneOrMany<T>) -> Self {
+        match from {
+            OneOrMany::One(val) => vec![val],
+            OneOrMany::Many(vec) => vec,
+        }
+    }
 }
 
 #[cfg(feature = "tx2")]

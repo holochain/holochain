@@ -168,8 +168,8 @@ impl KitsuneP2pActor {
         #[cfg(feature = "tx5")]
         if ep_hnd.is_none() && config.is_tx5() {
             tracing::trace!("tx5");
-            let signal_url = match config.transport_pool.get(0).unwrap() {
-                TransportConfig::WebRTC { signal_url } => signal_url.clone(),
+            let signal_urls = match config.transport_pool.get(0).unwrap() {
+                TransportConfig::WebRTC { signal_urls } => signal_urls.clone(),
                 _ => unreachable!(),
             };
             let (h, e) = MetaNet::new_tx5(
@@ -177,7 +177,7 @@ impl KitsuneP2pActor {
                 host.clone(),
                 internal_sender.clone(),
                 evt_sender.clone(),
-                signal_url,
+                signal_urls.into(),
             )
             .await?;
             ep_hnd = Some(h);

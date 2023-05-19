@@ -600,7 +600,7 @@ impl MetaNet {
         host: HostApi,
         kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-        signal_url: String,
+        signal_urls: Vec<String>,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
@@ -672,8 +672,15 @@ impl MetaNet {
 
         let (ep_hnd, mut ep_evt) = tx5::Ep::with_config(tx5_config).await?;
 
-        let cli_url = ep_hnd.listen(tx5::Tx5Url::new(&signal_url)?).await?;
-        tracing::info!(%cli_url, "tx5 listening at url");
+        let mut cli_url_list = Vec::new();
+        for signal_url in signal_urls {
+            cli_url_list.push(ep_hnd.listen(tx5::Tx5Url::new(signal_url)?).await?);
+        }
+        //let cli_url = ep_hnd.listen(tx5::Tx5Url::new(&signal_url)?).await?;
+        tracing::info!(?cli_url_list, "tx5 listening at urls");
+
+        // TODO - FIXME
+        let cli_url = cli_url_list.get(0).unwrap().clone();
 
         let res_store = Arc::new(Mutex::new(HashMap::new()));
 

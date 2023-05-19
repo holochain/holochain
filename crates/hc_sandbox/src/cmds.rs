@@ -78,8 +78,8 @@ pub enum NetworkType {
     /// A transport that uses the WebRTC protocol.
     #[command(name = "webrtc")]
     WebRTC {
-        /// URL to a holochain tx5 WebRTC signal server.
-        signal_url: String,
+        /// List of URLs to holochain tx5 WebRTC signal servers.
+        signal_url: Vec<String>,
     },
 }
 
@@ -241,7 +241,9 @@ impl From<Network> for KitsuneP2pConfig {
             }
             */
             NetworkType::WebRTC { signal_url } => {
-                let transport = TransportConfig::WebRTC { signal_url };
+                let transport = TransportConfig::WebRTC {
+                    signal_urls: holochain_p2p::kitsune_p2p::OneOrMany::Many(signal_url),
+                };
                 kit.transport_pool = vec![transport];
             }
         }

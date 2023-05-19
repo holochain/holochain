@@ -44,9 +44,20 @@ impl SweetConductorConfig {
             #[cfg(feature = "tx5")]
             {
                 for t in n.transport_pool.iter_mut() {
-                    if let kitsune_p2p::TransportConfig::WebRTC { signal_url } = t {
-                        if signal_url == "rendezvous:" {
-                            *signal_url = rendezvous.sig_addr().to_string();
+                    if let kitsune_p2p::TransportConfig::WebRTC { signal_urls } = t {
+                        match signal_urls {
+                            kitsune_p2p::OneOrMany::One(signal_url) => {
+                                if signal_url == "rendezvous:" {
+                                    *signal_url = rendezvous.sig_addr().to_string();
+                                }
+                            }
+                            kitsune_p2p::OneOrMany::Many(signal_urls) => {
+                                for signal_url in signal_urls.iter_mut() {
+                                    if signal_url == "rendezvous:" {
+                                        *signal_url = rendezvous.sig_addr().to_string();
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -79,7 +90,7 @@ impl SweetConductorConfig {
         #[cfg(feature = "tx5")]
         {
             network.transport_pool = vec![kitsune_p2p::TransportConfig::WebRTC {
-                signal_url: "rendezvous:".into(),
+                signal_urls: vec!["rendezvous:".into()].into(),
             }];
         }
 
