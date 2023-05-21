@@ -2,6 +2,7 @@
 //! This module is used to configure the conductor
 
 use holochain_types::db::DbSyncStrategy;
+use kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pTuningParams;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -91,6 +92,14 @@ impl ConductorConfig {
             _ => err.into(),
         })?;
         config_from_yaml(&config_yaml)
+    }
+
+    /// Get tuning params for this config (default if not set)
+    pub fn kitsune_tuning_params(&self) -> KitsuneP2pTuningParams {
+        self.network
+            .as_ref()
+            .map(|c| c.tuning_params.clone())
+            .unwrap_or_default()
     }
 }
 

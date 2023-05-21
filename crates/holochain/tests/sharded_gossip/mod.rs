@@ -4,12 +4,12 @@ use std::time::Instant;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain::conductor::config::ConductorConfig;
-use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetInlineZomes};
+use holochain::sweettest::*;
 use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
 use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
-use holochain::test_utils::{consistency_10s, consistency_60s, consistency_advanced};
+use holochain::test_utils::{consistency_10s, consistency_60s, consistency_advanced, WaitFor};
 use holochain::{
     conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
 };
@@ -18,17 +18,18 @@ use holochain_sqlite::db::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
-fn make_config(
+fn make_tuning(
+    publish: bool,
     recent: bool,
     historical: bool,
     recent_threshold: Option<u64>,
-) -> holochain::sweettest::SweetConductorConfig {
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+) -> KitsuneP2pTuningParams {
+    let mut tuning = KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
-    tuning.disable_publish = true;
+    tuning.disable_publish = !publish;
     tuning.disable_recent_gossip = !recent;
     tuning.disable_historical_gossip = !historical;
     tuning.danger_gossip_recent_threshold_secs =
@@ -42,8 +43,17 @@ fn make_config(
     // This allows attempting to contact an offline node to timeout quickly,
     // so we can fallback to the next one
     tuning.default_rpc_single_timeout_ms = 3_000;
+    tuning
+}
 
-    holochain::sweettest::SweetConductorConfig::standard().tune(Arc::new(tuning))
+fn make_config(
+    publish: bool,
+    recent: bool,
+    historical: bool,
+    recent_threshold: Option<u64>,
+) -> SweetConductorConfig {
+    let tuning = make_tuning(publish, recent, historical, recent_threshold);
+    SweetConductorConfig::standard().tune(Arc::new(tuning))
 }
 
 #[cfg(feature = "test_utils")]
@@ -54,7 +64,8 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     const NUM_CONDUCTORS: usize = 2;
 
     let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(true, true, None)).await;
+        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, true, true, None))
+            .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -100,7 +111,8 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     const NUM_OPS: usize = 100;
 
     let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, true, Some(0))).await;
+        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, false, true, Some(0)))
+            .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome())).await;
@@ -163,6 +175,164 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test that conductors with arcs clamped to zero do not gossip.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zero_arc_no_gossip_2way() {
+    holochain_trace::test_run().ok();
+
+    // Standard config
+    let config_0 = make_config(true, true, true, None);
+
+    // Standard config with arc clamped to zero and publishing off
+    // This should result in no publishing or gossip
+    let mut tuning_1 = make_tuning(false, true, true, None);
+    tuning_1.gossip_arc_clamping = "empty".into();
+    let config_1 = SweetConductorConfig::standard().tune(Arc::new(tuning_1));
+
+    let mut conductors = SweetConductorBatch::from_configs([config_0, config_1]).await;
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let ((cell_0,), (cell_1,)) = apps.into_tuples();
+
+    conductors.exchange_peer_info().await;
+
+    let zome_0 = cell_0.zome(SweetInlineZomes::COORDINATOR);
+    let hash_0: ActionHash = conductors[0]
+        .call(&zome_0, "create_string", "hi".to_string())
+        .await;
+
+    let zome_1 = cell_1.zome(SweetInlineZomes::COORDINATOR);
+    let hash_1: ActionHash = conductors[1]
+        .call(&zome_1, "create_string", "hi".to_string())
+        .await;
+
+    // can't await consistency because one node is neither publishing nor gossiping, and is relying only on `get`
+
+    let record_01: Option<Record> = conductors[0].call(&zome_0, "read", hash_1.clone()).await;
+    let record_10: Option<Record> = conductors[1].call(&zome_1, "read", hash_0.clone()).await;
+
+    // 1 is not a valid target for the get, and 0 did not publish, so 0 can't get 1's data.
+    assert!(record_01.is_none());
+
+    // 1 can get 0's data, though.
+    assert!(record_10.is_some());
+}
+
+/// Test that conductors with arcs clamped to zero do not gossip.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zero_arc_no_gossip_4way() {
+    use futures::future::join_all;
+
+    holochain_trace::test_run().ok();
+
+    let configs = [
+        // Standard config
+        make_config(true, true, true, None),
+        // Publishing turned off
+        make_config(false, true, true, None),
+        {
+            // Standard config with arc clamped to zero
+            let mut tuning = make_tuning(true, true, true, None);
+            tuning.gossip_arc_clamping = "empty".into();
+            SweetConductorConfig::standard().tune(Arc::new(tuning))
+        },
+        {
+            // Publishing turned off, arc clamped to zero
+            let mut tuning = make_tuning(false, true, true, None);
+            tuning.gossip_arc_clamping = "empty".into();
+            SweetConductorConfig::standard().tune(Arc::new(tuning))
+        },
+    ];
+
+    let mut conductors = SweetConductorBatch::from_configs(configs).await;
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
+    let dna_hash = dna_file.dna_hash().clone();
+
+    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let cells = apps.cells_flattened();
+    let zomes: Vec<_> = cells
+        .iter()
+        .map(|c| c.zome(SweetInlineZomes::COORDINATOR))
+        .collect();
+
+    // Ensure that each node has one agent in its peer store, for the single app installed.
+    for (i, cell) in cells.iter().enumerate() {
+        let stored_agents = holochain::conductor::p2p_agent_store::all_agent_infos(
+            conductors[i]
+                .get_spaces()
+                .p2p_agents_db(&dna_hash)
+                .unwrap()
+                .into(),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|i| AgentPubKey::from_kitsune(&i.agent()))
+        .collect::<Vec<_>>();
+        assert_eq!(stored_agents, vec![cell.agent_pubkey().clone()]);
+    }
+
+    conductors.exchange_peer_info().await;
+
+    // Ensure that each node has all agents in their local p2p store.
+    for c in conductors.iter() {
+        let stored_agents = holochain::conductor::p2p_agent_store::all_agent_infos(
+            c.get_spaces().p2p_agents_db(&dna_hash).unwrap().into(),
+        )
+        .await
+        .unwrap()
+        .len();
+        assert_eq!(stored_agents, conductors.len());
+    }
+
+    // Have each conductor create an entry
+    let hashes: Vec<ActionHash> = join_all(
+        conductors
+            .iter()
+            .enumerate()
+            .map(|(i, c)| c.call(&zomes[i], "create_string", format!("{}", i))),
+    )
+    .await;
+
+    // Have each conductor attempt to get every other conductor's entry,
+    // retrying for a certain amount of time until the entry could be successfully retrieved,
+    // then testing for success.
+    //
+    // Nobody should be able to get conductor 3's entry, because it is not publishing
+    // and not gossiping due to zero arc.
+    let _: Vec<()> = join_all(conductors.iter().enumerate().flat_map(|(i, c)| {
+        hashes
+            .iter()
+            .enumerate()
+            .map(|(j, hash)| {
+                let zome = zomes[i].clone();
+                async move {
+                    let assertion = |x: bool| {
+                        if j == 3 && i != j {
+                            assert!(!x, "Node 3's data should not be accessible by anyone but itself. i={}, j={}", i, j);
+                        } else {
+                            assert!(x, "All nodes should be able to get all data except for node 3's. i={}, j={}", i, j);
+                        }
+                    };
+                    holochain::wait_for!(
+                        WaitFor::new(std::time::Duration::from_secs(5), 10),
+                        c.call::<_, Option<Record>, _>(&zome, "read", hash.clone())
+                            .await
+                            .is_some(),
+                        |x: &bool| *x,
+                        assertion
+                    );
+                }
+            })
+            .collect::<Vec<_>>()
+    }))
+    .await;
+}
+
 /// Test that when the conductor shuts down, gossip does not continue,
 /// and when it restarts, gossip resumes.
 #[cfg(feature = "slow_tests")]
@@ -170,7 +340,8 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 #[ignore = "deal with connections closing and banning for 10s"]
 async fn test_gossip_shutdown() {
     holochain_trace::test_run().ok();
-    let mut conductors = SweetConductorBatch::from_config(2, make_config(true, true, None)).await;
+    let mut conductors =
+        SweetConductorBatch::from_config(2, make_config(false, true, true, None)).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -206,7 +377,7 @@ async fn test_gossip_shutdown() {
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_recent() {
     holochain_trace::test_run().ok();
-    let config = make_config(true, false, None);
+    let config = make_config(false, true, false, None);
     three_way_gossip(config).await;
 }
 
@@ -215,7 +386,7 @@ async fn three_way_gossip_recent() {
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn three_way_gossip_historical() {
     holochain_trace::test_run().ok();
-    let config = make_config(false, true, Some(0));
+    let config = make_config(false, false, true, Some(0));
     three_way_gossip(config).await;
 }
 
@@ -323,7 +494,7 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 
     let _g = holochain_trace::test_run().ok();
 
-    let mut conductor = SweetConductor::from_config(make_config(true, true, None)).await;
+    let mut conductor = SweetConductor::from_config(make_config(false, true, true, None)).await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -772,8 +943,7 @@ async fn mock_network_sharded_gossip() {
     let mock_network: AdapterFactory = Arc::new(mock_network);
 
     // Setup the network.
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    let mut tuning = KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
@@ -1281,8 +1451,7 @@ async fn mock_network_sharding() {
     // Setup the bootstrap.
     let (bootstrap, _shutdown) = run_bootstrap(data.agent_to_info.values().cloned()).await;
     // Setup the network.
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    let mut tuning = KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
