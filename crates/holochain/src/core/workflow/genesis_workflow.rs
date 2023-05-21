@@ -7,6 +7,8 @@ use std::sync::Arc;
 
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::guest_callback::genesis_self_check::{
     GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
 };
@@ -19,8 +21,6 @@ use holochain_state::workspace::WorkspaceResult;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
-use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
-use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
 
 /// The struct which implements the genesis Workflow
 #[derive(Constructor)]

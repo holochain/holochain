@@ -805,7 +805,6 @@ fixturator!(
     };
 );
 
-
 fixturator!(
     Duration;
     curve Empty std::time::Duration::new(
@@ -821,7 +820,6 @@ fixturator!(
         U32Fixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()
     );
 );
-
 
 fixturator!(
     DnaModifiers;

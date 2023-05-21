@@ -5,10 +5,10 @@ use crate::EntryDefIndex;
 use crate::EntryDefs;
 use crate::FunctionName;
 use crate::LinkType;
+use crate::Timestamp;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use std::time::Duration;
-use crate::Timestamp;
 
 #[cfg(test)]
 mod test;
@@ -184,7 +184,6 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
         self.network_seed.is_some() || self.properties.is_some() || self.origin_time.is_some()
     }
 }
-
 
 #[derive(Debug, Serialize, Deserialize)]
 /// Information about the current DNA.

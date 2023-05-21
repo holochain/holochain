@@ -11,6 +11,9 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckInvocationV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckInvocationV2;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckResultV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckHostAccess;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckInvocation;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
@@ -69,6 +72,8 @@ use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_export::x_s
 use crate::core::ribosome::host_fn::x_salsa20_poly1305_shared_secret_ingest::x_salsa20_poly1305_shared_secret_ingest;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::GenesisSelfCheckHostAccessV1;
+use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -782,6 +787,16 @@ macro_rules! do_callback {
     }};
 }
 
+impl RealRibosome {
+    fn run_genesis_self_check_v1(&self, host_access: GenesisSelfCheckHostAccessV1, invocation: GenesisSelfCheckInvocationV1) -> RibosomeResult<GenesisSelfCheckResultV1> {
+        do_callback!(self, host_access, invocation, ValidateCallbackResult)
+    }
+
+    fn run_genesis_self_check_v2(&self, host_access: GenesisSelfCheckHostAccessV2, invocation: GenesisSelfCheckInvocationV2) -> RibosomeResult<GenesisSelfCheckResultV1> {
+        do_callback!(self, host_access, invocation, ValidateCallbackResult)
+    }
+}
+
 impl RibosomeT for RealRibosome {
     fn dna_def(&self) -> &DnaDefHashed {
         self.dna_file.dna()
@@ -953,7 +968,20 @@ impl RibosomeT for RealRibosome {
         host_access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
     ) -> RibosomeResult<GenesisSelfCheckResult> {
-        do_callback!(self, host_access, invocation, ValidateCallbackResult)
+        let (invocation_v1, invocation_v2): (
+            GenesisSelfCheckInvocationV1,
+            GenesisSelfCheckInvocationV2,
+        ) = invocation.into();
+        let (host_access_v1, host_access_v2): (
+            GenesisSelfCheckHostAccessV1,
+            GenesisSelfCheckHostAccessV2,
+        ) = host_access.into();
+        match self.run_genesis_self_check_v1(host_access_v1, invocation_v1) {
+            Ok(GenesisSelfCheckResultV1::Valid) => {
+                Ok(self.run_genesis_self_check_v2(host_access_v2, invocation_v2)?.into())
+            }
+            result => Ok(result?.into())
+        }
     }
 
     fn run_validate(

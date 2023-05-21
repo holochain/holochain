@@ -18,6 +18,8 @@ use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::ZomeCall;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
@@ -46,8 +48,6 @@ use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
 use std::iter::Iterator;
 use std::sync::Arc;
-use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
-use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
 
 use self::guest_callback::{
     entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,

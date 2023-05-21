@@ -14,12 +14,21 @@ pub struct GenesisSelfCheckHostAccessV2;
 
 #[derive(Clone)]
 pub struct GenesisSelfCheckInvocationV2 {
-    pub payload: Arc<GenesisSelfCheckDataV2>
+    pub payload: Arc<GenesisSelfCheckDataV2>,
 }
 
 impl From<GenesisSelfCheckHostAccessV2> for HostContext {
     fn from(host_access: GenesisSelfCheckHostAccessV2) -> Self {
         Self::GenesisSelfCheckV2(host_access)
+    }
+}
+
+impl From<&GenesisSelfCheckHostAccessV2> for HostFnAccess {
+    fn from(_: &GenesisSelfCheckHostAccessV2) -> Self {
+        let mut access = Self::none();
+        access.keystore_deterministic = Permission::Allow;
+        access.bindings_deterministic = Permission::Allow;
+        access
     }
 }
 
