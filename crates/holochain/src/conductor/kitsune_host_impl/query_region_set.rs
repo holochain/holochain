@@ -12,7 +12,14 @@ use crate::conductor::error::ConductorResult;
 static LAST_LOG_MS: AtomicI64 = AtomicI64::new(0);
 const LOG_RATE_MS: i64 = 1000;
 
-/// The network module needs info about various groupings ("regions") of ops
+/// The network module needs info about various groupings ("regions") of ops.
+///
+/// Note that this always includes all ops regardless of integration status.
+/// This is to avoid the degenerate case of freshly joining a network, and
+/// having several new peers gossiping with you at once about the same regions.
+/// If we calculate our region hash only by integrated ops, we will experience
+/// mismatches for a large number of ops repeatedly until we have integrated
+/// those ops. Note that when *sending* ops we filter out ops in limbo.
 pub async fn query_region_set(
     db: DbWrite<DbKindDht>,
     topology: Topology,

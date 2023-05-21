@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use arbitrary::*;
@@ -14,7 +15,10 @@ use holochain_types::dht_op::facts::valid_dht_op;
 use holochain_types::dht_op::{DhtOp, DhtOpHashed};
 use holochain_types::prelude::*;
 use holochain_zome_types::{DnaDef, DnaDefHashed, NOISE};
+use kitsune_p2p_types::dht::ArqStrat;
 use rand::Rng;
+
+use crate::conductor::kitsune_host_impl::query_region_set;
 
 use super::Spaces;
 
@@ -58,6 +62,7 @@ async fn test_region_queries() {
     // Cutoff duration is 2 quanta, meaning historic gossip goes up to 1 quantum ago
     let cutoff = Duration::from_micros(q_us * 2);
     let topo = dna_def.topology(cutoff);
+    let strat = ArqStrat::default();
 
     // Builds an arbitrary valid op at the given timestamp
     let mut arbitrary_valid_op = |timestamp: Timestamp| -> DhtOp {
@@ -74,8 +79,7 @@ async fn test_region_queries() {
     let mut ops = vec![];
 
     // - Check that we have no ops to begin with
-    let region_set = spaces
-        .handle_fetch_op_regions(dna_def.as_hash(), topo.clone(), DhtArcSet::Full)
+    let region_set = query_region_set(db.clone(), topo.clone(), &strat, Arc::new(DhtArcSet::Full))
         .await
         .unwrap();
     let region_sum: RegionData = region_set.regions().map(|r| r.data).sum();
@@ -102,8 +106,7 @@ async fn test_region_queries() {
         let op2 = DhtOpHashed::from_content_sync(op2);
         fill_db(&db, op2);
     }
-    let region_set = spaces
-        .handle_fetch_op_regions(dna_def.as_hash(), topo.clone(), DhtArcSet::Full)
+    let region_set = query_region_set(db.clone(), topo.clone(), &strat, Arc::new(DhtArcSet::Full))
         .await
         .unwrap();
 
