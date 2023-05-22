@@ -1,11 +1,19 @@
 ---
-default_semver_increment_mode: !pre_minor beta-rc
+default_semver_increment_mode: !pre_minor beta-dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+- Changes the `ChainQueryFilter` to support filtering on multiple entry types and actions types in the same query. The query builder interface 
+  hasn't changed but if your code was calling `entry_type` or `action_type` more than once it will now create a logical OR rather than replacing the
+  action or entry type to filter on.
+
+## 0.2.0
+
+## 0.2.0-beta-rc.6
 
 ## 0.2.0-beta-rc.5
 

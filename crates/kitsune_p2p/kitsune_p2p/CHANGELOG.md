@@ -1,11 +1,22 @@
 ---
-default_semver_increment_mode: !pre_minor beta-rc
+default_semver_increment_mode: !pre_minor beta-dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+- Bump tx5 to include https://github.com/holochain/tx5/pull/31 which should fix the network loop halting on certain error types, like Ban on data send. [\#2315](https://github.com/holochain/holochain/pull/2315)
+- Removes the experimental `gossip_single_storage_arc_per_space` tuning param
+- Fixes sharded gossip issue where storage arcs are not properly quantized in multi-agent-per-node sharded scenarios. [\#2332](https://github.com/holochain/holochain/pull/2332)
+- Add `gossip_arc_clamping` Kitsune tuning param, allowing initial options to set all storage arcs to empty or full. [\#2352](https://github.com/holochain/holochain/pull/2352)
+- Changes to arc resizing algorithm to ensure that nodes pick up the slack for freeloading nodes with zero storage arcs. [\#2352](https://github.com/holochain/holochain/pull/2352)
+- Disables gossip when using `gossip_arc_clamping = "empty"`: when the arc is clamped to empty, the gossip module doesn't even activate. [\#2380](https://github.com/holochain/holochain/pull/2380)
+
+## 0.2.0
+
+## 0.2.0-beta-rc.6
 
 ## 0.2.0-beta-rc.5
 

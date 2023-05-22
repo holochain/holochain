@@ -1,11 +1,19 @@
 ---
-default_semver_increment_mode: !pre_minor beta-rc
+default_semver_increment_mode: !pre_minor beta-dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.3.0-beta-dev.0
+
+- The feature `test_utils` is no longer a default feature. To consume `sweetest` from this crate please now use `default-features = false` and the feature `sweetest`.
+
+## 0.2.0
+
+## 0.2.0-beta-rc.7
 
 ## 0.2.0-beta-rc.6
 

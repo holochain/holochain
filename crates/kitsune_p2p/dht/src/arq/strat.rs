@@ -1,4 +1,4 @@
-use kitsune_p2p_dht_arc::DhtArc;
+use kitsune_p2p_dht_arc::{DhtArc, DEFAULT_MIN_PEERS};
 
 use crate::spacetime::Topology;
 
@@ -12,6 +12,7 @@ pub enum PeerStrat {
     Quantized(ArqStrat),
 }
 
+#[cfg(feature = "test_utils")]
 impl Default for PeerStrat {
     fn default() -> Self {
         ArqStrat::default().into()
@@ -38,9 +39,13 @@ impl PeerStrat {
 /// resizing algorithm.
 #[derive(Debug, Clone)]
 pub struct ArqStrat {
-    /// The minimum coverage the DHT seeks to maintain.
+    /// The minimum overall coverage the DHT seeks to maintain.
+    /// A coverage of N means that any particular location of the DHT is covered
+    /// by N nodes. You can also think of this as a "redundancy factor".
     ///
-    /// This is the whole purpose for arc resizing.
+    /// The whole purpose of the arc resizing is for all agents to adjust
+    /// their arcs so that at least this amount of coverage (redundancy) is obtained
+    /// at all times.
     pub min_coverage: f64,
 
     /// A multiplicative factor of the min coverage which defines a max.
@@ -90,27 +95,30 @@ pub struct ArqStrat {
     ///
     /// TODO: this can probably be expressed in terms of `max_power_diff`.
     pub power_std_dev_threshold: f64,
+
+    /// Settings to override the global arc settings, for instance to mandate
+    /// an always full arc, or an always zero arc
+    pub local_storage: LocalStorageConfig,
 }
 
+#[cfg(feature = "test_utils")]
 impl Default for ArqStrat {
     fn default() -> Self {
+        Self::standard(LocalStorageConfig::default())
+    }
+}
+
+impl ArqStrat {
+    /// Standard arq strat
+    pub fn standard(local_storage: LocalStorageConfig) -> Self {
         Self {
-            min_coverage: 50.0,
+            min_coverage: DEFAULT_MIN_PEERS as f64,
             // this buffer implies min-max chunk count of 8-16
             buffer: 0.143,
             power_std_dev_threshold: 1.0,
             max_power_diff: 2,
             slacker_ratio: 0.75,
-        }
-    }
-}
-
-impl ArqStrat {
-    /// Constructor
-    pub fn from_params(min_coverage: f64) -> Self {
-        Self {
-            min_coverage,
-            ..Default::default()
+            local_storage,
         }
     }
 
@@ -180,4 +188,28 @@ impl ArqStrat {
             self.max_chunks()
         )
     }
+}
+
+/// Configure settings for arc storage.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct LocalStorageConfig {
+    /// Setting to clamp all arcs to a given size
+    pub arc_clamping: Option<ArqClamping>,
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for LocalStorageConfig {
+    fn default() -> Self {
+        Self { arc_clamping: None }
+    }
+}
+
+/// Instructions to clamp all arqs to a certain size, regardless of network conditions.
+/// This allows the user to either be the ultimate freeloader, or the ultimate benefactor.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+pub enum ArqClamping {
+    /// Clamp all arqs to be empty, and never grow them.
+    Empty,
+    /// Clamp all arqs to be full, and never shrink them.
+    Full,
 }

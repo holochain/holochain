@@ -7,6 +7,7 @@ use kitsune_p2p_fetch::FetchPool;
 use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+use kitsune_p2p_types::dht::prelude::ArqClamping;
 use kitsune_p2p_types::dht_arc::{DhtArc, DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
@@ -191,10 +192,6 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
-        let single_storage_arc_per_space = self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space;
         let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![TxUrl::from(ep_hnd.local_addr()?)];
@@ -213,7 +210,6 @@ impl SpaceInternalHandler for Space {
                     mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
                     dynamic_arcs,
-                    single_storage_arc_per_space,
                 };
                 peer_data.push(update_single_agent_info(input).await?);
             }
@@ -243,10 +239,6 @@ impl SpaceInternalHandler for Space {
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
-        let single_storage_arc_per_space = self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space;
         let arc = self.get_agent_arc(&agent);
 
         Ok(async move {
@@ -264,7 +256,6 @@ impl SpaceInternalHandler for Space {
                 mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
                 dynamic_arcs,
-                single_storage_arc_per_space,
             };
             let peer_data = vec![update_single_agent_info(input).await?];
             internal_sender
@@ -637,7 +628,6 @@ struct UpdateAgentInfoInput<'borrow> {
     mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
     dynamic_arcs: bool,
-    single_storage_arc_per_space: bool,
 }
 
 async fn update_arc_length(
@@ -676,13 +666,9 @@ async fn update_single_agent_info(
         mdns_handles,
         bootstrap_service,
         dynamic_arcs,
-        single_storage_arc_per_space,
     } = input;
 
-    // If there is only a single agent per space don't update the empty arcs.
-    let should_not_update_arc_length = single_storage_arc_per_space && arc.is_empty();
-
-    if dynamic_arcs && !should_not_update_arc_length {
+    if dynamic_arcs {
         update_arc_length(evt_sender, space.clone(), &mut arc).await?;
     }
 
@@ -718,6 +704,11 @@ async fn update_single_agent_info(
     .await?;
 
     tracing::debug!(?agent_info_signed);
+
+    // Write to the local peer store. The agent info will also be stored via a local broadcast,
+    // except in the case of a zero arc where it gets filtered out, so we store it here too
+    // to be sure it makes it into the local store.
+    put_local_agent_info(evt_sender.clone(), space.clone(), agent_info_signed.clone()).await?;
 
     // Push to the network as well
     match network_type {
@@ -994,12 +985,11 @@ impl KitsuneP2pHandler for Space {
                     .values()
                     .any(|arc| arc.contains(basis.get_loc()))
                 {
-                    let fut = self
-                        .evt_sender
-                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space: self.space.clone(),
-                            peer_data: vec![agent_info.clone()],
-                        });
+                    let fut = put_local_agent_info(
+                        self.evt_sender.clone(),
+                        self.space.clone(),
+                        agent_info.clone(),
+                    );
                     local_agent_info_events.push(async move {
                         if let Err(err) = fut.await {
                             tracing::warn!(?err, "failed local broadcast");
@@ -1398,51 +1388,58 @@ impl Space {
             metrics.clone(),
         );
 
-        let gossip_mod = config
-            .tuning_params
-            .gossip_strategy
-            .split(',')
-            .flat_map(|module| match module {
-                "sharded-gossip" => {
-                    let mut gossips = vec![];
-                    if !config.tuning_params.disable_recent_gossip {
-                        gossips.push((
-                            GossipModuleType::ShardedRecent,
-                            crate::gossip::sharded_gossip::recent_factory(
-                                bandwidth_throttles.recent(),
-                            ),
-                        ));
+        let gossip_mod = if config.tuning_params.arc_clamping() == Some(ArqClamping::Empty) {
+            // If arcs are clamped to zero, then completely disable gossip for this node.
+            // Gossip will never resume
+            tracing::info!("Gossip is disabled due to arc_clamping setting");
+            HashMap::new()
+        } else {
+            config
+                .tuning_params
+                .gossip_strategy
+                .split(',')
+                .flat_map(|module| match module {
+                    "sharded-gossip" => {
+                        let mut gossips = vec![];
+                        if !config.tuning_params.disable_recent_gossip {
+                            gossips.push((
+                                GossipModuleType::ShardedRecent,
+                                crate::gossip::sharded_gossip::recent_factory(
+                                    bandwidth_throttles.recent(),
+                                ),
+                            ));
+                        }
+                        if !config.tuning_params.disable_historical_gossip {
+                            gossips.push((
+                                GossipModuleType::ShardedHistorical,
+                                crate::gossip::sharded_gossip::historical_factory(
+                                    bandwidth_throttles.historical(),
+                                ),
+                            ));
+                        }
+                        gossips
                     }
-                    if !config.tuning_params.disable_historical_gossip {
-                        gossips.push((
-                            GossipModuleType::ShardedHistorical,
-                            crate::gossip::sharded_gossip::historical_factory(
-                                bandwidth_throttles.historical(),
-                            ),
-                        ));
+                    "none" => vec![],
+                    _ => {
+                        panic!("unknown gossip strategy: {}", module);
                     }
-                    gossips
-                }
-                "none" => vec![],
-                _ => {
-                    panic!("unknown gossip strategy: {}", module);
-                }
-            })
-            .map(|(module, factory)| {
-                (
-                    module,
-                    factory.spawn_gossip_task(
-                        config.tuning_params.clone(),
-                        space.clone(),
-                        ep_hnd.clone(),
-                        evt_sender.clone(),
-                        host_api.clone(),
-                        metrics.clone(),
-                        fetch_pool.clone(),
-                    ),
-                )
-            })
-            .collect();
+                })
+                .map(|(module, factory)| {
+                    (
+                        module,
+                        factory.spawn_gossip_task(
+                            config.tuning_params.clone(),
+                            space.clone(),
+                            ep_hnd.clone(),
+                            evt_sender.clone(),
+                            host_api.clone(),
+                            metrics.clone(),
+                            fetch_pool.clone(),
+                        ),
+                    )
+                })
+                .collect()
+        };
 
         let i_s_c = i_s.clone();
         let agent_info_update_interval_ms =
@@ -1638,32 +1635,33 @@ impl Space {
 
     /// Get the existing agent storage arc or create a new one.
     fn get_agent_arc(&self, agent: &Arc<KitsuneAgent>) -> DhtArc {
-        if self
-            .config
-            .tuning_params
-            .gossip_single_storage_arc_per_space
-        {
-            let arc = self.agent_arcs.get(agent).cloned();
-            match arc {
-                Some(arc) => arc,
-                None => {
-                    if self.agent_arcs.is_empty() {
-                        DhtArc::full(agent.get_loc())
-                    } else {
-                        DhtArc::empty(agent.get_loc())
-                    }
-                }
+        // TODO: We are simply setting the initial arc to full.
+        // In the future we may want to do something more intelligent.
+        //
+        // In the case an initial_arc is passend into the join request,
+        // handle_join will initialize this agent_arcs map to that value.
+        self.agent_arcs.get(agent).cloned().unwrap_or_else(|| {
+            match self.config.tuning_params.arc_clamping() {
+                Some(ArqClamping::Empty) => DhtArc::empty(agent.get_loc()),
+                Some(ArqClamping::Full) | None => DhtArc::full(agent.get_loc()),
             }
-        } else {
-            // TODO: We are simply setting the initial arc to full.
-            // In the future we may want to do something more intelligent.
-            //
-            // In the case an initial_arc is passend into the join request,
-            // handle_join will initialize this agent_arcs map to that value.
-            self.agent_arcs
-                .get(agent)
-                .cloned()
-                .unwrap_or_else(|| DhtArc::full(agent.get_loc()))
-        }
+        })
     }
+}
+
+/// Function to add local agent info to the store.
+/// There's nothing special about this method, it's just helpful to
+/// semantically see the situations where local info is being added.
+async fn put_local_agent_info(
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    space: KSpace,
+    agent_info: AgentInfoSigned,
+) -> KitsuneP2pResult<()> {
+    evt_sender
+        .put_agent_info_signed(PutAgentInfoSignedEvt {
+            space,
+            peer_data: vec![agent_info],
+        })
+        .await?;
+    Ok(())
 }

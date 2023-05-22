@@ -17,6 +17,10 @@ We are committed to foster a vibrant thriving community, including growing a cul
 
 Please make use of these resources to support your contributions, or simply to contribute your voice.
 
+## Getting started with developing Holochain
+
+To get a development environment and tools set up for developing holochain, you can work through [this guide](https://github.com/holochain/holochain/blob/develop/docs/developer-setup.md).
+
 ## Git Hygiene
 This section describes our practices and guidelines for using git and making changes to the repo.
 
