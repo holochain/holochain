@@ -188,7 +188,7 @@ pub(crate) fn initialize_connection(
     // Tell SQLite to wait this long during write contention.
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
-    #[cfg(feature = "db-encryption")]
+    #[cfg(feature = "sqlite-encrypted")]
     {
         use std::io::Write;
         let key = get_encryption_key_shim();
@@ -222,7 +222,7 @@ pub(crate) fn initialize_connection(
     Ok(())
 }
 
-#[cfg(feature = "db-encryption")]
+#[cfg(feature = "sqlite-encrypted")]
 /// Simulate getting an encryption key from Lair.
 fn get_encryption_key_shim() -> [u8; 32] {
     [

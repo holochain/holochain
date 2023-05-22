@@ -713,7 +713,12 @@ impl KitsuneP2pActor {
                         }
                     })
                     .await;
-                tracing::warn!("KitsuneP2p tx2:ep poll shutdown");
+
+                tracing::error!(
+                    "KitsuneP2p: networking poll shutdown. Networking will no longer work! 
+                You can ignore this is if it happened during node shutdown. 
+                Otherwise please restart your node and report this error."
+                )
             }
         });
 

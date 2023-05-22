@@ -28,6 +28,14 @@
           '';
         };
 
+        holochainBinaries = pkgs.mkShell {
+          inputsFrom = [ self'.devShells.rustDev ];
+          packages = [ self'.packages.holochain self'.packages.lair-keystore ];
+          shellHook = ''
+            export PS1='\n\[\033[1;34m\][holochainBinaries:\w]\$\[\033[0m\] '
+          '';
+        };
+
         release = pkgs.mkShell {
           inputsFrom = [ self'.devShells.rustDev ];
 
@@ -42,7 +50,6 @@
               (
                 lib.attrsets.filterAttrs
                   (name: package:
-                    # (package.checkPhase or null) != null &&
                     (builtins.match "^build-holochain-tests.*" name) != null
                   )
                   self'.packages
@@ -86,7 +93,32 @@
 
           in
           pkgs.mkShell {
-            inputsFrom = [ self'.devShells.rustDev ] ++ (builtins.attrValues holochainTestDrvs);
+            inputsFrom = [ self'.devShells.rustDev ] ++ (
+              # filter out the holochain binary crates from the shell because it's at best unnecessary in local development
+              # it's currently a nativeBuildInput because one of the unit tests requires `holochain` and `hc-sandbox` in PATH
+              builtins.map
+                (testDrv:
+                  if (testDrv.overrideDerivation or null) != null
+                  then
+                    testDrv.overrideDerivation
+                      (testDrvAttrs: {
+                        nativeBuildInputs =
+                          builtins.filter
+                            (nativeBuildInput:
+                              !lib.lists.any (unwantedPackage: nativeBuildInput == unwantedPackage)
+                                [
+                                  self'.packages.holochain
+                                ]
+                            )
+                            (testDrvAttrs.nativeBuildInputs or [ ])
+                        ;
+                      })
+                  else testDrv
+                )
+                (builtins.attrValues holochainTestDrvs)
+            )
+            ;
+
 
             packages = with pkgs; [
               cargo-nextest

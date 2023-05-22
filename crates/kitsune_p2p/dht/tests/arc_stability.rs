@@ -53,7 +53,7 @@ fn stability_test_case_near_ideal() {
 
     let strat = ArqStrat {
         min_coverage: cov,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     println!("{}", strat.summary());
 
@@ -77,7 +77,7 @@ fn stability_test_case_messy() {
     let cov = 100.0;
     let strat = ArqStrat {
         min_coverage: cov,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     let peers = generate_messy_coverage(&topo, &mut rng, &strat, len_mean, len_std, n, j);
     parameterized_stability_test(&topo, &strat, peers, detail);
@@ -101,7 +101,7 @@ proptest::proptest! {
 
         let strat = ArqStrat {
             min_coverage,
-            ..Default::default()
+            ..ArqStrat::default()
         };
 
         let peers = generate_messy_coverage(&topo, &mut rng, &strat, len_mean, len_std, num_peers, j);

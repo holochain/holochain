@@ -684,8 +684,10 @@ impl MetaNet {
             while let Some(evt) = ep_evt.recv().await {
                 let evt = match evt {
                     Ok(evt) => evt,
-                    // TODO - FIXME - handle errors / reconnect?
-                    Err(err) => panic!("{:?}", err),
+                    Err(err) => {
+                        tracing::error!(?err, "tx5 err event");
+                        continue;
+                    }
                 };
 
                 match evt {

@@ -4,6 +4,8 @@
 //! make it easy to write a zome on-the-fly or programmatically, rather than
 //! having to go through the heavy machinery of wasm compilation
 
+// TODO: move entire module to `holochain_types`
+
 use self::error::InlineZomeResult;
 use crate::prelude::*;
 use serde::de::DeserializeOwned;

@@ -6,7 +6,8 @@ use rusqlite::named_params;
 
 use crate::conductor::error::ConductorResult;
 
-pub(super) async fn query_region_op_hashes(
+/// Get all op hashes within a region
+pub async fn query_region_op_hashes(
     db: DbWrite<DbKindDht>,
     bounds: RegionBounds,
 ) -> ConductorResult<Vec<OpHashSized>> {
