@@ -331,8 +331,8 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
         .ok_or_else(|| ValidationOutcome::EntryTypeMismatch.into())
 }
 
-/// Check the app entry type isn't private for store entry
-pub fn check_not_private(op: &DhtOp) -> SysValidationResult<()> {
+/// Check that the EntryVisibility is congruous with the presence or absence of entry data
+pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
     match (
         op.action().entry_type().map(|t| t.visibility()),
         op.entry().is_some(),

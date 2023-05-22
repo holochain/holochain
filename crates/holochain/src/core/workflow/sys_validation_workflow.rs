@@ -285,7 +285,7 @@ async fn validate_op_inner(
     dna_def: &DnaDefHashed,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
-    check_not_private(op)?;
+    check_entry_visibility(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
             store_record(action, cascade).await?;
@@ -396,20 +396,21 @@ pub async fn sys_validate_record(
     record: &Record,
     cascade: &impl Cascade,
 ) -> SysValidationOutcome<()> {
-    trace!(?record);
-    let result = match sys_validate_record_inner(record, cascade).await {
+    match sys_validate_record_inner(record, cascade).await {
         // Validation succeeded
         Ok(_) => Ok(()),
         // Validation failed so exit with that outcome
         Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
-            error!(msg = "Direct validation failed", ?record);
+            error!(
+                msg = "Direct validation failed",
+                ?validation_outcome,
+                ?record,
+            );
             validation_outcome.into_outcome()
         }
         // An error occurred so return it
         Err(e) => Err(OutcomeOrError::Err(e)),
-    };
-
-    result
+    }
 }
 
 async fn sys_validate_record_inner(
