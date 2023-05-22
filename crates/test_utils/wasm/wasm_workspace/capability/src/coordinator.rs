@@ -8,7 +8,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
     let mut fns = BTreeSet::new();
     fns.insert((zome_info()?.name, "accept_cap_claim".into()));
-    fns.insert((zome_info()?.name, "another_cap_claim".into()));
+    fns.insert((zome_info()?.name, "another_cap_grant".into()));
     let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
