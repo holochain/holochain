@@ -656,7 +656,7 @@ async fn concurrent_install_dna() {
 async fn network_stats() {
     holochain_trace::test_run().ok();
 
-    let mut batch = SweetConductorBatch::from_config(2, SweetConductorConfig::standard()).await;
+    let mut batch = SweetConductorBatch::from_standard_config(2).await;
 
     let dna_file = SweetDnaFile::unique_empty().await;
 
