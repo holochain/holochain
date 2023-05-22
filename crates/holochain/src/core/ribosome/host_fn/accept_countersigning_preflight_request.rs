@@ -116,7 +116,7 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::error::WorkflowError;
-    use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::{SweetConductorBatch, SweetConductorConfig};
     use crate::sweettest::SweetDnaFile;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
@@ -939,7 +939,7 @@ pub mod wasm_test {
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
-        let mut conductors = SweetConductorBatch::from_standard_config(3).await;
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous()).await;
         let apps = conductors
             .setup_app("countersigning", &[dna_file.clone()])
             .await

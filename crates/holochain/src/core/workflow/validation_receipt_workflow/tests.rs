@@ -158,9 +158,9 @@ async fn test_block_invalid_receipt() {
         _ => Ok(ValidateResult::Valid),
     });
 
-    let config = SweetConductorConfig::standard();
-    let conductors = SweetConductorBatch::from_config(2, config).await;
-    conductors.exchange_peer_info().await;
+    let config = SweetConductorConfig::rendezvous();
+    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
     let mut conductors = conductors.into_inner().into_iter();
 
     let mut alice_conductor = conductors.next().unwrap();
