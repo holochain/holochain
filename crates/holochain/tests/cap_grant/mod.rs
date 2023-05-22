@@ -14,6 +14,7 @@ use holochain_zome_types::{
 };
 use std::collections::BTreeSet;
 use std::time::Duration;
+use holochain::test_utils::consistency_60s;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn grant_access_to_multiple_zome_functions() {
@@ -42,14 +43,17 @@ async fn grant_access_to_multiple_zome_functions() {
         })
         .function("bar", move |_, _: ()| Ok(()))
         .function("list_entries", move |api, _: ()| {
-            println!("debug zome {:?}", api.zome_info(())?);
+            println!("list_entries: debug zome {:?}", api.zome_info(())?);
+            println!("list_entries: zome id {:?}", api.zome_info(())?.id);
 
-            println!("zome id {:?}", api.zome_info(())?.id);
+            let result: Vec<Record> = api.query(ChainQueryFilter::new().include_entries(true).action_type(ActionType::Create)).unwrap();
+
+            println!("Found {:?}", result);
 
             api.query(
                 ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::new(
                     EntryDefIndex(0),
-                    0.into(),
+                    api.zome_info(())?.id,
                     EntryVisibility::Public,
                 ))),
             )
@@ -122,15 +126,21 @@ async fn grant_access_to_multiple_zome_functions() {
 
     let entries: Vec<Record> = conductors[0].call(&zome_a, "list_entries", ()).await;
     println!("got records {:?}", entries);
+    // Should be empty, nothing created yet
+    assert!(entries.is_empty());
 
     let _: ActionHash = conductors[1]
         .call(&zome_b, "call_foo", cell.agent_pubkey())
         .await;
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(15)).await;
 
     let entries: Vec<Record> = conductors[0].call(&zome_a, "list_entries", ()).await;
-    println!("got records {:?}", entries);
+    println!("a: got records {:?}", entries);
+
+    consistency_60s(&[cell, cell2]).await;
+
+    tokio::time::sleep(Duration::from_secs(15)).await;
 
     let entries_b: Vec<Record> = conductors[1].call(&zome_b, "list_entries", ()).await;
     println!("b: got records {:?}", entries_b);
