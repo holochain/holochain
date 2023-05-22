@@ -156,7 +156,7 @@ fn test_mismatched_powers() {
 /// of the nodes after enough gossip rounds
 #[test]
 fn gossip_scenario_full_sync() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let topo = Topology::standard_zero();
     let gopa = GossipParams::new(1.into(), 0);
 
@@ -169,7 +169,7 @@ fn gossip_scenario_full_sync() {
 
     let strat = ArqStrat {
         min_coverage: n as f64,
-        ..Default::default()
+        ..ArqStrat::default()
     };
 
     let expected_num_space_chunks: u32 = 8;

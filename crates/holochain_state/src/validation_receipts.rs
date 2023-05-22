@@ -177,7 +177,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_receipts_db_populate_and_list() -> StateMutationResult<()> {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let test_db = crate::test_utils::test_authored_db();
         let env = test_db.to_db();

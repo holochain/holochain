@@ -29,7 +29,6 @@ use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 use error::CellError;
 use futures::future::FutureExt;
-use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_conductor_api::ZomeCall;
@@ -162,7 +161,7 @@ impl Cell {
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
     pub async fn genesis<Ribosome>(
-        id: CellId,
+        cell_id: CellId,
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
@@ -176,10 +175,10 @@ impl Cell {
     {
         // get the dna
         let dna_file = conductor_handle
-            .get_dna_file(id.dna_hash())
-            .ok_or_else(|| DnaError::DnaMissing(id.dna_hash().to_owned()))?;
+            .get_dna_file(cell_id.dna_hash())
+            .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
 
-        let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
+        let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
         let workspace = GenesisWorkspace::new(authored_db, dht_db)
@@ -187,13 +186,16 @@ impl Cell {
             .map_err(Box::new)?;
 
         // exit early if genesis has already run
-        if workspace.has_genesis(id.agent_pubkey().clone()).await? {
+        if workspace
+            .has_genesis(cell_id.agent_pubkey().clone())
+            .await?
+        {
             return Ok(());
         }
 
         let args = GenesisWorkflowArgs::new(
             dna_file,
-            id.agent_pubkey().clone(),
+            cell_id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
             dht_db_cache,
@@ -207,7 +209,7 @@ impl Cell {
 
         if let Some(trigger) = conductor_handle
             .get_queue_consumer_workflows()
-            .integration_trigger(Arc::new(id.dna_hash().clone()))
+            .integration_trigger(Arc::new(cell_id.dna_hash().clone()))
         {
             trigger.trigger(&"genesis");
         }
@@ -235,17 +237,6 @@ impl Cell {
 
     fn signal_broadcaster(&self) -> SignalBroadcaster {
         self.conductor_api.signal_broadcaster()
-    }
-
-    pub(super) async fn delete_all_ephemeral_scheduled_fns(self: Arc<Self>) -> CellResult<()> {
-        let author = self.id.agent_pubkey().clone();
-        Ok(self
-            .space
-            .authored_db
-            .async_commit(move |txn: &mut Transaction| {
-                delete_all_ephemeral_scheduled_fns(txn, &author)
-            })
-            .await?)
     }
 
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
@@ -608,13 +599,13 @@ impl Cell {
         // we can just have these defaults depending on whether or not
         // the hash is an entry or action.
         // In the future we should use GetOptions to choose which get to run.
-        let mut r = match *dht_hash.hash_type() {
-            AnyDht::Entry => self
-                .handle_get_entry(dht_hash.into(), options)
+        let mut r = match dht_hash.into_primitive() {
+            AnyDhtHashPrimitive::Entry(hash) => self
+                .handle_get_entry(hash, options)
                 .await
                 .map(WireOps::Entry),
-            AnyDht::Action => self
-                .handle_get_record(dht_hash.into(), options)
+            AnyDhtHashPrimitive::Action(hash) => self
+                .handle_get_record(hash, options)
                 .await
                 .map(WireOps::Record),
         };

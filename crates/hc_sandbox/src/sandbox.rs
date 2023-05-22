@@ -1,4 +1,5 @@
 //! Common use sandboxes with lots of default choices.
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -11,7 +12,7 @@ use crate::CmdRunner;
 
 /// Generates a new sandbox with a default [`ConductorConfig`](holochain_conductor_api::config::conductor::ConductorConfig)
 /// and optional network.
-/// Then installs the dnas with a new app per dna.
+/// Then installs the specified hApp.
 pub async fn default_with_network(
     holochain_path: &Path,
     create: Create,
@@ -19,8 +20,18 @@ pub async fn default_with_network(
     happ: PathBuf,
     app_id: InstalledAppId,
 ) -> anyhow::Result<PathBuf> {
-    let Create { network, root, .. } = create;
-    let path = crate::generate::generate(network.map(|n| n.into_inner().into()), root, directory)?;
+    let Create {
+        network,
+        root,
+        in_process_lair,
+        ..
+    } = create;
+    let path = crate::generate::generate(
+        network.map(|n| n.into_inner().into()),
+        root,
+        directory,
+        in_process_lair,
+    )?;
     let conductor = run_async(holochain_path, path.clone(), None).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
     let install_bundle = InstallApp {
@@ -33,8 +44,8 @@ pub async fn default_with_network(
     Ok(path)
 }
 
-/// Same as [`default_with_network`] but creates n copies
-/// of this sandbox in their own directories.
+/// Same as [`default_with_network`] but creates _n_ copies
+/// of this sandbox in separate directories.
 pub async fn default_n(
     holochain_path: &Path,
     create: Create,

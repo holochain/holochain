@@ -10,6 +10,11 @@ pub const RECENT_THRESHOLD_DEFAULT: std::time::Duration = std::time::Duration::f
 /// so the widely used type def can be an Arc<>
 pub mod tuning_params_struct {
     use ghost_actor::dependencies::tracing;
+    use kitsune_p2p_dht::{
+        prelude::{ArqClamping, LocalStorageConfig},
+        ArqStrat,
+    };
+    use kitsune_p2p_dht_arc::DEFAULT_MIN_PEERS;
     use std::collections::HashMap;
 
     macro_rules! mk_tune {
@@ -127,10 +132,9 @@ pub mod tuning_params_struct {
         /// [Default: 5 minutes]
         gossip_agent_info_update_interval_ms: u32 = 1000 * 60 * 5,
 
-
         /// The target redundancy is the number of peers we expect to hold any
         /// given Op.
-        gossip_redundancy_target: f64 = 100.0,
+        gossip_redundancy_target: f64 = DEFAULT_MIN_PEERS as f64,
 
         /// The max number of bytes of data to send in a single message.
         ///
@@ -145,14 +149,20 @@ pub mod tuning_params_struct {
         /// Should gossip dynamically resize storage arcs?
         gossip_dynamic_arcs: bool = true,
 
-        /// Allow only the first agent to join the space to
-        /// have a sized storage arc. [Default: false]
-        /// This is an experimental feature that sets the first
-        /// agent to join as the full arc and all other later
-        /// agents to empty.
-        /// It should not be used in production unless you understand
-        /// what you are doing.
-        gossip_single_storage_arc_per_space: bool = false,
+        /// By default, Holochain adjusts the gossip_arc to match the
+        /// the current network conditions for the given DNA.
+        /// If unsure, please keep this setting at the default "none",
+        /// meaning no arc clamping. Setting options are:
+        /// - "none" - Keep the default auto-adjust behavior.
+        /// - "empty" - Makes you a freeloader, contributing nothing
+        ///   to the network. Please don't choose this option without
+        ///   a good reason, such as being on a bandwidth constrained
+        ///   mobile device!
+        /// - "full" - Indicates that you commit to serve and hold all
+        ///   all data from all agents, and be a potential target for all
+        ///   get requests. This could be a significant investment of
+        ///   bandwidth. Don't take this responsibility lightly.
+        gossip_arc_clamping: String = "none".to_string(),
 
         /// Default timeout for rpc single. [Default: 60s]
         default_rpc_single_timeout_ms: u32 = 1000 * 60,
@@ -226,6 +236,9 @@ pub mod tuning_params_struct {
         /// [Default: 60]
         tx5_max_conn_init_s: u32 = 60,
 
+        /// Tx5 ban time in seconds.
+        tx5_ban_time_s: u32 = 10,
+
         /// if you would like to be able to use an external tool
         /// to debug the QUIC messages sent and received by kitsune
         /// you'll need the decryption keys.
@@ -273,10 +286,33 @@ pub mod tuning_params_struct {
             std::time::Duration::from_secs(self.tx5_max_conn_init_s as u64)
         }
 
+        /// get the tx5_ban_time_s param as a Duration.
+        pub fn tx5_ban_time(&self) -> std::time::Duration {
+            std::time::Duration::from_secs(self.tx5_ban_time_s as u64)
+        }
+
         /// returns true if we should initialize a tls keylog
         /// based on the `SSLKEYLOGFILE` environment variable
         pub fn use_env_tls_keylog(&self) -> bool {
             self.danger_tls_keylog == "env_keylog"
+        }
+
+        /// Parse the gossip_arc_clamping string as a proper type
+        pub fn arc_clamping(&self) -> Option<ArqClamping> {
+            match self.gossip_arc_clamping.to_lowercase().as_str() {
+                "none" => None,
+                "empty" => Some(ArqClamping::Empty),
+                "full" => Some(ArqClamping::Full),
+                other => panic!("Invalid kitsune tuning param: arc_clamping = '{}'", other),
+            }
+        }
+
+        /// Create a standard ArqStrat from the tuning params
+        pub fn to_arq_strat(&self) -> ArqStrat {
+            let local_storage = LocalStorageConfig {
+                arc_clamping: self.arc_clamping(),
+            };
+            ArqStrat::standard(local_storage)
         }
     }
 }

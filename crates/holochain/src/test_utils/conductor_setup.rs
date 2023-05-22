@@ -53,12 +53,12 @@ impl CellHostFnCaller {
         let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
         let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
-        let cache = handle.get_cache_db(cell_id).unwrap();
+        let cache = handle.get_cache_db(cell_id).await.unwrap();
         let keystore = handle.keystore().clone();
         let network = handle
             .holochain_p2p()
             .to_dna(cell_id.dna_hash().clone(), chc);
-        let triggers = handle.get_cell_triggers(cell_id).unwrap();
+        let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
         let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();

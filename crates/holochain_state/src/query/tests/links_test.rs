@@ -2,9 +2,9 @@ use super::*;
 use crate::here;
 use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::prelude::*;
+use holochain_trace;
 use holochain_types::db::DbWrite;
 use holochain_types::record::SignedActionHashedExt;
-use observability;
 
 #[derive(Clone)]
 struct TestData {
@@ -531,7 +531,7 @@ async fn multiple_links() {
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn duplicate_links() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -593,7 +593,7 @@ async fn duplicate_links() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_base() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -683,7 +683,7 @@ async fn links_on_same_base() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_tag() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -754,7 +754,7 @@ async fn links_on_same_tag() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn links_on_same_type() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 
@@ -811,7 +811,7 @@ async fn links_on_same_type() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn link_type_ranges() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let arc = test_db.to_db();
 

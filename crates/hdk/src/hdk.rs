@@ -53,6 +53,8 @@ pub trait HdkT: HdiT {
         get_links_input: Vec<GetLinksInput>,
     ) -> ExternResult<Vec<LinkDetails>>;
     // P2P
+    fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()>;
+    fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
     fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
     fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
@@ -123,6 +125,8 @@ mockall::mock! {
             get_links_input: Vec<GetLinksInput>,
         ) -> ExternResult<Vec<LinkDetails>>;
         // P2P
+        fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()>;
+        fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
         fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
         fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
         fn remote_signal(&self, remote_signal: RemoteSignal) -> ExternResult<()>;
@@ -324,6 +328,12 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // P2P
+    fn block_agent(&self, _: BlockAgentInput) -> ExternResult<()> {
+        Self::err()
+    }
+    fn unblock_agent(&self, _: BlockAgentInput) -> ExternResult<()> {
+        Self::err()
+    }
     fn call(&self, _: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
         Self::err()
     }
@@ -519,8 +529,14 @@ impl HdkT for HostHdk {
     ) -> ExternResult<Vec<LinkDetails>> {
         host_call::<Vec<GetLinksInput>, Vec<LinkDetails>>(__hc__get_link_details_1, get_links_input)
     }
-    fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
-        host_call::<Vec<Call>, Vec<ZomeCallResponse>>(__hc__call_1, call)
+    fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()> {
+        host_call::<BlockAgentInput, ()>(__hc__block_agent_1, block_agent_input)
+    }
+    fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()> {
+        host_call::<BlockAgentInput, ()>(__hc__unblock_agent_1, unblock_agent_input)
+    }
+    fn call(&self, call_input: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>> {
+        host_call::<Vec<Call>, Vec<ZomeCallResponse>>(__hc__call_1, call_input)
     }
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()> {
         host_call::<AppSignal, ()>(__hc__emit_signal_1, app_signal)

@@ -49,16 +49,16 @@ use tokio::sync::mpsc;
 
 pub use itertools;
 
-use crate::sweettest::SweetCell;
-
 pub mod conductor_setup;
 pub mod consistency;
 pub mod host_fn_caller;
 pub mod inline_zomes;
 pub mod network_simulation;
 
-mod wait_for_any;
-pub use wait_for_any::*;
+mod wait_for;
+pub use wait_for::*;
+
+pub use crate::sweettest::sweet_consistency::*;
 
 /// Produce file and line number info at compile-time
 #[macro_export]
@@ -293,7 +293,10 @@ where
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let dna_network = network.to_dna(dna.clone(), None);
-    network.join(dna.clone(), agent_key, None).await.unwrap();
+    network
+        .join(dna.clone(), agent_key, None, None)
+        .await
+        .unwrap();
     TestNetwork::new(network, respond_task, dna_network, check_op_data_calls)
 }
 
@@ -309,7 +312,7 @@ pub async fn install_app(
     }
     conductor_handle
         .clone()
-        .install_app(name.to_string(), cell_data)
+        .install_app_legacy(name.to_string(), cell_data)
         .await
         .unwrap();
 
@@ -331,7 +334,8 @@ pub async fn install_app(
 pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<MembraneProof>)>;
 
 /// One of various ways to setup an app, used somewhere...
-pub async fn setup_app(
+pub async fn setup_app_in_new_conductor(
+    installed_app_id: InstalledAppId,
     dnas: Vec<DnaFile>,
     cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
@@ -342,19 +346,37 @@ pub async fn setup_app(
         .await
         .unwrap();
 
+    install_app_in_conductor(conductor_handle.clone(), installed_app_id, dnas, cell_data).await;
+
+    let handle = conductor_handle.clone();
+
+    (
+        Arc::new(db_dir),
+        RealAppInterfaceApi::new(conductor_handle),
+        handle,
+    )
+}
+
+/// Install an app into an existing conductor instance
+pub async fn install_app_in_conductor(
+    conductor_handle: ConductorHandle,
+    installed_app_id: InstalledAppId,
+    dnas: Vec<DnaFile>,
+    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+) {
     for dna in dnas {
         conductor_handle.register_dna(dna).await.unwrap();
     }
 
     conductor_handle
         .clone()
-        .install_app("test app".to_string(), cell_data)
+        .install_app_legacy(installed_app_id.clone(), cell_data)
         .await
         .unwrap();
 
     conductor_handle
         .clone()
-        .enable_app("test app".to_string())
+        .enable_app(installed_app_id)
         .await
         .unwrap();
 
@@ -365,14 +387,6 @@ pub async fn setup_app(
         .unwrap();
 
     assert!(errors.is_empty());
-
-    let handle = conductor_handle.clone();
-
-    (
-        Arc::new(db_dir),
-        RealAppInterfaceApi::new(conductor_handle),
-        handle,
-    )
 }
 
 /// Setup an app for testing
@@ -474,88 +488,6 @@ impl WaitOps {
     }
 }
 
-/// Wait for all cells to reach consistency for 10 seconds
-pub async fn consistency_10s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency for 10 seconds,
-/// with the option to specify that some cells are offline.
-pub async fn consistency_10s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    consistency_advanced(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency for 60 seconds
-pub async fn consistency_60s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
-    const NUM_ATTEMPTS: usize = 60;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_secs(1);
-    consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency for 60 seconds,
-/// with the option to specify that some cells are offline.
-pub async fn consistency_60s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-) {
-    const NUM_ATTEMPTS: usize = 60;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_secs(1);
-    consistency_advanced(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency
-#[tracing::instrument(skip(all_cells))]
-pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
-    all_cells: I,
-    num_attempts: usize,
-    delay: Duration,
-) {
-    consistency_advanced(
-        all_cells.into_iter().map(|c| (c, true)),
-        num_attempts,
-        delay,
-    )
-    .await
-}
-
-/// Wait for all cells to reach consistency,
-/// with the option to specify that some cells are offline.
-///
-/// Cells paired with a `false` value will have their authored ops counted towards the total,
-/// but not their integrated ops (since they are not online to integrate things).
-/// This is useful for tests where nodes go offline.
-#[tracing::instrument(skip(all_cells))]
-pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-    num_attempts: usize,
-    delay: Duration,
-) {
-    let all_cell_dbs: Vec<(
-        AgentPubKey,
-        DbRead<DbKindAuthored>,
-        Option<DbRead<DbKindDht>>,
-    )> = all_cells
-        .into_iter()
-        .map(|(c, online)| {
-            (
-                c.agent_pubkey().clone(),
-                c.authored_db().clone().into(),
-                online.then(|| c.dht_db().clone().into()),
-            )
-        })
-        .collect();
-    let all_cell_dbs: Vec<_> = all_cell_dbs
-        .iter()
-        .map(|c| (&c.0, &c.1, c.2.as_ref()))
-        .collect();
-    consistency_dbs(&all_cell_dbs[..], num_attempts, delay).await
-}
-
 /// Wait for all cell envs to reach consistency
 pub async fn consistency_dbs<AuthorDb, DhtDb>(
     all_cell_dbs: &[(&AgentPubKey, &AuthorDb, Option<&DhtDb>)],
@@ -575,32 +507,8 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
     }
 }
 
-/// Same as wait_for_integration but with a default wait time of 60 seconds
-/// Wait for all cells to reach consistency for 10 seconds
-pub async fn consistency_10s_others(all_cells: &[&SweetCell]) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    consistency_others(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency
-#[tracing::instrument(skip(all_cells))]
-pub async fn consistency_others(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
-    let all_cell_dbs: Vec<(AgentPubKey, DbRead<DbKindAuthored>, DbRead<DbKindDht>)> = all_cells
-        .iter()
-        .map(|c| {
-            (
-                c.agent_pubkey().clone(),
-                c.authored_db().clone().into(),
-                c.dht_db().clone().into(),
-            )
-        })
-        .collect();
-    let all_cell_dbs: Vec<_> = all_cell_dbs.iter().map(|c| (&c.0, &c.1, &c.2)).collect();
-    consistency_dbs_others(&all_cell_dbs[..], num_attempts, delay).await
-}
-
-async fn consistency_dbs_others<AuthorDb, DhtDb>(
+/// Alternate version of consistency awaiting (TODO: what is this actually doing?)
+pub(crate) async fn consistency_dbs_others<AuthorDb, DhtDb>(
     all_cell_dbs: &[(&AgentPubKey, &AuthorDb, &DhtDb)],
     num_attempts: usize,
     delay: Duration,
@@ -689,6 +597,8 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
         }
         tokio::time::sleep(delay).await;
     }
+
+    panic!("Consistency not achieved after {} attempts", num_attempts);
 }
 
 /// Same as wait for integration but can print other states at the same time
@@ -767,6 +677,11 @@ pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
         }
         tokio::time::sleep(delay).await;
     }
+
+    panic!(
+        "Integration with others not complete after {} attempts",
+        num_attempts
+    );
 }
 
 #[tracing::instrument(skip(envs))]
@@ -820,7 +735,7 @@ async fn display_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor.list_cell_ids(Some(CellStatus::Joined)) {
+    for cell_id in conductor.running_cell_ids(Some(CellStatus::Joined)) {
         let space = cell_id.dna_hash();
         let db = conductor.get_p2p_db(space);
         let info = p2p_agent_store::dump_state(db.into(), Some(cell_id))

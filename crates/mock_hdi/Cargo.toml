@@ -9,4 +9,4 @@ documentation = "https://docs.rs/holochain_mock_hdi"
 
 [dependencies]
 hdi = { path = "../hdi" }
-mockall = { version = "0.11.0" }
+mockall = { version = "0.11.3" }

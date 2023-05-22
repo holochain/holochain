@@ -158,7 +158,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn unlock_timeout_session() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -368,7 +368,7 @@ pub mod wasm_test {
     async fn unlock_invalid_session() {
         use holochain_state::nonce::fresh_nonce;
 
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -489,7 +489,7 @@ pub mod wasm_test {
     async fn lock_chain() {
         use holochain_state::nonce::fresh_nonce;
 
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -795,7 +795,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn enzymatic_session_success() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -934,7 +934,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn enzymatic_session_fail() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;

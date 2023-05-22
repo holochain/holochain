@@ -37,7 +37,7 @@
             IOKit
           ]));
 
-        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config go ])
+        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config self'.packages.goWrapper ])
           ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
       };
@@ -60,7 +60,7 @@
         cargoArtifacts = holochainDepsRelease;
         src = flake.config.srcCleanedHolochain;
         doCheck = false;
-        passthru.src.rev = inputs.holochain.rev;
+        passthru.src.rev = flake.config.reconciledInputs.holochain.rev;
       });
 
       holochainNextestDeps = craneLib.buildDepsOnly (commonArgs // {
@@ -114,8 +114,12 @@
             ${disabledTestsArg} \
           '';
 
+          cargoNextestExtraArgs = builtins.getEnv "NEXTEST_EXTRA_ARGS";
+
           dontPatchELF = true;
           dontFixup = true;
+
+          nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ holochain ];
 
           installPhase = ''
             mkdir -p $out
@@ -124,7 +128,7 @@
           '';
         });
 
-      build-holochain-tests-unit = craneLib.cargoNextest holochainTestsNextestArgs;
+      build-holochain-tests-unit = lib.makeOverridable craneLib.cargoNextest holochainTestsNextestArgs;
 
       build-holochain-tests-static-fmt = craneLib.cargoFmt (commonArgs // {
         src = flake.config.srcCleanedHolochain;

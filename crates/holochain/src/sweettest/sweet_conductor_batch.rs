@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use super::{SweetAgents, SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
 use ::fixt::prelude::StdRng;
@@ -6,10 +8,24 @@ use hdk::prelude::*;
 use holochain_types::prelude::*;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
-#[derive(derive_more::From, derive_more::Into, derive_more::IntoIterator)]
+#[derive(derive_more::Into, derive_more::IntoIterator, derive_more::Deref)]
 pub struct SweetConductorBatch(Vec<SweetConductor>);
 
 impl SweetConductorBatch {
+    /// Constructor with validation
+    pub fn new(conductors: Vec<SweetConductor>) -> Self {
+        let paths: HashSet<PathBuf> = conductors
+            .iter()
+            .map(|c| c.config.environment_path.clone().into())
+            .collect();
+        assert_eq!(
+            conductors.len(),
+            paths.len(),
+            "Some conductors in a SweetConductorBatch share the same database path!"
+        );
+        Self(conductors)
+    }
+
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
     pub async fn from_configs<C, I>(configs: I) -> SweetConductorBatch
     where
@@ -28,13 +44,14 @@ impl SweetConductorBatch {
         R: Into<crate::sweettest::DynSweetRendezvous>,
     {
         let rendezvous = rendezvous.into();
-        future::join_all(
-            configs
-                .into_iter()
-                .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
+        Self::new(
+            future::join_all(
+                configs
+                    .into_iter()
+                    .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
+            )
+            .await,
         )
-        .await
-        .into()
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments

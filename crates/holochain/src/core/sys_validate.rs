@@ -8,8 +8,9 @@ use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::space::Space;
 use crate::conductor::Conductor;
+use holochain_cascade::Cascade;
+use holochain_cascade::CascadeSource;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::HolochainP2pDna;
 use holochain_types::prelude::*;
 use holochain_zome_types::countersigning::CounterSigningSessionData;
 use std::convert::TryInto;
@@ -184,15 +185,13 @@ pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
 }
 
 /// Check that Dna actions are only added to empty source chains
-pub async fn check_valid_if_dna(
-    action: &Action,
-    workspace: &SysValidationWorkspace,
-) -> SysValidationResult<()> {
+pub fn check_valid_if_dna(action: &Action, dna_def: &DnaDefHashed) -> SysValidationResult<()> {
     match action {
-        Action::Dna(_) => {
-            if !workspace.is_chain_empty(action.author()).await? {
-                Err(PrevActionError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-            } else if action.timestamp() < workspace.dna_def().modifiers.origin_time {
+        Action::Dna(a) => {
+            let dna_hash = dna_def.as_hash();
+            if a.hash != *dna_hash {
+                Err(ValidationOutcome::WrongDna(a.hash.clone(), dna_hash.clone()).into())
+            } else if action.timestamp() < dna_def.modifiers.origin_time {
                 // If the Dna timestamp is ahead of the origin time, every other action
                 // will be inductively so also due to the prev_action check
                 Err(PrevActionError::InvalidRootOriginTime)
@@ -234,38 +233,32 @@ pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
     Ok(())
 }
 
-/// Check previous action type is valid
-pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+/// Check that created agents are always paired with an AgentValidationPkg and vice versa
+pub fn check_agent_validation_pkg_predecessor(
+    action: &Action,
+    prev_action: &Action,
+) -> SysValidationResult<()> {
     let maybe_error = match (prev_action, action) {
         (
-            Action::AgentValidationPkg(AgentValidationPkg {
-                author: author1, ..
-            }),
-            Action::Create(Create {
-                author: author2,
-                entry_type: EntryType::AgentPubKey,
-                ..
-            }),
-        ) => {
-            if author1 != author2 {
-                Some("author of agent validation package must match succeeding agent")
-            } else {
-                None
-            }
-        }
-
-        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => {
-            Some("Every AgentValidationPkg must be followed by a Create for an AgentPubKey")
-        }
-
+            Action::AgentValidationPkg(AgentValidationPkg { .. }),
+            Action::Create(Create { .. }) | Action::Update(Update { .. }),
+        ) => None,
+        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => Some(
+            "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey",
+        ),
         (
             _,
             Action::Create(Create {
                 entry_type: EntryType::AgentPubKey,
                 ..
+            })
+            | Action::Update(Update {
+                entry_type: EntryType::AgentPubKey,
+                ..
             }),
-        ) => Some("Every Create for an AgentPubKey must be preceded by an AgentValidationPkg"),
-
+        ) => Some(
+            "Every Create or Update for an AgentPubKey must be preceded by an AgentValidationPkg",
+        ),
         _ => None,
     };
 
@@ -277,6 +270,37 @@ pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationRe
         .map_err(|e| ValidationOutcome::from(e).into())
     } else {
         Ok(())
+    }
+}
+
+/// Check that the author didn't change between actions
+pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+    // Agent updates will be valid when DPKI support lands
+    let a1: AgentPubKey = if let Action::Update(
+        u @ Update {
+            entry_type: EntryType::AgentPubKey,
+            ..
+        },
+    ) = prev_action
+    {
+        #[cfg(feature = "dpki")]
+        {
+            u.entry_hash.clone().into()
+        }
+
+        #[cfg(not(feature = "dpki"))]
+        {
+            u.author.clone()
+        }
+    } else {
+        prev_action.author().clone()
+    };
+
+    let a2 = action.author();
+    if a1 == *a2 {
+        Ok(())
+    } else {
+        Err(PrevActionError::Author(a1, a2.clone())).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
@@ -488,15 +512,14 @@ fn check_prev_action_chain<A: ChainItem>(
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_add_link<F>(
     hash: &ActionHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -518,15 +541,14 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_agent_activity<F>(
     hash: &ActionHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -548,15 +570,14 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_entry<F>(
     hash: &ActionHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -581,15 +602,14 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_any_store_entry<F>(
     hash: &EntryHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -609,15 +629,14 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_record<F>(
     hash: &ActionHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -704,25 +723,12 @@ impl AsRef<Record> for Source {
 /// it to the incoming ops.
 async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     hash: &I,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &Cascade,
 ) -> SysValidationResult<Source> {
     let hash: AnyDhtHash = hash.clone().into();
-    // Create a workspace with just the local stores
-    let mut local_cascade = workspace.local_cascade();
-    if let Some(el) = local_cascade
-        .retrieve(hash.clone(), Default::default())
-        .await?
-    {
-        return Ok(Source::Local(el));
-    }
-    // Create a workspace with just the network
-    let mut network_only_cascade = workspace.full_cascade(network);
-    match network_only_cascade
-        .retrieve(hash.clone(), Default::default())
-        .await?
-    {
-        Some(el) => Ok(Source::Network(el.privatized().0)),
+    match cascade.retrieve(hash.clone(), Default::default()).await? {
+        Some((el, CascadeSource::Local)) => Ok(Source::Local(el)),
+        Some((el, CascadeSource::Network)) => Ok(Source::Network(el.privatized().0)),
         None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }

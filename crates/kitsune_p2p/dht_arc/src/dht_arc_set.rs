@@ -165,6 +165,20 @@ impl DhtArcSet {
             Self::Partial(intervals) => intervals.size(),
         }
     }
+
+    pub fn print_arcs(&self, len: usize) {
+        let arcs = self.intervals();
+        println!("{} arcs", arcs.len());
+        for (i, arc) in arcs.iter().enumerate() {
+            println!(
+                "{:>3}: |{}| {} {:?}",
+                i,
+                arc.to_ascii(len),
+                arc.length(),
+                arc.to_bounds_grouped(),
+            );
+        }
+    }
 }
 
 impl From<&DhtArcRange> for DhtArcSet {

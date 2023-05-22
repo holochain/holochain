@@ -95,7 +95,7 @@ impl Scenario {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn integrate_query() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let db = test_dht_db();
     let expected = test_data(&db.to_db().into());
     let (qt, _rx) = TriggerSender::new();

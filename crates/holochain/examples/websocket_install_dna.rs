@@ -15,7 +15,7 @@ pub async fn main() {
     //     static NUM_CONCURRENT_INSTALLS: usize = 2;
     //     static REQ_TIMEOUT_MS: u64 = 30000;
 
-    //     observability::test_run().ok();
+    //     holochain_trace::test_run().ok();
     //     // NOTE: This is a full integration test that
     //     // actually runs the holochain binary
 
