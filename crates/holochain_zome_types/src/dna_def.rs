@@ -278,14 +278,14 @@ mod tests {
             network_seed: None,
             properties: Some(props.clone()),
             origin_time: Some(now),
-            quantum_time: Some(Duration::from_secs(60)),
+            quantum_time: Some(core::time::Duration::from_secs(60)),
         };
 
         let expected = DnaModifiers {
             network_seed: "seed".into(),
             properties: props.clone(),
             origin_time: now,
-            quantum_time: Duration::from_secs(60),
+            quantum_time: core::time::Duration::from_secs(60),
         };
 
         assert_eq!(mods.update(opt), expected);

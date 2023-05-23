@@ -21,11 +21,7 @@ pub enum EntryTypes {
 
 #[hdk_extern]
 fn genesis_self_check(data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
-    let GenesisSelfCheckData {
-        dna_info: _,
-        membrane_proof: _,
-        agent_key: _,
-    } = data;
+    let GenesisSelfCheckDataV2(_maybe_membrane_proof) = data;
     Ok(ValidateCallbackResult::Valid)
 }
 

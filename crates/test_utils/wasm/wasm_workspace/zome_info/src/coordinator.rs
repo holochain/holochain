@@ -113,7 +113,7 @@ fn dna_info(_: ()) -> ExternResult<DnaInfo> {
 #[hdk_extern]
 fn dna_info_value(k: String) -> ExternResult<serde_yaml::Value> {
     Ok(
-        YamlProperties::try_from(hdk::prelude::dna_info()?.properties)
+        YamlProperties::try_from(hdk::prelude::dna_info()?.modifiers.properties)
             .map_err(|e| wasm_error!(e))?
             .into_inner()[k]
             .clone(),
@@ -160,7 +160,7 @@ struct MaybePropertiesDirect(Option<PropertiesDirect>);
 #[hdk_extern]
 fn dna_info_foo_direct(_: ()) -> ExternResult<Option<Foo>> {
     Ok(
-        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)
+        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.modifiers.properties)
             .map_err(|e| wasm_error!(e))?
             .0
             .and_then(|properties| properties.foo),
@@ -170,7 +170,7 @@ fn dna_info_foo_direct(_: ()) -> ExternResult<Option<Foo>> {
 #[hdk_extern]
 fn dna_info_bar_direct(_: ()) -> ExternResult<Option<String>> {
     Ok(
-        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)
+        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.modifiers.properties)
             .map_err(|e| wasm_error!(e))?
             .0
             .and_then(|properties| properties.bar),
@@ -180,7 +180,7 @@ fn dna_info_bar_direct(_: ()) -> ExternResult<Option<String>> {
 #[hdk_extern]
 fn dna_info_nested(_: ()) -> ExternResult<Option<i64>> {
     Ok(
-        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.properties)
+        MaybePropertiesDirect::try_from(hdk::prelude::dna_info()?.modifiers.properties)
             .map_err(|e| wasm_error!(e))?
             .0
             .and_then(|properties| properties.baz["foo"]["bar"].as_i64()),

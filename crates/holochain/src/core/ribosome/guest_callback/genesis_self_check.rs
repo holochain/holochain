@@ -3,9 +3,9 @@ pub mod v2;
 
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckInvocationV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckResultV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckInvocationV2;
-use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckResultV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckResultV2;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
@@ -69,5 +69,70 @@ impl From<GenesisSelfCheckInvocation>
                 payload: invocation.data_2,
             },
         )
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+mod slow_tests {
+    use super::GenesisSelfCheckInvocation;
+    use crate::core::ribosome::GenesisSelfCheckHostAccessV1;
+    use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
+    use holochain_wasm_test_utils::TestWasm;
+    use crate::{
+        core::ribosome::{
+            guest_callback::genesis_self_check::{
+                GenesisSelfCheckHostAccess, GenesisSelfCheckResult,
+            },
+            RibosomeT,
+        },
+    };
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::RealRibosomeFixturator;
+    use super::v1;
+    use super::v2;
+    use std::sync::Arc;
+
+    fn invocation_fixture() -> GenesisSelfCheckInvocation {
+        GenesisSelfCheckInvocation {
+            data_1: Arc::new(v1::slow_tests::invocation_fixture()),
+            data_2: Arc::new(v2::slow_tests::invocation_fixture()),
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_genesis_self_check_unimplemented() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+        let invocation = invocation_fixture();
+
+        let result = ribosome
+            .run_genesis_self_check(GenesisSelfCheckHostAccess {
+                host_access_1: GenesisSelfCheckHostAccessV1,
+                host_access_2: GenesisSelfCheckHostAccessV2,
+            }, invocation)
+            .unwrap();
+        assert_eq!(result, GenesisSelfCheckResult::Valid,);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_validate_implemented_invalid() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckInvalid]))
+            .next()
+            .unwrap();
+
+        let invocation = invocation_fixture();
+
+        let result = ribosome
+            .run_genesis_self_check(GenesisSelfCheckHostAccess {
+                host_access_1: GenesisSelfCheckHostAccessV1,
+                host_access_2: GenesisSelfCheckHostAccessV2,
+            }, invocation)
+            .unwrap();
+        assert_eq!(
+            result,
+            GenesisSelfCheckResult::Invalid("esoteric edge case".into()),
+        );
     }
 }

@@ -83,77 +83,26 @@ impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResultV1 {
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
-mod slow_tests {
+pub(crate) mod slow_tests {
     use std::sync::Arc;
 
-    use super::GenesisSelfCheckInvocation;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::*;
+    use super::GenesisSelfCheckInvocationV1;
     use crate::{
-        core::ribosome::{
-            guest_callback::genesis_self_check::{
-                GenesisSelfCheckHostAccess, GenesisSelfCheckResult,
-            },
-            RibosomeT,
-        },
         sweettest::*,
     };
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_types::prelude::*;
-    use holochain_wasm_test_utils::{TestCoordinatorWasm, TestIntegrityWasm, TestWasm};
+    use holochain_wasm_test_utils::{TestCoordinatorWasm, TestIntegrityWasm};
 
-    fn invocation_fixture() -> GenesisSelfCheckInvocation {
-        GenesisSelfCheckInvocation {
-            payload: Arc::new(GenesisSelfCheckData {
-                dna_info: fixt!(DnaInfo),
+    pub(crate) fn invocation_fixture() -> GenesisSelfCheckInvocationV1 {
+        GenesisSelfCheckInvocationV1 {
+            payload: Arc::new(GenesisSelfCheckDataV1 {
+                dna_info: fixt!(DnaInfoV1),
                 membrane_proof: Some(Arc::new(().try_into().unwrap())),
                 agent_key: fixt!(AgentPubKey),
             }),
         }
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_validate_unimplemented() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
-        let invocation = invocation_fixture();
-
-        let result = ribosome
-            .run_genesis_self_check(GenesisSelfCheckHostAccess, invocation)
-            .unwrap();
-        assert_eq!(result, GenesisSelfCheckResult::Valid,);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_validate_implemented_valid() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckValid]))
-            .next()
-            .unwrap();
-        let invocation = invocation_fixture();
-
-        let result = ribosome
-            .run_genesis_self_check(GenesisSelfCheckHostAccess, invocation)
-            .unwrap();
-        assert_eq!(result, GenesisSelfCheckResult::Valid,);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_validate_implemented_invalid() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckInvalid]))
-            .next()
-            .unwrap();
-
-        let invocation = invocation_fixture();
-
-        let result = ribosome
-            .run_genesis_self_check(GenesisSelfCheckHostAccess, invocation)
-            .unwrap();
-        assert_eq!(
-            result,
-            GenesisSelfCheckResult::Invalid("esoteric edge case".into()),
-        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

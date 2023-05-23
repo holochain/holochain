@@ -32,3 +32,13 @@ pub struct GenesisSelfCheckDataV1 {
 /// in the chain, but is provided as an argument to the callback for convenience.
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct GenesisSelfCheckDataV2(pub Option<MembraneProof>);
+
+impl GenesisSelfCheckDataV2 {
+    /// Accessor to inner membrane proof by ref.
+    pub fn maybe_membrane_proof(&self) -> Option<&MembraneProof> {
+        self.0.as_ref()
+    }
+}
+
+/// Alias to the current version of `GenesisSelfCheckData`.
+pub type GenesisSelfCheckData = GenesisSelfCheckDataV2;

@@ -12,8 +12,8 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckInvocationV1;
-use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckInvocationV2;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckResultV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckInvocationV2;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckHostAccess;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckInvocation;
 use crate::core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult;
@@ -788,11 +788,19 @@ macro_rules! do_callback {
 }
 
 impl RealRibosome {
-    fn run_genesis_self_check_v1(&self, host_access: GenesisSelfCheckHostAccessV1, invocation: GenesisSelfCheckInvocationV1) -> RibosomeResult<GenesisSelfCheckResultV1> {
+    fn run_genesis_self_check_v1(
+        &self,
+        host_access: GenesisSelfCheckHostAccessV1,
+        invocation: GenesisSelfCheckInvocationV1,
+    ) -> RibosomeResult<GenesisSelfCheckResultV1> {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 
-    fn run_genesis_self_check_v2(&self, host_access: GenesisSelfCheckHostAccessV2, invocation: GenesisSelfCheckInvocationV2) -> RibosomeResult<GenesisSelfCheckResultV1> {
+    fn run_genesis_self_check_v2(
+        &self,
+        host_access: GenesisSelfCheckHostAccessV2,
+        invocation: GenesisSelfCheckInvocationV2,
+    ) -> RibosomeResult<GenesisSelfCheckResultV1> {
         do_callback!(self, host_access, invocation, ValidateCallbackResult)
     }
 }
@@ -977,10 +985,10 @@ impl RibosomeT for RealRibosome {
             GenesisSelfCheckHostAccessV2,
         ) = host_access.into();
         match self.run_genesis_self_check_v1(host_access_v1, invocation_v1) {
-            Ok(GenesisSelfCheckResultV1::Valid) => {
-                Ok(self.run_genesis_self_check_v2(host_access_v2, invocation_v2)?.into())
-            }
-            result => Ok(result?.into())
+            Ok(GenesisSelfCheckResultV1::Valid) => Ok(self
+                .run_genesis_self_check_v2(host_access_v2, invocation_v2)?
+                .into()),
+            result => Ok(result?.into()),
         }
     }
 

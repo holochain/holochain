@@ -852,6 +852,54 @@ fixturator!(
 );
 
 fixturator!(
+    DnaInfoV1;
+    curve Empty DnaInfoV1 {
+        name: StringFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: DnaModifiersFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap().properties,
+        zome_names: vec![ZomeNameFixturator::new_indexed(Empty, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Unpredictable DnaInfoV1 {
+        name: StringFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: DnaModifiersFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap().properties,
+        zome_names: vec![ZomeNameFixturator::new_indexed(Unpredictable, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+
+    curve Predictable DnaInfoV1 {
+        name: StringFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        hash: DnaHashFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        properties: DnaModifiersFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap().properties,
+        zome_names: vec![ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap()],
+    };
+);
+
+fixturator!(
     DnaInfo;
     curve Empty DnaInfo {
         name: StringFixturator::new_indexed(Empty, get_fixt_index!())
