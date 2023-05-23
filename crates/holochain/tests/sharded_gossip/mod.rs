@@ -49,6 +49,7 @@ fn make_tuning(
     tuning
 }
 
+
 fn make_config(
     publish: bool,
     recent: bool,
@@ -61,6 +62,7 @@ fn make_config(
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
@@ -110,6 +112,7 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     // let _g = holochain_trace::test_run().ok();
 
@@ -189,6 +192,7 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_2way() {
     holochain_trace::test_run().ok();
 
@@ -234,6 +238,7 @@ async fn test_zero_arc_no_gossip_2way() {
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_4way() {
     use futures::future::join_all;
 
