@@ -1933,13 +1933,13 @@ mod app_status_impls {
 
             // These unwraps are both safe because of the partition.
             let cell_ids: Vec<_> = cell_ids.into_iter().map(Result::unwrap).collect();
-            let failed_joins: Vec<_> = failed_joins.into_iter().map(Result::unwrap_err).collect();
+            let failed_joins = failed_joins.into_iter().map(Result::unwrap_err);
 
             // Update the status of the cells which were able to join the network
             // (may or may not be all cells which were added)
             self.update_cell_status(cell_ids.iter().map(|c| (c, CellStatus::Joined)));
 
-            self.update_cell_status(failed_joins.into_iter());
+            self.update_cell_status(failed_joins);
 
             cell_ids
         }
