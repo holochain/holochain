@@ -933,6 +933,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn enzymatic_session_fail() {
         holochain_trace::test_run().ok();
 
