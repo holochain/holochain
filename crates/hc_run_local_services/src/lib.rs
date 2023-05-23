@@ -10,9 +10,9 @@ pub struct HcRunLocalServices {
     #[arg(long)]
     bootstrap_address_path: Option<std::path::PathBuf>,
 
-    /// A single interface on which to run the bootstrap server.
+    /// A single address on which to run the bootstrap server.
     #[arg(long, default_value = "127.0.0.1")]
-    bootstrap_interface: String,
+    bootstrap_address: String,
 
     /// The port to use for the bootstrap server. You probably want
     /// to leave this as 0 (zero) to be assigned an available port.
@@ -28,9 +28,9 @@ pub struct HcRunLocalServices {
     #[arg(long)]
     signal_address_path: Option<std::path::PathBuf>,
 
-    /// A comma-separated list of interfaces on which to run the signal server.
+    /// A comma-separated list of addresses on which to run the signal server.
     #[arg(long, default_value = "127.0.0.1")]
-    signal_interfaces: String,
+    signal_address: String,
 
     /// The port to use for the signal server. You probably want
     /// to leave this as 0 (zero) to be assigned an available port.
@@ -87,7 +87,7 @@ impl HcRunLocalServices {
         let mut task_list = Vec::new();
 
         if !self.disable_bootstrap {
-            let bs_ip: std::net::IpAddr = self.bootstrap_interface.parse().map_err(Error::err)?;
+            let bs_ip: std::net::IpAddr = self.bootstrap_address.parse().map_err(Error::err)?;
             let bs_addr = std::net::SocketAddr::from((bs_ip, self.bootstrap_port));
             let (bs_driver, bs_addr, shutdown) = kitsune_p2p_bootstrap::run(bs_addr, vec![])
                 .await
@@ -109,7 +109,7 @@ impl HcRunLocalServices {
 
         if !self.disable_signal {
             let mut config = tx5_signal_srv::Config::default();
-            config.interfaces = self.signal_interfaces;
+            config.interfaces = self.signal_address;
             config.port = self.signal_port;
             config.demo = false;
             tracing::info!(?config);
