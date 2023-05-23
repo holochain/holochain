@@ -8,6 +8,7 @@ members = [
   "crates/hdi",
   "crates/mock_hdi",
   "crates/mr_bundle",
+  "crates/nonet",
 
   "crates/holochain_integrity_types",
   "crates/holochain_zome_types",
