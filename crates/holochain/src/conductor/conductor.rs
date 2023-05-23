@@ -1995,6 +1995,7 @@ mod app_status_impls {
                                     if !missing.is_empty() {
                                         if missing.iter().any(|c| retry_cell_ids.contains(c)) {
                                             // The spin up needs to be tried again for this app
+                                            warn!(msg = "Some cells did not start", ?app, ?missing);
                                             AppStatusFx::SpinUp
                                         } else {
                                             let reason = PausedAppReason::Error(format!(
@@ -2010,7 +2011,6 @@ mod app_status_impls {
                                 Paused(_) => {
                                     // If all required cells are now running, restart the app
                                     if app.required_cells().all(|id| cell_ids.contains(id)) {
-                                        println!("Bringing app back online");
                                         app.status.transition(Start)
                                     } else {
                                         AppStatusFx::NoChange
@@ -2047,6 +2047,7 @@ mod app_status_impls {
 
         fn is_p2p_join_error_retryable(e: &HolochainP2pError) -> bool {
             match e {
+                // TODO this is brittle because some other network access could fail first if Kitune changes.
                 HolochainP2pError::OtherKitsuneP2pError(KitsuneP2pError::Reqwest(e)) => {
                     e.is_connect()
                 }
