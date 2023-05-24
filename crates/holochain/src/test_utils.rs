@@ -490,19 +490,16 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
 ) {
     fn display_op(op: &DhtOp) -> String {
         format!(
-            "{} {:>3}  {}  {} ({})",
+            "{} {:>3}  {} ({})",
             op.action().author(),
             op.action().action_seq(),
-            op.to_light().action_hash().clone(),
+            // op.to_light().action_hash().clone(),
             op.get_type(),
             op.action().action_type(),
         )
     }
 
-    let header = format!(
-        "{} {:>3}  {}  {}",
-        "author", "seq", "hash", "op_type(action_type)",
-    );
+    let header = format!("{:54} {:>3}  {}", "author", "seq", "op_type(action_type)",);
 
     let num_published = published.len();
     let mut num_integrated = 0;
@@ -552,7 +549,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     let timeout = delay * num_attempts as u32;
 
     panic!(
-        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}",
+        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n",
         timeout.as_millis(),
         num_published,
         num_integrated,

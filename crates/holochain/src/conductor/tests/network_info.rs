@@ -3,10 +3,7 @@ use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Timestamp;
 
-use crate::{
-    sweettest::{consistency_10s, SweetConductorBatch, SweetDnaFile, SweetZome},
-    test_utils::wait_for_integration,
-};
+use crate::sweettest::{consistency_10s, SweetConductorBatch, SweetDnaFile, SweetZome};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_info() {

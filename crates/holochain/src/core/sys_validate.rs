@@ -347,7 +347,7 @@ pub async fn check_entry_def(
     conductor: &Conductor,
 ) -> SysValidationResult<()> {
     if let Some((_, entry_type)) = op.entry_data() {
-        if let EntryType::App(app_entry_def) = (entry_type) {
+        if let EntryType::App(app_entry_def) = entry_type {
             check_app_entry_def(app_entry_def, dna_hash, conductor).await
         } else {
             Ok(())
@@ -400,12 +400,20 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
     ) {
         (Some(EntryVisibility::Public), true) => Ok(()),
         (Some(EntryVisibility::Private), false) => Ok(()),
-        (Some(EntryVisibility::Public), false) => Err(ValidationOutcome::MalformedDhtOp(
-            Box::new(op.action()),
-            op.get_type(),
-            "Op has public entry type but is missing its data".to_string(),
-        )
-        .into()),
+        (Some(EntryVisibility::Public), false) => {
+            if op.action().entry_type() == Some(&EntryType::AgentPubKey) {
+                // Agent entries are a special case. The "entry data" is already present in
+                // the action as the entry hash, so no external entry data is needed.
+                Ok(())
+            } else {
+                Err(ValidationOutcome::MalformedDhtOp(
+                    Box::new(op.action()),
+                    op.get_type(),
+                    "Op has public entry type but is missing its data".to_string(),
+                )
+                .into())
+            }
+        }
         (Some(EntryVisibility::Private), true) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
         (None, false) => Ok(()),
         (None, true) => Err(ValidationOutcome::MalformedDhtOp(
