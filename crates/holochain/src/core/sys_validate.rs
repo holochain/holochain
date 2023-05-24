@@ -347,7 +347,7 @@ pub async fn check_entry_def(
     conductor: &Conductor,
 ) -> SysValidationResult<()> {
     if let Some((_, entry_type)) = op.entry_data() {
-        if let EntryType::App(app_entry_def) = dbg!(entry_type) {
+        if let EntryType::App(app_entry_def) = (entry_type) {
             check_app_entry_def(app_entry_def, dna_hash, conductor).await
         } else {
             Ok(())

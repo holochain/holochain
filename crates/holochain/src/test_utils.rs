@@ -585,15 +585,14 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
 ) {
     for i in 0..num_attempts {
         let count = display_integration(db).await;
+        let total_time_waited = delay * i as u32;
+        tracing::info!(?count, ?total_time_waited, counts = ?query_integration(db).await);
         if count >= expected_count {
             if count > expected_count {
                 tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
                 Consistency may not be complete.")
             }
             return;
-        } else {
-            let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(db).await);
         }
         tokio::time::sleep(delay).await;
     }
@@ -646,34 +645,35 @@ pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
         };
         let change = total.checked_sub(last_total).expect("LOST A VALUE");
         last_total = total;
+
+        let time_waited = this_start.elapsed().as_secs();
+        let total_time_waited = start.map(|s| s.elapsed().as_secs()).unwrap_or(0);
+        let ops_per_s = if total_time_waited == 0 {
+            0.0
+        } else {
+            total as f64 / total_time_waited as f64
+        };
+        tracing::info!(
+            "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
+            count.integrated,
+            count.validation_limbo,
+            count.integration_limbo,
+            time_waited,
+            total_time_waited,
+            counts,
+            total,
+            total_expected,
+            progress,
+            change,
+            ops_per_s,
+        );
+
         if count.integrated >= expected_count {
             if count.integrated > expected_count {
                 tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
                 Consistency may not be complete.")
             }
             return;
-        } else {
-            let time_waited = this_start.elapsed().as_secs();
-            let total_time_waited = start.map(|s| s.elapsed().as_secs()).unwrap_or(0);
-            let ops_per_s = if total_time_waited == 0 {
-                0.0
-            } else {
-                total as f64 / total_time_waited as f64
-            };
-            tracing::debug!(
-                "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
-                count.integrated,
-                count.validation_limbo,
-                count.integration_limbo,
-                time_waited,
-                total_time_waited,
-                counts,
-                total,
-                total_expected,
-                progress,
-                change,
-                ops_per_s,
-            );
         }
         tokio::time::sleep(delay).await;
     }

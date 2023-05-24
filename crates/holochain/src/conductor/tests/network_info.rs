@@ -4,20 +4,24 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Timestamp;
 
 use crate::{
-    sweettest::{SweetConductorBatch, SweetDnaFile, SweetZome},
+    sweettest::{consistency_10s, SweetConductorBatch, SweetDnaFile, SweetZome},
     test_utils::wait_for_integration,
 };
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_info() {
+    holochain_trace::test_run().ok();
+
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let number_of_peers = 3;
     let mut conductors = SweetConductorBatch::from_standard_config(number_of_peers).await;
     let app_id: InstalledAppId = "app".into();
     let app_batch = conductors.setup_app(&app_id, &[dna.clone()]).await.unwrap();
+    let cells = app_batch.cells_flattened();
     let apps = app_batch.into_inner();
     let alice_app = &apps[0];
     let bob_app = &apps[1];
+
     conductors.exchange_peer_info().await;
 
     // query since beginning of unix epoch
@@ -45,20 +49,23 @@ async fn network_info() {
 
     assert_eq!(network_info[0].bytes_since_last_time_queried, 0);
 
+    let cell = alice_app.cells()[0].clone();
     // alice creates one entry
     let zome = SweetZome::new(
-        alice_app.cells()[0].cell_id().clone(),
+        cell.cell_id().clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let _: ActionHash = conductors[0].call(&zome, "create_entry", ()).await;
 
-    wait_for_integration(
-        &conductors[1].get_dht_db(dna.dna_hash()).unwrap(),
-        28,
-        100,
-        std::time::Duration::from_millis(100),
-    )
-    .await;
+    consistency_10s(&cells).await;
+
+    // wait_for_integration(
+    //     &conductors[1].get_dht_db(dna.dna_hash()).unwrap(),
+    //     28,
+    //     100,
+    //     std::time::Duration::from_millis(100),
+    // )
+    // .await;
 
     // query bob's DB for bytes since last time queried
     let payload = NetworkInfoRequestPayload {
