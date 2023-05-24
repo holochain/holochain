@@ -545,7 +545,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     //     .collect::<Vec<_>>();
 
     assert!(
-        unintegrated.len() > 0,
+        !unintegrated.is_empty(),
         "consistency should only fail if items were published but not integrated"
     );
 
