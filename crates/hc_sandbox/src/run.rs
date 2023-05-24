@@ -1,8 +1,8 @@
 //! Helpers for running the conductor.
 
+use anyhow::anyhow;
 use std::path::Path;
 use std::{path::PathBuf, process::Stdio};
-use anyhow::anyhow;
 
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
 use tokio::io::AsyncBufReadExt;
@@ -104,8 +104,7 @@ pub async fn run_async(
     }
     let config_path = write_config(sandbox_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
-    let (child, lair) =
-        start_holochain(holochain_path, &config, config_path, tx_config).await?;
+    let (child, lair) = start_holochain(holochain_path, &config, config_path, tx_config).await?;
 
     let port = match rx_config.await {
         Ok(port) => port,
