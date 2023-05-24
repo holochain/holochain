@@ -7,7 +7,6 @@ use holochain_p2p::DhtOpHashExt;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::prelude::ReadAccess;
 use holochain_state::query::prelude::*;
-use holochain_types::db::DbRead;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::OpBasis;
@@ -174,7 +173,7 @@ mod tests {
         holochain_trace::test_run().ok();
         let db = test_authored_db();
         let expected = test_data(&db.to_db().into());
-        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db().into())
+        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db())
             .await
             .unwrap();
         assert_eq!(

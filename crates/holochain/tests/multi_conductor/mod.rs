@@ -3,8 +3,7 @@ use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::{SweetConductor, SweetZome};
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
-use holochain::test_utils::wait_for_integration_1m;
-use holochain::test_utils::WaitOps;
+use holochain::test_utils::consistency_10s;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_state::prelude::fresh_reader_test;
 use unwrap_to::unwrap_to;
@@ -88,7 +87,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
-    let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
+    let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
@@ -96,11 +95,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    wait_for_integration_1m(
-        bobbo.dht_db(),
-        WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
-    )
-    .await;
+    consistency_10s([&alice, &bobbo, &carol]).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]

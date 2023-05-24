@@ -42,6 +42,7 @@ use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -451,44 +452,6 @@ pub fn warm_wasm_tests() {
     }
 }
 
-/// Number of ops per sourechain change
-pub struct WaitOps;
-
-#[allow(missing_docs)]
-impl WaitOps {
-    pub const GENESIS: usize = 7;
-    pub const INIT: usize = 2;
-    pub const CAP_TOKEN: usize = 2;
-    pub const ENTRY: usize = 3;
-    pub const LINK: usize = 3;
-    pub const DELETE_LINK: usize = 2;
-    pub const UPDATE: usize = 5;
-    pub const DELETE: usize = 4;
-
-    /// Added the app but haven't made any zome calls
-    /// so init hasn't happened.
-    pub const fn cold_start() -> usize {
-        Self::GENESIS
-    }
-
-    /// Genesis and init.
-    pub const fn start() -> usize {
-        Self::GENESIS + Self::INIT
-    }
-
-    /// Start but there's a cap grant in init.
-    pub const fn start_with_cap() -> usize {
-        Self::GENESIS + Self::INIT + Self::CAP_TOKEN
-    }
-
-    /// Path to a set depth.
-    /// This doesn't take into account paths
-    /// with sharding strategy.
-    pub const fn path(depth: usize) -> usize {
-        Self::ENTRY + (Self::LINK + Self::ENTRY) * depth
-    }
-}
-
 /// Wait for all cell envs to reach consistency
 pub async fn consistency_dbs<AuthorDb, DhtDb>(
     all_cell_dbs: &[(&AgentPubKey, &AuthorDb, Option<&DhtDb>)],
@@ -498,51 +461,50 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
     AuthorDb: ReadAccess<DbKindAuthored>,
     DhtDb: ReadAccess<DbKindDht>,
 {
-    let mut expected_count = 0;
+    let mut published = HashSet::new();
     for (author, db, _) in all_cell_dbs.iter() {
-        let count = get_ops_to_publish((*author).to_owned(), *db)
-            .await
-            .unwrap()
-            .len();
-        expected_count += count;
+        published.extend(
+            get_ops_to_publish((*author).to_owned(), *db)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|(_, _, ops)| ops),
+        );
     }
     for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
-        wait_for_integration(db, expected_count, num_attempts, delay).await
+        wait_for_integration_full_ops(db, &published, num_attempts, delay).await
     }
 }
 
-/// Alternate version of consistency awaiting (TODO: what is this actually doing?)
-pub(crate) async fn consistency_dbs_others<AuthorDb, DhtDb>(
-    all_cell_dbs: &[(&AgentPubKey, &AuthorDb, &DhtDb)],
+/// Exit early if the expected number of ops
+/// have been integrated or wait for num_attempts * delay
+#[tracing::instrument(skip(db))]
+async fn wait_for_integration_full_ops<Db: ReadAccess<DbKindDht>>(
+    db: &Db,
+    published: &HashSet<DhtOp>,
     num_attempts: usize,
     delay: Duration,
-) where
-    AuthorDb: ReadAccess<DbKindAuthored>,
-    DhtDb: ReadAccess<DbKindDht>,
-{
-    let mut expected_count = 0;
-    for (author, db, _) in all_cell_dbs.iter() {
-        let count = get_ops_to_publish((*author).to_owned(), *db)
-            .await
-            .unwrap()
-            .len();
-        expected_count += count;
+) {
+    let num_published = published.len();
+    for i in 0..num_attempts {
+        let integrated = get_integrated_ops(db);
+        let num_integrated = integrated.len();
+        if num_integrated >= num_published {
+            if num_integrated > num_published {
+                tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
+                Consistency may not be complete.")
+            }
+            return;
+        } else {
+            let total_time_waited = delay * i as u32;
+            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await);
+        }
+        tokio::time::sleep(delay).await;
     }
-    let start = Some(std::time::Instant::now());
-    for (i, &db) in all_cell_dbs.iter().map(|(_, _, d)| d).enumerate() {
-        let mut others: Vec<_> = all_cell_dbs.iter().map(|(_, _, d)| *d).collect();
-        others.remove(i);
-        wait_for_integration_with_others(db, &others, expected_count, num_attempts, delay, start)
-            .await
-    }
-}
 
-/// Same as wait_for_integration but with a default wait time of 10 seconds
-#[tracing::instrument(skip(db))]
-pub async fn wait_for_integration_1m<Db: ReadAccess<DbKindDht>>(db: &Db, expected_count: usize) {
-    const NUM_ATTEMPTS: usize = 120;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
-    wait_for_integration(db, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
+    todo!("print diffs");
+
+    panic!("Consistency not achieved after {} attempts", num_attempts);
 }
 
 /// Exit early if the expected number of ops
@@ -550,109 +512,26 @@ pub async fn wait_for_integration_1m<Db: ReadAccess<DbKindDht>>(db: &Db, expecte
 #[tracing::instrument(skip(db))]
 pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     db: &Db,
-    expected_count: usize,
+    num_published: usize,
     num_attempts: usize,
     delay: Duration,
 ) {
     for i in 0..num_attempts {
-        let count = display_integration(db).await;
-        if count >= expected_count {
-            if count > expected_count {
-                tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
+        let num_integrated = get_integrated_count(db).await;
+        if num_integrated >= num_published {
+            if num_integrated > num_published {
+                tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
                 Consistency may not be complete.")
             }
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(db).await);
+            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await);
         }
         tokio::time::sleep(delay).await;
     }
 
     panic!("Consistency not achieved after {} attempts", num_attempts);
-}
-
-/// Same as wait for integration but can print other states at the same time
-pub async fn wait_for_integration_with_others_10s<Db: ReadAccess<DbKindDht>>(
-    db: &Db,
-    others: &[&Db],
-    expected_count: usize,
-    start: Option<std::time::Instant>,
-) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    wait_for_integration_with_others(
-        db,
-        others,
-        expected_count,
-        NUM_ATTEMPTS,
-        DELAY_PER_ATTEMPT,
-        start,
-    )
-    .await
-}
-
-#[tracing::instrument(skip(db, others, start))]
-/// Same as wait for integration but can print other states at the same time
-pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
-    db: &Db,
-    others: &[&Db],
-    expected_count: usize,
-    num_attempts: usize,
-    delay: Duration,
-    start: Option<std::time::Instant>,
-) {
-    let mut last_total = 0;
-    let this_start = std::time::Instant::now();
-    for _ in 0..num_attempts {
-        let count = query_integration(db).await;
-        let counts = get_integration_dumps(others).await;
-        let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
-        let num_conductors = counts.0.len() + 1;
-        let total_expected = num_conductors * expected_count;
-        let progress = if total_expected == 0 {
-            0.0
-        } else {
-            total as f64 / total_expected as f64 * 100.0
-        };
-        let change = total.checked_sub(last_total).expect("LOST A VALUE");
-        last_total = total;
-        if count.integrated >= expected_count {
-            if count.integrated > expected_count {
-                tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
-                Consistency may not be complete.")
-            }
-            return;
-        } else {
-            let time_waited = this_start.elapsed().as_secs();
-            let total_time_waited = start.map(|s| s.elapsed().as_secs()).unwrap_or(0);
-            let ops_per_s = if total_time_waited == 0 {
-                0.0
-            } else {
-                total as f64 / total_time_waited as f64
-            };
-            tracing::debug!(
-                "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
-                count.integrated,
-                count.validation_limbo,
-                count.integration_limbo,
-                time_waited,
-                total_time_waited,
-                counts,
-                total,
-                total_expected,
-                progress,
-                change,
-                ops_per_s,
-            );
-        }
-        tokio::time::sleep(delay).await;
-    }
-
-    panic!(
-        "Integration with others not complete after {} attempts",
-        num_attempts
-    );
 }
 
 #[tracing::instrument(skip(envs))]
@@ -677,7 +556,10 @@ pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     }
 }
 
-async fn get_integration_dumps<Db: ReadAccess<DbKindDht>>(dbs: &[&Db]) -> IntegrationStateDumps {
+/// Get multiple db states with compact Display representation
+pub async fn get_integration_dumps<Db: ReadAccess<DbKindDht>>(
+    dbs: &[&Db],
+) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for db in dbs {
         let db = *db;
@@ -693,13 +575,47 @@ pub async fn query_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> Integratio
         .unwrap()
 }
 
-async fn display_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
+async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
     fresh_reader_test(db.clone(), |txn| {
         txn.query_row(
             "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
             [],
             |row| row.get(0),
         )
+        .unwrap()
+    })
+}
+
+/// Get all [`DhtOps`] integrated by this node
+pub fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
+    fresh_reader_test(db.clone(), |txn| {
+        txn.prepare(
+            "
+            SELECT
+            DhtOp.type, Action.blob as action_blob, Entry.blob as entry_blob
+            FROM DhtOp
+            JOIN
+            Action ON DhtOp.action_hash = Action.hash
+            LEFT JOIN
+            Entry ON Action.entry_hash = Entry.hash
+            WHERE
+            DhtOp.when_integrated IS NOT NULL
+            ORDER BY DhtOp.rowid ASC
+        ",
+        )
+        .unwrap()
+        .query_and_then(named_params! {}, |row| {
+            let op_type: DhtOpType = row.get("type")?;
+            let action: SignedAction = from_blob(row.get("action_blob")?)?;
+            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+            let entry: Option<Entry> = match entry {
+                Some(entry) => Some(from_blob::<Entry>(entry)?),
+                None => None,
+            };
+            Ok(DhtOp::from_type(op_type, action, entry)?)
+        })
+        .unwrap()
+        .collect::<StateQueryResult<_>>()
         .unwrap()
     })
 }
