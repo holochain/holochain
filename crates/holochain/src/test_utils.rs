@@ -452,7 +452,8 @@ pub fn warm_wasm_tests() {
     }
 }
 
-/// Wait for all cell envs to reach consistency
+/// Wait for all cell envs to reach consistency, meaning that every op
+/// published by every cell has been integrated by every node
 pub async fn consistency_dbs<AuthorDb, DhtDb>(
     all_cell_dbs: &[(&AgentPubKey, &AuthorDb, Option<&DhtDb>)],
     num_attempts: usize,
@@ -471,24 +472,42 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
                 .map(|(_, _, ops)| ops),
         );
     }
+    let published = published.into_iter().collect::<Vec<_>>();
     for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
-        wait_for_integration_full_ops(db, &published, num_attempts, delay).await
+        wait_for_integration_diff(db, &published, num_attempts, delay).await
     }
 }
 
-/// Exit early if the expected number of ops
-/// have been integrated or wait for num_attempts * delay
+/// Wait for num_attempts * delay, or until all published ops have been integrated.
+/// If the timeout is reached, print a report including a diff of all published ops
+/// which were not integrated.
 #[tracing::instrument(skip(db))]
-async fn wait_for_integration_full_ops<Db: ReadAccess<DbKindDht>>(
+async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     db: &Db,
-    published: &HashSet<DhtOp>,
+    published: &[DhtOp],
     num_attempts: usize,
     delay: Duration,
 ) {
+    fn display_op(op: &DhtOp) -> String {
+        format!(
+            "{} {:>3}  {}  {} ({})",
+            op.action().author(),
+            op.action().action_seq(),
+            op.to_light().action_hash().clone(),
+            op.get_type(),
+            op.action().action_type(),
+        )
+    }
+
+    let header = format!(
+        "{} {:>3}  {}  {}",
+        "author", "seq", "hash", "op_type(action_type)",
+    );
+
     let num_published = published.len();
+    let mut num_integrated = 0;
     for i in 0..num_attempts {
-        let integrated = get_integrated_ops(db);
-        let num_integrated = integrated.len();
+        num_integrated = get_integrated_count(db);
         if num_integrated >= num_published {
             if num_integrated > num_published {
                 tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
@@ -502,13 +521,44 @@ async fn wait_for_integration_full_ops<Db: ReadAccess<DbKindDht>>(
         tokio::time::sleep(delay).await;
     }
 
-    todo!("print diffs");
+    let integrated = get_integrated_ops(db);
 
-    panic!("Consistency not achieved after {} attempts", num_attempts);
+    let unintegrated = diff::slice(published, &integrated)
+        .into_iter()
+        .filter_map(|d| match d {
+            diff::Result::Left(l) => Some(l),
+            _ => None,
+        })
+        .map(display_op)
+        .collect::<Vec<_>>();
+
+    // let unpublished = diff::slice(published, &integrated)
+    //     .into_iter()
+    //     .filter_map(|d| match d {
+    //         diff::Result::Right(l) => Some(l),
+    //         _ => None,
+    //     })
+    //     .map(display_op)
+    //     .collect::<Vec<_>>();
+
+    assert!(
+        unintegrated.len() > 0,
+        "consistency should only fail if items were published but not integrated"
+    );
+
+    let timeout = delay * num_attempts as u32;
+
+    panic!(
+        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}",
+        timeout.as_millis(),
+        num_published,
+        num_integrated,
+        header,
+        unintegrated.join("\n"),
+    );
 }
 
-/// Exit early if the expected number of ops
-/// have been integrated or wait for num_attempts * delay
+/// Wait for num_attempts * delay, or until all published ops have been integrated.
 #[tracing::instrument(skip(db))]
 pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     db: &Db,
@@ -517,7 +567,7 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     delay: Duration,
 ) {
     for i in 0..num_attempts {
-        let num_integrated = get_integrated_count(db).await;
+        let num_integrated = get_integrated_count(db);
         if num_integrated >= num_published {
             if num_integrated > num_published {
                 tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
@@ -575,7 +625,7 @@ pub async fn query_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> Integratio
         .unwrap()
 }
 
-async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
+fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
     fresh_reader_test(db.clone(), |txn| {
         txn.query_row(
             "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
