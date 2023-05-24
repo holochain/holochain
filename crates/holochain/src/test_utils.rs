@@ -521,15 +521,18 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         tokio::time::sleep(delay).await;
     }
 
-    let integrated = get_integrated_ops(db);
+    let mut published: Vec<_> = published.iter().map(display_op).collect();
+    let mut integrated: Vec<_> = get_integrated_ops(db).iter().map(display_op).collect();
+    published.sort();
+    integrated.sort();
 
-    let unintegrated = diff::slice(published, &integrated)
+    let unintegrated = diff::slice(&published, &integrated)
         .into_iter()
         .filter_map(|d| match d {
             diff::Result::Left(l) => Some(l),
             _ => None,
         })
-        .map(display_op)
+        .cloned()
         .collect::<Vec<_>>();
 
     // let unpublished = diff::slice(published, &integrated)
