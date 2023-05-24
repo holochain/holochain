@@ -9,6 +9,7 @@ use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::publish_dht_ops_workflow::get_ops_to_publish;
 use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
@@ -498,8 +499,11 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
     DhtDb: ReadAccess<DbKindDht>,
 {
     let mut expected_count = 0;
-    for (author, db) in all_cell_dbs.iter().map(|(author, a, _)| (author, a)) {
-        let count = get_published_ops(*db, author).len();
+    for (author, db, _) in all_cell_dbs.iter() {
+        let count = get_ops_to_publish((*author).to_owned(), *db)
+            .await
+            .unwrap()
+            .len();
         expected_count += count;
     }
     for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
@@ -517,8 +521,11 @@ pub(crate) async fn consistency_dbs_others<AuthorDb, DhtDb>(
     DhtDb: ReadAccess<DbKindDht>,
 {
     let mut expected_count = 0;
-    for (author, db) in all_cell_dbs.iter().map(|(author, a, _)| (author, a)) {
-        let count = get_published_ops(*db, author).len();
+    for (author, db, _) in all_cell_dbs.iter() {
+        let count = get_ops_to_publish((*author).to_owned(), *db)
+            .await
+            .unwrap()
+            .len();
         expected_count += count;
     }
     let start = Some(std::time::Instant::now());
@@ -528,42 +535,6 @@ pub(crate) async fn consistency_dbs_others<AuthorDb, DhtDb>(
         wait_for_integration_with_others(db, &others, expected_count, num_attempts, delay, start)
             .await
     }
-}
-
-fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
-    db: &Db,
-    author: &AgentPubKey,
-) -> Vec<DhtOpLight> {
-    fresh_reader_test(db.clone(), |txn| {
-        txn.prepare(
-            "
-            SELECT
-            DhtOp.type, Action.hash, Action.blob
-            FROM DhtOp
-            JOIN
-            Action ON DhtOp.action_hash = Action.hash
-            WHERE
-            Action.author = :author
-            AND (DhtOp.type != :store_entry OR Action.private_entry = 0)
-        ",
-        )
-        .unwrap()
-        .query_and_then(
-            named_params! {
-                ":store_entry": DhtOpType::StoreEntry,
-                ":author": author,
-            },
-            |row| {
-                let op_type: DhtOpType = row.get("type")?;
-                let hash: ActionHash = row.get("hash")?;
-                let action: SignedAction = from_blob(row.get("blob")?)?;
-                Ok(DhtOpLight::from_type(op_type, hash, &action.0)?)
-            },
-        )
-        .unwrap()
-        .collect::<StateQueryResult<_>>()
-        .unwrap()
-    })
 }
 
 /// Same as wait_for_integration but with a default wait time of 10 seconds

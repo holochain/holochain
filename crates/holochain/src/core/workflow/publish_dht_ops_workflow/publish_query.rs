@@ -5,6 +5,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_p2p::DhtOpHashExt;
 use holochain_sqlite::db::DbKindAuthored;
+use holochain_sqlite::prelude::ReadAccess;
 use holochain_state::query::prelude::*;
 use holochain_types::db::DbRead;
 use holochain_types::dht_op::DhtOp;
@@ -25,10 +26,13 @@ use super::MIN_PUBLISH_INTERVAL;
 /// - Don't publish private entries.
 /// - Only get ops that haven't been published within the minimum publish interval
 /// - Only get ops that have less then the RECEIPT_BUNDLE_SIZE
-pub async fn get_ops_to_publish(
+pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
-    db: &DbRead<DbKindAuthored>,
-) -> WorkflowResult<Vec<(OpBasis, OpHashSized, DhtOp)>> {
+    db: &AuthorDb,
+) -> WorkflowResult<Vec<(OpBasis, OpHashSized, DhtOp)>>
+where
+    AuthorDb: ReadAccess<DbKindAuthored>,
+{
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
