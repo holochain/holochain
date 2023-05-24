@@ -22,11 +22,12 @@ pub fn valid_dht_op(
                 let h = action.entry_data();
                 let e = op.entry();
                 match (h, e) {
-                    (Some((_entry_hash, entry_type)), Some(_e)) => {
+                    (Some((_entry_hash, entry_type)), RecordEntry::Present(_e)) => {
                         // Ensure that entries are public
                         !must_be_public || entry_type.visibility().is_public()
                     }
-                    (None, None) => true,
+                    (None, RecordEntry::Present(_)) => false,
+                    (None, _) => true,
                     _ => false,
                 }
             }
@@ -34,7 +35,7 @@ pub fn valid_dht_op(
         mapped(
             "If there is entry data, the action must point to it",
             |op: &DhtOp| {
-                if let Some(entry) = op.entry() {
+                if let Some(entry) = op.entry().into_option() {
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.

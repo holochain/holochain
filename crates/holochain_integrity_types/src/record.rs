@@ -1,5 +1,7 @@
 //! Defines a Record, the basic unit of Holochain data.
 
+use std::borrow::Borrow;
+
 use crate::action::conversions::WrongActionError;
 use crate::action::ActionHashed;
 use crate::action::CreateLink;
@@ -23,7 +25,7 @@ pub struct Record<A = SignedActionHashed> {
     pub signed_action: A,
     /// If there is an entry associated with this action it will be here.
     /// If not, there will be an enum variant explaining the reason.
-    pub entry: RecordEntry,
+    pub entry: RecordEntry<Entry>,
 }
 
 impl<A> AsRef<A> for Record<A> {
@@ -36,9 +38,9 @@ impl<A> AsRef<A> for Record<A> {
 /// can be intepreted
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum RecordEntry {
+pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     /// The Action has an entry_address reference, and the Entry is accessible.
-    Present(Entry),
+    Present(E),
     /// The Action has an entry_address reference, but we are in a public
     /// context and the entry is private.
     Hidden,
@@ -48,6 +50,73 @@ pub enum RecordEntry {
     /// This can happen when you receive gossip of just an action
     /// when the action type is a [`crate::EntryCreationAction`]
     NotStored,
+}
+
+impl<E: Borrow<Entry>> RecordEntry<E> {
+    /// Provides entry data by reference if it exists
+    ///
+    /// Collapses the enum down to the two possibilities of
+    /// extant or nonextant Entry data
+    pub fn as_option(&self) -> Option<&E> {
+        if let RecordEntry::Present(ref entry) = self {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    /// Provides entry data as owned value if it exists.
+    ///
+    /// Collapses the enum down to the two possibilities of
+    /// extant or nonextant Entry data
+    pub fn into_option(self) -> Option<E> {
+        if let RecordEntry::Present(entry) = self {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    /// Provides deserialized app entry if it exists
+    ///
+    /// same as as_option but handles deserialization
+    /// anything other tha RecordEntry::Present returns None
+    /// a present entry that fails to deserialize cleanly is an error
+    /// a present entry that deserializes cleanly is returned as the provided type A
+    pub fn to_app_option<A: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
+        &self,
+    ) -> Result<Option<A>, SerializedBytesError> {
+        match self.as_option().map(|e| e.borrow()) {
+            Some(Entry::App(eb)) => Ok(Some(A::try_from(SerializedBytes::from(eb.to_owned()))?)),
+            _ => Ok(None),
+        }
+    }
+
+    /// Provides CapGrantEntry if it exists
+    ///
+    /// same as as_option but handles cap grants
+    /// anything other tha RecordEntry::Present for a Entry::CapGrant returns None
+    pub fn to_grant_option(&self) -> Option<crate::entry::CapGrantEntry> {
+        match self.as_option().map(|e| e.borrow()) {
+            Some(Entry::CapGrant(cap_grant_entry)) => Some(cap_grant_entry.to_owned()),
+            _ => None,
+        }
+    }
+
+    /// If no entry is available, return Hidden, else return Present
+    pub fn or_hidden(entry: Option<E>) -> Self {
+        entry.map(Self::Present).unwrap_or(Self::Hidden)
+    }
+
+    /// If no entry is available, return NotApplicable, else return Present
+    pub fn or_not_applicable(entry: Option<E>) -> Self {
+        entry.map(Self::Present).unwrap_or(Self::NotApplicable)
+    }
+
+    /// If no entry is available, return NotStored, else return Present
+    pub fn or_not_stored(entry: Option<E>) -> Self {
+        entry.map(Self::Present).unwrap_or(Self::NotStored)
+    }
 }
 
 /// The hashed action and the signature that signed it
@@ -174,57 +243,6 @@ impl<A> Record<A> {
     /// The inner signed-action
     pub fn signed_action(&self) -> &A {
         &self.signed_action
-    }
-}
-
-impl RecordEntry {
-    /// Provides entry data by reference if it exists
-    ///
-    /// Collapses the enum down to the two possibilities of
-    /// extant or nonextant Entry data
-    pub fn as_option(&self) -> Option<&Entry> {
-        if let RecordEntry::Present(ref entry) = self {
-            Some(entry)
-        } else {
-            None
-        }
-    }
-    /// Provides entry data as owned value if it exists.
-    ///
-    /// Collapses the enum down to the two possibilities of
-    /// extant or nonextant Entry data
-    pub fn into_option(self) -> Option<Entry> {
-        if let RecordEntry::Present(entry) = self {
-            Some(entry)
-        } else {
-            None
-        }
-    }
-
-    /// Provides deserialized app entry if it exists
-    ///
-    /// same as as_option but handles deserialization
-    /// anything other tha RecordEntry::Present returns None
-    /// a present entry that fails to deserialize cleanly is an error
-    /// a present entry that deserializes cleanly is returned as the provided type A
-    pub fn to_app_option<A: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
-        &self,
-    ) -> Result<Option<A>, SerializedBytesError> {
-        match self.as_option() {
-            Some(Entry::App(eb)) => Ok(Some(A::try_from(SerializedBytes::from(eb.to_owned()))?)),
-            _ => Ok(None),
-        }
-    }
-
-    /// Provides CapGrantEntry if it exists
-    ///
-    /// same as as_option but handles cap grants
-    /// anything other tha RecordEntry::Present for a Entry::CapGrant returns None
-    pub fn to_grant_option(&self) -> Option<crate::entry::CapGrantEntry> {
-        match self.as_option() {
-            Some(Entry::CapGrant(cap_grant_entry)) => Some(cap_grant_entry.to_owned()),
-            _ => None,
-        }
     }
 }
 

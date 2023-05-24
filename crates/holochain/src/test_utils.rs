@@ -500,7 +500,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         )
     }
 
-    let header = format!("{} {:>3}  {}", "author", "seq", "op_type (action_type)",);
+    let header = format!("{:54} {:>3}  {}", "author", "seq", "op_type (action_type)",);
 
     let num_published = published.len();
     let mut num_integrated = 0;
@@ -543,7 +543,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     let timeout = delay * num_attempts as u32;
 
     panic!(
-        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}",
+        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n",
         timeout.as_millis(),
         num_published,
         num_integrated,

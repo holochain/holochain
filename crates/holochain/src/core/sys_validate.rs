@@ -333,12 +333,13 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 
 /// Check that the EntryVisibility is congruous with the presence or absence of entry data
 pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
+    todo!("use RecordEntry");
     match (
         op.action().entry_type().map(|t| t.visibility()),
-        op.entry().is_some(),
+        op.entry().as_option().is_some(),
     ) {
-        (Some(EntryVisibility::Public), true) => Ok(()),
-        (Some(EntryVisibility::Private), false) => Ok(()),
+        (Some(EntryVisibility::Public), true /*RecordEntry::Present(_)*/) => Ok(()),
+        (Some(EntryVisibility::Private), false /*RecordEntry::NotStored*/) => Ok(()),
         (Some(EntryVisibility::Public), false) => {
             if op.action().entry_type() == Some(&EntryType::AgentPubKey) {
                 // Agent entries are a special case. The "entry data" is already present in
@@ -354,6 +355,7 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
             }
         }
         (Some(EntryVisibility::Private), true) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
+        // (None, RecordEntry::NotApplicable) => Ok(()),
         (None, false) => Ok(()),
         (None, true) => Err(ValidationOutcome::MalformedDhtOp(
             Box::new(op.action()),
@@ -387,7 +389,6 @@ pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
     match entry {
         Entry::App(bytes) | Entry::CounterSign(_, bytes) => {
             let size = std::mem::size_of_val(&bytes.bytes()[..]);
-            dbg!(&size);
             if size <= MAX_ENTRY_SIZE {
                 Ok(())
             } else {

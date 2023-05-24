@@ -353,17 +353,21 @@ impl DhtOp {
     }
 
     /// Get the entry from this op, if one exists
-    pub fn entry(&self) -> Option<&Entry> {
+    pub fn entry(&self) -> RecordEntry<&Entry> {
         match self {
-            DhtOp::StoreRecord(_, _, e) => e.as_ref().map(|b| &**b),
-            DhtOp::StoreEntry(_, _, e) => Some(e),
-            DhtOp::RegisterUpdatedContent(_, _, e) => e.as_ref().map(|b| &**b),
-            DhtOp::RegisterUpdatedRecord(_, _, e) => e.as_ref().map(|b| &**b),
-            DhtOp::RegisterAgentActivity(_, _) => None,
-            DhtOp::RegisterDeletedBy(_, _) => None,
-            DhtOp::RegisterDeletedEntryAction(_, _) => None,
-            DhtOp::RegisterAddLink(_, _) => None,
-            DhtOp::RegisterRemoveLink(_, _) => None,
+            DhtOp::StoreRecord(_, _, e) => RecordEntry::or_not_stored(e.as_ref().map(|b| &**b)),
+            DhtOp::StoreEntry(_, _, e) => RecordEntry::Present(e),
+            DhtOp::RegisterUpdatedContent(_, _, e) => {
+                RecordEntry::or_not_stored(e.as_ref().map(|b| &**b))
+            }
+            DhtOp::RegisterUpdatedRecord(_, _, e) => {
+                RecordEntry::or_not_stored(e.as_ref().map(|b| &**b))
+            }
+            DhtOp::RegisterAgentActivity(_, _) => RecordEntry::NotApplicable,
+            DhtOp::RegisterDeletedBy(_, _) => RecordEntry::NotApplicable,
+            DhtOp::RegisterDeletedEntryAction(_, _) => RecordEntry::NotApplicable,
+            DhtOp::RegisterAddLink(_, _) => RecordEntry::NotApplicable,
+            DhtOp::RegisterRemoveLink(_, _) => RecordEntry::NotApplicable,
         }
     }
 
@@ -428,7 +432,7 @@ impl DhtOp {
     /// countersigning session then the return will be None so can be used as
     /// a boolean for filtering with is_some().
     pub fn enzymatic_countersigning_enzyme(&self) -> Option<&AgentPubKey> {
-        if let Some(Entry::CounterSign(session_data, _)) = self.entry() {
+        if let Some(Entry::CounterSign(session_data, _)) = self.entry().into_option() {
             if session_data.preflight_request().enzymatic {
                 session_data
                     .preflight_request()
