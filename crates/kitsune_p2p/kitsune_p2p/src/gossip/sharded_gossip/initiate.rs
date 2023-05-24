@@ -27,7 +27,7 @@ impl ShardedGossipLocal {
         }
 
         // Get the local agents intervals.
-        let intervals: Vec<_> = store::local_arcs(&self.evt_sender, &self.space, &local_agents)
+        let intervals: Vec<_> = store::local_arcs(&self.host_api, &self.space, &local_agents)
             .await?
             .into_iter()
             .map(DhtArcRange::from)
@@ -47,7 +47,8 @@ impl ShardedGossipLocal {
             let id = rand::thread_rng().gen();
 
             let agent_list = self
-                .evt_sender
+                .host_api
+                .legacy
                 .query_agents(
                     QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
                 )
@@ -129,14 +130,15 @@ impl ShardedGossipLocal {
 
         // Get the local intervals.
         let local_agent_arcs =
-            store::local_agent_arcs(&self.evt_sender, &self.space, &local_agents).await?;
+            store::local_agent_arcs(&self.host_api, &self.space, &local_agents).await?;
         let local_arcs: Vec<DhtArcRange> = local_agent_arcs
             .into_iter()
             .map(|(_, arc)| arc.into())
             .collect();
 
         let agent_list = self
-            .evt_sender
+            .host_api
+            .legacy
             .query_agents(
                 QueryAgentsEvt::new(self.space.clone()).by_agents(local_agents.iter().cloned()),
             )
@@ -204,7 +206,7 @@ impl ShardedGossipLocal {
 
         let region_set = if let GossipType::Historical = self.gossip_type {
             let region_set = store::query_region_set(
-                self.host_api.clone(),
+                self.host_api.clone().api,
                 self.space.clone(),
                 common_arc_set.clone(),
             )

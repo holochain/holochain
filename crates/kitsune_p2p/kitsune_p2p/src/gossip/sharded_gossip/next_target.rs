@@ -23,7 +23,7 @@ impl ShardedGossipLocal {
 
         // Get all the remote nodes in this arc set.
         let remote_agents_within_arc_set: HashSet<_> =
-            store::agents_within_arcset(&self.evt_sender, &self.space, arc_set.clone())
+            store::agents_within_arcset(&self.host_api, &self.space, arc_set.clone())
                 .await?
                 .into_iter()
                 .filter(|(a, _)| !local_agents.contains(a))
@@ -31,7 +31,7 @@ impl ShardedGossipLocal {
                 .collect();
 
         // Get all the agent info for these remote nodes.
-        for info in store::all_agent_info(&self.evt_sender, &self.space)
+        for info in store::all_agent_info(&self.host_api, &self.space)
             .await?
             .into_iter()
             .filter(|a| {

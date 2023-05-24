@@ -1,10 +1,10 @@
 //! An in-memory network for sharded kitsune tests.
 
 use crate::gossip::sharded_gossip::{BandwidthThrottle, GossipType, ShardedGossip};
-use crate::meta_net::*;
 use crate::test_util::spawn_handler;
 use crate::types::gossip::*;
 use crate::types::wire;
+use crate::{meta_net::*, HostApiLegacy};
 use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::GhostResult;
@@ -128,8 +128,9 @@ impl Switchboard {
         let ep_hnd = ep.handle().clone();
 
         let evt_handler = SwitchboardEventHandler::new(ep_hnd.clone(), self.clone());
-        let host_api = Arc::new(evt_handler.clone());
         let (evt_sender, handler_task) = spawn_handler(evt_handler.clone()).await;
+        let host_api = Arc::new(evt_handler.clone());
+        let host_api = HostApiLegacy::new(host_api, evt_sender);
 
         let bandwidth = Arc::new(BandwidthThrottle::new(1000.0, 1000.0, 10.0));
 
@@ -137,7 +138,6 @@ impl Switchboard {
             tuning_params,
             space.clone(),
             MetaNet::Tx2(ep_hnd.clone()),
-            evt_sender,
             host_api,
             self.gossip_type,
             bandwidth,

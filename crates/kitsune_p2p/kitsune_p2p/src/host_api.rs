@@ -120,6 +120,18 @@ pub trait KitsuneHost: 'static + Send + Sync {
 /// Trait object for the host interface
 pub type HostApi = std::sync::Arc<dyn KitsuneHost>;
 
+/// A HostApi paired with a ghost_actor sender (legacy)
+/// When all legacy functions have been moved to the API,
+/// this type can be replaced by `HostApi`.
+#[derive(Clone, derive_more::Constructor, derive_more::Deref, derive_more::Into)]
+pub struct HostApiLegacy {
+    /// The new API
+    #[deref]
+    pub api: HostApi,
+    /// The old ghost_actor sender based API
+    pub legacy: futures::channel::mpsc::Sender<crate::event::KitsuneP2pEvent>,
+}
+
 // Test-only stub which mostly panics
 #[cfg(any(test, feature = "test_utils"))]
 mod host_stub;

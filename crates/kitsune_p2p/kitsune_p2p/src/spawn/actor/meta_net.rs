@@ -597,14 +597,14 @@ impl MetaNet {
     #[cfg(feature = "tx5")]
     pub async fn new_tx5(
         tuning_params: KitsuneP2pTuningParams,
-        host: HostApi,
+        host: HostApiLegacy,
         kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
-        evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         signal_url: String,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv)> {
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
 
+        let evt_sender = host.legacy.clone();
         let mut tx5_config = tx5::DefConfig::default()
             .with_max_send_bytes(tuning_params.tx5_max_send_bytes)
             .with_max_recv_bytes(tuning_params.tx5_max_recv_bytes)
