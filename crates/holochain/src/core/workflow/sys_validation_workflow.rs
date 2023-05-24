@@ -233,9 +233,9 @@ pub(crate) async fn validate_op(
                 error = ?e,
                 error_msg = %e
             );
-            let outcome = handle_failed(e);
+            let outcome = handle_failed(&e);
             if let Outcome::Rejected = outcome {
-                warn!(msg = "DhtOp was rejected during system validation.", ?op,)
+                warn!(msg = "DhtOp was rejected during system validation.", ?op, error = ?e, error_msg = %e)
             }
             Ok(outcome)
         }
@@ -247,7 +247,7 @@ pub(crate) async fn validate_op(
 /// we might find it useful to include the reason something
 /// was rejected etc.
 /// This is why the errors contain data but is currently unread.
-fn handle_failed(error: ValidationOutcome) -> Outcome {
+fn handle_failed(error: &ValidationOutcome) -> Outcome {
     use Outcome::*;
     match error {
         ValidationOutcome::Counterfeit(_, _) => {
@@ -264,9 +264,9 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::MalformedDhtOp(_, _, _) => Rejected,
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
-        ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep),
+        ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep.clone()),
         ValidationOutcome::PrevActionError(PrevActionError::MissingMeta(dep)) => {
-            AwaitingOpDep(dep.into())
+            AwaitingOpDep(dep.clone().into())
         }
         ValidationOutcome::PrevActionError(_) => Rejected,
         ValidationOutcome::PrivateEntryLeaked => Rejected,

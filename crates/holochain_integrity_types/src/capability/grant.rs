@@ -36,7 +36,7 @@ impl From<holo_hash::AgentPubKey> for CapGrant {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 /// The entry for the ZomeCall capability grant.
 /// This data is committed to the callee's source chain as a private entry.
@@ -122,7 +122,7 @@ impl CapGrant {
 }
 
 /// Represents access requirements for capability grants.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum CapAccess {
     /// No restriction: callable by anyone.
@@ -187,7 +187,7 @@ impl CapAccess {
 pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GrantedFunctions {
     /// grant all zomes all functions

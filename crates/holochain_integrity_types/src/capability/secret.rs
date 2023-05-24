@@ -14,7 +14,7 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 /// secret to specific agents.
 ///
 /// @todo enforce that secrets are unique across all grants in a chain.
-#[derive(Clone, Copy, SerializedBytes)]
+#[derive(Clone, Copy, Hash, SerializedBytes)]
 pub struct CapSecret(CapSecretBytes);
 
 #[cfg(feature = "arbitrary")]
