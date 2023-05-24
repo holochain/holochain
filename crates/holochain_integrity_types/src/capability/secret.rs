@@ -14,7 +14,9 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 /// secret to specific agents.
 ///
 /// @todo enforce that secrets are unique across all grants in a chain.
-#[derive(Clone, Copy, Hash, SerializedBytes)]
+#[derive(Clone, Copy, SerializedBytes)]
+#[allow(clippy::derive_hash_xor_eq)] // Hash is only used in tests and is not so crucial
+#[cfg_attr(feature = "test_utils", derive(Hash))]
 pub struct CapSecret(CapSecretBytes);
 
 #[cfg(feature = "arbitrary")]
