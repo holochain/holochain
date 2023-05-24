@@ -37,7 +37,7 @@ async fn can_update_state() {
         environment_path: db_dir.path().to_path_buf().into(),
         ..Default::default()
     })
-    .unwrap();
+        .unwrap();
     let conductor = Conductor::new(
         Default::default(),
         ribosome_store,
@@ -88,7 +88,7 @@ async fn app_ids_are_unique() {
         environment_path: db_dir.path().to_path_buf().into(),
         ..Default::default()
     })
-    .unwrap();
+        .unwrap();
     let conductor = Conductor::new(
         Default::default(),
         ribosome_store,
@@ -231,8 +231,7 @@ async fn common_genesis_test_app(
     // no other app could be possibly referencing it, but just in case we have some kind of complex
     // behavior like installing two apps which reference each others' Cells at the same time,
     // we need to be aware of this distinction.
-    holochain_types::app::we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution(
-    );
+    holochain_types::app::we_must_remember_to_rework_cell_panic_handling_after_implementing_use_existing_cell_resolution();
 
     // Create one DNA which always works, and another from a zome that gets passed in
     let (dna_hardcoded, _, _) = mk_dna(("hardcoded", hardcoded_zome)).await;
@@ -271,11 +270,11 @@ async fn test_uninstall_app() {
         .await;
 
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone(),)
+        .call::<_, Option<Record>, _>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_some());
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone(),)
+        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
         .is_some());
 
@@ -297,11 +296,11 @@ async fn test_uninstall_app() {
 
     // - Ensure that the remaining app can still access both hashes
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone(),)
+        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
         .is_some());
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash2.clone(),)
+        .call::<_, Option<Record>, _>(&app2.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_some());
 
@@ -325,11 +324,11 @@ async fn test_uninstall_app() {
     //   of the cells was destroyed, all data was destroyed as well.
     let app3 = conductor.setup_app(&"app2", [&dna]).await.unwrap();
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone(),)
+        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone())
         .await
         .is_none());
     assert!(conductor
-        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash2.clone(),)
+        .call::<_, Option<Record>, _>(&app3.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_none());
 }
@@ -371,7 +370,7 @@ async fn test_signing_error_during_genesis() {
         config,
         None,
     )
-    .await;
+        .await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
 
@@ -728,7 +727,7 @@ async fn name_has_no_effect_on_dna_hash() {
     let app_id1 = apps[0].installed_app_id().clone();
     let app_id2 = apps[1].installed_app_id().clone();
     let app_id3 = apps[2].installed_app_id().clone();
-    let ((cell1,), (cell2,), (cell3,)) = apps.into_tuples();
+    let ((cell1, ), (cell2, ), (cell3, )) = apps.into_tuples();
     let role_name1 = cell1.cell_id().dna_hash().to_string();
     let role_name2 = cell2.cell_id().dna_hash().to_string();
     let role_name3 = cell3.cell_id().dna_hash().to_string();
@@ -812,12 +811,12 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             .function("integrity", "validate", |_api, op: Op| match op {
                 Op::StoreEntry(StoreEntry { action, .. })
-                    if action.hashed.content.app_entry_def().is_some() =>
-                {
-                    Ok(ValidateResult::Invalid(
-                        "intentional invalid result for testing".into(),
-                    ))
-                }
+                if action.hashed.content.app_entry_def().is_some() =>
+                    {
+                        Ok(ValidateResult::Invalid(
+                            "intentional invalid result for testing".into(),
+                        ))
+                    }
                 _ => Ok(ValidateResult::Valid),
             })
             .function("custom", "create", move |api, ()| {
@@ -874,12 +873,12 @@ async fn test_apps_disable_on_panic_after_genesis() {
             .function("integrity", "validate", |_api, op: Op| {
                 match op {
                     Op::StoreEntry(StoreEntry { action, .. })
-                        if action.hashed.content.app_entry_def().is_some() =>
-                    {
-                        // Trigger a deserialization error
-                        let _: Entry = SerializedBytes::try_from(())?.try_into()?;
-                        Ok(ValidateResult::Valid)
-                    }
+                    if action.hashed.content.app_entry_def().is_some() =>
+                        {
+                            // Trigger a deserialization error
+                            let _: Entry = SerializedBytes::try_from(())?.try_into()?;
+                            Ok(ValidateResult::Valid)
+                        }
                     _ => Ok(ValidateResult::Valid),
                 }
             })
@@ -1014,6 +1013,10 @@ async fn test_cell_and_app_status_reconciliation() {
             conductor.running_cell_ids(Some(Joined)).len(),
             conductor
                 .running_cell_ids(Some(PendingJoin(PendingJoinReason::Initial)))
+                .len() + conductor
+                .running_cell_ids(Some(PendingJoin(PendingJoinReason::Retry)))
+                .len() + conductor
+                .running_cell_ids(Some(PendingJoin(PendingJoinReason::Failed)))
                 .len(),
         )
     };
@@ -1113,7 +1116,7 @@ async fn test_app_status_filters() {
             list_apps!(Some(Disabled)).len(),
             list_apps!(Some(Paused)).len(),
         ),
-        (1, 2, 2, 1, 1,)
+        (1, 2, 2, 1, 1, )
     );
 
     // check that paused apps move to Running state on conductor restart
@@ -1130,7 +1133,7 @@ async fn test_app_status_filters() {
             list_apps!(Some(Disabled)).len(),
             list_apps!(Some(Paused)).len(),
         ),
-        (2, 1, 2, 1, 0,)
+        (2, 1, 2, 1, 0, )
     );
 }
 
@@ -1157,7 +1160,7 @@ async fn test_init_concurrency() {
     let dnas = [mk_dna(zome).await.0];
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("app", &dnas).await.unwrap();
-    let (cell,) = app.into_tuple();
+    let (cell, ) = app.into_tuple();
     let conductor = Arc::new(conductor);
 
     // Perform 100 concurrent zome calls
