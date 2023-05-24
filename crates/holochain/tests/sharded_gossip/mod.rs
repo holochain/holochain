@@ -49,7 +49,6 @@ fn make_tuning(
     tuning
 }
 
-
 fn make_config(
     publish: bool,
     recent: bool,
