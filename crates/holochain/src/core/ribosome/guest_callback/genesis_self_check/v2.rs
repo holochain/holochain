@@ -85,15 +85,15 @@ pub(crate) mod slow_tests {
     use std::sync::Arc;
 
     use super::GenesisSelfCheckInvocationV2;
-    use crate::{
-        sweettest::*,
-    };
+    use crate::sweettest::*;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::{TestCoordinatorWasm, TestIntegrityWasm};
 
     pub(crate) fn invocation_fixture() -> GenesisSelfCheckInvocationV2 {
         GenesisSelfCheckInvocationV2 {
-            payload: Arc::new(GenesisSelfCheckDataV2(Some(Arc::new(().try_into().unwrap())))),
+            payload: Arc::new(GenesisSelfCheckDataV2(Some(Arc::new(
+                ().try_into().unwrap(),
+            )))),
         }
     }
 

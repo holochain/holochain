@@ -176,7 +176,12 @@ pub mod test {
                 Ok(DnaInfo {
                     name: "".to_string(),
                     hash: empty_dna_hash.clone(),
-                    properties: UnsafeBytes::from(vec![]).into(),
+                    modifiers: DnaModifiers {
+                        network_seed: String::new(),
+                        properties: UnsafeBytes::from(vec![]).into(),
+                        origin_time: Timestamp(0),
+                        quantum_time: std::time::Duration::new(0, 0),
+                    },
                     zome_names: vec![],
                 })
             }

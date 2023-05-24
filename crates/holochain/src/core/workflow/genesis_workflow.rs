@@ -8,7 +8,9 @@ use std::sync::Arc;
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckInvocationV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckInvocationV2;
 use crate::core::ribosome::guest_callback::genesis_self_check::{
     GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
 };
@@ -89,12 +91,16 @@ where
             host_access_2: GenesisSelfCheckHostAccessV2,
         },
         GenesisSelfCheckInvocation {
-            data_1: Arc::new(GenesisSelfCheckDataV1 {
-                dna_info,
-                membrane_proof: membrane_proof.clone(),
-                agent_key: agent_pubkey.clone(),
-            }),
-            data_2: Arc::new(GenesisSelfCheckDataV2(membrane_proof.clone())),
+            invocation_1: GenesisSelfCheckInvocationV1 {
+                payload: Arc::new(GenesisSelfCheckDataV1 {
+                    dna_info,
+                    membrane_proof: membrane_proof.clone(),
+                    agent_key: agent_pubkey.clone(),
+                }),
+            },
+            invocation_2: GenesisSelfCheckInvocationV2 {
+                payload: Arc::new(GenesisSelfCheckDataV2(membrane_proof.clone())),
+            },
         },
     )?;
 

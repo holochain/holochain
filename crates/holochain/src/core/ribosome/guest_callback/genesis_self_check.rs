@@ -9,9 +9,6 @@ use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCh
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckResultV2;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::GenesisSelfCheckDataV1;
-use holochain_zome_types::GenesisSelfCheckDataV2;
-use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum GenesisSelfCheckResult {
@@ -53,50 +50,38 @@ impl From<GenesisSelfCheckHostAccess>
 
 #[derive(Clone)]
 pub struct GenesisSelfCheckInvocation {
-    pub data_1: Arc<GenesisSelfCheckDataV1>,
-    pub data_2: Arc<GenesisSelfCheckDataV2>,
+    pub invocation_1: GenesisSelfCheckInvocationV1,
+    pub invocation_2: GenesisSelfCheckInvocationV2,
 }
 
 impl From<GenesisSelfCheckInvocation>
     for (GenesisSelfCheckInvocationV1, GenesisSelfCheckInvocationV2)
 {
     fn from(invocation: GenesisSelfCheckInvocation) -> Self {
-        (
-            GenesisSelfCheckInvocationV1 {
-                payload: invocation.data_1,
-            },
-            GenesisSelfCheckInvocationV2 {
-                payload: invocation.data_2,
-            },
-        )
+        (invocation.invocation_1, invocation.invocation_2)
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
+    use super::v1;
+    use super::v2;
     use super::GenesisSelfCheckInvocation;
     use crate::core::ribosome::GenesisSelfCheckHostAccessV1;
     use crate::core::ribosome::GenesisSelfCheckHostAccessV2;
-    use holochain_wasm_test_utils::TestWasm;
-    use crate::{
-        core::ribosome::{
-            guest_callback::genesis_self_check::{
-                GenesisSelfCheckHostAccess, GenesisSelfCheckResult,
-            },
-            RibosomeT,
-        },
+    use crate::core::ribosome::{
+        guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckResult},
+        RibosomeT,
     };
     use crate::fixt::curve::Zomes;
     use crate::fixt::RealRibosomeFixturator;
-    use super::v1;
-    use super::v2;
-    use std::sync::Arc;
+    use holochain_wasm_test_utils::TestWasm;
 
     fn invocation_fixture() -> GenesisSelfCheckInvocation {
         GenesisSelfCheckInvocation {
-            data_1: Arc::new(v1::slow_tests::invocation_fixture()),
-            data_2: Arc::new(v2::slow_tests::invocation_fixture()),
+            invocation_1: v1::slow_tests::invocation_fixture(),
+            invocation_2: v2::slow_tests::invocation_fixture(),
         }
     }
 
@@ -108,10 +93,13 @@ mod slow_tests {
         let invocation = invocation_fixture();
 
         let result = ribosome
-            .run_genesis_self_check(GenesisSelfCheckHostAccess {
-                host_access_1: GenesisSelfCheckHostAccessV1,
-                host_access_2: GenesisSelfCheckHostAccessV2,
-            }, invocation)
+            .run_genesis_self_check(
+                GenesisSelfCheckHostAccess {
+                    host_access_1: GenesisSelfCheckHostAccessV1,
+                    host_access_2: GenesisSelfCheckHostAccessV2,
+                },
+                invocation,
+            )
             .unwrap();
         assert_eq!(result, GenesisSelfCheckResult::Valid,);
     }
@@ -125,10 +113,13 @@ mod slow_tests {
         let invocation = invocation_fixture();
 
         let result = ribosome
-            .run_genesis_self_check(GenesisSelfCheckHostAccess {
-                host_access_1: GenesisSelfCheckHostAccessV1,
-                host_access_2: GenesisSelfCheckHostAccessV2,
-            }, invocation)
+            .run_genesis_self_check(
+                GenesisSelfCheckHostAccess {
+                    host_access_1: GenesisSelfCheckHostAccessV1,
+                    host_access_2: GenesisSelfCheckHostAccessV2,
+                },
+                invocation,
+            )
             .unwrap();
         assert_eq!(
             result,

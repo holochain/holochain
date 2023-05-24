@@ -1142,6 +1142,7 @@ pub mod wasm_test {
                 "__hc__delete_1",
                 "__hc__delete_link_1",
                 "__hc__dna_info_1",
+                "__hc__dna_info_2",
                 "__hc__emit_signal_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",

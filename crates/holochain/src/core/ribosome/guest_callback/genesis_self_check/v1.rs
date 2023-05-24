@@ -87,9 +87,7 @@ pub(crate) mod slow_tests {
     use std::sync::Arc;
 
     use super::GenesisSelfCheckInvocationV1;
-    use crate::{
-        sweettest::*,
-    };
+    use crate::sweettest::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_types::prelude::*;
