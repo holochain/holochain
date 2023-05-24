@@ -2546,6 +2546,7 @@ dependencies = [
  "contrafact",
  "criterion",
  "derive_more",
+ "diff",
  "directories",
  "ed25519-dalek",
  "either",
