@@ -499,7 +499,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         )
     }
 
-    let header = format!("{:54} {:>3}  {}", "author", "seq", "op_type(action_type)",);
+    let header = format!("{:53} {:>3}  {}", "author", "seq", "op_type (action_type)",);
 
     let num_published = published.len();
     let mut num_integrated = 0;
