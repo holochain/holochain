@@ -190,7 +190,7 @@ async fn count_links_with_filters() {
 
     // Negative check for `author`
     let mut query = td.link_query.clone();
-    query.author = Some(fake_agent_pub_key(1));
+    query.author = Some(fake_agent_pub_key(2));
     assert_eq!(0, execute_query(&cascade, query).await);
 
     // Positive check for `author
