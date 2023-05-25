@@ -858,7 +858,8 @@ where
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
-        let query = GetLinksQuery::new(key.base, key.type_query, key.tag, GetLinksFilter::default());
+        let query =
+            GetLinksQuery::new(key.base, key.type_query, key.tag, GetLinksFilter::default());
         let results = self.cascading(query).await?;
         Ok(results)
     }
@@ -884,8 +885,12 @@ where
     #[instrument(skip(self, query))]
     pub async fn dht_count_links(&self, query: WireLinkQuery) -> CascadeResult<usize> {
         if self.am_i_an_authority(query.base.clone()).await? {
-            let get_links_query =
-                GetLinksQuery::new(query.base.clone(), query.link_type.clone(), query.tag_prefix.clone(), query.into());
+            let get_links_query = GetLinksQuery::new(
+                query.base.clone(),
+                query.link_type.clone(),
+                query.tag_prefix.clone(),
+                query.into(),
+            );
             self.cascading(get_links_query)
                 .await
                 .map(|v| v.into_iter().collect::<HashSet<_>>().len())

@@ -115,7 +115,12 @@ pub async fn handle_get_links_query(
     db: DbRead<DbKindDht>,
     query: WireLinkQuery,
 ) -> CascadeResult<Vec<Link>> {
-    let get_links_query = GetLinksQuery::new(query.base.clone(), query.link_type.clone(), query.tag_prefix.clone(), query.into());
+    let get_links_query = GetLinksQuery::new(
+        query.base.clone(),
+        query.link_type.clone(),
+        query.tag_prefix.clone(),
+        query.into(),
+    );
     Ok(db
         .async_reader(move |txn| get_links_query.run(Txn::from(&txn)))
         .await?)

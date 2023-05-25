@@ -479,15 +479,13 @@ impl HolochainP2pActor {
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
-            let res = evt_sender
-                .count_links(dna_hash, to_agent, query)
-                .await;
+            let res = evt_sender.count_links(dna_hash, to_agent, query).await;
             res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
                 .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
         }
-            .boxed()
-            .into())
+        .boxed()
+        .into())
     }
 
     /// receiving an incoming get_links request from a remote node
@@ -1312,11 +1310,13 @@ impl HolochainP2pHandler for HolochainP2pActor {
                 let kitsune_p2p::actor::RpcMultiResponse { response, .. } = result;
                 Ok(SerializedBytes::from(UnsafeBytes::from(response)).try_into()?)
             } else {
-                Err(HolochainP2pError::from("Failed to fetch link count from a peer"))
+                Err(HolochainP2pError::from(
+                    "Failed to fetch link count from a peer",
+                ))
             }
         }
-            .boxed()
-            .into())
+        .boxed()
+        .into())
     }
 
     #[tracing::instrument(skip(self), level = "trace")]

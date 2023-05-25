@@ -1,5 +1,5 @@
-use holochain_types::link::WireLinkQuery;
 use crate::query::link::GetLinksFilter;
+use holochain_types::link::WireLinkQuery;
 
 // Note that link_count uses `GetLinksQuery`, so there is no query implemented here
 

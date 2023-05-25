@@ -29,7 +29,12 @@ pub struct LinksQuery {
 }
 
 impl LinksQuery {
-    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>, filter: GetLinksFilter) -> Self {
+    pub fn new(
+        base: AnyLinkableHash,
+        type_query: LinkTypeFilter,
+        tag: Option<LinkTag>,
+        filter: GetLinksFilter,
+    ) -> Self {
         let tag = tag.map(|tag| Self::tag_to_hex(&tag));
         let create_string = Self::create_query_string(&type_query, tag.clone(), &filter);
         let delete_string = Self::delete_query_string(&type_query, tag.clone());
@@ -52,7 +57,12 @@ impl LinksQuery {
     }
 
     pub fn base(base: AnyLinkableHash, dependencies: Vec<ZomeIndex>) -> Self {
-        Self::new(base, LinkTypeFilter::Dependencies(dependencies), None, GetLinksFilter::default())
+        Self::new(
+            base,
+            LinkTypeFilter::Dependencies(dependencies),
+            None,
+            GetLinksFilter::default(),
+        )
     }
 
     fn create_query(create: String, delete: String) -> String {
@@ -75,7 +85,11 @@ impl LinksQuery {
         "
     }
 
-    fn create_query_string(type_query: &LinkTypeFilter, tag: Option<String>, filter: &GetLinksFilter) -> String {
+    fn create_query_string(
+        type_query: &LinkTypeFilter,
+        tag: Option<String>,
+        filter: &GetLinksFilter,
+    ) -> String {
         let mut s = format!(
             "
             SELECT Action.blob AS action_blob FROM DhtOp
@@ -115,7 +129,7 @@ impl LinksQuery {
             Some(_) => {
                 format!("{} AND DhtOp.authored_timestamp >= :after", q)
             }
-            None => q
+            None => q,
         }
     }
 
@@ -124,7 +138,7 @@ impl LinksQuery {
             Some(_) => {
                 format!("{} AND DhtOp.authored_timestamp <= :before", q)
             }
-            None => q
+            None => q,
         }
     }
 
@@ -133,7 +147,7 @@ impl LinksQuery {
             Some(_) => {
                 format!("{} AND Action.author <= :author", q)
             }
-            None => q
+            None => q,
         }
     }
 
@@ -181,7 +195,12 @@ impl LinksQuery {
 }
 
 impl GetLinksQuery {
-    pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>, filter: GetLinksFilter) -> Self {
+    pub fn new(
+        base: AnyLinkableHash,
+        type_query: LinkTypeFilter,
+        tag: Option<LinkTag>,
+        filter: GetLinksFilter,
+    ) -> Self {
         Self {
             query: LinksQuery::new(base, type_query, tag, filter),
         }

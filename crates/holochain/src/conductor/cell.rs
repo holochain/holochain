@@ -4,7 +4,6 @@
 //! Records can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use std::collections::HashSet;
 use super::api::CellConductorHandle;
 use super::interface::SignalBroadcaster;
 use super::space::Space;
@@ -46,6 +45,7 @@ use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
+use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
@@ -473,8 +473,8 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                    .instrument(debug_span!("cell_handle_count_links"))
-                    .await;
+                .instrument(debug_span!("cell_handle_count_links"))
+                .await;
             }
 
             GetAgentActivity {
@@ -686,13 +686,15 @@ impl Cell {
 
     /// a remote node is asking us to count links
     #[instrument(skip(self))]
-    async fn handle_count_links(
-        &self,
-        query: WireLinkQuery,
-    ) -> CellResult<CountLinksResponse> {
+    async fn handle_count_links(&self, query: WireLinkQuery) -> CellResult<CountLinksResponse> {
         let db = self.space.dht_db.clone();
-        Ok(CountLinksResponse::new(authority::handle_get_links_query(db.into(), query)
-            .await?.into_iter().collect::<HashSet<_>>().len()))
+        Ok(CountLinksResponse::new(
+            authority::handle_get_links_query(db.into(), query)
+                .await?
+                .into_iter()
+                .collect::<HashSet<_>>()
+                .len(),
+        ))
     }
 
     #[instrument(skip(self, options))]

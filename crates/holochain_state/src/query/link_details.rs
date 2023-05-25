@@ -1,7 +1,7 @@
+use crate::query::link::GetLinksFilter;
 use holo_hash::*;
 use holochain_zome_types::*;
 use std::fmt::Debug;
-use crate::query::link::GetLinksFilter;
 
 use super::link::LinksQuery;
 use super::*;

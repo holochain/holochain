@@ -264,9 +264,7 @@ impl<S: Into<String>> LinkMatch<S> {
 }
 
 /// TODO document me
-#[derive(
-serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug,
-)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
 pub struct WireLinkQuery {
     /// TODO document me
     pub base: AnyLinkableHash,

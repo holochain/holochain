@@ -329,7 +329,9 @@ impl HdkT for ErrHdk {
     fn get_link_details(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<LinkDetails>> {
         Self::err()
     }
-    fn count_links(&self, _: LinkQuery) -> ExternResult<usize> { Self::err() }
+    fn count_links(&self, _: LinkQuery) -> ExternResult<usize> {
+        Self::err()
+    }
     // P2P
     fn block_agent(&self, _: BlockAgentInput) -> ExternResult<()> {
         Self::err()
@@ -622,8 +624,8 @@ impl HdkT for HostHdk {
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
 pub fn set_hdk<H: 'static>(hdk: H)
-    where
-        H: HdkT,
+where
+    H: HdkT,
 {
     let hdk = Rc::new(hdk);
     let hdk2 = hdk.clone();

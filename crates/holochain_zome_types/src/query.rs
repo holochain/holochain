@@ -5,15 +5,15 @@ use std::collections::HashSet;
 
 use crate::action::ActionType;
 use crate::action::EntryType;
+use crate::timestamp::Timestamp;
 use crate::warrant::Warrant;
 use crate::ActionHashed;
 use crate::Record;
-use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
-pub use holochain_serialized_bytes::prelude::*;
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holochain_integrity_types::{LinkTag, LinkTypeFilter};
-use crate::timestamp::Timestamp;
+pub use holochain_serialized_bytes::prelude::*;
 
 /// Defines several ways that queries can be restricted to a range.
 /// Notably hash bounded ranges disambiguate forks whereas sequence indexes do
@@ -89,9 +89,7 @@ pub struct ChainQueryFilter {
 }
 
 /// TODO document me
-#[derive(
-serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug,
-)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
 pub struct LinkQuery {
     /// TODO document me
     pub base: AnyLinkableHash,
