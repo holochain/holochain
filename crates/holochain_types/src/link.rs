@@ -263,39 +263,39 @@ impl<S: Into<String>> LinkMatch<S> {
     }
 }
 
-/// TODO document me
+/// Query for links to be sent over the network.
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
 pub struct WireLinkQuery {
-    /// TODO document me
+    /// The base to find links from.
     pub base: AnyLinkableHash,
 
-    /// TODO document me
+    /// Filter by the link type.
     pub link_type: LinkTypeFilter,
 
-    /// TODO document me
+    /// Filter by tag prefix.
     pub tag_prefix: Option<LinkTag>,
 
-    /// TODO document me
+    /// Only include links created before this time.
     pub before: Option<Timestamp>,
 
-    /// TODO document me
+    /// Only include links created after this time.
     pub after: Option<Timestamp>,
 
-    /// TODO document me
+    /// Only include links created by this author.
     pub author: Option<AgentPubKey>,
 }
 
-/// TODO document me
+/// Response type for a `WireLinkQuery`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct CountLinksResponse(Vec<ActionHash>);
 
 impl CountLinksResponse {
-    /// TODO document me
+    /// Create a new response from the action hashes of the matched links
     pub fn new(create_link_actions: Vec<ActionHash>) -> Self {
         CountLinksResponse(create_link_actions)
     }
 
-    /// TODO document me
+    /// Get the action hashes of the matched links
     pub fn create_link_actions(&self) -> Vec<ActionHash> {
         self.0.clone()
     }

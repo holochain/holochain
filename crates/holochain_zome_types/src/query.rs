@@ -88,25 +88,25 @@ pub struct ChainQueryFilter {
     pub order_descending: bool,
 }
 
-/// TODO document me
+/// A query for links to be used with host functions that support filtering links
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
 pub struct LinkQuery {
-    /// TODO document me
+    /// The base to find links from.
     pub base: AnyLinkableHash,
 
-    /// TODO document me
+    /// Filter by the link type.
     pub link_type: LinkTypeFilter,
 
-    /// TODO document me
+    /// Filter by tag prefix.
     pub tag_prefix: Option<LinkTag>,
 
-    /// TODO document me
+    /// Only include links created before this time.
     pub before: Option<Timestamp>,
 
-    /// TODO document me
+    /// Only include links created after this time.
     pub after: Option<Timestamp>,
 
-    /// TODO document me
+    /// Only include links created by this author.
     pub author: Option<AgentPubKey>,
 }
 
@@ -375,7 +375,7 @@ impl ChainQueryFilter {
 }
 
 impl LinkQuery {
-    /// TODO document me
+    /// Create a new link query for a base and link type
     pub fn new(base: impl Into<AnyLinkableHash>, link_type: LinkTypeFilter) -> Self {
         LinkQuery {
             base: base.into(),
@@ -387,7 +387,29 @@ impl LinkQuery {
         }
     }
 
-    // TODO make setters for the other fields
+    /// Filter by tag prefix.
+    pub fn tag_prefix(mut self, tag_prefix: LinkTag) -> Self {
+        self.tag_prefix = Some(tag_prefix);
+        self
+    }
+
+    /// Filter for links created before `before`.
+    pub fn before(mut self, before: Timestamp) -> Self {
+        self.before = Some(before);
+        self
+    }
+
+    /// Filter for links create after `after`.
+    pub fn after(mut self, after: Timestamp) -> Self {
+        self.after = Some(after);
+        self
+    }
+
+    /// Filter for links created by this author.
+    pub fn author(mut self, author: AgentPubKey) -> Self {
+        self.author = Some(author);
+        self
+    }
 }
 
 #[cfg(test)]
