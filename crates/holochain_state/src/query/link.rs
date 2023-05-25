@@ -140,7 +140,7 @@ impl LinksQuery {
 
     fn add_author(q: String, author: Option<&AgentPubKey>) -> String {
         match author {
-            Some(_) => format!("{} AND Action.author <= :author", q),
+            Some(_) => format!("{} AND Action.author = :author", q),
             None => format!("{} AND :author IS NULL", q),
         }
     }

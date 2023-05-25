@@ -86,4 +86,76 @@ pub mod slow_tests {
         let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
         assert_eq!(2, count);
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn count_links_filtered_by_author() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, bob, ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
+
+        // Create a link for Alice
+        let _: ActionHash = conductor
+            .call(&alice, "create_link", ())
+            .await;
+
+        let base: AnyLinkableHash = conductor.call(&alice, "get_count_base", ()).await;
+
+        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        assert_eq!(1, count);
+
+        // Create a link for Bob
+        let _: ActionHash = conductor
+            .call(&bob, "create_link", ())
+            .await;
+
+        // Check that Alice can count her link and Bob's
+        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        assert_eq!(2, count);
+
+        // Only count Alice's links
+        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])).author(alice.cell_id().agent_pubkey().clone())).await;
+        assert_eq!(1, count);
+
+        // Only count Bob's links
+        let count: usize = conductor.call(&bob, "get_count", LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])).author(bob.cell_id().agent_pubkey().clone())).await;
+        assert_eq!(1, count);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn count_links_filtered_by_timestamp() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, bob, ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
+
+        // Create a link for Alice
+        let _: ActionHash = conductor
+            .call(&alice, "create_link", ())
+            .await;
+
+        let base: AnyLinkableHash = conductor.call(&alice, "get_count_base", ()).await;
+
+        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        assert_eq!(1, count);
+
+        let mid_time = Timestamp::now();
+
+        // Create a link for Bob
+        let _: ActionHash = conductor
+            .call(&bob, "create_link", ())
+            .await;
+
+        // Check that Alice can count her link and Bob's
+        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        assert_eq!(2, count);
+
+        // Get links created before the mid-time (only Alice's)
+        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])).after(mid_time.clone())).await;
+        assert_eq!(1, count);
+
+        // Get links created after the mid-time (only Bob's)
+        let count: usize = conductor.call(&bob, "get_count", LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])).before(mid_time.clone())).await;
+        assert_eq!(1, count);
+    }
 }
