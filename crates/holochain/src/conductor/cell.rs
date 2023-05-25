@@ -45,7 +45,6 @@ use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::OptionalExtension;
 use rusqlite::Transaction;
-use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
@@ -692,7 +691,7 @@ impl Cell {
             authority::handle_get_links_query(db.into(), query)
                 .await?
                 .into_iter()
-                .map(|l| l.create_link_action)
+                .map(|l| l.create_link_hash)
                 .collect::<Vec<_>>(),
         ))
     }
