@@ -99,7 +99,10 @@ where
                 }),
             },
             invocation_2: GenesisSelfCheckInvocationV2 {
-                payload: Arc::new(GenesisSelfCheckDataV2(membrane_proof.clone())),
+                payload: Arc::new(GenesisSelfCheckDataV2 {
+                    membrane_proof: membrane_proof.clone(),
+                    agent_key: agent_pubkey.clone(),
+                }),
             },
         },
     )?;

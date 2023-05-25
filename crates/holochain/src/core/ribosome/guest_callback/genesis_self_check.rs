@@ -144,17 +144,15 @@ mod slow_tests {
                 invocation,
             )
             .unwrap();
-        assert_eq!(
-            result,
-            GenesisSelfCheckResult::Valid,
-        );
+        assert_eq!(result, GenesisSelfCheckResult::Valid,);
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_genesis_self_check_implemented_valid_legacy() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckValidLegacy]))
-            .next()
-            .unwrap();
+        let ribosome =
+            RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckValidLegacy]))
+                .next()
+                .unwrap();
 
         let invocation = invocation_fixture();
 
@@ -167,9 +165,6 @@ mod slow_tests {
                 invocation,
             )
             .unwrap();
-        assert_eq!(
-            result,
-            GenesisSelfCheckResult::Valid,
-        );
+        assert_eq!(result, GenesisSelfCheckResult::Valid,);
     }
 }

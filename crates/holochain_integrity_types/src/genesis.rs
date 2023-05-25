@@ -27,17 +27,15 @@ pub struct GenesisSelfCheckDataV1 {
 }
 
 /// Data passed into the genesis_self_check callback for verifying the initial
-/// chain entries
-/// The proof of membership provided by the AgentValidationPkg is the 2nd record
-/// in the chain, but is provided as an argument to the callback for convenience.
+/// chain entries. DnaInfo can be read with a call to `dna_info` within the
+/// self check callback, it is elided here to minimise/stabilise the callback
+/// function signature.
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
-pub struct GenesisSelfCheckDataV2(pub Option<MembraneProof>);
-
-impl GenesisSelfCheckDataV2 {
-    /// Accessor to inner membrane proof by ref.
-    pub fn maybe_membrane_proof(&self) -> Option<&MembraneProof> {
-        self.0.as_ref()
-    }
+pub struct GenesisSelfCheckDataV2 {
+    /// The proof of membership that will be the AgentValidationPkg (2nd record).
+    pub membrane_proof: Option<MembraneProof>,
+    /// Will be the 3rd record of the chain, the agent key.
+    pub agent_key: AgentPubKey,
 }
 
 /// Alias to the current version of `GenesisSelfCheckData`.
