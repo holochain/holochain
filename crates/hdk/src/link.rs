@@ -61,9 +61,9 @@ pub fn create_link<T, E>(
     link_type: T,
     tag: impl Into<LinkTag>,
 ) -> ExternResult<ActionHash>
-where
-    ScopedLinkType: TryFrom<T, Error = E>,
-    WasmError: From<E>,
+    where
+        ScopedLinkType: TryFrom<T, Error=E>,
+        WasmError: From<E>,
 {
     let ScopedLinkType {
         zome_index,
@@ -195,4 +195,12 @@ pub fn get_link_details(
         .into_iter()
         .next()
         .unwrap())
+}
+
+pub fn count_links(query: LinkQuery) -> ExternResult<usize> {
+    HDK
+        .with(|h| {
+            h.borrow()
+                .count_links(query)
+        })
 }

@@ -4,6 +4,7 @@
 //! Records can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
+use std::collections::HashSet;
 use super::api::CellConductorHandle;
 use super::interface::SignalBroadcaster;
 use super::space::Space;
@@ -459,6 +460,23 @@ impl Cell {
                 .await;
             }
 
+            CountLinks {
+                span_context: _,
+                respond,
+                query,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_count_links(query)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                    .instrument(debug_span!("cell_handle_count_links"))
+                    .await;
+            }
+
             GetAgentActivity {
                 span_context: _,
                 respond,
@@ -664,6 +682,17 @@ impl Cell {
         authority::handle_get_links(db.into(), link_key, options)
             .await
             .map_err(Into::into)
+    }
+
+    /// a remote node is asking us to count links
+    #[instrument(skip(self))]
+    async fn handle_count_links(
+        &self,
+        query: WireLinkQuery,
+    ) -> CellResult<CountLinksResponse> {
+        let db = self.space.dht_db.clone();
+        Ok(CountLinksResponse::new(authority::handle_get_links_query(db.into(), query)
+            .await?.into_iter().collect::<HashSet<_>>().len()))
     }
 
     #[instrument(skip(self, options))]

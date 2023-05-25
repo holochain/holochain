@@ -8,10 +8,12 @@ use crate::action::EntryType;
 use crate::warrant::Warrant;
 use crate::ActionHashed;
 use crate::Record;
-use holo_hash::ActionHash;
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 pub use holochain_serialized_bytes::prelude::*;
+use holochain_integrity_types::{LinkTag, LinkTypeFilter};
+use crate::timestamp::Timestamp;
 
 /// Defines several ways that queries can be restricted to a range.
 /// Notably hash bounded ranges disambiguate forks whereas sequence indexes do
@@ -84,6 +86,30 @@ pub struct ChainQueryFilter {
     /// The query should be ordered in descending order (default is ascending),
     /// when run as a database query. There is no provisioning for in-memory ordering.
     pub order_descending: bool,
+}
+
+/// TODO document me
+#[derive(
+serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug,
+)]
+pub struct LinkQuery {
+    /// TODO document me
+    pub base: AnyLinkableHash,
+
+    /// TODO document me
+    pub link_type: LinkTypeFilter,
+
+    /// TODO document me
+    pub tag_prefix: Option<LinkTag>,
+
+    /// TODO document me
+    pub before: Option<Timestamp>,
+
+    /// TODO document me
+    pub after: Option<Timestamp>,
+
+    /// TODO document me
+    pub author: Option<AgentPubKey>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -348,6 +374,22 @@ impl ChainQueryFilter {
             .filter(|record| action_hashset.contains(record.action_address()))
             .collect()
     }
+}
+
+impl LinkQuery {
+    /// TODO document me
+    pub fn new(base: impl Into<AnyLinkableHash>, link_type: LinkTypeFilter) -> Self {
+        LinkQuery {
+            base: base.into(),
+            link_type,
+            tag_prefix: None,
+            before: None,
+            after: None,
+            author: None,
+        }
+    }
+
+    // TODO make setters for the other fields
 }
 
 #[cfg(test)]

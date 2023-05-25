@@ -52,6 +52,7 @@ pub trait HdkT: HdiT {
         &self,
         get_links_input: Vec<GetLinksInput>,
     ) -> ExternResult<Vec<LinkDetails>>;
+    fn count_links(&self, query: LinkQuery) -> ExternResult<usize>;
     // P2P
     fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()>;
     fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
@@ -124,6 +125,7 @@ mockall::mock! {
             &self,
             get_links_input: Vec<GetLinksInput>,
         ) -> ExternResult<Vec<LinkDetails>>;
+        fn count_links(&self, query: LinkQuery) -> ExternResult<usize>;
         // P2P
         fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()>;
         fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
@@ -327,6 +329,7 @@ impl HdkT for ErrHdk {
     fn get_link_details(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<LinkDetails>> {
         Self::err()
     }
+    fn count_links(&self, _: LinkQuery) -> ExternResult<usize> { Self::err() }
     // P2P
     fn block_agent(&self, _: BlockAgentInput) -> ExternResult<()> {
         Self::err()
@@ -529,6 +532,9 @@ impl HdkT for HostHdk {
     ) -> ExternResult<Vec<LinkDetails>> {
         host_call::<Vec<GetLinksInput>, Vec<LinkDetails>>(__hc__get_link_details_1, get_links_input)
     }
+    fn count_links(&self, query: LinkQuery) -> ExternResult<usize> {
+        host_call::<LinkQuery, usize>(__hc__count_links_1, query)
+    }
     fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()> {
         host_call::<BlockAgentInput, ()>(__hc__block_agent_1, block_agent_input)
     }
@@ -616,8 +622,8 @@ impl HdkT for HostHdk {
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
 pub fn set_hdk<H: 'static>(hdk: H)
-where
-    H: HdkT,
+    where
+        H: HdkT,
 {
     let hdk = Rc::new(hdk);
     let hdk2 = hdk.clone();

@@ -129,6 +129,7 @@ macro_rules! holochain_externs {
             get_details:1,
             get_links:1,
             get_link_details:1,
+            count_links:1,
             get_agent_activity:1,
             must_get_entry:1,
             must_get_valid_record:1,

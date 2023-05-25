@@ -41,6 +41,7 @@ pub mod entry_details;
 pub mod error;
 pub mod link;
 pub mod link_details;
+pub mod link_count;
 pub mod live_entry;
 pub mod live_record;
 pub mod record_details;

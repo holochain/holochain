@@ -262,3 +262,43 @@ impl<S: Into<String>> LinkMatch<S> {
         }
     }
 }
+
+/// TODO document me
+#[derive(
+serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug,
+)]
+pub struct WireLinkQuery {
+    /// TODO document me
+    pub base: AnyLinkableHash,
+
+    /// TODO document me
+    pub link_type: LinkTypeFilter,
+
+    /// TODO document me
+    pub tag_prefix: Option<LinkTag>,
+
+    /// TODO document me
+    pub before: Option<Timestamp>,
+
+    /// TODO document me
+    pub after: Option<Timestamp>,
+
+    /// TODO document me
+    pub author: Option<AgentPubKey>,
+}
+
+/// TODO document me
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct CountLinksResponse(usize);
+
+impl CountLinksResponse {
+    /// TODO document me
+    pub fn new(count: usize) -> Self {
+        CountLinksResponse(count)
+    }
+
+    /// TODO document me
+    pub fn count(&self) -> usize {
+        self.0
+    }
+}

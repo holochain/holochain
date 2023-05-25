@@ -23,6 +23,7 @@
 //!
 #![warn(missing_docs)]
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use error::CascadeResult;
@@ -41,7 +42,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::set_validation_status;
 use holochain_state::prelude::*;
 use holochain_state::query::entry_details::GetEntryDetailsQuery;
-use holochain_state::query::link::GetLinksQuery;
+use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 use holochain_state::query::link_details::GetLinkDetailsQuery;
 use holochain_state::query::live_entry::GetLiveEntryQuery;
 use holochain_state::query::live_record::GetLiveRecordQuery;
@@ -644,8 +645,8 @@ where
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
+                // We didn't get a result so if we are either authoring
+                // or the authority there's nothing left to do.
             } else if authoring || authority {
                 return Ok(None);
             }
@@ -687,8 +688,8 @@ where
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
+                // We didn't get a result so if we are either authoring
+                // or the authority there's nothing left to do.
             } else if authoring || authority {
                 return Ok(None);
             }
@@ -731,8 +732,8 @@ where
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
+                // We didn't get a result so if we are either authoring
+                // or the authority there's nothing left to do.
             } else if authoring || authority {
                 return Ok(None);
             }
@@ -769,8 +770,8 @@ where
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
-            // We didn't get a result so if we are either authoring
-            // or the authority there's nothing left to do.
+                // We didn't get a result so if we are either authoring
+                // or the authority there's nothing left to do.
             } else if authoring || authority {
                 return Ok(None);
             }
@@ -857,7 +858,7 @@ where
         if !authority {
             self.fetch_links(key.clone(), options).await?;
         }
-        let query = GetLinksQuery::new(key.base, key.type_query, key.tag);
+        let query = GetLinksQuery::new(key.base, key.type_query, key.tag, GetLinksFilter::default());
         let results = self.cascading(query).await?;
         Ok(results)
     }
@@ -877,6 +878,23 @@ where
         let query = GetLinkDetailsQuery::new(key.base, key.type_query, key.tag);
         let results = self.cascading(query).await?;
         Ok(results)
+    }
+
+    /// Count the number of links matching the `query`.
+    #[instrument(skip(self, query))]
+    pub async fn dht_count_links(&self, query: WireLinkQuery) -> CascadeResult<usize> {
+        if self.am_i_an_authority(query.base.clone()).await? {
+            let get_links_query =
+                GetLinksQuery::new(query.base.clone(), query.link_type.clone(), query.tag_prefix.clone(), query.into());
+            self.cascading(get_links_query)
+                .await
+                .map(|v| v.into_iter().collect::<HashSet<_>>().len())
+        } else if let Some(network) = &self.network {
+            Ok(network.count_links(query).await?.count())
+        } else {
+            trace!("Not an authority and no network available, cannot count links");
+            Ok(0)
+        }
     }
 
     /// Request a hash bounded chain query.
@@ -903,14 +921,15 @@ where
                             scratch.apply_and_then(|scratch| {
                                 authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, Some(scratch), &author, filter.clone())
                             })?
-                        },
+                        }
                         None => authority::get_agent_activity_query::must_get_agent_activity::get_bounded_activity(&mut txn, None, &author, filter.clone())?
                     };
                     results.push(r);
                 }
-            CascadeResult::Ok(results)
-        }})
-        .await??;
+                CascadeResult::Ok(results)
+            }
+        })
+            .await??;
 
         // For each response run the chain filter and check the invariants hold.
         for response in results {
