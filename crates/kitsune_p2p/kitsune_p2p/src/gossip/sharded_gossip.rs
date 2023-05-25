@@ -79,9 +79,6 @@ pub(crate) mod tests;
 ///    16384 will now be shrunk resulting in additional memory thrashing
 const MAX_SEND_BUF_BYTES: usize = 16_000_000;
 
-/// The timeout for a gossip round if there is no contact. One minute.
-const ROUND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
-
 type BloomFilter = bloomfilter::Bloom<MetaOpKey>;
 type EventSender = futures::channel::mpsc::Sender<event::KitsuneP2pEvent>;
 
@@ -510,7 +507,7 @@ impl ShardedGossipLocalState {
         r
     }
 
-    fn check_tgt_expired(&mut self, gossip_type: GossipType) {
+    fn check_tgt_expired(&mut self, gossip_type: GossipType, round_timeout: Duration) {
         if let Some((remote_agent_list, cert, when_initiated)) = self
             .initiate_tgt
             .as_ref()
@@ -520,7 +517,7 @@ impl ShardedGossipLocalState {
             let no_current_round_exist = !self.round_map.round_exists(&cert);
             match when_initiated {
                 Some(when_initiated)
-                    if no_current_round_exist && when_initiated.elapsed() > ROUND_TIMEOUT =>
+                    if no_current_round_exist && when_initiated.elapsed() > round_timeout =>
                 {
                     tracing::error!("Tgt expired {:?}", cert);
                     {
@@ -732,12 +729,13 @@ impl ShardedGossipLocal {
         remote_agent_list: Vec<AgentInfoSigned>,
         common_arc_set: Arc<DhtArcSet>,
         region_set_sent: Option<RegionSetLtcs>,
+        round_timeout: Duration,
     ) -> KitsuneResult<RoundState> {
         Ok(RoundState::new(
             remote_agent_list,
             common_arc_set,
             region_set_sent.map(Arc::new),
-            ROUND_TIMEOUT,
+            round_timeout,
         ))
     }
 
