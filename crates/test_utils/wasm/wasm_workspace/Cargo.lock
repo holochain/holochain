@@ -2755,6 +2755,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_genesis_self_check_legacy"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_genesis_self_check_valid"
 version = "0.0.1"
 dependencies = [

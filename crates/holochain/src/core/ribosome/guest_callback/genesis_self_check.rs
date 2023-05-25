@@ -151,8 +151,8 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_genesis_self_check_implemented_valid_1() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckValidV1]))
+    async fn test_genesis_self_check_implemented_valid_legacy() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckValidLegacy]))
             .next()
             .unwrap();
 

@@ -15,6 +15,7 @@ members = [
     "entry_defs",
     "hash_entry",
     "foo",
+    "genesis_self_check_legacy",
     "genesis_self_check_1",
     "genesis_self_check_invalid",
     "genesis_self_check_valid",
