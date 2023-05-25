@@ -750,6 +750,7 @@ async fn mock_network_sharded_gossip() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }
@@ -1266,6 +1267,7 @@ async fn mock_network_sharding() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }

@@ -78,6 +78,7 @@ use holochain_wasmer_host::module::SerializedModuleCache;
 // without it.
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::parking_lot::lock_api::RwLock;
 
+use crate::core::ribosome::host_fn::count_links::count_links;
 use holochain_types::wasmer_types::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
@@ -611,6 +612,7 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__get_details_1", get_details)
             .with_host_function(&mut ns, "__hc__get_links_1", get_links)
             .with_host_function(&mut ns, "__hc__get_link_details_1", get_link_details)
+            .with_host_function(&mut ns, "__hc__count_links_1", count_links)
             .with_host_function(&mut ns, "__hc__get_agent_activity_1", get_agent_activity)
             .with_host_function(&mut ns, "__hc__must_get_entry_1", must_get_entry)
             .with_host_function(&mut ns, "__hc__must_get_action_1", must_get_action)
