@@ -86,72 +86,12 @@ pub mod test {
 
         let (conductor, alice) = test_conductor(SerializedBytes::default()).await;
 
-        let dna_info: DnaInfo = conductor.call(&alice, "dna_info", ()).await;
+        let dna_info: DnaInfoV1 = conductor.call(&alice, "dna_info_1", ()).await;
         assert_eq!(dna_info.name, String::from("Generated DnaDef"));
 
         let (conductor, alice) = test_conductor(SerializedBytes::default()).await;
 
-        let dna_info: DnaInfo = conductor.call(&alice, "dna_info", ()).await;
+        let dna_info: DnaInfoV1 = conductor.call(&alice, "dna_info_1", ()).await;
         assert_eq!(dna_info.name, String::from("Generated DnaDef"));
-
-        let dna_info_foo: Option<String> = conductor.call(&alice, "dna_info_value", "foo").await;
-        assert_eq!(dna_info_foo, None);
-        let dna_info_foo_direct: Option<String> =
-            conductor.call(&alice, "dna_info_foo_direct", ()).await;
-        assert_eq!(dna_info_foo_direct, None);
-
-        let dna_info_bar: Option<String> = conductor.call(&alice, "dna_info_value", "bar").await;
-        assert_eq!(dna_info_bar, None);
-        let dna_info_bar_direct: Option<String> =
-            conductor.call(&alice, "dna_info_bar_direct", ()).await;
-        assert_eq!(dna_info_bar_direct, None);
-
-        let yaml = "foo: bar";
-        let (conductor, alice) = test_conductor(
-            YamlProperties::new(serde_yaml::from_str(yaml).unwrap())
-                .try_into()
-                .unwrap(),
-        )
-        .await;
-        let dna_info_foo: Option<String> = conductor.call(&alice, "dna_info_value", "foo").await;
-        assert_eq!(dna_info_foo, Some("bar".into()));
-        let dna_info_foo_direct: Option<String> =
-            conductor.call(&alice, "dna_info_foo_direct", ()).await;
-        assert_eq!(dna_info_foo_direct, Some("bar".into()));
-
-        let dna_info_bar: Option<String> = conductor.call(&alice, "dna_info_value", "bar").await;
-        assert_eq!(dna_info_bar, None);
-        let dna_info_bar_direct: Option<String> =
-            conductor.call(&alice, "dna_info_bar_direct", ()).await;
-        assert_eq!(dna_info_bar_direct, None);
-
-        let yaml = "foo: 1\nbar: bing";
-        let (conductor, alice) = test_conductor(
-            YamlProperties::new(serde_yaml::from_str(yaml).unwrap())
-                .try_into()
-                .unwrap(),
-        )
-        .await;
-        let dna_info_foo: Option<u64> = conductor.call(&alice, "dna_info_value", "foo").await;
-        assert_eq!(dna_info_foo, Some(1));
-        let dna_info_foo_direct: Option<u64> =
-            conductor.call(&alice, "dna_info_foo_direct", ()).await;
-        assert_eq!(dna_info_foo_direct, Some(1));
-
-        let dna_info_bar: Option<String> = conductor.call(&alice, "dna_info_value", "bar").await;
-        assert_eq!(dna_info_bar, Some("bing".into()));
-        let dna_info_bar_direct: Option<String> =
-            conductor.call(&alice, "dna_info_bar_direct", ()).await;
-        assert_eq!(dna_info_bar_direct, Some("bing".into()));
-
-        let yaml = "baz: \n  foo: \n   bar: 1";
-        let (conductor, alice) = test_conductor(
-            YamlProperties::new(serde_yaml::from_str(yaml).unwrap())
-                .try_into()
-                .unwrap(),
-        )
-        .await;
-        let nested: Option<i64> = conductor.call(&alice, "dna_info_nested", ()).await;
-        assert_eq!(nested, Some(1));
     }
 }

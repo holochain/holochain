@@ -1,5 +1,6 @@
 use crate::integrity::*;
 use hdk::prelude::*;
+use hdi::prelude::__hc__dna_info_1;
 use serde_yaml::Value;
 
 #[hdk_extern]
@@ -68,6 +69,11 @@ fn remote_remote_call_info(agent: AgentPubKey) -> ExternResult<CallInfo> {
             Err(wasm_error!(WasmErrorInner::Guest(format!("{:?}", not_ok))))
         }
     }
+}
+
+#[hdk_extern]
+fn dna_info_1(_: ()) -> ExternResult<DnaInfoV1> {
+    host_call::<(), DnaInfoV1>(__hc__dna_info_1, ())
 }
 
 #[hdk_extern]
