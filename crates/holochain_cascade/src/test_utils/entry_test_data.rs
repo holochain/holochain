@@ -10,7 +10,7 @@ use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::link::WireCreateLink;
 use holochain_types::link::WireDeleteLink;
 use holochain_types::link::WireLinkKey;
-use holochain_types::prelude::EntryData;
+use holochain_types::prelude::{EntryData, WireLinkQuery};
 use holochain_zome_types::fixt::*;
 use holochain_zome_types::Action;
 use holochain_zome_types::ActionHashed;
@@ -55,6 +55,7 @@ pub struct EntryTestData {
     pub link_key: WireLinkKey,
     pub link_key_tag: WireLinkKey,
     pub links: Vec<Link>,
+    pub link_query: WireLinkQuery,
 }
 
 impl EntryTestData {
@@ -189,6 +190,15 @@ impl EntryTestData {
             create_link_hash,
         };
 
+        let link_query = WireLinkQuery {
+            base: create_link.base_address.clone(),
+            link_type: LinkTypeFilter::single_dep(0.into()),
+            tag_prefix: None,
+            before: None,
+            after: None,
+            author: None,
+        };
+
         let entry = EntryData {
             entry,
             entry_type: create.entry_type,
@@ -216,6 +226,7 @@ impl EntryTestData {
             create_link_action,
             delete_link_action,
             wire_create_link_base,
+            link_query,
         }
     }
 }

@@ -126,28 +126,22 @@ impl LinksQuery {
 
     fn add_after(q: String, after: Option<Timestamp>) -> String {
         match after {
-            Some(_) => {
-                format!("{} AND DhtOp.authored_timestamp >= :after", q)
-            }
-            None => q,
+            Some(_) => format!("{} AND DhtOp.authored_timestamp >= :after", q),
+            None => format!("{} AND :after IS NULL", q),
         }
     }
 
     fn add_before(q: String, before: Option<Timestamp>) -> String {
         match before {
-            Some(_) => {
-                format!("{} AND DhtOp.authored_timestamp <= :before", q)
-            }
-            None => q,
+            Some(_) => format!("{} AND DhtOp.authored_timestamp <= :before", q),
+            None => format!("{} AND :before IS NULL", q),
         }
     }
 
     fn add_author(q: String, author: Option<&AgentPubKey>) -> String {
         match author {
-            Some(_) => {
-                format!("{} AND Action.author <= :author", q)
-            }
-            None => q,
+            Some(_) => format!("{} AND Action.author <= :author", q),
+            None => format!("{} AND :author IS NULL", q),
         }
     }
 

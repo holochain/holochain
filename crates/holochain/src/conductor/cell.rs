@@ -692,8 +692,8 @@ impl Cell {
             authority::handle_get_links_query(db.into(), query)
                 .await?
                 .into_iter()
-                .collect::<HashSet<_>>()
-                .len(),
+                .map(|l| l.create_link_action)
+                .collect::<Vec<_>>(),
         ))
     }
 

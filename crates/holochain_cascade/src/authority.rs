@@ -109,7 +109,7 @@ pub async fn handle_get_links(
     Ok(results)
 }
 
-/// Handler for get_links query to a Record/Entry authority
+/// Handler for querying links
 #[instrument(skip(db))]
 pub async fn handle_get_links_query(
     db: DbRead<DbKindDht>,

@@ -169,7 +169,11 @@ impl HolochainP2pDnaT for PassThroughNetwork {
             out.extend(r);
         }
 
-        Ok(CountLinksResponse::new(out.len()))
+        Ok(CountLinksResponse::new(
+            out.into_iter()
+                .map(|l| l.create_link_hash)
+                .collect::<Vec<_>>(),
+        ))
     }
 
     async fn get_agent_activity(

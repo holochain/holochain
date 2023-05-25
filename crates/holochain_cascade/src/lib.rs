@@ -884,22 +884,33 @@ where
     /// Count the number of links matching the `query`.
     #[instrument(skip(self, query))]
     pub async fn dht_count_links(&self, query: WireLinkQuery) -> CascadeResult<usize> {
-        if self.am_i_an_authority(query.base.clone()).await? {
-            let get_links_query = GetLinksQuery::new(
-                query.base.clone(),
-                query.link_type.clone(),
-                query.tag_prefix.clone(),
-                query.into(),
-            );
-            self.cascading(get_links_query)
-                .await
-                .map(|v| v.into_iter().collect::<HashSet<_>>().len())
-        } else if let Some(network) = &self.network {
-            Ok(network.count_links(query).await?.count())
-        } else {
-            trace!("Not an authority and no network available, cannot count links");
-            Ok(0)
+        let mut links = HashSet::<ActionHash>::new();
+        if !self.am_i_an_authority(query.base.clone()).await? {
+            if let Some(network) = &self.network {
+                links.extend(
+                    network
+                        .count_links(query.clone())
+                        .await?
+                        .create_link_actions(),
+                );
+            }
         }
+
+        let get_links_query = GetLinksQuery::new(
+            query.base.clone(),
+            query.link_type.clone(),
+            query.tag_prefix.clone(),
+            query.into(),
+        );
+
+        links.extend(
+            self.cascading(get_links_query)
+                .await?
+                .into_iter()
+                .map(|l| l.create_link_hash),
+        );
+
+        Ok(links.len())
     }
 
     /// Request a hash bounded chain query.

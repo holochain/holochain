@@ -7,6 +7,7 @@ use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
+/// Count links
 #[allow(clippy::extra_unused_lifetimes)]
 #[tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name))]
 pub fn count_links<'a>(

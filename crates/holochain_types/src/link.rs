@@ -287,16 +287,16 @@ pub struct WireLinkQuery {
 
 /// TODO document me
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct CountLinksResponse(usize);
+pub struct CountLinksResponse(Vec<ActionHash>);
 
 impl CountLinksResponse {
     /// TODO document me
-    pub fn new(count: usize) -> Self {
-        CountLinksResponse(count)
+    pub fn new(create_link_actions: Vec<ActionHash>) -> Self {
+        CountLinksResponse(create_link_actions)
     }
 
     /// TODO document me
-    pub fn count(&self) -> usize {
-        self.0
+    pub fn create_link_actions(&self) -> Vec<ActionHash> {
+        self.0.clone()
     }
 }
