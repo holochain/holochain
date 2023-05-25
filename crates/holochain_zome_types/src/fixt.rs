@@ -807,17 +807,12 @@ fixturator!(
 
 fixturator!(
     Duration;
-    curve Empty std::time::Duration::new(
-        U64Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
-        U32Fixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap()
+    curve Empty std::time::Duration::from_nanos(0);
+    curve Unpredictable std::time::Duration::from_nanos(
+        U64Fixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()
     );
-    curve Unpredictable std::time::Duration::new(
-        U64Fixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
-        U32Fixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap()
-    );
-    curve Predictable std::time::Duration::new(
-        U64Fixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
-        U32Fixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()
+    curve Predictable std::time::Duration::from_nanos(
+        U64Fixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()
     );
 );
 
