@@ -105,7 +105,7 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_validate_implemented_invalid() {
+    async fn test_genesis_self_check_implemented_invalid() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckInvalid]))
             .next()
             .unwrap();
@@ -124,6 +124,52 @@ mod slow_tests {
         assert_eq!(
             result,
             GenesisSelfCheckResult::Invalid("esoteric edge case".into()),
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_genesis_self_check_implemented_valid() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckValid]))
+            .next()
+            .unwrap();
+
+        let invocation = invocation_fixture();
+
+        let result = ribosome
+            .run_genesis_self_check(
+                GenesisSelfCheckHostAccess {
+                    host_access_1: GenesisSelfCheckHostAccessV1,
+                    host_access_2: GenesisSelfCheckHostAccessV2,
+                },
+                invocation,
+            )
+            .unwrap();
+        assert_eq!(
+            result,
+            GenesisSelfCheckResult::Valid,
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_genesis_self_check_implemented_valid_1() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::GenesisSelfCheckValidV1]))
+            .next()
+            .unwrap();
+
+        let invocation = invocation_fixture();
+
+        let result = ribosome
+            .run_genesis_self_check(
+                GenesisSelfCheckHostAccess {
+                    host_access_1: GenesisSelfCheckHostAccessV1,
+                    host_access_2: GenesisSelfCheckHostAccessV2,
+                },
+                invocation,
+            )
+            .unwrap();
+        assert_eq!(
+            result,
+            GenesisSelfCheckResult::Valid,
         );
     }
 }
