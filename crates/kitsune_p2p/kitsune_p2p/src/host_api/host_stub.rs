@@ -112,6 +112,14 @@ impl KitsuneHost for HostStub {
         KitsuneHostDefaultError::query_region_set(&self.err, space, dht_arc_set)
     }
 
+    fn get_local_authors(
+        &self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+    ) -> KitsuneHostResult<Vec<KAgent>> {
+        KitsuneHostDefaultError::get_local_authors(&self.err, space, basis)
+    }
+
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
         KitsuneHostDefaultError::get_topology(&self.err, space)
     }

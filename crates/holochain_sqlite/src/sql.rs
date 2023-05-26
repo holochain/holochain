@@ -27,6 +27,8 @@ pub mod sql_cell {
 
     pub const FETCH_PUBLISHABLE_OP: &str = include_str!("sql/cell/fetch_publishable_op.sql");
 
+    pub const GET_LOCAL_AUTHORS: &str = include_str!("sql/cell/get_local_authors.sql");
+
     pub const SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP: &str =
         include_str!("sql/cell/sum_of_received_bytes_since_timestamp.sql");
 

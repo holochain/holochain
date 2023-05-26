@@ -113,6 +113,19 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
         .into()))
     }
 
+    fn get_local_authors(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _basis: Arc<KitsuneBasis>,
+    ) -> KitsuneHostResult<Vec<KAgent>> {
+        box_fut(Err(format!(
+            "error for unimplemented KitsuneHost test behavior: method {} of {}",
+            "get_local_authors",
+            Self::NAME
+        )
+        .into()))
+    }
+
     fn get_topology(&self, _space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
         box_fut(Err(format!(
             "error for unimplemented KitsuneHost test behavior: method {} of {}",
@@ -210,6 +223,13 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         KitsuneHostDefaultError::query_region_set(self, space, dht_arc_set)
     }
 
+    fn get_local_authors(
+        &self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+    ) -> KitsuneHostResult<Vec<KAgent>> {
+        KitsuneHostDefaultError::get_local_authors(self, space, basis)
+    }
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology> {
         KitsuneHostDefaultError::get_topology(self, space)
     }

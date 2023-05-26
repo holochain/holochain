@@ -112,6 +112,14 @@ impl KitsuneHost for StandardResponsesHostApi {
         .into()
     }
 
+    fn get_local_authors(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _basis: Arc<KitsuneBasis>,
+    ) -> crate::KitsuneHostResult<Vec<KAgent>> {
+        todo!()
+    }
+
     fn record_metrics(
         &self,
         _space: Arc<KitsuneSpace>,

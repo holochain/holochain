@@ -333,6 +333,7 @@ impl SpaceInternalHandler for Space {
         agent: Arc<KitsuneAgent>,
         arc: DhtArc,
     ) -> SpaceInternalHandlerResult<()> {
+        tracing::debug!(?agent, ?arc, "handle_update_agent_arc");
         self.agent_arcs.insert(agent, arc);
         self.update_metric_exchange_arcset();
         Ok(async move { Ok(()) }.boxed().into())
@@ -932,7 +933,7 @@ impl KitsuneP2pHandler for Space {
         input: actor::RpcMulti,
     ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
         let location = input.basis.get_loc();
-        let local_agents_holding_basis = self
+        let mut local_agents_holding_basis: HashSet<_> = self
             .local_joined_agents
             .keys()
             .filter(|agent_key| {
@@ -942,12 +943,25 @@ impl KitsuneP2pHandler for Space {
             })
             .cloned()
             .collect();
-        let fut = rpc_multi_logic::handle_rpc_multi(
-            input,
-            self.ro_inner.clone(),
-            local_agents_holding_basis,
-        );
-        Ok(async move { fut.await }.boxed().into())
+
+        let space = self.space.clone();
+        let host = self.host_api.clone();
+        let ro_inner = self.ro_inner.clone();
+
+        Ok(async move {
+            // If one of our local agents has authored the data, be sure
+            // to add them to the list of local agents holding it, even
+            // if their arc doesn't cover it
+            let authors = host
+                .get_local_authors(space, input.basis.clone())
+                .await
+                .map_err(KitsuneError::other)?;
+            local_agents_holding_basis.extend(authors.into_iter());
+
+            rpc_multi_logic::handle_rpc_multi(input, ro_inner, local_agents_holding_basis).await
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_broadcast(

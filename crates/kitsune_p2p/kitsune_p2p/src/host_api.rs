@@ -4,7 +4,7 @@ use must_future::MustBoxFuture;
 use std::sync::Arc;
 
 use kitsune_p2p_types::{
-    bin_types::KitsuneSpace,
+    bin_types::{KitsuneBasis, KitsuneSpace},
     dependencies::lair_keystore_api,
     dht::{
         region::{Region, RegionCoords},
@@ -12,7 +12,7 @@ use kitsune_p2p_types::{
         spacetime::Topology,
     },
     dht_arc::DhtArcSet,
-    KOpData, KOpHash,
+    KAgent, KOpData, KOpHash,
 };
 
 use crate::event::{GetAgentInfoSignedEvt, MetricRecord};
@@ -83,6 +83,14 @@ pub trait KitsuneHost: 'static + Send + Sync {
         space: Arc<KitsuneSpace>,
         records: Vec<MetricRecord>,
     ) -> KitsuneHostResult<()>;
+
+    /// Ask the host if this basis hash was authored by a local agent,
+    /// and if so, by whom.
+    fn get_local_authors(
+        &self,
+        space: Arc<KitsuneSpace>,
+        basis: Arc<KitsuneBasis>,
+    ) -> KitsuneHostResult<Vec<KAgent>>;
 
     /// Get the quantum Topology associated with this Space.
     fn get_topology(&self, space: Arc<KitsuneSpace>) -> KitsuneHostResult<Topology>;

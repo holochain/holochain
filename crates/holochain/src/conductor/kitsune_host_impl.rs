@@ -1,8 +1,10 @@
 //! Implementation of the Kitsune Host API
 
+mod query_get_local_authors;
 mod query_region_op_hashes;
 mod query_region_set;
 mod query_size_limited_regions;
+pub use query_get_local_authors::query_get_local_authors;
 pub use query_region_op_hashes::query_region_op_hashes;
 pub use query_region_set::query_region_set;
 pub use query_size_limited_regions::query_size_limited_regions;
@@ -11,10 +13,10 @@ use std::sync::Arc;
 
 use super::{ribosome_store::RibosomeStore, space::Spaces};
 use futures::FutureExt;
-use holo_hash::DnaHash;
+use holo_hash::{AnyDhtHash, DnaHash};
 use holochain_p2p::{
     dht::{spacetime::Topology, ArqStrat},
-    DnaHashExt,
+    AnyDhtHashExt, DnaHashExt,
 };
 use holochain_sqlite::prelude::AsP2pStateTxExt;
 use holochain_types::{
@@ -210,6 +212,22 @@ impl KitsuneHost for KitsuneHostImpl {
             let topology = self.get_topology(space).await?;
             let bounds = region.to_bounds(&topology);
             Ok(query_region_op_hashes::query_region_op_hashes(db.clone(), bounds).await?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn get_local_authors(
+        &self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        basis: Arc<kitsune_p2p::KitsuneBasis>,
+    ) -> KitsuneHostResult<Vec<kitsune_p2p_types::KAgent>> {
+        let dna_hash = DnaHash::from_kitsune(&space);
+        async move {
+            let hash = AnyDhtHash::from_kitsune(&basis);
+            let db = self.spaces.authored_db(&dna_hash)?;
+            let authors = query_get_local_authors::query_get_local_authors(db.into(), hash).await?;
+            Ok(authors.into_iter().map(|a| a.to_kitsune()).collect())
         }
         .boxed()
         .into()

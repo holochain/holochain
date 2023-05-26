@@ -195,6 +195,14 @@ impl KitsuneHost for SwitchboardEventHandler {
         .into()
     }
 
+    fn get_local_authors(
+        &self,
+        _space: Arc<KitsuneSpace>,
+        _basis: Arc<KitsuneBasis>,
+    ) -> crate::KitsuneHostResult<Vec<kitsune_p2p_types::KAgent>> {
+        box_fut(Ok(vec![]))
+    }
+
     fn get_topology(
         &self,
         _space: Arc<KitsuneSpace>,
