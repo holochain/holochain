@@ -1100,6 +1100,7 @@ pub mod wasm_test {
                 "__hc__capability_claims_1",
                 "__hc__capability_grants_1",
                 "__hc__capability_info_1",
+                "__hc__count_links_1",
                 "__hc__create_1",
                 "__hc__create_link_1",
                 "__hc__create_x25519_keypair_1",

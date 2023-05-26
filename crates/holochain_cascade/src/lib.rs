@@ -645,8 +645,8 @@ where
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
-                // We didn't get a result so if we are either authoring
-                // or the authority there's nothing left to do.
+            // We didn't get a result so if we are either authoring
+            // or the authority there's nothing left to do.
             } else if authoring || authority {
                 return Ok(None);
             }
@@ -688,8 +688,8 @@ where
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
-                // We didn't get a result so if we are either authoring
-                // or the authority there's nothing left to do.
+            // We didn't get a result so if we are either authoring
+            // or the authority there's nothing left to do.
             } else if authoring || authority {
                 return Ok(None);
             }
@@ -732,8 +732,8 @@ where
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
-                // We didn't get a result so if we are either authoring
-                // or the authority there's nothing left to do.
+            // We didn't get a result so if we are either authoring
+            // or the authority there's nothing left to do.
             } else if authoring || authority {
                 return Ok(None);
             }
@@ -770,8 +770,8 @@ where
             // We got a result so can short circuit.
             if results.is_some() {
                 return Ok(results);
-                // We didn't get a result so if we are either authoring
-                // or the authority there's nothing left to do.
+            // We didn't get a result so if we are either authoring
+            // or the authority there's nothing left to do.
             } else if authoring || authority {
                 return Ok(None);
             }
