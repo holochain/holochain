@@ -168,7 +168,12 @@ impl TestData {
     }
 
     fn is_on_type_query<'a>(&'a self, type_query: LinkTypeFilter, test: &'static str) {
-        let query = GetLinksQuery::new(self.base_hash.clone().into(), type_query, None, GetLinksFilter::default());
+        let query = GetLinksQuery::new(
+            self.base_hash.clone().into(),
+            type_query,
+            None,
+            GetLinksFilter::default(),
+        );
         let val = fresh_reader_test(self.env.clone(), |txn| {
             query
                 .run(DbScratch::new(&[&txn], &self.scratch))
@@ -315,7 +320,12 @@ impl TestData {
             .iter()
             .map(|d| d.expected_link.clone())
             .collect::<HashSet<_>>();
-        let query = GetLinksQuery::new(base_hash.clone().into(), query.into(), None, GetLinksFilter::default());
+        let query = GetLinksQuery::new(
+            base_hash.clone().into(),
+            query.into(),
+            None,
+            GetLinksFilter::default(),
+        );
         let val: HashSet<_> = fresh_reader_test(td[0].env.clone(), |txn| {
             query.run(DbScratch::new(&[&txn], &scratch)).unwrap()
         })

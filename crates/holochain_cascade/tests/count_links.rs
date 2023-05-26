@@ -8,7 +8,7 @@ use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_state::scratch::Scratch;
 use holochain_types::link::{CountLinksResponse, WireLinkQuery};
-use holochain_zome_types::{ChainTopOrdering, fake_agent_pub_key};
+use holochain_zome_types::{fake_agent_pub_key, ChainTopOrdering};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn count_links_not_authority() {
@@ -200,8 +200,5 @@ async fn count_links_with_filters() {
 }
 
 async fn execute_query(cascade: &Cascade<PassThroughNetwork>, query: WireLinkQuery) -> usize {
-    cascade
-        .dht_count_links(query)
-        .await
-        .unwrap()
+    cascade.dht_count_links(query).await.unwrap()
 }
