@@ -8,6 +8,7 @@ use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_state::scratch::Scratch;
 use holochain_types::link::{CountLinksResponse, WireLinkQuery};
+use holochain_types::test_utils::chain::action_hash;
 use holochain_zome_types::{fake_agent_pub_key, ChainTopOrdering};
 
 // Checks that links can be counted by asking a remote peer who is an authority on the base for the count
@@ -118,7 +119,7 @@ async fn count_links_authoring() {
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
     mock.expect_count_links()
-        .returning(|_| Ok(CountLinksResponse::new(vec![])));
+        .returning(|_| Ok(CountLinksResponse::new(vec![action_hash(&[1, 2, 3])])));
     let mock = MockNetwork::new(mock);
 
     // Cascade
@@ -131,7 +132,8 @@ async fn count_links_authoring() {
         .await
         .unwrap();
 
-    assert_eq!(count, td.links.len());
+    // plus 1 to account for the remote link that we aren't storing
+    assert_eq!(count, td.links.len() + 1);
 
     insert_op_scratch(
         &mut scratch,
@@ -149,7 +151,8 @@ async fn count_links_authoring() {
         .await
         .unwrap();
 
-    assert_eq!(count, 0);
+    // Our link has been deleted but the other link that the remote knows about remains
+    assert_eq!(count, 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
