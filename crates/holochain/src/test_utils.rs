@@ -62,6 +62,8 @@ pub use wait_for::*;
 
 pub use crate::sweettest::sweet_consistency::*;
 
+use self::consistency::request_published_ops;
+
 /// Produce file and line number info at compile-time
 #[macro_export]
 macro_rules! here {
@@ -465,11 +467,11 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
     let mut published = HashSet::new();
     for (author, db, _) in all_cell_dbs.iter() {
         published.extend(
-            get_ops_to_publish((*author).to_owned(), *db)
+            request_published_ops(*db, Some((*author).to_owned()))
                 .await
                 .unwrap()
                 .into_iter()
-                .map(|(_, _, ops)| ops),
+                .map(|(_, _, op)| op),
         );
     }
     let published = published.into_iter().collect::<Vec<_>>();
