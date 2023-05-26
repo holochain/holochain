@@ -191,7 +191,7 @@ impl EntryTestData {
         };
 
         let link_query = WireLinkQuery {
-            base: create_link.base_address.clone(),
+            base: create_link.base_address,
             link_type: LinkTypeFilter::single_dep(0.into()),
             tag_prefix: None,
             before: None,
