@@ -1306,7 +1306,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
             input.max_remote_agent_count = 1;
             let result = kitsune_p2p.rpc_multi(input).await?;
 
-            if let Some(result) = result.into_iter().nth(0) {
+            if let Some(result) = result.into_iter().next() {
                 let kitsune_p2p::actor::RpcMultiResponse { response, .. } = result;
                 Ok(SerializedBytes::from(UnsafeBytes::from(response)).try_into()?)
             } else {
