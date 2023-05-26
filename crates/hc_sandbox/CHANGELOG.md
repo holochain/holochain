@@ -7,13 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.1
+
 ## 0.3.0-beta-dev.0
 
 - updated comment in src/cli.rs to clarify use of –force-admin-ports
 
 - Improved documentation in README, code comments, help text, and error messages.
-- Updated from structopt 0.3 to clap 4. [#2125](https://github.com/holochain/holochain/pull/2125)
-- **BREAKING**: In the course of updates, a bug was discovered which necessitated a breaking change; the short arg for `--holochain-path` used in `hc sandbox` subcommand has changed from `-h` to `-H` to resolve a conflict with the short arg for `--help`. [#2125](https://github.com/holochain/holochain/pull/2125)
+
+- Updated from structopt 0.3 to clap 4. [\#2125](https://github.com/holochain/holochain/pull/2125)
+
+- **BREAKING**: In the course of updates, a bug was discovered which necessitated a breaking change; the short arg for `--holochain-path` used in `hc sandbox` subcommand has changed from `-h` to `-H` to resolve a conflict with the short arg for `--help`. [\#2125](https://github.com/holochain/holochain/pull/2125)
 
 ## 0.2.0
 

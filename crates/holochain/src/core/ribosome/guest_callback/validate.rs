@@ -75,15 +75,6 @@ impl Invocation for ValidateInvocation {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub enum ValidateResult {
-    Valid,
-    Invalid(String),
-    /// subconscious needs to map this to either pending or abandoned based on context that the
-    /// wasm can't possibly have
-    UnresolvedDependencies(UnresolvedDependencies),
-}
-
 impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
     /// This function is called after multiple app validation callbacks
     /// have been run by a Ribosome and it is necessary to return one
