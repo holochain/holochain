@@ -510,8 +510,8 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         num_integrated = get_integrated_count(db);
         if num_integrated >= num_published {
             if num_integrated > num_published {
-                tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
-                Consistency may not be complete.")
+                tracing::warn!("num integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test.
+                Consistency may not be complete.", num_integrated, num_published)
             }
             return;
         } else {
