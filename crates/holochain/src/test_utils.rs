@@ -518,6 +518,8 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         tokio::time::sleep(delay).await;
     }
 
+    // Timeout has been reached at this point, so print a helpful report
+
     let mut published: Vec<_> = published.iter().map(display_op).collect();
     let mut integrated: Vec<_> = get_integrated_ops(db).iter().map(display_op).collect();
     published.sort();
@@ -532,17 +534,8 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         .cloned()
         .collect::<Vec<_>>();
 
-    // let unpublished = diff::slice(published, &integrated)
-    //     .into_iter()
-    //     .filter_map(|d| match d {
-    //         diff::Result::Right(l) => Some(l),
-    //         _ => None,
-    //     })
-    //     .map(display_op)
-    //     .collect::<Vec<_>>();
-
     assert!(
-        unintegrated.len() > 0,
+        !unintegrated.is_empty(),
         "consistency should only fail if items were published but not integrated"
     );
 

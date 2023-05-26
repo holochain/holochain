@@ -254,12 +254,14 @@ async fn run(
         }
     };
 
-    let config = holochain::sweettest::SweetConductorConfig::standard();
+    let config = holochain::sweettest::SweetConductorConfig::rendezvous();
 
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 
-    let mut conductor = holochain::sweettest::SweetConductor::from_config_rendezvous_keystore(
-        config, rendezvous, keystore,
+    let mut conductor = holochain::sweettest::SweetConductor::create_with_defaults(
+        config,
+        Some(keystore),
+        Some(rendezvous),
     )
     .await;
 

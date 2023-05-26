@@ -1,5 +1,6 @@
 //! Helpers for running the conductor.
 
+use anyhow::anyhow;
 use std::path::Path;
 use std::{path::PathBuf, process::Stdio};
 
@@ -103,12 +104,17 @@ pub async fn run_async(
     }
     let config_path = write_config(sandbox_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
-    let (mut child, lair) =
-        start_holochain(holochain_path, &config, config_path, tx_config).await?;
-    check_started(&mut child).await;
-    let port = rx_config
-        .await
-        .expect("Failed to get admin port from conductor");
+    let (child, lair) = start_holochain(holochain_path, &config, config_path, tx_config).await?;
+
+    let port = match rx_config.await {
+        Ok(port) => port,
+        Err(_) => {
+            // We know this here because the sender has dropped which should only happen
+            // if the spawned task that is scanning Holochain output has stopped
+            return Err(anyhow!("Holochain process has exited"));
+        }
+    };
+
     Ok((port, child, lair))
 }
 
@@ -142,7 +148,7 @@ async fn start_holochain(
         .arg(config_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
     let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
@@ -201,18 +207,8 @@ async fn check_lair_running(stdout: tokio::process::ChildStdout) {
     let _ = r.await;
 }
 
-// TODO: Find a better way to confirm the child is running.
-async fn check_started(holochain: &mut Child) {
-    let started =
-        tokio::time::timeout(std::time::Duration::from_millis(20), holochain.wait()).await;
-    if let Ok(status) = started {
-        panic!("Holochain failed to start. status: {:?}", status);
-    }
-}
-
 fn spawn_output(holochain: &mut Child, config: oneshot::Sender<u16>) {
     let stdout = holochain.stdout.take();
-    let stderr = holochain.stderr.take();
     tokio::task::spawn(async move {
         let mut needs_setup = true;
         let mut config = Some(config);
@@ -234,14 +230,6 @@ fn spawn_output(holochain: &mut Child, config: oneshot::Sender<u16>) {
                     }
                 }
                 println!("{}", line);
-            }
-        }
-    });
-    tokio::task::spawn(async move {
-        if let Some(stderr) = stderr {
-            let mut reader = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                eprintln!("{}", line);
             }
         }
     });

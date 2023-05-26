@@ -2,10 +2,10 @@ use ::fixt::prelude::*;
 use anyhow::Result;
 use futures::future;
 use hdk::prelude::RemoteSignal;
-use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetDnaFile;
+use holochain::sweettest::{SweetAgents, SweetConductorConfig};
 use holochain::{
     conductor::{
         api::{AdminRequest, AdminResponse},
@@ -656,7 +656,8 @@ async fn concurrent_install_dna() {
 async fn network_stats() {
     holochain_trace::test_run().ok();
 
-    let mut batch = SweetConductorBatch::from_standard_config(2).await;
+    let mut batch =
+        SweetConductorBatch::from_config_rendezvous(2, SweetConductorConfig::rendezvous()).await;
 
     let dna_file = SweetDnaFile::unique_empty().await;
 
