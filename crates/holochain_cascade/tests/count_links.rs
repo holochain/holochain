@@ -10,6 +10,7 @@ use holochain_state::scratch::Scratch;
 use holochain_types::link::{CountLinksResponse, WireLinkQuery};
 use holochain_zome_types::{fake_agent_pub_key, ChainTopOrdering};
 
+// Checks that links can be counted by asking a remote peer who is an authority on the base for the count
 #[tokio::test(flavor = "multi_thread")]
 async fn count_links_not_authority() {
     holochain_trace::test_run().ok();
@@ -46,6 +47,7 @@ async fn count_links_not_authority() {
     assert_eq!(count, 0);
 }
 
+// Checks that network access is not required for an authority, the agent can count links locally
 #[tokio::test(flavor = "multi_thread")]
 async fn count_links_authority() {
     holochain_trace::test_run().ok();
@@ -87,6 +89,8 @@ async fn count_links_authority() {
     assert_eq!(count, 0);
 }
 
+// Checks that locally authored data that hasn't yet been published to the network is included in the link count
+// seen by the agent doing the publish
 #[tokio::test(flavor = "multi_thread")]
 async fn count_links_authoring() {
     holochain_trace::test_run().ok();
@@ -111,7 +115,6 @@ async fn count_links_authoring() {
     .unwrap();
 
     // Network
-    // - Not expecting any calls to the network.
     let mut mock = MockHolochainP2pDnaT::new();
     mock.expect_authority_for_hash().returning(|_| Ok(false));
     mock.expect_count_links()
