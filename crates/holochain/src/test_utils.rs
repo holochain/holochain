@@ -9,7 +9,6 @@ use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::publish_dht_ops_workflow::get_ops_to_publish;
 use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
