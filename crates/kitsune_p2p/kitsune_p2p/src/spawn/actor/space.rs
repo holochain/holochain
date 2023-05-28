@@ -932,21 +932,9 @@ impl KitsuneP2pHandler for Space {
         input: actor::RpcMulti,
     ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
         let location = input.basis.get_loc();
-        let local_agents_holding_basis = self
-            .local_joined_agents
-            .keys()
-            .filter(|agent_key| {
-                self.agent_arcs
-                    .get(*agent_key)
-                    .map_or(false, |arc| arc.contains(location))
-            })
-            .cloned()
-            .collect();
-        let fut = rpc_multi_logic::handle_rpc_multi(
-            input,
-            self.ro_inner.clone(),
-            local_agents_holding_basis,
-        );
+        let local_joined_agents = self.local_joined_agents.keys().cloned().collect();
+        let fut =
+            rpc_multi_logic::handle_rpc_multi(input, self.ro_inner.clone(), local_joined_agents);
         Ok(async move { fut.await }.boxed().into())
     }
 
@@ -1461,6 +1449,9 @@ impl Space {
             let i_s_c = i_s.clone();
             let evt_s_c = evt_sender.clone();
             let bootstrap_service = config.bootstrap_service.clone();
+            let bootstrap_check_delay_backoff_multiplier = config
+                .tuning_params
+                .bootstrap_check_delay_backoff_multiplier;
             let space_c = space.clone();
             tokio::task::spawn(async move {
                 const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
@@ -1476,7 +1467,7 @@ impl Space {
 
                     tokio::time::sleep(delay_len).await;
                     if delay_len <= MAX_DELAY {
-                        delay_len *= 2;
+                        delay_len *= bootstrap_check_delay_backoff_multiplier;
                     }
 
                     match super::bootstrap::random(

@@ -23,6 +23,7 @@ use std::time;
 use tracing::*;
 
 mod publish_query;
+pub use publish_query::get_ops_to_publish;
 
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
