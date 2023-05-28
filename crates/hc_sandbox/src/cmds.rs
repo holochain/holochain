@@ -62,10 +62,12 @@ pub struct Network {
     #[command(subcommand)]
     pub transport: NetworkType,
 
-    /// Optionally override arc size
+    /// Optionally lock a specific gossip arc size
     /// possible values: full, empty
+    /// See documentation on KitsuneP2pTuningParams.gossip_arc_clamping
+    /// for usage.
     #[arg(short, long, default_value = "none")]
-    pub arc_clamping: String,
+    pub gossip_arc_clamping: String,
 
     /// Optionally set a bootstrap service URL.
     /// A bootstrap service can used for peers to discover each other without
@@ -200,12 +202,12 @@ impl From<Network> for KitsuneP2pConfig {
     fn from(n: Network) -> Self {
         let Network {
             transport,
-            arc_clamping,
+            gossip_arc_clamping,
             bootstrap,
         } = n;
         let mut kit = KitsuneP2pConfig::default();
         let mut tuning = tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning.gossip_arc_clamping = arc_clamping;
+        tuning.gossip_arc_clamping = gossip_arc_clamping;
         kit.tuning_params = Arc::new(tuning);
         kit.bootstrap_service = bootstrap;
 
