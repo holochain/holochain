@@ -1,8 +1,10 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use clap::Parser;
 use holochain_p2p::kitsune_p2p::KitsuneP2pConfig;
 use holochain_p2p::kitsune_p2p::TransportConfig;
+use holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::tuning_params_struct;
 use url2::Url2;
 
 // This creates a new Holochain sandbox
@@ -59,6 +61,11 @@ pub struct Network {
     /// Set the type of network.
     #[command(subcommand)]
     pub transport: NetworkType,
+
+    /// Optionally override arc size
+    /// possible values: full, empty
+    #[arg(short, long, default_value = "none")]
+    pub arc_clamping: String,
 
     /// Optionally set a bootstrap service URL.
     /// A bootstrap service can used for peers to discover each other without
@@ -193,9 +200,13 @@ impl From<Network> for KitsuneP2pConfig {
     fn from(n: Network) -> Self {
         let Network {
             transport,
+            arc_clamping,
             bootstrap,
         } = n;
         let mut kit = KitsuneP2pConfig::default();
+        let mut tuning = tuning_params_struct::KitsuneP2pTuningParams::default();
+        tuning.gossip_arc_clamping = arc_clamping;
+        kit.tuning_params = Arc::new(tuning);
         kit.bootstrap_service = bootstrap;
 
         match transport {
