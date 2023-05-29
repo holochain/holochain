@@ -179,7 +179,7 @@ async fn count_links_with_filters() {
     query.after = Some(Timestamp::now());
     assert_eq!(0, execute_query(&cascade, query).await);
 
-    // Positive check for `after
+    // Positive check for `after`
     let mut query = td.link_query.clone();
     query.after = Some(Timestamp::MIN);
     assert_eq!(td.links.len(), execute_query(&cascade, query).await);
@@ -189,7 +189,7 @@ async fn count_links_with_filters() {
     query.before = Some(Timestamp::MIN);
     assert_eq!(0, execute_query(&cascade, query).await);
 
-    // Positive check for `before
+    // Positive check for `before`
     let mut query = td.link_query.clone();
     query.before = Some(Timestamp::now());
     assert_eq!(td.links.len(), execute_query(&cascade, query).await);
@@ -199,7 +199,7 @@ async fn count_links_with_filters() {
     query.author = Some(fake_agent_pub_key(2));
     assert_eq!(0, execute_query(&cascade, query).await);
 
-    // Positive check for `author
+    // Positive check for `author`
     let mut query = td.link_query.clone();
     query.author = td.links.first().map(|l| l.author.clone());
     assert_eq!(td.links.len(), execute_query(&cascade, query).await);
