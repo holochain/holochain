@@ -1,10 +1,11 @@
 use crate::record::SignedActionHashed;
 use crate::ChainTopOrdering;
-use holo_hash::ActionHash;
+use holo_hash::{ActionHash, AgentPubKey};
 use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::link::*;
+use kitsune_p2p_timestamp::Timestamp;
 
 #[derive(
     Debug,
@@ -91,53 +92,93 @@ pub struct GetLinksInput {
     /// The link types to include in this get.
     pub link_type: LinkTypeFilter,
     pub tag_prefix: Option<LinkTag>,
+
+    /// Only include links created after this time.
+    pub after: Option<Timestamp>,
+
+    /// Only include links created before this time.
+    pub before: Option<Timestamp>,
+
+    /// Only include links created by this author.
+    pub author: Option<AgentPubKey>,
+
+    /// Number of links to fetch in this batch.
+    ///
+    /// This option is required for the `batch_index` or `previous_batch_end` to be considered.
+    pub batch_size: Option<usize>,
+    /// Index of this batch, 0-based.
+    ///
+    /// This option should not be used with `previous_batch_end` as it will be ignored.
+    ///
+    /// Indexing pages is more resilient to deleted links than `previous_batch_end` but might show you items you've already
+    /// been given for a previous page if previously unknown, older links arrive.
+    pub batch_index: Option<usize>,
+    /// The action hash of the link that was at the end of the previous batch. Pass `None` to get the first page.
+    ///
+    /// Providing the end of the previous batch as an anchor is more resilient to previously unknown, older links arriving.
+    /// There is a downside that if the link is deleted then it won't be possible to determine where the batch starts and the call will fail.
+    /// If your happ uses this mechanism for batching then you might consider consider retrying with the last but one hash from the previous batch.
+    pub previous_batch_end: Option<ActionHash>,
 }
 
 impl GetLinksInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
         link_type: LinkTypeFilter,
-        tag_prefix: Option<LinkTag>,
     ) -> Self {
         Self {
             base_address,
             link_type,
-            tag_prefix,
+            tag_prefix: None,
+            before: None,
+            after: None,
+            author: None,
+            batch_size: None,
+            batch_index: None,
+            previous_batch_end: None,
         }
     }
-}
 
-/// Input for fetching links in batches
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct GetLinksBatchInput {
-    /// Base hash to find links from.
-    pub base_address: holo_hash::AnyLinkableHash,
-    /// Link types to include in this get.
-    pub link_type: LinkTypeFilter,
-    /// Number of links to fetch in this batch.
-    pub batch_size: usize,
-    /// Index of this batch, 0-based.
-    pub batch_index: usize,
-    /// Filter by tag prefix.
-    pub tag_prefix: Option<LinkTag>,
-}
+    /// Filter for links with the given tag prefix.
+    pub fn tag_prefix(mut self, tag_prefix: LinkTag) -> Self {
+        self.tag_prefix = Some(tag_prefix);
+        self
+    }
 
-impl GetLinksBatchInput {
-    /// Create a new instance of `GetLinksBatchInput`.
-    pub fn new(
-        base_address: holo_hash::AnyLinkableHash,
-        link_type: LinkTypeFilter,
-        batch_size: usize,
-        batch_index: usize,
-        tag_prefix: Option<LinkTag>,
-    ) -> Self {
-        Self {
-            base_address,
-            link_type,
-            batch_size,
-            batch_index,
-            tag_prefix,
-        }
+    /// Filter for links created before `before`.
+    pub fn before(mut self, before: Timestamp) -> Self {
+        self.before = Some(before);
+        self
+    }
+
+    /// Filter for links create after `after`.
+    pub fn after(mut self, after: Timestamp) -> Self {
+        self.after = Some(after);
+        self
+    }
+
+    /// Filter for links created by this author.
+    pub fn author(mut self, author: AgentPubKey) -> Self {
+        self.author = Some(author);
+        self
+    }
+
+    /// Set the size of the batch to fetch.
+    pub fn batch_size(mut self, batch_size: usize) -> Self {
+        self.batch_size = Some(batch_size);
+        self
+    }
+
+    /// Set the 0-based batch index to get.
+    pub fn batch_index(mut self, batch_index: usize) -> Self {
+        self.batch_index = Some(batch_index);
+        self
+    }
+
+    /// Set the action hash for the end of the previous batch.
+    pub fn previous_batch_end(mut self, previous_batch_end: ActionHash) -> Self {
+        self.previous_batch_end = Some(previous_batch_end);
+        self
     }
 }
 

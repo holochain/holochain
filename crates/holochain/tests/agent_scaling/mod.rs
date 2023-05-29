@@ -32,7 +32,6 @@ fn links_zome() -> InlineIntegrityZome {
                 Ok(api.get_links(vec![GetLinksInput::new(
                     base,
                     InlineZomeSet::dep_link_filter(&api),
-                    None,
                 )])?)
             },
         )

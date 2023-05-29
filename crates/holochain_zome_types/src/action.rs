@@ -21,6 +21,8 @@ pub enum ActionError {
     WrongActionError(#[from] WrongActionError),
     #[error("{0}")]
     Rebase(String),
+    #[error("Action not found [{0}]")]
+    NotFound(ActionHash)
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]

@@ -31,6 +31,18 @@ pub struct WireLinkKey {
     pub type_query: LinkTypeFilter,
     /// Optionally specify a tag for more specific queries.
     pub tag: Option<LinkTag>,
+    /// Specify a minimum action timestamp to filter results.
+    pub after: Option<Timestamp>,
+    /// Specify a maximum action timestamp to filter results.
+    pub before: Option<Timestamp>,
+    /// Only get links created by this author.
+    pub author: Option<AgentPubKey>,
+    /// The number of links to fetch in this batch.
+    pub batch_size: Option<usize>,
+    /// Index of this batch, 0-based.
+    pub batch_index: Option<usize>,
+    /// The action hash of the link at the end of the previous batch or `None` for the first batch.
+    pub previous_batch_end: Option<ActionHash>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Default)]

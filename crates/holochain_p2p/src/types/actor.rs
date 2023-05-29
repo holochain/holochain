@@ -197,14 +197,6 @@ pub struct GetLinksOptions {
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
-
-    /// ```[Remote]```
-    /// The number of links to fetch in this batch.
-    pub batch_size: Option<usize>,
-
-    /// ```[Remote]```
-    /// Index of this batch, 0-based.
-    pub batch_index: Option<usize>,
 }
 
 #[derive(Debug, Clone)]

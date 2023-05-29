@@ -148,8 +148,12 @@ pub fn get_links(
     let link_type = link_type.try_into_filter()?;
     Ok(HDK
         .with(|h| {
+            let mut input = GetLinksInput::new(base.into(), link_type);
+            if let Some(link_tag) = link_tag {
+                input = input.tag_prefix(link_tag);
+            }
             h.borrow()
-                .get_links(vec![GetLinksInput::new(base.into(), link_type, link_tag)])
+                .get_links(vec![input])
         })?
         .into_iter()
         .next()
@@ -189,8 +193,12 @@ pub fn get_link_details(
     let link_type = link_type.try_into_filter()?;
     Ok(HDK
         .with(|h| {
+            let mut input = GetLinksInput::new(base.into(), link_type);
+            if let Some(link_tag) = link_tag {
+                input = input.tag_prefix(link_tag);
+            }
             h.borrow()
-                .get_link_details(vec![GetLinksInput::new(base.into(), link_type, link_tag)])
+                .get_link_details(vec![input])
         })?
         .into_iter()
         .next()

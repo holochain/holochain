@@ -25,17 +25,30 @@ pub fn get_links<'a>(
         } => {
             let results: Vec<Result<Vec<Link>, RibosomeError>> =
                 tokio_helper::block_forever_on(async move {
-                    futures::stream::iter(inputs.into_iter().map(|input| async {
+                    let call_context_iter = std::iter::from_fn(|| Some(call_context.clone()));
+                    futures::stream::iter(std::iter::zip(inputs.into_iter(), call_context_iter).map(|(input, call_context)| async move {
                         let GetLinksInput {
                             base_address,
                             link_type,
                             tag_prefix,
+                            after,
+                            before,
+                            author,
+                            batch_size,
+                            batch_index,
+                            previous_batch_end,
                         } = input;
 
                         let key = WireLinkKey {
                             base: base_address,
                             type_query: link_type,
                             tag: tag_prefix,
+                            after,
+                            before,
+                            author,
+                            batch_size,
+                            batch_index,
+                            previous_batch_end,
                         };
                         Ok(CascadeImpl::from_workspace_and_network(
                             &call_context.host_context.workspace(),

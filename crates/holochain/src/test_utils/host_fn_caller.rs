@@ -384,7 +384,10 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<Link> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, type_query, link_tag);
+        let mut input = GetLinksInput::new(base, type_query);
+        if let Some(link_tag) = link_tag {
+            input = input.tag_prefix(link_tag);
+        }
         let output = {
             host_fn::get_links::get_links(ribosome, call_context, vec![input])
                 .unwrap()
@@ -407,7 +410,7 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInput::new(base, type_query, Some(tag));
+        let input = GetLinksInput::new(base, type_query).tag_prefix(tag);
         let output = {
             host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
                 .unwrap()
