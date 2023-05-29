@@ -41,10 +41,10 @@ use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::dht_op::WireOps;
-use holochain_types::link::WireLinkKey;
 use holochain_types::link::WireLinkOps;
+use holochain_types::link::{WireLinkKey, WireLinkQuery};
 use holochain_types::metadata::MetadataSet;
-use holochain_types::prelude::WireEntryOps;
+use holochain_types::prelude::{CountLinksResponse, WireEntryOps};
 use holochain_types::record::WireRecordOps;
 use holochain_types::test_utils::chain::*;
 use holochain_zome_types::zome_io::Nonce256Bits;
@@ -55,6 +55,7 @@ use holochain_zome_types::Timestamp;
 use holochain_zome_types::ValidationStatus;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
+use std::collections::HashSet;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;
@@ -153,6 +154,26 @@ impl HolochainP2pDnaT for PassThroughNetwork {
             out.push(r);
         }
         Ok(out)
+    }
+
+    async fn count_links(
+        &self,
+        query: WireLinkQuery,
+    ) -> actor::HolochainP2pResult<CountLinksResponse> {
+        let mut out = HashSet::new();
+
+        for env in &self.envs {
+            let r = authority::handle_get_links_query(env.clone(), query.clone())
+                .await
+                .map_err(|e| HolochainP2pError::Other(e.into()))?;
+            out.extend(r);
+        }
+
+        Ok(CountLinksResponse::new(
+            out.into_iter()
+                .map(|l| l.create_link_hash)
+                .collect::<Vec<_>>(),
+        ))
     }
 
     async fn get_agent_activity(
@@ -371,6 +392,13 @@ impl HolochainP2pDnaT for MockNetwork {
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<WireLinkOps>> {
         self.0.lock().await.get_links(link_key, options).await
+    }
+
+    async fn count_links(
+        &self,
+        query: WireLinkQuery,
+    ) -> actor::HolochainP2pResult<CountLinksResponse> {
+        self.0.lock().await.count_links(query).await
     }
 
     async fn get_agent_activity(

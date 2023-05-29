@@ -87,7 +87,7 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
 
 /// `do_api` wrapper for the `put` op.
 ///
-/// Input must be an AgentInfoSigned with a valid siganture otherwise the remote service will not
+/// Input must be an AgentInfoSigned with a valid signature otherwise the remote service will not
 /// accept the data.
 pub async fn put(
     url: Option<Url2>,

@@ -1,3 +1,4 @@
+use crate::query::link::GetLinksFilter;
 use holo_hash::*;
 use holochain_zome_types::*;
 use std::fmt::Debug;
@@ -13,7 +14,7 @@ pub struct GetLinkDetailsQuery {
 impl GetLinkDetailsQuery {
     pub fn new(base: AnyLinkableHash, type_query: LinkTypeFilter, tag: Option<LinkTag>) -> Self {
         Self {
-            query: LinksQuery::new(base, type_query, tag),
+            query: LinksQuery::new(base, type_query, tag, GetLinksFilter::default()),
         }
     }
 }

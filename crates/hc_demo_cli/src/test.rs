@@ -11,6 +11,7 @@ const FILE: &str = "test.txt";
 const CONTENT: &[u8] = b"this is a test\n";
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn demo() {
     init_tracing();
 

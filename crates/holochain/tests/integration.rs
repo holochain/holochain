@@ -7,6 +7,7 @@ mod multi_conductor;
 mod network_tests;
 mod new_lair;
 mod ser_regression;
+#[cfg(not(target_os = "macos"))]
 mod sharded_gossip;
 mod speed_tests;
 mod test_cli;

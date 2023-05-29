@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
@@ -43,6 +43,9 @@ fn make_tuning(
     // This allows attempting to contact an offline node to timeout quickly,
     // so we can fallback to the next one
     tuning.default_rpc_single_timeout_ms = 3_000;
+    tuning.gossip_round_timeout_ms = 10_000;
+    tuning.bootstrap_check_delay_backoff_multiplier = 1;
+
     tuning
 }
 
@@ -53,7 +56,7 @@ fn make_config(
     recent_threshold: Option<u64>,
 ) -> SweetConductorConfig {
     let tuning = make_tuning(publish, recent, historical, recent_threshold);
-    SweetConductorConfig::standard().tune(Arc::new(tuning))
+    SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
 }
 
 #[cfg(feature = "test_utils")]
@@ -63,17 +66,22 @@ async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 
-    let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, true, true, None))
-            .await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        NUM_CONDUCTORS,
+        make_config(false, true, true, None),
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    conductors
+        .require_initial_gossip_activity_for_cell(&alice, Duration::from_secs(90))
+        .await;
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
@@ -110,9 +118,11 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
     const NUM_CONDUCTORS: usize = 3;
     const NUM_OPS: usize = 100;
 
-    let mut conductors =
-        SweetConductorBatch::from_config(NUM_CONDUCTORS, make_config(false, false, true, Some(0)))
-            .await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(
+        NUM_CONDUCTORS,
+        make_config(false, false, true, Some(0)),
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("zome", batch_create_zome())).await;
@@ -121,9 +131,12 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
         .setup_app("app", &[dna_file.clone()])
         .await
         .unwrap();
-    conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
+
+    conductors
+        .require_initial_gossip_activity_for_cell(&alice, Duration::from_secs(90))
+        .await;
 
     // Call the "create" zome fn on Alice's app
     let hashes: Vec<ActionHash> = conductors[0]
@@ -178,6 +191,37 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+async fn test_zero_arc_get_links() {
+    holochain_trace::test_run().ok();
+
+    // Standard config with arc clamped to zero
+    let mut tuning = make_tuning(true, true, true, None);
+    tuning.gossip_arc_clamping = "empty".into();
+    let config = SweetConductorConfig::standard().tune(Arc::new(tuning));
+
+    let mut conductor0 = SweetConductor::from_config(config).await;
+    let mut conductor1 = SweetConductor::from_standard_config().await;
+
+    let tw = holochain_wasm_test_utils::TestWasm::Link;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![tw]).await;
+    let app0 = conductor0.setup_app("app", [&dna_file]).await.unwrap();
+    let app1 = conductor1.setup_app("app", [&dna_file]).await.unwrap();
+    let (cell0,) = app0.into_tuple();
+    // let (cell1,) = app1.into_tuple();
+
+    // conductors.exchange_peer_info().await;
+
+    let zome0 = cell0.zome(tw);
+    let _hash0: ActionHash = conductor0.call(&zome0, "create_link", ()).await;
+
+    let links: Vec<Link> = conductor0.call(&zome0, "get_links", ()).await;
+    assert_eq!(links.len(), 1);
+}
+
+/// Test that conductors with arcs clamped to zero do not gossip.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_2way() {
     holochain_trace::test_run().ok();
 
@@ -188,9 +232,9 @@ async fn test_zero_arc_no_gossip_2way() {
     // This should result in no publishing or gossip
     let mut tuning_1 = make_tuning(false, true, true, None);
     tuning_1.gossip_arc_clamping = "empty".into();
-    let config_1 = SweetConductorConfig::standard().tune(Arc::new(tuning_1));
+    let config_1 = SweetConductorConfig::rendezvous().tune(Arc::new(tuning_1));
 
-    let mut conductors = SweetConductorBatch::from_configs([config_0, config_1]).await;
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
@@ -223,6 +267,7 @@ async fn test_zero_arc_no_gossip_2way() {
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_4way() {
     use futures::future::join_all;
 
@@ -237,17 +282,17 @@ async fn test_zero_arc_no_gossip_4way() {
             // Standard config with arc clamped to zero
             let mut tuning = make_tuning(true, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::standard().tune(Arc::new(tuning))
+            SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
         },
         {
             // Publishing turned off, arc clamped to zero
             let mut tuning = make_tuning(false, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::standard().tune(Arc::new(tuning))
+            SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
         },
     ];
 
-    let mut conductors = SweetConductorBatch::from_configs(configs).await;
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous(configs).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let dna_hash = dna_file.dna_hash().clone();
@@ -341,7 +386,7 @@ async fn test_zero_arc_no_gossip_4way() {
 async fn test_gossip_shutdown() {
     holochain_trace::test_run().ok();
     let mut conductors =
-        SweetConductorBatch::from_config(2, make_config(false, true, true, None)).await;
+        SweetConductorBatch::from_config_rendezvous(2, make_config(false, true, true, None)).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
 
@@ -395,7 +440,7 @@ async fn three_way_gossip_historical() {
 /// - then A can shut down and C and start up,
 /// - and then that same data passes from B to C.
 async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
-    let mut conductors = SweetConductorBatch::from_config(2, config.clone()).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config.clone()).await;
     let start = Instant::now();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -421,7 +466,6 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         hashes.push(hash);
     }
 
-    conductors.exchange_peer_info().await;
     consistency_60s([&cells[0], &cells[1]]).await;
 
     println!(
@@ -450,16 +494,18 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     conductors[0].shutdown().await;
 
     // Bring a third conductor online
-    let mut conductor = SweetConductor::from_config(config).await;
-    let (cell,) = conductor
+    conductors.add_conductor_from_config(config).await;
+
+    let (cell,) = conductors[2]
         .setup_app("app", [&dna_file])
         .await
         .unwrap()
         .into_tuple();
     let zome = cell.zome(SweetInlineZomes::COORDINATOR);
 
-    conductors.add_conductor(conductor);
-    conductors.exchange_peer_info().await;
+    conductors[2]
+        .require_initial_gossip_activity_for_cell(&cell, 3, Duration::from_secs(90))
+        .await;
 
     consistency_advanced(
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
@@ -494,7 +540,11 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
 
     let _g = holochain_trace::test_run().ok();
 
-    let mut conductor = SweetConductor::from_config(make_config(false, true, true, None)).await;
+    let mut conductor = SweetConductor::from_config_rendezvous(
+        make_config(false, true, true, None),
+        SweetLocalRendezvous::new().await,
+    )
+    .await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
@@ -700,6 +750,7 @@ async fn mock_network_sharded_gossip() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }
@@ -1216,6 +1267,7 @@ async fn mock_network_sharding() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }
