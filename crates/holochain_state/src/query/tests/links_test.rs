@@ -71,6 +71,7 @@ fn fixtures(env: DbWrite<DbKindDht>, n: usize) -> Vec<TestData> {
             link_add.base_address.clone(),
             LinkTypeFilter::single_dep(zome_index),
             Some(link_add.tag.clone()),
+            GetLinksFilter::default(),
         );
         let query_no_tag = GetLinksQuery::base(link_add.base_address.clone(), vec![zome_index]);
 
@@ -151,6 +152,7 @@ impl TestData {
             self.base_hash.clone().into(),
             LinkTypeFilter::single_type(self.zome_index, self.link_type),
             None,
+            GetLinksFilter::default(),
         );
         let val = fresh_reader_test(self.env.clone(), |txn| {
             query
@@ -166,7 +168,12 @@ impl TestData {
     }
 
     fn is_on_type_query<'a>(&'a self, type_query: LinkTypeFilter, test: &'static str) {
-        let query = GetLinksQuery::new(self.base_hash.clone().into(), type_query, None);
+        let query = GetLinksQuery::new(
+            self.base_hash.clone().into(),
+            type_query,
+            None,
+            GetLinksFilter::default(),
+        );
         let val = fresh_reader_test(self.env.clone(), |txn| {
             query
                 .run(DbScratch::new(&[&txn], &self.scratch))
@@ -189,6 +196,7 @@ impl TestData {
             self.base_hash.clone().into(),
             LinkTypeFilter::single_type(self.zome_index, self.link_type),
             Some(half_tag),
+            GetLinksFilter::default(),
         );
         let val = fresh_reader_test(self.env.clone(), |txn| {
             query.run(DbScratch::new(&[&txn], &self.scratch)).unwrap()
@@ -205,6 +213,7 @@ impl TestData {
             self.base_hash.clone().into(),
             LinkTypeFilter::single_type(self.zome_index, self.link_type),
             Some(half_tag),
+            GetLinksFilter::default(),
         );
         let val = fresh_reader_test(self.env.clone(), |txn| {
             query
@@ -282,6 +291,7 @@ impl TestData {
                 base_hash.clone().into(),
                 LinkTypeFilter::single_type(d.zome_index, d.link_type),
                 None,
+                GetLinksFilter::default(),
             );
             fresh_reader_test(d.env.clone(), |txn| {
                 val.extend(
@@ -310,7 +320,12 @@ impl TestData {
             .iter()
             .map(|d| d.expected_link.clone())
             .collect::<HashSet<_>>();
-        let query = GetLinksQuery::new(base_hash.clone().into(), query.into(), None);
+        let query = GetLinksQuery::new(
+            base_hash.clone().into(),
+            query.into(),
+            None,
+            GetLinksFilter::default(),
+        );
         let val: HashSet<_> = fresh_reader_test(td[0].env.clone(), |txn| {
             query.run(DbScratch::new(&[&txn], &scratch)).unwrap()
         })
@@ -337,6 +352,7 @@ impl TestData {
             base_hash.into(),
             LinkTypeFilter::single_dep(zome_index),
             Some(tag),
+            GetLinksFilter::default(),
         );
         let mut val = Vec::new();
         for d in td {
@@ -373,6 +389,7 @@ impl TestData {
             base_hash.into(),
             LinkTypeFilter::single_dep(zome_index),
             Some(half_tag),
+            GetLinksFilter::default(),
         );
         let mut val = Vec::new();
         for d in td {
@@ -613,6 +630,7 @@ async fn links_on_same_base() {
             base_hash.clone().into(),
             LinkTypeFilter::single_dep(d.zome_index),
             Some(d.tag.clone()),
+            GetLinksFilter::default(),
         );
         d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), vec![d.zome_index]);
     }
@@ -717,6 +735,7 @@ async fn links_on_same_tag() {
             base_hash.clone().into(),
             LinkTypeFilter::single_dep(d.zome_index),
             Some(tag.clone()),
+            GetLinksFilter::default(),
         );
         d.query_no_tag = GetLinksQuery::base(base_hash.clone().into(), vec![d.zome_index]);
     }

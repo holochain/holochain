@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add new HDK function `count_links` which accepts a filter that can be applied remotely. This is a more optimal alternative to requesting all links and counting them within a zome function.
+
 ## 0.3.0-beta-dev.1
 
 ## 0.3.0-beta-dev.0
