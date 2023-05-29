@@ -90,18 +90,52 @@ pub struct GetLinksInput {
     pub base_address: holo_hash::AnyLinkableHash,
     /// The link types to include in this get.
     pub link_type: LinkTypeFilter,
-    pub tag_prefix: Option<crate::link::LinkTag>,
+    pub tag_prefix: Option<LinkTag>,
 }
 
 impl GetLinksInput {
     pub fn new(
         base_address: holo_hash::AnyLinkableHash,
         link_type: LinkTypeFilter,
-        tag_prefix: Option<crate::link::LinkTag>,
+        tag_prefix: Option<LinkTag>,
     ) -> Self {
         Self {
             base_address,
             link_type,
+            tag_prefix,
+        }
+    }
+}
+
+/// Input for fetching links in batches
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct GetLinksBatchInput {
+    /// Base hash to find links from.
+    pub base_address: holo_hash::AnyLinkableHash,
+    /// Link types to include in this get.
+    pub link_type: LinkTypeFilter,
+    /// Number of links to fetch in this batch.
+    pub batch_size: usize,
+    /// Index of this batch, 0-based.
+    pub batch_index: usize,
+    /// Filter by tag prefix.
+    pub tag_prefix: Option<LinkTag>,
+}
+
+impl GetLinksBatchInput {
+    /// Create a new instance of `GetLinksBatchInput`.
+    pub fn new(
+        base_address: holo_hash::AnyLinkableHash,
+        link_type: LinkTypeFilter,
+        batch_size: usize,
+        batch_index: usize,
+        tag_prefix: Option<LinkTag>,
+    ) -> Self {
+        Self {
+            base_address,
+            link_type,
+            batch_size,
+            batch_index,
             tag_prefix,
         }
     }
