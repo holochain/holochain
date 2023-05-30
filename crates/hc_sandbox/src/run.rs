@@ -9,6 +9,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
+use holochain_trace::Output;
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
@@ -39,9 +40,10 @@ pub async fn run(
     conductor_index: usize,
     app_ports: Vec<u16>,
     force_admin_port: Option<u16>,
+    structured: Output,
 ) -> anyhow::Result<()> {
     let (admin_port, mut holochain, lair) =
-        run_async(holochain_path, sandbox_path.clone(), force_admin_port).await?;
+        run_async(holochain_path, sandbox_path.clone(), force_admin_port, structured).await?;
     let mut launch_info = LaunchInfo::from_admin_port(admin_port);
     for app_port in app_ports {
         let mut cmd = CmdRunner::try_new(admin_port).await?;
@@ -85,6 +87,7 @@ pub async fn run_async(
     holochain_path: &Path,
     sandbox_path: PathBuf,
     force_admin_port: Option<u16>,
+    structured: Output,
 ) -> anyhow::Result<(u16, Child, Option<Child>)> {
     let mut config = match read_config(sandbox_path.clone())? {
         Some(c) => c,
@@ -104,7 +107,7 @@ pub async fn run_async(
     }
     let config_path = write_config(sandbox_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
-    let (child, lair) = start_holochain(holochain_path, &config, config_path, tx_config).await?;
+    let (child, lair) = start_holochain(holochain_path, &config, config_path, structured, tx_config).await?;
 
     let port = match rx_config.await {
         Ok(port) => port,
@@ -122,6 +125,7 @@ async fn start_holochain(
     holochain_path: &Path,
     config: &ConductorConfig,
     config_path: PathBuf,
+    structured: Output,
     tx_config: oneshot::Sender<u16>,
 ) -> anyhow::Result<(Child, Option<Child>)> {
     use tokio::io::AsyncWriteExt;
@@ -141,9 +145,9 @@ async fn start_holochain(
 
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let mut cmd = Command::new(holochain_path);
-    cmd.arg("--structured")
-        // .env("RUST_LOG", "trace")
+    cmd
         .arg("--piped")
+        .arg(format!("--structured={}", structured))
         .arg("--config-path")
         .arg(config_path)
         .stdin(Stdio::piped())

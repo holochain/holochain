@@ -82,6 +82,7 @@ use tracing_subscriber::{
 };
 
 use std::{str::FromStr, sync::Once};
+use derive_more::Display;
 
 use flames::{toml_path, FlameTimed};
 use fmt::*;
@@ -99,7 +100,7 @@ pub mod metrics;
 
 pub use tracing;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Display)]
 /// Sets the kind of structured logging output you want
 pub enum Output {
     /// More compact version of above
