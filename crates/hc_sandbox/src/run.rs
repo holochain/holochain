@@ -5,11 +5,11 @@ use std::path::Path;
 use std::{path::PathBuf, process::Stdio};
 
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
+use holochain_trace::Output;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
-use holochain_trace::Output;
 
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
@@ -42,8 +42,13 @@ pub async fn run(
     force_admin_port: Option<u16>,
     structured: Output,
 ) -> anyhow::Result<()> {
-    let (admin_port, mut holochain, lair) =
-        run_async(holochain_path, sandbox_path.clone(), force_admin_port, structured).await?;
+    let (admin_port, mut holochain, lair) = run_async(
+        holochain_path,
+        sandbox_path.clone(),
+        force_admin_port,
+        structured,
+    )
+    .await?;
     let mut launch_info = LaunchInfo::from_admin_port(admin_port);
     for app_port in app_ports {
         let mut cmd = CmdRunner::try_new(admin_port).await?;
@@ -107,7 +112,8 @@ pub async fn run_async(
     }
     let config_path = write_config(sandbox_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
-    let (child, lair) = start_holochain(holochain_path, &config, config_path, structured, tx_config).await?;
+    let (child, lair) =
+        start_holochain(holochain_path, &config, config_path, structured, tx_config).await?;
 
     let port = match rx_config.await {
         Ok(port) => port,
@@ -145,8 +151,7 @@ async fn start_holochain(
 
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let mut cmd = Command::new(holochain_path);
-    cmd
-        .arg("--piped")
+    cmd.arg("--piped")
         .arg(format!("--structured={}", structured))
         .arg("--config-path")
         .arg(config_path)

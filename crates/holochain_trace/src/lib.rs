@@ -81,8 +81,8 @@ use tracing_subscriber::{
     FmtSubscriber,
 };
 
-use std::{str::FromStr, sync::Once};
 use derive_more::Display;
+use std::{str::FromStr, sync::Once};
 
 use flames::{toml_path, FlameTimed};
 use fmt::*;

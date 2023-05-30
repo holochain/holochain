@@ -1,8 +1,8 @@
 //! Common use sandboxes with lots of default choices.
 
+use holochain_trace::Output;
 use std::path::Path;
 use std::path::PathBuf;
-use holochain_trace::Output;
 
 use holochain_types::prelude::InstalledAppId;
 

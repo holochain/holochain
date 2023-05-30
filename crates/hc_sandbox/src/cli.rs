@@ -2,11 +2,11 @@
 
 use crate::cmds::*;
 use clap::{ArgAction, Parser};
+use holochain_trace::Output;
 use holochain_types::prelude::InstalledAppId;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::path::PathBuf;
-use holochain_trace::Output;
 
 const DEFAULT_APP_ID: &str = "test-app";
 
@@ -124,7 +124,14 @@ impl HcSandbox {
                 run,
                 happ,
             } => {
-                let paths = generate(&self.holochain_path, happ, create, app_id, self.structured.clone()).await?;
+                let paths = generate(
+                    &self.holochain_path,
+                    happ,
+                    create,
+                    app_id,
+                    self.structured.clone(),
+                )
+                .await?;
                 for (port, path) in self
                     .force_admin_ports
                     .clone()
@@ -139,7 +146,8 @@ impl HcSandbox {
                     let structured = self.structured.clone();
                     tokio::task::spawn(async move {
                         if let Err(e) =
-                            run_n(&holochain_path, paths, ports, force_admin_ports, structured).await
+                            run_n(&holochain_path, paths, ports, force_admin_ports, structured)
+                                .await
                         {
                             tracing::error!(failed_to_run = ?e);
                         }
@@ -156,7 +164,15 @@ impl HcSandbox {
                 let holochain_path = self.holochain_path.clone();
                 let force_admin_ports = self.force_admin_ports.clone();
                 tokio::task::spawn(async move {
-                    if let Err(e) = run_n(&holochain_path, paths, ports, force_admin_ports, self.structured).await {
+                    if let Err(e) = run_n(
+                        &holochain_path,
+                        paths,
+                        ports,
+                        force_admin_ports,
+                        self.structured,
+                    )
+                    .await
+                    {
                         tracing::error!(failed_to_run = ?e);
                     }
                 });
@@ -233,7 +249,15 @@ async fn run_n(
                          ports,
                          force_admin_port,
                          structured| async move {
-        crate::run::run(&holochain_path, path, index, ports, force_admin_port, structured).await?;
+        crate::run::run(
+            &holochain_path,
+            path,
+            index,
+            ports,
+            force_admin_port,
+            structured,
+        )
+        .await?;
         Result::<_, anyhow::Error>::Ok(())
     };
     let mut force_admin_ports = force_admin_ports.into_iter();
