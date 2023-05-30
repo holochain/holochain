@@ -4,7 +4,7 @@ use holo_hash::bytes_to_hex;
 use holochain_serialized_bytes::prelude::*;
 
 /// Newtype for the bytes comprising an App entry
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AppEntryBytes(pub SerializedBytes);
 

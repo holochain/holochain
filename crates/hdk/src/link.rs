@@ -196,3 +196,7 @@ pub fn get_link_details(
         .next()
         .unwrap())
 }
+
+pub fn count_links(query: LinkQuery) -> ExternResult<usize> {
+    HDK.with(|h| h.borrow().count_links(query))
+}

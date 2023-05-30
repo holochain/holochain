@@ -5,12 +5,14 @@ use std::collections::HashSet;
 
 use crate::action::ActionType;
 use crate::action::EntryType;
+use crate::timestamp::Timestamp;
 use crate::warrant::Warrant;
 use crate::ActionHashed;
 use crate::Record;
-use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
+use holochain_integrity_types::{LinkTag, LinkTypeFilter};
 pub use holochain_serialized_bytes::prelude::*;
 
 /// Defines several ways that queries can be restricted to a range.
@@ -84,6 +86,28 @@ pub struct ChainQueryFilter {
     /// The query should be ordered in descending order (default is ascending),
     /// when run as a database query. There is no provisioning for in-memory ordering.
     pub order_descending: bool,
+}
+
+/// A query for links to be used with host functions that support filtering links
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+pub struct LinkQuery {
+    /// The base to find links from.
+    pub base: AnyLinkableHash,
+
+    /// Filter by the link type.
+    pub link_type: LinkTypeFilter,
+
+    /// Filter by tag prefix.
+    pub tag_prefix: Option<LinkTag>,
+
+    /// Only include links created before this time.
+    pub before: Option<Timestamp>,
+
+    /// Only include links created after this time.
+    pub after: Option<Timestamp>,
+
+    /// Only include links created by this author.
+    pub author: Option<AgentPubKey>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -347,6 +371,44 @@ impl ChainQueryFilter {
             .into_iter()
             .filter(|record| action_hashset.contains(record.action_address()))
             .collect()
+    }
+}
+
+impl LinkQuery {
+    /// Create a new link query for a base and link type
+    pub fn new(base: impl Into<AnyLinkableHash>, link_type: LinkTypeFilter) -> Self {
+        LinkQuery {
+            base: base.into(),
+            link_type,
+            tag_prefix: None,
+            before: None,
+            after: None,
+            author: None,
+        }
+    }
+
+    /// Filter by tag prefix.
+    pub fn tag_prefix(mut self, tag_prefix: LinkTag) -> Self {
+        self.tag_prefix = Some(tag_prefix);
+        self
+    }
+
+    /// Filter for links created before `before`.
+    pub fn before(mut self, before: Timestamp) -> Self {
+        self.before = Some(before);
+        self
+    }
+
+    /// Filter for links create after `after`.
+    pub fn after(mut self, after: Timestamp) -> Self {
+        self.after = Some(after);
+        self
+    }
+
+    /// Filter for links created by this author.
+    pub fn author(mut self, author: AgentPubKey) -> Self {
+        self.author = Some(author);
+        self
     }
 }
 

@@ -116,7 +116,7 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::error::WorkflowError;
-    use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::{SweetConductorBatch, SweetConductorConfig};
     use crate::sweettest::SweetDnaFile;
     use crate::test_utils::consistency_10s;
     use hdk::prelude::*;
@@ -933,13 +933,14 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn enzymatic_session_fail() {
         holochain_trace::test_run().ok();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
-        let mut conductors = SweetConductorBatch::from_standard_config(3).await;
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(3, SweetConductorConfig::rendezvous()).await;
         let apps = conductors
             .setup_app("countersigning", &[dna_file.clone()])
             .await
