@@ -110,14 +110,14 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     -- This is required as a field because different ops have different EntryTypes,
     -- which have different numbers of required validation receipts.
     receipts_complete   INTEGER     NULL,     -- BOOLEAN
-    
+
     last_publish_time   INTEGER     NULL,   -- UNIX TIMESTAMP SECONDS
 
     -- 0: Awaiting System Validation Dependencies.
     -- 1: Successfully System Validated (And ready for app validation).
     -- 2: Awaiting App Validation Dependencies.
     -- 3: Awaiting integration.
-    -- Don't need the other stages (pending, awaiting itntegration) because:
+    -- Don't need the other stages (pending, awaiting integration) because:
     -- - pending = validation_stage null && validation_status null.
     -- We could make this an enum and use a Blob so we can capture which
     -- deps are being awaited for debugging.

@@ -9,6 +9,7 @@ use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::workflow::publish_dht_ops_workflow::get_ops_to_publish;
 use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
@@ -41,6 +42,7 @@ use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -49,16 +51,18 @@ use tokio::sync::mpsc;
 
 pub use itertools;
 
-use crate::sweettest::SweetCell;
-
 pub mod conductor_setup;
 pub mod consistency;
 pub mod host_fn_caller;
 pub mod inline_zomes;
 pub mod network_simulation;
 
-mod wait_for_any;
-pub use wait_for_any::*;
+mod wait_for;
+pub use wait_for::*;
+
+pub use crate::sweettest::sweet_consistency::*;
+
+use self::consistency::request_published_ops;
 
 /// Produce file and line number info at compile-time
 #[macro_export]
@@ -293,7 +297,10 @@ where
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let dna_network = network.to_dna(dna.clone(), None);
-    network.join(dna.clone(), agent_key, None).await.unwrap();
+    network
+        .join(dna.clone(), agent_key, None, None)
+        .await
+        .unwrap();
     TestNetwork::new(network, respond_task, dna_network, check_op_data_calls)
 }
 
@@ -309,7 +316,7 @@ pub async fn install_app(
     }
     conductor_handle
         .clone()
-        .install_app(name.to_string(), cell_data)
+        .install_app_legacy(name.to_string(), cell_data)
         .await
         .unwrap();
 
@@ -331,7 +338,8 @@ pub async fn install_app(
 pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<MembraneProof>)>;
 
 /// One of various ways to setup an app, used somewhere...
-pub async fn setup_app(
+pub async fn setup_app_in_new_conductor(
+    installed_app_id: InstalledAppId,
     dnas: Vec<DnaFile>,
     cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
@@ -342,19 +350,37 @@ pub async fn setup_app(
         .await
         .unwrap();
 
+    install_app_in_conductor(conductor_handle.clone(), installed_app_id, dnas, cell_data).await;
+
+    let handle = conductor_handle.clone();
+
+    (
+        Arc::new(db_dir),
+        RealAppInterfaceApi::new(conductor_handle),
+        handle,
+    )
+}
+
+/// Install an app into an existing conductor instance
+pub async fn install_app_in_conductor(
+    conductor_handle: ConductorHandle,
+    installed_app_id: InstalledAppId,
+    dnas: Vec<DnaFile>,
+    cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
+) {
     for dna in dnas {
         conductor_handle.register_dna(dna).await.unwrap();
     }
 
     conductor_handle
         .clone()
-        .install_app("test app".to_string(), cell_data)
+        .install_app_legacy(installed_app_id.clone(), cell_data)
         .await
         .unwrap();
 
     conductor_handle
         .clone()
-        .enable_app("test app".to_string())
+        .enable_app(installed_app_id)
         .await
         .unwrap();
 
@@ -365,14 +391,6 @@ pub async fn setup_app(
         .unwrap();
 
     assert!(errors.is_empty());
-
-    let handle = conductor_handle.clone();
-
-    (
-        Arc::new(db_dir),
-        RealAppInterfaceApi::new(conductor_handle),
-        handle,
-    )
 }
 
 /// Setup an app for testing
@@ -436,127 +454,8 @@ pub fn warm_wasm_tests() {
     }
 }
 
-/// Number of ops per sourechain change
-pub struct WaitOps;
-
-#[allow(missing_docs)]
-impl WaitOps {
-    pub const GENESIS: usize = 7;
-    pub const INIT: usize = 2;
-    pub const CAP_TOKEN: usize = 2;
-    pub const ENTRY: usize = 3;
-    pub const LINK: usize = 3;
-    pub const DELETE_LINK: usize = 2;
-    pub const UPDATE: usize = 5;
-    pub const DELETE: usize = 4;
-
-    /// Added the app but haven't made any zome calls
-    /// so init hasn't happened.
-    pub const fn cold_start() -> usize {
-        Self::GENESIS
-    }
-
-    /// Genesis and init.
-    pub const fn start() -> usize {
-        Self::GENESIS + Self::INIT
-    }
-
-    /// Start but there's a cap grant in init.
-    pub const fn start_with_cap() -> usize {
-        Self::GENESIS + Self::INIT + Self::CAP_TOKEN
-    }
-
-    /// Path to a set depth.
-    /// This doesn't take into account paths
-    /// with sharding strategy.
-    pub const fn path(depth: usize) -> usize {
-        Self::ENTRY + (Self::LINK + Self::ENTRY) * depth
-    }
-}
-
-/// Wait for all cells to reach consistency for 10 seconds
-pub async fn consistency_10s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency for 10 seconds,
-/// with the option to specify that some cells are offline.
-pub async fn consistency_10s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    consistency_advanced(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency for 60 seconds
-pub async fn consistency_60s<'a, I: IntoIterator<Item = &'a SweetCell>>(all_cells: I) {
-    const NUM_ATTEMPTS: usize = 60;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_secs(1);
-    consistency(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency for 60 seconds,
-/// with the option to specify that some cells are offline.
-pub async fn consistency_60s_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-) {
-    const NUM_ATTEMPTS: usize = 60;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_secs(1);
-    consistency_advanced(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency
-#[tracing::instrument(skip(all_cells))]
-pub async fn consistency<'a, I: IntoIterator<Item = &'a SweetCell>>(
-    all_cells: I,
-    num_attempts: usize,
-    delay: Duration,
-) {
-    consistency_advanced(
-        all_cells.into_iter().map(|c| (c, true)),
-        num_attempts,
-        delay,
-    )
-    .await
-}
-
-/// Wait for all cells to reach consistency,
-/// with the option to specify that some cells are offline.
-///
-/// Cells paired with a `false` value will have their authored ops counted towards the total,
-/// but not their integrated ops (since they are not online to integrate things).
-/// This is useful for tests where nodes go offline.
-#[tracing::instrument(skip(all_cells))]
-pub async fn consistency_advanced<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
-    all_cells: I,
-    num_attempts: usize,
-    delay: Duration,
-) {
-    let all_cell_dbs: Vec<(
-        AgentPubKey,
-        DbRead<DbKindAuthored>,
-        Option<DbRead<DbKindDht>>,
-    )> = all_cells
-        .into_iter()
-        .map(|(c, online)| {
-            (
-                c.agent_pubkey().clone(),
-                c.authored_db().clone().into(),
-                online.then(|| c.dht_db().clone().into()),
-            )
-        })
-        .collect();
-    let all_cell_dbs: Vec<_> = all_cell_dbs
-        .iter()
-        .map(|c| (&c.0, &c.1, c.2.as_ref()))
-        .collect();
-    consistency_dbs(&all_cell_dbs[..], num_attempts, delay).await
-}
-
-/// Wait for all cell envs to reach consistency
+/// Wait for all cell envs to reach consistency, meaning that every op
+/// published by every cell has been integrated by every node
 pub async fn consistency_dbs<AuthorDb, DhtDb>(
     all_cell_dbs: &[(&AgentPubKey, &AuthorDb, Option<&DhtDb>)],
     num_attempts: usize,
@@ -565,208 +464,122 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
     AuthorDb: ReadAccess<DbKindAuthored>,
     DhtDb: ReadAccess<DbKindDht>,
 {
-    let mut expected_count = 0;
-    for (author, db) in all_cell_dbs.iter().map(|(author, a, _)| (author, a)) {
-        let count = get_published_ops(*db, author).len();
-        expected_count += count;
+    let mut published = HashSet::new();
+    for (author, db, _) in all_cell_dbs.iter() {
+        published.extend(
+            request_published_ops(*db, Some((*author).to_owned()))
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|(_, _, op)| op),
+        );
     }
+    let published = published.into_iter().collect::<Vec<_>>();
     for &db in all_cell_dbs.iter().flat_map(|(_, _, d)| d) {
-        wait_for_integration(db, expected_count, num_attempts, delay).await
+        wait_for_integration_diff(db, &published, num_attempts, delay).await
     }
 }
 
-/// Same as wait_for_integration but with a default wait time of 60 seconds
-/// Wait for all cells to reach consistency for 10 seconds
-pub async fn consistency_10s_others(all_cells: &[&SweetCell]) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    consistency_others(all_cells, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Wait for all cells to reach consistency
-#[tracing::instrument(skip(all_cells))]
-pub async fn consistency_others(all_cells: &[&SweetCell], num_attempts: usize, delay: Duration) {
-    let all_cell_dbs: Vec<(AgentPubKey, DbRead<DbKindAuthored>, DbRead<DbKindDht>)> = all_cells
-        .iter()
-        .map(|c| {
-            (
-                c.agent_pubkey().clone(),
-                c.authored_db().clone().into(),
-                c.dht_db().clone().into(),
-            )
-        })
-        .collect();
-    let all_cell_dbs: Vec<_> = all_cell_dbs.iter().map(|c| (&c.0, &c.1, &c.2)).collect();
-    consistency_dbs_others(&all_cell_dbs[..], num_attempts, delay).await
-}
-
-async fn consistency_dbs_others<AuthorDb, DhtDb>(
-    all_cell_dbs: &[(&AgentPubKey, &AuthorDb, &DhtDb)],
+/// Wait for num_attempts * delay, or until all published ops have been integrated.
+/// If the timeout is reached, print a report including a diff of all published ops
+/// which were not integrated.
+#[tracing::instrument(skip(db))]
+async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
+    db: &Db,
+    published: &[DhtOp],
     num_attempts: usize,
     delay: Duration,
-) where
-    AuthorDb: ReadAccess<DbKindAuthored>,
-    DhtDb: ReadAccess<DbKindDht>,
-{
-    let mut expected_count = 0;
-    for (author, db) in all_cell_dbs.iter().map(|(author, a, _)| (author, a)) {
-        let count = get_published_ops(*db, author).len();
-        expected_count += count;
-    }
-    let start = Some(std::time::Instant::now());
-    for (i, &db) in all_cell_dbs.iter().map(|(_, _, d)| d).enumerate() {
-        let mut others: Vec<_> = all_cell_dbs.iter().map(|(_, _, d)| *d).collect();
-        others.remove(i);
-        wait_for_integration_with_others(db, &others, expected_count, num_attempts, delay, start)
-            .await
-    }
-}
-
-fn get_published_ops<Db: ReadAccess<DbKindAuthored>>(
-    db: &Db,
-    author: &AgentPubKey,
-) -> Vec<DhtOpLight> {
-    fresh_reader_test(db.clone(), |txn| {
-        txn.prepare(
-            "
-            SELECT
-            DhtOp.type, Action.hash, Action.blob
-            FROM DhtOp
-            JOIN
-            Action ON DhtOp.action_hash = Action.hash
-            WHERE
-            Action.author = :author
-            AND (DhtOp.type != :store_entry OR Action.private_entry = 0)
-        ",
+) {
+    fn display_op(op: &DhtOp) -> String {
+        format!(
+            "{} {:>3}  {}  {} ({})",
+            op.action().author(),
+            op.action().action_seq(),
+            op.to_light().action_hash().clone(),
+            op.get_type(),
+            op.action().action_type(),
         )
-        .unwrap()
-        .query_and_then(
-            named_params! {
-                ":store_entry": DhtOpType::StoreEntry,
-                ":author": author,
-            },
-            |row| {
-                let op_type: DhtOpType = row.get("type")?;
-                let hash: ActionHash = row.get("hash")?;
-                let action: SignedAction = from_blob(row.get("blob")?)?;
-                Ok(DhtOpLight::from_type(op_type, hash, &action.0)?)
-            },
-        )
-        .unwrap()
-        .collect::<StateQueryResult<_>>()
-        .unwrap()
-    })
+    }
+
+    let header = format!(
+        "{} {:>3}  {}  {}",
+        "author", "seq", "hash", "op_type(action_type)",
+    );
+
+    let num_published = published.len();
+    let mut num_integrated = 0;
+    for i in 0..num_attempts {
+        num_integrated = get_integrated_count(db);
+        if num_integrated >= num_published {
+            if num_integrated > num_published {
+                tracing::warn!("num integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test.
+                Consistency may not be complete.", num_integrated, num_published)
+            }
+            return;
+        } else {
+            let total_time_waited = delay * i as u32;
+            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await);
+        }
+        tokio::time::sleep(delay).await;
+    }
+
+    // Timeout has been reached at this point, so print a helpful report
+
+    let mut published: Vec<_> = published.iter().map(display_op).collect();
+    let mut integrated: Vec<_> = get_integrated_ops(db).iter().map(display_op).collect();
+    published.sort();
+    integrated.sort();
+
+    let unintegrated = diff::slice(&published, &integrated)
+        .into_iter()
+        .filter_map(|d| match d {
+            diff::Result::Left(l) => Some(l),
+            _ => None,
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+
+    assert!(
+        !unintegrated.is_empty(),
+        "consistency should only fail if items were published but not integrated"
+    );
+
+    let timeout = delay * num_attempts as u32;
+
+    panic!(
+        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}",
+        timeout.as_millis(),
+        num_published,
+        num_integrated,
+        header,
+        unintegrated.join("\n"),
+    );
 }
 
-/// Same as wait_for_integration but with a default wait time of 10 seconds
-#[tracing::instrument(skip(db))]
-pub async fn wait_for_integration_1m<Db: ReadAccess<DbKindDht>>(db: &Db, expected_count: usize) {
-    const NUM_ATTEMPTS: usize = 120;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(500);
-    wait_for_integration(db, expected_count, NUM_ATTEMPTS, DELAY_PER_ATTEMPT).await
-}
-
-/// Exit early if the expected number of ops
-/// have been integrated or wait for num_attempts * delay
+/// Wait for num_attempts * delay, or until all published ops have been integrated.
 #[tracing::instrument(skip(db))]
 pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     db: &Db,
-    expected_count: usize,
+    num_published: usize,
     num_attempts: usize,
     delay: Duration,
 ) {
     for i in 0..num_attempts {
-        let count = display_integration(db).await;
-        if count >= expected_count {
-            if count > expected_count {
-                tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
+        let num_integrated = get_integrated_count(db);
+        if num_integrated >= num_published {
+            if num_integrated > num_published {
+                tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
                 Consistency may not be complete.")
             }
             return;
         } else {
             let total_time_waited = delay * i as u32;
-            tracing::debug!(?count, ?total_time_waited, counts = ?query_integration(db).await);
+            tracing::debug!(?num_integrated, ?total_time_waited, counts = ?query_integration(db).await);
         }
         tokio::time::sleep(delay).await;
     }
-}
 
-/// Same as wait for integration but can print other states at the same time
-pub async fn wait_for_integration_with_others_10s<Db: ReadAccess<DbKindDht>>(
-    db: &Db,
-    others: &[&Db],
-    expected_count: usize,
-    start: Option<std::time::Instant>,
-) {
-    const NUM_ATTEMPTS: usize = 100;
-    const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-    wait_for_integration_with_others(
-        db,
-        others,
-        expected_count,
-        NUM_ATTEMPTS,
-        DELAY_PER_ATTEMPT,
-        start,
-    )
-    .await
-}
-
-#[tracing::instrument(skip(db, others, start))]
-/// Same as wait for integration but can print other states at the same time
-pub async fn wait_for_integration_with_others<Db: ReadAccess<DbKindDht>>(
-    db: &Db,
-    others: &[&Db],
-    expected_count: usize,
-    num_attempts: usize,
-    delay: Duration,
-    start: Option<std::time::Instant>,
-) {
-    let mut last_total = 0;
-    let this_start = std::time::Instant::now();
-    for _ in 0..num_attempts {
-        let count = query_integration(db).await;
-        let counts = get_integration_dumps(others).await;
-        let total: usize = counts.0.clone().into_iter().map(|i| i.integrated).sum();
-        let num_conductors = counts.0.len() + 1;
-        let total_expected = num_conductors * expected_count;
-        let progress = if total_expected == 0 {
-            0.0
-        } else {
-            total as f64 / total_expected as f64 * 100.0
-        };
-        let change = total.checked_sub(last_total).expect("LOST A VALUE");
-        last_total = total;
-        if count.integrated >= expected_count {
-            if count.integrated > expected_count {
-                tracing::warn!("count > expected_count, meaning you may not be accounting for all nodes in this test.
-                Consistency may not be complete.")
-            }
-            return;
-        } else {
-            let time_waited = this_start.elapsed().as_secs();
-            let total_time_waited = start.map(|s| s.elapsed().as_secs()).unwrap_or(0);
-            let ops_per_s = if total_time_waited == 0 {
-                0.0
-            } else {
-                total as f64 / total_time_waited as f64
-            };
-            tracing::debug!(
-                "Count: {}, val: {}, int: {}\nTime waited: {}s (total {}s),\nCounts: {:?}\nTotal: {} out of {} {:.4}% change:{} {:.4}ops/s\n",
-                count.integrated,
-                count.validation_limbo,
-                count.integration_limbo,
-                time_waited,
-                total_time_waited,
-                counts,
-                total,
-                total_expected,
-                progress,
-                change,
-                ops_per_s,
-            );
-        }
-        tokio::time::sleep(delay).await;
-    }
+    panic!("Consistency not achieved after {} attempts", num_attempts);
 }
 
 #[tracing::instrument(skip(envs))]
@@ -791,7 +604,10 @@ pub fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     }
 }
 
-async fn get_integration_dumps<Db: ReadAccess<DbKindDht>>(dbs: &[&Db]) -> IntegrationStateDumps {
+/// Get multiple db states with compact Display representation
+pub async fn get_integration_dumps<Db: ReadAccess<DbKindDht>>(
+    dbs: &[&Db],
+) -> IntegrationStateDumps {
     let mut output = Vec::new();
     for db in dbs {
         let db = *db;
@@ -807,7 +623,7 @@ pub async fn query_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> Integratio
         .unwrap()
 }
 
-async fn display_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
+fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
     fresh_reader_test(db.clone(), |txn| {
         txn.query_row(
             "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
@@ -818,9 +634,43 @@ async fn display_integration<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
     })
 }
 
+/// Get all [`DhtOps`] integrated by this node
+pub fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
+    fresh_reader_test(db.clone(), |txn| {
+        txn.prepare(
+            "
+            SELECT
+            DhtOp.type, Action.blob as action_blob, Entry.blob as entry_blob
+            FROM DhtOp
+            JOIN
+            Action ON DhtOp.action_hash = Action.hash
+            LEFT JOIN
+            Entry ON Action.entry_hash = Entry.hash
+            WHERE
+            DhtOp.when_integrated IS NOT NULL
+            ORDER BY DhtOp.rowid ASC
+        ",
+        )
+        .unwrap()
+        .query_and_then(named_params! {}, |row| {
+            let op_type: DhtOpType = row.get("type")?;
+            let action: SignedAction = from_blob(row.get("action_blob")?)?;
+            let entry: Option<Vec<u8>> = row.get("entry_blob")?;
+            let entry: Option<Entry> = match entry {
+                Some(entry) => Some(from_blob::<Entry>(entry)?),
+                None => None,
+            };
+            Ok(DhtOp::from_type(op_type, action, entry)?)
+        })
+        .unwrap()
+        .collect::<StateQueryResult<_>>()
+        .unwrap()
+    })
+}
+
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor.list_cell_ids(Some(CellStatus::Joined)) {
+    for cell_id in conductor.running_cell_ids(Some(CellStatus::Joined)) {
         let space = cell_id.dna_hash();
         let db = conductor.get_p2p_db(space);
         let info = p2p_agent_store::dump_state(db.into(), Some(cell_id))

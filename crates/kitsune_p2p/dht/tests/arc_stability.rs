@@ -42,7 +42,7 @@ fn pass_redundancy(stats: &Stats, redundancy_target: f64) {
 #[test]
 fn stability_test_case_near_ideal() {
     std::env::set_var("RUST_LOG", "debug");
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let topo = Topology::standard_zero();
     let detail = false;
@@ -53,7 +53,7 @@ fn stability_test_case_near_ideal() {
 
     let strat = ArqStrat {
         min_coverage: cov,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     println!("{}", strat.summary());
 
@@ -64,7 +64,7 @@ fn stability_test_case_near_ideal() {
 #[test]
 fn stability_test_case_messy() {
     std::env::set_var("RUST_LOG", "debug");
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let topo = Topology::standard_zero();
     let detail = true;
@@ -77,7 +77,7 @@ fn stability_test_case_messy() {
     let cov = 100.0;
     let strat = ArqStrat {
         min_coverage: cov,
-        ..Default::default()
+        ..ArqStrat::default()
     };
     let peers = generate_messy_coverage(&topo, &mut rng, &strat, len_mean, len_std, n, j);
     parameterized_stability_test(&topo, &strat, peers, detail);
@@ -89,7 +89,7 @@ proptest::proptest! {
     #[ignore = "takes a very long time. run sparingly."]
     fn stability_test(num_peers in 100u32..300, min_coverage in 50.0f64..100.0, j in 0.0..1.0) {
         std::env::set_var("RUST_LOG", "debug");
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         let topo = Topology::unit_zero();
         let detail = false;
@@ -101,7 +101,7 @@ proptest::proptest! {
 
         let strat = ArqStrat {
             min_coverage,
-            ..Default::default()
+            ..ArqStrat::default()
         };
 
         let peers = generate_messy_coverage(&topo, &mut rng, &strat, len_mean, len_std, num_peers, j);

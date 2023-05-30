@@ -35,7 +35,7 @@ const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
@@ -169,7 +169,7 @@ async fn get_agent_activity_test() {
     let mut record_cache = RecordBuf::cache(alice_call_data.db.clone().into()).unwrap();
     let mut meta_cache = MetadataBuf::cache(alice_call_data.db.clone().into()).unwrap();
     let cache_data = DbPairMut::new(&mut record_cache, &mut meta_cache);
-    let mut cascade = Cascade::empty()
+    let cascade = Cascade::empty()
         .with_cache(cache_data)
         .with_network(alice_call_data.network.clone());
 
@@ -316,7 +316,7 @@ async fn get_agent_activity_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_host_fn_test() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
 
     let zomes = vec![TestWasm::Create];
     let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;

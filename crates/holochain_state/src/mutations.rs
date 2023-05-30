@@ -327,17 +327,19 @@ pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
     // Build one new block from the extremums.
     insert_block_inner(
         txn,
-        Block::try_new(
+        Block::new(
             block.target().clone(),
-            match maybe_min_maybe_max.0 {
-                Some(min) => std::cmp::min(Timestamp(min), block.start()),
-                None => block.start(),
-            },
-            match maybe_min_maybe_max.1 {
-                Some(max) => std::cmp::max(Timestamp(max), block.end()),
-                None => block.end(),
-            },
-        )?,
+            InclusiveTimestampInterval::try_new(
+                match maybe_min_maybe_max.0 {
+                    Some(min) => std::cmp::min(Timestamp(min), block.start()),
+                    None => block.start(),
+                },
+                match maybe_min_maybe_max.1 {
+                    Some(max) => std::cmp::max(Timestamp(max), block.end()),
+                    None => block.end(),
+                },
+            )?,
+        ),
     )
 }
 
@@ -355,7 +357,10 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
                 if preblock_start <= preblock_end {
                     insert_block_inner(
                         txn,
-                        Block::try_new(unblock0.target().clone(), preblock_start, preblock_end)?,
+                        Block::new(
+                            unblock0.target().clone(),
+                            InclusiveTimestampInterval::try_new(preblock_start, preblock_end)?,
+                        ),
                     )?
                 }
             }
@@ -376,7 +381,10 @@ pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<(
                 if postblock_start <= postblock_end {
                     insert_block_inner(
                         txn,
-                        Block::try_new(unblock.target().clone(), postblock_start, postblock_end)?,
+                        Block::new(
+                            unblock.target().clone(),
+                            InclusiveTimestampInterval::try_new(postblock_start, postblock_end)?,
+                        ),
                     )?
                 }
             }
@@ -649,21 +657,18 @@ pub fn insert_entry(
             access,
             functions: _,
         }) => {
-            cap_access = match access {
-                CapAccess::Unrestricted => Some("unrestricted"),
-                CapAccess::Transferable { secret } => {
-                    cap_secret = Some(to_blob(secret)?);
-                    Some("transferable")
-                }
+            cap_secret = match access {
+                CapAccess::Unrestricted => None,
+                CapAccess::Transferable { secret } => Some(to_blob(secret)?),
                 CapAccess::Assigned {
                     secret,
                     assignees: _,
                 } => {
-                    cap_secret = Some(to_blob(secret)?);
+                    Some(to_blob(secret)?)
                     // TODO: put assignees in when we merge in BHashSet from develop.
-                    Some("assigned")
                 }
             };
+            cap_access = Some(access.as_variant_string());
             // TODO: put functions in when we merge in BHashSet from develop.
             Some(tag.clone())
         }
@@ -722,15 +727,10 @@ pub fn unlock_chain(txn: &mut Transaction, author: &AgentPubKey) -> StateMutatio
     Ok(())
 }
 
-pub fn delete_all_ephemeral_scheduled_fns(
-    txn: &mut Transaction,
-    author: &AgentPubKey,
-) -> StateMutationResult<()> {
+pub fn delete_all_ephemeral_scheduled_fns(txn: &mut Transaction) -> StateMutationResult<()> {
     txn.execute(
         holochain_sqlite::sql::sql_cell::schedule::DELETE_ALL_EPHEMERAL,
-        named_params! {
-            ":author" : author,
-        },
+        named_params! {},
     )?;
     Ok(())
 }

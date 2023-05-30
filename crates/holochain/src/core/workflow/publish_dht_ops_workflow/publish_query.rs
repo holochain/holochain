@@ -5,8 +5,8 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_p2p::DhtOpHashExt;
 use holochain_sqlite::db::DbKindAuthored;
+use holochain_sqlite::prelude::ReadAccess;
 use holochain_state::query::prelude::*;
-use holochain_types::db::DbRead;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::OpBasis;
@@ -25,10 +25,13 @@ use super::MIN_PUBLISH_INTERVAL;
 /// - Don't publish private entries.
 /// - Only get ops that haven't been published within the minimum publish interval
 /// - Only get ops that have less then the RECEIPT_BUNDLE_SIZE
-pub async fn get_ops_to_publish(
+pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
-    db: &DbRead<DbKindAuthored>,
-) -> WorkflowResult<Vec<(OpBasis, OpHashSized, DhtOp)>> {
+    db: &AuthorDb,
+) -> WorkflowResult<Vec<(OpBasis, OpHashSized, DhtOp)>>
+where
+    AuthorDb: ReadAccess<DbKindAuthored>,
+{
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
@@ -167,10 +170,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let db = test_authored_db();
         let expected = test_data(&db.to_db().into());
-        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db().into())
+        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db())
             .await
             .unwrap();
         assert_eq!(

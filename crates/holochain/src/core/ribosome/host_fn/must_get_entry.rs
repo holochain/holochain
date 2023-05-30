@@ -23,7 +23,7 @@ pub fn must_get_entry<'a>(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = match call_context.host_context {
+                let cascade = match call_context.host_context {
                     HostContext::Validate(_) => {
                         Cascade::from_workspace_stores(workspace.stores(), None)
                     }
@@ -32,13 +32,14 @@ pub fn must_get_entry<'a>(
                         call_context.host_context.network().clone(),
                     ),
                 };
-                let result: Result<_, RuntimeError> = match cascade
+
+                match cascade
                     .retrieve_entry(entry_hash.clone(), NetworkGetOptions::must_get_options())
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })? {
-                    Some(entry) => Ok(entry),
+                    Some((entry, _)) => Ok(entry),
                     None => match call_context.host_context {
                         HostContext::EntryDefs(_)
                         | HostContext::GenesisSelfCheck(_)
@@ -75,8 +76,7 @@ pub fn must_get_entry<'a>(
                             .into())
                         }
                     },
-                };
-                result
+                }
             })
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(
@@ -109,7 +109,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_entry_test<'a>() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

@@ -20,19 +20,19 @@ members = [
   "crates/holochain_sqlite",
   "crates/holochain_state",
   "crates/holochain_sqlite",
+  "crates/holochain_trace",
   "crates/holochain_websocket",
   "crates/holochain_util",
 
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
+  "crates/hc_run_local_services",
+  "crates/hc_demo_cli",
 
   "crates/kitsune_p2p/bootstrap",
   "crates/kitsune_p2p/dht",
   "crates/kitsune_p2p/dht_arc",
-  "crates/kitsune_p2p/direct",
-  "crates/kitsune_p2p/direct_api",
-  "crates/kitsune_p2p/direct_test",
   "crates/kitsune_p2p/fetch",
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/mdns",
@@ -43,9 +43,14 @@ members = [
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
+
+  "crates/holochain_diagnostics",
+  "crates/diagnostic_tests",
 ]
 
 exclude = ["crates/release-automation"]
+
+resolver = "2"
 
 [profile.fast-test]
 inherits = "dev"
@@ -61,15 +66,19 @@ codegen-units = 16
 
 [patch.crates-io]
 # tx5 = { path = "../tx5/crates/tx5" }
+# tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
+# tx5-signal = { path = "../tx5/crates/tx5-signal" }
+# tx5-signal-srv = { path = "../tx5/crates/tx5-signal-srv" }
+# tx5 = { git = "https://github.com/holochain/tx5.git", rev = "954c8b901993b8a60deaca99528373f5eb42fb82" }
+# tx5-signal-srv = { git = "https://github.com/holochain/tx5.git", rev = "954c8b901993b8a60deaca99528373f5eb42fb82" }
+# tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "954c8b901993b8a60deaca99528373f5eb42fb82" }
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", branch = "pr/bump-serde" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
-# observability = { git = "https://github.com/freesig/observability.git", branch = "main" }
-# ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
-# ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "add_observability" }
+#ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 #lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 #lair_keystore = { path = "../lair/crates/lair_keystore" }
 #lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
@@ -77,5 +86,4 @@ codegen-units = 16
 #lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }
 #lair_keystore_api_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_api" }
 #lair_keystore_client_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_client" }
-# observability = { path = "../../rust/observability" }
 # r2d2_sqlite = { path = "../r2d2-sqlite" }

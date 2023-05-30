@@ -4,7 +4,6 @@
 #![allow(missing_docs)]
 
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_zome_types::block::BlockError;
 use holochain_zome_types::TimestampError;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -60,15 +59,6 @@ pub enum DatabaseError {
 
     #[error(transparent)]
     GetRandom(getrandom::Error),
-
-    #[error(transparent)]
-    Block(BlockError),
-}
-
-impl From<BlockError> for DatabaseError {
-    fn from(block_error: BlockError) -> Self {
-        Self::Block(block_error)
-    }
 }
 
 impl From<TimestampError> for DatabaseError {

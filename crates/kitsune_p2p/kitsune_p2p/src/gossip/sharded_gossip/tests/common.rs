@@ -3,7 +3,7 @@ pub use crate::test_util::spawn_handler;
 use crate::{HostStub, KitsuneHost};
 use kitsune_p2p_fetch::FetchPoolConfig;
 use kitsune_p2p_types::box_fut;
-use kitsune_p2p_types::dht::prelude::{ArqBoundsSet, RegionCoordSetLtcs, RegionData};
+use kitsune_p2p_types::dht::prelude::{ArqSet, RegionCoordSetLtcs, RegionData};
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, Topology};
 use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
 use num_traits::Zero;
@@ -24,6 +24,22 @@ impl FetchPoolConfig for StandardResponsesHostApi {
 }
 
 impl KitsuneHost for StandardResponsesHostApi {
+    fn block(&self, _: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn unblock(&self, _: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn is_blocked(
+        &self,
+        _: kitsune_p2p_block::BlockTargetId,
+        _: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(false))
+    }
+
     fn get_agent_info_signed(
         &self,
         input: GetAgentInfoSignedEvt,
@@ -70,7 +86,7 @@ impl KitsuneHost for StandardResponsesHostApi {
         dht_arc_set: Arc<DhtArcSet>,
     ) -> crate::KitsuneHostResult<RegionSetLtcs> {
         async move {
-            let arqs = ArqBoundsSet::from_dht_arc_set(
+            let arqs = ArqSet::from_dht_arc_set_exact(
                 &self.get_topology(space).await?,
                 &self.strat,
                 &dht_arc_set,

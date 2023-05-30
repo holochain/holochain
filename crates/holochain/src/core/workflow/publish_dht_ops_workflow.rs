@@ -23,6 +23,7 @@ use std::time;
 use tracing::*;
 
 mod publish_query;
+pub use publish_query::get_ops_to_publish;
 
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
@@ -131,9 +132,9 @@ mod tests {
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
+    use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::prelude::*;
-    use observability;
     use rusqlite::Transaction;
     use std::collections::HashMap;
     use std::convert::TryInto;
@@ -233,7 +234,7 @@ mod tests {
         // Join some agents onto the network
         // Skip the first agent as it has already joined
         for agent in agents.into_iter().skip(1) {
-            HolochainP2pRef::join(&network, dna.clone(), agent, None)
+            HolochainP2pRef::join(&network, dna.clone(), agent, None, None)
                 .await
                 .unwrap();
         }
@@ -271,7 +272,7 @@ mod tests {
     #[ignore = "(david.b) tests should be re-written using mock network"]
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
-            observability::test_run().ok();
+            holochain_trace::test_run().ok();
 
             // Create test db
             let test_db = test_authored_db();
@@ -325,7 +326,7 @@ mod tests {
     #[test_case(100, 100)]
     fn test_no_republish(num_agents: u32, num_hash: u32) {
         tokio_helper::block_forever_on(async {
-            observability::test_run().ok();
+            holochain_trace::test_run().ok();
 
             // Create test db
             let test_db = test_authored_db();
@@ -378,7 +379,7 @@ mod tests {
     fn test_private_entries(num_agents: u32) {
         tokio_helper::block_forever_on(
             async {
-                observability::test_run().ok();
+                holochain_trace::test_run().ok();
 
                 // Create test db
                 let test_db = test_authored_db();
@@ -606,7 +607,7 @@ mod tests {
                 {
                     let network = test_network.network();
                     for agent in agents {
-                        HolochainP2pRef::join(&network, dna.clone(), agent, None)
+                        HolochainP2pRef::join(&network, dna.clone(), agent, None, None)
                             .await
                             .unwrap()
                     }

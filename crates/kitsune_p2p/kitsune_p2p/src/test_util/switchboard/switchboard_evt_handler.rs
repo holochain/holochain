@@ -13,7 +13,7 @@ use kitsune_p2p_types::bin_types::*;
 use kitsune_p2p_types::combinators::second;
 use kitsune_p2p_types::dht::hash::RegionHash;
 use kitsune_p2p_types::dht::prelude::{
-    array_xor, ArqBoundsSet, RegionBounds, RegionCoordSetLtcs, RegionData,
+    array_xor, ArqSet, RegionBounds, RegionCoordSetLtcs, RegionData,
 };
 use kitsune_p2p_types::dht::region::RegionCoords;
 use kitsune_p2p_types::dht::spacetime::{TelescopingTimes, TimeQuantum};
@@ -54,6 +54,22 @@ impl FetchPoolConfig for SwitchboardEventHandler {
 }
 
 impl KitsuneHost for SwitchboardEventHandler {
+    fn block(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn unblock(&self, _input: kitsune_p2p_block::Block) -> crate::KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
+    fn is_blocked(
+        &self,
+        _input: kitsune_p2p_block::BlockTargetId,
+        _timestamp: Timestamp,
+    ) -> crate::KitsuneHostResult<bool> {
+        box_fut(Ok(false))
+    }
+
     fn get_agent_info_signed(
         &self,
         GetAgentInfoSignedEvt { agent, space: _ }: GetAgentInfoSignedEvt,
@@ -114,7 +130,7 @@ impl KitsuneHost for SwitchboardEventHandler {
     ) -> crate::KitsuneHostResult<dht::region_set::RegionSetLtcs> {
         async move {
             let topo = self.get_topology(space).await?;
-            let arq_set = ArqBoundsSet::from_dht_arc_set(&topo, &self.sb.strat, &dht_arc_set)
+            let arq_set = ArqSet::from_dht_arc_set_exact(&topo, &self.sb.strat, &dht_arc_set)
                 .expect("an arq could not be quantized");
 
             // NOTE: If this were implemented correctly, it would take the recent_threshold

@@ -9,6 +9,13 @@ impl<T: 'static + Send> Clone for Share<T> {
     }
 }
 
+impl<T: 'static + Send + std::fmt::Debug> std::fmt::Debug for Share<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.share_ref(|s| Ok(f.debug_tuple("Share").field(s).finish()))
+            .unwrap()
+    }
+}
+
 impl<T: 'static + Send> PartialEq for Share<T> {
     fn eq(&self, oth: &Self) -> bool {
         Arc::ptr_eq(&self.0, &oth.0)
@@ -87,7 +94,7 @@ impl<T: 'static + Send> Share<T> {
 
 /// A version of Share which can never be closed, and thus every
 /// share is infallible (no Err possible).
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct ShareOpen<T: 'static + Send>(Share<T>);
 
 impl<T: 'static + Send> Clone for ShareOpen<T> {

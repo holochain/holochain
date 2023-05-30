@@ -11,8 +11,8 @@ use crate::config::write_config;
 use crate::ports::random_admin_port;
 
 /// Generate a new sandbox.
-/// This creates a directory and a [`ConductorConfig`]
-/// from an optional network.
+/// This creates a directory containing a [`ConductorConfig`],
+/// a keystore, and a database.
 /// The root directory and inner directory
 /// (where this sandbox will be created) can be overridden.
 /// For example `my_root_dir/this_sandbox_dir/`
@@ -20,8 +20,9 @@ pub fn generate(
     network: Option<KitsuneP2pConfig>,
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
+    in_process_lair: bool,
 ) -> anyhow::Result<PathBuf> {
-    let (dir, con_url) = generate_directory(root, directory)?;
+    let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url);
     config.network = network;
@@ -29,7 +30,7 @@ pub fn generate(
     let path = write_config(dir.clone(), &config);
     msg!("Config {:?}", config);
     msg!(
-        "Created directory at: {} {}",
+        "Created directory at: {} {} It has also been saved to a file called `.hc` in your current working directory.",
         ansi_term::Style::new()
             .bold()
             .underline()
@@ -38,7 +39,7 @@ pub fn generate(
             .paint(dir.display().to_string()),
         ansi_term::Style::new()
             .bold()
-            .paint("Keep this path to rerun the same sandbox")
+            .paint("Keep this path to rerun the same sandbox.")
     );
     msg!("Created config at {}", path.display());
     Ok(dir)
@@ -50,11 +51,13 @@ pub fn generate_with_config(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
 ) -> anyhow::Result<PathBuf> {
-    let (dir, con_url) = generate_directory(root, directory)?;
+    let (dir, con_url) = generate_directory(root, directory, true)?;
     let config = config.unwrap_or_else(|| {
         let mut config = create_config(dir.clone(), con_url.clone());
         config.keystore = KeystoreConfig::LairServer {
-            connection_url: con_url,
+            connection_url: con_url.expect(
+                "Lair should have been initialised but did not get a connection URL for it",
+            ),
         };
         config
     });
@@ -66,7 +69,8 @@ pub fn generate_with_config(
 pub fn generate_directory(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
-) -> anyhow::Result<(PathBuf, url2::Url2)> {
+    initialise_lair: bool,
+) -> anyhow::Result<(PathBuf, Option<url2::Url2>)> {
     let passphrase = holochain_util::pw::pw_get()?;
 
     let mut dir = root.unwrap_or_else(std::env::temp_dir);
@@ -77,7 +81,11 @@ pub fn generate_directory(
     keystore_dir.push("keystore");
     std::fs::create_dir(&keystore_dir)?;
 
-    let con_url = init_lair(&keystore_dir, passphrase)?;
+    let con_url = if initialise_lair {
+        Some(init_lair(&keystore_dir, passphrase)?)
+    } else {
+        None
+    };
 
     Ok((dir, con_url))
 }

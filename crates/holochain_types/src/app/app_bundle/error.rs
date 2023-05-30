@@ -6,8 +6,8 @@ use crate::prelude::{AppManifestError, DnaError, RoleName};
 /// Errors occurring while installing an AppBundle
 #[derive(thiserror::Error, Debug)]
 pub enum AppBundleError {
-    #[error("Could not resolve the app role '{0}'")]
-    CellResolutionFailure(RoleName),
+    #[error("Could not resolve the app role '{0}'. Detail: {1}")]
+    CellResolutionFailure(RoleName, String),
 
     #[error(transparent)]
     AppManifestError(#[from] AppManifestError),

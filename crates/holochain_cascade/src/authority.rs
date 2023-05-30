@@ -12,6 +12,7 @@ use self::{
 use super::error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
+use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::Query;
 use holochain_state::query::Txn;
 use holochain_types::prelude::*;
@@ -106,4 +107,21 @@ pub async fn handle_get_links(
         .async_reader(move |txn| query.run(Txn::from(&txn)))
         .await?;
     Ok(results)
+}
+
+/// Handler for querying links
+#[instrument(skip(db))]
+pub async fn handle_get_links_query(
+    db: DbRead<DbKindDht>,
+    query: WireLinkQuery,
+) -> CascadeResult<Vec<Link>> {
+    let get_links_query = GetLinksQuery::new(
+        query.base.clone(),
+        query.link_type.clone(),
+        query.tag_prefix.clone(),
+        query.into(),
+    );
+    Ok(db
+        .async_reader(move |txn| get_links_query.run(Txn::from(&txn)))
+        .await?)
 }

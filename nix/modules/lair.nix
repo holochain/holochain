@@ -3,17 +3,17 @@
 { self, inputs, lib, ... }@flake: {
   perSystem = { config, self', inputs', system, pkgs, ... }:
     let
-
       rustToolchain = config.rust.mkRust {
         track = "stable";
         version = "1.66.1";
       };
+
       craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
 
       commonArgs = {
 
         pname = "lair-keystore";
-        src = inputs.lair;
+        src = flake.config.reconciledInputs.lair;
 
         CARGO_PROFILE = "release";
 

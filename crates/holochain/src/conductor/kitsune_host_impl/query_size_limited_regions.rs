@@ -11,6 +11,7 @@ use super::query_region_set::query_region_data;
 /// Regions larger than size_limit will be quadrisected, and the size of each subregion
 /// will be fetched from the database. The quadrisecting is recursive until either all
 /// regions are either small enough, or cannot be further subdivided.
+#[tracing::instrument(skip(db, topology))]
 pub async fn query_size_limited_regions(
     db: DbWrite<DbKindDht>,
     topology: Topology,

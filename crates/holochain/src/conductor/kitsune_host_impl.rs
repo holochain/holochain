@@ -3,6 +3,9 @@
 mod query_region_op_hashes;
 mod query_region_set;
 mod query_size_limited_regions;
+pub use query_region_op_hashes::query_region_op_hashes;
+pub use query_region_set::query_region_set;
+pub use query_size_limited_regions::query_size_limited_regions;
 
 use std::sync::Arc;
 
@@ -19,6 +22,7 @@ use holochain_types::{
     prelude::{DhtOpHash, DnaError},
     share::RwShare,
 };
+use holochain_zome_types::Timestamp;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned, dependencies::kitsune_p2p_fetch::OpHashSized,
     event::GetAgentInfoSignedEvt, KitsuneHost, KitsuneHostResult,
@@ -60,6 +64,37 @@ impl KitsuneHostImpl {
 }
 
 impl KitsuneHost for KitsuneHostImpl {
+    fn block(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()> {
+        async move {
+            let result = self.spaces.block(input.into()).await;
+            Ok(result?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn unblock(&self, input: kitsune_p2p_block::Block) -> KitsuneHostResult<()> {
+        async move {
+            let result = self.spaces.unblock(input.into()).await;
+            Ok(result?)
+        }
+        .boxed()
+        .into()
+    }
+
+    fn is_blocked(
+        &self,
+        input: kitsune_p2p_block::BlockTargetId,
+        timestamp: Timestamp,
+    ) -> KitsuneHostResult<bool> {
+        async move {
+            let result = self.spaces.is_blocked(input.into(), timestamp).await;
+            Ok(result?)
+        }
+        .boxed()
+        .into()
+    }
+
     fn peer_extrapolated_coverage(
         &self,
         space: std::sync::Arc<kitsune_p2p::KitsuneSpace>,
@@ -138,8 +173,7 @@ impl KitsuneHost for KitsuneHostImpl {
             let topology = self.get_topology(space.clone()).await?;
             let db = self.spaces.dht_db(&dna_hash)?;
             let region_set =
-                query_region_set::query_region_set(db, topology.clone(), &self.strat, dht_arc_set)
-                    .await?;
+                query_region_set(db, topology.clone(), &self.strat, dht_arc_set).await?;
             Ok(region_set)
         }
         .boxed()

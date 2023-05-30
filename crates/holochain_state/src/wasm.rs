@@ -59,7 +59,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
         use holochain_sqlite::prelude::*;
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
         let db = crate::test_utils::test_wasm_db();

@@ -2,58 +2,46 @@
 
 this implementation of holonix uses the flake- and crane-based nix expressions.
 
-coarse compatibility with the previous holonix interface is provided so that
-all previously working nix expressions targetting the holonix repository still
-work.
-
 more advanced customization features are now possible via the flake's native
 input override feature.
 
-as an exmaple, here is a _flake.nix_ that references a custom branch.
+## recommended versioning specification in a consumer's flake.nix
 
-```nix=
-{
-  description = "Template for Holochain app development";
+#### use the "versions" flake as a separate input in their flake.nix and configuring the holochain flake to follow the versions flake, as in:
 
-  inputs = {
-    nixpkgs.follows = "holochain/nixpkgs";
+```nix
+inputs = {
+  holochain-versions.url = "github:holochain/holochain?dir=versions/0_1";
 
-    holochain = {
-      url = "github:holochain/holochain/pr_holonix_on_flakes";
-      inputs.versions.url = "github:holochain/holochain/pr_holonix_on_flakes?dir=versions/0_1";
-      inputs.versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.0";
-    };
-  };
-
-  outputs = inputs @ { ... }:
-    inputs.holochain.inputs.flake-parts.lib.mkFlake
-      {
-        inherit inputs;
-      }
-      {
-        systems = builtins.attrNames inputs.holochain.devShells;
-        perSystem =
-          { config
-          , pkgs
-          , system
-          , ...
-          }: {
-            devShells.default = pkgs.mkShell {
-              inputsFrom = [ inputs.holochain.devShells.${system}.holonix ];
-              packages = with pkgs; [
-                  # more packages go here
-              ]
-            };
-          };
-      };
-}
+  holochain-flake.url = "github:holochain/holochain";
+  holochain-flake.inputs.versions.follows = "holochain-versions";
+};
 ```
 
-this exmaple would translate to the following CLI invocatin
+#### override single components either via the holochain versions flake:
 
-```shell=
-nix develop \
-  github:holochain/holochain/pr_holonix_on_flakes#holonix \
-  --override-input versions 'github:holochain/holochain/pr_holonix_on_flakes?dir=versions/0_1' \
-  --override-input versions/holochain 'github:holochain/holochain/holochain-0.1.0'
+```nix
+inputs = {
+  holochain-versions.url = "github:holochain/holochain?dir=versions/0_1"; holochain-versions.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.5-beta-rc.0";
+
+  holochain-flake.url = "github:holochain/holochain";
+  holochain-flake.inputs.versions.follows = "holochain-versions";
+};
 ```
+
+or via their the toplevel component input:
+
+```nix
+inputs = {
+  holochain-versions.url = "github:holochain/holochain?dir=versions/0_1";
+
+  holochain-flake.url = "github:holochain/holochain";
+  holochain-flake.inputs.versions.follows = "holochain-versions";
+
+  holochain-flake.inputs.holochain.url = "github:holochain/holochain/holochain-0.1.5-beta-rc.0";
+};
+```
+
+please see the following examples to learn more about common and more specific use cases:
+
+* [specifying custom component versions](examples/custom_versions/flake.nix)

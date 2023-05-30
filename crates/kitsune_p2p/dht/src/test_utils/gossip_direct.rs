@@ -1,7 +1,7 @@
 use crate::{
     error::{GossipError, GossipResult},
     persistence::HostAccessTest,
-    prelude::ArqBoundsSet,
+    prelude::ArqSet,
     region::REGION_MASS,
     spacetime::{Quantum, TimeQuantum},
 };
@@ -106,7 +106,7 @@ pub fn gossip_direct<Peer: HostAccessTest>(
 /// Useful data calculated during the test node gossip round
 pub struct TestNodeGossipRoundInfo {
     /// The common arq set calculated during gossip
-    pub common_arqs: ArqBoundsSet,
+    pub common_arqs: ArqSet,
     /// Stats about data transfer during the round
     pub stats: TestNodeGossipRoundStats,
 }

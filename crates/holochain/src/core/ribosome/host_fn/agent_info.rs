@@ -60,7 +60,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_info_test() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,

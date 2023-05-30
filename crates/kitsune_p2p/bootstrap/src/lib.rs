@@ -29,7 +29,7 @@ pub const PRUNE_EXPIRED_FREQ: std::time::Duration = std::time::Duration::from_se
 
 pub type BootstrapDriver = futures::future::BoxFuture<'static, ()>;
 
-pub type BootstrapShutdown = Box<dyn FnOnce() + 'static + Send>;
+pub type BootstrapShutdown = Box<dyn FnOnce() + 'static + Send + Sync>;
 
 /// Run a bootstrap with the default prune frequency [`PRUNE_EXPIRED_FREQ`].
 pub async fn run(
