@@ -8,7 +8,7 @@ use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
-use holochain_state::query::link::GetLinksQuery;
+use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 use holochain_state::workspace::WorkspaceError;
 use holochain_trace;
 use holochain_zome_types::ActionHashed;
@@ -307,6 +307,7 @@ impl Db {
                             link_add.base_address.clone(),
                             LinkTypeFilter::single_type(link_add.zome_index, link_add.link_type),
                             Some(link_add.tag.clone()),
+                            GetLinksFilter::default(),
                         );
                         let res = query.run(Txn::from(&txn)).unwrap();
                         assert_eq!(res.len(), 0, "{}", here);
