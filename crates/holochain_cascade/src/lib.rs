@@ -912,7 +912,7 @@ where
                     return Err(CascadeError::ActionError(ActionError::NotFound(previous_batch_end)));
                 }
 
-                results.into_iter().skip(previous_index.unwrap()).take(batch_size).collect()
+                results.into_iter().skip(previous_index.unwrap() + 1).take(batch_size).collect()
             } else if let Some(batch_index) = key.batch_index {
                 results.into_iter().skip(batch_index * batch_size).take(batch_size).collect()
             } else {

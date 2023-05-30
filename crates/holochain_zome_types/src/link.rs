@@ -121,67 +121,6 @@ pub struct GetLinksInput {
     pub previous_batch_end: Option<ActionHash>,
 }
 
-impl GetLinksInput {
-    pub fn new(
-        base_address: holo_hash::AnyLinkableHash,
-        link_type: LinkTypeFilter,
-    ) -> Self {
-        Self {
-            base_address,
-            link_type,
-            tag_prefix: None,
-            before: None,
-            after: None,
-            author: None,
-            batch_size: None,
-            batch_index: None,
-            previous_batch_end: None,
-        }
-    }
-
-    /// Filter for links with the given tag prefix.
-    pub fn tag_prefix(mut self, tag_prefix: LinkTag) -> Self {
-        self.tag_prefix = Some(tag_prefix);
-        self
-    }
-
-    /// Filter for links created before `before`.
-    pub fn before(mut self, before: Timestamp) -> Self {
-        self.before = Some(before);
-        self
-    }
-
-    /// Filter for links create after `after`.
-    pub fn after(mut self, after: Timestamp) -> Self {
-        self.after = Some(after);
-        self
-    }
-
-    /// Filter for links created by this author.
-    pub fn author(mut self, author: AgentPubKey) -> Self {
-        self.author = Some(author);
-        self
-    }
-
-    /// Set the size of the batch to fetch.
-    pub fn batch_size(mut self, batch_size: usize) -> Self {
-        self.batch_size = Some(batch_size);
-        self
-    }
-
-    /// Set the 0-based batch index to get.
-    pub fn batch_index(mut self, batch_index: usize) -> Self {
-        self.batch_index = Some(batch_index);
-        self
-    }
-
-    /// Set the action hash for the end of the previous batch.
-    pub fn previous_batch_end(mut self, previous_batch_end: ActionHash) -> Self {
-        self.previous_batch_end = Some(previous_batch_end);
-        self
-    }
-}
-
 type CreateLinkWithDeleteLinks = Vec<(SignedActionHashed, Vec<SignedActionHashed>)>;
 #[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// CreateLinks with and DeleteLinks on them

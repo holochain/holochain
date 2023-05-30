@@ -4,6 +4,7 @@ use crate::prelude::*;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
 use std::str::FromStr;
+use crate::link::GetLinksInputBuilder;
 
 #[cfg(all(test, feature = "mock"))]
 mod test;
@@ -16,7 +17,7 @@ pub fn root_hash() -> ExternResult<AnyLinkableHash> {
         AppEntryBytes::try_from(SerializedBytes::from(UnsafeBytes::from(ROOT.to_vec())))
             .expect("This cannot fail as it's under the max entry bytes"),
     ))
-    .map(Into::into)
+        .map(Into::into)
 }
 
 /// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
@@ -29,7 +30,7 @@ pub const DELIMITER: &str = ".";
 /// Each path component is arbitrary bytes to be hashed together in a predictable way when the path
 /// is hashed to create something that can be linked and discovered by all DHT participants.
 #[derive(
-    Clone, PartialEq, Debug, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
+Clone, PartialEq, Debug, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
 )]
 #[repr(transparent)]
 pub struct Component(#[serde(with = "serde_bytes")] Vec<u8>);
@@ -81,12 +82,14 @@ impl From<&str> for Component {
         Self::from(bytes)
     }
 }
+
 /// Alias From<&str>
 impl From<&String> for Component {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())
     }
 }
+
 /// Alias From<&str>
 impl From<String> for Component {
     fn from(s: String) -> Self {
@@ -154,7 +157,7 @@ impl TryFrom<&Component> for String {
 /// the tree and the linking functionality of the Holochain DHT allows us to travel "down" the tree
 /// after at least one DHT participant has followed the path "up".
 #[derive(
-    Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
+Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
 )]
 #[repr(transparent)]
 pub struct Path(Vec<Component>);
@@ -245,12 +248,14 @@ impl From<&str> for Path {
         )
     }
 }
+
 /// Alias From<&str>
 impl From<&String> for Path {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())
     }
 }
+
 /// Alias From<&str>
 impl From<String> for Path {
     fn from(s: String) -> Self {
@@ -281,9 +286,9 @@ impl Path {
     /// Try attaching a [`LinkType`] to this path
     /// so its type is known for [`create_link`] and [`get_links`].
     pub fn typed<TY, E>(self, link_type: TY) -> Result<TypedPath, WasmError>
-    where
-        ScopedLinkType: TryFrom<TY, Error = E>,
-        WasmError: From<E>,
+        where
+            ScopedLinkType: TryFrom<TY, Error=E>,
+            WasmError: From<E>,
     {
         Ok(TypedPath::new(ScopedLinkType::try_from(link_type)?, self))
     }
@@ -338,12 +343,11 @@ impl TypedPath {
         } else if self.is_root() {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
-                root_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-                Some(self.make_tag()?),
+                GetLinksInputBuilder::try_new(root_hash()?,
+                                              LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type))?.tag_prefix(self.make_tag()?).build()
             )?
-            .iter()
-            .any(|Link { target, .. }| *target == this_paths_hash);
+                .iter()
+                .any(|Link { target, .. }| *target == this_paths_hash);
             Ok(exists)
         } else {
             let parent = self
@@ -351,12 +355,11 @@ impl TypedPath {
                 .expect("Must have parent if not empty or root");
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
-                parent.path_entry_hash()?,
-                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-                Some(self.make_tag()?),
+                GetLinksInputBuilder::try_new(parent.path_entry_hash()?.into(),
+                                              LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type))?.tag_prefix(self.make_tag()?).build()
             )?
-            .iter()
-            .any(|Link { target, .. }| *target == this_paths_hash);
+                .iter()
+                .any(|Link { target, .. }| *target == this_paths_hash);
             Ok(exists)
         }
     }
@@ -400,9 +403,8 @@ impl TypedPath {
     pub fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
         let mut unwrapped = get_links(
-            self.path_entry_hash()?,
-            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-            None,
+            GetLinksInputBuilder::try_new(self.path_entry_hash()?.into(),
+                                          LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type))?.build()
         )?;
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
@@ -480,7 +482,7 @@ impl TryInto<String> for TypedPath {
 #[test]
 #[cfg(test)]
 fn hash_path_delimiter() {
-    assert_eq!(".", DELIMITER,);
+    assert_eq!(".", DELIMITER, );
 }
 
 #[test]
@@ -492,7 +494,7 @@ fn hash_path_component() {
 
     let component = Component::from(bytes.clone());
 
-    assert_eq!(bytes, component.as_ref(),);
+    assert_eq!(bytes, component.as_ref(), );
 
     assert_eq!(
         Component::from(vec![102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0]),
@@ -501,9 +503,9 @@ fn hash_path_component() {
 
     assert_eq!(
         String::try_from(&Component::from(vec![
-            102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0
+            102, 0, 0, 0, 111, 0, 0, 0, 111, 0, 0, 0,
         ]))
-        .unwrap(),
+            .unwrap(),
         String::from("foo"),
     );
 
@@ -535,7 +537,7 @@ fn hash_path_path() {
         vec
     };
 
-    assert_eq!(&components, Path::from(components.clone()).as_ref(),);
+    assert_eq!(&components, Path::from(components.clone()).as_ref(), );
 
     for (input, output) in vec![
         ("", vec![]),
@@ -596,7 +598,7 @@ fn hash_path_path() {
             ],
         ),
     ] {
-        assert_eq!(Path::from(input), Path::from(output),);
+        assert_eq!(Path::from(input), Path::from(output), );
     }
 
     let path = "foo.a.b.c.abcdef.bar";

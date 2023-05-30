@@ -10,7 +10,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
+#[tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name))]
 pub fn get_links<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -26,37 +26,41 @@ pub fn get_links<'a>(
             let results: Vec<Result<Vec<Link>, RibosomeError>> =
                 tokio_helper::block_forever_on(async move {
                     let call_context_iter = std::iter::from_fn(|| Some(call_context.clone()));
-                    futures::stream::iter(std::iter::zip(inputs.into_iter(), call_context_iter).map(|(input, call_context)| async move {
-                        let GetLinksInput {
-                            base_address,
-                            link_type,
-                            tag_prefix,
-                            after,
-                            before,
-                            author,
-                            batch_size,
-                            batch_index,
-                            previous_batch_end,
-                        } = input;
+                    futures::stream::iter(
+                        std::iter::zip(inputs.into_iter(), call_context_iter).map(
+                            |(input, call_context)| async move {
+                                let GetLinksInput {
+                                    base_address,
+                                    link_type,
+                                    tag_prefix,
+                                    after,
+                                    before,
+                                    author,
+                                    batch_size,
+                                    batch_index,
+                                    previous_batch_end,
+                                } = input;
 
-                        let key = WireLinkKey {
-                            base: base_address,
-                            type_query: link_type,
-                            tag: tag_prefix,
-                            after,
-                            before,
-                            author,
-                            batch_size,
-                            batch_index,
-                            previous_batch_end,
-                        };
-                        Ok(CascadeImpl::from_workspace_and_network(
-                            &call_context.host_context.workspace(),
-                            call_context.host_context.network().to_owned(),
-                        )
-                        .dht_get_links(key, GetLinksOptions::default())
-                        .await?)
-                    }))
+                                let key = WireLinkKey {
+                                    base: base_address,
+                                    type_query: link_type,
+                                    tag: tag_prefix,
+                                    after,
+                                    before,
+                                    author,
+                                    batch_size,
+                                    batch_index,
+                                    previous_batch_end,
+                                };
+                                Ok(CascadeImpl::from_workspace_and_network(
+                                    &call_context.host_context.workspace(),
+                                    call_context.host_context.network().to_owned(),
+                                )
+                                .dht_get_links(key, GetLinksOptions::default())
+                                .await?)
+                            },
+                        ),
+                    )
                     // Limit concurrent calls to 10 as each call
                     // can spawn multiple connections.
                     .buffered(10)
@@ -97,6 +101,7 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
+    use crate::core::ribosome::host_fn::hash::hash;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_test_wasm_common::*;
@@ -273,65 +278,34 @@ pub mod slow_tests {
         let forward_links: Vec<Link> = conductor.call(&alice, "get_links", ()).await;
         let back_links: Vec<Link> = conductor.call(&alice, "get_back_links", ()).await;
         let links_bidi: Vec<Vec<Link>> = conductor.call(&alice, "get_links_bidi", ()).await;
-        let hash_path_a: holo_hash::AnyLinkableHash =  conductor.call(&alice, "get_path_hash", "a").await;
-        let hash_path_b: holo_hash::AnyLinkableHash =  conductor.call(&alice, "get_path_hash", "b").await;
+        let hash_path_a: holo_hash::AnyLinkableHash =
+            conductor.call(&alice, "get_path_hash", "a").await;
+        let hash_path_b: holo_hash::AnyLinkableHash =
+            conductor.call(&alice, "get_path_hash", "b").await;
 
         const LINK_TYPE: ScopedLinkType = ScopedLinkType {
             zome_index: ZomeIndex(0),
             zome_type: LinkType(0),
         };
         let forward_link_0 = forward_links.get(0).unwrap();
-        assert_eq!(
-            forward_link_0.base,
-            hash_path_a
-        );
-        assert_eq!(
-            forward_link_0.target,
-            hash_path_b
-        );
+        assert_eq!(forward_link_0.base, hash_path_a);
+        assert_eq!(forward_link_0.target, hash_path_b);
         assert_eq!(
             forward_link_0.author,
             alice.cell_id().agent_pubkey().clone()
         );
-        assert_eq!(
-            forward_link_0.tag,
-            LinkTag::from(())
-        );
-        assert_eq!(
-            forward_link_0.link_type,
-            LinkType(0)
-        );
-        assert_eq!(
-            forward_link_0.zome_index,
-            ZomeIndex(0)
-        );
+        assert_eq!(forward_link_0.tag, LinkTag::from(()));
+        assert_eq!(forward_link_0.link_type, LinkType(0));
+        assert_eq!(forward_link_0.zome_index, ZomeIndex(0));
         assert!(t1 <= forward_link_0.timestamp && t2 >= forward_link_0.timestamp);
 
         let back_link_0 = back_links.get(0).unwrap();
-        assert_eq!(
-            back_link_0.base,
-            hash_path_b
-        );
-        assert_eq!(
-            back_link_0.target,
-            hash_path_a
-        );
-        assert_eq!(
-            back_link_0.author,
-            alice.cell_id().agent_pubkey().clone()
-        );
-        assert_eq!(
-            back_link_0.tag,
-            LinkTag::from(())
-        );
-        assert_eq!(
-            back_link_0.link_type,
-            LinkType(0)
-        );
-        assert_eq!(
-            back_link_0.zome_index,
-            ZomeIndex(0)
-        );
+        assert_eq!(back_link_0.base, hash_path_b);
+        assert_eq!(back_link_0.target, hash_path_a);
+        assert_eq!(back_link_0.author, alice.cell_id().agent_pubkey().clone());
+        assert_eq!(back_link_0.tag, LinkTag::from(()));
+        assert_eq!(back_link_0.link_type, LinkType(0));
+        assert_eq!(back_link_0.zome_index, ZomeIndex(0));
         assert!(t2 <= back_link_0.timestamp && t3 >= back_link_0.timestamp);
         assert_eq!(links_bidi, vec![forward_links.clone(), back_links.clone()],);
 
@@ -361,5 +335,214 @@ pub mod slow_tests {
 
         let links: Vec<hdk::prelude::Link> = conductor.call(&alice, "get_long_path", ()).await;
         assert_eq!(links.len(), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn get_links_filtered() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor,
+            alice,
+            bob,
+            ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
+
+        let hash_a: ActionHash = conductor
+            .call(&alice, "create_tagged_link", "a".to_string())
+            .await;
+
+        let hash_b: ActionHash = conductor
+            .call(&bob, "create_tagged_link", "b".to_string())
+            .await;
+
+        let mid_time = Timestamp::now();
+
+        let hash_c: ActionHash = conductor
+            .call(&alice, "create_tagged_link", "c".to_string())
+            .await;
+
+        let hash_d: ActionHash = conductor
+            .call(&bob, "create_tagged_link", "d".to_string())
+            .await;
+
+        // Get the base all the links are attached from
+        let base: AnyLinkableHash = conductor.call(&alice, "get_base_hash", ()).await;
+
+        // Get all the links to check they've been created as expected
+        let links: Vec<Link> = conductor
+            .call(
+                &alice,
+                "get_links_with_query",
+                GetLinksInputBuilder::try_new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                )
+                .unwrap()
+                .build(),
+            )
+            .await;
+        assert_eq!(4, links.len());
+
+        // Filter by created before
+        let links: Vec<Link> = conductor
+            .call(
+                &alice,
+                "get_links_with_query",
+                GetLinksInputBuilder::try_new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                )
+                .unwrap()
+                .before(mid_time)
+                .build(),
+            )
+            .await;
+        assert_eq!(
+            vec![hash_a.clone(), hash_b],
+            links
+                .into_iter()
+                .map(|l| l.create_link_hash)
+                .collect::<Vec<ActionHash>>()
+        );
+
+        // Filter by created after
+        let links: Vec<Link> = conductor
+            .call(
+                &alice,
+                "get_links_with_query",
+                GetLinksInputBuilder::try_new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                )
+                .unwrap()
+                .after(mid_time)
+                .build(),
+            )
+            .await;
+        assert_eq!(
+            vec![hash_c.clone(), hash_d],
+            links
+                .into_iter()
+                .map(|l| l.create_link_hash)
+                .collect::<Vec<ActionHash>>()
+        );
+
+        // Filter by author
+        let links: Vec<Link> = conductor
+            .call(
+                &alice,
+                "get_links_with_query",
+                GetLinksInputBuilder::try_new(
+                    base,
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                )
+                .unwrap()
+                .author(alice.cell_id().agent_pubkey().clone())
+                .build(),
+            )
+            .await;
+        assert_eq!(
+            vec![hash_a, hash_c],
+            links
+                .into_iter()
+                .map(|l| l.create_link_hash)
+                .collect::<Vec<ActionHash>>()
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn get_links_batch() {
+        holochain_trace::test_run().ok();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::Link).await;
+
+        let mut hashes = Vec::<ActionHash>::new();
+        for _ in 0..10 {
+            let hash: ActionHash = conductor
+                .call(&alice, "create_tagged_link", "a".to_string())
+                .await;
+            hashes.push(hash);
+        }
+
+        // Get the base all the links are attached from
+        let base: AnyLinkableHash = conductor.call(&alice, "get_base_hash", ()).await;
+
+        // Get all the links to check they've been created as expected
+        let links: Vec<Link> = conductor
+            .call(
+                &alice,
+                "get_links_with_query",
+                GetLinksInputBuilder::try_new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                )
+                .unwrap()
+                .build(),
+            )
+            .await;
+        assert_eq!(10, links.len());
+
+        // Get in batches of 3 using `batch_size`
+        for i in 0..4 {
+            let batch_size = 3;
+            let links: Vec<Link> = conductor
+                .call(
+                    &alice,
+                    "get_links_with_query",
+                    GetLinksInputBuilder::try_new(
+                        base.clone(),
+                        LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                    )
+                    .unwrap()
+                    .batch_size(batch_size)
+                    .batch_index(i)
+                    .build(),
+                )
+                .await;
+            assert_eq!(
+                hashes
+                    .iter()
+                    .skip(i * batch_size)
+                    .take(batch_size)
+                    .cloned()
+                    .collect::<Vec<ActionHash>>(),
+                links
+                    .into_iter()
+                    .map(|l| l.create_link_hash)
+                    .collect::<Vec<ActionHash>>()
+            );
+        }
+
+        // Get in batches of 3 using `batch_size`
+        for i in 0..4 {
+            let batch_size = 3;
+            let mut builder = GetLinksInputBuilder::try_new(
+                base.clone(),
+                LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+            )
+            .unwrap()
+            .batch_size(batch_size);
+
+            if i > 0 {
+                builder = builder.previous_batch_end(hashes[i * batch_size - 1].clone())
+            }
+
+            let links: Vec<Link> = conductor
+                .call(&alice, "get_links_with_query", builder.build())
+                .await;
+            assert_eq!(
+                hashes
+                    .iter()
+                    .skip(i * batch_size)
+                    .take(batch_size)
+                    .cloned()
+                    .collect::<Vec<ActionHash>>(),
+                links
+                    .into_iter()
+                    .map(|l| l.create_link_hash)
+                    .collect::<Vec<ActionHash>>()
+            );
+        }
     }
 }

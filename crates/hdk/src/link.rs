@@ -1,5 +1,8 @@
 use crate::prelude::*;
 
+pub mod link_types;
+
+pub use link_types::*;
 pub use hdi::link::*;
 
 /// Create a link from a base hash to a target hash, with an optional tag.
@@ -141,23 +144,16 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
 ///
 /// See [ `get_link_details` ].
 pub fn get_links(
-    base: impl Into<AnyLinkableHash>,
-    link_type: impl LinkTypeFilterExt,
-    link_tag: Option<LinkTag>,
+    input: GetLinksInput,
 ) -> ExternResult<Vec<Link>> {
-    let link_type = link_type.try_into_filter()?;
     Ok(HDK
         .with(|h| {
-            let mut input = GetLinksInput::new(base.into(), link_type);
-            if let Some(link_tag) = link_tag {
-                input = input.tag_prefix(link_tag);
-            }
             h.borrow()
                 .get_links(vec![input])
         })?
         .into_iter()
-        .next()
-        .unwrap())
+        .flatten()
+        .collect())
 }
 
 /// Get all link creates and deletes that reference a base hash, optionally filtered by type or tag.
@@ -190,15 +186,14 @@ pub fn get_link_details(
     link_type: impl LinkTypeFilterExt,
     link_tag: Option<LinkTag>,
 ) -> ExternResult<LinkDetails> {
-    let link_type = link_type.try_into_filter()?;
     Ok(HDK
         .with(|h| {
-            let mut input = GetLinksInput::new(base.into(), link_type);
+            let mut input = GetLinksInputBuilder::try_new(base.into(), link_type)?;
             if let Some(link_tag) = link_tag {
                 input = input.tag_prefix(link_tag);
             }
             h.borrow()
-                .get_link_details(vec![input])
+                .get_link_details(vec![input.build()])
         })?
         .into_iter()
         .next()
@@ -208,3 +203,5 @@ pub fn get_link_details(
 pub fn count_links(query: LinkQuery) -> ExternResult<usize> {
     HDK.with(|h| h.borrow().count_links(query))
 }
+
+
