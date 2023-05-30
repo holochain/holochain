@@ -10,11 +10,11 @@ pub struct GetLinksInputBuilder(GetLinksInput);
 impl GetLinksInputBuilder {
     /// Create a new `GetLinksInputBuilder` from the required fields for a `GetLinksInput`
     pub fn try_new(
-        base_address: AnyLinkableHash,
+        base_address: impl Into<AnyLinkableHash>,
         link_type: impl LinkTypeFilterExt,
     ) -> Result<Self, WasmError> {
         Ok(GetLinksInputBuilder(GetLinksInput {
-            base_address,
+            base_address: base_address.into(),
             link_type: link_type.try_into_filter()?,
             tag_prefix: None,
             before: None,

@@ -1,9 +1,9 @@
 use crate::prelude::*;
 
-pub mod link_types;
+pub mod builder;
 
 pub use hdi::link::*;
-pub use link_types::*;
+pub use builder::*;
 
 /// Create a link from a base hash to a target hash, with an optional tag.
 ///
@@ -114,7 +114,8 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
     })
 }
 
-/// Returns all links that reference a base hash, optionally filtered by link type and tag.
+/// Returns all links that reference a base hash, filtered by link type. Use a [ `GetLinksInputBuilder` ] to create the
+/// [ `GetLinksInput` ]. That optionally allows links to be further filtered or batched.
 ///
 /// Type can be filtered by providing a variant of the link types or the full range operator. Get links of
 /// all types like this: `get_links(base, .., None)`. Refer to the `get_links` function in

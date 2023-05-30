@@ -363,7 +363,7 @@ impl TypedPath {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
                 GetLinksInputBuilder::try_new(
-                    parent.path_entry_hash()?.into(),
+                    parent.path_entry_hash()?,
                     LinkTypeFilter::single_type(
                         self.link_type.zome_index,
                         self.link_type.zome_type,
@@ -418,7 +418,7 @@ impl TypedPath {
         Self::ensure(self)?;
         let mut unwrapped = get_links(
             GetLinksInputBuilder::try_new(
-                self.path_entry_hash()?.into(),
+                self.path_entry_hash()?,
                 LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
             )?
             .build(),

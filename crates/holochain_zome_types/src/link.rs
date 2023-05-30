@@ -88,9 +88,13 @@ impl DeleteLinkInput {
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GetLinksInput {
+    /// The base to get links from.
     pub base_address: holo_hash::AnyLinkableHash,
+
     /// The link types to include in this get.
     pub link_type: LinkTypeFilter,
+
+    /// The tag prefix to filter by.
     pub tag_prefix: Option<LinkTag>,
 
     /// Only include links created after this time.

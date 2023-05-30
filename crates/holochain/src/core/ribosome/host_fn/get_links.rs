@@ -10,7 +10,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-#[tracing::instrument(skip(_ribosome, call_context), fields(? call_context.zome, function = ? call_context.function_name))]
+#[tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name))]
 pub fn get_links<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -200,7 +200,7 @@ pub mod slow_tests {
             hdk::hash_path::path::Component::from("foo".as_bytes().to_vec()),
         ]);
         // should be 1 anchor type, "foo"
-        assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
+        assert_eq!(list_anchor_type_addresses_output.0.len(), 1);
         assert_eq!(
             (list_anchor_type_addresses_output.0)[0],
             EntryHash::with_data_sync(&Entry::App(AppEntryBytes(expect.try_into().unwrap())))
@@ -211,7 +211,7 @@ pub mod slow_tests {
             .await;
 
         // should be 2 anchors under "foo" sorted by hash
-        assert_eq!(list_anchor_addresses_output.0.len(), 2,);
+        assert_eq!(list_anchor_addresses_output.0.len(), 2);
         assert_eq!(
             (list_anchor_addresses_output.0)[0].get_raw_32().to_vec(),
             anchor_address_one.get_raw_32().to_vec(),
@@ -307,7 +307,7 @@ pub mod slow_tests {
         assert_eq!(back_link_0.link_type, LinkType(0));
         assert_eq!(back_link_0.zome_index, ZomeIndex(0));
         assert!(t2 <= back_link_0.timestamp && t3 >= back_link_0.timestamp);
-        assert_eq!(links_bidi, vec![forward_links.clone(), back_links.clone()],);
+        assert_eq!(links_bidi, vec![forward_links.clone(), back_links.clone()]);
 
         let forward_link_details: LinkDetails =
             conductor.call(&alice, "get_link_details", ()).await;
