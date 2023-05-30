@@ -1,11 +1,11 @@
 #![cfg(feature = "test_utils")]
 
+use hdk::prelude::GetLinksInputBuilder;
 use holochain::sweettest::SweetAgents;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
 use holochain::test_utils::consistency_10s;
 use holochain_serialized_bytes::prelude::*;
-use hdk::prelude::GetLinksInputBuilder;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -33,7 +33,9 @@ fn links_zome() -> InlineIntegrityZome {
                 Ok(api.get_links(vec![GetLinksInputBuilder::try_new(
                     base,
                     InlineZomeSet::dep_link_filter(&api),
-                ).unwrap().build()])?)
+                )
+                .unwrap()
+                .build()])?)
             },
         )
 }

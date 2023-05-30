@@ -22,7 +22,7 @@ pub enum ActionError {
     #[error("{0}")]
     Rebase(String),
     #[error("Action not found [{0}]")]
-    NotFound(ActionHash)
+    NotFound(ActionHash),
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]

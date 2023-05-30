@@ -1,6 +1,6 @@
-use holochain_wasmer_guest::WasmError;
 use hdi::prelude::LinkTypeFilterExt;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
+use holochain_wasmer_guest::WasmError;
 use holochain_zome_types::{GetLinksInput, LinkTag, Timestamp};
 
 /// A builder to streamline creating a `GetLinksInput`

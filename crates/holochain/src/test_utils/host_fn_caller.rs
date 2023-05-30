@@ -410,7 +410,10 @@ impl HostFnCaller {
         _options: GetLinksOptions,
     ) -> Vec<(SignedActionHashed, Vec<SignedActionHashed>)> {
         let (ribosome, call_context, workspace_lock) = self.unpack().await;
-        let input = GetLinksInputBuilder::try_new(base, type_query).unwrap().tag_prefix(tag).build();
+        let input = GetLinksInputBuilder::try_new(base, type_query)
+            .unwrap()
+            .tag_prefix(tag)
+            .build();
         let output = {
             host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
                 .unwrap()
