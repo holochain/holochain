@@ -191,6 +191,36 @@ async fn fullsync_sharded_gossip_high_data() -> anyhow::Result<()> {
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[cfg(feature = "slow_tests")]
 #[tokio::test(flavor = "multi_thread")]
+async fn test_zero_arc_get_links() {
+    holochain_trace::test_run().ok();
+
+    // Standard config with arc clamped to zero
+    let mut tuning = make_tuning(true, true, true, None);
+    tuning.gossip_arc_clamping = "empty".into();
+    let config = SweetConductorConfig::standard().tune(Arc::new(tuning));
+
+    let mut conductor0 = SweetConductor::from_config(config).await;
+    let mut conductor1 = SweetConductor::from_standard_config().await;
+
+    let tw = holochain_wasm_test_utils::TestWasm::Link;
+    let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![tw]).await;
+    let app0 = conductor0.setup_app("app", [&dna_file]).await.unwrap();
+    let app1 = conductor1.setup_app("app", [&dna_file]).await.unwrap();
+    let (cell0,) = app0.into_tuple();
+    // let (cell1,) = app1.into_tuple();
+
+    // conductors.exchange_peer_info().await;
+
+    let zome0 = cell0.zome(tw);
+    let _hash0: ActionHash = conductor0.call(&zome0, "create_link", ()).await;
+
+    let links: Vec<Link> = conductor0.call(&zome0, "get_links", ()).await;
+    assert_eq!(links.len(), 1);
+}
+
+/// Test that conductors with arcs clamped to zero do not gossip.
+#[cfg(feature = "slow_tests")]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_zero_arc_no_gossip_2way() {
     holochain_trace::test_run().ok();
@@ -720,6 +750,7 @@ async fn mock_network_sharded_gossip() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }
@@ -1236,6 +1267,7 @@ async fn mock_network_sharding() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }

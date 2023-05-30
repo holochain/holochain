@@ -1153,6 +1153,7 @@ mod network_impls {
                 | Get { .. }
                 | GetMeta { .. }
                 | GetLinks { .. }
+                | CountLinks { .. }
                 | GetAgentActivity { .. }
                 | MustGetAgentActivity { .. }
                 | ValidationReceiptReceived { .. } => {
