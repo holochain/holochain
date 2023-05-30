@@ -2,8 +2,8 @@ use crate::prelude::*;
 
 pub mod builder;
 
-pub use hdi::link::*;
 pub use builder::*;
+pub use hdi::link::*;
 
 /// Create a link from a base hash to a target hash, with an optional tag.
 ///
