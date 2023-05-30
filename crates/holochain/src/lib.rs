@@ -42,5 +42,6 @@ pub mod prelude {
     pub use holochain_p2p::*;
     pub use holochain_types::inline_zome::*;
     pub use holochain_types::prelude::*;
+    pub use hdk::link::GetLinksInputBuilder;
     pub use kitsune_p2p::*;
 }
