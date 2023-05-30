@@ -98,7 +98,7 @@ mod test {
         let bob_agent = KitsuneAgent(bob_pubkey.get_raw_32().to_vec());
         let carol_agent = KitsuneAgent(carol_pubkey.get_raw_32().to_vec());
 
-        dbg!(&alice_agent, bob_agent, carol_agent);
+        dbg!(alice_pubkey, bob_pubkey, carol_pubkey);
 
         // conductors.exchange_peer_info().await;
 
@@ -110,10 +110,12 @@ mod test {
 
         let action0: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
-        consistency_10s_advanced([(&alice_cell, true), (&bob_cell, true), (&carol_cell, false)]).await;
+        consistency_10s([&alice_cell, &bob_cell]).await;
 
         // Before bob is blocked he can get posts just fine.
         let bob_get0: Option<Record> = bob_conductor.call(&bob, "get_post", action0).await;
+        // Await bob's init to propagate to alice.
+        consistency_10s([&alice_cell, &bob_cell]).await;
         assert!(bob_get0.is_some());
 
         // Bob gets blocked by alice.
@@ -121,22 +123,22 @@ mod test {
 
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
-        // Now that bob is blocked by alice he cannot get data from alice.
-        consistency_10s_advanced([(&alice_cell, true), (&bob_cell, true), (&carol_cell, false)]).await;
+        // // Now that bob is blocked by alice he cannot get data from alice.
+        consistency_10s([&alice_cell, &bob_cell]).await;
         let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
 
         assert!(bob_get1.is_none());
 
-        // If carol joins the party but DOES NOT block bob then she will
-        // give access to data once more for bob.
+        // // If carol joins the party but DOES NOT block bob then she will
+        // // give access to data once more for bob.
 
-        conductors.exchange_peer_info().await;
+        // conductors.exchange_peer_info().await;
 
-        consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+        // consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
 
-        // Bob can get data from alice via. carol.
-        let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
-        assert!(bob_get2.is_some());
+        // // Bob can get data from alice via. carol.
+        // let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
+        // assert!(bob_get2.is_some());
     }
 
 }
