@@ -14,7 +14,7 @@ impl GetLinksInputBuilder {
         link_type: impl LinkTypeFilterExt,
     ) -> Result<Self, WasmError> {
         Ok(GetLinksInputBuilder(GetLinksInput {
-            base_address: base_address.into(),
+            base_address,
             link_type: link_type.try_into_filter()?,
             tag_prefix: None,
             before: None,
