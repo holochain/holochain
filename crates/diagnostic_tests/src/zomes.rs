@@ -58,7 +58,9 @@ pub fn basic_zome() -> InlineIntegrityZome {
                     .get_links(vec![GetLinksInputBuilder::try_new(
                         base,
                         LinkTypeFilter::single_dep(0.into()),
-                    ).unwrap().build()])
+                    )
+                    .unwrap()
+                    .build()])
                     .unwrap();
                 let links = links.first().unwrap();
                 if entries {
