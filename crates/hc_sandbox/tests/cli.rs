@@ -123,7 +123,6 @@ async fn clean_sandboxes() {
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO: @ThetaSinner please have a look"]
 async fn generate_sandbox_and_connect() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
@@ -151,7 +150,8 @@ async fn generate_sandbox_and_connect() {
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    let launch_info = get_launch_info(hc_admin.stdout.take().unwrap()).await;
+    let mut stdout = hc_admin.stdout.take().unwrap();
+    let launch_info = get_launch_info(&mut stdout).await;
 
     // - Make a call to list app info to the port
     get_app_info(*launch_info.app_ports.first().expect("No app ports found")).await;
@@ -159,7 +159,6 @@ async fn generate_sandbox_and_connect() {
 
 /// Generates a new sandbox with a single app deployed and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO: @ThetaSinner please have a look"]
 async fn generate_sandbox_and_call_list_dna() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
@@ -186,7 +185,8 @@ async fn generate_sandbox_and_call_list_dna() {
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     drop(child_stdin);
 
-    let launch_info = get_launch_info(hc_admin.stdout.take().unwrap()).await;
+    let mut stdout = hc_admin.stdout.take().unwrap();
+    let launch_info = get_launch_info(&mut stdout).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -200,8 +200,6 @@ async fn generate_sandbox_and_call_list_dna() {
 
     let exit_code = hc_call.wait().await.unwrap();
     assert!(exit_code.success());
-
-    hc_admin.kill().await.unwrap();
 }
 
 fn get_hc_command() -> Command {
@@ -225,7 +223,7 @@ fn get_sandbox_command() -> Command {
     }
 }
 
-async fn get_launch_info(stdout: ChildStdout) -> LaunchInfo {
+async fn get_launch_info(stdout: &mut ChildStdout) -> LaunchInfo {
     let mut lines = BufReader::new(stdout).lines();
     while let Ok(Some(line)) = lines.next_line().await {
         if let Some(index) = line.find("#!0") {

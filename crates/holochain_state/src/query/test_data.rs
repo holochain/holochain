@@ -135,6 +135,7 @@ impl LinkTestData {
             base_hash.clone().into(),
             LinkTypeFilter::single_dep(0.into()),
             Some(create_link.tag.clone()),
+            GetLinksFilter::default(),
         );
         let details_tag_query = GetLinkDetailsQuery::new(
             base_hash.clone().into(),
