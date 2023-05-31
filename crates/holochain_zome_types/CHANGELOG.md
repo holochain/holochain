@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.3.0-beta-dev.1
+
 ## 0.3.0-beta-dev.0
 
 - Changes the `ChainQueryFilter` to support filtering on multiple entry types and actions types in the same query. The query builder interface hasn’t changed but if your code was calling `entry_type` or `action_type` more than once it will now create a logical OR rather than replacing the action or entry type to filter on.
