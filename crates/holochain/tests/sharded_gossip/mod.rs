@@ -205,9 +205,8 @@ async fn test_zero_arc_get_links() {
     let tw = holochain_wasm_test_utils::TestWasm::Link;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![tw]).await;
     let app0 = conductor0.setup_app("app", [&dna_file]).await.unwrap();
-    let app1 = conductor1.setup_app("app", [&dna_file]).await.unwrap();
+    let _ = conductor1.setup_app("app", [&dna_file]).await.unwrap();
     let (cell0,) = app0.into_tuple();
-    // let (cell1,) = app1.into_tuple();
 
     // conductors.exchange_peer_info().await;
 
@@ -750,6 +749,7 @@ async fn mock_network_sharded_gossip() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }
@@ -1266,6 +1266,7 @@ async fn mock_network_sharding() {
                         }
                         holochain_p2p::WireMessage::GetMeta { .. } => debug!("get_meta"),
                         holochain_p2p::WireMessage::GetLinks { .. } => debug!("get_links"),
+                        holochain_p2p::WireMessage::CountLinks { .. } => debug!("count_links"),
                         holochain_p2p::WireMessage::GetAgentActivity { .. } => {
                             debug!("get_agent_activity")
                         }

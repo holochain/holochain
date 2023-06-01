@@ -40,6 +40,7 @@ pub mod chain_head;
 pub mod entry_details;
 pub mod error;
 pub mod link;
+pub mod link_count;
 pub mod link_details;
 pub mod live_entry;
 pub mod live_record;

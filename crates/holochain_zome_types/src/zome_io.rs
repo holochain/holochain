@@ -95,6 +95,8 @@ wasm_io_types! {
     // Get links by entry hash from the cascade.
     fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
+    fn count_links(zt::query::LinkQuery) -> usize;
+
     // Attempt to get a live entry from the cascade.
     fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::record::Record>>;
 

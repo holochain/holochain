@@ -153,6 +153,8 @@ host_fn_api_impls! {
 
     fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
+    fn count_links(zt::query::LinkQuery) -> usize;
+
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
