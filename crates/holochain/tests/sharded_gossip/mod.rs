@@ -15,6 +15,7 @@ use holochain::{
 };
 use holochain_p2p::*;
 use holochain_sqlite::db::*;
+use holochain_trace::{init_fmt, test_run_timed_flame};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p::KitsuneP2pConfig;
@@ -63,6 +64,8 @@ fn make_config(
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn fullsync_sharded_gossip_low_data() -> anyhow::Result<()> {
+    let f = test_run_timed_flame().unwrap();
+
     let _g = holochain_trace::test_run().ok();
     const NUM_CONDUCTORS: usize = 2;
 

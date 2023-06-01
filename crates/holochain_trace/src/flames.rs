@@ -3,6 +3,7 @@ use tracing_subscriber::field::Visit;
 
 use chrono::SecondsFormat;
 use std::path::PathBuf;
+use crate::writer::InMemoryWriter;
 
 pub(crate) struct EventFieldFlameVisitor {
     pub samples: usize,
@@ -32,19 +33,35 @@ impl Visit for EventFieldFlameVisitor {
     }
 }
 
-pub(crate) struct FlameTimed {
-    path: PathBuf,
-}
+pub(crate) struct FlameTimed(InMemoryWriter);
 
 impl FlameTimed {
-    pub(crate) fn new(path: PathBuf) -> Self {
-        Self { path }
+    pub(crate) fn new(writer: InMemoryWriter) -> Self {
+        Self(writer)
+    }
+
+    fn save_flame_graph(&mut self) -> Option<()> {
+        let now = chrono::Local::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        println!("data size {}", self.0.buf().unwrap().len());
+        let reader = std::io::BufReader::new(&mut self.0);
+
+        let out = std::fs::File::create(toml_path().unwrap_or(PathBuf::from(".")).join(format!("tracing_flame_{}.svg", now)))
+            .ok()
+            .or_else(|| {
+                eprintln!("failed to create flames inferno");
+                None
+            })?;
+        let writer = std::io::BufWriter::new(out);
+
+        let mut opts = inferno::flamegraph::Options::default();
+        inferno::flamegraph::from_reader(&mut opts, reader, writer).unwrap();
+        Some(())
     }
 }
 
 impl Drop for FlameTimed {
     fn drop(&mut self) {
-        save_flamegraph(self.path.clone());
+        self.save_flame_graph();
     }
 }
 
@@ -54,30 +71,6 @@ pub(crate) fn toml_path() -> Option<PathBuf> {
         None
     })?;
     Some(PathBuf::from(path))
-}
-
-fn save_flamegraph(path: PathBuf) -> Option<()> {
-    println!("path {:?}", path);
-    let now = chrono::Local::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let inf = std::fs::File::open(path.join("flames.folded"))
-        .ok()
-        .or_else(|| {
-            eprintln!("failed to create flames dir");
-            None
-        })?;
-    let reader = std::io::BufReader::new(inf);
-
-    let out = std::fs::File::create(path.join(format!("tracing_flame_{}.svg", now)))
-        .ok()
-        .or_else(|| {
-            eprintln!("failed to create flames inferno");
-            None
-        })?;
-    let writer = std::io::BufWriter::new(out);
-
-    let mut opts = inferno::flamegraph::Options::default();
-    inferno::flamegraph::from_reader(&mut opts, reader, writer).unwrap();
-    Some(())
 }
 
 fn parse_time(samples: &mut usize, value: &dyn std::fmt::Debug) {

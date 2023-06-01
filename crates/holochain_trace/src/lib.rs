@@ -83,10 +83,12 @@ use tracing_subscriber::{
 
 use derive_more::Display;
 use std::{str::FromStr, sync::Once};
+use std::sync::{Arc, Mutex};
 
-use flames::{toml_path, FlameTimed};
+use flames::FlameTimed;
 use fmt::*;
 
+mod writer;
 mod flames;
 mod fmt;
 pub mod metrics;
@@ -99,6 +101,8 @@ pub mod metrics;
 // pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 
 pub use tracing;
+use tracing_subscriber::fmt::MakeWriter;
+use crate::writer::InMemoryWriter;
 
 #[derive(Debug, Clone, Display)]
 /// Sets the kind of structured logging output you want
@@ -146,13 +150,14 @@ impl FromStr for Output {
     }
 }
 
-/// Run logging in a unit test
-/// RUST_LOG or CUSTOM_FILTER must be set or
-/// this is a no-op
+/// Run logging in a unit test.
+///
+/// RUST_LOG must be set or this is a no-op.
 pub fn test_run() -> Result<(), errors::TracingError> {
     if std::env::var_os("RUST_LOG").is_none() {
         return Ok(());
     }
+
     init_fmt(Output::Log)
 }
 
@@ -181,49 +186,39 @@ pub fn test_run_timed_json() -> Result<(), errors::TracingError> {
     init_fmt(Output::JsonTimed)
 }
 
-/// Generate a flamegraph from timed spans "busy time".
-/// Takes a path where you are piping the output into.
-/// If the path is provided a flamegraph will automatically be generated.
-/// TODO: Get auto inferno to work
-/// for now use (fish, or the bash equiv):
-/// `2>| inferno-flamegraph > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
-/// And run with `cargo test --quiet`
-pub fn test_run_timed_flame(path: Option<&str>) -> Result<Option<impl Drop>, errors::TracingError> {
+/// Generate a flamegraph from timed spans of "busy time".
+pub fn test_run_timed_flame() -> Result<Option<Box<impl Drop>>, errors::TracingError> {
     if std::env::var_os("RUST_LOG").is_none() {
         return Ok(None);
     }
-    init_fmt(Output::FlameTimed)?;
-    Ok(path.and_then(|p| {
-        toml_path().map(|mut t| {
-            t.push(p);
-            FlameTimed::new(t)
-        })
-    }))
+
+    let buffer = Arc::new(Mutex::new(Vec::new()));
+    let writer_handle = InMemoryWriter::new(buffer.clone());
+
+    init_fmt_with_opts(Output::FlameTimed, move || InMemoryWriter::new(buffer.clone()))?;
+    Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
-/// Generate a flamegraph from timed spans "idle time".
-/// Takes a path where you are piping the output into.
-/// If the path is provided a flamegraph will automatically be generated.
-/// TODO: Get auto inferno to work
-/// for now use (fish, or the bash equiv):
-/// `2>| inferno-flamegraph -c blue > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
-/// And run with `cargo test --quiet`
-pub fn test_run_timed_ice(path: Option<&str>) -> Result<Option<impl Drop>, errors::TracingError> {
+/// Generate a flamegraph from timed spans of "idle time".
+pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingError> {
     if std::env::var_os("RUST_LOG").is_none() {
         return Ok(None);
     }
-    init_fmt(Output::IceTimed)?;
-    Ok(path.and_then(|p| {
-        toml_path().map(|mut t| {
-            t.push(p);
-            FlameTimed::new(t)
-        })
-    }))
+
+    let buffer = Arc::new(Mutex::new(Vec::new()));
+    let writer_handle = InMemoryWriter::new(buffer.clone());
+
+    init_fmt_with_opts(Output::IceTimed, move || InMemoryWriter::new(buffer.clone()))?;
+    Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
 /// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
 /// It then checks for CUSTOM_FILTER which if set will output an error if it doesn't parse.
 pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
+    init_fmt_with_opts(output, std::io::stderr)
+}
+
+fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::TracingError> where W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static {
     let mut filter = match std::env::var("RUST_LOG") {
         Ok(_) => EnvFilter::from_default_env(),
         Err(_) => EnvFilter::from_default_env().add_directive("[wasm_debug]=debug".parse()?),
@@ -238,7 +233,8 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
     }
 
     let subscriber = FmtSubscriber::builder()
-        .with_writer(std::io::stderr)
+        .with_test_writer()
+        .with_writer(writer)
         .with_file(true)
         .with_line_number(true)
         .with_target(true);
