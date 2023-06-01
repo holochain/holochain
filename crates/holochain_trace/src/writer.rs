@@ -11,7 +11,9 @@ impl InMemoryWriter {
     }
 
     pub(crate) fn buf(&self) -> io::Result<MutexGuard<'_, Vec<u8>>> {
-        self.buf.try_lock().map_err(|_| io::Error::from(io::ErrorKind::Other))
+        self.buf
+            .lock()
+            .map_err(|_| io::Error::from(io::ErrorKind::Other))
     }
 }
 
@@ -27,6 +29,12 @@ impl io::Write for InMemoryWriter {
 
 impl io::Read for InMemoryWriter {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.buf()?.as_slice().read(buf)
+        let result = self.buf()?.as_slice().read(buf);
+
+        if let Ok(count) = &result {
+            self.buf()?.drain(0..*count);
+        }
+
+        result
     }
 }

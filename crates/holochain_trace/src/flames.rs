@@ -1,9 +1,9 @@
 use tracing_core::field::Field;
 use tracing_subscriber::field::Visit;
 
+use crate::writer::InMemoryWriter;
 use chrono::SecondsFormat;
 use std::path::PathBuf;
-use crate::writer::InMemoryWriter;
 
 pub(crate) struct EventFieldFlameVisitor {
     pub samples: usize,
@@ -45,12 +45,16 @@ impl FlameTimed {
         println!("data size {}", self.0.buf().unwrap().len());
         let reader = std::io::BufReader::new(&mut self.0);
 
-        let out = std::fs::File::create(toml_path().unwrap_or(PathBuf::from(".")).join(format!("tracing_flame_{}.svg", now)))
-            .ok()
-            .or_else(|| {
-                eprintln!("failed to create flames inferno");
-                None
-            })?;
+        let out = std::fs::File::create(
+            toml_path()
+                .unwrap_or(PathBuf::from("."))
+                .join(format!("tracing_flame_{}.svg", now)),
+        )
+        .ok()
+        .or_else(|| {
+            eprintln!("failed to create flames inferno");
+            None
+        })?;
         let writer = std::io::BufWriter::new(out);
 
         let mut opts = inferno::flamegraph::Options::default();
