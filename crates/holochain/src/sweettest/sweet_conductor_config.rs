@@ -60,6 +60,11 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
+        KitsuneP2pConfig::default().into()
+    }
+
+    /// Rendezvous config for SweetConductors
+    pub fn rendezvous() -> Self {
         let mut tuning =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();

@@ -9,7 +9,7 @@ impl ShardedGossipLocal {
     pub(super) async fn try_initiate(&self) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
-            i.check_tgt_expired(self.gossip_type);
+            i.check_tgt_expired(self.gossip_type, self.tuning_params.gossip_round_timeout());
             let has_target = i.initiate_tgt.is_some();
             // Clear any expired rounds.
             i.round_map.current_rounds();
@@ -216,7 +216,12 @@ impl ShardedGossipLocal {
         };
 
         // Generate the new state.
-        let mut state = self.new_state(remote_agent_list, common_arc_set, region_set)?;
+        let mut state = self.new_state(
+            remote_agent_list,
+            common_arc_set,
+            region_set,
+            self.tuning_params.gossip_round_timeout(),
+        )?;
 
         // Generate the agent bloom.
         if let GossipType::Recent = self.gossip_type {

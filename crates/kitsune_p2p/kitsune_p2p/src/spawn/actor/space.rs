@@ -1461,6 +1461,9 @@ impl Space {
             let i_s_c = i_s.clone();
             let evt_s_c = evt_sender.clone();
             let bootstrap_service = config.bootstrap_service.clone();
+            let bootstrap_check_delay_backoff_multiplier = config
+                .tuning_params
+                .bootstrap_check_delay_backoff_multiplier;
             let space_c = space.clone();
             tokio::task::spawn(async move {
                 const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
@@ -1476,7 +1479,7 @@ impl Space {
 
                     tokio::time::sleep(delay_len).await;
                     if delay_len <= MAX_DELAY {
-                        delay_len *= 2;
+                        delay_len *= bootstrap_check_delay_backoff_multiplier;
                     }
 
                     match super::bootstrap::random(

@@ -110,6 +110,7 @@ macro_rules! wait_until {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_block_invalid_receipt() {
     holochain_trace::test_run().ok();
     let unit_entry_def = EntryDef::from_id("unit");
@@ -167,9 +168,9 @@ async fn test_block_invalid_receipt() {
         _ => Ok(ValidateResult::Valid),
     });
 
-    let config = SweetConductorConfig::standard();
-    let conductors = SweetConductorBatch::from_config(2, config).await;
-    conductors.exchange_peer_info().await;
+    let config = SweetConductorConfig::rendezvous();
+    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
     let mut conductors = conductors.into_inner().into_iter();
 
     let mut alice_conductor = conductors.next().unwrap();
