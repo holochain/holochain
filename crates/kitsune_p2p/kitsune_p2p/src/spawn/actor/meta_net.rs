@@ -41,6 +41,9 @@ use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::spawn::actor::UNAUTHORIZED_DISCONNECT_CODE;
+use crate::spawn::actor::UNAUTHORIZED_DISCONNECT_REASON;
+
 kitsune_p2p_types::write_codec_enum! {
     /// KitsuneP2p WebRTC wrapper enum.
     codec WireWrap {
@@ -123,12 +126,6 @@ pub enum MetaNetEvt {
     },
 }
 
-pub enum MetaNetEvtAuth {
-    Authorized,
-    UnauthorizedIgnore,
-    UnauthorizedDisconnect,
-}
-
 impl MetaNetEvt {
     pub fn con(&self) -> &MetaNetCon {
         match self {
@@ -149,15 +146,21 @@ impl MetaNetEvt {
     }
 }
 
-pub async fn node_is_authorized(
+pub enum MetaNetAuth {
+    Authorized,
+    UnauthorizedIgnore,
+    UnauthorizedDisconnect,
+}
+
+async fn node_is_authorized(
     host: &HostApi,
     node_id: Arc<[u8; 32]>,
     now: Timestamp,
-) -> MetaNetEvtAuth {
+) -> MetaNetAuth {
     match host.is_blocked(BlockTargetId::Node(node_id), now).await {
-        Ok(true) => MetaNetEvtAuth::UnauthorizedDisconnect,
-        Ok(false) => MetaNetEvtAuth::Authorized,
-        Err(_) => MetaNetEvtAuth::UnauthorizedIgnore,
+        Ok(true) => MetaNetAuth::UnauthorizedDisconnect,
+        Ok(false) => MetaNetAuth::Authorized,
+        Err(_) => MetaNetAuth::UnauthorizedIgnore,
     }
 }
 
@@ -166,23 +169,23 @@ pub async fn nodespace_is_authorized(
     node_id: Arc<[u8; 32]>,
     maybe_space: Option<Arc<KitsuneSpace>>,
     now: Timestamp,
-) -> MetaNetEvtAuth {
+) -> MetaNetAuth {
     if let Some(space) = maybe_space {
         match node_is_authorized(host, node_id.clone(), now).await {
-            MetaNetEvtAuth::Authorized => {
+            MetaNetAuth::Authorized => {
                 match host
                     .is_blocked(BlockTargetId::NodeSpace(node_id, space), now)
                     .await
                 {
-                    Ok(true) => MetaNetEvtAuth::UnauthorizedIgnore,
-                    Ok(false) => MetaNetEvtAuth::Authorized,
-                    Err(_) => MetaNetEvtAuth::UnauthorizedIgnore,
+                    Ok(true) => MetaNetAuth::UnauthorizedIgnore,
+                    Ok(false) => MetaNetAuth::Authorized,
+                    Err(_) => MetaNetAuth::UnauthorizedIgnore,
                 }
             }
             unauthorized => unauthorized,
         }
     } else {
-        MetaNetEvtAuth::Authorized
+        MetaNetAuth::Authorized
     }
 }
 
@@ -197,6 +200,7 @@ pub enum MetaNetCon {
 
     #[cfg(feature = "tx5")]
     Tx5 {
+        host: HostApi,
         ep: tx5::Ep,
         rem_url: tx5::Tx5Url,
         res: ResStore,
@@ -258,6 +262,17 @@ impl MetaNetCon {
         true
     }
 
+    #[cfg(feature = "tx5")]
+    async fn wire_is_authorized(&self, payload: &wire::Wire, now: Timestamp) -> MetaNetAuth {
+        if let MetaNetCon::Tx5 { host, .. } = self {
+            nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
+        }
+        else {
+            // For real unreachable.
+            unreachable!();
+        }
+    }
+
     pub async fn notify(&self, payload: &wire::Wire, timeout: KitsuneTimeout) -> KitsuneResult<()> {
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
@@ -272,15 +287,28 @@ impl MetaNetCon {
 
             #[cfg(feature = "tx5")]
             {
-                if let MetaNetCon::Tx5 { ep, rem_url, .. } = self {
-                    let wire = payload.encode_vec().map_err(KitsuneError::other)?;
-                    let wrap = WireWrap::notify(msg_id, WireData(wire));
+                match self.wire_is_authorized(payload, Timestamp::now()).await {
+                    MetaNetAuth::Authorized => {
+                        dbg!("notify auth");
+                        if let MetaNetCon::Tx5 { ep, rem_url, .. } = self {
+                            let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                            let wrap = WireWrap::notify(msg_id, WireData(wire));
 
-                    let data = wrap.encode_vec().map_err(KitsuneError::other)?;
-                    ep.send(rem_url.clone(), data.as_slice())
-                        .await
-                        .map_err(KitsuneError::other)?;
-                    return Ok(());
+                            let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+                            ep.send(rem_url.clone(), data.as_slice())
+                                .await
+                                .map_err(KitsuneError::other)?;
+                            return Ok(());
+                        }
+                    }
+                    MetaNetAuth::UnauthorizedIgnore => {
+                        dbg!("notify ignore");
+                        return Ok(());
+                    },
+                    MetaNetAuth::UnauthorizedDisconnect => {
+                        dbg!("notify disconnect");
+                        return Ok(self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON).await);
+                    }
                 }
             }
 
@@ -315,30 +343,44 @@ impl MetaNetCon {
 
             #[cfg(feature = "tx5")]
             {
-                if let MetaNetCon::Tx5 {
-                    ep,
-                    rem_url,
-                    res: res_store,
-                    ..
-                } = self
-                {
-                    let (s, r) = tokio::sync::oneshot::channel();
-                    res_store.lock().insert(msg_id, s);
+                match self.wire_is_authorized(payload, Timestamp::now()).await {
+                    MetaNetAuth::Authorized => {
+                        dbg!("request authorized");
+                        if let MetaNetCon::Tx5 {
+                            ep,
+                            rem_url,
+                            res: res_store,
+                            ..
+                        } = self
+                        {
+                            let (s, r) = tokio::sync::oneshot::channel();
+                            res_store.lock().insert(msg_id, s);
 
-                    let res_store = res_store.clone();
-                    tokio::task::spawn(async move {
-                        tokio::time::sleep(timeout.time_remaining()).await;
-                        res_store.lock().remove(&msg_id);
-                    });
+                            let res_store = res_store.clone();
+                            tokio::task::spawn(async move {
+                                tokio::time::sleep(timeout.time_remaining()).await;
+                                res_store.lock().remove(&msg_id);
+                            });
 
-                    let wire = payload.encode_vec().map_err(KitsuneError::other)?;
-                    let wrap = WireWrap::request(msg_id, WireData(wire));
-                    let data = wrap.encode_vec().map_err(KitsuneError::other)?;
+                            let wire = payload.encode_vec().map_err(KitsuneError::other)?;
+                            let wrap = WireWrap::request(msg_id, WireData(wire));
+                            let data = wrap.encode_vec().map_err(KitsuneError::other)?;
 
-                    ep.send(rem_url.clone(), data.as_slice())
-                        .await
-                        .map_err(KitsuneError::other)?;
-                    return r.await.map_err(|_| KitsuneError::other("timeout"));
+                            ep.send(rem_url.clone(), data.as_slice())
+                                .await
+                                .map_err(KitsuneError::other)?;
+                            return r.await.map_err(|_| KitsuneError::other("timeout"));
+                        }
+                    },
+                    MetaNetAuth::UnauthorizedIgnore => {
+                        dbg!("request unauth ignore");
+                        return Err(KitsuneErrorKind::Unauthorized.into());
+                    },
+                    MetaNetAuth::UnauthorizedDisconnect => {
+                        dbg!("request disconnect");
+                        self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON).await;
+                        return Err(KitsuneErrorKind::Unauthorized.into());
+                    }
                 }
             }
 
@@ -374,7 +416,7 @@ impl MetaNetCon {
 }
 
 /// Networking abstraction to handle feature flipping.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum MetaNet {
     /// Tx2 Abstraction
     #[cfg(feature = "tx2")]
@@ -383,6 +425,7 @@ pub enum MetaNet {
     /// Tx5 Abstraction
     #[cfg(feature = "tx5")]
     Tx5 {
+        host: HostApi,
         ep: tx5::Ep,
         url: tx5::Tx5Url,
         res: ResStore,
@@ -680,6 +723,7 @@ impl MetaNet {
         let ep_hnd2 = ep_hnd.clone();
         let res_store2 = res_store.clone();
         let tuning_params2 = tuning_params.clone();
+        let spawn_host = host.clone();
         tokio::task::spawn(async move {
             while let Some(evt) = ep_evt.recv().await {
                 let evt = match evt {
@@ -696,6 +740,7 @@ impl MetaNet {
                             .send(MetaNetEvt::Connected {
                                 remote_url: rem_cli_url.to_string(),
                                 con: MetaNetCon::Tx5 {
+                                    host: spawn_host.clone(),
                                     ep: ep_hnd2.clone(),
                                     rem_url: rem_cli_url,
                                     res: res_store2.clone(),
@@ -713,6 +758,7 @@ impl MetaNet {
                             .send(MetaNetEvt::Disconnected {
                                 remote_url: rem_cli_url.to_string(),
                                 con: MetaNetCon::Tx5 {
+                                    host: spawn_host.clone(),
                                     ep: ep_hnd2.clone(),
                                     rem_url: rem_cli_url,
                                     res: res_store2.clone(),
@@ -741,6 +787,7 @@ impl MetaNet {
                                             .send(MetaNetEvt::Notify {
                                                 remote_url: rem_cli_url.to_string(),
                                                 con: MetaNetCon::Tx5 {
+                                                    host: spawn_host.clone(),
                                                     ep: ep_hnd2.clone(),
                                                     rem_url: rem_cli_url,
                                                     res: res_store2.clone(),
@@ -787,6 +834,7 @@ impl MetaNet {
                                             .send(MetaNetEvt::Request {
                                                 remote_url: rem_cli_url.to_string(),
                                                 con: MetaNetCon::Tx5 {
+                                                    host: spawn_host.clone(),
                                                     ep: ep_hnd2.clone(),
                                                     rem_url: rem_cli_url,
                                                     res: res_store2.clone(),
@@ -836,6 +884,7 @@ impl MetaNet {
 
         Ok((
             MetaNet::Tx5 {
+                host,
                 ep: ep_hnd,
                 url: cli_url,
                 res: res_store,
@@ -940,8 +989,9 @@ impl MetaNet {
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5 { ep, res, tun, .. } = self {
+            if let MetaNet::Tx5 { host, ep, res, tun, .. } = self {
                 return Ok(MetaNetCon::Tx5 {
+                    host: host.clone(),
                     ep: ep.clone(),
                     rem_url: tx5::Tx5Url::new(remote_url).map_err(KitsuneError::other)?,
                     res: res.clone(),

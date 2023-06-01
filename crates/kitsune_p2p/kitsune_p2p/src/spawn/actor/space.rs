@@ -1002,8 +1002,8 @@ impl KitsuneP2pHandler for Space {
             futures::future::join_all(local_agent_info_events).await;
 
             // NOTE
-            // Holochain currently does all its testing without any remote nodes
-            // if we do this inline, it takes us to the 30 second timeout
+            // Holochain currently does most of its testing without any remote
+            // nodes if we do this inline, it takes us to the 30 second timeout
             // on every one of those... so spawning for now, which means
             // we won't get notified if we are unable to publish to anyone.
             // Also, if conductor spams us with publishes, we could fill
@@ -1016,6 +1016,7 @@ impl KitsuneP2pHandler for Space {
                 .ok();
             tokio::task::spawn(async move {
                 let cover_nodes = discover_fut.await?;
+                dbg!(&cover_nodes);
                 if cover_nodes.is_empty() {
                     return Err("failed to discover neighboring peers".into());
                 }

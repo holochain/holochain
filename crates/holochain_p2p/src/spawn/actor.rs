@@ -1102,6 +1102,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         timeout_ms: Option<u64>,
         reflect_ops: Option<Vec<DhtOp>>,
     ) -> HolochainP2pHandlerResult<()> {
+        dbg!("handle publish");
         use kitsune_p2p_types::KitsuneTimeout;
 
         let source = source.into_kitsune();

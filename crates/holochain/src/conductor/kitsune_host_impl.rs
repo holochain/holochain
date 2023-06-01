@@ -42,6 +42,17 @@ pub struct KitsuneHostImpl {
     lair_client: Option<lair_keystore_api::LairClient>,
 }
 
+/// Manual Debug implementation to skip non debuggable fields.
+impl std::fmt::Debug for KitsuneHostImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KitsuneHostImpl")
+         .field("tuning_params", &self.tuning_params)
+         .field("strat", &self.strat)
+         .field("lair_tag", &self.lair_tag)
+         .finish()
+    }
+}
+
 impl KitsuneHostImpl {
     /// Constructor
     pub fn new(

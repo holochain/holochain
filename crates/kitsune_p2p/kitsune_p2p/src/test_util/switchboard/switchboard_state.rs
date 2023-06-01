@@ -55,7 +55,7 @@ static ZERO_SPACE: once_cell::sync::Lazy<Arc<KitsuneSpace>> =
 /// spawned to feed incoming network messages to the gossip module, and another
 /// task is spawned which handles the events received, mutating the state
 /// in the process.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Switchboard {
     pub(super) strat: ArqStrat,
     pub(super) topology: Topology,
@@ -203,6 +203,7 @@ impl Switchboard {
 /// getting a lock on the state via `Switchboard::share`. This same state is
 /// modified directly by an actively running GossipModule which is processing
 /// messages from other nodes.
+#[derive(Debug)]
 pub struct SwitchboardState {
     space: KSpace,
     pub(super) nodes: HashMap<NodeEp, NodeEntry>,

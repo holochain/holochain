@@ -99,6 +99,7 @@ mod test {
         let carol_agent = KitsuneAgent(carol_pubkey.get_raw_32().to_vec());
 
         dbg!(alice_pubkey, bob_pubkey, carol_pubkey);
+        dbg!(alice_agent, bob_agent, carol_agent);
 
         // conductors.exchange_peer_info().await;
 
@@ -119,12 +120,15 @@ mod test {
         assert!(bob_get0.is_some());
 
         // Bob gets blocked by alice.
+        dbg!("block");
         let _block: () = alice_conductor.call(&alice, "block_agent", bob_pubkey).await;
 
+        dbg!("create");
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
         // // Now that bob is blocked by alice he cannot get data from alice.
         consistency_10s([&alice_cell, &bob_cell]).await;
+        dbg!("get");
         let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
 
         assert!(bob_get1.is_none());
