@@ -698,7 +698,10 @@ where
         LEFT JOIN
         Entry ON Action.entry_hash = Entry.hash
         WHERE
-        (DhtOp.type != :store_entry OR Action.private_entry = 0)
+        DhtOp.last_publish_time IS NOT NULL
+        -- the query was previously written this way, keeping this comment
+        -- here in case it's helpful to revert it.
+        -- (DhtOp.type != :store_entry OR Action.private_entry = 0)
         ";
 
         let r = if let Some(author) = author {
@@ -712,7 +715,8 @@ where
             ))?
             .query_and_then(
                 named_params! {
-                    ":store_entry": DhtOpType::StoreEntry,
+                    // this is needed for the commented line in the query above.
+                    // ":store_entry": DhtOpType::StoreEntry,
                     ":author": author,
                 },
                 |row| {
