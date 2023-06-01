@@ -262,3 +262,41 @@ impl<S: Into<String>> LinkMatch<S> {
         }
     }
 }
+
+/// Query for links to be sent over the network.
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+pub struct WireLinkQuery {
+    /// The base to find links from.
+    pub base: AnyLinkableHash,
+
+    /// Filter by the link type.
+    pub link_type: LinkTypeFilter,
+
+    /// Filter by tag prefix.
+    pub tag_prefix: Option<LinkTag>,
+
+    /// Only include links created before this time.
+    pub before: Option<Timestamp>,
+
+    /// Only include links created after this time.
+    pub after: Option<Timestamp>,
+
+    /// Only include links created by this author.
+    pub author: Option<AgentPubKey>,
+}
+
+/// Response type for a `WireLinkQuery`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct CountLinksResponse(Vec<ActionHash>);
+
+impl CountLinksResponse {
+    /// Create a new response from the action hashes of the matched links
+    pub fn new(create_link_actions: Vec<ActionHash>) -> Self {
+        CountLinksResponse(create_link_actions)
+    }
+
+    /// Get the action hashes of the matched links
+    pub fn create_link_actions(&self) -> Vec<ActionHash> {
+        self.0.clone()
+    }
+}

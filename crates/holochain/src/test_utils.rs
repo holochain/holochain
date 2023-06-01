@@ -9,7 +9,6 @@ use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::publish_dht_ops_workflow::get_ops_to_publish;
 use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
@@ -61,6 +60,8 @@ mod wait_for;
 pub use wait_for::*;
 
 pub use crate::sweettest::sweet_consistency::*;
+
+use self::consistency::request_published_ops;
 
 /// Produce file and line number info at compile-time
 #[macro_export]
@@ -465,11 +466,11 @@ pub async fn consistency_dbs<AuthorDb, DhtDb>(
     let mut published = HashSet::new();
     for (author, db, _) in all_cell_dbs.iter() {
         published.extend(
-            get_ops_to_publish((*author).to_owned(), *db)
+            request_published_ops(*db, Some((*author).to_owned()))
                 .await
                 .unwrap()
                 .into_iter()
-                .map(|(_, _, ops)| ops),
+                .map(|(_, _, op)| op),
         );
     }
     let published = published.into_iter().collect::<Vec<_>>();
@@ -499,7 +500,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         )
     }
 
-    let header = format!("{:53} {:>3}  {}", "author", "seq", "op_type (action_type)",);
+    let header = format!("{} {:>3}  {}", "author", "seq", "op_type (action_type)",);
 
     let num_published = published.len();
     let mut num_integrated = 0;
@@ -507,8 +508,8 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
         num_integrated = get_integrated_count(db);
         if num_integrated >= num_published {
             if num_integrated > num_published {
-                tracing::warn!("num integrated ops > num published ops, meaning you may not be accounting for all nodes in this test.
-                Consistency may not be complete.")
+                tracing::warn!("num integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test.
+                Consistency may not be complete.", num_integrated, num_published)
             }
             return;
         } else {
@@ -542,7 +543,7 @@ async fn wait_for_integration_diff<Db: ReadAccess<DbKindDht>>(
     let timeout = delay * num_attempts as u32;
 
     panic!(
-        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}\n",
+        "Consistency not achieved after {:?}ms. Expected {} ops, but only {} integrated. Unintegrated ops:\n\n{}\n{}",
         timeout.as_millis(),
         num_published,
         num_integrated,
@@ -559,6 +560,17 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     num_attempts: usize,
     delay: Duration,
 ) {
+    fn display_op(op: &DhtOp) -> String {
+        format!(
+            "{} {:>3}  {} ({})",
+            op.action().author(),
+            op.action().action_seq(),
+            // op.to_light().action_hash().clone(),
+            op.get_type(),
+            op.action().action_type(),
+        )
+    }
+
     for i in 0..num_attempts {
         let num_integrated = get_integrated_count(db);
         if num_integrated >= num_published {
