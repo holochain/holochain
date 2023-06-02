@@ -113,7 +113,7 @@ impl EntryTestData {
         let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
             NewEntryAction::Create(create.clone()),
-            Box::new(entry.clone()),
+            entry.clone().into(),
         ));
 
         let wire_create = Judged::valid(SignedAction(create_action, signature).try_into().unwrap());
@@ -129,7 +129,7 @@ impl EntryTestData {
         let update_content_op = DhtOpHashed::from_content_sync(DhtOp::RegisterUpdatedContent(
             signature.clone(),
             update,
-            Some(Box::new(update_entry)),
+            update_entry.into(),
         ));
         let wire_update = Judged::valid(SignedAction(update_action, signature).try_into().unwrap());
 

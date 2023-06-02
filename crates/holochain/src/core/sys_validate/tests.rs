@@ -925,7 +925,7 @@ async fn valid_chain_fact_test() {
 
     let mut u = arbitrary::Unstructured::new(&NOISE);
     let fact = contrafact::facts![
-        record::facts::action_and_entry_match(),
+        holochain_zome_types::record::facts::action_and_entry_match(),
         contrafact::lens(
             "action is valid",
             |(a, _)| a,

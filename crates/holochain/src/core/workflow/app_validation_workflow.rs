@@ -345,12 +345,12 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
                     ActionHashed::from_content_sync(action),
                     signature,
                 ),
-                entry.map(|e| *e),
+                entry.into_option(),
             ),
         }),
         DhtOp::StoreEntry(signature, action, entry) => Op::StoreEntry(StoreEntry {
             action: SignedHashed::new(action.into(), signature),
-            entry: *entry,
+            entry,
         }),
         DhtOp::RegisterAgentActivity(signature, action) => {
             Op::RegisterAgentActivity(RegisterAgentActivity {
@@ -364,8 +364,8 @@ async fn dhtop_to_op(op: DhtOp, cascade: &impl Cascade) -> AppValidationOutcome<
         DhtOp::RegisterUpdatedContent(signature, update, entry)
         | DhtOp::RegisterUpdatedRecord(signature, update, entry) => {
             let new_entry = match update.entry_type.visibility() {
-                EntryVisibility::Public => match entry {
-                    Some(entry) => Some(*entry),
+                EntryVisibility::Public => match entry.into_option() {
+                    Some(entry) => Some(entry),
                     None => Some(
                         cascade
                             .retrieve_entry(update.entry_hash.clone(), Default::default())

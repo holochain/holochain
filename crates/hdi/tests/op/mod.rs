@@ -52,9 +52,9 @@ pub enum LinkTypes {
 // Not quite sure why, but sometimes this is a Guest and sometimes a Host error
 #[test_case(s_record(create_entry(0, 0), RecordEntry::Present(Entry::Agent(ak(0)))) => with |_| {})]
 #[test_case(s_record(create_hidden_entry(0, 0), RecordEntry::Present(e(A{}))) => matches WasmErrorInner::Guest(_))]
-#[test_case(s_record(create_hidden_entry(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-#[test_case(s_record(create_link(0, 100), RecordEntry::NotApplicable) => matches WasmErrorInner::Guest(_))]
-#[test_case(s_record(create_link(100, 0), RecordEntry::NotApplicable) => matches WasmErrorInner::Host(_))]
+#[test_case(s_record(create_hidden_entry(0, 100), RecordEntry::NA) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(create_link(0, 100), RecordEntry::NA) => matches WasmErrorInner::Guest(_))]
+#[test_case(s_record(create_link(100, 0), RecordEntry::NA) => matches WasmErrorInner::Host(_))]
 // Store Entry
 #[test_case(s_entry(c(EntryType::App(public_app_entry_def(0, 100))).into(), e(A{})) => matches WasmErrorInner::Guest(_))]
 #[test_case(s_entry(c(EntryType::App(public_app_entry_def(100, 0))).into(), e(A{})) => matches WasmErrorInner::Host(_))]
@@ -206,23 +206,23 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
     let o = match op.clone() {
         FlatOp::StoreRecord(OpRecord::Dna { action, .. }) => {
             let d = Action::Dna(action);
-            store_record_entry(d, RecordEntry::NotApplicable)
+            store_record_entry(d, RecordEntry::NA)
         }
         FlatOp::StoreRecord(OpRecord::AgentValidationPkg { action, .. }) => {
             let d = Action::AgentValidationPkg(action);
-            store_record_entry(d, RecordEntry::NotApplicable)
+            store_record_entry(d, RecordEntry::NA)
         }
         FlatOp::StoreRecord(OpRecord::InitZomesComplete { action }) => {
             let d = Action::InitZomesComplete(action);
-            store_record_entry(d, RecordEntry::NotApplicable)
+            store_record_entry(d, RecordEntry::NA)
         }
         FlatOp::StoreRecord(OpRecord::OpenChain { action, .. }) => {
             let d = Action::OpenChain(action);
-            store_record_entry(d, RecordEntry::NotApplicable)
+            store_record_entry(d, RecordEntry::NA)
         }
         FlatOp::StoreRecord(OpRecord::CloseChain { action, .. }) => {
             let d = Action::CloseChain(action);
-            store_record_entry(d, RecordEntry::NotApplicable)
+            store_record_entry(d, RecordEntry::NA)
         }
         FlatOp::StoreRecord(OpRecord::CreateCapClaim { action }) => {
             let d = Action::Create(action);
@@ -265,7 +265,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
                         hashed: ActionHashed::from_content_sync(c),
                         signature: Signature::arbitrary(&mut ud).unwrap(),
                     },
-                    entry: RecordEntry::NotApplicable,
+                    entry: RecordEntry::NA,
                 },
             })
         }
@@ -277,7 +277,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
                         hashed: ActionHashed::from_content_sync(c),
                         signature: Signature::arbitrary(&mut ud).unwrap(),
                     },
-                    entry: RecordEntry::NotApplicable,
+                    entry: RecordEntry::NA,
                 },
             })
         }
@@ -303,7 +303,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
         }
         FlatOp::StoreRecord(OpRecord::DeleteEntry { action, .. }) => {
             let d = Action::Delete(action);
-            store_record_entry(d, RecordEntry::NotApplicable)
+            store_record_entry(d, RecordEntry::NA)
         }
         FlatOp::StoreEntry(OpEntry::CreateEntry {
             app_entry: et,

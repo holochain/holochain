@@ -289,10 +289,10 @@ async fn validate_op_inner(
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
             store_record(action, cascade).await?;
-            if let Some(entry) = entry {
+            if let Some(entry) = entry.as_option() {
                 // Retrieve for all other actions on countersigned entry.
-                if let Entry::CounterSign(session_data, _) = &**entry {
-                    let entry_hash = EntryHash::with_data_sync(&**entry);
+                if let Entry::CounterSign(session_data, _) = entry {
+                    let entry_hash = EntryHash::with_data_sync(entry);
                     let weight = action
                         .entry_rate_data()
                         .ok_or_else(|| SysValidationError::NonEntryAction(action.clone()))?;
@@ -313,7 +313,7 @@ async fn validate_op_inner(
                     (action)
                         .try_into()
                         .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
-                    entry.as_ref(),
+                    &entry,
                     cascade,
                 )
                 .await?;
@@ -322,9 +322,9 @@ async fn validate_op_inner(
         }
         DhtOp::StoreEntry(_, action, entry) => {
             // Check and hold for all other actions on countersigned entry.
-            if let Entry::CounterSign(session_data, _) = &**entry {
+            if let Entry::CounterSign(session_data, _) = entry {
                 let dependency_check = |_original_record: &Record| Ok(());
-                let entry_hash = EntryHash::with_data_sync(&**entry);
+                let entry_hash = EntryHash::with_data_sync(entry);
                 let weight = match action {
                     NewEntryAction::Create(h) => h.weight.clone(),
                     NewEntryAction::Update(h) => h.weight.clone(),
@@ -340,7 +340,7 @@ async fn validate_op_inner(
                 }
             }
 
-            store_entry((action).into(), entry.as_ref(), cascade).await?;
+            store_entry((action).into(), entry, cascade).await?;
 
             let action = action.clone().into();
             store_record(&action, cascade).await?;
@@ -353,16 +353,16 @@ async fn validate_op_inner(
         }
         DhtOp::RegisterUpdatedContent(_, action, entry) => {
             register_updated_content(action, cascade, incoming_dht_ops_sender).await?;
-            if let Some(entry) = entry {
-                store_entry(NewEntryActionRef::Update(action), entry.as_ref(), cascade).await?;
+            if let Some(entry) = entry.as_option() {
+                store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
             }
 
             Ok(())
         }
         DhtOp::RegisterUpdatedRecord(_, action, entry) => {
             register_updated_record(action, cascade, incoming_dht_ops_sender).await?;
-            if let Some(entry) = entry {
-                store_entry(NewEntryActionRef::Update(action), entry.as_ref(), cascade).await?;
+            if let Some(entry) = entry.as_option() {
+                store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
             }
 
             Ok(())

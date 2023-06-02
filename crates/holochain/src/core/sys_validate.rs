@@ -333,36 +333,40 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
 
 /// Check that the EntryVisibility is congruous with the presence or absence of entry data
 pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
-    todo!("use RecordEntry");
-    match (
-        op.action().entry_type().map(|t| t.visibility()),
-        op.entry().as_option().is_some(),
-    ) {
-        (Some(EntryVisibility::Public), true /*RecordEntry::Present(_)*/) => Ok(()),
-        (Some(EntryVisibility::Private), false /*RecordEntry::NotStored*/) => Ok(()),
-        (Some(EntryVisibility::Public), false) => {
-            if op.action().entry_type() == Some(&EntryType::AgentPubKey) {
-                // Agent entries are a special case. The "entry data" is already present in
+    use EntryVisibility::*;
+    use RecordEntry::*;
+
+    let err = |reason: &str| {
+        Err(ValidationOutcome::MalformedDhtOp(
+            Box::new(op.action()),
+            op.get_type(),
+            reason.to_string(),
+        )
+        .into())
+    };
+
+    match (op.action().entry_type().map(|t| t.visibility()), op.entry()) {
+        (Some(Public), Present(_)) => Ok(()),
+        (Some(Public), Hidden) => Ok(()),
+        (Some(Private), NotStored) => Ok(()),
+
+        (Some(Private) | None, Hidden) => err("RecordEntry::Hidden is only for Public entry type"),
+        (Some(_), NA) => err("There is action entry data but the entry itself is N/A"),
+        (Some(Private), Present(_)) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
+        (Some(Public), NotStored) => {
+            if op.get_type() == DhtOpType::RegisterAgentActivity
+                || op.action().entry_type() == Some(&EntryType::AgentPubKey)
+            {
+                // RegisterAgentActivity is a special case, where the entry data can be omitted.
+                // Agent entries are also a special case. The "entry data" is already present in
                 // the action as the entry hash, so no external entry data is needed.
                 Ok(())
             } else {
-                Err(ValidationOutcome::MalformedDhtOp(
-                    Box::new(op.action()),
-                    op.get_type(),
-                    "Op has public entry type but is missing its data".to_string(),
-                )
-                .into())
+                err("Op has public entry type but is missing its data")
             }
         }
-        (Some(EntryVisibility::Private), true) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
-        // (None, RecordEntry::NotApplicable) => Ok(()),
-        (None, false) => Ok(()),
-        (None, true) => Err(ValidationOutcome::MalformedDhtOp(
-            Box::new(op.action()),
-            op.get_type(),
-            "Op record has entry data with no entry_type".to_string(),
-        )
-        .into()),
+        (None, NA) => Ok(()),
+        (None, _) => err("Entry must be N/A for action with no entry type"),
     }
 }
 
@@ -731,11 +735,8 @@ fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
-    // Check the entry
-    let maybe_entry_box = record_entry.into_option().map(Box::new);
-
     // Create the hash and op
-    let op = DhtOp::StoreRecord(signature, action, maybe_entry_box);
+    let op = DhtOp::StoreRecord(signature, action, record_entry);
     let hash = op.to_hash();
     Some((hash, op))
 }

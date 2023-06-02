@@ -36,7 +36,7 @@ impl<A> AsRef<A> for Record<A> {
 
 /// Represents the different ways the entry_address reference within an action
 /// can be intepreted
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     /// The Action has an entry_address reference, and the Entry is accessible.
@@ -44,15 +44,36 @@ pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     /// The Action has an entry_address reference, but we are in a public
     /// context and the entry is private.
     Hidden,
-    /// The Action does not contain an entry_address reference.
-    NotApplicable,
+    /// The Action does not contain an entry_address reference, so there will
+    /// never be an associated Entry.
+    NA,
     /// The Action has an entry but was stored without it.
     /// This can happen when you receive gossip of just an action
-    /// when the action type is a [`crate::EntryCreationAction`]
+    /// when the action type is a [`crate::EntryCreationAction`],
+    /// in particular for certain DhtOps
     NotStored,
 }
 
+impl<E: Borrow<Entry>> From<E> for RecordEntry<E> {
+    fn from(entry: E) -> Self {
+        RecordEntry::Present(entry)
+    }
+}
+
 impl<E: Borrow<Entry>> RecordEntry<E> {
+    /// Constructor based on Action data
+    pub fn new(vis: Option<&EntryVisibility>, maybe_entry: Option<E>) -> Self {
+        match (maybe_entry, vis) {
+            (Some(entry), Some(_)) => RecordEntry::Present(entry),
+            (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
+            (None, None) => RecordEntry::NA,
+            (Some(_), None) => {
+                unreachable!("Entry is present for an action type which has no entry reference")
+            }
+            (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,
+        }
+    }
+
     /// Provides entry data by reference if it exists
     ///
     /// Collapses the enum down to the two possibilities of
@@ -92,6 +113,19 @@ impl<E: Borrow<Entry>> RecordEntry<E> {
         }
     }
 
+    /// Use a reference to the Entry, if present
+    pub fn as_ref<'a>(&'a self) -> RecordEntry<&'a E>
+    where
+        &'a E: Borrow<Entry>,
+    {
+        match self {
+            RecordEntry::Present(ref e) => RecordEntry::Present(e),
+            RecordEntry::Hidden => RecordEntry::Hidden,
+            RecordEntry::NA => RecordEntry::NA,
+            RecordEntry::NotStored => RecordEntry::NotStored,
+        }
+    }
+
     /// Provides CapGrantEntry if it exists
     ///
     /// same as as_option but handles cap grants
@@ -110,7 +144,7 @@ impl<E: Borrow<Entry>> RecordEntry<E> {
 
     /// If no entry is available, return NotApplicable, else return Present
     pub fn or_not_applicable(entry: Option<E>) -> Self {
-        entry.map(Self::Present).unwrap_or(Self::NotApplicable)
+        entry.map(Self::Present).unwrap_or(Self::NA)
     }
 
     /// If no entry is available, return NotStored, else return Present
@@ -118,6 +152,9 @@ impl<E: Borrow<Entry>> RecordEntry<E> {
         entry.map(Self::Present).unwrap_or(Self::NotStored)
     }
 }
+
+/// Alias for record with ref entry
+pub type RecordEntryRef<'a> = RecordEntry<&'a Entry>;
 
 /// The hashed action and the signature that signed it
 pub type SignedActionHashed = SignedHashed<Action>;
@@ -144,21 +181,8 @@ impl Record {
     /// Raw record constructor.  Used only when we know that the values are valid.
     /// NOTE: this will NOT hide private entry data if present!
     pub fn new(signed_action: SignedActionHashed, maybe_entry: Option<Entry>) -> Self {
-        let maybe_visibility = signed_action
-            .action()
-            .entry_data()
-            .map(|(_, entry_type)| entry_type.visibility());
-
-        let entry = match (maybe_entry, maybe_visibility) {
-            (Some(entry), Some(_)) => RecordEntry::Present(entry),
-            (None, Some(EntryVisibility::Private)) => RecordEntry::Hidden,
-            (None, None) => RecordEntry::NotApplicable,
-            (Some(_), None) => {
-                unreachable!("Entry is present for an action type which has no entry reference")
-            }
-            (None, Some(EntryVisibility::Public)) => RecordEntry::NotStored,
-        };
-
+        let maybe_visibility = signed_action.action().entry_visibility();
+        let entry = RecordEntry::new(maybe_visibility, maybe_entry);
         Self {
             signed_action,
             entry,

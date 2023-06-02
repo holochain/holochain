@@ -139,20 +139,17 @@ pub mod test {
 
         let signature = record.signature().clone();
         let action = record.action().clone();
-        let maybe_entry_box: Option<Box<Entry>> = record
-            .entry()
-            .as_option()
-            .cloned()
-            .map(|entry| Box::new(entry));
+        let record_entry: RecordEntry = record.entry().clone();
+        let entry = record_entry.clone().into_option().unwrap();
         let entry_state = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
             NewEntryAction::try_from(action.clone()).unwrap(),
-            maybe_entry_box.clone().unwrap(),
+            entry.clone(),
         ));
         let record_state = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature,
             action.clone(),
-            maybe_entry_box,
+            record_entry,
         ));
         dht_db
             .conn()
@@ -169,7 +166,7 @@ pub mod test {
         let must_get_entry: EntryHashed = conductor
             .call(&bob, "must_get_entry", action.entry_hash().clone())
             .await;
-        assert_eq!(Entry::from(must_get_entry), entry,);
+        assert_eq!(Entry::from(must_get_entry), entry);
 
         // Must get action returns the action if it exists regardless of the
         // validation status.

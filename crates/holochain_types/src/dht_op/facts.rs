@@ -84,21 +84,29 @@ mod tests {
 
         let e = Entry::arbitrary(u).unwrap();
 
-        let mut hn = not_(action_facts::is_new_entry_action()).build(u);
-        *hn.author_mut() = agent.clone();
+        let mut a0 = not_(action_facts::is_new_entry_action()).build(u);
+        *a0.author_mut() = agent.clone();
 
-        let mut he = action_facts::is_new_entry_action().build(u);
-        *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
-        let mut he = Action::from(he);
-        *he.author_mut() = agent.clone();
+        let mut a1 = action_facts::is_new_entry_action().build(u);
+        *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
+        let mut a1 = Action::from(a1);
+        *a1.author_mut() = agent.clone();
 
-        let se = agent.sign(&keystore, &he).await.unwrap();
-        let sn = agent.sign(&keystore, &hn).await.unwrap();
+        let se = agent.sign(&keystore, &a1).await.unwrap();
+        let sn = agent.sign(&keystore, &a0).await.unwrap();
 
-        let op1 = DhtOp::StoreRecord(se.clone(), he.clone(), Some(Box::new(e.clone())));
-        let op2 = DhtOp::StoreRecord(se.clone(), he.clone(), None);
-        let op3 = DhtOp::StoreRecord(sn.clone(), hn.clone(), Some(Box::new(e.clone())));
-        let op4 = DhtOp::StoreRecord(sn.clone(), hn.clone(), None);
+        let op1 = DhtOp::StoreRecord(
+            se.clone(),
+            a1.clone(),
+            RecordEntry::new(a1.entry_visibility(), Some(e.clone())),
+        );
+        let op2 = DhtOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::Hidden);
+        let op3 = DhtOp::StoreRecord(
+            sn.clone(),
+            a0.clone(),
+            RecordEntry::new(a0.entry_visibility(), Some(e.clone())),
+        );
+        let op4 = DhtOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::Hidden);
         let fact = valid_dht_op(keystore, agent, false);
 
         fact.check(&op1).unwrap();
