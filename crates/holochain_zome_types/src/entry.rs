@@ -245,6 +245,7 @@ impl From<ScopedEntryDefIndex> for EntryDefLocation {
 
 /// Check the entry variant matches the variant in the actions entry type
 pub fn entry_type_matches(entry_type: &EntryType, entry: &Entry) -> bool {
+    #[allow(clippy::match_like_matches_macro)]
     match (entry_type, entry) {
         (EntryType::AgentPubKey, Entry::Agent(_)) => true,
         (EntryType::App(_), Entry::App(_)) => true,

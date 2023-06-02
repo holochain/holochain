@@ -21,7 +21,7 @@ pub fn unstructured_noise() -> arbitrary::Unstructured<'static> {
 }
 
 static ENTROPY: Lazy<Mutex<Unstructured<'static>>> =
-    Lazy::new(|| Mutex::new(Unstructured::new(&*NOISE)));
+    Lazy::new(|| Mutex::new(Unstructured::new(&NOISE)));
 
 /// Additional methods for arbitrary data types
 pub trait ArbitraryExt: Arbitrary<'static> {
