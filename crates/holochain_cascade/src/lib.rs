@@ -907,36 +907,9 @@ where
                 author: key.author,
             },
         );
+
         let results = self.cascading(query).await?;
-
-        Ok(if let Some(batch_size) = key.batch_size {
-            if let Some(previous_batch_end) = key.previous_batch_end {
-                let previous_index = results
-                    .iter()
-                    .position(|l| l.create_link_hash == previous_batch_end);
-                if previous_index.is_none() {
-                    return Err(CascadeError::ActionError(ActionError::NotFound(
-                        previous_batch_end,
-                    )));
-                }
-
-                results
-                    .into_iter()
-                    .skip(previous_index.unwrap() + 1)
-                    .take(batch_size)
-                    .collect()
-            } else if let Some(batch_index) = key.batch_index {
-                results
-                    .into_iter()
-                    .skip(batch_index * batch_size)
-                    .take(batch_size)
-                    .collect()
-            } else {
-                results.into_iter().take(batch_size).collect()
-            }
-        } else {
-            results
-        })
+        Ok(results)
     }
 
     #[instrument(skip(self, key, options))]

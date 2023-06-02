@@ -37,9 +37,6 @@ pub fn get_link_details<'a>(
                             after: None,
                             before: None,
                             author: None,
-                            batch_size: None,
-                            batch_index: None,
-                            previous_batch_end: None,
                         };
                         Ok(CascadeImpl::from_workspace_and_network(
                             &call_context.host_context.workspace(),

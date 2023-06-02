@@ -36,9 +36,6 @@ pub fn get_links<'a>(
                                     after,
                                     before,
                                     author,
-                                    batch_size,
-                                    batch_index,
-                                    previous_batch_end,
                                 } = input;
 
                                 let key = WireLinkKey {
@@ -48,9 +45,6 @@ pub fn get_links<'a>(
                                     after,
                                     before,
                                     author,
-                                    batch_size,
-                                    batch_index,
-                                    previous_batch_end,
                                 };
                                 Ok(CascadeImpl::from_workspace_and_network(
                                     &call_context.host_context.workspace(),

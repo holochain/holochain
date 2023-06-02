@@ -176,9 +176,6 @@ impl EntryTestData {
             after: None,
             before: None,
             author: None,
-            batch_size: None,
-            batch_index: None,
-            previous_batch_end: None,
         };
         let link_key_tag = WireLinkKey {
             base: create_link.base_address.clone(),
@@ -187,9 +184,6 @@ impl EntryTestData {
             after: None,
             before: None,
             author: None,
-            batch_size: None,
-            batch_index: None,
-            previous_batch_end: None,
         };
 
         let link = Link {

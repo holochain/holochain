@@ -105,24 +105,6 @@ pub struct GetLinksInput {
 
     /// Only include links created by this author.
     pub author: Option<AgentPubKey>,
-
-    /// Number of links to fetch in this batch.
-    ///
-    /// This option is required for the `batch_index` or `previous_batch_end` to be considered.
-    pub batch_size: Option<usize>,
-    /// Index of this batch, 0-based.
-    ///
-    /// This option should not be used with `previous_batch_end` as it will be ignored.
-    ///
-    /// Indexing pages is more resilient to deleted links than `previous_batch_end` but might show you items you've already
-    /// been given for a previous page if previously unknown, older links arrive.
-    pub batch_index: Option<usize>,
-    /// The action hash of the link that was at the end of the previous batch. Pass `None` to get the first page.
-    ///
-    /// Providing the end of the previous batch as an anchor is more resilient to previously unknown, older links arriving.
-    /// There is a downside that if the link is deleted then it won't be possible to determine where the batch starts and the call will fail.
-    /// If your happ uses this mechanism for batching then you might consider consider retrying with the last but one hash from the previous batch.
-    pub previous_batch_end: Option<ActionHash>,
 }
 
 type CreateLinkWithDeleteLinks = Vec<(SignedActionHashed, Vec<SignedActionHashed>)>;

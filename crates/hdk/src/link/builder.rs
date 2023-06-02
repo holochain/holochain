@@ -20,9 +20,6 @@ impl GetLinksInputBuilder {
             before: None,
             after: None,
             author: None,
-            batch_size: None,
-            batch_index: None,
-            previous_batch_end: None,
         }))
     }
 
@@ -47,24 +44,6 @@ impl GetLinksInputBuilder {
     /// Filter for links created by this author.
     pub fn author(mut self, author: AgentPubKey) -> Self {
         self.0.author = Some(author);
-        self
-    }
-
-    /// Set the size of the batch to fetch.
-    pub fn batch_size(mut self, batch_size: usize) -> Self {
-        self.0.batch_size = Some(batch_size);
-        self
-    }
-
-    /// Set the 0-based batch index to get.
-    pub fn batch_index(mut self, batch_index: usize) -> Self {
-        self.0.batch_index = Some(batch_index);
-        self
-    }
-
-    /// Set the action hash for the end of the previous batch.
-    pub fn previous_batch_end(mut self, previous_batch_end: ActionHash) -> Self {
-        self.0.previous_batch_end = Some(previous_batch_end);
         self
     }
 
