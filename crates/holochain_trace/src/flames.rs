@@ -47,7 +47,7 @@ impl FlameTimed {
 
         let out = std::fs::File::create(
             toml_path()
-                .unwrap_or(PathBuf::from("."))
+                .unwrap_or_else(|| PathBuf::from("."))
                 .join(format!("tracing_flame_{}.svg", now)),
         )
         .ok()
