@@ -1,5 +1,6 @@
 //! Common use sandboxes with lots of default choices.
 
+use holochain_trace::Output;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -19,6 +20,7 @@ pub async fn default_with_network(
     directory: Option<PathBuf>,
     happ: PathBuf,
     app_id: InstalledAppId,
+    structured: Output,
 ) -> anyhow::Result<PathBuf> {
     let Create {
         network,
@@ -32,7 +34,7 @@ pub async fn default_with_network(
         directory,
         in_process_lair,
     )?;
-    let conductor = run_async(holochain_path, path.clone(), None).await?;
+    let conductor = run_async(holochain_path, path.clone(), None, structured).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
     let install_bundle = InstallApp {
         app_id: Some(app_id),
@@ -51,6 +53,7 @@ pub async fn default_n(
     create: Create,
     happ: PathBuf,
     app_id: InstalledAppId,
+    structured: Output,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let num_sandboxes = create.num_sandboxes;
     msg!(
@@ -65,6 +68,7 @@ pub async fn default_n(
             create.directories.get(i).cloned(),
             happ.clone(),
             app_id.clone(),
+            structured.clone(),
         )
         .await?;
         paths.push(p);
