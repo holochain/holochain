@@ -82,16 +82,16 @@ use tracing_subscriber::{
 };
 
 use derive_more::Display;
-use std::{str::FromStr, sync::Once};
 use std::sync::{Arc, Mutex};
+use std::{str::FromStr, sync::Once};
 
 use flames::FlameTimed;
 use fmt::*;
 
-mod writer;
 mod flames;
 mod fmt;
 pub mod metrics;
+mod writer;
 // mod open;
 
 // #[cfg(all(feature = "opentelemetry-on", feature = "channels"))]
@@ -100,9 +100,9 @@ pub mod metrics;
 // pub use open::should_run;
 // pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 
+use crate::writer::InMemoryWriter;
 pub use tracing;
 use tracing_subscriber::fmt::MakeWriter;
-use crate::writer::InMemoryWriter;
 
 #[derive(Debug, Clone, Display)]
 /// Sets the kind of structured logging output you want
@@ -195,7 +195,9 @@ pub fn test_run_timed_flame() -> Result<Option<Box<impl Drop>>, errors::TracingE
     let buffer = Arc::new(Mutex::new(Vec::new()));
     let writer_handle = InMemoryWriter::new(buffer.clone());
 
-    init_fmt_with_opts(Output::FlameTimed, move || InMemoryWriter::new(buffer.clone()))?;
+    init_fmt_with_opts(Output::FlameTimed, move || {
+        InMemoryWriter::new(buffer.clone())
+    })?;
     Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
@@ -208,7 +210,9 @@ pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingErr
     let buffer = Arc::new(Mutex::new(Vec::new()));
     let writer_handle = InMemoryWriter::new(buffer.clone());
 
-    init_fmt_with_opts(Output::IceTimed, move || InMemoryWriter::new(buffer.clone()))?;
+    init_fmt_with_opts(Output::IceTimed, move || {
+        InMemoryWriter::new(buffer.clone())
+    })?;
     Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
@@ -218,7 +222,10 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
     init_fmt_with_opts(output, std::io::stderr)
 }
 
-fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::TracingError> where W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static {
+fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::TracingError>
+where
+    W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
+{
     let mut filter = match std::env::var("RUST_LOG") {
         Ok(_) => EnvFilter::from_default_env(),
         Err(_) => EnvFilter::from_default_env().add_directive("[wasm_debug]=debug".parse()?),
