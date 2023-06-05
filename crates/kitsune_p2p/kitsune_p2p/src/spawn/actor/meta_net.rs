@@ -328,23 +328,24 @@ impl MetaNetCon {
         payload: &wire::Wire,
         timeout: KitsuneTimeout,
     ) -> KitsuneResult<wire::Wire> {
+        dbg!("request");
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
 
         tracing::trace!(?payload, "initiating request");
 
         let result = (move || async move {
-            #[cfg(feature = "tx2")]
-            {
-                if let MetaNetCon::Tx2(con, _) = self {
-                    return con.request(payload, timeout).await;
-                }
-            }
+            match self.wire_is_authorized(payload, Timestamp::now()).await {
+                MetaNetAuth::Authorized => {
+                    #[cfg(feature = "tx2")]
+                    {
+                        if let MetaNetCon::Tx2(con, _) = self {
+                            return con.request(payload, timeout).await;
+                        }
+                    }
 
-            #[cfg(feature = "tx5")]
-            {
-                match self.wire_is_authorized(payload, Timestamp::now()).await {
-                    MetaNetAuth::Authorized => {
+                    #[cfg(feature = "tx5")]
+                    {
                         dbg!("request authorized");
                         if let MetaNetCon::Tx5 {
                             ep,
@@ -372,20 +373,20 @@ impl MetaNetCon {
                             return r.await.map_err(|_| KitsuneError::other("timeout"));
                         }
                     }
-                    MetaNetAuth::UnauthorizedIgnore => {
-                        dbg!("request unauth ignore");
-                        return Err(KitsuneErrorKind::Unauthorized.into());
-                    }
-                    MetaNetAuth::UnauthorizedDisconnect => {
-                        dbg!("request disconnect");
-                        self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
-                            .await;
-                        return Err(KitsuneErrorKind::Unauthorized.into());
-                    }
+
+                    return Err("invalid features".into());
+                }
+                MetaNetAuth::UnauthorizedIgnore => {
+                    dbg!("request unauth ignore");
+                    return Err(KitsuneErrorKind::Unauthorized.into());
+                }
+                MetaNetAuth::UnauthorizedDisconnect => {
+                    dbg!("request disconnect");
+                    self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
+                        .await;
+                    return Err(KitsuneErrorKind::Unauthorized.into());
                 }
             }
-
-            Err("invalid features".into())
         })()
         .await;
 

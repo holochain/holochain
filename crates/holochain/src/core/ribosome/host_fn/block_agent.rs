@@ -126,19 +126,19 @@ mod test {
         dbg!("create");
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
-        // // Now that bob is blocked by alice he cannot get data from alice.
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        // Now that bob is blocked by alice he cannot get data from alice.
+        consistency_10s([&alice_cell]).await;
         dbg!("get");
         let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
 
         assert!(bob_get1.is_none());
 
-        // // If carol joins the party but DOES NOT block bob then she will
-        // // give access to data once more for bob.
+        // If carol joins the party but DOES NOT block bob then she will
+        // give access to data once more for bob.
 
-        // conductors.exchange_peer_info().await;
+        conductors.exchange_peer_info().await;
 
-        // consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+        consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
 
         // // Bob can get data from alice via. carol.
         // let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
