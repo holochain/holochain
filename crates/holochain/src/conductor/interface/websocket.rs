@@ -146,10 +146,7 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 
 /// Polls for messages coming in from the external client.
 /// Used by Admin interface.
-async fn recv_incoming_admin_msgs<A: InterfaceApi>(
-    api: A,
-    rx_from_iface: WebsocketReceiver,
-) {
+async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, rx_from_iface: WebsocketReceiver) {
     use futures::stream::StreamExt;
 
     rx_from_iface
