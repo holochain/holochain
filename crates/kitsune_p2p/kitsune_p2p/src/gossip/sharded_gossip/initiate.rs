@@ -39,7 +39,11 @@ impl ShardedGossipLocal {
             .await?;
 
         if let Some(agent) = &remote_agent {
-            tracing::warn!("{:?} Attempting to initiate gossip with {:?}", &local_agents, agent);
+            tracing::warn!(
+                "{:?} Attempting to initiate gossip with {:?}",
+                &local_agents,
+                agent
+            );
         }
 
         let maybe_gossip = if let Some(next_target::Node {
@@ -101,7 +105,12 @@ impl ShardedGossipLocal {
                 Ok((i.local_agents.clone(), same_as_target, already_in_progress))
             })?;
 
-        tracing::warn!("{} {:?} incoming initiate from {:?}", remote_id, &local_agents, &remote_agent_list);
+        tracing::warn!(
+            "{} {:?} incoming initiate from {:?}",
+            remote_id,
+            &local_agents,
+            &remote_agent_list
+        );
 
         // The round is already in progress from our side.
         // The remote side should not be initiating.

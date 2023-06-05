@@ -46,10 +46,10 @@ pub struct KitsuneHostImpl {
 impl std::fmt::Debug for KitsuneHostImpl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("KitsuneHostImpl")
-         .field("tuning_params", &self.tuning_params)
-         .field("strat", &self.strat)
-         .field("lair_tag", &self.lair_tag)
-         .finish()
+            .field("tuning_params", &self.tuning_params)
+            .field("strat", &self.strat)
+            .field("lair_tag", &self.lair_tag)
+            .finish()
     }
 }
 

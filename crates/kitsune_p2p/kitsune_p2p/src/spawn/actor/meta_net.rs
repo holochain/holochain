@@ -152,11 +152,7 @@ pub enum MetaNetAuth {
     UnauthorizedDisconnect,
 }
 
-async fn node_is_authorized(
-    host: &HostApi,
-    node_id: Arc<[u8; 32]>,
-    now: Timestamp,
-) -> MetaNetAuth {
+async fn node_is_authorized(host: &HostApi, node_id: Arc<[u8; 32]>, now: Timestamp) -> MetaNetAuth {
     match host.is_blocked(BlockTargetId::Node(node_id), now).await {
         Ok(true) => MetaNetAuth::UnauthorizedDisconnect,
         Ok(false) => MetaNetAuth::Authorized,
@@ -196,7 +192,7 @@ type ResStore = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<wire::Wire>>
 #[derive(Debug, Clone)]
 pub enum MetaNetCon {
     #[cfg(feature = "tx2")]
-    Tx2(Tx2ConHnd<wire::Wire>),
+    Tx2(Tx2ConHnd<wire::Wire>, HostApi),
 
     #[cfg(feature = "tx5")]
     Tx5 {
@@ -212,7 +208,7 @@ impl PartialEq for MetaNetCon {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             #[cfg(feature = "tx2")]
-            (MetaNetCon::Tx2(a), MetaNetCon::Tx2(b)) => a == b,
+            (MetaNetCon::Tx2(a, _), MetaNetCon::Tx2(b, _)) => a == b,
             #[cfg(feature = "tx5")]
             (MetaNetCon::Tx5 { ep: a, .. }, MetaNetCon::Tx5 { ep: b, .. }) => a == b,
             _ => false,
@@ -226,7 +222,7 @@ impl MetaNetCon {
     pub async fn close(&self, code: u32, reason: &str) {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNetCon::Tx2(con) = self {
+            if let MetaNetCon::Tx2(con, _) = self {
                 con.close(code, reason).await;
                 return;
             }
@@ -247,7 +243,7 @@ impl MetaNetCon {
     pub fn is_closed(&self) -> bool {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNetCon::Tx2(con) = self {
+            if let MetaNetCon::Tx2(con, _) = self {
                 return con.is_closed();
             }
         }
@@ -262,34 +258,36 @@ impl MetaNetCon {
         true
     }
 
-    #[cfg(feature = "tx5")]
     async fn wire_is_authorized(&self, payload: &wire::Wire, now: Timestamp) -> MetaNetAuth {
-        if let MetaNetCon::Tx5 { host, .. } = self {
-            nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
-        }
-        else {
-            // For real unreachable.
-            unreachable!();
+        match self {
+            MetaNetCon::Tx5 { host, .. } | MetaNetCon::Tx2(_, host) => {
+                nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
+            }
         }
     }
 
     pub async fn notify(&self, payload: &wire::Wire, timeout: KitsuneTimeout) -> KitsuneResult<()> {
+        dbg!("notifyy");
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
 
         let result = (move || async move {
-            #[cfg(feature = "tx2")]
-            {
-                if let MetaNetCon::Tx2(con) = self {
-                    return con.notify(payload, timeout).await;
-                }
-            }
+            match self.wire_is_authorized(payload, Timestamp::now()).await {
+                MetaNetAuth::Authorized => {
+                    dbg!("notify auth");
 
-            #[cfg(feature = "tx5")]
-            {
-                match self.wire_is_authorized(payload, Timestamp::now()).await {
-                    MetaNetAuth::Authorized => {
-                        dbg!("notify auth");
+                    #[cfg(feature = "tx2")]
+                    {
+                        dbg!("tx2");
+                        if let MetaNetCon::Tx2(con, _) = self {
+                            return con.notify(payload, timeout).await;
+                        }
+                    }
+
+                    #[cfg(feature = "tx5")]
+                    {
+                        dbg!("tx5");
+
                         if let MetaNetCon::Tx5 { ep, rem_url, .. } = self {
                             let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                             let wrap = WireWrap::notify(msg_id, WireData(wire));
@@ -301,18 +299,20 @@ impl MetaNetCon {
                             return Ok(());
                         }
                     }
-                    MetaNetAuth::UnauthorizedIgnore => {
-                        dbg!("notify ignore");
-                        return Ok(());
-                    },
-                    MetaNetAuth::UnauthorizedDisconnect => {
-                        dbg!("notify disconnect");
-                        return Ok(self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON).await);
-                    }
+
+                    return Err("invalid features".into());
+                }
+                MetaNetAuth::UnauthorizedIgnore => {
+                    dbg!("notify ignore");
+                    return Ok(());
+                }
+                MetaNetAuth::UnauthorizedDisconnect => {
+                    dbg!("notify disconnect");
+                    return Ok(self
+                        .close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
+                        .await);
                 }
             }
-
-            Err("invalid features".into())
         })()
         .await;
 
@@ -336,7 +336,7 @@ impl MetaNetCon {
         let result = (move || async move {
             #[cfg(feature = "tx2")]
             {
-                if let MetaNetCon::Tx2(con) = self {
+                if let MetaNetCon::Tx2(con, _) = self {
                     return con.request(payload, timeout).await;
                 }
             }
@@ -371,14 +371,15 @@ impl MetaNetCon {
                                 .map_err(KitsuneError::other)?;
                             return r.await.map_err(|_| KitsuneError::other("timeout"));
                         }
-                    },
+                    }
                     MetaNetAuth::UnauthorizedIgnore => {
                         dbg!("request unauth ignore");
                         return Err(KitsuneErrorKind::Unauthorized.into());
-                    },
+                    }
                     MetaNetAuth::UnauthorizedDisconnect => {
                         dbg!("request disconnect");
-                        self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON).await;
+                        self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
+                            .await;
                         return Err(KitsuneErrorKind::Unauthorized.into());
                     }
                 }
@@ -398,7 +399,7 @@ impl MetaNetCon {
     pub fn peer_id(&self) -> Arc<[u8; 32]> {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNetCon::Tx2(con) = self {
+            if let MetaNetCon::Tx2(con, _) = self {
                 return con.peer_cert().into();
             }
         }
@@ -420,7 +421,7 @@ impl MetaNetCon {
 pub enum MetaNet {
     /// Tx2 Abstraction
     #[cfg(feature = "tx2")]
-    Tx2(Tx2EpHnd<wire::Wire>),
+    Tx2(Tx2EpHnd<wire::Wire>, HostApi),
 
     /// Tx5 Abstraction
     #[cfg(feature = "tx5")]
@@ -550,6 +551,7 @@ impl MetaNet {
         // capture endpoint handle
         let ep_hnd = ep.handle().clone();
 
+        let return_host = host.clone();
         tokio::task::spawn(async move {
             let tuning_params = &tuning_params;
             while let Some(evt) = ep.next().await {
@@ -558,7 +560,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                             })
                             .await
                             .is_err()
@@ -570,7 +572,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Connected {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                             })
                             .await
                             .is_err()
@@ -582,7 +584,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Disconnected {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                             })
                             .await
                             .is_err()
@@ -600,7 +602,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Request {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                                 data,
                                 respond: Box::new(move |data| {
                                     let out: RespondFut = Box::pin(async move {
@@ -619,7 +621,7 @@ impl MetaNet {
                         if evt_send
                             .send(MetaNetEvt::Notify {
                                 remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con),
+                                con: MetaNetCon::Tx2(con, host.clone()),
                                 data,
                             })
                             .await
@@ -633,7 +635,7 @@ impl MetaNet {
             }
         });
 
-        Ok((MetaNet::Tx2(ep_hnd), evt_recv))
+        Ok((MetaNet::Tx2(ep_hnd, return_host), evt_recv))
     }
 
     /// Construct abstraction with tx5 backend.
@@ -897,7 +899,7 @@ impl MetaNet {
     pub fn local_addr(&self) -> KitsuneResult<String> {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNet::Tx2(ep) = self {
+            if let MetaNet::Tx2(ep, _) = self {
                 return ep.local_addr().map(|s| s.to_string());
             }
         }
@@ -915,7 +917,7 @@ impl MetaNet {
     pub fn local_id(&self) -> Arc<[u8; 32]> {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNet::Tx2(ep) = self {
+            if let MetaNet::Tx2(ep, _) = self {
                 return ep.local_cert().into();
             }
         }
@@ -965,7 +967,7 @@ impl MetaNet {
     pub async fn close(&self, code: u32, reason: &str) {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNet::Tx2(ep) = self {
+            if let MetaNet::Tx2(ep, _) = self {
                 ep.close(code, reason).await;
                 return;
             }
@@ -981,15 +983,18 @@ impl MetaNet {
     ) -> KitsuneResult<MetaNetCon> {
         #[cfg(feature = "tx2")]
         {
-            if let MetaNet::Tx2(ep) = self {
+            if let MetaNet::Tx2(ep, host) = self {
                 let con = ep.get_connection(remote_url, timeout).await?;
-                return Ok(MetaNetCon::Tx2(con));
+                return Ok(MetaNetCon::Tx2(con, host.clone()));
             }
         }
 
         #[cfg(feature = "tx5")]
         {
-            if let MetaNet::Tx5 { host, ep, res, tun, .. } = self {
+            if let MetaNet::Tx5 {
+                host, ep, res, tun, ..
+            } = self
+            {
                 return Ok(MetaNetCon::Tx5 {
                     host: host.clone(),
                     ep: ep.clone(),
@@ -1010,7 +1015,7 @@ impl MetaNet {
 
         #[cfg(feature = "tx2")]
         {
-            if let MetaNet::Tx2(ep) = self {
+            if let MetaNet::Tx2(ep, _) = self {
                 let mut res = ep.debug();
                 if let Some(map) = res.as_object_mut() {
                     map.insert("backend".into(), "tx2-quic".into());

@@ -14,9 +14,9 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_zome_types::CellId;
+use std::collections::HashSet;
 use std::sync::Arc;
 use thiserror::Error;
-use std::collections::HashSet;
 
 use super::error::ConductorResult;
 
@@ -126,12 +126,18 @@ pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     let mut all_infos: HashSet<AgentInfoSigned> = HashSet::new();
 
     for env in envs.iter() {
-        let infos: HashSet<AgentInfoSigned> = all_agent_infos(env.clone().into()).await.unwrap().into_iter().collect();
+        let infos: HashSet<AgentInfoSigned> = all_agent_infos(env.clone().into())
+            .await
+            .unwrap()
+            .into_iter()
+            .collect();
         all_infos.extend(infos);
     }
 
     for env in envs.iter() {
-        inject_agent_infos(env.clone(), all_infos.iter()).await.unwrap();
+        inject_agent_infos(env.clone(), all_infos.iter())
+            .await
+            .unwrap();
     }
 }
 
