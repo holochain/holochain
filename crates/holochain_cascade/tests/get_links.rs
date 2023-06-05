@@ -1,3 +1,4 @@
+use hdk::prelude::LinkTag;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::MockHolochainP2pDnaT;
@@ -36,7 +37,7 @@ async fn links_not_authority() {
     assert_eq!(r, td.links);
 
     let r = cascade
-        .get_link_details(td.link_key.clone(), Default::default())
+        .get_link_details(td.link_key_tag.clone(), Default::default())
         .await
         .unwrap();
 
@@ -45,14 +46,14 @@ async fn links_not_authority() {
     fill_db(&authority.to_db(), td.delete_link_op.clone()).await;
 
     let r = cascade
-        .dht_get_links(td.link_key.clone(), Default::default())
+        .dht_get_links(td.link_key_tag.clone(), Default::default())
         .await
         .unwrap();
 
     assert!(r.is_empty());
 
     let r = cascade
-        .get_link_details(td.link_key.clone(), Default::default())
+        .get_link_details(td.link_key_tag.clone(), Default::default())
         .await
         .unwrap();
 
@@ -99,7 +100,7 @@ async fn links_authority() {
     fill_db(&vault.to_db(), td.delete_link_op.clone()).await;
 
     let r = cascade
-        .dht_get_links(td.link_key.clone(), Default::default())
+        .dht_get_links(td.link_key_tag.clone(), Default::default())
         .await
         .unwrap();
 
@@ -165,7 +166,7 @@ async fn links_authoring() {
         .with_scratch(scratch.into_sync());
 
     let r = cascade
-        .dht_get_links(td.link_key.clone(), Default::default())
+        .dht_get_links(td.link_key_tag.clone(), Default::default())
         .await
         .unwrap();
 
@@ -173,7 +174,53 @@ async fn links_authoring() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "todo"]
 async fn test_links_can_match_a_partial_tag() {
-    todo!()
+    holochain_trace::test_run().ok();
+
+    // Environments
+    let cache = test_cache_db();
+    let mut scratch = Scratch::new();
+
+    // Data
+    let td = EntryTestData::create();
+    insert_op_scratch(
+        &mut scratch,
+        td.store_entry_op.clone(),
+        ChainTopOrdering::default(),
+    )
+        .unwrap();
+    insert_op_scratch(
+        &mut scratch,
+        td.create_link_op.clone(),
+        ChainTopOrdering::default(),
+    )
+        .unwrap();
+
+    // Network
+    // - Not expecting any calls to the network.
+    let mut mock = MockHolochainP2pDnaT::new();
+    mock.expect_authority_for_hash().returning(|_| Ok(false));
+    mock.expect_get_links().returning(|_, _| {
+        Ok(vec![WireLinkOps {
+            creates: vec![],
+            deletes: vec![],
+        }])
+    });
+    let mock = MockNetwork::new(mock);
+
+    // Cascade
+    let cascade = Cascade::empty()
+        .with_network(mock.clone(), cache.to_db())
+        .with_scratch(scratch.clone().into_sync());
+
+    let mut query = td.link_key_tag.clone();
+    // Take the first 10 bytes of the tag
+    query.tag = Some(LinkTag::new(query.tag.unwrap().0.into_iter().take(10).collect::<Vec<u8>>()));
+
+    let r = cascade
+        .dht_get_links(td.link_key_tag.clone(), Default::default())
+        .await
+        .unwrap();
+
+    assert_eq!(1, r.len());
 }
