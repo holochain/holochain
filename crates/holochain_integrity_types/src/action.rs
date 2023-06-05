@@ -446,19 +446,19 @@ pub struct Dna {
 #[derive(Lens)]
 pub struct AgentValidationPkg {
     #[optic]
-    author: AgentPubKey,
+    pub author: AgentPubKey,
 
     #[optic]
-    timestamp: Timestamp,
+    pub timestamp: Timestamp,
 
     #[optic]
-    action_seq: u32,
+    pub action_seq: u32,
 
     #[optic]
-    prev_action: ActionHash,
+    pub prev_action: ActionHash,
 
     #[optic]
-    membrane_proof: Option<MembraneProof>,
+    pub membrane_proof: Option<MembraneProof>,
 }
 
 /// A action which declares that all zome init functions have successfully
@@ -758,8 +758,10 @@ pub struct AppEntryDef {
     /// A unique u8 identifier within a zome for this
     /// entry type.
     pub entry_index: EntryDefIndex,
+
     /// The id of the zome that defines this entry type.
     pub zome_index: ZomeIndex,
+    
     // @todo don't do this, use entry defs instead
     /// The visibility of this app entry.
     pub visibility: EntryVisibility,

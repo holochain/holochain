@@ -116,6 +116,9 @@ reqwest = "0.11.2"
 serial_test = "0.4.0"
 test-case = "1.2.1"
 
+lens-rs = { path = "/home/michael/gitfork/lens-rs/lens-rs", optional = false }
+
+
 # Dependencies for test_utils: keep in sync with above
 hdk = { version = "^0.2.0-beta-rc.0", path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }

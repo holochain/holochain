@@ -2487,6 +2487,7 @@ dependencies = [
  "kitsune_p2p_bootstrap",
  "kitsune_p2p_types",
  "lazy_static",
+ "lens-rs",
  "maplit",
  "matches",
  "mockall 0.11.4",
@@ -3869,7 +3870,6 @@ checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 [[package]]
 name = "lens-rs"
 version = "0.3.2"
-source = "git+https://github.com/TOETOE55/lens-rs#e3f6e3cf13f8e3b6d3c04e3cb6adf14a201b1442"
 dependencies = [
  "lens-rs_derive",
  "lens-rs_generator",
@@ -3878,7 +3878,6 @@ dependencies = [
 [[package]]
 name = "lens-rs_derive"
 version = "0.3.2"
-source = "git+https://github.com/TOETOE55/lens-rs#e3f6e3cf13f8e3b6d3c04e3cb6adf14a201b1442"
 dependencies = [
  "lens-rs_generator",
  "proc-macro2",
@@ -3889,7 +3888,6 @@ dependencies = [
 [[package]]
 name = "lens-rs_generator"
 version = "0.1.2"
-source = "git+https://github.com/TOETOE55/lens-rs#e3f6e3cf13f8e3b6d3c04e3cb6adf14a201b1442"
 dependencies = [
  "inwelling 0.3.0",
  "proc-macro2",

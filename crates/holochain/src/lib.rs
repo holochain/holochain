@@ -20,6 +20,7 @@ pub mod core;
 #[cfg(feature = "test_utils")]
 pub mod fixt;
 
+#[cfg(test)]
 #[cfg(feature = "test_utils")]
 mod lens_tests;
 

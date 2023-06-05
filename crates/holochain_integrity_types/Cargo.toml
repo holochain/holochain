@@ -24,7 +24,8 @@ kitsune_p2p_timestamp = { version = "^0.2.0-beta-rc.0", path = "../kitsune_p2p/t
 subtle = "2"
 
 # lens-rs = { version = "0.3", optional = true }
-lens-rs = { git = "https://github.com/TOETOE55/lens-rs", ref = "c3c5d50c16368174c00cccab1cb012e4ddba350b", optional = false }
+# lens-rs = { git = "https://github.com/TOETOE55/lens-rs", ref = "c3c5d50c16368174c00cccab1cb012e4ddba350b", optional = false }
+lens-rs = { path = "/home/michael/gitfork/lens-rs/lens-rs", optional = false }
 
 # Optional
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
