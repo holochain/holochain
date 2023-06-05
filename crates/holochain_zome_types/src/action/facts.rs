@@ -23,7 +23,7 @@ struct ValidChainFact {
     author: AgentPubKey,
 }
 
-impl Fact<Action> for ValidChainFact {
+impl<'a> Fact<'a, Action> for ValidChainFact {
     fn check(&self, action: &Action) -> Check {
         let action_hash = ActionHash::with_data_sync(action);
         let result = match (action.prev_action(), self.hash.as_ref()) {
@@ -50,7 +50,7 @@ impl Fact<Action> for ValidChainFact {
         result
     }
 
-    fn mutate(&self, action: &mut Action, u: &mut Unstructured<'static>) {
+    fn mutate(&self, action: &mut Action, u: &mut Unstructured<'a>) {
         if let Some(stored_hash) = self.hash.as_ref() {
             // This is not the first action we've seen
             while action.prev_action().is_none() {
@@ -83,22 +83,20 @@ impl Fact<Action> for ValidChainFact {
     }
 }
 
-pub fn is_of_type(action_type: ActionType) -> Facts<'static, Action> {
+pub fn is_of_type(action_type: ActionType) -> Facts<'_, Action> {
     facts![brute("action is of type", move |h: &Action| h
         .action_type()
         == action_type)]
 }
 
-pub fn is_new_entry_action() -> Facts<'static, Action> {
-    facts![or(
-        "is NewEntryAction",
-        is_of_type(ActionType::Create),
-        is_of_type(ActionType::Update)
-    )]
+pub fn is_new_entry_action() -> Facts<'_, Action> {
+    facts![brute("is NewEntryAction", move |a: &Action| a
+        .entry_type()
+        .map_or(false, |et| matches!(et, EntryType::App(_))))]
 }
 
 /// WIP: Fact: The actions form a valid SourceChain
-pub fn valid_chain(author: AgentPubKey) -> Facts<'static, Action> {
+pub fn valid_chain(author: AgentPubKey) -> Facts<'_, Action> {
     facts![ValidChainFact {
         hash: None,
         seq: 0,
@@ -107,7 +105,7 @@ pub fn valid_chain(author: AgentPubKey) -> Facts<'static, Action> {
 }
 
 /// Fact: The action must be a NewEntryAction
-pub fn new_entry_action() -> Facts<'static, Action> {
+pub fn new_entry_action() -> Facts<'_, Action> {
     facts![brute("Is a NewEntryAction", |h: &Action| {
         matches!(h.action_type(), ActionType::Create | ActionType::Update)
     }),]

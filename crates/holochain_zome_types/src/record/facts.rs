@@ -58,27 +58,32 @@ mod tests {
     use crate::action::facts as action_facts;
     use arbitrary::Arbitrary;
 
-    #[test]
-    fn test_action_and_entry_match() {
-        let mut uu = unstructured_noise();
-        let u = &mut uu;
+    proptest::proptest! {
+        #[test]
+        fn test_action_and_entry_match(seed: u64) {
+            let ns = noise(seed);
+            let mut uu = unstructured(&ns);
+            let u = &mut uu;
 
-        let e = Entry::arbitrary(u).unwrap();
-        let hn = not_(action_facts::is_new_entry_action()).build(u);
-        let mut he = action_facts::is_new_entry_action().build(u);
-        *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
-        let he = Action::from(he);
+            let e = brute("Is App entry", |e| matches!(e, Entry::App(_))).build(u);
+            let a0 = not_(action_facts::is_new_entry_action()).build(u);
+            let mut a1 = action_facts::is_new_entry_action().build(u);
+            *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
+            let a1 = Action::from(a1);
 
-        let pair1: Pair = (hn.clone(), None);
-        let pair2: Pair = (hn.clone(), Some(e.clone()));
-        let pair3: Pair = (he.clone(), None);
-        let pair4: Pair = (he.clone(), Some(e.clone()));
+            let pair1: Pair = (a0.clone(), None);
+            let pair2: Pair = (a0.clone(), Some(e.clone()));
+            let pair3: Pair = (a1.clone(), None);
+            let pair4: Pair = (a1.clone(), Some(e.clone()));
 
-        let fact = action_and_entry_match();
+            dbg!(&a0, &a1, &e);
 
-        fact.check(&pair1).unwrap();
-        assert!(fact.check(&pair2).is_err());
-        assert!(fact.check(&pair3).is_err());
-        fact.check(&pair4).unwrap();
+            let fact = action_and_entry_match();
+
+            fact.check(&pair1).unwrap();
+            assert!(fact.check(&pair2).is_err());
+            assert!(fact.check(&pair3).is_err());
+            fact.check(&pair4).unwrap();
+        }
     }
 }

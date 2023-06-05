@@ -4,16 +4,34 @@ use std::sync::Mutex;
 
 use arbitrary::{Arbitrary, Unstructured};
 use once_cell::sync::Lazy;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 /// 10MB of entropy free for the taking.
 /// Useful for initializing arbitrary::Unstructured data
 pub static NOISE: Lazy<Vec<u8>> = Lazy::new(|| {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
+    let mut rng = seeded_rng(None);
     std::iter::repeat_with(|| rng.gen())
         .take(10_000_000)
         .collect()
 });
+
+fn seeded_rng(seed: Option<u64>) -> StdRng {
+    let seed = seed.unwrap_or_else(|| rand::thread_rng().gen());
+    StdRng::seed_from_u64(seed)
+}
+
+/// Get some noise to feed into arbitrary::Unstructured
+pub fn noise(seed: u64) -> Vec<u8> {
+    let mut rng = seeded_rng(Some(seed));
+    std::iter::repeat_with(|| rng.gen())
+        .take(10_000_000)
+        .collect()
+}
+
+/// Alias for arbitrary::Unstructured::new
+pub fn unstructured(noise: &[u8]) -> arbitrary::Unstructured<'_> {
+    arbitrary::Unstructured::new(noise)
+}
 
 /// 10MB of random Unstructured data for use with `arbitrary`
 pub fn unstructured_noise() -> arbitrary::Unstructured<'static> {
