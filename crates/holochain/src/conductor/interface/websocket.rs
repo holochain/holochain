@@ -18,10 +18,9 @@ use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 use std::convert::TryFrom;
 
-use std::sync::atomic::AtomicIsize;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::*;
 use url2::url2;
@@ -30,7 +29,8 @@ use url2::url2;
 /// Number of signals in buffer before applying
 /// back pressure.
 pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
-const MAX_CONNECTIONS: isize = 400;
+/// The maximum number of connections allowed to the admin interface
+pub const MAX_CONNECTIONS: usize = 400;
 
 /// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(
@@ -65,22 +65,25 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
 
     tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), |_stop| {
         async move {
-            let num_connections = Arc::new(AtomicIsize::new(0));
+            let mut active_connections = Vec::new();
             futures::pin_mut!(listener);
             // establish a new connection to a client
             while let Some(connection) = listener.next().await {
+                active_connections.retain_mut(|handle: &mut JoinHandle<()>| !handle.is_finished());
+
                 match connection {
                     Ok((_, rx_from_iface)) => {
-                        if num_connections.fetch_add(1, Ordering::Relaxed) > MAX_CONNECTIONS {
+                        if active_connections.len() >= MAX_CONNECTIONS {
+                            warn!("Connection limit reached, dropping newly opened connection. num_connections={}", active_connections.len());
                             // Max connections so drop this connection
                             // which will close it.
                             continue;
                         };
-                        tokio::task::spawn(recv_incoming_admin_msgs(
+                        debug!("Accepting new connection with number of existing connections {}", active_connections.len());
+                        active_connections.push(tokio::task::spawn(recv_incoming_admin_msgs(
                             api.clone(),
                             rx_from_iface,
-                            num_connections.clone(),
-                        ));
+                        )));
                     }
                     Err(err) => {
                         warn!("Admin socket connection failed: {}", err);
@@ -146,7 +149,6 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
 async fn recv_incoming_admin_msgs<A: InterfaceApi>(
     api: A,
     rx_from_iface: WebsocketReceiver,
-    num_connections: Arc<AtomicIsize>,
 ) {
     use futures::stream::StreamExt;
 
@@ -160,7 +162,6 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
             }
         })
         .await;
-    num_connections.fetch_sub(1, Ordering::SeqCst);
 }
 
 /// Polls for messages coming in from the external client while simultaneously

@@ -28,6 +28,7 @@ use tempfile::TempDir;
 use tokio_stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
+use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
 
 use crate::test_utils::*;
 
@@ -67,7 +68,7 @@ test: "example"
 how_many: 42
     "#,
         )
-        .unwrap(),
+            .unwrap(),
     );
 
     // Install Dna
@@ -83,7 +84,7 @@ how_many: 42
         "role_name".into(),
         10000,
     )
-    .await;
+        .await;
 
     // List Dnas
     let request = AdminRequest::ListDnas;
@@ -142,7 +143,7 @@ async fn call_zome() {
         "".into(),
         10000,
     )
-    .await;
+        .await;
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // List Dnas
@@ -176,7 +177,7 @@ async fn call_zome() {
         fn_name.clone(),
         signing_key,
     )
-    .await;
+        .await;
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -194,7 +195,7 @@ async fn call_zome() {
         fn_name.clone(),
         &(),
     )
-    .await;
+        .await;
 
     // Ensure that the other client does not receive any messages, i.e. that
     // responses are not broadcast to all connected clients, only the one
@@ -240,7 +241,7 @@ async fn call_zome() {
         fn_name.clone(),
         &(),
     )
-    .await;
+        .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -305,8 +306,8 @@ async fn remote_signals() -> anyhow::Result<()> {
             assert_matches!(r, Ok(Signal::App{signal: a,..}) if a == signal);
         }
     })
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     Ok(())
 }
@@ -351,7 +352,7 @@ async fn emit_signals() {
         "".into(),
         10000,
     )
-    .await;
+        .await;
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
 
     // Activate cells
@@ -377,7 +378,7 @@ async fn emit_signals() {
         fn_name.clone(),
         signing_key,
     )
-    .await;
+        .await;
 
     // Attach App Interface
     let app_port = attach_app_interface(&mut admin_tx, None).await;
@@ -397,7 +398,7 @@ async fn emit_signals() {
         fn_name,
         &(),
     )
-    .await;
+        .await;
 
     let (sig1, msg1) = Box::pin(app_rx_1.timeout(Duration::from_secs(1)))
         .next()
@@ -417,7 +418,7 @@ async fn emit_signals() {
         Signal::App {
             cell_id,
             zome_name,
-            signal: AppSignal::new(ExternIO::encode(()).unwrap())
+            signal: AppSignal::new(ExternIO::encode(()).unwrap()),
         },
         Signal::try_from(sig1.clone()).unwrap(),
     );
@@ -471,7 +472,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
             ..Default::default()
         }),
     )
-    .await?;
+        .await?;
 
     let request = AdminRequest::ListAppInterfaces;
 
@@ -510,7 +511,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
             ..Default::default()
         }),
     )
-    .await?;
+        .await?;
 
     info!("client connect");
 
@@ -552,27 +553,47 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn too_many_open() {
+#[cfg(feature = "slow_tests")]
+async fn connection_limit_is_respected() {
     holochain_trace::test_run().ok();
 
-    info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
-    info!("building conductor");
-    for _i in 0..1000 {
-        holochain_websocket::connect(
-            url2!("ws://127.0.0.1:{}", port),
-            Arc::new(WebsocketConfig {
-                default_request_timeout_s: 1,
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap();
+
+    let url = url2!("ws://127.0.0.1:{}", port);
+    let cfg = Arc::new(WebsocketConfig::default());
+
+    // Retain handles so that the test can control when to disconnect clients
+    let mut handles = Vec::new();
+
+    // The first `MAX_CONNECTIONS` connections should succeed
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender.request(AdminRequest::ListDnas).await.expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
     }
+
+    // Try lots of failed connections to make sure the limit is respected
+    for _ in 0..2*MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+
+        // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
+        sender.request::<AdminRequest, AdminResponse>(AdminRequest::ListDnas).await.expect_err("Should be no available connection slots");
+    }
+
+    // Disconnect all the clients
+    handles.clear();
+
+    // Should now be possible to connect new clients
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender.request(AdminRequest::ListDnas).await.expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
+    }
+
     conductor_handle.shutdown();
 }
 
@@ -628,7 +649,7 @@ async fn concurrent_install_dna() {
                 name.clone(),
                 REQ_TIMEOUT_MS,
             )
-            .await;
+                .await;
 
             //println!(
             //    "[{}] installed dna with hash {} and name {}",
@@ -636,7 +657,7 @@ async fn concurrent_install_dna() {
             //);
         })
     }))
-    .buffer_unordered(NUM_CONCURRENT_INSTALLS.into());
+        .buffer_unordered(NUM_CONCURRENT_INSTALLS.into());
 
     let install_tasks = futures::StreamExt::collect::<Vec<_>>(install_tasks_stream);
 
@@ -722,7 +743,7 @@ async fn full_state_dump_cursor_works() {
         cell_id,
         Some(full_state.integration_dump.dht_ops_cursor - 1),
     )
-    .await;
+        .await;
 
     let integrated_ops_count = full_state.integration_dump.integrated.len();
     let validation_limbo_ops_count = full_state.integration_dump.validation_limbo.len();
