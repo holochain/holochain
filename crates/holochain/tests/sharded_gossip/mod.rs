@@ -56,7 +56,7 @@ fn make_config(
     recent_threshold: Option<u64>,
 ) -> SweetConductorConfig {
     let tuning = make_tuning(publish, recent, historical, recent_threshold);
-    SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
+    SweetConductorConfig::rendezvous().set_tune(tuning)
 }
 
 #[cfg(feature = "test_utils")]
@@ -197,7 +197,7 @@ async fn test_zero_arc_get_links() {
     // Standard config with arc clamped to zero
     let mut tuning = make_tuning(true, true, true, None);
     tuning.gossip_arc_clamping = "empty".into();
-    let config = SweetConductorConfig::standard().tune(Arc::new(tuning));
+    let config = SweetConductorConfig::standard().set_tune(tuning);
 
     let mut conductor0 = SweetConductor::from_config(config).await;
     let mut conductor1 = SweetConductor::from_standard_config().await;
@@ -232,7 +232,7 @@ async fn test_zero_arc_no_gossip_2way() {
     // This should result in no publishing or gossip
     let mut tuning_1 = make_tuning(false, true, true, None);
     tuning_1.gossip_arc_clamping = "empty".into();
-    let config_1 = SweetConductorConfig::rendezvous().tune(Arc::new(tuning_1));
+    let config_1 = SweetConductorConfig::rendezvous().set_tune(tuning_1);
 
     let mut conductors = SweetConductorBatch::from_configs_rendezvous([config_0, config_1]).await;
 
@@ -282,13 +282,13 @@ async fn test_zero_arc_no_gossip_4way() {
             // Standard config with arc clamped to zero
             let mut tuning = make_tuning(true, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
+            SweetConductorConfig::rendezvous().set_tune(tuning)
         },
         {
             // Publishing turned off, arc clamped to zero
             let mut tuning = make_tuning(false, true, true, None);
             tuning.gossip_arc_clamping = "empty".into();
-            SweetConductorConfig::rendezvous().tune(Arc::new(tuning))
+            SweetConductorConfig::rendezvous().set_tune(tuning)
         },
     ];
 

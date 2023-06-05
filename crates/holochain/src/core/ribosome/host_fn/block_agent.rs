@@ -1,11 +1,11 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use std::sync::Arc;
+use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTarget;
 use holochain_zome_types::block::CellBlockReason;
-use holochain_types::prelude::*;
+use std::sync::Arc;
 
 pub fn block_agent(
     _ribosome: Arc<impl RibosomeT>,
@@ -13,32 +13,43 @@ pub fn block_agent(
     input: holochain_zome_types::block::BlockAgentInput,
 ) -> Result<(), RuntimeError> {
     tokio_helper::block_forever_on(async move {
-        call_context.host_context().call_zome_handle().block(Block::new(
-            BlockTarget::Cell(CellId::new(call_context
-                .host_context()
-                .call_zome_handle()
-                .cell_id().dna_hash()
-                .clone(), input.target), CellBlockReason::App(input.reason)),
-            input.interval
-        )).await.map_err(|e| -> RuntimeError {
-            wasm_error!(e.to_string()).into()
-        })
+        call_context
+            .host_context()
+            .call_zome_handle()
+            .block(Block::new(
+                BlockTarget::Cell(
+                    CellId::new(
+                        call_context
+                            .host_context()
+                            .call_zome_handle()
+                            .cell_id()
+                            .dna_hash()
+                            .clone(),
+                        input.target,
+                    ),
+                    CellBlockReason::App(input.reason),
+                ),
+                input.interval,
+            ))
+            .await
+            .map_err(|e| -> RuntimeError { wasm_error!(e.to_string()).into() })
     })
 }
 
 #[cfg(test)]
 mod test {
-    use holochain_types::prelude::CapSecret;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use holochain_wasm_test_utils::TestWasm;
-    use holo_hash::AgentPubKey;
-    use holochain_types::prelude::ZomeCallResponse;
-    use holo_hash::ActionHash;
     use crate::conductor::api::error::ConductorApiResult;
-    use holochain_types::prelude::Record;
+    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::sweettest::SweetConductorBatch;
+    use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::{consistency_10s_advanced, consistency_10s};
+    use crate::test_utils::{consistency_10s, consistency_10s_advanced};
+    use holo_hash::ActionHash;
+    use holo_hash::AgentPubKey;
+    use holochain_types::prelude::CapSecret;
+    use holochain_types::prelude::Record;
+    use holochain_types::prelude::ZomeCallResponse;
+    use holochain_wasm_test_utils::TestWasm;
 
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
     pub struct CapFor(CapSecret, AgentPubKey);
@@ -47,18 +58,33 @@ mod test {
     async fn zome_call_verify_block() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
-            conductor, alice, alice_pubkey, bob, bob_pubkey, ..
+            conductor,
+            alice,
+            alice_pubkey,
+            bob,
+            bob_pubkey,
+            ..
         } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let secret: CapSecret = conductor.call(&bob, "cap_secret", ()).await;
-        let _action_hash: ActionHash = conductor.call(&bob, "transferable_cap_grant", secret.clone()).await;
+        let _action_hash: ActionHash = conductor
+            .call(&bob, "transferable_cap_grant", secret.clone())
+            .await;
         let cap_for = CapFor(secret, bob_pubkey);
-        let _response0: ZomeCallResponse = conductor.call(&alice, "try_cap_claim", cap_for.clone()).await;
-        let _response1: ZomeCallResponse = conductor.call(&alice, "try_cap_claim", cap_for.clone()).await;
+        let _response0: ZomeCallResponse = conductor
+            .call(&alice, "try_cap_claim", cap_for.clone())
+            .await;
+        let _response1: ZomeCallResponse = conductor
+            .call(&alice, "try_cap_claim", cap_for.clone())
+            .await;
 
-        let _: () = conductor.call(&bob, "block_agent", alice_pubkey.clone()).await;
+        let _: () = conductor
+            .call(&bob, "block_agent", alice_pubkey.clone())
+            .await;
 
-        let response2: ConductorApiResult<ZomeCallResponse> = conductor.call_fallible(&alice, "try_cap_claim", cap_for.clone()).await;
+        let response2: ConductorApiResult<ZomeCallResponse> = conductor
+            .call_fallible(&alice, "try_cap_claim", cap_for.clone())
+            .await;
         assert!(response2.is_err());
 
         let _: () = conductor.call(&bob, "unblock_agent", alice_pubkey).await;
@@ -73,10 +99,14 @@ mod test {
         //     conductor, alice, bob, bob_pubkey, ..
         // } = RibosomeTestFixture::new(TestWasm::Create).await;
 
-        let (dna_file, _, _) =
-        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        let mut conductors = SweetConductorBatch::from_standard_config(3).await;
+        let config = SweetConductorConfig::standard().tune(|tune| {
+            tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
+            tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
+            tune.gossip_round_timeout_ms = 3000;
+        });
+        let mut conductors = SweetConductorBatch::from_config(3, config).await;
         let apps = conductors
             .setup_app("create", &[dna_file.clone()])
             .await
@@ -121,10 +151,13 @@ mod test {
 
         // Bob gets blocked by alice.
         dbg!("block");
-        let _block: () = alice_conductor.call(&alice, "block_agent", bob_pubkey).await;
+        let _block: () = alice_conductor
+            .call(&alice, "block_agent", bob_pubkey)
+            .await;
 
         dbg!("create");
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
+        dbg!(&action1);
 
         // Now that bob is blocked by alice he cannot get data from alice.
         consistency_10s([&alice_cell]).await;
@@ -144,5 +177,4 @@ mod test {
         // let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
         // assert!(bob_get2.is_some());
     }
-
 }
