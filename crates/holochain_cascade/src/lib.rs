@@ -27,7 +27,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use crate::error::CascadeError;
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
