@@ -60,12 +60,12 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn test_action_and_entry_match(seed: u64) {
-            let ns = noise(seed);
+            let ns = noise(seed, 100_000);
             let mut uu = unstructured(&ns);
             let u = &mut uu;
 
             let e = brute("Is App entry", |e| matches!(e, Entry::App(_))).build(u);
-            let a0 = not_(action_facts::is_new_entry_action()).build(u);
+            let a0 = action_facts::is_not_entry_action().build(u);
             let mut a1 = action_facts::is_new_entry_action().build(u);
             *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
             let a1 = Action::from(a1);
@@ -75,7 +75,7 @@ mod tests {
             let pair3: Pair = (a1.clone(), None);
             let pair4: Pair = (a1.clone(), Some(e.clone()));
 
-            dbg!(&a0, &a1, &e);
+            // dbg!(&a0, &a1, &e);
 
             let fact = action_and_entry_match();
 

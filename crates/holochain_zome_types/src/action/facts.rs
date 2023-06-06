@@ -91,9 +91,26 @@ pub fn is_of_type(action_type: ActionType) -> Facts<Action> {
 }
 
 pub fn is_new_entry_action<'a>() -> FactsRef<'a, Action> {
-    facts![brute("is NewEntryAction", move |a: &Action| a
+    let et_fact = brute("is NewEntryAction", move |et: &EntryType| {
+        matches!(et, EntryType::App(_))
+    });
+
+    facts![
+        // Must ensure entry type exists, because if not, the prism
+        // fact will not be checked
+        brute("has entry type", |a: &Action| a.entry_type().is_some()),
+        prism(
+            "entry type",
+            |a: &mut Action| { a.entry_data_mut().map(|(_, et)| et) },
+            et_fact
+        )
+    ]
+}
+
+pub fn is_not_entry_action<'a>() -> FactsRef<'a, Action> {
+    facts![brute("is not NewEntryAction", move |a: &Action| a
         .entry_type()
-        .map_or(false, |et| matches!(et, EntryType::App(_))))]
+        .is_none())]
 }
 
 /// WIP: Fact: The actions form a valid SourceChain

@@ -21,11 +21,9 @@ fn seeded_rng(seed: Option<u64>) -> StdRng {
 }
 
 /// Get some noise to feed into arbitrary::Unstructured
-pub fn noise(seed: u64) -> Vec<u8> {
+pub fn noise(seed: u64, size: usize) -> Vec<u8> {
     let mut rng = seeded_rng(Some(seed));
-    std::iter::repeat_with(|| rng.gen())
-        .take(10_000_000)
-        .collect()
+    std::iter::repeat_with(|| rng.gen()).take(size).collect()
 }
 
 /// Alias for arbitrary::Unstructured::new
