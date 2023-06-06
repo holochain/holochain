@@ -98,49 +98,54 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     let validation_failures = std::sync::Arc::new(parking_lot::Mutex::new(vec![]));
     let validation_failures_2 = validation_failures.clone();
 
-    let zomeset = InlineZomeSet::new_unique(
-        [("integrity", vec![EntryDef::from_id("unit")], 0)],
-        ["coordinator"],
-    )
-    .function("integrity", "validate", move |_h, op: Op| {
-        // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
-        // and we're not guaranteed to be running on the same thread throughout the test.
-        set_zome_types(&[(0, 3)], &[]);
-        validation_ops_2.lock().push(op.clone());
-        if let Err(err) = op.flattened::<EntryTypes, ()>() {
-            validation_failures_2.lock().push(err);
-        }
-        Ok(ValidateResult::Valid)
-    })
-    .function("coordinator", "create", |h, ()| {
-        // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
-        // and we're not guaranteed to be running on the same thread throughout the test.
-        set_zome_types(&[(0, 3)], &[]);
-        let claim = CapClaimEntry {
-            tag: "tag".into(),
-            grantor: ::fixt::fixt!(AgentPubKey),
-            secret: ::fixt::fixt!(CapSecret),
-        };
-        let input = EntryTypes::Post(Post("whatever".into()));
-        let location = EntryDefLocation::app(0, 0);
-        let visibility = EntryVisibility::from(&input);
-        assert_eq!(visibility, EntryVisibility::Private);
-        let entry = input.try_into().unwrap();
-        h.create(CreateInput::new(
-            location.clone(),
-            visibility,
-            entry,
-            ChainTopOrdering::default(),
-        ))?;
-        h.create(CreateInput::new(
-            EntryDefLocation::CapClaim,
-            visibility,
-            Entry::CapClaim(claim),
-            ChainTopOrdering::default(),
-        ))?;
+    let entry_def = EntryDef {
+        id: "unit".into(),
+        visibility: EntryVisibility::Private,
+        ..Default::default()
+    };
 
-        Ok(())
-    });
+    let zomeset = InlineZomeSet::new_unique([("integrity", vec![entry_def], 0)], ["coordinator"])
+        .function("integrity", "validate", move |_h, op: Op| {
+            // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
+            // and we're not guaranteed to be running on the same thread throughout the test.
+            set_zome_types(&[(0, 3)], &[]);
+            validation_ops_2.lock().push(op.clone());
+            if let Err(err) = op.flattened::<EntryTypes, ()>() {
+                validation_failures_2.lock().push(err);
+            }
+            Ok(ValidateResult::Valid)
+        })
+        .function("coordinator", "create", |h, ()| {
+            // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local
+            // and we're not guaranteed to be running on the same thread throughout the test.
+            set_zome_types(&[(0, 3)], &[]);
+            let claim = CapClaimEntry {
+                tag: "tag".into(),
+                grantor: ::fixt::fixt!(AgentPubKey),
+                secret: ::fixt::fixt!(CapSecret),
+            };
+            let input = EntryTypes::Post(Post("whatever".into()));
+            let location = EntryDefLocation::app(0, 0);
+            let visibility = EntryVisibility::from(&input);
+            assert_eq!(visibility, EntryVisibility::Private);
+            let entry = input.try_into().unwrap();
+            dbg!();
+            h.create(CreateInput::new(
+                location.clone(),
+                visibility,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            dbg!();
+            h.create(CreateInput::new(
+                EntryDefLocation::CapClaim,
+                visibility,
+                Entry::CapClaim(claim),
+                ChainTopOrdering::default(),
+            ))?;
+
+            Ok(())
+        });
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomeset).await;
 
     // Note, we have to be a bit aggressive about setting the HDI, since it is thread_local

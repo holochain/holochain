@@ -347,10 +347,10 @@ pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
 
     match (op.action().entry_type().map(|t| t.visibility()), op.entry()) {
         (Some(Public), Present(_)) => Ok(()),
-        (Some(Public), Hidden) => Ok(()),
+        (Some(Private), Hidden) => Ok(()),
         (Some(Private), NotStored) => Ok(()),
 
-        (Some(Private) | None, Hidden) => err("RecordEntry::Hidden is only for Public entry type"),
+        (Some(Public), Hidden) => err("RecordEntry::Hidden is only for Private entry type"),
         (Some(_), NA) => err("There is action entry data but the entry itself is N/A"),
         (Some(Private), Present(_)) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
         (Some(Public), NotStored) => {

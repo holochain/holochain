@@ -514,7 +514,7 @@ async fn test_signing_error_during_genesis() {
 // }
 
 pub(crate) fn simple_create_entry_zome() -> InlineIntegrityZome {
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     InlineIntegrityZome::new_unique(vec![unit_entry_def.clone()], 0)
         .function("create", move |api, ()| {
             let entry = Entry::app(().try_into().unwrap()).unwrap();
@@ -807,7 +807,7 @@ async fn test_installation_fails_if_genesis_self_check_is_invalid() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     holochain_trace::test_run().ok();
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             .function("integrity", "validate", |_api, op: Op| match op {
@@ -866,7 +866,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
 #[ignore = "need to figure out how to write this test, i.e. to make genesis panic"]
 async fn test_apps_disable_on_panic_after_genesis() {
     holochain_trace::test_run().ok();
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     let bad_zome =
         InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
             // We need a different validation callback that doesn't happen inline

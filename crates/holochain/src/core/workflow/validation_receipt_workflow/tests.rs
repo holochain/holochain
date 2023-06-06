@@ -113,7 +113,7 @@ macro_rules! wait_until {
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_block_invalid_receipt() {
     holochain_trace::test_run().ok();
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     let integrity_name = "integrity";
     let coordinator_name = "coordinator";
     let integrity_uuid = "a";
@@ -239,7 +239,7 @@ async fn test_block_invalid_receipt() {
 async fn test_not_block_self_receipt() {
     holochain_trace::test_run().ok();
 
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     let zomes = InlineZomeSet::new_single(
         "integrity",
         "coordinator",
