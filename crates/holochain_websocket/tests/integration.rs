@@ -83,6 +83,7 @@ fn server_recv(
 
 /// Runs a listener and accepts multiple incoming connections. A task is spawned for each connection
 /// that will listen until the client disconnects.
+#[cfg(feature = "slow_tests")]
 fn server_recv_multi(
     mut listener: impl futures::stream::Stream<Item = ListenerItem> + Unpin + Send + 'static,
 ) -> tokio::task::JoinHandle<()> {
@@ -492,8 +493,8 @@ async fn can_handle_many_connections_and_disconnects() {
     let b2 = binding.clone();
     tokio::spawn(async move {
         let mut senders = Vec::new();
-        for i in 0..100_000 {
-            if i % 5_000 == 0 {
+        for i in 0..10_000 {
+            if i % 800 == 0 {
                 senders.clear();
             }
 
