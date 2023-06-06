@@ -103,6 +103,7 @@ mod writer;
 use crate::writer::InMemoryWriter;
 pub use tracing;
 use tracing_subscriber::fmt::MakeWriter;
+use crate::flames::{FlameTimedConsole, toml_path};
 
 #[derive(Debug, Clone, Display)]
 /// Sets the kind of structured logging output you want
@@ -201,6 +202,27 @@ pub fn test_run_timed_flame() -> Result<Option<Box<impl Drop>>, errors::TracingE
     Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
+/// Generate a flamegraph from timed spans "busy time".
+/// Takes a path where you are piping the output into.
+/// If the path is provided a flamegraph will automatically be generated.
+/// TODO: Get auto inferno to work
+/// for now use (fish, or the bash equiv):
+/// `2>| inferno-flamegraph > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
+/// And run with `cargo test --quiet`
+#[deprecated]
+pub fn test_run_timed_flame_console(path: Option<&str>) -> Result<Option<impl Drop>, errors::TracingError> {
+    if std::env::var_os("RUST_LOG").is_none() {
+        return Ok(None);
+    }
+    init_fmt(Output::FlameTimed)?;
+    Ok(path.and_then(|p| {
+        toml_path().map(|mut t| {
+            t.push(p);
+            FlameTimedConsole::new(t)
+        })
+    }))
+}
+
 /// Generate a flamegraph from timed spans of "idle time".
 pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingError> {
     if std::env::var_os("RUST_LOG").is_none() {
@@ -216,6 +238,28 @@ pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingErr
     Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
+
+/// Generate a flamegraph from timed spans "idle time".
+/// Takes a path where you are piping the output into.
+/// If the path is provided a flamegraph will automatically be generated.
+/// TODO: Get auto inferno to work
+/// for now use (fish, or the bash equiv):
+/// `2>| inferno-flamegraph -c blue > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
+/// And run with `cargo test --quiet`
+#[deprecated]
+pub fn test_run_timed_ice_console(path: Option<&str>) -> Result<Option<impl Drop>, errors::TracingError> {
+    if std::env::var_os("RUST_LOG").is_none() {
+        return Ok(None);
+    }
+    init_fmt(Output::IceTimed)?;
+    Ok(path.and_then(|p| {
+        toml_path().map(|mut t| {
+            t.push(p);
+            FlameTimedConsole::new(t)
+        })
+    }))
+}
+
 /// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
 /// It then checks for CUSTOM_FILTER which if set will output an error if it doesn't parse.
 pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
@@ -223,8 +267,8 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
 }
 
 fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::TracingError>
-where
-    W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
+    where
+        W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
 {
     let mut filter = match std::env::var("RUST_LOG") {
         Ok(_) => EnvFilter::from_default_env(),
@@ -317,8 +361,8 @@ where
 }
 
 fn finish<S>(subscriber: S) -> Result<(), errors::TracingError>
-where
-    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
+    where
+        S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
 {
     let mut result = Ok(());
     INIT.call_once(|| {
