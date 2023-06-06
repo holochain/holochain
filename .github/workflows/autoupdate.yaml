@@ -18,11 +18,14 @@ on:
 jobs:
     autoupdate:
         name: autoupdate
+        env:
+            hra_github_token: ${{ secrets.HRA_GITHUB_TOKEN }}
         runs-on: ubuntu-latest
         steps:
             - uses: docker://chinthakagodawita/autoupdate-action:v1
+              if: ${{ env.hra_github_token != '' }}
               env:
-                  GITHUB_TOKEN: "${{ secrets.HRA_GITHUB_TOKEN }}"
+                  GITHUB_TOKEN: "${{ env.hra_github_token }}"
                   PR_FILTER: "labelled"
                   PR_LABELS: "autoupdate:opt-in"
                   MERGE_CONFLICT_ACTION: "fail"
