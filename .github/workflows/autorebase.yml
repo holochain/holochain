@@ -17,6 +17,7 @@ on:
 
 jobs:
     auto-rebase:
+        if: github.repository == 'holochain/holochain'
         name: AutoRebase
         runs-on: ubuntu-latest
         steps:
