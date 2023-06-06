@@ -188,13 +188,13 @@ async fn test_links_can_match_a_partial_tag() {
         td.store_entry_op.clone(),
         ChainTopOrdering::default(),
     )
-        .unwrap();
+    .unwrap();
     insert_op_scratch(
         &mut scratch,
         td.create_link_op.clone(),
         ChainTopOrdering::default(),
     )
-        .unwrap();
+    .unwrap();
 
     // Network
     // - Not expecting any calls to the network.
@@ -215,7 +215,15 @@ async fn test_links_can_match_a_partial_tag() {
 
     let mut query = td.link_key_tag.clone();
     // Take the first 10 bytes of the tag
-    query.tag = Some(LinkTag::new(query.tag.unwrap().0.into_iter().take(10).collect::<Vec<u8>>()));
+    query.tag = Some(LinkTag::new(
+        query
+            .tag
+            .unwrap()
+            .0
+            .into_iter()
+            .take(10)
+            .collect::<Vec<u8>>(),
+    ));
 
     let r = cascade
         .dht_get_links(td.link_key_tag.clone(), Default::default())
