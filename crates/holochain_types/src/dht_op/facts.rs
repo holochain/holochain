@@ -13,7 +13,7 @@ pub fn valid_dht_op(
     keystore: MetaLairClient,
     author: AgentPubKey,
     must_be_public: bool,
-) -> Facts<'static, DhtOp> {
+) -> Facts<DhtOp> {
     facts![
         brute(
             "Action type matches Entry existence, and is public if exists",

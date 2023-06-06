@@ -50,12 +50,12 @@ impl<'a> Fact<'a, Action> for ValidChainFact {
         result
     }
 
-    fn mutate(&self, action: &mut Action, u: &mut Unstructured<'a>) {
+    fn mutate(&self, mut action: Action, u: &mut Unstructured<'a>) -> Action {
         if let Some(stored_hash) = self.hash.as_ref() {
             // This is not the first action we've seen
             while action.prev_action().is_none() {
                 // Generate arbitrary actions until we get one with a prev action
-                *action = Action::arbitrary(u).unwrap();
+                action = Action::arbitrary(u).unwrap();
             }
             // Set the action's prev hash to the one we stored from our previous
             // visit
@@ -65,11 +65,12 @@ impl<'a> Fact<'a, Action> for ValidChainFact {
             *action.action_seq_mut().unwrap() = self.seq;
         } else {
             // This is the first action we've seen, so it must be a Dna
-            *action = Action::Dna(Dna::arbitrary(u).unwrap());
+            action = Action::Dna(Dna::arbitrary(u).unwrap());
         }
 
         *action.author_mut() = self.author.clone();
 
+        action
         // println!(
         //     "{}  =>  {:?}\n",
         //     ActionHash::with_data_sync(action),
@@ -83,20 +84,20 @@ impl<'a> Fact<'a, Action> for ValidChainFact {
     }
 }
 
-pub fn is_of_type(action_type: ActionType) -> Facts<'_, Action> {
+pub fn is_of_type(action_type: ActionType) -> Facts<Action> {
     facts![brute("action is of type", move |h: &Action| h
         .action_type()
         == action_type)]
 }
 
-pub fn is_new_entry_action() -> Facts<'_, Action> {
+pub fn is_new_entry_action<'a>() -> FactsRef<'a, Action> {
     facts![brute("is NewEntryAction", move |a: &Action| a
         .entry_type()
         .map_or(false, |et| matches!(et, EntryType::App(_))))]
 }
 
 /// WIP: Fact: The actions form a valid SourceChain
-pub fn valid_chain(author: AgentPubKey) -> Facts<'_, Action> {
+pub fn valid_chain(author: AgentPubKey) -> Facts<Action> {
     facts![ValidChainFact {
         hash: None,
         seq: 0,
@@ -105,7 +106,7 @@ pub fn valid_chain(author: AgentPubKey) -> Facts<'_, Action> {
 }
 
 /// Fact: The action must be a NewEntryAction
-pub fn new_entry_action() -> Facts<'_, Action> {
+pub fn new_entry_action() -> Facts<Action> {
     facts![brute("Is a NewEntryAction", |h: &Action| {
         matches!(h.action_type(), ActionType::Create | ActionType::Update)
     }),]
