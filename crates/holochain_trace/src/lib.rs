@@ -100,10 +100,10 @@ mod writer;
 // pub use open::should_run;
 // pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 
+use crate::flames::{toml_path, FlameTimedConsole};
 use crate::writer::InMemoryWriter;
 pub use tracing;
 use tracing_subscriber::fmt::MakeWriter;
-use crate::flames::{FlameTimedConsole, toml_path};
 
 #[derive(Debug, Clone, Display)]
 /// Sets the kind of structured logging output you want
@@ -210,7 +210,9 @@ pub fn test_run_timed_flame() -> Result<Option<Box<impl Drop>>, errors::TracingE
 /// `2>| inferno-flamegraph > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
 /// And run with `cargo test --quiet`
 #[deprecated]
-pub fn test_run_timed_flame_console(path: Option<&str>) -> Result<Option<impl Drop>, errors::TracingError> {
+pub fn test_run_timed_flame_console(
+    path: Option<&str>,
+) -> Result<Option<impl Drop>, errors::TracingError> {
     if std::env::var_os("RUST_LOG").is_none() {
         return Ok(None);
     }
@@ -238,7 +240,6 @@ pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingErr
     Ok(Some(Box::new(FlameTimed::new(writer_handle))))
 }
 
-
 /// Generate a flamegraph from timed spans "idle time".
 /// Takes a path where you are piping the output into.
 /// If the path is provided a flamegraph will automatically be generated.
@@ -247,7 +248,9 @@ pub fn test_run_timed_ice() -> Result<Option<Box<impl Drop>>, errors::TracingErr
 /// `2>| inferno-flamegraph -c blue > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg`
 /// And run with `cargo test --quiet`
 #[deprecated]
-pub fn test_run_timed_ice_console(path: Option<&str>) -> Result<Option<impl Drop>, errors::TracingError> {
+pub fn test_run_timed_ice_console(
+    path: Option<&str>,
+) -> Result<Option<impl Drop>, errors::TracingError> {
     if std::env::var_os("RUST_LOG").is_none() {
         return Ok(None);
     }
@@ -267,8 +270,8 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
 }
 
 fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::TracingError>
-    where
-        W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
+where
+    W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
 {
     let mut filter = match std::env::var("RUST_LOG") {
         Ok(_) => EnvFilter::from_default_env(),
@@ -361,8 +364,8 @@ fn init_fmt_with_opts<W>(output: Output, writer: W) -> Result<(), errors::Tracin
 }
 
 fn finish<S>(subscriber: S) -> Result<(), errors::TracingError>
-    where
-        S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
+where
+    S: Subscriber + Send + Sync + for<'span> LookupSpan<'span>,
 {
     let mut result = Ok(());
     INIT.call_once(|| {
