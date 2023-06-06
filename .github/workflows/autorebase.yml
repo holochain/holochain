@@ -17,11 +17,13 @@ on:
 
 jobs:
     auto-rebase:
-        if: github.repository == 'holochain/holochain'
+        env:
+            hra_github_token: ${{ secrets['HRA_GITHUB_TOKEN'] }}
         name: AutoRebase
         runs-on: ubuntu-latest
         steps:
             - uses: Label305/AutoRebase@v0.1
+              if: ${{ env.hra_github_token != '' }}
               with:
                   # We can't use the built-in secrets.GITHUB_TOKEN yet because of this limitation:
                   # https://github.community/t5/GitHub-Actions/Triggering-a-new-workflow-from-another-workflow/td-p/31676
@@ -30,4 +32,4 @@ jobs:
                   #   See https://github.com/marketplace/actions/github-app-token.
                   # - a personal access token
                   #   See https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line.
-                  github_token: ${{ secrets.HRA_GITHUB_TOKEN }}
+                  github_token: ${{ env.HRA_GITHUB_TOKEN }}
