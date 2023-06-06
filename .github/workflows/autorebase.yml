@@ -18,7 +18,7 @@ on:
 jobs:
     auto-rebase:
         env:
-            hra_github_token: ${{ secrets['HRA_GITHUB_TOKEN'] }}
+            hra_github_token: ${{ secrets.HRA_GITHUB_TOKEN }}
         name: AutoRebase
         runs-on: ubuntu-latest
         steps:
