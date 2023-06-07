@@ -181,9 +181,7 @@ impl LocalState {
     }
 
     pub fn selected_node(&self) -> Option<usize> {
-        self.node_list_state
-            .selected()
-            .and_then(|s| (s > 0).then_some(s - 1))
+        self.node_list_state.selected().map(|s| s.saturating_sub(1))
     }
 }
 

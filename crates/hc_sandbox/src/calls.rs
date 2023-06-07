@@ -33,6 +33,7 @@ use crate::ports::get_admin_ports;
 use crate::run::run_async;
 use crate::CmdRunner;
 use clap::Parser;
+use holochain_trace::Output;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -210,7 +211,7 @@ pub struct ListApps {
 }
 
 #[doc(hidden)]
-pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
+pub async fn call(holochain_path: &Path, req: Call, structured: Output) -> anyhow::Result<()> {
     let Call {
         existing,
         running,
@@ -233,7 +234,7 @@ pub async fn call(holochain_path: &Path, req: Call) -> anyhow::Result<()> {
                         | std::io::ErrorKind::AddrNotAvailable = e.kind()
                         {
                             let (port, holochain, lair) =
-                                run_async(holochain_path, path, None).await?;
+                                run_async(holochain_path, path, None, structured.clone()).await?;
                             cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
                             continue;
                         }
