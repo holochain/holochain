@@ -12,6 +12,7 @@ use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::new_invocation;
 use crate::test_utils::new_zome_call;
 use crate::test_utils::wait_for_integration;
+use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
 use hdk::prelude::*;
 use holo_hash::ActionHash;
@@ -230,6 +231,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
 /// Check the AppEntryDef is valid for the zome and the EntryDefId and ZomeIndex are in range.
 #[tokio::test(flavor = "multi_thread")]
 async fn check_app_entry_def_test() {
+    let mut u = unstructured_noise();
     holochain_trace::test_run().ok();
     let TestWasmPair::<DnaWasm> {
         integrity,
@@ -254,7 +256,7 @@ async fn check_app_entry_def_test() {
     )
     .await;
     let dna_hash = dna_file.dna_hash().to_owned().clone();
-    let mut entry_def = EntryDef::fixture();
+    let mut entry_def = EntryDef::arbitrary(&mut u).unwrap();
     entry_def.visibility = EntryVisibility::Public;
 
     let db_dir = test_db_dir();

@@ -123,11 +123,28 @@ async fn record_with_deps_fixup(
         action => {
             let mut deps = vec![];
             let prev_seq = action.action_seq() - 1;
+
+            let entry = action.entry_data_mut().map(|(entry_hash, entry_type)| {
+                let entry = contrafact::brute("Not countersigning entry", |e: &Entry| {
+                    !matches!(e, Entry::CounterSign(_, _))
+                })
+                .build(&mut u);
+                *entry_hash = EntryHash::with_data_sync(&entry);
+                *entry_type = entry
+                    .entry_type(Some(AppEntryDef::arbitrary(&mut u).unwrap()))
+                    .unwrap();
+                entry
+            });
+
             let mut prev = if prev_seq == 0 {
                 matching_record(&mut u, is_dna_record)
             } else {
                 let mut prev = match action {
                     Action::Create(Create {
+                        entry_type: EntryType::AgentPubKey,
+                        ..
+                    })
+                    | Action::Update(Update {
                         entry_type: EntryType::AgentPubKey,
                         ..
                     }) => matching_record(&mut u, is_pkg_record),
@@ -145,24 +162,8 @@ async fn record_with_deps_fixup(
             assert_eq!(*action.prev_action().unwrap(), prev_hash);
             deps.push(prev);
 
-            let entry = action.entry_data_mut().map(|(entry_hash, _)| {
-                let entry = contrafact::brute("Not countersigning entry", |e: &Entry| {
-                    !matches!(e, Entry::CounterSign(_, _))
-                })
-                .build(&mut u);
-                *entry_hash = EntryHash::with_data_sync(&entry);
-                entry
-            });
             match action {
-                Action::Create(create) => {
-                    if create.entry_type == EntryType::AgentPubKey {
-                        let mut memproof = AgentValidationPkg::arbitrary(&mut u).unwrap();
-                        memproof.action_seq = create.action_seq;
-                        memproof.author = fake_agent_pubkey_1();
-                        let memproof = sign_record(&keystore, memproof.into(), None).await;
-                        deps.push(memproof);
-                    }
-                }
+                Action::Create(_create) => {}
                 Action::Update(update) => {
                     let mut create = matching_record(&mut u, is_entry_record);
                     update.original_action_address = create.action_address().clone();
@@ -170,14 +171,6 @@ async fn record_with_deps_fixup(
                         create.entry().as_option().unwrap().to_hash().clone();
                     *create.as_action_mut().entry_data_mut().unwrap().1 = update.entry_type.clone();
                     deps.push(create);
-
-                    if update.entry_type == EntryType::AgentPubKey {
-                        let mut memproof = AgentValidationPkg::arbitrary(&mut u).unwrap();
-                        memproof.action_seq = update.action_seq;
-                        memproof.author = fake_agent_pubkey_1();
-                        let memproof = sign_record(&keystore, memproof.into(), None).await;
-                        deps.push(memproof);
-                    }
                 }
                 Action::Delete(delete) => {
                     let dep = matching_record(&mut u, is_entry_record);
@@ -188,15 +181,15 @@ async fn record_with_deps_fixup(
                     deps.push(dep);
                 }
                 Action::CreateLink(link) => {
-                    let base = Record::fixture();
-                    let target = Record::fixture();
+                    let base = Record::arbitrary(&mut u).unwrap();
+                    let target = Record::arbitrary(&mut u).unwrap();
                     link.base_address = base.action_address().clone().into();
                     link.target_address = target.action_address().clone().into();
                     deps.push(base);
                     deps.push(target);
                 }
                 Action::DeleteLink(delete) => {
-                    let base = Record::fixture();
+                    let base = Record::arbitrary(&mut u).unwrap();
                     let create =
                         matching_record(&mut u, |r| matches!(r.action(), Action::CreateLink(_)));
                     delete.base_address = base.action_address().clone().into();
@@ -275,8 +268,9 @@ async fn test_record_with_cascade() {
 /// Mismatched signatures are rejected
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_action_signature_test() {
+    let mut u = unstructured_noise();
     let keystore = holochain_state::test_utils::test_keystore();
-    let action = CreateLink::fixture();
+    let action = CreateLink::arbitrary(&mut u).unwrap();
     let (record_valid, cascade) = record_with_cascade(&keystore, Action::CreateLink(action)).await;
 
     let wrong_signature = Signature([1_u8; 64]);
@@ -292,8 +286,9 @@ async fn verify_action_signature_test() {
 /// Any action other than DNA cannot be at seq 0
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_action() {
+    let mut u = unstructured_noise();
     let keystore = holochain_state::test_utils::test_keystore();
-    let mut action = Action::Delete(Delete::fixture());
+    let mut action = Action::Delete(Delete::arbitrary(&mut u).unwrap());
     *action.author_mut() = keystore.new_sign_keypair_random().await.unwrap();
 
     *action.action_seq_mut().unwrap() = 7;
@@ -320,7 +315,7 @@ async fn check_previous_action() {
     }
 
     // Dna is always ok because of the type system
-    let action = Action::Dna(Dna::fixture());
+    let action = Action::Dna(Dna::arbitrary(&mut u).unwrap());
     assert_valid_action(&keystore, action.clone()).await;
 }
 
@@ -329,19 +324,20 @@ async fn check_previous_action() {
 /// (this "if chain not empty" thing is a bit weird, TODO refactor to not look in the db)
 #[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
+    let mut u = unstructured_noise();
     let tmp = test_authored_db();
     let tmp_dht = test_dht_db();
     let tmp_cache = test_cache_db();
     let keystore = test_keystore();
     let db = tmp.to_db();
     // Test data
-    let _activity_return = vec![ActionHash::fixture()];
+    let _activity_return = vec![ActionHash::arbitrary(&mut u).unwrap()];
 
-    let mut dna_def = DnaDef::fixture();
+    let mut dna_def = DnaDef::arbitrary(&mut u).unwrap();
     dna_def.modifiers.origin_time = Timestamp::MIN;
 
     // Empty store not dna
-    let action = CreateLink::fixture();
+    let action = CreateLink::arbitrary(&mut u).unwrap();
     let cache: DhtDbQueryCache = tmp_dht.to_db().into();
     let mut workspace = SysValidationWorkspace::new(
         db.clone().into(),
@@ -358,7 +354,7 @@ async fn check_valid_if_dna_test() {
         check_valid_if_dna(&action.clone().into(), &workspace.dna_def_hashed()),
         Ok(())
     );
-    let mut action = Dna::fixture();
+    let mut action = Dna::arbitrary(&mut u).unwrap();
     action.hash = DnaHash::with_data_sync(&dna_def);
 
     assert_matches!(
@@ -410,11 +406,12 @@ async fn check_valid_if_dna_test() {
 /// Timestamps must increase monotonically
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_timestamp() {
+    let mut u = unstructured_noise();
     let before = Timestamp::from(chrono::Utc::now() - chrono::Duration::weeks(1));
     let after = Timestamp::from(chrono::Utc::now() + chrono::Duration::weeks(1));
 
     let keystore = test_keystore();
-    let mut action: Action = CreateLink::fixture().into();
+    let mut action: Action = CreateLink::arbitrary(&mut u).unwrap().into();
     *action.timestamp_mut() = Timestamp::now();
     let (record, mut deps) = record_with_deps(&keystore, action).await;
     *deps[0].as_action_mut().timestamp_mut() = before;
@@ -440,8 +437,9 @@ async fn check_previous_timestamp() {
 /// Sequence numbers must increment by 1 for each new action
 #[tokio::test(flavor = "multi_thread")]
 async fn check_previous_seq() {
+    let mut u = unstructured_noise();
     let keystore = test_keystore();
-    let mut action: Action = CreateLink::fixture().into();
+    let mut action: Action = CreateLink::arbitrary(&mut u).unwrap().into();
     *action.action_seq_mut().unwrap() = 2;
     let (mut record, mut deps) = record_with_deps(&keystore, action).await;
 
@@ -518,8 +516,9 @@ async fn check_entry_type_test() {
 /// Hash integrity check. The hash of an entry always matches what's in the action.
 #[tokio::test(flavor = "multi_thread")]
 async fn check_entry_hash_test() {
-    let mut ec = Create::fixture();
-    let entry = Entry::fixture();
+    let mut u = unstructured_noise();
+    let mut ec = Create::arbitrary(&mut u).unwrap();
+    let entry = Entry::arbitrary(&mut u).unwrap();
     let hash = EntryHash::with_data_sync(&entry);
     let action: Action = ec.clone().into();
 
@@ -540,7 +539,7 @@ async fn check_entry_hash_test() {
     let eh = action.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(check_entry_hash(&eh, &entry).await, Ok(()));
     assert_matches!(
-        check_new_entry_action(&CreateLink::fixture().into()),
+        check_new_entry_action(&CreateLink::arbitrary(&mut u).unwrap().into()),
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::NotNewEntry(_)
         ))
@@ -550,14 +549,17 @@ async fn check_entry_hash_test() {
 /// The size of an entry does not exceed the max
 #[tokio::test(flavor = "multi_thread")]
 async fn check_entry_size_test() {
+    let mut u = unstructured_noise();
     let keystore = test_keystore();
 
-    let (mut record, cascade) = record_with_cascade(&keystore, Create::fixture().into()).await;
+    let (mut record, cascade) =
+        record_with_cascade(&keystore, Create::arbitrary(&mut u).unwrap().into()).await;
 
     let tiny_entry = Entry::App(AppEntryBytes(SerializedBytes::from(UnsafeBytes::from(
         (0..5).map(|_| 0u8).into_iter().collect::<Vec<_>>(),
     ))));
-    *record.as_action_mut().entry_data_mut().unwrap().1 = EntryType::App(AppEntryDef::fixture());
+    *record.as_action_mut().entry_data_mut().unwrap().1 =
+        EntryType::App(AppEntryDef::arbitrary(&mut u).unwrap());
     *record.as_entry_mut() = RecordEntry::Present(tiny_entry);
     let mut record = rebuild_record(record, &keystore).await;
     sys_validate_record(&record, &cascade).await.unwrap();
@@ -624,6 +626,7 @@ async fn check_update_reference_test() {
 /// The link tag size is bounded
 #[tokio::test(flavor = "multi_thread")]
 async fn check_link_tag_size_test() {
+    let mut u = unstructured_noise();
     let keystore = test_keystore();
 
     let bytes = (0..super::MAX_TAG_SIZE + 1)
@@ -632,7 +635,7 @@ async fn check_link_tag_size_test() {
         .collect::<Vec<_>>();
     let huge = LinkTag(bytes);
 
-    let mut action = CreateLink::fixture();
+    let mut action = CreateLink::arbitrary(&mut u).unwrap();
     action.tag = huge;
     let (record, cascade) = record_with_cascade(&keystore, action.into()).await;
 
@@ -648,15 +651,16 @@ async fn check_link_tag_size_test() {
 /// Check that StoreEntry does not have a private entry type
 #[tokio::test(flavor = "multi_thread")]
 async fn incoming_ops_filters_private_entry() {
-    let dna = DnaHash::fixture();
+    let mut u = unstructured_noise();
+    let dna = DnaHash::arbitrary(&mut u).unwrap();
     let spaces = TestSpaces::new([dna.clone()]);
     let space = Arc::new(spaces.test_spaces[&dna].space.clone());
     let vault = space.dht_db.clone();
     let keystore = test_keystore();
     let (tx, _rx) = TriggerSender::new();
 
-    let private_entry = Entry::fixture();
-    let mut create = Create::fixture();
+    let private_entry = Entry::arbitrary(&mut u).unwrap();
+    let mut create = Create::arbitrary(&mut u).unwrap();
     let author = keystore.new_sign_keypair_random().await.unwrap();
     let app_entry_def = AppEntryDef::new(0.into(), 0.into(), EntryVisibility::Private);
     create.entry_type = EntryType::App(app_entry_def);

@@ -1,8 +1,6 @@
 //! Types for arbitrary data driven by entropy
 
-use std::sync::Mutex;
 
-use arbitrary::{Arbitrary, Unstructured};
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -11,8 +9,8 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 pub static NOISE: Lazy<Vec<u8>> = Lazy::new(|| {
     let mut rng = seeded_rng(None);
     std::iter::repeat_with(|| rng.gen())
-        .take(10_000_000)
-        .collect()
+    .take(10_000_000)
+    .collect()
 });
 
 fn seeded_rng(seed: Option<u64>) -> StdRng {
@@ -36,20 +34,29 @@ pub fn unstructured_noise() -> arbitrary::Unstructured<'static> {
     arbitrary::Unstructured::new(&NOISE)
 }
 
-static ENTROPY: Lazy<Mutex<Unstructured<'static>>> =
-    Lazy::new(|| Mutex::new(Unstructured::new(&NOISE)));
+// The following seemed like a convenient way to avoid having to
+// create an Unstructured data, but it's actually harmful since
+// it causes identical data to be created if used in conjunction
+// with unstructured_noise. Don't use shortcuts.
+//
+// use std::sync::Mutex;
+// use arbitrary::{Arbitrary, Unstructured};
+// 
+// static ENTROPY: Lazy<Mutex<Unstructured<'static>>> =
+//     Lazy::new(|| Mutex::new(Unstructured::new(&NOISE)));
 
-/// Additional methods for arbitrary data types
-pub trait ArbitraryExt: Arbitrary<'static> {
-    /// Generate arbitrary data from built-in noise
-    fn fixture() -> Self {
-        let mut u = ENTROPY.lock().unwrap();
-        if let Ok(a) = Self::arbitrary(&mut u) {
-            a
-        } else {
-            *u = unstructured_noise();
-            Self::arbitrary(&mut u).unwrap()
-        }
-    }
-}
-impl<T> ArbitraryExt for T where T: Arbitrary<'static> {}
+// /// Additional methods for arbitrary data types
+// pub trait ArbitraryExt: Arbitrary<'static> {
+//     /// Generate arbitrary data from built-in noise
+//     #[deprecated]
+//     fn fixture() -> Self {
+//         let mut u = ENTROPY.lock().unwrap();
+//         if let Ok(a) = Self::arbitrary(&mut u) {
+//             a
+//         } else {
+//             *u = unstructured_noise();
+//             Self::arbitrary(&mut u).unwrap()
+//         }
+//     }
+// }
+// impl<T> ArbitraryExt for T where T: Arbitrary<'static> {}
