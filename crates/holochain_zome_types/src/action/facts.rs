@@ -122,13 +122,6 @@ pub fn valid_chain(author: AgentPubKey) -> Facts<Action> {
     },]
 }
 
-/// Fact: The action must be a NewEntryAction
-pub fn new_entry_action() -> Facts<Action> {
-    facts![brute("Is a NewEntryAction", |h: &Action| {
-        matches!(h.action_type(), ActionType::Create | ActionType::Update)
-    }),]
-}
-
 #[cfg(test)]
 mod tests {
 

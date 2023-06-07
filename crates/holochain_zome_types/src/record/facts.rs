@@ -4,7 +4,7 @@ use crate::prelude::*;
 use contrafact::*;
 use holo_hash::*;
 
-type Pair = (Action, Option<Entry>);
+type Pair = (Action, RecordEntry);
 
 /// Fact: Given a pair of an action and optional Entry:
 /// - If the action references an Entry, the Entry will exist and be of the appropriate hash, and the entry types will match
@@ -20,28 +20,36 @@ type Pair = (Action, Option<Entry>);
 // At least we can use this as a reference to write the same logic for DhtOp and Record,
 // which require the same sort of checks.
 
-pub fn action_and_entry_match() -> Facts<Pair> {
+pub fn action_and_entry_match(must_be_public: bool) -> Facts<Pair> {
     facts![
         brute(
-            "Action type matches Entry existence",
-            |(action, entry): &Pair| {
-                match (action.entry_data(), entry) {
-                    (Some((_, et)), Some(entry)) => entry_type_matches(et, entry),
-                    (None, None) => true,
+            "Action type matches Entry existence, and is public if exists",
+            move |(action, entry): &Pair| {
+                let data = action.entry_data();
+                match (data, entry) {
+                    (
+                        Some((_entry_hash, entry_type)),
+                        RecordEntry::Present(_) | RecordEntry::NotStored,
+                    ) => {
+                        // Ensure that entries are public
+                        !must_be_public || entry_type.visibility().is_public()
+                    }
+                    (None, RecordEntry::Present(_)) => false,
+                    (None, _) => true,
                     _ => false,
                 }
             }
         ),
         mapped(
             "If there is entry data, the action must point to it",
-            |pair: &Pair| {
-                if let Some(entry) = &pair.1 {
+            |(_, entry): &Pair| {
+                if let Some(entry) = entry.as_option() {
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.
                     facts![prism(
                         "action's entry hash",
-                        |pair: &mut Pair| pair.0.entry_data_mut().map(|(hash, _)| hash),
+                        |(action, _): &mut Pair| action.entry_data_mut().map(|(hash, _)| hash),
                         eq("hash of matching entry", EntryHash::with_data_sync(entry)),
                     )]
                 } else {
@@ -70,14 +78,14 @@ mod tests {
             *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
             let a1 = Action::from(a1);
 
-            let pair1: Pair = (a0.clone(), None);
-            let pair2: Pair = (a0.clone(), Some(e.clone()));
-            let pair3: Pair = (a1.clone(), None);
-            let pair4: Pair = (a1.clone(), Some(e.clone()));
+            let pair1: Pair = (a0.clone(), RecordEntry::NA);
+            let pair2: Pair = (a0.clone(), RecordEntry::Present(e.clone()));
+            let pair3: Pair = (a1.clone(), RecordEntry::NA);
+            let pair4: Pair = (a1.clone(), RecordEntry::Present(e.clone()));
 
             // dbg!(&a0, &a1, &e);
 
-            let fact = action_and_entry_match();
+            let fact = action_and_entry_match(false);
 
             fact.check(&pair1).unwrap();
             assert!(fact.check(&pair2).is_err());

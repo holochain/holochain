@@ -146,18 +146,38 @@ async fn record_with_deps_fixup(
             deps.push(prev);
 
             let entry = action.entry_data_mut().map(|(entry_hash, _)| {
-                let entry = Entry::fixture();
+                let entry = contrafact::brute("Not countersigning entry", |e: &Entry| {
+                    !matches!(e, Entry::CounterSign(_, _))
+                })
+                .build(&mut u);
                 *entry_hash = EntryHash::with_data_sync(&entry);
                 entry
             });
             match action {
+                Action::Create(create) => {
+                    if create.entry_type == EntryType::AgentPubKey {
+                        let mut memproof = AgentValidationPkg::arbitrary(&mut u).unwrap();
+                        memproof.action_seq = create.action_seq;
+                        memproof.author = fake_agent_pubkey_1();
+                        let memproof = sign_record(&keystore, memproof.into(), None).await;
+                        deps.push(memproof);
+                    }
+                }
                 Action::Update(update) => {
-                    let mut dep = matching_record(&mut u, is_entry_record);
-                    update.original_action_address = dep.action_address().clone();
+                    let mut create = matching_record(&mut u, is_entry_record);
+                    update.original_action_address = create.action_address().clone();
                     update.original_entry_address =
-                        dep.entry().as_option().unwrap().to_hash().clone();
-                    *dep.as_action_mut().entry_data_mut().unwrap().1 = update.entry_type.clone();
-                    deps.push(dep);
+                        create.entry().as_option().unwrap().to_hash().clone();
+                    *create.as_action_mut().entry_data_mut().unwrap().1 = update.entry_type.clone();
+                    deps.push(create);
+
+                    if update.entry_type == EntryType::AgentPubKey {
+                        let mut memproof = AgentValidationPkg::arbitrary(&mut u).unwrap();
+                        memproof.action_seq = update.action_seq;
+                        memproof.author = fake_agent_pubkey_1();
+                        let memproof = sign_record(&keystore, memproof.into(), None).await;
+                        deps.push(memproof);
+                    }
                 }
                 Action::Delete(delete) => {
                     let dep = matching_record(&mut u, is_entry_record);
@@ -184,8 +204,7 @@ async fn record_with_deps_fixup(
                     deps.push(base);
                     deps.push(create);
                 }
-                Action::Create(_)
-                | Action::AgentValidationPkg(_)
+                Action::AgentValidationPkg(_)
                 | Action::CloseChain(_)
                 | Action::InitZomesComplete(_)
                 | Action::OpenChain(_) => {
@@ -221,7 +240,8 @@ async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
     let cascade = MockCascade::with_records(deps.clone());
     let result = sys_validate_record(&record, &cascade).await;
     if result.is_err() {
-        result.unwrap()
+        dbg!(&deps, &record);
+        result.unwrap();
     }
 }
 
@@ -238,9 +258,17 @@ async fn assert_invalid_action(keystore: &MetaLairClient, action: Action) {
 /// Mismatched signatures are rejected
 #[tokio::test(flavor = "multi_thread")]
 async fn test_record_with_cascade() {
+    let mut u = unstructured_noise();
     let keystore = holochain_state::test_utils::test_keystore();
     for _ in 0..100 {
-        assert_valid_action(&keystore, Action::fixture()).await;
+        let op = holochain_types::dht_op::facts::valid_dht_op(
+            keystore.clone(),
+            fake_agent_pubkey_1(),
+            false,
+        )
+        .build(&mut u);
+        let action = op.action().clone();
+        assert_valid_action(&keystore, action).await;
     }
 }
 
@@ -386,14 +414,14 @@ async fn check_previous_timestamp() {
     let after = Timestamp::from(chrono::Utc::now() + chrono::Duration::weeks(1));
 
     let keystore = test_keystore();
-    let (record, mut deps) = record_with_deps(&keystore, CreateLink::fixture().into()).await;
+    let mut action: Action = CreateLink::fixture().into();
+    *action.timestamp_mut() = Timestamp::now();
+    let (record, mut deps) = record_with_deps(&keystore, action).await;
     *deps[0].as_action_mut().timestamp_mut() = before;
 
-    assert!(
-        sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
-            .await
-            .is_ok()
-    );
+    sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
+        .await
+        .unwrap();
 
     *deps[0].as_action_mut().timestamp_mut() = after;
     let r = sys_validate_record(&record, &MockCascade::with_records(deps.clone()))
@@ -925,7 +953,7 @@ async fn valid_chain_fact_test() {
 
     let mut u = arbitrary::Unstructured::new(&NOISE);
     let fact = contrafact::facts![
-        holochain_zome_types::record::facts::action_and_entry_match(),
+        holochain_zome_types::record::facts::action_and_entry_match(false),
         contrafact::lens(
             "action is valid",
             |(a, _)| a,
@@ -941,7 +969,7 @@ async fn valid_chain_fact_test() {
                         SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
                             .await
                             .unwrap(),
-                        entry,
+                        entry.into_option(),
                     )
                 }
             },
