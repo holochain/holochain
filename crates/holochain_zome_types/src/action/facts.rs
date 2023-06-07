@@ -23,7 +23,7 @@ struct ValidChainFact {
     seq: u32,
 }
 
-impl Fact<Action> for ValidChainFact {
+impl Fact<'_, Action> for ValidChainFact {
     fn check(&self, action: &Action) -> Check {
         let action_hash = ActionHash::with_data_sync(action);
         let result = match (action.prev_action(), self.hash.as_ref()) {
@@ -50,29 +50,25 @@ impl Fact<Action> for ValidChainFact {
         result
     }
 
-    fn mutate(&self, action: &mut Action, u: &mut Unstructured<'static>) {
+    fn mutate(&self, input_action: Action, u: &mut Unstructured<'_>) -> Action {
+        let mut output_action: Action = input_action;
         if let Some(stored_hash) = self.hash.as_ref() {
             // This is not the first action we've seen
-            while action.prev_action().is_none() {
+            while output_action.prev_action().is_none() {
                 // Generate arbitrary actions until we get one with a prev action
-                *action = Action::arbitrary(u).unwrap();
+                output_action = Action::arbitrary(u).unwrap();
             }
             // Set the action's prev hash to the one we stored from our previous
             // visit
-            *action.prev_action_mut().unwrap() = stored_hash.clone();
+            *output_action.prev_action_mut().unwrap() = stored_hash.clone();
             // Also set the seq to the next value (this should only be None
             // iff prev_action is None)
-            *action.action_seq_mut().unwrap() = self.seq;
+            *output_action.action_seq_mut().unwrap() = self.seq;
         } else {
             // This is the first action we've seen, so it must be a Dna
-            *action = Action::Dna(Dna::arbitrary(u).unwrap());
+            output_action = Action::Dna(Dna::arbitrary(u).unwrap());
         }
-
-        // println!(
-        //     "{}  =>  {:?}\n",
-        //     ActionHash::with_data_sync(action),
-        //     action.prev_action()
-        // );
+        output_action
     }
 
     fn advance(&mut self, action: &Action) {
@@ -81,13 +77,13 @@ impl Fact<Action> for ValidChainFact {
     }
 }
 
-pub fn is_of_type(action_type: ActionType) -> Facts<'static, Action> {
+pub fn is_of_type(action_type: ActionType) -> Facts<Action> {
     facts![brute("action is of type", move |h: &Action| h
         .action_type()
         == action_type)]
 }
 
-pub fn is_new_entry_action() -> Facts<'static, Action> {
+pub fn is_new_entry_action() -> Facts<Action> {
     facts![or(
         "is NewEntryAction",
         is_of_type(ActionType::Create),
@@ -96,12 +92,12 @@ pub fn is_new_entry_action() -> Facts<'static, Action> {
 }
 
 /// WIP: Fact: The actions form a valid SourceChain
-pub fn valid_chain() -> Facts<'static, Action> {
+pub fn valid_chain() -> Facts<Action> {
     facts![ValidChainFact::default(),]
 }
 
 /// Fact: The action must be a NewEntryAction
-pub fn new_entry_action() -> Facts<'static, Action> {
+pub fn new_entry_action() -> Facts<Action> {
     facts![brute("Is a NewEntryAction", |h: &Action| {
         matches!(h.action_type(), ActionType::Create | ActionType::Update)
     }),]

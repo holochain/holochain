@@ -20,7 +20,7 @@ type Pair = (Action, Option<Entry>);
 // At least we can use this as a reference to write the same logic for DhtOp and Record,
 // which require the same sort of checks.
 
-pub fn action_and_entry_match() -> Facts<'static, Pair> {
+pub fn action_and_entry_match() -> Facts<Pair> {
     facts![
         brute(
             "Action type matches Entry existence",

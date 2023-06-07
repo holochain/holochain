@@ -121,8 +121,6 @@ async fn multi_conductor() -> anyhow::Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn sharded_consistency() {
-    use std::sync::Arc;
-
     use holochain::test_utils::{
         consistency::local_machine_session, inline_zomes::simple_create_read_zome,
     };

@@ -43,7 +43,7 @@ mod test {
     use crate::sweettest::SweetConductorBatch;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::{consistency_10s, consistency_10s_advanced};
+    use crate::test_utils::{consistency_10s};
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
     use holochain_types::prelude::CapSecret;
@@ -173,8 +173,8 @@ mod test {
 
         consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
 
-        // // Bob can get data from alice via. carol.
-        // let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
-        // assert!(bob_get2.is_some());
+        // Bob can get data from alice via. carol.
+        let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
+        assert!(bob_get2.is_some());
     }
 }
