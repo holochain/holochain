@@ -267,18 +267,14 @@ impl MetaNetCon {
     }
 
     pub async fn notify(&self, payload: &wire::Wire, timeout: KitsuneTimeout) -> KitsuneResult<()> {
-        dbg!("notifyy");
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
 
         let result = (move || async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
-                    dbg!("notify auth");
-
                     #[cfg(feature = "tx2")]
                     {
-                        dbg!("tx2");
                         if let MetaNetCon::Tx2(con, _) = self {
                             return con.notify(payload, timeout).await;
                         }
@@ -286,8 +282,6 @@ impl MetaNetCon {
 
                     #[cfg(feature = "tx5")]
                     {
-                        dbg!("tx5");
-
                         if let MetaNetCon::Tx5 { ep, rem_url, .. } = self {
                             let wire = payload.encode_vec().map_err(KitsuneError::other)?;
                             let wrap = WireWrap::notify(msg_id, WireData(wire));
@@ -303,11 +297,9 @@ impl MetaNetCon {
                     return Err("invalid features".into());
                 }
                 MetaNetAuth::UnauthorizedIgnore => {
-                    dbg!("notify ignore");
                     return Ok(());
                 }
                 MetaNetAuth::UnauthorizedDisconnect => {
-                    dbg!("notify disconnect");
                     return Ok(self
                         .close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
                         .await);
@@ -328,7 +320,6 @@ impl MetaNetCon {
         payload: &wire::Wire,
         timeout: KitsuneTimeout,
     ) -> KitsuneResult<wire::Wire> {
-        dbg!("request");
         let start = std::time::Instant::now();
         let msg_id = next_msg_id();
 
@@ -346,7 +337,6 @@ impl MetaNetCon {
 
                     #[cfg(feature = "tx5")]
                     {
-                        dbg!("request authorized");
                         if let MetaNetCon::Tx5 {
                             ep,
                             rem_url,
@@ -377,11 +367,9 @@ impl MetaNetCon {
                     return Err("invalid features".into());
                 }
                 MetaNetAuth::UnauthorizedIgnore => {
-                    dbg!("request unauth ignore");
                     return Err(KitsuneErrorKind::Unauthorized.into());
                 }
                 MetaNetAuth::UnauthorizedDisconnect => {
-                    dbg!("request disconnect");
                     self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
                         .await;
                     return Err(KitsuneErrorKind::Unauthorized.into());

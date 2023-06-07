@@ -298,7 +298,6 @@ impl KitsuneP2pActor {
                                     data,
                                     respond,
                                 } => {
-                                    dbg!("request");
                                     match nodespace_is_authorized(
                                         &host,
                                         con.peer_id(),
@@ -307,9 +306,8 @@ impl KitsuneP2pActor {
                                     )
                                     .await
                                     {
-                                        MetaNetAuth::UnauthorizedIgnore => { dbg!("ignore"); }
+                                        MetaNetAuth::UnauthorizedIgnore => {}
                                         MetaNetAuth::UnauthorizedDisconnect => {
-                                            dbg!("disconnect");
                                             con.close(
                                                 UNAUTHORIZED_DISCONNECT_CODE,
                                                 UNAUTHORIZED_DISCONNECT_REASON,
@@ -317,7 +315,6 @@ impl KitsuneP2pActor {
                                             .await;
                                         }
                                         MetaNetAuth::Authorized => {
-                                            dbg!("authorized");
                                             match data {
                                                 wire::Wire::Call(wire::Call {
                                                     space,

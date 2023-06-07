@@ -95,9 +95,6 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_call_get_block() {
         holochain_trace::test_run().ok();
-        // let RibosomeTestFixture {
-        //     conductor, alice, bob, bob_pubkey, ..
-        // } = RibosomeTestFixture::new(TestWasm::Create).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
@@ -113,25 +110,11 @@ mod test {
             .unwrap();
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
-        // let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
 
         let alice = alice_cell.zome(TestWasm::Create);
         let bob = bob_cell.zome(TestWasm::Create);
-        // let carol = carol_cell.zome(TestWasm::Create);
 
-        use crate::prelude::KitsuneAgent;
-        let alice_pubkey = alice_cell.cell_id().agent_pubkey();
         let bob_pubkey = bob_cell.cell_id().agent_pubkey();
-        let carol_pubkey = carol_cell.cell_id().agent_pubkey();
-
-        let alice_agent = KitsuneAgent(alice_pubkey.get_raw_32().to_vec());
-        let bob_agent = KitsuneAgent(bob_pubkey.get_raw_32().to_vec());
-        let carol_agent = KitsuneAgent(carol_pubkey.get_raw_32().to_vec());
-
-        dbg!(alice_pubkey, bob_pubkey, carol_pubkey);
-        dbg!(alice_agent, bob_agent, carol_agent);
-
-        // conductors.exchange_peer_info().await;
 
         conductors.reveal_peer_info(0, 1).await;
         conductors.reveal_peer_info(1, 0).await;
@@ -150,18 +133,14 @@ mod test {
         assert!(bob_get0.is_some());
 
         // Bob gets blocked by alice.
-        dbg!("block");
         let _block: () = alice_conductor
             .call(&alice, "block_agent", bob_pubkey)
             .await;
 
-        dbg!("create");
         let action1: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
-        dbg!(&action1);
 
         // Now that bob is blocked by alice he cannot get data from alice.
         consistency_10s([&alice_cell]).await;
-        dbg!("get");
         let bob_get1: Option<Record> = bob_conductor.call(&bob, "get_post", action1.clone()).await;
 
         assert!(bob_get1.is_none());

@@ -1015,7 +1015,6 @@ impl KitsuneP2pHandler for Space {
                 .ok();
             tokio::task::spawn(async move {
                 let cover_nodes = discover_fut.await?;
-                dbg!(&cover_nodes);
                 if cover_nodes.is_empty() {
                     return Err("failed to discover neighboring peers".into());
                 }
