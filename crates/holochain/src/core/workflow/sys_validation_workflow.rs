@@ -313,7 +313,7 @@ async fn validate_op_inner(
                     (action)
                         .try_into()
                         .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
-                    &entry,
+                    entry,
                     cascade,
                 )
                 .await?;
@@ -347,7 +347,7 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, action) => {
-            register_agent_activity(action, cascade, &dna_def, incoming_dht_ops_sender).await?;
+            register_agent_activity(action, cascade, dna_def, incoming_dht_ops_sender).await?;
             store_record(action, cascade).await?;
             Ok(())
         }

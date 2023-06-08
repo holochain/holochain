@@ -754,7 +754,7 @@ fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     let (action, signature) = shh.into_inner();
 
     // Check the entry and exit early if it's not there
-    let entry_box = record_entry.into_option()?.into();
+    let entry_box = record_entry.into_option()?;
     // If the action is the wrong type exit early
     let action = action.into_content().try_into().ok()?;
 
