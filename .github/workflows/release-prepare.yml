@@ -262,7 +262,7 @@ jobs:
           git tag --sort=-taggerdate --merged $(git branch --show-current) | grep holochain-
 
           export RELEASE_BRANCH=$(git branch --show-current)
-          export LATEST_HOLOCHAIN_TAG=$(git tag --sort=-taggerdate --merged $RELEASE_BRANCH | grep holochain- | head -n1)
+          export LATEST_HOLOCHAIN_TAG=$(git tag --sort=-taggerdate --merged "${RELEASE_BRANCH}" | grep holochain- | head -n1)
           export LATEST_HOLOCHAIN_VERSION=${LATEST_HOLOCHAIN_TAG/holochain-/}
 
           # clean the repo before adding it to the store
