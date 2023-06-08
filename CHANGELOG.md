@@ -6,6 +6,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230608.204523
+
+## [holochain\_cli-0.1.5](crates/holochain_cli/CHANGELOG.md#0.1.5)
+
+## [holochain\_cli\_sandbox-0.1.5](crates/holochain_cli_sandbox/CHANGELOG.md#0.1.5)
+
+## [holochain\_cli\_bundle-0.1.5](crates/holochain_cli_bundle/CHANGELOG.md#0.1.5)
+
+## [holochain-0.1.5](crates/holochain/CHANGELOG.md#0.1.5)
+
+## [holochain\_websocket-0.1.1](crates/holochain_websocket/CHANGELOG.md#0.1.1)
+
+## [holochain\_test\_wasm\_common-0.1.3](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.3)
+
+## [holochain\_conductor\_api-0.1.5](crates/holochain_conductor_api/CHANGELOG.md#0.1.5)
+
+## [holochain\_wasm\_test\_utils-0.1.5](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.5)
+
+## [holochain\_cascade-0.1.5](crates/holochain_cascade/CHANGELOG.md#0.1.5)
+
+## [holochain\_state-0.1.5](crates/holochain_state/CHANGELOG.md#0.1.5)
+
+## [holochain\_p2p-0.1.5](crates/holochain_p2p/CHANGELOG.md#0.1.5)
+
+## [holochain\_types-0.1.5](crates/holochain_types/CHANGELOG.md#0.1.5)
+
+## [holochain\_keystore-0.1.5](crates/holochain_keystore/CHANGELOG.md#0.1.5)
+
+## [holochain\_sqlite-0.1.5](crates/holochain_sqlite/CHANGELOG.md#0.1.5)
+
+## [kitsune\_p2p-0.1.4](crates/kitsune_p2p/CHANGELOG.md#0.1.4)
+
+## [kitsune\_p2p\_proxy-0.1.3](crates/kitsune_p2p_proxy/CHANGELOG.md#0.1.3)
+
+## [kitsune\_p2p\_transport\_quic-0.1.3](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.1.3)
+
+## [kitsune\_p2p\_mdns-0.1.1](crates/kitsune_p2p_mdns/CHANGELOG.md#0.1.1)
+
+## [kitsune\_p2p\_fetch-0.1.3](crates/kitsune_p2p_fetch/CHANGELOG.md#0.1.3)
+
+## [kitsune\_p2p\_types-0.1.3](crates/kitsune_p2p_types/CHANGELOG.md#0.1.3)
+
+## [mr\_bundle-0.1.1](crates/mr_bundle/CHANGELOG.md#0.1.1)
+
+## [holochain\_util-0.1.1](crates/holochain_util/CHANGELOG.md#0.1.1)
+
+## [hdk-0.1.3](crates/hdk/CHANGELOG.md#0.1.3)
+
+## [holochain\_zome\_types-0.1.3](crates/holochain_zome_types/CHANGELOG.md#0.1.3)
+
+## [kitsune\_p2p\_dht-0.1.1](crates/kitsune_p2p_dht/CHANGELOG.md#0.1.1)
+
+## [hdi-0.2.3](crates/hdi/CHANGELOG.md#0.2.3)
+
+## [hdk\_derive-0.1.3](crates/hdk_derive/CHANGELOG.md#0.1.3)
+
+## [holochain\_integrity\_types-0.1.3](crates/holochain_integrity_types/CHANGELOG.md#0.1.3)
+
+## [kitsune\_p2p\_timestamp-0.1.1](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.1.1)
+
+## [holo\_hash-0.1.3](crates/holo_hash/CHANGELOG.md#0.1.3)
+
+## [kitsune\_p2p\_dht\_arc-0.1.1](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.1.1)
+
+## [fixt-0.1.2](crates/fixt/CHANGELOG.md#0.1.2)
+
 # 20230508.190706
 
 ## [holochain\_cli-0.1.5-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.1.5-beta-rc.1)
