@@ -7,7 +7,9 @@ use holo_hash::*;
 type Pair = (Action, RecordEntry);
 
 /// Fact: Given a pair of an action and optional Entry:
-/// - If the action references an Entry, the Entry will exist and be of the appropriate hash, and the entry types will match
+/// - If the action references an Entry,
+///     - the Entry will exist and be of the appropriate hash,
+///     - and the entry types will match
 /// - If the action does not reference an Entry, the entry will be None
 //
 // TODO: this Fact is useless until we can write "traversals" in addition to lenses and prisms,

@@ -1184,7 +1184,7 @@ impl MockCascade {
             })))
         });
 
-        let map = map0.clone();
+        let map = map0;
         cascade.expect_retrieve_entry().returning(move |hash, _| {
             box_fut_plain(Ok(map.share_ref(|m| {
                 m.get(&hash.into()).map(|r| {

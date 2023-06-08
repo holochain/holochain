@@ -113,7 +113,7 @@ impl EntryTestData {
         let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
             NewEntryAction::Create(create.clone()),
-            entry.clone().into(),
+            entry.clone(),
         ));
 
         let wire_create = Judged::valid(SignedAction(create_action, signature).try_into().unwrap());
