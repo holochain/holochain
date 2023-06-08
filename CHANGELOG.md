@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230508.190706
+
+## [holochain\_cli-0.1.5-beta-rc.1](crates/holochain_cli/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain\_cli\_sandbox-0.1.5-beta-rc.1](crates/holochain_cli_sandbox/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain\_cli\_bundle-0.1.5-beta-rc.1](crates/holochain_cli_bundle/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain-0.1.5-beta-rc.1](crates/holochain/CHANGELOG.md#0.1.5-beta-rc.1)
+
+- The feature `test_utils` is no longer a default feature. To consume `sweetest` from this crate please now use `default-features = false` and the feature `sweetest`.
+
+## [holochain\_test\_wasm\_common-0.1.3-beta-rc.1](crates/holochain_test_wasm_common/CHANGELOG.md#0.1.3-beta-rc.1)
+
+## [holochain\_conductor\_api-0.1.5-beta-rc.1](crates/holochain_conductor_api/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain\_wasm\_test\_utils-0.1.5-beta-rc.1](crates/holochain_wasm_test_utils/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain\_cascade-0.1.5-beta-rc.1](crates/holochain_cascade/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain\_state-0.1.5-beta-rc.1](crates/holochain_state/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain\_p2p-0.1.5-beta-rc.1](crates/holochain_p2p/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain\_types-0.1.5-beta-rc.1](crates/holochain_types/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain\_keystore-0.1.5-beta-rc.1](crates/holochain_keystore/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [holochain\_sqlite-0.1.5-beta-rc.1](crates/holochain_sqlite/CHANGELOG.md#0.1.5-beta-rc.1)
+
+## [kitsune\_p2p-0.1.4-beta-rc.1](crates/kitsune_p2p/CHANGELOG.md#0.1.4-beta-rc.1)
+
+## [kitsune\_p2p\_proxy-0.1.3-beta-rc.1](crates/kitsune_p2p_proxy/CHANGELOG.md#0.1.3-beta-rc.1)
+
+## [kitsune\_p2p\_transport\_quic-0.1.3-beta-rc.1](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.1.3-beta-rc.1)
+
+## [hdk-0.1.3-beta-rc.1](crates/hdk/CHANGELOG.md#0.1.3-beta-rc.1)
+
+## [holochain\_zome\_types-0.1.3-beta-rc.1](crates/holochain_zome_types/CHANGELOG.md#0.1.3-beta-rc.1)
+
+- Reverts the below change so that `name` in DnaDef does effect on the DNA hash. Holochain does not support the DNA hash changing so this change will remain in `0.2` but be removed from the `0.1` stream.
+
 # 20230424.185716
 
 ## [holochain\_cli-0.1.5-beta-rc.0](crates/holochain_cli/CHANGELOG.md#0.1.5-beta-rc.0)
