@@ -1,6 +1,5 @@
 //! Types for arbitrary data driven by entropy
 
-
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -9,8 +8,8 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 pub static NOISE: Lazy<Vec<u8>> = Lazy::new(|| {
     let mut rng = seeded_rng(None);
     std::iter::repeat_with(|| rng.gen())
-    .take(10_000_000)
-    .collect()
+        .take(10_000_000)
+        .collect()
 });
 
 fn seeded_rng(seed: Option<u64>) -> StdRng {
@@ -41,7 +40,7 @@ pub fn unstructured_noise() -> arbitrary::Unstructured<'static> {
 //
 // use std::sync::Mutex;
 // use arbitrary::{Arbitrary, Unstructured};
-// 
+//
 // static ENTROPY: Lazy<Mutex<Unstructured<'static>>> =
 //     Lazy::new(|| Mutex::new(Unstructured::new(&NOISE)));
 
