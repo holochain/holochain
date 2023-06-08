@@ -65,7 +65,7 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "main" }
+# contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "main" }
 # tx5 = { path = "../tx5/crates/tx5" }
 # tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
 # tx5-signal = { path = "../tx5/crates/tx5-signal" }

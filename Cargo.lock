@@ -8844,8 +8844,3 @@ dependencies = [
  "crossbeam-utils",
  "flate2",
 ]
-
-[[patch.unused]]
-name = "contrafact"
-version = "0.1.1"
-source = "git+https://github.com/maackle/contrafact-rs.git?branch=main#d458d6b5700b6f6cc369bcc29adb7b512874be71"
