@@ -3,6 +3,7 @@ use anyhow::Result;
 use futures::future;
 use hdk::prelude::RemoteSignal;
 use holochain::sweettest::SweetAgents;
+use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetConductorBatch;
 use holochain::sweettest::SweetDnaFile;
@@ -417,7 +418,7 @@ async fn emit_signals() {
         Signal::App {
             cell_id,
             zome_name,
-            signal: AppSignal::new(ExternIO::encode(()).unwrap())
+            signal: AppSignal::new(ExternIO::encode(()).unwrap()),
         },
         Signal::try_from(sig1.clone()).unwrap(),
     );
@@ -552,27 +553,56 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn too_many_open() {
+#[cfg(feature = "slow_tests")]
+async fn connection_limit_is_respected() {
     holochain_trace::test_run().ok();
 
-    info!("creating config");
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path);
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
-    info!("building conductor");
-    for _i in 0..1000 {
-        holochain_websocket::connect(
-            url2!("ws://127.0.0.1:{}", port),
-            Arc::new(WebsocketConfig {
-                default_request_timeout_s: 1,
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap();
+
+    let url = url2!("ws://127.0.0.1:{}", port);
+    let cfg = Arc::new(WebsocketConfig::default());
+
+    // Retain handles so that the test can control when to disconnect clients
+    let mut handles = Vec::new();
+
+    // The first `MAX_CONNECTIONS` connections should succeed
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender
+            .request(AdminRequest::ListDnas)
+            .await
+            .expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
     }
+
+    // Try lots of failed connections to make sure the limit is respected
+    for _ in 0..2 * MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+
+        // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
+        sender
+            .request::<AdminRequest, AdminResponse>(AdminRequest::ListDnas)
+            .await
+            .expect_err("Should be no available connection slots");
+    }
+
+    // Disconnect all the clients
+    handles.clear();
+
+    // Should now be possible to connect new clients
+    for _ in 0..MAX_CONNECTIONS {
+        let (mut sender, _) = connect(url.clone(), cfg.clone()).await.unwrap();
+        let _: AdminResponse = sender
+            .request(AdminRequest::ListDnas)
+            .await
+            .expect("Admin request should succeed because there are enough available connections");
+        handles.push(sender);
+    }
+
     conductor_handle.shutdown();
 }
 
