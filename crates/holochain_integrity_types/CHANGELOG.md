@@ -1,12 +1,13 @@
 ---
 default_semver_increment_mode: !pre_patch beta-rc
-semver_increment_mode: patch
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.1.3
 
 ## 0.1.3-beta-rc.0
 
