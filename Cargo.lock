@@ -948,8 +948,9 @@ checksum = "13418e745008f7349ec7e449155f419a61b92b58a99cc3616942b926825ec76b"
 
 [[package]]
 name = "contrafact"
-version = "0.1.1"
-source = "git+https://github.com/maackle/contrafact-rs.git?branch=main#d458d6b5700b6f6cc369bcc29adb7b512874be71"
+version = "0.2.0-dev.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "745c60dde49b81b9ba515c0f857b11341240f30b788f26bb6589cb6e61ce8dfd"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3092,7 +3093,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -8843,3 +8844,8 @@ dependencies = [
  "crossbeam-utils",
  "flate2",
 ]
+
+[[patch.unused]]
+name = "contrafact"
+version = "0.1.1"
+source = "git+https://github.com/maackle/contrafact-rs.git?branch=main#d458d6b5700b6f6cc369bcc29adb7b512874be71"
