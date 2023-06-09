@@ -1,6 +1,7 @@
 use tracing_core::field::Field;
 use tracing_subscriber::field::Visit;
 
+use crate::writer::InMemoryWriter;
 use chrono::SecondsFormat;
 use std::path::PathBuf;
 
@@ -32,19 +33,55 @@ impl Visit for EventFieldFlameVisitor {
     }
 }
 
-pub(crate) struct FlameTimed {
+pub(crate) struct FlameTimedConsole {
     path: PathBuf,
 }
 
-impl FlameTimed {
+impl FlameTimedConsole {
     pub(crate) fn new(path: PathBuf) -> Self {
         Self { path }
     }
 }
 
-impl Drop for FlameTimed {
+impl Drop for FlameTimedConsole {
     fn drop(&mut self) {
         save_flamegraph(self.path.clone());
+    }
+}
+
+pub(crate) struct FlameTimed(InMemoryWriter);
+
+impl FlameTimed {
+    pub(crate) fn new(writer: InMemoryWriter) -> Self {
+        Self(writer)
+    }
+
+    fn save_flame_graph(&mut self) -> Option<()> {
+        let now = chrono::Local::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        println!("data size {}", self.0.buf().unwrap().len());
+        let reader = std::io::BufReader::new(&mut self.0);
+
+        let out = std::fs::File::create(
+            toml_path()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(format!("tracing_flame_{}.svg", now)),
+        )
+        .ok()
+        .or_else(|| {
+            eprintln!("failed to create flames inferno");
+            None
+        })?;
+        let writer = std::io::BufWriter::new(out);
+
+        let mut opts = inferno::flamegraph::Options::default();
+        inferno::flamegraph::from_reader(&mut opts, reader, writer).unwrap();
+        Some(())
+    }
+}
+
+impl Drop for FlameTimed {
+    fn drop(&mut self) {
+        self.save_flame_graph();
     }
 }
 
