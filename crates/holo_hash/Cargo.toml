@@ -37,7 +37,6 @@ serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
 [features]
 default = ["serialization"]
 full = [
-    # TODO check all uses of holo_hash which specify `full`
     "hashing",
     "encoding",
     "sqlite"
