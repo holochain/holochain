@@ -2701,6 +2701,7 @@ dependencies = [
  "getrandom 0.2.9",
  "holo_hash",
  "holochain_serialized_bytes 0.0.51",
+ "holochain_sqlite",
  "holochain_util",
  "holochain_zome_types",
  "kitsune_p2p",

@@ -43,7 +43,7 @@ full = [
 ]
 
 fixturators = ["fixt", "rand", "hashing", "encoding"]
-hashing = ["futures", "must_future", "blake2b_simd", "serialization"]
+hashing = ["futures", "must_future", "blake2b_simd", "serialization", "encoding"]
 serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]
 encoding = ["base64", "blake2b_simd", "derive_more"]
 test_utils = ["fixturators"]
