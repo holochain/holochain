@@ -15,7 +15,9 @@ use super::{Region, RegionCoords, RegionData, RegionDataConstraints};
 /// [`SpaceSegment`]s are implied by the [`ArqBoundsSet`].
 ///
 /// LTCS stands for Logarithmic Time, Constant Space.
-#[derive(Debug, Clone, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize,
+)]
 pub struct RegionCoordSetLtcs {
     pub(super) times: TelescopingTimes,
     pub(super) arq_set: ArqBoundsSet,
