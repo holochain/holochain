@@ -34,8 +34,8 @@ test-case = "1.2"
 tokio = { version = "1.11", features = [ "full", "test-util" ] }
 
 [features]
+default = []
 test_utils = []
-default = ["test_utils"]
 sqlite-encrypted = [
     "kitsune_p2p_timestamp/sqlite-encrypted",
     "kitsune_p2p_types/sqlite-encrypted",

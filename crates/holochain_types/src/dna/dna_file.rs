@@ -152,7 +152,6 @@ impl DnaFile {
     }
 
     /// Construct a DnaFile from its constituent parts
-    #[cfg(feature = "fixturators")]
     pub fn from_parts(dna: DnaDefHashed, code: WasmMap) -> Self {
         Self { dna, code }
     }

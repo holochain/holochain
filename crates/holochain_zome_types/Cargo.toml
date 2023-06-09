@@ -44,7 +44,7 @@ shrinkwraprs = { version = "0.3", optional = true }
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 
 # contrafact
-contrafact = { version = "0.1.0-dev.1", optional = true }
+contrafact = { version = "=0.1.0-dev.1", optional = true }
 once_cell = { version = "1.4", optional = true }
 
 # for hex encoding of signatures
@@ -55,7 +55,7 @@ once_cell = { version = "1.4", optional = false }
 matches = "0.1"
 
 [features]
-default = ["full-dna-def", "fixturators", "test_utils", "subtle-encoding"]
+default = ["full-dna-def", "subtle-encoding"]
 
 # Extra impls for DnaDef, including InlineZome, which are not used in Wasm
 # but used in Holochain
