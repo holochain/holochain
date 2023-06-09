@@ -48,7 +48,6 @@ fixt = { path = "../../fixt", version = "^0.1.2"}
 # arbitrary could be made optional
 arbitrary = { version = "1.0", features = ["derive"] }
 
-blake2b_simd = { version = "0.5.10", optional = true }
 maplit = { version = "1", optional = true }
 mockall = { version = "0.10.2", optional = true }
 
@@ -71,7 +70,6 @@ tracing-subscriber = "0.2"
 default = [ "tx2" ]
 
 test_utils = [
-  "blake2b_simd",
   "tokio/test-util",
   "ghost_actor/test_utils",
   "kitsune_p2p_types/test_utils",

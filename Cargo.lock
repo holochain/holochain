@@ -3322,7 +3322,6 @@ dependencies = [
  "arbitrary",
  "arrayref",
  "base64 0.13.1",
- "blake2b_simd 0.5.11",
  "bloomfilter",
  "contrafact",
  "derive_more",
@@ -3584,6 +3583,7 @@ version = "0.1.3"
 dependencies = [
  "arbitrary",
  "base64 0.13.1",
+ "blake2b_simd 0.5.11",
  "criterion",
  "derive_more",
  "futures",

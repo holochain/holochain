@@ -6,7 +6,6 @@ use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use ghost_actor::GhostControlSender;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchPoolConfig;
-use kitsune_p2p::test_util::hash_op_data;
 //use ghost_actor::dependencies::tracing;
 use crate::types::direct::*;
 use kitsune_p2p::actor::{BroadcastData, KitsuneP2pSender};
@@ -282,6 +281,7 @@ impl AsKitsuneDirect for Kd1 {
     }
 }
 
+#[cfg(feature = "test_utils")]
 impl KitsuneHostDefaultError for Kd1 {
     const NAME: &'static str = "Kd1";
 

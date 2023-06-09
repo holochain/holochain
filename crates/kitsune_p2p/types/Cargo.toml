@@ -38,6 +38,7 @@ tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
 url = "2"
 url2 = "0.0.6"
 webpki = "0.22.0"
+blake2b_simd = { version = "0.5.10" }
 
 # arbitrary
 arbitrary = { version = "1.0", features = ["derive"], optional = true}

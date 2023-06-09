@@ -1,5 +1,6 @@
 //! Binary types, hashes, signatures, etc used by kitsune.
 
+use std::sync::Arc;
 use kitsune_p2p_dht_arc::DhtLocation;
 
 /// Kitsune hashes are expected to be 36 bytes.
@@ -136,6 +137,17 @@ make_kitsune_bin_type! {
     r#"Top-level "KitsuneDataHash" items are buckets of related meta-data.
 These metadata "Operations" each also have unique OpHashes."#,
     KitsuneOpHash,
+}
+
+/// Hash op data from raw bytes
+pub fn hash_op_data(data: &[u8]) -> Arc<KitsuneOpHash> {
+    Arc::new(KitsuneOpHash::new(
+        blake2b_simd::Params::new()
+            .hash_length(32)
+            .hash(data)
+            .as_bytes()
+            .to_vec(),
+    ))
 }
 
 /// The op data with its location
