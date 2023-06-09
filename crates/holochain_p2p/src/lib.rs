@@ -18,10 +18,17 @@ mod spawn;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 pub use spawn::*;
-pub use test::stub_network;
-pub use test::HolochainP2pDnaFixturator;
 
 pub use kitsune_p2p;
+pub use kitsune_p2p::dht;
+pub use kitsune_p2p::dht_arc;
+
+#[cfg(feature = "mock_network")]
+mod test;
+#[cfg(feature = "mock_network")]
+pub use test::stub_network;
+#[cfg(feature = "mock_network")]
+pub use test::HolochainP2pDnaFixturator;
 
 #[mockall::automock]
 #[allow(clippy::too_many_arguments)]
@@ -385,8 +392,3 @@ impl HolochainP2pDnaT for HolochainP2pDna {
         self.chc.clone()
     }
 }
-
-pub use kitsune_p2p::dht;
-pub use kitsune_p2p::dht_arc;
-
-mod test;

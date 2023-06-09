@@ -654,7 +654,6 @@ impl<'e> PConn {
 }
 
 impl<'e> WriteManager<'e> for PConn {
-    #[cfg(feature = "test_utils")]
     fn with_commit_sync<E, R, F>(&'e mut self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,

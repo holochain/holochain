@@ -113,6 +113,7 @@ pub enum DhtOp {
     RegisterRemoveLink(Signature, action::DeleteLink),
 }
 
+#[cfg(feature = "test_utils")]
 impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
     fn loc(&self) -> Loc {
         self.dht_basis().get_loc()
@@ -419,6 +420,7 @@ impl DhtOp {
         Ok(r)
     }
 
+    #[cfg(feature = "test_utils")]
     fn to_order(&self) -> OpOrder {
         OpOrder::new(self.get_type(), self.timestamp())
     }
@@ -444,12 +446,14 @@ impl DhtOp {
     }
 }
 
+#[cfg(feature = "test_utils")]
 impl PartialOrd for DhtOp {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
+#[cfg(feature = "test_utils")]
 impl Ord for DhtOp {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.to_order().cmp(&other.to_order())

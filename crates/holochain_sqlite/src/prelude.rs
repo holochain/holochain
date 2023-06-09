@@ -3,6 +3,7 @@
 pub use crate::db::*;
 pub use crate::error::*;
 pub use crate::exports::*;
+#[cfg(feature = "test_utils")]
 pub use crate::fresh_reader_test;
 
 #[cfg(any(test, feature = "test_utils"))]

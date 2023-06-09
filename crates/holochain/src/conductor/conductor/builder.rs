@@ -5,6 +5,7 @@ use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
+#[cfg(any(test, feature = "test_utils"))]
 use holochain_types::prelude::test_keystore;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle

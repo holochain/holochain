@@ -27,8 +27,9 @@ pub enum InlineEntryTypes {
     C,
 }
 
+#[cfg(feature = "test_utils")]
 impl InlineEntryTypes {
-    /// Create the entry defs for tese types.
+    /// Create the entry defs for these types.
     pub fn entry_defs() -> Vec<EntryDef> {
         vec![Default::default(); 3]
     }

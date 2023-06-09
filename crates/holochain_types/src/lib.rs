@@ -25,6 +25,7 @@ pub mod db_cache;
 pub mod dht_op;
 pub mod dna;
 pub mod entry;
+#[cfg(feature = "fixturators")]
 pub mod fixt;
 pub mod inline_zome;
 pub mod link;

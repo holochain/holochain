@@ -161,7 +161,7 @@ impl<A> Record<A> {
     /// This is useless and dangerous in production usage.
     /// Guaranteed to make hashes and signatures mismatch whatever the RecordEntry is mutated to (at least).
     /// This may be useful for tests that rely heavily on mocked and fixturated data.
-    #[cfg(feature = "test_utils")]
+    // TODO documented not to be used in production code but it is used in production code -> #[cfg(feature = "test_utils")]
     pub fn as_entry_mut(&mut self) -> &mut RecordEntry {
         &mut self.entry
     }
@@ -228,7 +228,6 @@ impl RecordEntry {
     }
 }
 
-#[cfg(feature = "test_utils")]
 impl<T> SignedHashed<T>
 where
     T: HashableContent,
