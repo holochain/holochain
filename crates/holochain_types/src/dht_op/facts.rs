@@ -70,7 +70,7 @@ pub fn valid_dht_op(
 
 #[cfg(test)]
 mod tests {
-    use arbitrary::{Arbitrary, Unstructured};
+    use arbitrary::Arbitrary;
     use holochain_keystore::test_keystore::spawn_test_keystore;
 
     use super::*;
@@ -80,17 +80,17 @@ mod tests {
     async fn test_valid_dht_op() {
         // TODO: Must add constraint on dht op variant wrt action variant
 
-        let mut uu = Unstructured::new(&NOISE);
-        let u = &mut uu;
+        let mut gg = Generator::from(unstructured_noise());
+        let g = &mut gg;
         let keystore = spawn_test_keystore().await.unwrap();
         let agent = AgentPubKey::new_random(&keystore).await.unwrap();
 
-        let e = Entry::arbitrary(u).unwrap();
+        let e = Entry::arbitrary(g).unwrap();
 
-        let mut a0 = action_facts::is_not_entry_action().build(u);
+        let mut a0 = action_facts::is_not_entry_action().build(g);
         *a0.author_mut() = agent.clone();
 
-        let mut a1 = action_facts::is_new_entry_action().build(u);
+        let mut a1 = action_facts::is_new_entry_action().build(g);
         *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
         let mut a1 = Action::from(a1);
         *a1.author_mut() = agent.clone();

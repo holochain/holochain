@@ -1,5 +1,6 @@
 //! Types for arbitrary data driven by entropy
 
+use contrafact::Generator;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -31,6 +32,11 @@ pub fn unstructured(noise: &[u8]) -> arbitrary::Unstructured<'_> {
 /// 10MB of random Unstructured data for use with `arbitrary`
 pub fn unstructured_noise() -> arbitrary::Unstructured<'static> {
     arbitrary::Unstructured::new(&NOISE)
+}
+
+/// A Generator backed by unstructured_noise
+pub fn random_generator() -> Generator<'static> {
+    Generator::from(unstructured_noise())
 }
 
 // The following seemed like a convenient way to avoid having to

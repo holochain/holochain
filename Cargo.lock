@@ -948,9 +948,9 @@ checksum = "13418e745008f7349ec7e449155f419a61b92b58a99cc3616942b926825ec76b"
 
 [[package]]
 name = "contrafact"
-version = "0.2.0-dev.0"
+version = "0.2.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "745c60dde49b81b9ba515c0f857b11341240f30b788f26bb6589cb6e61ce8dfd"
+checksum = "40d694ba695770cd8a7af00d141a96c633960844ef9ccbf15e0bcabe25861301"
 dependencies = [
  "anyhow",
  "arbitrary",

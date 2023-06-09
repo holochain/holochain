@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use arbitrary::{Arbitrary, Unstructured};
 use contrafact::*;
 use holo_hash::*;
 
@@ -24,58 +23,45 @@ struct ValidChainFact {
 }
 
 impl<'a> Fact<'a, Action> for ValidChainFact {
-    fn check(&self, action: &Action) -> Check {
-        let action_hash = ActionHash::with_data_sync(action);
-        let result = match (action.prev_action(), self.hash.as_ref()) {
-            (Some(prev), Some(stored)) => {
-                if prev == stored {
-                    Check::pass()
-                } else {
-                    vec![format!("Hashes don't match: {} != {}", prev, stored)].into()
-                }
+    fn mutate(&self, mut action: Action, g: &mut Generator<'a>) -> Mutation<Action> {
+        match (self.hash.as_ref(), action.prev_action_mut()) {
+            (Some(stored), Some(prev)) => {
+                g.set(
+                    prev,
+                    stored,
+                    format!("Hashes don't match: {} != {}", prev, stored),
+                )?;
             }
-            (None, None) => Check::pass(),
-            (None, Some(_)) => vec![format!(
-                "Found Dna in position other than beginning of the chain. Hash: {}",
-                action_hash
-            )]
-            .into(),
-            (Some(_), None) => vec![format!(
-                "First action must be of type Dna, but instead got type {:?}",
-                action.action_type()
-            )]
-            .into(),
+            (None, None) => {}
+            (Some(_), None) => {
+                let action_hash = ActionHash::with_data_sync(&action);
+                action = g.arbitrary(format!(
+                    "Found Dna in position other than beginning of the chain. Hash: {}",
+                    action_hash
+                ))?
+            }
+            (None, Some(_)) => {
+                let err = format!(
+                    "First action must be of type Dna, but instead got type {:?}",
+                    action.action_type()
+                );
+                action = Action::Dna(g.arbitrary(err)?);
+            }
         };
 
-        result
-    }
-
-    fn mutate(&self, mut action: Action, u: &mut Unstructured<'a>) -> Action {
-        if let Some(stored_hash) = self.hash.as_ref() {
-            // This is not the first action we've seen
-            while action.prev_action().is_none() {
-                // Generate arbitrary actions until we get one with a prev action
-                action = Action::arbitrary(u).unwrap();
+        match (self.seq, action.action_seq_mut()) {
+            (0, None) => {}
+            (stored, Some(seq)) => g.set(seq, &stored, "Seq must be 1 more than the last")?,
+            _ => {
+                return Err(MutationError::Exception(
+                    "ValidChainFact: Action should already be set properly".to_string(),
+                ))
             }
-            // Set the action's prev hash to the one we stored from our previous
-            // visit
-            *action.prev_action_mut().unwrap() = stored_hash.clone();
-            // Also set the seq to the next value (this should only be None
-            // iff prev_action is None)
-            *action.action_seq_mut().unwrap() = self.seq;
-        } else {
-            // This is the first action we've seen, so it must be a Dna
-            action = Action::Dna(Dna::arbitrary(u).unwrap());
         }
 
-        *action.author_mut() = self.author.clone();
+        g.set(action.author_mut(), &self.author, "Author must be the same")?;
 
-        action
-        // println!(
-        //     "{}  =>  {:?}\n",
-        //     ActionHash::with_data_sync(action),
-        //     action.prev_action()
-        // );
+        Ok(action)
     }
 
     fn advance(&mut self, action: &Action) {
@@ -129,10 +115,10 @@ mod tests {
 
     #[test]
     fn test_valid_chain_fact() {
-        let mut u = unstructured_noise();
+        let mut g = unstructured_noise().into();
         let author = ::fixt::fixt!(AgentPubKey);
 
-        let chain = build_seq(&mut u, 5, valid_chain(author.clone()));
+        let chain = build_seq(&mut g, 5, valid_chain(author.clone()));
         check_seq(chain.as_slice(), valid_chain(author)).unwrap();
 
         let hashes: Vec<_> = chain

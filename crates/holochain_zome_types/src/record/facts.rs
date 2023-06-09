@@ -71,12 +71,12 @@ mod tests {
         #[test]
         fn test_action_and_entry_match(seed: u64) {
             let ns = noise(seed, 100_000);
-            let mut uu = unstructured(&ns);
-            let u = &mut uu;
+            let mut gg = unstructured(&ns).into();
+            let g = &mut gg;
 
-            let e = brute("Is App entry", |e| matches!(e, Entry::App(_))).build(u);
-            let a0 = action_facts::is_not_entry_action().build(u);
-            let mut a1 = action_facts::is_new_entry_action().build(u);
+            let e = brute("Is App entry", |e| matches!(e, Entry::App(_))).build(g);
+            let a0 = action_facts::is_not_entry_action().build(g);
+            let mut a1 = action_facts::is_new_entry_action().build(g);
             *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
             let a1 = Action::from(a1);
 
