@@ -65,7 +65,7 @@ pub fn box_fut<'a, R: Send + 'a>(result: R) -> MustBoxFuture<'a, R> {
 
 use ::ghost_actor::dependencies::tracing;
 use futures::future::BoxFuture;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
+use must_future::MustBoxFuture;
 
 /// 32 byte binary TLS certificate digest.
 pub type CertDigest = lair_keystore_api::encoding_types::BinDataSized<32>;

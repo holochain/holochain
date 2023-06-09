@@ -23,7 +23,7 @@ fixt = { version = "^0.2.0", path = "../fixt" }
 futures = "0.3.1"
 getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
-ghost_actor = "0.3.0-alpha.5"
+ghost_actor = "0.4.0-alpha.5"
 holo_hash = { version = "^0.3.0-beta-dev.2", path = "../holo_hash", features = ["full"] }
 holochain_cascade = { version = "^0.3.0-beta-dev.3", path = "../holochain_cascade" }
 holochain_conductor_api = { version = "^0.3.0-beta-dev.3", path = "../holochain_conductor_api" }
@@ -152,7 +152,6 @@ tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
 # This feature should be turned off for production builds.
 test_utils = [
   "diff",
-  "ghost_actor/test_utils",
   "hdk/test_utils",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",

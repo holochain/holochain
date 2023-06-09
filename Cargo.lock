@@ -2223,21 +2223,6 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.3.0-alpha.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0f758b0048e5f55f4d927932a32eb4ab8a850c4b9a7951b259ba6c8792d5c38"
-dependencies = [
- "futures",
- "mockall 0.11.4",
- "must_future",
- "paste",
- "thiserror",
- "tracing",
- "tracing-futures",
-]
-
-[[package]]
-name = "ghost_actor"
 version = "0.4.0-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52cb0746ab4cf003d75cdbaaae2cf95139ec9607ae46bd5c68721bda2ca0c824"
@@ -2579,7 +2564,7 @@ dependencies = [
  "futures",
  "get_if_addrs",
  "getrandom 0.2.9",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor",
  "hdk",
  "holo_hash",
  "holochain",
@@ -2666,7 +2651,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor",
  "hdk",
  "hdk_derive",
  "holo_hash",
@@ -2877,7 +2862,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
@@ -3192,7 +3177,7 @@ version = "0.3.0-beta-dev.0"
 dependencies = [
  "criterion",
  "futures",
- "ghost_actor 0.4.0-alpha.5",
+ "ghost_actor",
  "holochain_serialized_bytes",
  "holochain_trace",
  "holochain_types",
@@ -3646,7 +3631,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor",
  "governor",
  "holochain_trace",
  "itertools 0.10.5",
@@ -3880,7 +3865,7 @@ dependencies = [
  "criterion",
  "derive_more",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor",
  "holochain_trace",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
@@ -3890,6 +3875,7 @@ dependencies = [
  "lair_keystore_api",
  "lru 0.8.1",
  "mockall 0.11.4",
+ "must_future",
  "nanoid 0.3.0",
  "once_cell",
  "parking_lot 0.11.2",

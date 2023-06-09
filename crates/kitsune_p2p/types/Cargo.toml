@@ -15,7 +15,8 @@ lair_keystore_api = "=0.2.4"
 base64 = "0.13"
 derive_more = "0.99.7"
 futures = "0.3"
-ghost_actor = "=0.3.0-alpha.5"
+ghost_actor = "=0.4.0-alpha.5"
+must_future = "0.1.2"
 kitsune_p2p_dht = { version = "^0.3.0-beta-dev.1", path = "../dht" }
 kitsune_p2p_dht_arc = { version = "^0.3.0-beta-dev.1", path = "../dht_arc" }
 kitsune_p2p_bin_data = { version = "^0.3.0-beta-dev.2", path = "../bin_data" }
@@ -60,7 +61,6 @@ test_utils = [
   "arbitrary",
   "kitsune_p2p_bin_data/test_utils",
   "kitsune_p2p_dht_arc/test_utils",
-  "ghost_actor/test_utils",
   "mockall",
 ]
 
