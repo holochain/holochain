@@ -16,6 +16,7 @@ use holo_hash::*;
 /// - constrain seq num
 /// - constrain prev_hashes
 /// ...but, this does it all in one Fact
+#[derive(Debug)]
 struct ValidChainFact {
     hash: Option<ActionHash>,
     seq: u32,
@@ -34,11 +35,14 @@ impl<'a> Fact<'a, Action> for ValidChainFact {
             }
             (None, None) => {}
             (Some(_), None) => {
-                let action_hash = ActionHash::with_data_sync(&action);
-                action = g.arbitrary(format!(
-                    "Found Dna in position other than beginning of the chain. Hash: {}",
-                    action_hash
-                ))?
+                action = brute(
+                    format!(
+                        "Found Dna in position other than beginning of the chain. Hash: {}",
+                        ActionHash::with_data_sync(&action)
+                    ),
+                    |a: &Action| a.action_type() != ActionType::Dna,
+                )
+                .mutate(action, g)?;
             }
             (None, Some(_)) => {
                 let err = format!(
@@ -51,11 +55,14 @@ impl<'a> Fact<'a, Action> for ValidChainFact {
 
         match (self.seq, action.action_seq_mut()) {
             (0, None) => {}
-            (stored, Some(seq)) => g.set(seq, &stored, "Seq must be 1 more than the last")?,
+            (stored, Some(seq)) if stored > 0 => {
+                g.set(seq, &stored, "Seq must be 1 more than the last")?
+            }
             _ => {
-                return Err(MutationError::Exception(
-                    "ValidChainFact: Action should already be set properly".to_string(),
-                ))
+                return Err(MutationError::Exception(format!(
+                    "ValidChainFact: Action should already be set properly. action={:?}, fact={:?}",
+                    action, self
+                )))
             }
         }
 

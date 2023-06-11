@@ -70,7 +70,7 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn test_action_and_entry_match(seed: u64) {
-            let ns = noise(seed, 100_000);
+            let ns = noise(Some(seed), 100_000);
             let mut gg = unstructured(&ns).into();
             let g = &mut gg;
 

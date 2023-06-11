@@ -963,10 +963,9 @@ async fn test_dpki_agent_update() {
 /// Test that the valid_chain contrafact matches our chain validation function,
 /// since many other tests will depend on this constraint
 async fn valid_chain_fact_test() {
+    let n = 100;
     let keystore = SweetConductor::from_standard_config().await.keystore();
     let author = SweetAgents::one(keystore.clone()).await;
-
-    let mut g = random_generator();
 
     let fact = contrafact::facts![
         holochain_zome_types::record::facts::action_and_entry_match(false),
@@ -976,8 +975,11 @@ async fn valid_chain_fact_test() {
             holochain_zome_types::action::facts::valid_chain(author),
         ),
     ];
+
+    let mut g = random_generator();
+
     let mut chain: Vec<Record> =
-        futures::future::join_all(contrafact::build_seq(&mut g, 100, fact).into_iter().map(
+        futures::future::join_all(contrafact::build_seq(&mut g, n, fact).into_iter().map(
             |(a, entry)| {
                 let keystore = keystore.clone();
                 async move {
