@@ -179,7 +179,7 @@ mod tests {
         use holochain::test_utils::inline_zomes::simple_crud_zome;
 
         let mut config = ConductorConfig::default();
-        config.chc_namespace = Some(CHC_LOCAL_MAGIC_STRING.to_string());
+        config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_STRING));
         let mut conductor = SweetConductor::from_config(config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -256,7 +256,7 @@ mod tests {
         use holochain::test_utils::inline_zomes::{simple_crud_zome, AppString};
 
         let mut config = ConductorConfig::default();
-        config.chc_namespace = Some(CHC_LOCAL_MAGIC_STRING.to_string());
+        config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_STRING));
         let mut conductors =
             SweetConductorBatch::from_configs([config.clone(), config.clone(), config.clone()])
                 .await;

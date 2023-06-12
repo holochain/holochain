@@ -55,7 +55,7 @@ impl ChainHeadCoordinator for ChcRemote {
 
 impl ChcRemote {
     /// Constructor
-    pub fn new(_namespace: &str, _cell_id: &CellId) -> Self {
+    pub fn new(url: Url, cell_id: &CellId) -> Self {
         todo!("Implement remote CHC client")
     }
 }

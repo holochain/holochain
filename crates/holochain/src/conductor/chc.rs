@@ -4,6 +4,7 @@ use holochain_p2p::ChcImpl;
 use holochain_zome_types::CellId;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
+use url2::Url2;
 
 mod chc_local;
 pub use chc_local::*;
@@ -18,18 +19,18 @@ const CHC_LOCAL_MAGIC_STRING: &'static str = "#LOCAL#";
 
 /// Build the appropriate CHC implementation.
 ///
-/// In particular, if the namespace is the magic string "#LOCAL#", then a [`ChcLocal`]
-/// implementation will be used. Otherwise, if the namespace is set, and the CellId
+/// In particular, if the url is the magic string "#LOCAL#", then a [`ChcLocal`]
+/// implementation will be used. Otherwise, if the url is set, and the CellId
 /// is "CHC-enabled", then a [`ChcRemote`] will be produced.
-pub fn build_chc(namespace: Option<&String>, cell_id: &CellId) -> Option<ChcImpl> {
+pub fn build_chc(url: Option<&Url2>, cell_id: &CellId) -> Option<ChcImpl> {
     // TODO: check if the agent key is Holo-hosted, otherwise return none
     let is_holo_agent = true;
     if is_holo_agent {
-        namespace.map(|ns| {
-            if ns == CHC_LOCAL_MAGIC_STRING {
+        url.map(|url| {
+            if url.as_str() == CHC_LOCAL_MAGIC_STRING {
                 chc_local(cell_id.clone())
             } else {
-                chc_remote(ns, cell_id)
+                chc_remote(url.clone().into(), cell_id)
             }
         })
     } else {
@@ -44,6 +45,6 @@ fn chc_local(cell_id: CellId) -> ChcImpl {
         .clone()
 }
 
-fn chc_remote(namespace: &str, cell_id: &CellId) -> ChcImpl {
-    Arc::new(ChcRemote::new(namespace, cell_id))
+fn chc_remote(url: reqwest::Url, cell_id: &CellId) -> ChcImpl {
+    Arc::new(ChcRemote::new(url, cell_id))
 }

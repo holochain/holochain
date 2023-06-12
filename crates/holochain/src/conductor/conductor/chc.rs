@@ -7,7 +7,7 @@ impl Conductor {
     pub(crate) fn chc(&self, cell_id: &CellId) -> Option<ChcImpl> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "chc")] {
-                crate::conductor::chc::build_chc(self.config.chc_namespace.as_ref(), cell_id)
+                crate::conductor::chc::build_chc(self.config.chc_url.as_ref(), cell_id)
             } else {
                 None
             }
