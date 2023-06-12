@@ -101,7 +101,7 @@ mod tests {
     use holochain_conductor_api::conductor::ConductorConfig;
 
     use crate::{
-        conductor::chc::{CHC_LOCAL_MAGIC_STRING, CHC_LOCAL_MAP},
+        conductor::chc::{CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
         sweettest::*,
     };
 
@@ -179,7 +179,7 @@ mod tests {
         use holochain::test_utils::inline_zomes::simple_crud_zome;
 
         let mut config = ConductorConfig::default();
-        config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_STRING));
+        config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
         let mut conductor = SweetConductor::from_config(config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -256,7 +256,7 @@ mod tests {
         use holochain::test_utils::inline_zomes::{simple_crud_zome, AppString};
 
         let mut config = ConductorConfig::default();
-        config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_STRING));
+        config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
         let mut conductors =
             SweetConductorBatch::from_configs([config.clone(), config.clone(), config.clone()])
                 .await;

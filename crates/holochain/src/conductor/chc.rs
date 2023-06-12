@@ -15,11 +15,11 @@ pub use chc_remote::*;
 static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, Arc<ChcLocal>>>> =
     Lazy::new(|| parking_lot::Mutex::new(HashMap::new()));
 
-const CHC_LOCAL_MAGIC_STRING: &'static str = "#LOCAL#";
+const CHC_LOCAL_MAGIC_URL: &'static str = "local:";
 
 /// Build the appropriate CHC implementation.
 ///
-/// In particular, if the url is the magic string "#LOCAL#", then a [`ChcLocal`]
+/// In particular, if the url is the magic string "local:", then a [`ChcLocal`]
 /// implementation will be used. Otherwise, if the url is set, and the CellId
 /// is "CHC-enabled", then a [`ChcRemote`] will be produced.
 pub fn build_chc(url: Option<&Url2>, cell_id: &CellId) -> Option<ChcImpl> {
@@ -27,7 +27,7 @@ pub fn build_chc(url: Option<&Url2>, cell_id: &CellId) -> Option<ChcImpl> {
     let is_holo_agent = true;
     if is_holo_agent {
         url.map(|url| {
-            if url.as_str() == CHC_LOCAL_MAGIC_STRING {
+            if url.as_str() == CHC_LOCAL_MAGIC_URL {
                 chc_local(cell_id.clone())
             } else {
                 chc_remote(url.clone().into(), cell_id)
