@@ -86,6 +86,9 @@ async fn async_main() {
         std::env::set_var("CUSTOM_FILTER", t);
     }
 
+    #[cfg(feature = "otel")]
+    holochain_trace::metric::init_metrics();
+
     holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("holochain_trace initialized");
 

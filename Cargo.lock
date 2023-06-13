@@ -3039,6 +3039,8 @@ dependencies = [
  "holochain_serialized_bytes",
  "inferno",
  "once_cell",
+ "opentelemetry",
+ "opentelemetry-stdout",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3092,7 +3094,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3716,6 +3718,7 @@ dependencies = [
  "criterion",
  "fixt",
  "futures",
+ "holochain_trace",
  "kitsune_p2p",
  "kitsune_p2p_types",
  "once_cell",
@@ -3810,6 +3813,7 @@ dependencies = [
  "err-derive",
  "futures-core",
  "futures-util",
+ "holochain_trace",
  "libmdns",
  "mdns",
  "tokio",
@@ -4892,10 +4896,77 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry"
+version = "0.19.0"
+source = "git+https://github.com/open-telemetry/opentelemetry-rust.git#00641fb01de4411bbac77f161f5d7b2baec69f00"
+dependencies = [
+ "opentelemetry_api",
+ "opentelemetry_sdk",
+]
+
+[[package]]
+name = "opentelemetry-stdout"
+version = "0.1.0"
+source = "git+https://github.com/open-telemetry/opentelemetry-rust.git#00641fb01de4411bbac77f161f5d7b2baec69f00"
+dependencies = [
+ "async-trait",
+ "opentelemetry_api",
+ "opentelemetry_sdk",
+ "ordered-float",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "opentelemetry_api"
+version = "0.19.0"
+source = "git+https://github.com/open-telemetry/opentelemetry-rust.git#00641fb01de4411bbac77f161f5d7b2baec69f00"
+dependencies = [
+ "futures-channel",
+ "futures-util",
+ "indexmap",
+ "js-sys",
+ "once_cell",
+ "pin-project-lite",
+ "thiserror",
+ "urlencoding",
+]
+
+[[package]]
+name = "opentelemetry_sdk"
+version = "0.19.0"
+source = "git+https://github.com/open-telemetry/opentelemetry-rust.git#00641fb01de4411bbac77f161f5d7b2baec69f00"
+dependencies = [
+ "async-trait",
+ "crossbeam-channel",
+ "futures-channel",
+ "futures-executor",
+ "futures-util",
+ "once_cell",
+ "opentelemetry_api",
+ "ordered-float",
+ "percent-encoding 2.2.0",
+ "rand 0.8.5",
+ "regex",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
+name = "ordered-float"
+version = "3.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fc2dbde8f8a79f2102cc474ceb0ad68e3b80b85289ea62389b60e66777e4213"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "os_info"
@@ -7933,6 +8004,12 @@ dependencies = [
  "serde",
  "url 1.7.2",
 ]
+
+[[package]]
+name = "urlencoding"
+version = "2.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8db7427f936968176eaa7cdf81b7f98b980b18495ec28f1b5791ac3bfe3eea9"
 
 [[package]]
 name = "utf-8"

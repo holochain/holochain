@@ -240,7 +240,13 @@ impl KitsuneP2pActor {
             let i_s = internal_sender.clone();
             let host = host.clone();
             tokio::task::spawn(async move {
+                #[cfg(feature = "otel")]
+                let task_run_metric = holochain_trace::metric::TaskRunMetric::new("fetch_items");
+
                 loop {
+                    #[cfg(feature = "otel")]
+                    task_run_metric.record_start();
+
                     let list = fetch_pool.get_items_to_fetch();
 
                     for (key, space, source, context) in list {
@@ -274,6 +280,9 @@ impl KitsuneP2pActor {
             let tuning_params = config.tuning_params.clone();
             let fetch_pool = fetch_pool.clone();
             async move {
+                #[cfg(feature = "otel")]
+                let task_run_metric = holochain_trace::metric::TaskRunMetric::new("meta_net_event");
+
                 let fetch_response_queue = &fetch_response_queue;
                 let fetch_pool = &fetch_pool;
                 ep_evt
@@ -281,6 +290,9 @@ impl KitsuneP2pActor {
                         let evt_sender = evt_sender.clone();
                         let host = host.clone();
                         let i_s = i_s.clone();
+
+                        #[cfg(feature = "otel")]
+                        task_run_metric.record_start();
 
                         async move {
                             let evt_sender = &evt_sender;

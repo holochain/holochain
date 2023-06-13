@@ -235,3 +235,7 @@ sweetest = [
   "test_utils",
   "sqlite",
 ]
+
+otel = [
+  "kitsune_p2p/otel"  
+]

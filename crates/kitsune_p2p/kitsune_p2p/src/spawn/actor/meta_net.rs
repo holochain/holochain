@@ -508,8 +508,15 @@ impl MetaNet {
         let ep_hnd = ep.handle().clone();
 
         tokio::task::spawn(async move {
+            #[cfg(feature = "otel")]
+            let task_run_metric =
+                holochain_trace::metric::TaskRunMetric::new("meta_net_tx2_ep_event");
+
             let tuning_params = &tuning_params;
             while let Some(evt) = ep.next().await {
+                #[cfg(feature = "otel")]
+                task_run_metric.record_start();
+
                 match evt {
                     Tx2EpEvent::OutgoingConnection(Tx2EpConnection { con, url }) => {
                         if evt_send
@@ -681,7 +688,14 @@ impl MetaNet {
         let res_store2 = res_store.clone();
         let tuning_params2 = tuning_params.clone();
         tokio::task::spawn(async move {
+            #[cfg(feature = "otel")]
+            let task_run_metric =
+                holochain_trace::metric::TaskRunMetric::new("meta_net_tx5_ep_event");
+
             while let Some(evt) = ep_evt.recv().await {
+                #[cfg(feature = "otel")]
+                task_run_metric.record_start();
+
                 let evt = match evt {
                     Ok(evt) => evt,
                     Err(err) => {

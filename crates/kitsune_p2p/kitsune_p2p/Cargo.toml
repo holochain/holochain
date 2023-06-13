@@ -104,3 +104,7 @@ sqlite = [
   "kitsune_p2p_transport_quic/sqlite",
   "kitsune_p2p_types/sqlite",
 ]
+
+otel = [
+  "holochain_trace/otel"  
+]

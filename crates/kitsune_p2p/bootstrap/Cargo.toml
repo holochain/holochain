@@ -25,6 +25,7 @@ serde_bytes = "0.11"
 serde_json = { version = "1", features = [ "preserve_order" ] }
 tokio = { version = "1", features = ["full"] }
 warp = "0.3"
+holochain_trace = { version = "^0.3.0-beta-dev.0", path = "../../holochain_trace", optional = true }
 
 [dev-dependencies]
 kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite"] }
@@ -50,4 +51,8 @@ sqlite-encrypted = [
 ]
 sqlite = [
     "kitsune_p2p_types/sqlite",
+]
+
+otel = [
+    "holochain_trace/otel"
 ]

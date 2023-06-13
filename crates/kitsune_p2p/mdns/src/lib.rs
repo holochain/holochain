@@ -62,6 +62,9 @@ pub fn mdns_create_broadcast_thread(
     //);
     // Create thread
     let _handle = tokio::task::spawn(async move {
+        #[cfg(feature = "otel")]
+        let task_run_metric = holochain_trace::metric::TaskRunMetric::new("mdns_broadcast");
+
         // Split buffer to fix TXT max size
         let mut substrs = Vec::new();
         while b64.len() > MAX_TXT_SIZE {
@@ -78,6 +81,10 @@ pub fn mdns_create_broadcast_thread(
         // Loop forever unless termination command received
         loop {
             tokio::time::sleep(::std::time::Duration::from_secs(BROADCAST_INTERVAL_SEC)).await;
+
+            #[cfg(feature = "otel")]
+            task_run_metric.record_start();
+
             if !can_run_clone.load(Ordering::Relaxed) {
                 //println!("Terminating.");
                 break;

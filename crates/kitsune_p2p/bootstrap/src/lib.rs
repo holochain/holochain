@@ -48,10 +48,17 @@ pub async fn run_with_prune_freq(
     let store = Store::new(proxy_list);
 
     {
+        #[cfg(feature = "otel")]
+        let task_run_metric = holochain_trace::metric::TaskRunMetric::new("bootstrap_prune");
+
         let store = store.clone();
         tokio::task::spawn(async move {
             loop {
                 tokio::time::sleep(prune_frequency).await;
+
+                #[cfg(feature = "otel")]
+                task_run_metric.record_start();
+
                 store.prune();
             }
         });

@@ -167,10 +167,17 @@ impl MetricExchangeSync {
         {
             let mx = out.clone();
             tokio::task::spawn(async move {
+                #[cfg(feature = "otel")]
+                let task_run_metric =
+                    holochain_trace::metric::TaskRunMetric::new("metric_exchange_sync");
+
                 let mut last_extrap_cov = ShouldTrigger::new(EXTRAP_COV_CHECK_FREQ);
 
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+                    #[cfg(feature = "otel")]
+                    task_run_metric.record_start();
 
                     if last_extrap_cov.should_trigger() {
                         let arc_set = mx.read().arc_set.clone();

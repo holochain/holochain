@@ -93,6 +93,8 @@ mod fmt;
 pub mod metrics;
 mod writer;
 // mod open;
+#[cfg(feature = "otel")]
+pub mod metric;
 
 // #[cfg(all(feature = "opentelemetry-on", feature = "channels"))]
 // pub use open::channel;
