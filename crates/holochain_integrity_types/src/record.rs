@@ -12,6 +12,7 @@ use holo_hash::ActionHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
+use holo_hash::PrimitiveHashType;
 use holochain_serialized_bytes::prelude::*;
 
 /// a chain record containing the signed action along with the
@@ -311,6 +312,19 @@ impl SignedActionHashed {
         let action = content.into();
         let hashed = ActionHashed::with_pre_hashed(action, hash);
         Self { hashed, signature }
+    }
+}
+
+impl<C: HashableContent<HashType = T>, T: PrimitiveHashType> HashableContent for SignedHashed<C> {
+    type HashType = C::HashType;
+
+    fn hash_type(&self) -> Self::HashType {
+        T::new()
+    }
+
+    fn hashable_content(&self) -> holo_hash::HashableContentBytes {
+        use holo_hash::HasHash;
+        holo_hash::HashableContentBytes::Prehashed39(self.hashed.as_hash().get_raw_39().to_vec())
     }
 }
 

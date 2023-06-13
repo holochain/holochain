@@ -30,6 +30,8 @@ use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
+use holochain_types::prelude::AddRecordPayload;
+use holochain_types::prelude::ChcResult;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::sql::AsSql;
 use holochain_types::EntryHashed;
@@ -298,23 +300,29 @@ impl SourceChain {
         if self.scratch.apply(|s| s.is_empty())? {
             return Ok(Vec::new());
         }
-        let (scheduled_fns, actions, ops, entries) = self.scratch.apply_and_then(|scratch| {
-            let (actions, ops) =
-                build_ops_from_actions(scratch.drain_actions().collect::<Vec<_>>())?;
+        let (scheduled_fns, actions, ops, entries, records) =
+            self.scratch.apply_and_then(|scratch| {
+                let records: Vec<Record> = scratch.records().collect();
 
-            // Drain out any entries.
-            let entries = scratch.drain_entries().collect::<Vec<_>>();
-            let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
-            SourceChainResult::Ok((scheduled_fns, actions, ops, entries))
-        })?;
+                let (actions, ops) =
+                    build_ops_from_actions(scratch.drain_actions().collect::<Vec<_>>())?;
+
+                // Drain out any entries.
+                let entries = scratch.drain_entries().collect::<Vec<_>>();
+                let scheduled_fns = scratch.drain_scheduled_fns().collect::<Vec<_>>();
+                SourceChainResult::Ok((scheduled_fns, actions, ops, entries, records))
+            })?;
 
         // Sync with CHC, if CHC is present
         if let Some(chc) = network.chc() {
-            chc.add_entries(entries.clone())
-                .await
-                .map_err(SourceChainError::other)?;
-            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_actions(actions.clone()).await
-            {
+            let payload = AddRecordPayload::from_records(
+                self.keystore.clone(),
+                (*self.author).clone(),
+                records,
+            )
+            .await
+            .map_err(SourceChainError::other)?;
+            if let Err(err @ ChcError::OutOfSync(_, _)) = chc.add_records(payload).await {
                 return Err(SourceChainError::ChcHeadMoved(
                     "SourceChain::flush".into(),
                     err,
@@ -1055,9 +1063,9 @@ pub async fn genesis(
     let dna_action = ActionHashed::from_content_sync(dna_action);
     let dna_action = SignedActionHashed::sign(&keystore, dna_action).await?;
     let dna_action_address = dna_action.as_hash().clone();
-    let record = Record::new(dna_action, None);
-    let dna_ops = produce_op_lights_from_records(vec![&record])?;
-    let (dna_action, _) = record.into_inner();
+    let dna_record = Record::new(dna_action, None);
+    let dna_ops = produce_op_lights_from_records(vec![&dna_record])?;
+    let (dna_action, _) = dna_record.clone().into_inner();
 
     // create the agent validation entry and add it directly to the store
     let agent_validation_action = Action::AgentValidationPkg(action::AgentValidationPkg {
@@ -1071,9 +1079,9 @@ pub async fn genesis(
     let agent_validation_action =
         SignedActionHashed::sign(&keystore, agent_validation_action).await?;
     let avh_addr = agent_validation_action.as_hash().clone();
-    let record = Record::new(agent_validation_action, None);
-    let avh_ops = produce_op_lights_from_records(vec![&record])?;
-    let (agent_validation_action, _) = record.into_inner();
+    let agent_validation_record = Record::new(agent_validation_action, None);
+    let avh_ops = produce_op_lights_from_records(vec![&agent_validation_record])?;
+    let (agent_validation_action, _) = agent_validation_record.clone().into_inner();
 
     // create a agent chain record and add it directly to the store
     let agent_action = Action::Create(action::Create {
@@ -1088,28 +1096,23 @@ pub async fn genesis(
     });
     let agent_action = ActionHashed::from_content_sync(agent_action);
     let agent_action = SignedActionHashed::sign(&keystore, agent_action).await?;
-    let record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
-    let agent_ops = produce_op_lights_from_records(vec![&record])?;
-    let (agent_action, agent_entry) = record.into_inner();
+    let agent_record = Record::new(agent_action, Some(Entry::Agent(agent_pubkey.clone())));
+    let agent_ops = produce_op_lights_from_records(vec![&agent_record])?;
+    let (agent_action, agent_entry) = agent_record.clone().into_inner();
     let agent_entry = agent_entry.into_option();
 
     let mut ops_to_integrate = Vec::new();
 
     if let Some(chc) = chc {
-        chc.add_entries(vec![EntryHashed::from_content_sync(Entry::Agent(
-            agent_pubkey,
-        ))])
+        let payload = AddRecordPayload::from_records(
+            keystore.clone(),
+            agent_pubkey.clone(),
+            vec![dna_record, agent_validation_record, agent_record],
+        )
         .await
         .map_err(SourceChainError::other)?;
-        match chc
-            .add_actions(vec![
-                dna_action.clone(),
-                agent_validation_action.clone(),
-                agent_action.clone(),
-            ])
-            .await
-        {
-            Err(e @ ChcError::InvalidChain(_, _)) => {
+        match chc.add_records(payload).await {
+            Err(e @ ChcError::OutOfSync(_, _)) => {
                 Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
             }
             e => e.map_err(SourceChainError::other),

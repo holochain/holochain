@@ -7,6 +7,7 @@ use crate::activity::ChainItems;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
+use holo_hash::HashableContent;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::ChainStatus;
 use holochain_zome_types::ActionHashed;
