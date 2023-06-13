@@ -13,7 +13,7 @@ default = []
 # default = ["opentelemetry-on"]
 # Allows across thread and process tracing
 # opentelemetry-on = ["opentelemetry", "tracing-opentelemetry", "holochain_serialized_bytes", "serde", "serde_bytes"]
-otel = ["dep:opentelemetry", "dep:opentelemetry-stdout"]
+otel = ["dep:opentelemetry", "dep:opentelemetry_stdout"]
 channels = ["tokio", "shrinkwraprs"]
 
 [dependencies]
@@ -27,8 +27,9 @@ tracing-core = "0.1.30"
 tracing-serde = "0.1.3"
 tracing-subscriber = { version = "0.3.16", features = [ "env-filter", "time", "json" ] }
 
-opentelemetry = { git = "https://github.com/open-telemetry/opentelemetry-rust.git", features = ["metrics", "rt-tokio"], optional = true }
-opentelemetry-stdout = { git = "https://github.com/open-telemetry/opentelemetry-rust.git", features = ["metrics"], optional = true }
+# Publish of the upcoming version of opentelemetry, they are slow to publish changes. Switch to 0.20.x when it is released
+opentelemetry = { version = "0.20.0-beta.1", features = ["metrics", "rt-tokio"], package = "ts_opentelemetry", optional = true }
+opentelemetry_stdout = { version = "0.1.0-beta.1", features = ["metrics"], package = "ts_opentelemetry_stdout", optional = true }
 # tracing-opentelemetry = { version = "0.8.0", optional = true }
 holochain_serialized_bytes = {version = "0.0", optional = true }
 serde = { version = "1", optional = true }

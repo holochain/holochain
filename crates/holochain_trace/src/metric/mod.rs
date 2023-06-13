@@ -1,4 +1,4 @@
-//! Wrappers for working with OTEL metrics
+//! Wrappers for working with OpenTelemetry metrics
 
 mod init;
 mod task_run;

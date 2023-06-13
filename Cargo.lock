@@ -3039,8 +3039,6 @@ dependencies = [
  "holochain_serialized_bytes",
  "inferno",
  "once_cell",
- "opentelemetry",
- "opentelemetry-stdout",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3052,6 +3050,8 @@ dependencies = [
  "tracing-futures",
  "tracing-serde",
  "tracing-subscriber",
+ "ts_opentelemetry",
+ "ts_opentelemetry_stdout",
 ]
 
 [[package]]
@@ -4893,64 +4893,6 @@ dependencies = [
  "openssl-src",
  "pkg-config",
  "vcpkg",
-]
-
-[[package]]
-name = "opentelemetry"
-version = "0.19.0"
-source = "git+https://github.com/open-telemetry/opentelemetry-rust.git#00641fb01de4411bbac77f161f5d7b2baec69f00"
-dependencies = [
- "opentelemetry_api",
- "opentelemetry_sdk",
-]
-
-[[package]]
-name = "opentelemetry-stdout"
-version = "0.1.0"
-source = "git+https://github.com/open-telemetry/opentelemetry-rust.git#00641fb01de4411bbac77f161f5d7b2baec69f00"
-dependencies = [
- "async-trait",
- "opentelemetry_api",
- "opentelemetry_sdk",
- "ordered-float",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "opentelemetry_api"
-version = "0.19.0"
-source = "git+https://github.com/open-telemetry/opentelemetry-rust.git#00641fb01de4411bbac77f161f5d7b2baec69f00"
-dependencies = [
- "futures-channel",
- "futures-util",
- "indexmap",
- "js-sys",
- "once_cell",
- "pin-project-lite",
- "thiserror",
- "urlencoding",
-]
-
-[[package]]
-name = "opentelemetry_sdk"
-version = "0.19.0"
-source = "git+https://github.com/open-telemetry/opentelemetry-rust.git#00641fb01de4411bbac77f161f5d7b2baec69f00"
-dependencies = [
- "async-trait",
- "crossbeam-channel",
- "futures-channel",
- "futures-executor",
- "futures-util",
- "once_cell",
- "opentelemetry_api",
- "ordered-float",
- "percent-encoding 2.2.0",
- "rand 0.8.5",
- "regex",
- "thiserror",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -7650,6 +7592,68 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "termcolor",
+]
+
+[[package]]
+name = "ts_opentelemetry"
+version = "0.20.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "988161c8c59ad38eda33f242441100bd96a4310c09d043cdf0a830f9401ff32c"
+dependencies = [
+ "ts_opentelemetry_api",
+ "ts_opentelemetry_sdk",
+]
+
+[[package]]
+name = "ts_opentelemetry_api"
+version = "0.20.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d186495330f646b5881aeb3b83bac75b8a462d7ef32fda06a2a68f3869d5ba82"
+dependencies = [
+ "futures-channel",
+ "futures-util",
+ "indexmap",
+ "js-sys",
+ "once_cell",
+ "pin-project-lite",
+ "thiserror",
+ "urlencoding",
+]
+
+[[package]]
+name = "ts_opentelemetry_sdk"
+version = "0.20.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b26b9d08e0eeba804aa5d3b1a720bc47ae831a034869569030e25a5bcd006f46"
+dependencies = [
+ "async-trait",
+ "crossbeam-channel",
+ "futures-channel",
+ "futures-executor",
+ "futures-util",
+ "once_cell",
+ "ordered-float",
+ "percent-encoding 2.2.0",
+ "rand 0.8.5",
+ "regex",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "ts_opentelemetry_api",
+]
+
+[[package]]
+name = "ts_opentelemetry_stdout"
+version = "0.1.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2229fc8f126fcba3b4329b224bd5f724ceadd6df47c6ea9086c44d0e3c46c29"
+dependencies = [
+ "async-trait",
+ "ordered-float",
+ "serde",
+ "serde_json",
+ "ts_opentelemetry_api",
+ "ts_opentelemetry_sdk",
 ]
 
 [[package]]
