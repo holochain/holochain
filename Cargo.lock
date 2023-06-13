@@ -3066,7 +3066,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -6198,6 +6198,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-webpki"
+version = "0.100.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6207cd5ed3d8dca7816f8f3725513a34609c0c765bf652b8c3cb4cfd87db46b"
+dependencies = [
+ "ring",
+ "untrusted",
+]
+
+[[package]]
 name = "rustversion"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7604,9 +7614,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.1-alpha.16"
+version = "0.0.1-alpha.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68877bfd419597a6aba9269a8890bad5fa0519af523252d529fa48afe52dd186"
+checksum = "54f5df4bf08ddcfd702f1b6a46f7ba81feaa55c4dc53685d02cb29c3fc1a0f2d"
 dependencies = [
  "bytes",
  "futures",
@@ -7644,9 +7654,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.1-alpha.10"
+version = "0.0.1-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "086338e5770a83d0811ac18bddfbfb3f70240796c34b682e3c25df3a22faf358"
+checksum = "15d7118da8a1353717e9a42b21d922933097c069e13ef8547c7be07efa8ea8a8"
 dependencies = [
  "parking_lot 0.12.1",
  "tokio",
@@ -7694,9 +7704,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.1-alpha.9"
+version = "0.0.1-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f3c853c5f4203d1d26d22cfac3b57980c7146c1f289dc7a26334ff7725b8e42"
+checksum = "7e26fee2c1c3e227c8bae711545c7536d17a508af0a5e317296cce18afaff5b7"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -7718,6 +7728,7 @@ dependencies = [
  "tracing",
  "tx5-core",
  "url 2.3.1",
+ "webpki-roots 0.23.1",
 ]
 
 [[package]]
@@ -7854,7 +7865,7 @@ dependencies = [
  "rustls",
  "url 2.3.1",
  "webpki 0.22.0",
- "webpki-roots",
+ "webpki-roots 0.22.6",
 ]
 
 [[package]]
@@ -8471,6 +8482,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c71e40d7d2c34a5106301fb632274ca37242cd0c9d3e64dbece371a40a2d87"
 dependencies = [
  "webpki 0.22.0",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b03058f88386e5ff5310d9111d53f48b17d732b401aeb83a8d5190f2ac459338"
+dependencies = [
+ "rustls-webpki",
 ]
 
 [[package]]
