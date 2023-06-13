@@ -225,6 +225,11 @@ impl Action {
         }
     }
 
+    pub fn entry_visibility(&self) -> Option<&EntryVisibility> {
+        self.entry_data()
+            .map(|(_, entry_type)| entry_type.visibility())
+    }
+
     pub fn entry_hash(&self) -> Option<&EntryHash> {
         self.entry_data().map(|d| d.0)
     }

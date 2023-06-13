@@ -945,7 +945,7 @@ where
                             Some(DhtOp::StoreEntry(
                                 shh.signature().clone(),
                                 shh.action().clone().try_into().ok()?,
-                                Box::new((**entry).clone()),
+                                (**entry).clone(),
                             ))
                         })
                 })
