@@ -484,6 +484,7 @@ async fn cancel_response() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
+#[ignore = "takes at least 45s, please run me occasionally"]
 async fn can_handle_many_connections_and_disconnects() {
     holochain_trace::test_run().ok();
     let (handle, listener) = server().await;
@@ -493,7 +494,7 @@ async fn can_handle_many_connections_and_disconnects() {
     let b2 = binding.clone();
     tokio::spawn(async move {
         let mut senders = Vec::new();
-        for i in 0..10_000 {
+        for i in 0..100_000 {
             if i % 800 == 0 {
                 senders.clear();
             }
