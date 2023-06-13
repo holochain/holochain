@@ -1,19 +1,25 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::sync::Arc;
 
+use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 
 use crate::core::validate_chain;
 
 /// Mutable wrapper around local CHC
-pub struct ChcLocal<A: ChainItem = SignedActionHashed>(parking_lot::Mutex<ChcLocalInner<A>>);
+pub struct ChcLocal<A: ChainItem = SignedActionHashed> {
+    inner: parking_lot::Mutex<ChcLocalInner<A>>,
+    keystore: MetaLairClient,
+    agent: AgentPubKey,
+}
 
 impl<A: ChainItem> ChcLocal<A> {
     /// Constructor
-    pub fn new() -> Self {
-        Self(parking_lot::Mutex::new(Default::default()))
+    pub fn new(keystore: MetaLairClient, agent: AgentPubKey) -> Self {
+        Self {
+            inner: parking_lot::Mutex::new(Default::default()),
+            keystore,
+            agent,
+        }
     }
 }
 
@@ -34,8 +40,8 @@ impl<A: ChainItem> Default for ChcLocalInner<A> {
 impl ChainHeadCoordinator for ChcLocal {
     type Item = SignedActionHashed;
 
-    async fn add_records(&self, request: AddRecordsRequest) -> ChcResult<()> {
-        let mut m = self.0.lock();
+    async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()> {
+        let mut m = self.inner.lock();
         let head = m
             .records
             .last()
@@ -43,21 +49,22 @@ impl ChainHeadCoordinator for ChcLocal {
         let actions = request.iter().map(|r| &r.action);
         validate_chain(actions, &head).map_err(|e| {
             let (hash, seq) = head.unwrap();
-            ChcError::OutOfSync(seq, hash)
+            ChcError::InvalidChain(seq, hash, e.to_string())
         })?;
         m.records.extend(request);
         Ok(())
     }
 
-    async fn get_record_data(
+    async fn get_record_data_request(
         &self,
         request: GetRecordsRequest,
     ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>> {
-        let m = self.0.lock();
+        let m = self.inner.lock();
         let records = if let Some(hash) = request.payload.since_hash.as_ref() {
             m.records
                 .iter()
                 .skip_while(|r| hash != r.action.get_hash())
+                .skip(1)
                 .cloned()
                 .collect()
         } else {
@@ -75,10 +82,16 @@ impl ChainHeadCoordinator for ChcLocal {
     }
 }
 
+impl ChainHeadCoordinatorExt for ChcLocal {
+    fn signing_info(&self) -> (MetaLairClient, AgentPubKey) {
+        (self.keystore.clone(), self.agent.clone())
+    }
+}
+
 impl ChcLocal {
     /// Just get the top hash
     pub fn head(&self) -> Option<ActionHash> {
-        self.0
+        self.inner
             .lock()
             .records
             .last()
@@ -88,8 +101,8 @@ impl ChcLocal {
 
 #[cfg(test)]
 mod tests {
-    use futures::FutureExt;
     use holochain_conductor_api::conductor::ConductorConfig;
+    use isotest::Iso;
 
     use crate::{
         conductor::chc::{CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
@@ -97,6 +110,7 @@ mod tests {
     };
 
     use super::*;
+    use ChainHeadCoordinatorExt;
 
     use ::fixt::prelude::*;
     use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
@@ -105,64 +119,63 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_add_actions() {
-        isotest::isotest_async!(TestChainItem, TestChainHash => |iso_a, iso_h| async move {
-            let chc = ChcLocal::new();
-            assert_eq!(chc.head(), None);
+        let keystore = test_keystore();
+        let agent = fake_agent_pubkey_1();
+        let chc = Arc::new(ChcLocal::new(keystore, agent));
+        assert_eq!(chc.head(), None);
 
-            let hash = |x| iso_h.create(TestChainHash(x));
-            let item = |x| iso_a.create(TestChainItem::new(x));
+        let hash = |x| TestChainHash(x).real();
+        let item = |x| Record::new(TestChainItem::new(x).real(), None);
 
-            let items = |i: &[u32]| i.into_iter().copied().map(item).collect::<Vec<_>>();
+        let items = |i: &[u32]| i.into_iter().copied().map(item).collect::<Vec<_>>();
 
-            let t0 = items(&[0, 1, 2]);
-            let t1 = items(&[3, 4, 5]);
-            let t2 = items(&[6, 7, 8]);
-            let t99 = items(&[99]);
+        let t0 = items(&[0, 1, 2]);
+        let t1 = items(&[3, 4, 5]);
+        let t2 = items(&[6, 7, 8]);
+        let t99 = items(&[99]);
 
-            chc.add_actions(t0.clone()).await.unwrap();
-            assert_eq!(chc.head().unwrap(), hash(2));
-            chc.add_actions(t1.clone()).await.unwrap();
-            assert_eq!(chc.head().unwrap(), hash(5));
+        chc.clone().add_records(t0.clone()).await.unwrap();
+        assert_eq!(chc.clone().head().unwrap(), hash(2));
+        chc.clone().add_records(t1.clone()).await.unwrap();
+        assert_eq!(chc.clone().head().unwrap(), hash(5));
 
-            // last_hash doesn't match
-            assert!(chc.add_actions(t0.clone()).await.is_err());
-            assert!(chc.add_actions(t1.clone()).await.is_err());
-            assert!(chc.add_actions(t99).await.is_err());
-            assert_eq!(chc.head().unwrap(), hash(5));
+        // last_hash doesn't match
+        assert!(chc.clone().add_records(t0.clone()).await.is_err());
+        assert!(chc.clone().add_records(t1.clone()).await.is_err());
+        assert!(chc.clone().add_records(t99).await.is_err());
+        assert_eq!(chc.clone().head().unwrap(), hash(5));
 
-            chc.add_actions(t2.clone()).await.unwrap();
-            assert_eq!(chc.head().unwrap(), hash(8));
+        chc.clone().add_records(t2.clone()).await.unwrap();
+        assert_eq!(chc.clone().head().unwrap(), hash(8));
 
-            assert_eq!(
-                chc.get_actions_since_hash(None).await.unwrap(),
-                items(&[0, 1, 2, 3, 4, 5, 6, 7, 8])
-            );
-            assert_eq!(
-                chc.get_actions_since_hash(Some(hash(0))).await.unwrap(),
-                items(&[1, 2, 3, 4, 5, 6, 7, 8])
-            );
-            assert_eq!(
-                chc.get_actions_since_hash(Some(hash(3))).await.unwrap(),
-                items(&[4, 5, 6, 7, 8])
-            );
-            assert_eq!(
-                chc.get_actions_since_hash(Some(hash(7))).await.unwrap(),
-                items(&[8])
-            );
-            assert_eq!(
-                chc.get_actions_since_hash(Some(hash(8))).await.unwrap(),
-                items(&[])
-            );
-            assert_eq!(
-                chc.get_actions_since_hash(Some(hash(9))).await.unwrap(),
-                items(&[0, 1, 2, 3, 4, 5, 6, 7, 8])
-            );
-            assert_eq!(
-                chc.get_actions_since_hash(Some(hash(33))).await.unwrap(),
-                items(&[0, 1, 2, 3, 4, 5, 6, 7, 8])
-            );
-        }
-        .boxed());
+        assert_eq!(
+            chc.clone().get_record_data(None).await.unwrap(),
+            items(&[0, 1, 2, 3, 4, 5, 6, 7, 8])
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(0))).await.unwrap(),
+            items(&[1, 2, 3, 4, 5, 6, 7, 8])
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(3))).await.unwrap(),
+            items(&[4, 5, 6, 7, 8])
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(7))).await.unwrap(),
+            items(&[8])
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(8))).await.unwrap(),
+            items(&[])
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(9))).await.unwrap(),
+            items(&[])
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(33))).await.unwrap(),
+            items(&[])
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -200,7 +213,7 @@ mod tests {
             timestamp: Timestamp::now(),
             action_seq: 3,
             prev_action: top_hash,
-            entry_type: fixt!(EntryType),
+            entry_type: new_entry.entry_type(Some(fixt!(AppEntryDef))).unwrap(),
             entry_hash: new_entry_hash,
             weight: EntryRateWeight::default(),
         };
@@ -209,15 +222,15 @@ mod tests {
             .await
             .unwrap();
         let new_action_hash = new_action.action_address().clone();
+        let new_record = Record::new(new_action, Some(new_entry.into_content()));
 
         {
             // add some data to the local CHC
             let m = CHC_LOCAL_MAP.lock();
             let chc = m.get(&cell_id).unwrap();
-            let actions = chc.get_actions_since_hash(None).await.unwrap();
-            assert_eq!(actions.len(), 3);
-            chc.add_actions(vec![new_action]).await.unwrap();
-            chc.add_entries(vec![new_entry]).await.unwrap();
+            let records = chc.clone().get_record_data(None).await.unwrap();
+            assert_eq!(records.len(), 3);
+            chc.clone().add_records(vec![new_record]).await.unwrap();
         }
 
         // Check that a sync picks up the new action
@@ -273,10 +286,10 @@ mod tests {
         // It's not ideal to match on a string, but it seems like the only option:
         // - The pattern involves Boxes which are impossible to match on
         // - The error types are not PartialEq, so cannot be constructed and tested for equality
-        assert_eq!(
-            format!("{:?}", install_result_1),
-            r#"Err(ConductorError(GenesisFailed { errors: [ConductorApiError(WorkflowError(SourceChainError(ChcHeadMoved("genesis", InvalidChain(Some(2), "Action is not the first, so needs previous action")))))] }))"#
-        );
+
+        regex::Regex::new(
+            r#".*ChcHeadMoved\("genesis", InvalidChain\(2, ActionHash\([a-zA-Z0-9-_]+\), "Action is not the first, so needs previous action"\)\).*"#
+        ).unwrap().captures(&format!("{:?}", install_result_1)).unwrap();
         assert_eq!(
             format!("{:?}", install_result_1),
             format!("{:?}", install_result_2)
@@ -330,10 +343,9 @@ mod tests {
             )
             .await;
 
-        assert_eq!(
-            format!("{:?}", hash1),
-            r#"Err(CellError(WorkflowError(SourceChainError(ChcHeadMoved("SourceChain::flush", InvalidChain(Some(4), "The previous action hash specified in an action doesn't match the actual previous action. Seq: 3"))))))"#
-        );
+        regex::Regex::new(
+            r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\(4, ActionHash\([a-zA-Z0-9-_]+\), "The previous action hash specified in an action doesn't match the actual previous action. Seq: 3".*"#
+        ).unwrap().captures(&format!("{:?}", hash1)).unwrap();
 
         // This should trigger a CHC sync
         let hash2: Result<ActionHash, _> = conductors[2]

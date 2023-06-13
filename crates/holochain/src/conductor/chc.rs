@@ -1,5 +1,6 @@
 //! Types for Chain Head Coordination
 
+use holochain_keystore::MetaLairClient;
 use holochain_p2p::ChcImpl;
 use holochain_zome_types::CellId;
 use once_cell::sync::Lazy;
@@ -22,15 +23,19 @@ const CHC_LOCAL_MAGIC_URL: &'static str = "local:";
 /// In particular, if the url is the magic string "local:", then a [`ChcLocal`]
 /// implementation will be used. Otherwise, if the url is set, and the CellId
 /// is "CHC-enabled", then a [`ChcRemote`] will be produced.
-pub fn build_chc(url: Option<&Url2>, cell_id: &CellId) -> Option<ChcImpl> {
+pub fn build_chc(
+    url: Option<&Url2>,
+    keystore: MetaLairClient,
+    cell_id: &CellId,
+) -> Option<ChcImpl> {
     // TODO: check if the agent key is Holo-hosted, otherwise return none
     let is_holo_agent = true;
     if is_holo_agent {
         url.map(|url| {
             if url.as_str() == CHC_LOCAL_MAGIC_URL {
-                chc_local(cell_id.clone())
+                chc_local(keystore, cell_id.clone())
             } else {
-                chc_remote(url.clone().into(), cell_id)
+                chc_remote(url.clone().into(), keystore, cell_id)
             }
         })
     } else {
@@ -38,13 +43,14 @@ pub fn build_chc(url: Option<&Url2>, cell_id: &CellId) -> Option<ChcImpl> {
     }
 }
 
-fn chc_local(cell_id: CellId) -> ChcImpl {
+fn chc_local(keystore: MetaLairClient, cell_id: CellId) -> ChcImpl {
+    let agent = cell_id.agent_pubkey().clone();
     let mut m = CHC_LOCAL_MAP.lock();
     m.entry(cell_id)
-        .or_insert_with(|| Arc::new(ChcLocal::new()))
+        .or_insert_with(|| Arc::new(ChcLocal::new(keystore, agent)))
         .clone()
 }
 
-fn chc_remote(url: reqwest::Url, cell_id: &CellId) -> ChcImpl {
-    Arc::new(ChcRemote::new(url, cell_id))
+fn chc_remote(url: reqwest::Url, keystore: MetaLairClient, cell_id: &CellId) -> ChcImpl {
+    Arc::new(ChcRemote::new(url, keystore, cell_id))
 }

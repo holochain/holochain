@@ -580,7 +580,7 @@ pub async fn check_app_entry_def(
     // Check the visibility and return
     match entry_def {
         Some(entry_def) => {
-            if dbg!(entry_def).visibility == *dbg!(app_entry_def).visibility() {
+            if entry_def.visibility == *app_entry_def.visibility() {
                 Ok(())
             } else {
                 Err(ValidationOutcome::EntryVisibility(app_entry_def.clone()).into())

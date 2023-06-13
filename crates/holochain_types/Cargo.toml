@@ -27,6 +27,7 @@ fixt = { path = "../fixt", version = "^0.2.0-beta-rc.4"}
 flate2 = "1.0.14"
 futures = "0.3"
 one_err = "0.0.8"
+getrandom = { version = "0.2.7" }
 holo_hash = { version = "^0.3.0-beta-dev.2", path = "../holo_hash", features = ["encoding"] }
 holochain_keystore = { version = "^0.3.0-beta-dev.2", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.51"
@@ -61,6 +62,7 @@ derive_builder = "0.9.0"
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true}
 isotest = { version = "0", optional = true }
+
 
 # contrafact
 contrafact = { version = "0.2.0-dev.3", optional = true }

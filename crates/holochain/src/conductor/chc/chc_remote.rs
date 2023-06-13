@@ -3,16 +3,14 @@
 //! **NOTE** this API is not set in stone. Do not design a CHC against this API yet,
 //! as it will change!
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use ::bytes::Bytes;
-use holo_hash::{ActionHash, EntryHash};
+use holo_hash::AgentPubKey;
+use holochain_keystore::MetaLairClient;
 use holochain_types::{
     chc::{ChainHeadCoordinator, ChcError, ChcResult},
-    prelude::{AddRecordsRequest, EncryptedEntry, GetRecordsRequest},
+    prelude::{AddRecordsRequest, ChainHeadCoordinatorExt, EncryptedEntry, GetRecordsRequest},
 };
 use holochain_zome_types::prelude::*;
 use reqwest::Url;
@@ -20,13 +18,15 @@ use reqwest::Url;
 /// An HTTP client which can talk to a remote CHC implementation
 pub struct ChcRemote {
     client: ChcRemoteClient,
+    keystore: MetaLairClient,
+    agent: AgentPubKey,
 }
 
 #[async_trait::async_trait]
 impl ChainHeadCoordinator for ChcRemote {
     type Item = SignedActionHashed;
 
-    async fn add_records(&self, request: AddRecordsRequest) -> ChcResult<()> {
+    async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()> {
         let body = serde_json::to_string(&request)
             .map(|json| json.into_bytes())
             .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
@@ -34,7 +34,7 @@ impl ChainHeadCoordinator for ChcRemote {
         todo!("parse and handle response");
     }
 
-    async fn get_record_data(
+    async fn get_record_data_request(
         &self,
         request: GetRecordsRequest,
     ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>> {
@@ -46,9 +46,15 @@ impl ChainHeadCoordinator for ChcRemote {
     }
 }
 
+impl ChainHeadCoordinatorExt for ChcRemote {
+    fn signing_info(&self) -> (MetaLairClient, holo_hash::AgentPubKey) {
+        (self.keystore.clone(), self.agent.clone())
+    }
+}
+
 impl ChcRemote {
     /// Constructor
-    pub fn new(url: Url, cell_id: &CellId) -> Self {
+    pub fn new(url: Url, keystore: MetaLairClient, cell_id: &CellId) -> Self {
         todo!("Implement remote CHC client")
     }
 }

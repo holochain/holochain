@@ -31,10 +31,8 @@ use holochain_types::dht_op::DhtOpLight;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::dht_op::UniqueForm;
 use holochain_types::prelude::AddRecordPayload;
-use holochain_types::prelude::ChcResult;
 use holochain_types::record::SignedActionHashedExt;
 use holochain_types::sql::AsSql;
-use holochain_types::EntryHashed;
 use holochain_zome_types::action;
 use holochain_zome_types::query::ChainQueryFilterRange;
 use holochain_zome_types::Action;
@@ -322,7 +320,9 @@ impl SourceChain {
             )
             .await
             .map_err(SourceChainError::other)?;
-            if let Err(err @ ChcError::OutOfSync(_, _)) = chc.add_records(payload).await {
+            if let Err(err @ ChcError::InvalidChain(_, _, _)) =
+                chc.add_records_request(payload).await
+            {
                 return Err(SourceChainError::ChcHeadMoved(
                     "SourceChain::flush".into(),
                     err,
@@ -1111,8 +1111,8 @@ pub async fn genesis(
         )
         .await
         .map_err(SourceChainError::other)?;
-        match chc.add_records(payload).await {
-            Err(e @ ChcError::OutOfSync(_, _)) => {
+        match chc.add_records_request(payload).await {
+            Err(e @ ChcError::InvalidChain(_, _, _)) => {
                 Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
             }
             e => e.map_err(SourceChainError::other),

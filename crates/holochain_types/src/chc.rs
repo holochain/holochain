@@ -1,25 +1,17 @@
 //! Defines the Chain Head Coordination API.
-//!
-//! **NOTE** this API is not set in stone. Do not design a CHC against this API yet,
-//! as it will change!
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-    sync::Arc,
-};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
+use futures::FutureExt;
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
 use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_zome_types::prelude::*;
+use must_future::MustBoxFuture;
 
 use crate::chain::ChainItem;
 
 /// The API which a Chain Head Coordinator service must implement.
-///
-/// **NOTE** this API is currently loosely defined and will certainly change
-/// in the future. Do not write a real CHC according to this spec!
 #[async_trait::async_trait]
 pub trait ChainHeadCoordinator {
     /// The item which the chain is made of.
@@ -33,13 +25,63 @@ pub trait ChainHeadCoordinator {
     /// If the records added would result in a fork, then a [`ChcError::OutOfSync`] will be returned
     /// along with the current
     // If there is an out-of-sync error, it will return a hash, designating the point of fork.
-    async fn add_records(&self, request: AddRecordsRequest) -> ChcResult<()>;
+    async fn add_records_request(&self, request: AddRecordsRequest) -> ChcResult<()>;
 
-    /// Get actions including and beyond the given hash.
-    async fn get_record_data(
+    /// Get actions after (not including) the given hash.
+    async fn get_record_data_request(
         &self,
         request: GetRecordsRequest,
     ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>>;
+}
+
+/// Add some convenience methods to the CHC trait
+pub trait ChainHeadCoordinatorExt:
+    'static + Send + Sync + ChainHeadCoordinator<Item = SignedActionHashed>
+{
+    /// Get info necessary for signing
+    fn signing_info(&self) -> (MetaLairClient, AgentPubKey);
+
+    /// More convenient way to call `add_records_request`
+    fn add_records(self: Arc<Self>, records: Vec<Record>) -> MustBoxFuture<'static, ChcResult<()>> {
+        let (keystore, agent) = self.signing_info();
+        let this = self.clone();
+        async move {
+            this.add_records_request(
+                AddRecordPayload::from_records(keystore, agent, records).await?,
+            )
+            .await
+        }
+        .boxed()
+        .into()
+    }
+
+    /// More convenient way to call `get_record_data_request`
+    fn get_record_data(
+        self: Arc<Self>,
+        since_hash: Option<ActionHash>,
+    ) -> MustBoxFuture<'static, ChcResult<Vec<Record>>> {
+        let mut bytes = [0; 32];
+        let _ = getrandom::getrandom(&mut bytes);
+        let nonce = Nonce256Bits::from(bytes);
+        let payload = GetRecordsPayload { since_hash, nonce };
+        let signature = Signature::from([0; 64]);
+        let this = self.clone();
+        async move {
+            this.get_record_data_request(GetRecordsRequest { payload, signature })
+                .await?
+                .into_iter()
+                .map(|(a, me)| {
+                    Ok(Record::new(
+                        a,
+                        me.map(|(e, _s)| holochain_serialized_bytes::decode(&e.0))
+                            .transpose()?,
+                    ))
+                })
+                .collect()
+        }
+        .boxed()
+        .into()
+    }
 }
 
 /// A Record to be added to the CHC.
@@ -174,8 +216,8 @@ pub enum ChcError {
     /// The out of sync error only happens when you attempt to add actions
     /// that would cause a fork with respect to the CHC. This can be remedied
     /// by syncing.
-    #[error("Local chain is out of sync with the CHC. The CHC head has advanced beyond the first action provided in the `add_records` request. Try calling `get_record_data` from hash {1} (sequence #{0})")]
-    OutOfSync(u32, ActionHash),
+    #[error("Local chain is out of sync with the CHC. The CHC head has advanced beyond the first action provided in the `add_records` request. Try calling `get_record_data` from hash {1} (sequence #{0}). Validation error: {2}")]
+    InvalidChain(u32, ActionHash, String),
 
     /// All other errors are due to an invalid request, which is a mistake
     /// that can't be remedied other than by fixing the programming mistake
