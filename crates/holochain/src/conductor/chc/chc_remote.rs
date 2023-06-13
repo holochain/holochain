@@ -3,53 +3,46 @@
 //! **NOTE** this API is not set in stone. Do not design a CHC against this API yet,
 //! as it will change!
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use ::bytes::Bytes;
 use holo_hash::{ActionHash, EntryHash};
-use holochain_serialized_bytes::{decode, encode};
-use holochain_types::chc::{ChainHeadCoordinator, ChcError, ChcResult};
+use holochain_types::{
+    chc::{ChainHeadCoordinator, ChcError, ChcResult},
+    prelude::{AddRecordsRequest, EncryptedEntry, GetRecordsRequest},
+};
 use holochain_zome_types::prelude::*;
 use reqwest::Url;
 
 /// An HTTP client which can talk to a remote CHC implementation
 pub struct ChcRemote {
-    actions: ChcRemoteClient,
-    entries: ChcRemoteClient,
+    client: ChcRemoteClient,
 }
 
 #[async_trait::async_trait]
 impl ChainHeadCoordinator for ChcRemote {
     type Item = SignedActionHashed;
 
-    async fn head(&self) -> ChcResult<Option<ActionHash>> {
-        let response = self.actions.get("/head").await?;
-        Ok(decode(&response)?)
+    async fn add_records(&self, request: AddRecordsRequest) -> ChcResult<()> {
+        let body = serde_json::to_string(&request)
+            .map(|json| json.into_bytes())
+            .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
+        let response = self.client.post("/add_records", body).await?;
+        todo!("parse and handle response");
     }
 
-    async fn add_actions(&self, actions: Vec<Self::Item>) -> ChcResult<()> {
-        let body = encode(&actions)?;
-        let _response = self.actions.post("/add_actions", body).await?;
-        Ok(())
-    }
-
-    async fn add_entries(&self, entries: Vec<EntryHashed>) -> ChcResult<()> {
-        let body = encode(&entries)?;
-        let _response = self.entries.post("/add_entries", body).await?;
-        Ok(())
-    }
-
-    async fn get_actions_since_hash(&self, hash: Option<ActionHash>) -> ChcResult<Vec<Self::Item>> {
-        let body = encode(&hash)?;
-        let response = self.actions.post("/get_actions_since_hash", body).await?;
-        Ok(decode(&response)?)
-    }
-
-    async fn get_entries(
+    async fn get_record_data(
         &self,
-        _hashes: HashSet<&EntryHash>,
-    ) -> ChcResult<HashMap<EntryHash, Entry>> {
-        todo!()
+        request: GetRecordsRequest,
+    ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>> {
+        let body = serde_json::to_string(&request)
+            .map(|json| json.into_bytes())
+            .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
+        let response = self.client.post("/get_record_data", body).await?;
+        todo!("parse and handle response");
     }
 }
 

@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use holochain_types::prelude::*;
 
@@ -16,82 +19,70 @@ impl<A: ChainItem> ChcLocal<A> {
 
 /// A local Rust implementation of a CHC, for testing purposes only.
 pub struct ChcLocalInner<A: ChainItem = SignedActionHashed> {
-    actions: Vec<A>,
-    entries: HashMap<EntryHash, Entry>,
+    records: Vec<AddRecordPayload<A>>,
 }
 
 impl<A: ChainItem> Default for ChcLocalInner<A> {
     fn default() -> Self {
         Self {
-            actions: Default::default(),
-            entries: Default::default(),
+            records: Default::default(),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<A: ChainItem> ChainHeadCoordinator for ChcLocal<A> {
-    type Item = A;
+impl ChainHeadCoordinator for ChcLocal {
+    type Item = SignedActionHashed;
 
-    async fn head(&self) -> ChcResult<Option<A::Hash>> {
-        Ok(self.0.lock().actions.last().map(|a| a.get_hash().clone()))
-    }
-
-    async fn add_actions(&self, new_actions: Vec<A>) -> ChcResult<()> {
+    async fn add_records(&self, request: AddRecordsRequest) -> ChcResult<()> {
         let mut m = self.0.lock();
-        let head = m.actions.last().map(|a| (a.get_hash().clone(), a.seq()));
-        let seq = head.as_ref().map(|h| h.1);
-        validate_chain(new_actions.iter(), &head)
-            .map_err(|e| ChcError::InvalidChain(seq, e.to_string()))?;
-        m.actions.extend(new_actions);
+        let head = m
+            .records
+            .last()
+            .map(|r| (r.action.get_hash().clone(), r.action.seq()));
+        let actions = request.iter().map(|r| &r.action);
+        validate_chain(actions, &head).map_err(|e| {
+            let (hash, seq) = head.unwrap();
+            ChcError::OutOfSync(seq, hash)
+        })?;
+        m.records.extend(request);
         Ok(())
     }
 
-    async fn add_entries(&self, entries: Vec<EntryHashed>) -> ChcResult<()> {
-        let mut m = self.0.lock();
-        m.entries
-            .extend(entries.into_iter().map(|e| swap2(e.into_inner())));
-        Ok(())
-    }
-
-    async fn get_actions_since_hash(&self, hash: Option<A::Hash>) -> ChcResult<Vec<A>> {
-        let m = self.0.lock();
-        let result = if let Some(hash) = hash.as_ref() {
-            let mut actions = m.actions.iter().skip_while(|a| hash != a.get_hash());
-
-            if actions.next().is_none() {
-                m.actions.clone()
-            } else {
-                actions.cloned().collect()
-            }
-        } else {
-            m.actions.clone()
-        };
-        Ok(result)
-    }
-
-    async fn get_entries(
+    async fn get_record_data(
         &self,
-        mut hashes: HashSet<&EntryHash>,
-    ) -> ChcResult<HashMap<EntryHash, Entry>> {
+        request: GetRecordsRequest,
+    ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>> {
         let m = self.0.lock();
-        let entries = m
-            .entries
-            .iter()
-            .filter_map(|(h, e)| {
-                hashes.contains(h).then(|| {
-                    hashes.remove(h);
-                    (h.clone(), e.clone())
-                })
-            })
-            .collect();
-        if !hashes.is_empty() {
-            Err(ChcError::MissingEntries(
-                hashes.into_iter().cloned().collect(),
-            ))
+        let records = if let Some(hash) = request.payload.since_hash.as_ref() {
+            m.records
+                .iter()
+                .skip_while(|r| hash != r.action.get_hash())
+                .cloned()
+                .collect()
         } else {
-            Ok(entries)
-        }
+            m.records.clone()
+        };
+        Ok(records
+            .into_iter()
+            .map(
+                |AddRecordPayload {
+                     action,
+                     encrypted_entry,
+                 }| (action, encrypted_entry),
+            )
+            .collect())
+    }
+}
+
+impl ChcLocal {
+    /// Just get the top hash
+    pub fn head(&self) -> Option<ActionHash> {
+        self.0
+            .lock()
+            .records
+            .last()
+            .map(|r| r.action.get_hash().clone())
     }
 }
 
@@ -116,7 +107,7 @@ mod tests {
     async fn test_add_actions() {
         isotest::isotest_async!(TestChainItem, TestChainHash => |iso_a, iso_h| async move {
             let chc = ChcLocal::new();
-            assert_eq!(chc.head().await.unwrap(), None);
+            assert_eq!(chc.head(), None);
 
             let hash = |x| iso_h.create(TestChainHash(x));
             let item = |x| iso_a.create(TestChainItem::new(x));
@@ -129,18 +120,18 @@ mod tests {
             let t99 = items(&[99]);
 
             chc.add_actions(t0.clone()).await.unwrap();
-            assert_eq!(chc.head().await.unwrap().unwrap(), hash(2));
+            assert_eq!(chc.head().unwrap(), hash(2));
             chc.add_actions(t1.clone()).await.unwrap();
-            assert_eq!(chc.head().await.unwrap().unwrap(), hash(5));
+            assert_eq!(chc.head().unwrap(), hash(5));
 
             // last_hash doesn't match
             assert!(chc.add_actions(t0.clone()).await.is_err());
             assert!(chc.add_actions(t1.clone()).await.is_err());
             assert!(chc.add_actions(t99).await.is_err());
-            assert_eq!(chc.head().await.unwrap().unwrap(), hash(5));
+            assert_eq!(chc.head().unwrap(), hash(5));
 
             chc.add_actions(t2.clone()).await.unwrap();
-            assert_eq!(chc.head().await.unwrap().unwrap(), hash(8));
+            assert_eq!(chc.head().unwrap(), hash(8));
 
             assert_eq!(
                 chc.get_actions_since_hash(None).await.unwrap(),

@@ -6,6 +6,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    sync::Arc,
 };
 
 use holo_hash::{ActionHash, AgentPubKey, EntryHash};
@@ -32,14 +33,13 @@ pub trait ChainHeadCoordinator {
     /// If the records added would result in a fork, then a [`ChcError::OutOfSync`] will be returned
     /// along with the current
     // If there is an out-of-sync error, it will return a hash, designating the point of fork.
-    async fn add_records(&self, data: Vec<AddRecordPayload>) -> ChcResult<()>;
+    async fn add_records(&self, request: AddRecordsRequest) -> ChcResult<()>;
 
     /// Get actions including and beyond the given hash.
     async fn get_record_data(
         &self,
-        payload: GetRecordsPayload,
-        signature: Signature,
-    ) -> ChcResult<Vec<(SignedActionHashed, Option<(EncryptedEntry, Signature)>)>>;
+        request: GetRecordsRequest,
+    ) -> ChcResult<Vec<(SignedActionHashed, Option<(Arc<EncryptedEntry>, Signature)>)>>;
 }
 
 /// A Record to be added to the CHC.
@@ -49,14 +49,14 @@ pub trait ChainHeadCoordinator {
 /// is signed by the agent. This ensures that only the correct agent is adding
 /// records to its CHC. This EncryptedEntry signature is not used anywhere
 /// outside the context of the CHC.
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct AddRecordPayload {
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct AddRecordPayload<A = SignedActionHashed> {
     /// The signed, hashed Action for the Record
-    pub action: SignedActionHashed,
+    pub action: A,
 
     /// The entry, encrypted (TODO: by which key?), with the signature of
     /// of the encrypted bytes
-    pub encrypted_entry: Option<(EncryptedEntry, Signature)>,
+    pub encrypted_entry: Option<(Arc<EncryptedEntry>, Signature)>,
 }
 
 impl AddRecordPayload {
@@ -84,8 +84,6 @@ impl AddRecordPayload {
                                 "CHC is using unencrypted entry data. TODO: add encryption"
                             );
 
-                            let keystore = keystore.clone();
-
                             ChcResult::Ok(entry)
                         })
                         .transpose()?;
@@ -93,7 +91,7 @@ impl AddRecordPayload {
                         let signature = keystore
                             .sign(agent_pubkey.clone(), bytes.clone().into())
                             .await?;
-                        Some((bytes.into(), signature))
+                        Some((Arc::new(bytes.into()), signature))
                     } else {
                         None
                     };
@@ -110,6 +108,9 @@ impl AddRecordPayload {
     }
 }
 
+/// The request type for `add_records`
+pub type AddRecordsRequest = Vec<AddRecordPayload>;
+
 /// The request to retrieve records from the CHC.
 ///
 /// If a `since_hash` is specified, all records with sequence numbers at and
@@ -117,14 +118,22 @@ impl AddRecordPayload {
 /// given, then all records will be returned.
 ///
 /// Since this payload is signed, including a unique nonce helps prevent replay
-/// attacks. TODO: determine nonce requirements.
+/// attacks.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct GetRecordsPayload {
     /// Only records beyond and including this hash are returned
     pub since_hash: Option<ActionHash>,
-
-    /// TODO
+    /// Randomly selected nonce to prevent replay attacks
     pub nonce: Nonce256Bits,
+}
+
+/// The full request for get_record_data
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GetRecordsRequest {
+    /// The payload
+    pub payload: GetRecordsPayload,
+    /// The signature of the payload
+    pub signature: Signature,
 }
 
 /// Encrypted bytes of an Entry
@@ -153,33 +162,11 @@ pub fn records_from_actions_and_entries(
     Ok(records)
 }
 
-/// Assemble records from a list of Actions and a map of Entries
-pub fn records_from_actions_and_entries_2(
-    actions: Vec<SignedActionHashed>,
-    mut entries: HashMap<EntryHash, Entry>,
-) -> ChcResult<Vec<Record>> {
-    let mut records = vec![];
-    for action in actions {
-        let entry = if let Some(hash) = action.hashed.entry_hash() {
-            Some(
-                entries
-                    .remove(hash)
-                    .ok_or_else(|| ChcError::MissingEntryForAction(action.as_hash().clone()))?,
-            )
-        } else {
-            None
-        };
-        let record = Record::new(action, entry);
-        records.push(record);
-    }
-    Ok(records)
-}
-
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
 pub enum ChcError {
     #[error(transparent)]
-    DeserializationError(#[from] SerializedBytesError),
+    SerializationError(#[from] SerializedBytesError),
 
     #[error(transparent)]
     LairError(#[from] one_err::OneErr),
