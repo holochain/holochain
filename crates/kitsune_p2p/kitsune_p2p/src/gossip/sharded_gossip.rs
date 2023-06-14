@@ -202,6 +202,9 @@ impl ShardedGossip {
         metric_task({
             let this = this.clone();
 
+            #[cfg(feature = "otel")]
+            let task_run = holochain_trace::metric::TaskRunMetric::new("gossip");
+
             async move {
                 let mut stats = Stats::reset();
                 while !this
@@ -210,6 +213,10 @@ impl ShardedGossip {
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
+
+                    #[cfg(feature = "otel")]
+                    task_run.record_start();
+
                     this.run_one_iteration().await;
                     this.stats(&mut stats);
                 }
