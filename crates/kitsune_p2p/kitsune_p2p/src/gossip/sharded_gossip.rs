@@ -199,11 +199,12 @@ impl ShardedGossip {
             },
             bandwidth,
         });
+
+        #[cfg(feature = "otel")]
+        let task_run = holochain_trace::metric::TaskRunMetric::new("gossip");
+
         metric_task({
             let this = this.clone();
-
-            #[cfg(feature = "otel")]
-            let task_run = holochain_trace::metric::TaskRunMetric::new("gossip");
 
             async move {
                 let mut stats = Stats::reset();
