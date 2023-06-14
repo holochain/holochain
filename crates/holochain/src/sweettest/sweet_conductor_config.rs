@@ -110,7 +110,7 @@ impl SweetConductorConfig {
     }
 
     /// Set network tuning params.
-    pub fn set_tune(
+    pub fn set_tuning_params(
         mut self,
         tuning_params: kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams,
     ) -> Self {

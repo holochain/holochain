@@ -134,7 +134,7 @@ async fn sharded_consistency() {
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
-    let config = SweetConductorConfig::standard().set_tune(tuning);
+    let config = SweetConductorConfig::standard().set_tuning_params(tuning);
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
