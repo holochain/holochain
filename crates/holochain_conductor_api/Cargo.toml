@@ -51,3 +51,9 @@ sqlite = [
     "holochain_keystore/sqlite",
 ]
 
+otel = [
+    "holochain_trace/otel",
+    "holochain_p2p/otel",
+    "kitsune_p2p/otel",
+    "holochain_state/otel",
+]
