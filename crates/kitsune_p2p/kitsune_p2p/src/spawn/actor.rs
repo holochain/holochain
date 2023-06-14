@@ -287,12 +287,12 @@ impl KitsuneP2pActor {
                 let fetch_pool = &fetch_pool;
                 ep_evt
                     .for_each_concurrent(tuning_params.concurrent_limit_per_thread, move |event| {
+                        #[cfg(feature = "otel")]
+                        task_run_metric.record_start();
+
                         let evt_sender = evt_sender.clone();
                         let host = host.clone();
                         let i_s = i_s.clone();
-
-                        #[cfg(feature = "otel")]
-                        task_run_metric.record_start();
 
                         async move {
                             let evt_sender = &evt_sender;

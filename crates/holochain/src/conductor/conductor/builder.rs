@@ -191,9 +191,15 @@ impl ConductorBuilder {
         receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         stop: StopReceiver,
     ) {
+        #[cfg(feature = "otel")]
+        let task_run = holochain_trace::metric::TaskRunMetric::new("post_commit");
+
         let receiver_stream = tokio_stream::wrappers::ReceiverStream::new(receiver);
         stop.fuse_with(receiver_stream)
             .for_each_concurrent(POST_COMMIT_CONCURRENT_LIMIT, move |post_commit_args| {
+                #[cfg(feature = "otel")]
+                task_run.record_start();
+
                 let conductor_handle = conductor_handle.clone();
                 async move {
                     let PostCommitArgs {

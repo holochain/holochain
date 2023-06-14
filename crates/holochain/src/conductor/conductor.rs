@@ -3008,8 +3008,15 @@ async fn p2p_event_task(
     const NUM_PARALLEL_EVTS: usize = 100;
     let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
+
+    #[cfg(feature = "otel")]
+    let task_run = holochain_trace::metric::TaskRunMetric::new("dispatch_p2p_event");
+
     p2p_evt
         .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
+            #[cfg(feature = "otel")]
+            task_run.record_start();
+
             let handle = handle.clone();
             let num_tasks = num_tasks.clone();
             let max_time = max_time.clone();
