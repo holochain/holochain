@@ -67,7 +67,7 @@ async fn speed_test_timed_json() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_flame() {
-    let _g = holochain_trace::test_run_timed_flame(None).unwrap();
+    let _g = holochain_trace::test_run_timed_flame().unwrap();
     speed_test(None).await;
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }
@@ -75,7 +75,7 @@ async fn speed_test_timed_flame() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_ice() {
-    let _g = holochain_trace::test_run_timed_ice(None).unwrap();
+    let _g = holochain_trace::test_run_timed_ice().unwrap();
     speed_test(None).await;
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 }

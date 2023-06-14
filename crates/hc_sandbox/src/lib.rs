@@ -49,6 +49,7 @@ pub mod run;
 pub mod sandbox;
 pub mod save;
 pub use cli::HcSandbox;
+use holochain_trace::Output;
 
 mod ports;
 
@@ -87,7 +88,7 @@ impl CmdRunner {
         holochain_bin_path: &Path,
         sandbox_path: PathBuf,
     ) -> anyhow::Result<(Self, tokio::process::Child)> {
-        let conductor = run::run_async(holochain_bin_path, sandbox_path, None).await?;
+        let conductor = run::run_async(holochain_bin_path, sandbox_path, None, Output::Log).await?;
         let cmd = CmdRunner::try_new(conductor.0).await?;
         Ok((cmd, conductor.1))
     }
