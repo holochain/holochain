@@ -493,9 +493,14 @@ async fn can_handle_many_connections_and_disconnects() {
 
     let b2 = binding.clone();
     tokio::spawn(async move {
+        // Hold opened senders to avoid immediately dropping them. Otherwise we're not really testing lots of open
+        // connections at once.
         let mut senders = Vec::new();
         for i in 0..100_000 {
             if i % 800 == 0 {
+                // Rather than attempting to exhaust resources by opening 100,000 connections at once, drop/close
+                // connections at intervals. If we are able to keep opening connections up to 100,000 then it's likely
+                // that connection closing is working correctly on both the client and server
                 senders.clear();
             }
 
