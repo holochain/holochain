@@ -28,7 +28,8 @@ base64 = "0.13"
 err-derive = "0.2.1"
 tokio = { version = "1.27", features = [ "full" ] }
 tokio-stream = { version = "0.1" }
-holochain_trace = { version = "^0.3.0-beta-dev.0", path = "../../holochain_trace", optional = true }
+holochain_trace = { version = "^0.3.0-beta-dev.3", path = "../../holochain_trace", optional = true }
+
 [features]
 otel = [
     "holochain_trace/otel",
