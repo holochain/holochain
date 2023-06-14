@@ -2824,6 +2824,7 @@ name = "holochain_integrity_types"
 version = "0.3.0-beta-dev.3"
 dependencies = [
  "arbitrary",
+ "derive_builder",
  "holo_hash",
  "holochain_serialized_bytes",
  "kitsune_p2p_timestamp",
