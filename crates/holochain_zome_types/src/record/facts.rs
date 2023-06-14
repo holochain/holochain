@@ -62,8 +62,8 @@ mod tests {
         let u = &mut uu;
 
         let e = Entry::arbitrary(u).unwrap();
-        let hn = not_(action_facts::is_new_entry_action()).build(u);
-        let mut he = action_facts::is_new_entry_action().build(u);
+        let hn = not_(action_facts::is_new_entry_action()).build(&mut Unstructured::new(&crate::NOISE).into());
+        let mut he = action_facts::is_new_entry_action().build(&mut Unstructured::new(&crate::NOISE).into());
         *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
         let he = Action::from(he);
 

@@ -76,17 +76,15 @@ mod tests {
     async fn test_valid_dht_op() {
         // TODO: Must add constraint on dht op variant wrt action variant
 
-        let mut uu = Unstructured::new(&NOISE);
-        let u = &mut uu;
         let keystore = spawn_test_keystore().await.unwrap();
         let agent = AgentPubKey::new_random(&keystore).await.unwrap();
 
-        let e = Entry::arbitrary(u).unwrap();
+        let e = Entry::arbitrary(&mut Unstructured::new(&NOISE).into()).unwrap();
 
-        let mut hn = not_(action_facts::is_new_entry_action()).build(u);
+        let mut hn = not_(action_facts::is_new_entry_action()).build(&mut Unstructured::new(&NOISE).into());
         *hn.author_mut() = agent.clone();
 
-        let mut he = action_facts::is_new_entry_action().build(u);
+        let mut he = action_facts::is_new_entry_action().build(&mut Unstructured::new(&NOISE).into());
         *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
         let mut he = Action::from(he);
         *he.author_mut() = agent.clone();

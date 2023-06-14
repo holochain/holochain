@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use arbitrary::{Arbitrary, Unstructured};
+use arbitrary::{Arbitrary};
 use contrafact::*;
 use holo_hash::*;
 
@@ -50,7 +50,7 @@ impl Fact<'_, Action> for ValidChainFact {
         result
     }
 
-    fn mutate(&self, input_action: Action, u: &mut Unstructured<'_>) -> Action {
+    fn mutate(&self, input_action: Action, u: &mut Generator<'_>) -> Result<Action, MutationError> {
         let mut output_action: Action = input_action;
         if let Some(stored_hash) = self.hash.as_ref() {
             // This is not the first action we've seen
@@ -68,7 +68,7 @@ impl Fact<'_, Action> for ValidChainFact {
             // This is the first action we've seen, so it must be a Dna
             output_action = Action::Dna(Dna::arbitrary(u).unwrap());
         }
-        output_action
+        Ok(output_action)
     }
 
     fn advance(&mut self, action: &Action) {
@@ -107,12 +107,11 @@ pub fn new_entry_action() -> Facts<Action> {
 mod tests {
 
     use super::*;
+    use arbitrary::Unstructured;
 
     #[test]
     fn test_valid_chain_fact() {
-        let mut u = Unstructured::new(&crate::NOISE);
-
-        let chain = build_seq(&mut u, 5, valid_chain());
+        let chain = build_seq(&mut Unstructured::new(&crate::NOISE).into(), 5, valid_chain());
         check_seq(chain.as_slice(), valid_chain()).unwrap();
 
         let hashes: Vec<_> = chain
