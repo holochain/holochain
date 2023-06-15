@@ -2653,7 +2653,7 @@ dependencies = [
  "tx5-go-pion-turn",
  "tx5-signal-srv",
  "unwrap_to",
- "url 1.7.2",
+ "url 2.4.0",
  "url2",
  "url_serde",
  "uuid 0.7.4",

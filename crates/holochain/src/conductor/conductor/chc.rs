@@ -7,7 +7,7 @@ impl Conductor {
     pub(crate) fn chc(&self, keystore: MetaLairClient, cell_id: &CellId) -> Option<ChcImpl> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "chc")] {
-                crate::conductor::chc::build_chc(self.config.chc_url.as_ref(), keystore, cell_id)
+                crate::conductor::chc::build_chc(self.config.chc_url.as_ref().map(|u| u.as_ref()), keystore, cell_id)
             } else {
                 None
             }

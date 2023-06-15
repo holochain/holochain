@@ -9,7 +9,8 @@ use holochain_types::{
     prelude::{AddRecordsRequest, ChainHeadCoordinatorExt, EncryptedEntry, GetRecordsRequest},
 };
 use holochain_zome_types::prelude::*;
-use reqwest::Url;
+use url::Url;
+use url2::Url2;
 
 /// An HTTP client which can talk to a remote CHC implementation
 pub struct ChcRemote {
@@ -69,8 +70,21 @@ impl ChainHeadCoordinatorExt for ChcRemote {
 
 impl ChcRemote {
     /// Constructor
-    pub fn new(url: Url, keystore: MetaLairClient, cell_id: &CellId) -> Self {
-        todo!("Implement remote CHC client")
+    pub fn new(base_url: Url, keystore: MetaLairClient, cell_id: &CellId) -> Self {
+        let client = ChcRemoteClient {
+            base_url: base_url
+                .join(&format!(
+                    "{}/{}/",
+                    cell_id.dna_hash(),
+                    cell_id.agent_pubkey()
+                ))
+                .expect("invalid URL"),
+        };
+        Self {
+            client,
+            keystore,
+            agent: cell_id.agent_pubkey().clone(),
+        }
     }
 }
 
@@ -80,9 +94,9 @@ pub struct ChcRemoteClient {
 }
 
 impl ChcRemoteClient {
-    fn url(&self, path: &str) -> Url {
+    fn url(&self, path: &str) -> String {
         assert!(path.chars().nth(0) == Some('/'));
-        Url::parse(&format!("{}{}", self.base_url, path)).expect("invalid URL")
+        self.base_url.join(path).expect("invalid URL").to_string()
     }
 
     async fn get(&self, path: &str) -> ChcResult<reqwest::Response> {

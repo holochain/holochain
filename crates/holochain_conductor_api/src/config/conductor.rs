@@ -16,7 +16,6 @@ pub mod paths;
 //mod logger_config;
 //mod signal_config;
 pub use paths::DatabaseRootPath;
-use url2::Url2;
 
 pub use super::*;
 pub use dpki_config::DpkiConfig;
@@ -56,7 +55,7 @@ pub struct ConductorConfig {
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
     /// If you don't know what this means, leave this setting alone (as `None`)
     #[serde(default)]
-    pub chc_url: Option<Url2>,
+    pub chc_url: Option<url2::Url2>,
 
     /// Override the default database synchronous strategy.
     ///

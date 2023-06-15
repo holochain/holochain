@@ -5,6 +5,7 @@ use holochain_p2p::ChcImpl;
 use holochain_zome_types::CellId;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
+use url::Url;
 use url2::Url2;
 
 mod chc_local;
@@ -23,11 +24,7 @@ const CHC_LOCAL_MAGIC_URL: &'static str = "local:";
 /// In particular, if the url is the magic string "local:", then a [`ChcLocal`]
 /// implementation will be used. Otherwise, if the url is set, and the CellId
 /// is "CHC-enabled", then a [`ChcRemote`] will be produced.
-pub fn build_chc(
-    url: Option<&Url2>,
-    keystore: MetaLairClient,
-    cell_id: &CellId,
-) -> Option<ChcImpl> {
+pub fn build_chc(url: Option<&Url>, keystore: MetaLairClient, cell_id: &CellId) -> Option<ChcImpl> {
     // TODO: check if the agent key is Holo-hosted, otherwise return none
     let is_holo_agent = true;
     if is_holo_agent {
@@ -51,6 +48,6 @@ fn chc_local(keystore: MetaLairClient, cell_id: CellId) -> ChcImpl {
         .clone()
 }
 
-fn chc_remote(url: reqwest::Url, keystore: MetaLairClient, cell_id: &CellId) -> ChcImpl {
+fn chc_remote(url: Url, keystore: MetaLairClient, cell_id: &CellId) -> ChcImpl {
     Arc::new(ChcRemote::new(url, keystore, cell_id))
 }
