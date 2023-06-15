@@ -88,16 +88,16 @@ impl ChainHeadCoordinatorExt for ChcLocal {
     }
 }
 
-impl ChcLocal {
-    /// Just get the top hash
-    pub fn head(&self) -> Option<ActionHash> {
-        self.inner
-            .lock()
-            .records
-            .last()
-            .map(|r| r.action.get_hash().clone())
-    }
-}
+// impl ChcLocal {
+//     /// Just get the top hash
+//     pub fn head(&self) -> Option<ActionHash> {
+//         self.inner
+//             .lock()
+//             .records
+//             .last()
+//             .map(|r| r.action.get_hash().clone())
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -105,7 +105,7 @@ mod tests {
     use isotest::Iso;
 
     use crate::{
-        conductor::chc::{CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
+        conductor::chc::{ChcRemote, CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
         sweettest::*,
     };
 
@@ -121,8 +121,15 @@ mod tests {
     async fn test_add_actions() {
         let keystore = test_keystore();
         let agent = fake_agent_pubkey_1();
-        let chc = Arc::new(ChcLocal::new(keystore, agent));
-        assert_eq!(chc.head(), None);
+        let cell_id = CellId::new(fixt!(DnaHash), agent);
+        let chc = Arc::new(ChcRemote::new(
+            url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
+            keystore,
+            &cell_id,
+        ));
+        // let chc = Arc::new(ChcLocal::new(keystore, agent));
+        
+        // assert_eq!(chc.clone().head().await.unwrap(), None);
 
         let hash = |x| TestChainHash(x).real();
         let item = |x| Record::new(TestChainItem::new(x).real(), None);
@@ -135,18 +142,18 @@ mod tests {
         let t99 = items(&[99]);
 
         chc.clone().add_records(t0.clone()).await.unwrap();
-        assert_eq!(chc.clone().head().unwrap(), hash(2));
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
         chc.clone().add_records(t1.clone()).await.unwrap();
-        assert_eq!(chc.clone().head().unwrap(), hash(5));
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
 
         // last_hash doesn't match
         assert!(chc.clone().add_records(t0.clone()).await.is_err());
         assert!(chc.clone().add_records(t1.clone()).await.is_err());
         assert!(chc.clone().add_records(t99).await.is_err());
-        assert_eq!(chc.clone().head().unwrap(), hash(5));
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
 
         chc.clone().add_records(t2.clone()).await.unwrap();
-        assert_eq!(chc.clone().head().unwrap(), hash(8));
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(8));
 
         assert_eq!(
             chc.clone().get_record_data(None).await.unwrap(),
@@ -282,6 +289,8 @@ mod tests {
         // - The pattern involves Boxes which are impossible to match on
         // - The error types are not PartialEq, so cannot be constructed and tested for equality
 
+        dbg!(&install_result_1);
+        dbg!(&install_result_2);
         regex::Regex::new(
             r#".*ChcHeadMoved\("genesis", InvalidChain\(2, ActionHash\([a-zA-Z0-9-_]+\), "Action is not the first, so needs previous action"\)\).*"#
         ).unwrap().captures(&format!("{:?}", install_result_1)).unwrap();

@@ -82,6 +82,19 @@ pub trait ChainHeadCoordinatorExt:
         .boxed()
         .into()
     }
+
+    /// Just a convenience for testing. Should not be used otherwise.
+    fn head(self: Arc<Self>) -> MustBoxFuture<'static, ChcResult<Option<ActionHash>>> {
+        async move {
+            Ok(self
+                .get_record_data(None)
+                .await?
+                .pop()
+                .map(|r| r.action_address().clone()))
+        }
+        .boxed()
+        .into()
+    }
 }
 
 /// A Record to be added to the CHC.

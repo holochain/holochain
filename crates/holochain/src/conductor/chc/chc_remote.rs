@@ -27,25 +27,25 @@ impl ChainHeadCoordinator for ChcRemote {
         let body = serde_json::to_string(&request)
             .map(|json| json.into_bytes())
             .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
-        let response: reqwest::Response = self.client.post("/add_records", body).await?;
-        match response.status().as_u16() {
+        let response: reqwest::Response = self.client.post("add_records", body).await?;
+        let status = response.status().as_u16();
+        let bytes = response.bytes().await.map_err(extract_string)?;
+        dbg!(std::str::from_utf8(&bytes).unwrap());
+        dbg!(match status {
             200 => Ok(()),
             409 => {
-                let (seq, hash): (u32, ActionHash) =
-                    serde_json::from_slice(&response.bytes().await.map_err(extract_string)?)?;
+                let (seq, hash): (u32, ActionHash) = serde_json::from_slice(&bytes)?;
                 Err(ChcError::InvalidChain(seq, hash, "".to_string()))
             }
             498 => {
-                let msg: String =
-                    serde_json::from_slice(&response.bytes().await.map_err(extract_string)?)?;
+                let msg: String = serde_json::from_slice(&bytes)?;
                 Err(ChcError::NoRecordsAdded(msg))
             }
             code => {
-                let msg: String =
-                    serde_json::from_slice(&response.bytes().await.map_err(extract_string)?)?;
+                let msg: String = serde_json::from_slice(&bytes)?;
                 Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
             }
-        }
+        })
     }
 
     async fn get_record_data_request(
@@ -55,7 +55,7 @@ impl ChainHeadCoordinator for ChcRemote {
         let body = serde_json::to_string(&request)
             .map(|json| json.into_bytes())
             .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
-        let response = self.client.post("/get_record_data", body).await?;
+        let response = self.client.post("get_record_data", body).await?;
         match response.status() {
             _ => todo!(),
         }
@@ -72,13 +72,13 @@ impl ChcRemote {
     /// Constructor
     pub fn new(base_url: Url, keystore: MetaLairClient, cell_id: &CellId) -> Self {
         let client = ChcRemoteClient {
-            base_url: base_url
+            base_url: dbg!(base_url
                 .join(&format!(
                     "{}/{}/",
                     cell_id.dna_hash(),
                     cell_id.agent_pubkey()
                 ))
-                .expect("invalid URL"),
+                .expect("invalid URL")),
         };
         Self {
             client,
@@ -95,18 +95,20 @@ pub struct ChcRemoteClient {
 
 impl ChcRemoteClient {
     fn url(&self, path: &str) -> String {
-        assert!(path.chars().nth(0) == Some('/'));
-        self.base_url.join(path).expect("invalid URL").to_string()
+        assert!(path.chars().nth(0) != Some('/'));
+        dbg!(self.base_url.join(path).expect("invalid URL").to_string())
     }
 
-    async fn get(&self, path: &str) -> ChcResult<reqwest::Response> {
-        reqwest::get(self.url(path)).await.map_err(extract_string)
-    }
+    // async fn get(&self, path: &str) -> ChcResult<reqwest::Response> {
+    //     reqwest::get(self.url(path)).await.map_err(extract_string)
+    // }
 
     async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<reqwest::Response> {
         let client = reqwest::Client::new();
+        let url = self.url(path);
+        dbg!(&url);
         client
-            .post(self.url(path))
+            .post(url)
             .body(body)
             .send()
             .await
