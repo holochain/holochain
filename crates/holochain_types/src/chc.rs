@@ -211,6 +211,9 @@ pub enum ChcError {
     SerializationError(#[from] SerializedBytesError),
 
     #[error(transparent)]
+    JsonSerializationError(#[from] serde_json::Error),
+
+    #[error(transparent)]
     LairError(#[from] one_err::OneErr),
 
     /// The out of sync error only happens when you attempt to add actions
@@ -235,6 +238,10 @@ pub enum ChcError {
 
     #[error("The CHC service is unreachable: {0}")]
     ServiceUnreachable(String),
+
+    /// Unexpected error
+    #[error("Unexpected error: {0}")]
+    Other(String),
 }
 
 #[allow(missing_docs)]

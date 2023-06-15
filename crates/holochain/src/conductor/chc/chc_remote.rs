@@ -1,12 +1,8 @@
 //! Defines a client for use with a remote HTTP-based CHC.
-//!
-//! **NOTE** this API is not set in stone. Do not design a CHC against this API yet,
-//! as it will change!
 
 use std::sync::Arc;
 
-use ::bytes::Bytes;
-use holo_hash::AgentPubKey;
+use holo_hash::{ActionHash, AgentPubKey};
 use holochain_keystore::MetaLairClient;
 use holochain_types::{
     chc::{ChainHeadCoordinator, ChcError, ChcResult},
@@ -30,8 +26,25 @@ impl ChainHeadCoordinator for ChcRemote {
         let body = serde_json::to_string(&request)
             .map(|json| json.into_bytes())
             .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
-        let response = self.client.post("/add_records", body).await?;
-        todo!("parse and handle response");
+        let response: reqwest::Response = self.client.post("/add_records", body).await?;
+        match response.status().as_u16() {
+            200 => Ok(()),
+            409 => {
+                let (seq, hash): (u32, ActionHash) =
+                    serde_json::from_slice(&response.bytes().await.map_err(extract_string)?)?;
+                Err(ChcError::InvalidChain(seq, hash, "".to_string()))
+            }
+            498 => {
+                let msg: String =
+                    serde_json::from_slice(&response.bytes().await.map_err(extract_string)?)?;
+                Err(ChcError::NoRecordsAdded(msg))
+            }
+            code => {
+                let msg: String =
+                    serde_json::from_slice(&response.bytes().await.map_err(extract_string)?)?;
+                Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
+            }
+        }
     }
 
     async fn get_record_data_request(
@@ -42,7 +55,9 @@ impl ChainHeadCoordinator for ChcRemote {
             .map(|json| json.into_bytes())
             .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
         let response = self.client.post("/get_record_data", body).await?;
-        todo!("parse and handle response");
+        match response.status() {
+            _ => todo!(),
+        }
     }
 }
 
@@ -70,25 +85,18 @@ impl ChcRemoteClient {
         Url::parse(&format!("{}{}", self.base_url, path)).expect("invalid URL")
     }
 
-    async fn get(&self, path: &str) -> ChcResult<Bytes> {
-        let bytes = reqwest::get(self.url(path))
-            .await
-            .map_err(extract_string)?
-            .bytes()
-            .await
-            .map_err(extract_string)?;
-        Ok(bytes)
+    async fn get(&self, path: &str) -> ChcResult<reqwest::Response> {
+        reqwest::get(self.url(path)).await.map_err(extract_string)
     }
 
-    async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<Bytes> {
+    async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<reqwest::Response> {
         let client = reqwest::Client::new();
-        let response = client
+        client
             .post(self.url(path))
             .body(body)
             .send()
             .await
-            .map_err(extract_string)?;
-        Ok(response.bytes().await.map_err(extract_string)?)
+            .map_err(extract_string)
     }
 }
 

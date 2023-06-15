@@ -206,23 +206,18 @@ mod tests {
             dump.source_chain_dump.records.pop().unwrap().action_address
         };
 
-        let new_entry = EntryHashed::from_content_sync(fixt!(Entry));
-        let new_entry_hash = new_entry.as_hash().clone();
-        let create = Create {
+        let izc = InitZomesComplete {
             author: agent.clone(),
             timestamp: Timestamp::now(),
             action_seq: 3,
             prev_action: top_hash,
-            entry_type: new_entry.entry_type(Some(fixt!(AppEntryDef))).unwrap(),
-            entry_hash: new_entry_hash,
-            weight: EntryRateWeight::default(),
         };
-        let new_action = ActionHashed::from_content_sync(Action::Create(create));
+        let new_action = ActionHashed::from_content_sync(Action::InitZomesComplete(izc));
         let new_action = SignedActionHashed::sign(&conductor.keystore(), new_action)
             .await
             .unwrap();
         let new_action_hash = new_action.action_address().clone();
-        let new_record = Record::new(new_action, Some(new_entry.into_content()));
+        let new_record = Record::new(new_action, None);
 
         {
             // add some data to the local CHC
