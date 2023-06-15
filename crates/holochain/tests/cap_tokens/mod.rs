@@ -7,8 +7,8 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
-/// A single link with a Path for the base and target is committed by one
-/// agent, and after a delay, all agents can get the link
+/// Alice creates a cap grant for her private function and then tries to use it to
+/// remote call Bobs private function
 #[tokio::test(flavor = "multi_thread")]
 
 #[cfg(feature = "slow_tests")]
