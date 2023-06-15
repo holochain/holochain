@@ -4,6 +4,7 @@ members = [
     "anchor",
     "bench",
     "capability",
+    "cap_tokens",
     "coordinator_zome",
     "coordinator_zome_update",
     "countersigning",
