@@ -19,7 +19,7 @@ jobs:
           - pkgs:
               - build-holochain-tests-unit-all
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_2 --override-input holochain ${{ inputs.repo_path }}"
+            extra_arg: "--override-input holochain ${{ inputs.repo_path }}"
 
           # ensures to keep the cache populated for the supported versions on multiple platforms
           - pkgs:
