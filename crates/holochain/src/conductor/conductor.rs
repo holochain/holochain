@@ -1908,9 +1908,7 @@ mod app_status_impls {
                         Ok(Err(e)) => {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
 
-                            println!("Error during network join {:?}", e);
                             if Self::is_p2p_join_error_retryable(&e) {
-                                println!("It is retryable");
                                 Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Retry)))
                             }
                             else {
@@ -1919,7 +1917,6 @@ mod app_status_impls {
                         }
                         Err(_) => {
                             tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                            println!("Failed with timeout");
                             Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
                         }
                         Ok(Ok(_)) => Ok(cell_id),
@@ -1976,7 +1973,6 @@ mod app_status_impls {
             let retry_cell_ids = self.running_cell_ids(Some(CellStatusFilter::PendingJoin(
                 PendingJoinReason::Retry,
             )));
-            println!("Have {} retry cells", retry_cell_ids.len());
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -2000,10 +1996,8 @@ mod app_status_impls {
                                         if missing.iter().any(|c| retry_cell_ids.contains(c)) {
                                             // The spin up needs to be tried again for this app
                                             warn!(msg = "Some cells did not start", ?app, ?missing);
-                                            println!("Sending app back to spin up again");
                                             AppStatusFx::SpinUp
                                         } else {
-                                            println!("Pausing app because it wasn't able to start");
                                             let reason = PausedAppReason::Error(format!(
                                                 "Some cells are missing / not able to run: {:#?}",
                                                 missing
