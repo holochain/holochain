@@ -94,6 +94,7 @@ use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::witness_nonce;
@@ -105,8 +106,10 @@ use holochain_state::prelude::*;
 use holochain_state::source_chain;
 use holochain_types::prelude::{wasm, *};
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::KitsuneP2pError;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::Transaction;
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -152,6 +155,20 @@ pub type CellStartupErrors = Vec<(CellId, CellError)>;
 /// Cloneable reference to a Conductor
 pub type ConductorHandle = Arc<Conductor>;
 
+/// The reason why a cell is waiting to join the network.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PendingJoinReason {
+    /// The initial state, no attempt has been made to join the network yet.
+    Initial,
+
+    /// The join failed with an error that is safe to retry, such as not being connected to the internet.
+    Retry,
+
+    /// The network join failed and will not be retried. This will impact the status of the associated
+    /// app and require manual intervention from the user.
+    Failed,
+}
+
 /// The status of an installed Cell, which captures different phases of its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CellStatus {
@@ -162,7 +179,7 @@ pub enum CellStatus {
     /// but it is considered not to be fully running from the perspective of
     /// app status, i.e. if any app has a required Cell with this status,
     /// the app is considered to be in the Paused state.
-    PendingJoin,
+    PendingJoin(PendingJoinReason),
 
     /// The Cell is currently in the process of trying to join the network.
     Joining,
@@ -1890,11 +1907,17 @@ mod app_status_impls {
                     match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
                         Ok(Err(e)) => {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
-                            Err(cell_id)
+
+                            if Self::is_p2p_join_error_retryable(&e) {
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Retry)))
+                            }
+                            else {
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
+                            }
                         }
                         Err(_) => {
                             tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
-                            Err(cell_id)
+                            Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
                         }
                         Ok(Ok(_)) => Ok(cell_id),
                     }
@@ -1910,13 +1933,13 @@ mod app_status_impls {
 
             // These unwraps are both safe because of the partition.
             let cell_ids: Vec<_> = cell_ids.into_iter().map(Result::unwrap).collect();
-            let failed_joins: Vec<_> = failed_joins.into_iter().map(Result::unwrap_err).collect();
+            let failed_joins = failed_joins.into_iter().map(Result::unwrap_err);
 
             // Update the status of the cells which were able to join the network
             // (may or may not be all cells which were added)
-            self.update_cell_status(cell_ids.as_slice(), CellStatus::Joined);
+            self.update_cell_status(cell_ids.iter().map(|c| (c, CellStatus::Joined)));
 
-            self.update_cell_status(failed_joins.as_slice(), CellStatus::PendingJoin);
+            self.update_cell_status(failed_joins);
 
             cell_ids
         }
@@ -1947,6 +1970,9 @@ mod app_status_impls {
             // possible, and let ourselves be optimistic that all cells will join soon after
             // the app starts.
             let cell_ids: HashSet<CellId> = self.live_cell_ids();
+            let retry_cell_ids = self.running_cell_ids(Some(CellStatusFilter::PendingJoin(
+                PendingJoinReason::Retry,
+            )));
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -1967,11 +1993,17 @@ mod app_status_impls {
                                         .filter(|id| !cell_ids.contains(id))
                                         .collect();
                                     if !missing.is_empty() {
-                                        let reason = PausedAppReason::Error(format!(
-                                            "Some cells are missing / not able to run: {:#?}",
-                                            missing
-                                        ));
-                                        app.status.transition(Pause(reason))
+                                        if missing.iter().any(|c| retry_cell_ids.contains(c)) {
+                                            // The spin up needs to be tried again for this app
+                                            warn!(msg = "Some cells did not start", ?app, ?missing);
+                                            AppStatusFx::SpinUp
+                                        } else {
+                                            let reason = PausedAppReason::Error(format!(
+                                                "Some cells are missing / not able to run: {:#?}",
+                                                missing
+                                            ));
+                                            app.status.transition(Pause(reason))
+                                        }
                                     } else {
                                         AppStatusFx::NoChange
                                     }
@@ -1999,13 +2031,27 @@ mod app_status_impls {
 
         /// Change the CellStatus of the given Cells in the Conductor.
         /// Silently ignores Cells that don't exist.
-        pub(crate) fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus) {
-            for cell_id in cell_ids {
+        pub(crate) fn update_cell_status<I, C>(&self, cell_ids: I)
+        where
+            I: Iterator<Item = (C, CellStatus)>,
+            C: Borrow<CellId>,
+        {
+            for (cell_id, status) in cell_ids {
                 self.running_cells.share_mut(|cells| {
-                    if let Some(mut cell) = cells.get_mut(cell_id) {
-                        cell.status = status.clone();
+                    if let Some(mut cell) = cells.get_mut(cell_id.borrow()) {
+                        cell.status = status;
                     }
                 });
+            }
+        }
+
+        fn is_p2p_join_error_retryable(e: &HolochainP2pError) -> bool {
+            match e {
+                // TODO this is brittle because some other network access could fail first if Kitune changes.
+                HolochainP2pError::OtherKitsuneP2pError(KitsuneP2pError::Reqwest(e)) => {
+                    e.is_connect()
+                }
+                _ => false,
             }
         }
     }
@@ -2412,7 +2458,7 @@ impl Conductor {
                     cell_id,
                     CellItem {
                         cell: Arc::new(cell),
-                        status: CellStatus::PendingJoin,
+                        status: CellStatus::PendingJoin(PendingJoinReason::Initial),
                     },
                 );
             }
@@ -2431,13 +2477,12 @@ impl Conductor {
         self.running_cells.share_mut(|cells| {
             cells
                 .iter_mut()
-                .filter_map(|(id, item)| {
-                    if item.status == CellStatus::PendingJoin {
+                .filter_map(|(id, item)| match item.status {
+                    CellStatus::PendingJoin(_) => {
                         item.status = CellStatus::Joining;
                         Some((id.clone(), item.cell.clone()))
-                    } else {
-                        None
                     }
+                    _ => None,
                 })
                 .collect()
         })
