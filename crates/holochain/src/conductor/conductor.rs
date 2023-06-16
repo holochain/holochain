@@ -1908,8 +1908,9 @@ mod app_status_impls {
                         Ok(Err(e)) => {
                             tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
 
-                            println!("Error during network join");
+                            println!("Error during network join {:?}", e);
                             if Self::is_p2p_join_error_retryable(&e) {
+                                println!("It is retryable");
                                 Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Retry)))
                             }
                             else {
