@@ -119,7 +119,7 @@
           dontPatchELF = true;
           dontFixup = true;
 
-          buildInputs = [ pkgs.cacert ];
+          buildInputs = commonArgs.buildInputs ++ [ pkgs.cacert ];
           nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ holochain ];
 
           installPhase = ''
