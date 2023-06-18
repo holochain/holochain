@@ -280,7 +280,7 @@ async fn signal_subscription() {
 
 /// Simple zome which contains a validation rule which can fail
 fn simple_validation_zome() -> InlineZomeSet {
-    let entry_def = EntryDef::from_id("string");
+    let entry_def = EntryDef::default_from_id("string");
 
     SweetInlineZomes::new(vec![entry_def.clone()], 0)
         .function("create", move |api, s: AppString| {

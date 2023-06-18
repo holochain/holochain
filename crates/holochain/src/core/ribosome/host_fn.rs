@@ -72,8 +72,9 @@ host_fn_api_impls! {
     // Block some agent on the same DNA.
     fn block_agent (zt::block::BlockAgentInput) -> ();
 
-    // @todo
-    fn dna_info (()) -> zt::info::DnaInfo;
+    // Info about the current DNA.
+    fn dna_info_1 (()) -> zt::info::DnaInfoV1;
+    fn dna_info_2 (()) -> zt::info::DnaInfoV2;
 
     // @todo
     fn call_info (()) -> zt::info::CallInfo;

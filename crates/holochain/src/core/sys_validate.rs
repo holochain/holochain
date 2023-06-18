@@ -2,12 +2,9 @@
 //! This module contains all the checks we run for sys validation
 
 use super::queue_consumer::TriggerSender;
-use super::ribosome::RibosomeT;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
-use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::space::Space;
-use crate::conductor::Conductor;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeSource;
 use holochain_keystore::AgentPubKeyExt;
@@ -329,95 +326,47 @@ pub fn check_prev_seq(action: &Action, prev_action: &Action) -> SysValidationRes
 
 /// Check the entry variant matches the variant in the actions entry type
 pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationResult<()> {
-    match (entry_type, entry) {
-        (EntryType::AgentPubKey, Entry::Agent(_)) => Ok(()),
-        (EntryType::App(_), Entry::App(_)) => Ok(()),
-        (EntryType::App(_), Entry::CounterSign(_, _)) => Ok(()),
-        (EntryType::CapClaim, Entry::CapClaim(_)) => Ok(()),
-        (EntryType::CapGrant, Entry::CapGrant(_)) => Ok(()),
-        _ => Err(ValidationOutcome::EntryType.into()),
-    }
-}
-
-/// Check the AppEntryDef is valid for the zome.
-/// Check the EntryDefId and ZomeIndex are in range.
-pub async fn check_entry_def(
-    op: &Op,
-    dna_hash: &DnaHash,
-    conductor: &Conductor,
-) -> SysValidationResult<()> {
-    if let Some((_, EntryType::App(app_entry_def))) = op.entry_data() {
-        check_app_entry_def(app_entry_def, dna_hash, conductor).await
-    } else {
-        Ok(())
-    }
-}
-
-/// Check the AppEntryDef is valid for the zome.
-/// Check the EntryDefId and ZomeIndex are in range.
-pub async fn check_app_entry_def(
-    app_entry_def: &AppEntryDef,
-    dna_hash: &DnaHash,
-    conductor: &Conductor,
-) -> SysValidationResult<()> {
-    // We want to be careful about holding locks open to the conductor api
-    // so calls are made in blocks
-    let ribosome = conductor
-        .get_ribosome(dna_hash)
-        .map_err(|_| SysValidationError::DnaMissing(dna_hash.clone()))?;
-
-    // Check if the zome is found
-    let zome = ribosome
-        .get_integrity_zome(&app_entry_def.zome_index())
-        .ok_or_else(|| ValidationOutcome::ZomeIndex(app_entry_def.clone()))?
-        .into_inner()
-        .1;
-
-    let entry_def = get_entry_def(app_entry_def.entry_index(), zome, dna_hash, conductor).await?;
-
-    // Check the visibility and return
-    match entry_def {
-        Some(entry_def) => {
-            if entry_def.visibility == *app_entry_def.visibility() {
-                Ok(())
-            } else {
-                Err(ValidationOutcome::EntryVisibility(app_entry_def.clone()).into())
-            }
-        }
-        None => Err(ValidationOutcome::EntryDefId(app_entry_def.clone()).into()),
-    }
+    entry_type_matches(entry_type, entry)
+        .then_some(())
+        .ok_or_else(|| ValidationOutcome::EntryTypeMismatch.into())
 }
 
 /// Check that the EntryVisibility is congruous with the presence or absence of entry data
 pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
-    match (
-        op.action().entry_type().map(|t| t.visibility()),
-        op.entry().is_some(),
-    ) {
-        (Some(EntryVisibility::Public), true) => Ok(()),
-        (Some(EntryVisibility::Private), false) => Ok(()),
-        (Some(EntryVisibility::Public), false) => {
-            if op.action().entry_type() == Some(&EntryType::AgentPubKey) {
-                // Agent entries are a special case. The "entry data" is already present in
+    use EntryVisibility::*;
+    use RecordEntry::*;
+
+    let err = |reason: &str| {
+        Err(ValidationOutcome::MalformedDhtOp(
+            Box::new(op.action()),
+            op.get_type(),
+            reason.to_string(),
+        )
+        .into())
+    };
+
+    match (op.action().entry_type().map(|t| t.visibility()), op.entry()) {
+        (Some(Public), Present(_)) => Ok(()),
+        (Some(Private), Hidden) => Ok(()),
+        (Some(Private), NotStored) => Ok(()),
+
+        (Some(Public), Hidden) => err("RecordEntry::Hidden is only for Private entry type"),
+        (Some(_), NA) => err("There is action entry data but the entry itself is N/A"),
+        (Some(Private), Present(_)) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
+        (Some(Public), NotStored) => {
+            if op.get_type() == DhtOpType::RegisterAgentActivity
+                || op.action().entry_type() == Some(&EntryType::AgentPubKey)
+            {
+                // RegisterAgentActivity is a special case, where the entry data can be omitted.
+                // Agent entries are also a special case. The "entry data" is already present in
                 // the action as the entry hash, so no external entry data is needed.
                 Ok(())
             } else {
-                Err(ValidationOutcome::MalformedDhtOp(
-                    Box::new(op.action()),
-                    op.get_type(),
-                    "Op has public entry type but is missing its data".to_string(),
-                )
-                .into())
+                err("Op has public entry type but is missing its data")
             }
         }
-        (Some(EntryVisibility::Private), true) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
-        (None, false) => Ok(()),
-        (None, true) => Err(ValidationOutcome::MalformedDhtOp(
-            Box::new(op.action()),
-            op.get_type(),
-            "Op record has entry data with no entry_type".to_string(),
-        )
-        .into()),
+        (None, NA) => Ok(()),
+        (None, _) => err("Entry must be N/A for action with no entry type"),
     }
 }
 
@@ -442,26 +391,28 @@ pub fn check_new_entry_action(action: &Action) -> SysValidationResult<()> {
 /// Check the entry size is under the MAX_ENTRY_SIZE
 pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
     match entry {
-        Entry::App(bytes) => {
+        Entry::App(bytes) | Entry::CounterSign(_, bytes) => {
             let size = std::mem::size_of_val(&bytes.bytes()[..]);
-            if size < MAX_ENTRY_SIZE {
+            if size <= MAX_ENTRY_SIZE {
                 Ok(())
             } else {
-                Err(ValidationOutcome::EntryTooLarge(size, MAX_ENTRY_SIZE).into())
+                Err(ValidationOutcome::EntryTooLarge(size).into())
             }
         }
-        // Other entry types are small
-        _ => Ok(()),
+        _ => {
+            // TODO: size checks on other types (cap grant and claim)
+            Ok(())
+        }
     }
 }
 
 /// Check the link tag size is under the MAX_TAG_SIZE
 pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     let size = std::mem::size_of_val(&tag.0[..]);
-    if size < MAX_TAG_SIZE {
+    if size <= MAX_TAG_SIZE {
         Ok(())
     } else {
-        Err(ValidationOutcome::TagTooLarge(size, MAX_TAG_SIZE).into())
+        Err(ValidationOutcome::TagTooLarge(size).into())
     }
 }
 
@@ -475,8 +426,8 @@ pub fn check_update_reference(
         Ok(())
     } else {
         Err(ValidationOutcome::UpdateTypeMismatch(
-            eu.entry_type.clone(),
             original_entry_action.entry_type().clone(),
+            eu.entry_type.clone(),
         )
         .into())
     }
@@ -784,11 +735,8 @@ fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
-    // Check the entry
-    let maybe_entry_box = record_entry.into_option().map(Box::new);
-
     // Create the hash and op
-    let op = DhtOp::StoreRecord(signature, action, maybe_entry_box);
+    let op = DhtOp::StoreRecord(signature, action, record_entry);
     let hash = op.to_hash();
     Some((hash, op))
 }
@@ -806,7 +754,7 @@ fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     let (action, signature) = shh.into_inner();
 
     // Check the entry and exit early if it's not there
-    let entry_box = record_entry.into_option()?.into();
+    let entry_box = record_entry.into_option()?;
     // If the action is the wrong type exit early
     let action = action.into_content().try_into().ok()?;
 

@@ -500,7 +500,7 @@ mod tests {
                     let expected_op = DhtOp::StoreRecord(
                         sig,
                         entry_create_action.into_content().try_into().unwrap(),
-                        None,
+                        RecordEntry::NA,
                     );
                     let op_hash = expected_op.to_hash();
 
@@ -511,8 +511,11 @@ mod tests {
                     let (entry_update_action, sig) = entry_update_action.into_inner();
                     let entry_update_action: Update =
                         entry_update_action.into_content().try_into().unwrap();
-                    let expected_op =
-                        DhtOp::StoreRecord(sig.clone(), entry_update_action.clone().into(), None);
+                    let expected_op = DhtOp::StoreRecord(
+                        sig.clone(),
+                        entry_update_action.clone().into(),
+                        RecordEntry::NA,
+                    );
                     let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, store_record_count.clone()));
@@ -520,7 +523,7 @@ mod tests {
                     let expected_op = DhtOp::RegisterUpdatedContent(
                         sig.clone(),
                         entry_update_action.clone(),
-                        None,
+                        RecordEntry::NA,
                     );
                     let op_hash = expected_op.to_hash();
 
@@ -528,7 +531,7 @@ mod tests {
                     let expected_op = DhtOp::RegisterUpdatedRecord(
                         sig.clone(),
                         entry_update_action.clone(),
-                        None,
+                        RecordEntry::NA,
                     );
                     let op_hash = expected_op.to_hash();
 

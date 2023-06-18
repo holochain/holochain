@@ -97,8 +97,9 @@ async fn sys_validation_workflow_inner(
                 let action = op.action();
 
                 let dependency = get_dependency(op_type, &action);
+                let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
-                let r = validate_op(&op, &workspace, cascade, Some(incoming_dht_ops_sender)).await;
+                let r = validate_op(&op, &dna_def, &cascade, Some(incoming_dht_ops_sender)).await;
                 r.map(|o| (op_hash, o, dependency))
             }
         }
@@ -211,19 +212,14 @@ async fn sys_validation_workflow_inner(
     })
 }
 
-// TODO: Some of these params are unnecessary or soon will be:
-// - The Workspace is only needed for some checks which are done in sys validation inappropriately, like fork detection.
-// - The Conductor handle is only needed for another inappropriate check of entry type, which invokes wasm and is not proper sys validation.
-// These two params can go away soon.
-// What's important to note is that the cascade must be passed in explicitly so that it can be mocked.
-async fn validate_op(
+/// Validate a single DhtOp, using the supplied Cascade to draw dependencies from
+pub(crate) async fn validate_op(
     op: &DhtOp,
-    workspace: &SysValidationWorkspace,
-    cascade: impl Cascade,
+    dna_def: &DnaDefHashed,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> WorkflowResult<Outcome> {
-    let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
-    match validate_op_inner(op, &cascade, dna_def, incoming_dht_ops_sender).await {
+    match validate_op_inner(op, cascade, dna_def, incoming_dht_ops_sender).await {
         Ok(_) => Ok(Outcome::Accepted),
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
@@ -257,10 +253,10 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
         ValidationOutcome::DepMissingFromDht(_) => MissingDhtDep,
         ValidationOutcome::EntryDefId(_) => Rejected,
         ValidationOutcome::EntryHash => Rejected,
-        ValidationOutcome::EntryTooLarge(_, _) => Rejected,
-        ValidationOutcome::EntryType => Rejected,
+        ValidationOutcome::EntryTooLarge(_) => Rejected,
+        ValidationOutcome::EntryTypeMismatch => Rejected,
         ValidationOutcome::EntryVisibility(_) => Rejected,
-        ValidationOutcome::TagTooLarge(_, _) => Rejected,
+        ValidationOutcome::TagTooLarge(_) => Rejected,
         ValidationOutcome::MalformedDhtOp(_, _, _) => Rejected,
         ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
@@ -282,17 +278,17 @@ fn handle_failed(error: &ValidationOutcome) -> Outcome {
 async fn validate_op_inner(
     op: &DhtOp,
     cascade: &impl Cascade,
-    dna_def: DnaDefHashed,
+    dna_def: &DnaDefHashed,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
     match op {
         DhtOp::StoreRecord(_, action, entry) => {
             store_record(action, cascade).await?;
-            if let Some(entry) = entry {
+            if let Some(entry) = entry.as_option() {
                 // Retrieve for all other actions on countersigned entry.
-                if let Entry::CounterSign(session_data, _) = &**entry {
-                    let entry_hash = EntryHash::with_data_sync(&**entry);
+                if let Entry::CounterSign(session_data, _) = entry {
+                    let entry_hash = EntryHash::with_data_sync(entry);
                     let weight = action
                         .entry_rate_data()
                         .ok_or_else(|| SysValidationError::NonEntryAction(action.clone()))?;
@@ -313,7 +309,7 @@ async fn validate_op_inner(
                     (action)
                         .try_into()
                         .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
-                    entry.as_ref(),
+                    entry,
                     cascade,
                 )
                 .await?;
@@ -322,9 +318,9 @@ async fn validate_op_inner(
         }
         DhtOp::StoreEntry(_, action, entry) => {
             // Check and hold for all other actions on countersigned entry.
-            if let Entry::CounterSign(session_data, _) = &**entry {
+            if let Entry::CounterSign(session_data, _) = entry {
                 let dependency_check = |_original_record: &Record| Ok(());
-                let entry_hash = EntryHash::with_data_sync(&**entry);
+                let entry_hash = EntryHash::with_data_sync(entry);
                 let weight = match action {
                     NewEntryAction::Create(h) => h.weight.clone(),
                     NewEntryAction::Update(h) => h.weight.clone(),
@@ -340,29 +336,29 @@ async fn validate_op_inner(
                 }
             }
 
-            store_entry((action).into(), entry.as_ref(), cascade).await?;
+            store_entry((action).into(), entry, cascade).await?;
 
             let action = action.clone().into();
             store_record(&action, cascade).await?;
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, action) => {
-            register_agent_activity(action, cascade, &dna_def, incoming_dht_ops_sender).await?;
+            register_agent_activity(action, cascade, dna_def, incoming_dht_ops_sender).await?;
             store_record(action, cascade).await?;
             Ok(())
         }
         DhtOp::RegisterUpdatedContent(_, action, entry) => {
             register_updated_content(action, cascade, incoming_dht_ops_sender).await?;
-            if let Some(entry) = entry {
-                store_entry(NewEntryActionRef::Update(action), entry.as_ref(), cascade).await?;
+            if let Some(entry) = entry.as_option() {
+                store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
             }
 
             Ok(())
         }
         DhtOp::RegisterUpdatedRecord(_, action, entry) => {
             register_updated_record(action, cascade, incoming_dht_ops_sender).await?;
-            if let Some(entry) = entry {
-                store_entry(NewEntryActionRef::Update(action), entry.as_ref(), cascade).await?;
+            if let Some(entry) = entry.as_option() {
+                store_entry(NewEntryActionRef::Update(action), entry, cascade).await?;
             }
 
             Ok(())
@@ -429,9 +425,7 @@ async fn sys_validate_record_inner(
     ) -> SysValidationResult<()> {
         let incoming_dht_ops_sender = None;
         store_record(action, cascade).await?;
-        if let Some((maybe_entry, EntryVisibility::Public)) =
-            &maybe_entry.and_then(|e| action.entry_type().map(|et| (e, et.visibility())))
-        {
+        if let Some(maybe_entry) = maybe_entry {
             store_entry(
                 (action)
                     .try_into()

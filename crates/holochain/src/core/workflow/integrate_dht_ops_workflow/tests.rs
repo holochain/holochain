@@ -406,12 +406,12 @@ fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
-        Some(a.original_entry.clone().into()),
+        a.original_entry.clone().into(),
     );
     let op = DhtOp::RegisterUpdatedRecord(
         a.signature.clone(),
         a.entry_update_action.clone(),
-        Some(a.new_entry.clone().into()),
+        a.new_entry.clone().into(),
     );
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
@@ -433,7 +433,7 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
     let op = DhtOp::RegisterUpdatedContent(
         a.signature.clone(),
         a.entry_update_entry.clone(),
-        Some(a.new_entry.clone().into()),
+        a.new_entry.clone().into(),
     );
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
@@ -469,7 +469,7 @@ fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
-        Some(a.original_entry.clone().into()),
+        a.original_entry.clone().into(),
     );
     let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
     let pre_state = vec![Db::IntQueue(op.clone()), Db::Integrated(original_op)];
