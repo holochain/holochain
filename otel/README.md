@@ -21,3 +21,6 @@ OTEL_EXPORT=otlp OTEL_SERVICE_NAME=holochain RUST_LOG=info holochain ...
 ```
 
 Now log into Grafana at (http://localhost:3000)[http://localhost:3000] and log in with `admin/admin`.
+
+Finally, to get set up to view data you can start from an existing dashboard. Add a Prometheus data source pointing at 
+`http://prometheus:9090`, then import the Holochain dashboard `./holochain-dashboard.json`.
