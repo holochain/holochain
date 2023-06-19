@@ -39,8 +39,6 @@ full = ["default", "subtle-encoding", "kitsune_p2p_timestamp/full"]
 
 full-dna-def = ["derive_builder"]
 
-full-dna-def = ["derive_builder"]
-
 test_utils = [
   "full",
   "arbitrary",
