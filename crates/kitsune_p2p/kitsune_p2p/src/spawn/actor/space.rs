@@ -772,9 +772,16 @@ impl KitsuneP2pHandler for Space {
                 if !self.mdns_listened_spaces.contains(&space_b64) {
                     self.mdns_listened_spaces.insert(space_b64.clone());
                     tokio::task::spawn(async move {
+                        #[cfg(feature = "otel")]
+                        let task_run_metric =
+                            holochain_trace::metric::TaskRunMetric::new("mdns_bootstrap");
+
                         let stream = mdns_listen(space_b64);
                         tokio::pin!(stream);
                         while let Some(maybe_response) = stream.next().await {
+                            #[cfg(feature = "otel")]
+                            task_run_metric.record_start();
+
                             match maybe_response {
                                 Ok(response) => {
                                     tracing::trace!(msg = "Peer found via MDNS", ?response);
@@ -1331,11 +1338,17 @@ impl Space {
             let metrics = metrics.clone();
             let host = host_api.clone();
             tokio::task::spawn(async move {
+                #[cfg(feature = "otel")]
+                let task_run_metric = holochain_trace::metric::TaskRunMetric::new("host_metrics");
+
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(
                         HISTORICAL_METRIC_RECORD_FREQ_MS,
                     ))
                     .await;
+
+                    #[cfg(feature = "otel")]
+                    task_run_metric.record_start();
 
                     let records = metrics.read().dump_historical();
 
@@ -1401,11 +1414,18 @@ impl Space {
         let agent_info_update_interval_ms =
             config.tuning_params.gossip_agent_info_update_interval_ms as u64;
         tokio::task::spawn(async move {
+            #[cfg(feature = "otel")]
+            let task_run_metric = holochain_trace::metric::TaskRunMetric::new("agent_info_update");
+
             loop {
                 tokio::time::sleep(std::time::Duration::from_millis(
                     agent_info_update_interval_ms,
                 ))
                 .await;
+
+                #[cfg(feature = "otel")]
+                task_run_metric.record_start();
+
                 if let Err(e) = i_s_c.update_agent_info().await {
                     tracing::error!(failed_to_update_agent_info_for_space = ?e);
                 }
@@ -1419,12 +1439,18 @@ impl Space {
             let bootstrap_service = config.bootstrap_service.clone();
             let space_c = space.clone();
             tokio::task::spawn(async move {
+                #[cfg(feature = "otel")]
+                let task_run_metric = holochain_trace::metric::TaskRunMetric::new("quic_bootstrap");
+
                 const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
                 const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
 
                 let mut delay_len = START_DELAY;
 
                 loop {
+                    #[cfg(feature = "otel")]
+                    task_run_metric.record_start();
+
                     use ghost_actor::GhostControlSender;
                     if !i_s_c.ghost_actor_is_active() {
                         break;

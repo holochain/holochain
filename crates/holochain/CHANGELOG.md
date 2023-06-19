@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Adds optional metrics to Holochain to help diagnose behaviour and errors. The conductor must be built with the `"otel"` feature to opt in to metrics.
+  Metrics are not shipped off the machine where they are being captured, they are simply dumped to stdout on an interval.
+
 ## 0.1.5
 
 ## 0.1.5-beta-rc.1

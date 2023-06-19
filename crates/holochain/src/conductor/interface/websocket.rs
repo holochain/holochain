@@ -63,10 +63,14 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
         handle.close_on(stop.map(|_| true)).map(Ok)
     });
 
-    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), |_stop| {
+    tm.add_conductor_task_ignored(&format!("admin interface, port {}", port), move |_stop| {
         async move {
             let num_connections = Arc::new(AtomicIsize::new(0));
             futures::pin_mut!(listener);
+
+            #[cfg(feature = "otel")]
+            let conn_metric = holochain_trace::metric::WebsocketConnectionsMetric::new(port);
+
             // establish a new connection to a client
             while let Some(connection) = listener.next().await {
                 match connection {
@@ -81,6 +85,10 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
                             rx_from_iface,
                             num_connections.clone(),
                         ));
+
+                        #[cfg(feature = "otel")]
+                        conn_metric
+                            .record_current(num_connections.clone().load(Ordering::Relaxed) as u64);
                     }
                     Err(err) => {
                         warn!("Admin socket connection failed: {}", err);

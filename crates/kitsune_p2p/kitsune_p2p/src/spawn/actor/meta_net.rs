@@ -381,6 +381,10 @@ impl MetaNet {
         let ep_hnd = ep.handle().clone();
 
         tokio::task::spawn(async move {
+            #[cfg(feature = "otel")]
+            let task_run_metric =
+                holochain_trace::metric::TaskRunMetric::new("meta_net_tx2_ep_event");
+
             let tuning_params = &tuning_params;
             while let Some(evt) = ep.next().await {
                 match evt {
@@ -499,7 +503,14 @@ impl MetaNet {
         let ep_hnd2 = ep_hnd.clone();
         let res_store2 = res_store.clone();
         tokio::task::spawn(async move {
+            #[cfg(feature = "otel")]
+            let task_run_metric =
+                holochain_trace::metric::TaskRunMetric::new("meta_net_tx5_ep_event");
+
             while let Some(evt) = ep_evt.recv().await {
+                #[cfg(feature = "otel")]
+                task_run_metric.record_start();
+
                 let evt = match evt {
                     Ok(evt) => evt,
                     // TODO - FIXME - handle errors / reconnect?

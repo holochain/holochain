@@ -2722,6 +2722,9 @@ async fn p2p_event_task(
     p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
 ) {
+    #[cfg(feature = "otel")]
+    let task_run = holochain_trace::metric::TaskRunMetric::new("dispatch_p2p_event");
+
     /// The number of events we allow to run in parallel before
     /// starting to await on the join handles.
     const NUM_PARALLEL_EVTS: usize = 100;
@@ -2729,6 +2732,9 @@ async fn p2p_event_task(
     let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
     p2p_evt
         .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
+            #[cfg(feature = "otel")]
+            task_run.record_start();
+
             let handle = handle.clone();
             let num_tasks = num_tasks.clone();
             let max_time = max_time.clone();

@@ -227,3 +227,13 @@ sweetest = [
   "test_utils",
   "no-deps",
 ]
+
+otel = [
+  "holochain_trace/otel",
+  "kitsune_p2p/otel",
+  "holochain_p2p/otel",
+  "holochain_state/otel",
+  "kitsune_p2p_bootstrap/otel",
+  "holochain_cascade/otel",
+  "holochain_conductor_api/otel",
+]

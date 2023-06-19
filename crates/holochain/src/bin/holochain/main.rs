@@ -8,6 +8,7 @@ use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_trace::Output;
 use holochain_util::tokio_helper;
+
 #[cfg(unix)]
 use sd_notify::{notify, NotifyState};
 use std::path::PathBuf;
@@ -85,6 +86,9 @@ async fn async_main() {
     if let Some(t) = &config.tracing_override {
         std::env::set_var("CUSTOM_FILTER", t);
     }
+
+    #[cfg(feature = "otel")]
+    holochain_trace::metric::init_metrics();
 
     holochain_trace::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
     debug!("holochain_trace initialized");
