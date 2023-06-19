@@ -1264,17 +1264,16 @@ mod network_impls {
         }
 
         /// Make a zome call with deserialization and some error unwrapping built in
-        pub async fn easy_call_zome<I, O, Z, F>(
+        pub async fn easy_call_zome<I, O, Z>(
             &self,
             provenance: &AgentPubKey,
             cap_secret: Option<CapSecret>,
             cell_id: CellId,
             zome_name: Z,
-            fn_name: F,
+            fn_name: impl Into<FunctionName>,
             payload: I,
         ) -> ConductorApiResult<O>
         where
-            FunctionName: From<F>,
             ZomeName: From<Z>,
             I: Serialize + std::fmt::Debug,
             O: serde::de::DeserializeOwned + std::fmt::Debug,
@@ -3077,8 +3076,8 @@ async fn p2p_event_task(
                             .fetch_max(us, std::sync::atomic::Ordering::Relaxed)
                             .max(us);
 
-                        let s = tracing::info_span!("holochain_perf", this_event_time = ?el, max_event_micros = %max_us);
-                        s.in_scope(|| tracing::info!("dispatch_holochain_p2p_event is saturated"))
+                        let s = tracing::warn_span!("holochain_perf", this_event_time = ?el, max_event_micros = %max_us);
+                        s.in_scope(|| tracing::warn!("dispatch_holochain_p2p_event is saturated"))
                     }
                     None => max_time.store(0, std::sync::atomic::Ordering::Relaxed),
                 }

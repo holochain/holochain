@@ -185,7 +185,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         if waiting > self.max_readers {
             let s = tracing::info_span!("holochain_perf", kind = ?self.kind().kind());
             s.in_scope(|| {
-                tracing::info!(
+                tracing::warn!(
                     "Database read connection is saturated. Util {:.2}%",
                     waiting as f64 / self.max_readers as f64 * 100.0
                 )

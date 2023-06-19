@@ -261,7 +261,7 @@ impl Cell {
         match lives {
             // Cannot proceed if we don't know what to run.
             Err(e) => {
-                error!("{}", e.to_string());
+                error!("error calling scheduled fn: {:?}", e);
             }
             Ok(lives) => {
                 let mut tasks = vec![];
@@ -271,7 +271,10 @@ impl Cell {
                     let payload = match ExternIO::encode(schedule) {
                         Ok(payload) => payload,
                         Err(e) => {
-                            error!("{}", e.to_string());
+                            error!(
+                                "error encoding scheduled fn: {:?} error: {:?}",
+                                scheduled_fn, e
+                            );
                             continue;
                         }
                     };
@@ -279,7 +282,10 @@ impl Cell {
                     let (nonce, expires_at) = match fresh_nonce(now) {
                         Ok(v) => v,
                         Err(e) => {
-                            error!("{}", e.to_string());
+                            error!(
+                                "error creating nonce for fn: {:?} error: {:?}",
+                                scheduled_fn, e
+                            );
                             continue;
                         }
                     };
@@ -304,7 +310,7 @@ impl Cell {
                             {
                                 Ok(zome_call) => zome_call,
                                 Err(e) => {
-                                    error!("{}", e.to_string());
+                                    error!("scheduled zome call error in try_from_unsigned_zome_call: {:?}", e);
                                     continue;
                                 }
                             },
@@ -330,7 +336,7 @@ impl Cell {
                                             continue;
                                         }
                                         Err(e) => {
-                                            error!("{}", e.to_string());
+                                            error!("scheduled zome call error in ExternIO::decode: {:?}", e);
                                             continue;
                                         }
                                     };
@@ -344,11 +350,11 @@ impl Cell {
                                         Some(next_schedule),
                                         now,
                                     ) {
-                                        error!("{}", e.to_string());
+                                        error!("scheduled zome call error in schedule_fn: {:?}", e);
                                         continue;
                                     }
                                 }
-                                errorish => error!("{:?}", errorish),
+                                errorish => error!("scheduled zome call error: {:?}", errorish),
                             }
                         }
                         Result::<(), DatabaseError>::Ok(())
