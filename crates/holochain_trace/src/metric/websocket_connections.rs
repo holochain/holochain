@@ -1,4 +1,4 @@
-use opentelemetry::{global, metrics::ObservableGauge, Context, Key, KeyValue, Value};
+use opentelemetry::{global, metrics::ObservableGauge, Key, KeyValue, Value};
 
 /// Record the number of open connections on a websocket server
 pub struct WebsocketConnectionsMetric {
