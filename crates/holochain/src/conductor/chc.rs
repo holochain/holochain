@@ -6,7 +6,6 @@ use holochain_zome_types::CellId;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
 use url::Url;
-use url2::Url2;
 
 mod chc_local;
 pub use chc_local::*;

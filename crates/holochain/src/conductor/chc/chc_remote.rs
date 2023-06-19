@@ -10,7 +10,6 @@ use holochain_types::{
 };
 use holochain_zome_types::prelude::*;
 use url::Url;
-use url2::Url2;
 
 /// An HTTP client which can talk to a remote CHC implementation
 pub struct ChcRemote {
@@ -30,7 +29,7 @@ impl ChainHeadCoordinator for ChcRemote {
         let response: reqwest::Response = self.client.post("add_records", body).await?;
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
-        dbg!(std::str::from_utf8(&bytes).unwrap());
+        dbg!(status, std::str::from_utf8(&bytes).unwrap());
         dbg!(match status {
             200 => Ok(()),
             409 => {
@@ -72,13 +71,13 @@ impl ChcRemote {
     /// Constructor
     pub fn new(base_url: Url, keystore: MetaLairClient, cell_id: &CellId) -> Self {
         let client = ChcRemoteClient {
-            base_url: dbg!(base_url
+            base_url: base_url
                 .join(&format!(
                     "{}/{}/",
                     cell_id.dna_hash(),
                     cell_id.agent_pubkey()
                 ))
-                .expect("invalid URL")),
+                .expect("invalid URL"),
         };
         Self {
             client,
@@ -96,7 +95,7 @@ pub struct ChcRemoteClient {
 impl ChcRemoteClient {
     fn url(&self, path: &str) -> String {
         assert!(path.chars().nth(0) != Some('/'));
-        dbg!(self.base_url.join(path).expect("invalid URL").to_string())
+        self.base_url.join(path).expect("invalid URL").to_string()
     }
 
     // async fn get(&self, path: &str) -> ChcResult<reqwest::Response> {
@@ -106,7 +105,6 @@ impl ChcRemoteClient {
     async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<reqwest::Response> {
         let client = reqwest::Client::new();
         let url = self.url(path);
-        dbg!(&url);
         client
             .post(url)
             .body(body)

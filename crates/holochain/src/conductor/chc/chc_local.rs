@@ -107,6 +107,7 @@ mod tests {
     use crate::{
         conductor::chc::{ChcRemote, CHC_LOCAL_MAGIC_URL, CHC_LOCAL_MAP},
         sweettest::*,
+        test_utils::valid_arbitrary_chain,
     };
 
     use super::*;
@@ -118,18 +119,78 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_add_actions() {
+    #[ignore = "this test requires a remote service, so it should only be run manually"]
+    async fn test_add_records_remote() {
         let keystore = test_keystore();
         let agent = fake_agent_pubkey_1();
-        let cell_id = CellId::new(fixt!(DnaHash), agent);
+        let cell_id = CellId::new(fixt!(DnaHash), agent.clone());
         let chc = Arc::new(ChcRemote::new(
             url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
-            keystore,
+            keystore.clone(),
             &cell_id,
         ));
-        // let chc = Arc::new(ChcLocal::new(keystore, agent));
-        
-        // assert_eq!(chc.clone().head().await.unwrap(), None);
+
+        let mut g = random_generator();
+
+        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
+        let t0 = &chain[0..3];
+        let t1 = &chain[3..6];
+        let t2 = &chain[6..9];
+        let t11 = &chain[11..=11];
+
+        let hash = |i: usize| chain[i].action_address().clone();
+
+        chc.clone().add_records(t0.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
+        chc.clone().add_records(t1.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
+
+        // last_hash doesn't match
+        assert!(chc.clone().add_records(t0.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t1.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t11.to_vec()).await.is_err());
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
+
+        chc.clone().add_records(t2.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(8));
+
+        assert_eq!(
+            chc.clone().get_record_data(None).await.unwrap(),
+            &chain[0..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(0))).await.unwrap(),
+            &chain[1..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(3))).await.unwrap(),
+            &chain[4..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(7))).await.unwrap(),
+            &chain[8..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(8))).await.unwrap(),
+            &[]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(9))).await.unwrap(),
+            &[]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(13))).await.unwrap(),
+            &[]
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_add_records_local() {
+        let keystore = test_keystore();
+        let agent = fake_agent_pubkey_1();
+        let chc = Arc::new(ChcLocal::new(keystore, agent));
+
+        assert_eq!(chc.clone().head().await.unwrap(), None);
 
         let hash = |x| TestChainHash(x).real();
         let item = |x| Record::new(TestChainItem::new(x).real(), None);

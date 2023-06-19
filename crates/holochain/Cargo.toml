@@ -84,6 +84,7 @@ wasmer-middlewares = "2"
 
 # Dependencies for test_utils
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
+contrafact = {version = "0.2.0-dev.3", optional = true }
 diff = {version = "0.1", optional = true }
 hdk = { version = "^0.3.0-beta-dev.3", path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }
@@ -107,7 +108,6 @@ holochain = { path = ".", features = ["test_utils"] }
 
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
-contrafact = "0.2.0-dev.3"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
 ed25519-dalek = "1"
 indoc = "1.0"
@@ -154,6 +154,7 @@ tx5 = [ "kitsune_p2p/tx5", "tx5-go-pion-turn", "tx5-signal-srv" ]
 # Exposes additional functionality only needed for integration tests.
 # This feature should be turned off for production builds.
 test_utils = [
+  "contrafact",
   "diff",
   "ghost_actor/test_utils",
   "hdk/test_utils",

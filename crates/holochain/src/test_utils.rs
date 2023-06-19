@@ -59,6 +59,9 @@ pub mod network_simulation;
 mod wait_for;
 pub use wait_for::*;
 
+mod generate_records;
+pub use generate_records::*;
+
 pub use crate::sweettest::sweet_consistency::*;
 
 use self::consistency::request_published_ops;

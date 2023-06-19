@@ -107,7 +107,7 @@ pub fn is_not_entry_action<'a>() -> FactsRef<'a, Action> {
 }
 
 /// WIP: Fact: The actions form a valid SourceChain
-pub fn valid_chain(author: AgentPubKey) -> Facts<Action> {
+pub fn valid_chain<'a>(author: AgentPubKey) -> FactsRef<'a, Action> {
     facts![ValidChainFact {
         hash: None,
         seq: 0,

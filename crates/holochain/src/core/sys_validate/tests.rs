@@ -33,6 +33,9 @@ use crate::core::workflow::sys_validation_workflow::sys_validate_record;
 use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
 use crate::test_utils::fake_genesis_for_agent;
+use crate::test_utils::rebuild_record;
+use crate::test_utils::sign_record;
+use crate::test_utils::valid_arbitrary_chain;
 use ::fixt::prelude::*;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
@@ -52,24 +55,6 @@ use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
 use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::time::Duration;
-
-async fn sign_record(keystore: &MetaLairClient, action: Action, entry: Option<Entry>) -> Record {
-    Record::new(
-        SignedActionHashed::sign(keystore, ActionHashed::from_content_sync(action))
-            .await
-            .unwrap(),
-        entry,
-    )
-}
-
-pub async fn rebuild_record(record: Record, keystore: &MetaLairClient) -> Record {
-    let (action, entry) = record.into_inner();
-    let mut action = action.into_inner().0.into_content();
-    if let (Some(ed), Some(entry)) = (action.entry_data_mut(), entry.as_option()) {
-        *ed.0 = EntryHash::with_data_sync(entry);
-    }
-    sign_record(keystore, action, entry.into_option()).await
-}
 
 fn matching_record(g: &mut Unstructured, f: impl Fn(&Record) -> bool) -> Record {
     // get anything but a Dna
@@ -966,33 +951,9 @@ async fn valid_chain_fact_test() {
     let n = 100;
     let keystore = SweetConductor::from_standard_config().await.keystore();
     let author = SweetAgents::one(keystore.clone()).await;
-
-    let fact = contrafact::facts![
-        holochain_zome_types::record::facts::action_and_entry_match(false),
-        contrafact::lens(
-            "action is valid",
-            |(a, _)| a,
-            holochain_zome_types::action::facts::valid_chain(author),
-        ),
-    ];
-
     let mut g = random_generator();
 
-    let mut chain: Vec<Record> =
-        futures::future::join_all(contrafact::build_seq(&mut g, n, fact).into_iter().map(
-            |(a, entry)| {
-                let keystore = keystore.clone();
-                async move {
-                    Record::new(
-                        SignedActionHashed::sign(&keystore, ActionHashed::from_content_sync(a))
-                            .await
-                            .unwrap(),
-                        entry.into_option(),
-                    )
-                }
-            },
-        ))
-        .await;
+    let mut chain = valid_arbitrary_chain(&mut g, keystore.clone(), author, n).await;
 
     validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
 
