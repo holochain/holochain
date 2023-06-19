@@ -89,9 +89,9 @@ impl AppString {
 
 /// An InlineZome with simple Create and Read operations
 pub fn simple_crud_zome() -> InlineZomeSet {
-    let string_entry_def = EntryDef::from_id("string");
-    let unit_entry_def = EntryDef::from_id("unit");
-    let bytes_entry_def = EntryDef::from_id("bytes");
+    let string_entry_def = EntryDef::default_from_id("string");
+    let unit_entry_def = EntryDef::default_from_id("unit");
+    let bytes_entry_def = EntryDef::default_from_id("bytes");
 
     SweetInlineZomes::new(vec![string_entry_def, unit_entry_def, bytes_entry_def], 0)
         .function("create_string", move |api, s: AppString| {

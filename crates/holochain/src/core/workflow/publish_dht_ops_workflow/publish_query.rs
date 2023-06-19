@@ -230,13 +230,13 @@ mod tests {
             DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
                 fixt!(Signature),
                 NewEntryAction::Create(action.clone()),
-                Box::new(entry.clone()),
+                entry.clone(),
             ))
         } else {
             DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
                 fixt!(Signature),
                 Action::Create(action.clone()),
-                Some(Box::new(entry.clone())),
+                entry.clone().into(),
             ))
         };
 
