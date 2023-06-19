@@ -68,9 +68,9 @@ tokio = { version = "1.11", features = [ "full"] }
 tokio-stream = { version = "0.1", features = [ "sync", "net" ] }
 task-motel = "0.1.0-rc.1"
 toml = "0.5.6"
-tracing = "0.1.26"
+tracing = "0.1.37"
 tracing-futures = "0.2.5"
-tracing-subscriber = "0.2.19"
+tracing-subscriber = "0.3.16"
 url = "1.7.2"
 url2 = "0.0.6"
 url_serde = "0.2.0"
