@@ -73,6 +73,7 @@ pub fn encode_to_guestptrlen<T: std::fmt::Debug + Serialize>(v: T) -> DoubleUSiz
 #[doc(hidden)]
 #[macro_export]
 macro_rules! map_extern {
+    ( genesis_self_check, $f:ident, $input:ty, $output:ty ) => { map_extern!(genesis_self_check_2, $f, $input, $output); };
     ( $name:tt, $f:ident, $input:ty, $output:ty ) => {
         $crate::paste::paste! {
             mod [< __ $name _extern >] {

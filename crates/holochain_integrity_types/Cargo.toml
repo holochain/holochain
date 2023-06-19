@@ -15,6 +15,7 @@ holochain_serialized_bytes = "=0.0.51"
 paste = "1.0"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
+kitsune_p2p_dht = { version = "0.3.0-beta-dev.0", path = "../kitsune_p2p/dht" }
 
 # Just the bare minimum timestamp with no extra features.
 # TODO: This needs to point to a published version of this crate and be pinned.
@@ -22,6 +23,9 @@ kitsune_p2p_timestamp = { version = "^0.2.0", path = "../kitsune_p2p/timestamp",
 
 # TODO: Figure out how to remove these dependencies.
 subtle = "2"
+
+# full-dna-def dependencies
+derive_builder = { version = "0.9", optional = true }
 
 # Optional
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
@@ -32,6 +36,8 @@ tracing = { version = "0.1", optional = true }
 default = []
 
 full = ["default", "kitsune_p2p_timestamp/full"]
+
+full-dna-def = ["derive_builder"]
 
 test_utils = [
   "arbitrary",
