@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  otelcol:
+    image: registry.hub.docker.com/otel/opentelemetry-collector:0.79.0
+    command: [ --config=/etc/otel-collector-config.yaml ]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - '4317:4317' # OTLP gRPC receiver
+      - '8888:8888' # Prometheus metrics exposed by the collector
+      - '8889:8889' # Prometheus exporter metrics
+    networks:
+      - otel
+  prometheus:
+    image: registry.hub.docker.com/prom/prometheus:v2.44.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-remote-write-receiver"
+      - "--log.level=debug"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+      - metrics:/prometheus
+    ports:
+      - '9090:9090'
+    networks:
+      - otel
+  grafana:
+    image: registry.hub.docker.com/grafana/grafana:10.0.0
+    volumes:
+      - dashboards:/var/lib/grafana
+    ports:
+      - '3000:3000'
+    networks:
+      - otel
+
+volumes:
+  metrics:
+  dashboards:
+
+networks:
+  otel:
