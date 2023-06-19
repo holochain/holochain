@@ -300,9 +300,9 @@ impl MetaNetCon {
                     return Ok(());
                 }
                 MetaNetAuth::UnauthorizedDisconnect => {
-                    return Ok(self
-                        .close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
-                        .await);
+                    self.close(UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON)
+                        .await;
+                    return Ok(());
                 }
             }
         })()

@@ -48,7 +48,6 @@ impl std::fmt::Debug for KitsuneHostImpl {
         f.debug_struct("KitsuneHostImpl")
             .field("tuning_params", &self.tuning_params)
             .field("strat", &self.strat)
-            .field("lair_tag", &self.lair_tag)
             .finish()
     }
 }

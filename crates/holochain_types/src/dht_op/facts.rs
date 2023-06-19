@@ -81,10 +81,12 @@ mod tests {
 
         let e = Entry::arbitrary(&mut Unstructured::new(&NOISE).into()).unwrap();
 
-        let mut hn = not_(action_facts::is_new_entry_action()).build(&mut Unstructured::new(&NOISE).into());
+        let mut hn =
+            not_(action_facts::is_new_entry_action()).build(&mut Unstructured::new(&NOISE).into());
         *hn.author_mut() = agent.clone();
 
-        let mut he = action_facts::is_new_entry_action().build(&mut Unstructured::new(&NOISE).into());
+        let mut he =
+            action_facts::is_new_entry_action().build(&mut Unstructured::new(&NOISE).into());
         *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
         let mut he = Action::from(he);
         *he.author_mut() = agent.clone();

@@ -948,15 +948,17 @@ checksum = "13418e745008f7349ec7e449155f419a61b92b58a99cc3616942b926825ec76b"
 
 [[package]]
 name = "contrafact"
-version = "0.1.0-dev.1"
+version = "0.2.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6231a9c847846745ffad14917538e99182408b3987e89a11d86a37677dbb3c01"
+checksum = "40d694ba695770cd8a7af00d141a96c633960844ef9ccbf15e0bcabe25861301"
 dependencies = [
  "anyhow",
  "arbitrary",
  "derive_more",
  "itertools 0.10.5",
  "num",
+ "once_cell",
+ "rand 0.7.3",
  "tracing",
 ]
 
@@ -3093,7 +3095,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",

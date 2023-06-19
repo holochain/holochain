@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use arbitrary::{Arbitrary};
+use arbitrary::Arbitrary;
 use contrafact::*;
 use holo_hash::*;
 
@@ -111,7 +111,11 @@ mod tests {
 
     #[test]
     fn test_valid_chain_fact() {
-        let chain = build_seq(&mut Unstructured::new(&crate::NOISE).into(), 5, valid_chain());
+        let chain = build_seq(
+            &mut Unstructured::new(&crate::NOISE).into(),
+            5,
+            valid_chain(),
+        );
         check_seq(chain.as_slice(), valid_chain()).unwrap();
 
         let hashes: Vec<_> = chain
