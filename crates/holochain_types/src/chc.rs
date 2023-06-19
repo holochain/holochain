@@ -46,10 +46,9 @@ pub trait ChainHeadCoordinatorExt:
         let (keystore, agent) = self.signing_info();
         let this = self.clone();
         async move {
-            this.add_records_request(
-                AddRecordPayload::from_records(keystore, agent, records).await?,
-            )
-            .await
+            let payload = AddRecordPayload::from_records(keystore, agent, records).await?;
+            dbg!(serde_json::to_string(&payload).unwrap());
+            this.add_records_request(payload).await
         }
         .boxed()
         .into()

@@ -30,7 +30,7 @@ impl ChainHeadCoordinator for ChcRemote {
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
         dbg!(status, std::str::from_utf8(&bytes).unwrap());
-        dbg!(match status {
+        match status {
             200 => Ok(()),
             409 => {
                 let (seq, hash): (u32, ActionHash) = serde_json::from_slice(&bytes)?;
@@ -41,10 +41,11 @@ impl ChainHeadCoordinator for ChcRemote {
                 Err(ChcError::NoRecordsAdded(msg))
             }
             code => {
-                let msg: String = serde_json::from_slice(&bytes)?;
+                let msg =
+                    std::str::from_utf8(&bytes).map_err(|e| ChcError::Other(e.to_string()))?;
                 Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
             }
-        })
+        }
     }
 
     async fn get_record_data_request(
