@@ -22,6 +22,7 @@ use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::*;
 use url2::url2;
@@ -69,7 +70,8 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
             futures::pin_mut!(listener);
 
             #[cfg(feature = "otel")]
-            let conn_metric = holochain_trace::metric::WebsocketConnectionsMetric::new(port);
+            let conn_metric =
+                holochain_trace::metric::WebsocketConnectionsMetric::new("admin", port);
 
             // establish a new connection to a client
             while let Some(connection) = listener.next().await {
@@ -80,6 +82,7 @@ pub fn spawn_admin_interface_tasks<A: InterfaceApi>(
                             // which will close it.
                             continue;
                         };
+
                         tokio::task::spawn(recv_incoming_admin_msgs(
                             api.clone(),
                             rx_from_iface,
@@ -123,19 +126,29 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
     tm.add_conductor_task_ignored("app interface websocket closer", |stop| {
         handle.close_on(stop.map(|_| true)).map(Ok)
     });
-    tm.add_conductor_task_ignored("app interface new connection handler", |_stop| {
+    tm.add_conductor_task_ignored("app interface new connection handler", move |_stop| {
         async move {
+            let mut active_connections = Vec::new();
+
+            #[cfg(feature = "otel")]
+            let conn_metric = holochain_trace::metric::WebsocketConnectionsMetric::new("app", port);
+
             // establish a new connection to a client
             while let Some(connection) = listener.next().await {
+                active_connections.retain_mut(|handle: &mut JoinHandle<()>| !handle.is_finished());
+
                 match connection {
                     Ok((tx_to_iface, rx_from_iface)) => {
                         let rx_from_cell = signal_broadcaster.subscribe();
-                        spawn_recv_incoming_msgs_and_outgoing_signals(
+                        active_connections.push(spawn_recv_incoming_msgs_and_outgoing_signals(
                             api.clone(),
                             rx_from_iface,
                             rx_from_cell,
                             tx_to_iface,
-                        );
+                        ));
+
+                        #[cfg(feature = "otel")]
+                        conn_metric.record_current(active_connections.len() as u64);
                     }
                     Err(err) => {
                         warn!("Admin socket connection failed: {}", err);
@@ -179,7 +192,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     rx_from_iface: WebsocketReceiver,
     rx_from_cell: broadcast::Receiver<Signal>,
     tx_to_iface: WebsocketSender,
-) {
+) -> JoinHandle<()> {
     use futures::stream::StreamExt;
 
     trace!("CONNECTION: {}", rx_from_iface.remote_addr());
@@ -215,7 +228,7 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
                 error!(?err, "error handling websocket message");
             }
         }
-    }));
+    }))
 }
 
 /// Handles messages on all interfaces

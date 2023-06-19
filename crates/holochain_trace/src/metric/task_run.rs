@@ -1,4 +1,4 @@
-use opentelemetry::{global, metrics::Counter, Context, Key, KeyValue, Value};
+use opentelemetry::{global, metrics::Counter, Context, Key, KeyValue, StringValue, Value};
 
 /// Record run cycles for a Tokio task.
 pub struct TaskRunMetric {
@@ -8,7 +8,10 @@ pub struct TaskRunMetric {
 
 impl TaskRunMetric {
     /// Create a new metric handle with a unique name for the current task.
-    pub fn new(task_name: &'static str) -> Self {
+    pub fn new<T>(task_name: T) -> Self
+    where
+        T: Into<StringValue>,
+    {
         let meter = global::meter("holochain.task");
         let counter = meter.u64_counter("run_count").init();
 
