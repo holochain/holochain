@@ -109,7 +109,7 @@ const MAX_HISTORY: usize = 10;
 /// The history of gossip with an agent on a remote node.
 /// We record metrics per agent,
 pub struct PeerAgentHistory {
-    /// Sucessful and unsuccessful messages from the remote
+    /// Successful and unsuccessful messages from the remote
     /// can be combined to estimate a "reachability quotient"
     /// between 1 (or 0 if empty) and 100. Errors are weighted
     /// heavier because we retry less frequently.
@@ -119,7 +119,7 @@ pub struct PeerAgentHistory {
     pub latency_micros: RunAvg,
     /// Times we recorded successful initiates to this node (they accepted).
     pub initiates: VecDeque<RoundMetric>,
-    /// Times we recorded initates from this node (we accepted).
+    /// Times we recorded initiates from this node (we accepted).
     pub accepts: VecDeque<RoundMetric>,
     /// Times we recorded complete rounds for this node.
     pub successes: VecDeque<RoundMetric>,

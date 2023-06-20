@@ -106,7 +106,15 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         MustBoxFuture::new(async move {
             match pub_key.verify_detached(sig.into(), data).await {
                 Ok(b) => b,
-                _ => false,
+                Err(e) => {
+                    tracing::error!(
+                        "Signature failed to verify: {:?}. Signature: {:?}, Pub key: {}",
+                        e,
+                        sig,
+                        pub_key
+                    );
+                    false
+                }
             }
         })
     }

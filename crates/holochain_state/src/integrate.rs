@@ -129,12 +129,12 @@ fn filter_private_entry(op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
         matches!(et.visibility(), EntryVisibility::Private)
     });
 
-    if is_private_entry && op.entry().is_some() {
+    if is_private_entry && op.entry().into_option().is_some() {
         let (op, hash) = op.into_inner();
         let op_type = op.get_type();
-        let (signature, action, _) = op.into_inner();
+        let (signature, action) = (op.signature(), op.action());
         Ok(DhtOpHashed::with_pre_hashed(
-            DhtOp::from_type(op_type, SignedAction(action, signature), None)?,
+            DhtOp::from_type(op_type, SignedAction(action, signature.clone()), None)?,
             hash,
         ))
     } else {

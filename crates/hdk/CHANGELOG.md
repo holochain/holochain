@@ -1,11 +1,33 @@
 ---
-default_semver_increment_mode: !pre_minor beta-rc
+default_semver_increment_mode: !pre_minor beta-dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+- New v2 of dna info returns full modifiers not just properties. Removed from genesis self check in favour of hdk call. [\#2366](https://github.com/holochain/holochain/pull/2366).
+
+## 0.3.0-beta-dev.4
+
+## 0.3.0-beta-dev.3
+
+## 0.3.0-beta-dev.2
+
+- Add new HDK function `count_links` which accepts a filter that can be applied remotely. This is a more optimal alternative to requesting all links and counting them within a zome function.
+
+## 0.3.0-beta-dev.1
+
+## 0.3.0-beta-dev.0
+
+## 0.2.0
+
+## 0.2.0-beta-rc.6
+
+## 0.2.0-beta-rc.5
+
+## 0.2.0-beta-rc.4
 
 ## 0.2.0-beta-rc.3
 
@@ -16,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.2.0-beta-rc.0
 
 - Add block/unblock agent functions to HDK [\#1828](https://github.com/holochain/holochain/pull/1828)
+- Rewrite hdk documentation and add links to conductor API docs.
 
 ## 0.1.0
 
@@ -249,14 +272,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - hdk: Now supports deserializing countersigned entries in app entry `try_from`
 
 - hdk: implements multi-call for:
-  
+
   - `remote_call`
   - `call`
   - `get`
   - `get_details`
   - `get_links`
   - `get_link_details`
-  
+
   We strictly only needed `remote_call` for countersigning, but feedback from the community was that having to sequentially loop over these common HDK functions is a pain point, so we enabled all of them to be async over a vector of inputs.
 
 ## 0.0.102

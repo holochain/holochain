@@ -8,6 +8,7 @@ const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum EntryDefId {
     App(AppEntryName),
     CapClaim,
@@ -20,6 +21,13 @@ pub enum EntryDefId {
 /// Identifier for an entry definition.
 /// This may be removed.
 pub struct AppEntryName(pub Cow<'static, str>);
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for AppEntryName {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self(Cow::Owned(String::arbitrary(u)?)))
+    }
+}
 
 /// Trait for binding static [`EntryDef`] property access for a type.
 /// This trait maps a type to its corresponding [`EntryDef`] property
@@ -38,11 +46,13 @@ pub trait EntryDefRegistration {
 )]
 /// The number of validations required for an entry to
 /// be considered published.
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct RequiredValidations(pub u8);
 
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct EntryDef {
     /// Zome-unique identifier for this entry type
     pub id: EntryDefId,
@@ -143,7 +153,7 @@ impl EntryDef {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    pub fn from_id<I: Into<EntryDefId>>(id: I) -> Self {
+    pub fn default_from_id<I: Into<EntryDefId>>(id: I) -> Self {
         EntryDef {
             id: id.into(),
             ..Default::default()

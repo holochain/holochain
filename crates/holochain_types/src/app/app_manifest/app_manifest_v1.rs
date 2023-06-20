@@ -89,8 +89,6 @@ pub struct AppRoleDnaManifest {
     pub installed_hash: Option<DnaHashB64>,
 
     /// Allow up to this many "clones" to be created at runtime.
-    /// Each runtime clone is created by the `CreateClone` strategy,
-    /// regardless of the provisioning strategy set in the manifest.
     /// Default: 0
     #[serde(default)]
     pub clone_limit: u32,
@@ -122,18 +120,23 @@ pub type DnaLocation = mr_bundle::Location;
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
-    /// Always create a new Cell when installing the App,
-    /// and use a unique network seed to ensure a distinct DHT network
-    CreateClone { deferred: bool },
-    /// Require that a Cell is already installed which matches the DNA installed_hash
-    /// spec, and which has an Agent that's associated with this App's agent
-    /// via DPKI. If no such Cell exists, *app installation fails*.
-    UseExisting { deferred: bool },
-    /// Try `UseExisting`, and if that fails, fallback to `Create`
-    CreateIfNotExists { deferred: bool },
-    /// Disallow provisioning altogether. In this case, we expect
-    /// `clone_limit > 0`: otherwise, no Cells will ever be created.
-    Disabled,
+
+    /*
+        TODO: implement
+
+        /// Require that a Cell is already installed which matches the DNA installed_hash
+        /// spec, and which has an Agent that's associated with this App's agent
+        /// via DPKI. If no such Cell exists, *app installation fails*.
+        UseExisting { deferred: bool },
+
+        /// Try `UseExisting`, and if that fails, fallback to `Create`
+        CreateIfNotExists { deferred: bool },
+
+    */
+    /// Install or locate the DNA, but never create a Cell for this DNA.
+    /// Only allow clones to be created from the DNA specified.
+    /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
+    CloneOnly,
 }
 
 impl Default for CellProvisioning {
@@ -152,12 +155,11 @@ impl AppManifestV1 {
     // we know we need it, since this way is substantially simpler.
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         for mut role in self.roles.iter_mut() {
-            if !matches!(
-                role.provisioning.clone().unwrap_or_default(),
-                CellProvisioning::CreateClone { .. } | CellProvisioning::UseExisting { .. }
-            ) {
-                // Only update the network seed for roles for which it makes sense to do so
-                role.dna.modifiers.network_seed = Some(network_seed.clone());
+            // Only update the network seed for roles for which it makes sense to do so
+            match role.provisioning.clone().unwrap_or_default() {
+                CellProvisioning::Create { .. } | CellProvisioning::CloneOnly => {
+                    role.dna.modifiers.network_seed = Some(network_seed.clone());
+                }
             }
         }
     }
@@ -194,43 +196,36 @@ impl AppManifestV1 {
                             modifiers,
                             installed_hash,
                         },
-                        CellProvisioning::CreateClone { deferred } => {
-                            AppRoleManifestValidated::CreateClone {
-                                deferred,
-                                clone_limit,
-                                location: Self::require(location, "roles.dna.(path|url)")?,
-                                modifiers,
-                                installed_hash,
-                            }
-                        }
-                        CellProvisioning::UseExisting { deferred } => {
-                            AppRoleManifestValidated::UseExisting {
-                                deferred,
-                                clone_limit,
-                                installed_hash: Self::require(
-                                    installed_hash,
-                                    "roles.dna.installed_hash",
-                                )?,
-                            }
-                        }
-                        CellProvisioning::CreateIfNotExists { deferred } => {
-                            AppRoleManifestValidated::CreateIfNotExists {
-                                deferred,
-                                clone_limit,
-                                location: Self::require(location, "roles.dna.(path|url)")?,
-                                installed_hash: Self::require(
-                                    installed_hash,
-                                    "roles.dna.installed_hash",
-                                )?,
-                                modifiers,
-                            }
-                        }
-                        CellProvisioning::Disabled => AppRoleManifestValidated::Disabled {
+                        // CellProvisioning::UseExisting { deferred } => {
+                        //     AppRoleManifestValidated::UseExisting {
+                        //         deferred,
+                        //         clone_limit,
+                        //         installed_hash: Self::require(
+                        //             installed_hash,
+                        //             "roles.dna.installed_hash",
+                        //         )?,
+                        //     }
+                        // }
+                        // CellProvisioning::CreateIfNotExists { deferred } => {
+                        //     AppRoleManifestValidated::CreateIfNotExists {
+                        //         deferred,
+                        //         clone_limit,
+                        //         location: Self::require(location, "roles.dna.(path|url)")?,
+                        //         installed_hash: Self::require(
+                        //             installed_hash,
+                        //             "roles.dna.installed_hash",
+                        //         )?,
+                        //         modifiers,
+                        //     }
+                        // }
+                        CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
+                            location: Self::require(location, "roles.dna.(path|url)")?,
                             installed_hash: Self::require(
                                 installed_hash,
                                 "roles.dna.installed_hash",
                             )?,
+                            modifiers,
                         },
                     };
                     AppManifestResult::Ok((name, validated))
@@ -358,14 +353,14 @@ roles:
         manifest.roles = vec![
             AppRoleManifest::arbitrary(&mut u).unwrap(),
             AppRoleManifest::arbitrary(&mut u).unwrap(),
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
+            // AppRoleManifest::arbitrary(&mut u).unwrap(),
+            // AppRoleManifest::arbitrary(&mut u).unwrap(),
         ];
         manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });
         manifest.roles[1].provisioning = Some(CellProvisioning::Create { deferred: false });
-        manifest.roles[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
-        manifest.roles[3].provisioning =
-            Some(CellProvisioning::CreateIfNotExists { deferred: false });
+        // manifest.roles[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
+        // manifest.roles[3].provisioning =
+        //     Some(CellProvisioning::CreateIfNotExists { deferred: false });
 
         let network_seed = NetworkSeed::from("blabla");
         manifest.set_network_seed(network_seed.clone());
@@ -379,15 +374,15 @@ roles:
             manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
-        assert_eq!(
-            manifest.roles[3].dna.modifiers.network_seed.as_ref(),
-            Some(&network_seed)
-        );
+        // assert_eq!(
+        //     manifest.roles[3].dna.modifiers.network_seed.as_ref(),
+        //     Some(&network_seed)
+        // );
 
-        // - The others do not.
-        assert_ne!(
-            manifest.roles[2].dna.modifiers.network_seed.as_ref(),
-            Some(&network_seed)
-        );
+        // // - The others do not.
+        // assert_ne!(
+        //     manifest.roles[2].dna.modifiers.network_seed.as_ref(),
+        //     Some(&network_seed)
+        // );
     }
 }

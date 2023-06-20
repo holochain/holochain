@@ -58,6 +58,20 @@ script-holochain-tests-all
 
 Or use `script-holochain-tests-unit-all` if you don't want to run the static checks (cargo doc, cargo fmt and cargo clippy, but all of these this will be RUN on CI.
 
+### Filtering tests
+
+To run the tests for a specific package you can pass a filter to `nextest`
+
+```shell
+env NEXTEST_EXTRA_ARGS="-E 'package(hdk)'" nix build --impure --override-input holochain . .#build-holochain-tests-unit
+```
+
+Or you can select a test by name
+
+```shell
+env NEXTEST_EXTRA_ARGS="-E 'test(paths_exists)'" nix build --impure --override-input holochain . .#build-holochain-tests-unit
+```
+
 ### Using `cargo test` manually
 
 - To run only one test from your crate, run this command:
@@ -70,6 +84,8 @@ cargo test [NAME_OF_THE_TEST_FUNCTION] --lib  --features 'slow_tests build_wasms
 If the test is located in a crate other than `holochain`, `cd` into its folder instead.
 
 ## Adding a test
+
+The documentation for the Holochain test harness is [here](https://docs.rs/holochain/latest/holochain/sweettest/index.html). Or you can run `cargo doc -p holochain --open` to view the documentation from your current branch. 
 
 The simplest way to add a new test is to locate a similar test, copy and paste it, and modify the necessary instructions to test what you want. Don't forget to change its name. Note that these tests are for testing holochain core, and not the wasms themselves. To unit test a wasm, the test should be added to the wasm.
 

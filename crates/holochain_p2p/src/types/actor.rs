@@ -7,6 +7,7 @@ use holochain_types::activity::AgentActivityResponse;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
+use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 /// Holochain-specific FetchContext extension trait.
 pub trait FetchContextExt {
@@ -246,7 +247,7 @@ ghost_actor::ghost_chan! {
     /// actor instance.
     pub chan HolochainP2p<HolochainP2pError> {
         /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
-        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey, initial_arc: Option<crate::dht_arc::DhtArc>) -> ();
+        fn join(dna_hash: DnaHash, agent_pub_key: AgentPubKey, maybe_agent_info: Option<AgentInfoSigned>, initial_arc: Option<crate::dht_arc::DhtArc>) -> ();
 
         /// If a cell is disabled, we'll need to \"leave\" the network module as well.
         fn leave(dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> ();
@@ -321,6 +322,12 @@ ghost_actor::ghost_chan! {
             link_key: WireLinkKey,
             options: GetLinksOptions,
         ) -> Vec<WireLinkOps>;
+
+        /// Get a count of links from the DHT.
+        fn count_links(
+            dna_hash: DnaHash,
+            query: WireLinkQuery,
+        ) -> CountLinksResponse;
 
         /// Get agent activity from the DHT.
         fn get_agent_activity(

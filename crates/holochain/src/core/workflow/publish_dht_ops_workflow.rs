@@ -23,6 +23,7 @@ use std::time;
 use tracing::*;
 
 mod publish_query;
+pub use publish_query::get_ops_to_publish;
 
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
@@ -43,7 +44,7 @@ pub async fn publish_dht_ops_workflow(
     let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
 
     // Commit to the network
-    tracing::info!("publishing to {} nodes", to_publish.len());
+    tracing::info!("publishing {} ops", to_publish.len());
     let mut success = Vec::new();
     for (basis, list) in to_publish {
         let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
@@ -233,7 +234,7 @@ mod tests {
         // Join some agents onto the network
         // Skip the first agent as it has already joined
         for agent in agents.into_iter().skip(1) {
-            HolochainP2pRef::join(&network, dna.clone(), agent, None)
+            HolochainP2pRef::join(&network, dna.clone(), agent, None, None)
                 .await
                 .unwrap();
         }
@@ -499,7 +500,7 @@ mod tests {
                     let expected_op = DhtOp::StoreRecord(
                         sig,
                         entry_create_action.into_content().try_into().unwrap(),
-                        None,
+                        RecordEntry::NA,
                     );
                     let op_hash = expected_op.to_hash();
 
@@ -510,8 +511,11 @@ mod tests {
                     let (entry_update_action, sig) = entry_update_action.into_inner();
                     let entry_update_action: Update =
                         entry_update_action.into_content().try_into().unwrap();
-                    let expected_op =
-                        DhtOp::StoreRecord(sig.clone(), entry_update_action.clone().into(), None);
+                    let expected_op = DhtOp::StoreRecord(
+                        sig.clone(),
+                        entry_update_action.clone().into(),
+                        RecordEntry::NA,
+                    );
                     let op_hash = expected_op.to_hash();
 
                     map.insert(op_hash, (expected_op, store_record_count.clone()));
@@ -519,7 +523,7 @@ mod tests {
                     let expected_op = DhtOp::RegisterUpdatedContent(
                         sig.clone(),
                         entry_update_action.clone(),
-                        None,
+                        RecordEntry::NA,
                     );
                     let op_hash = expected_op.to_hash();
 
@@ -527,7 +531,7 @@ mod tests {
                     let expected_op = DhtOp::RegisterUpdatedRecord(
                         sig.clone(),
                         entry_update_action.clone(),
-                        None,
+                        RecordEntry::NA,
                     );
                     let op_hash = expected_op.to_hash();
 
@@ -606,7 +610,7 @@ mod tests {
                 {
                     let network = test_network.network();
                     for agent in agents {
-                        HolochainP2pRef::join(&network, dna.clone(), agent, None)
+                        HolochainP2pRef::join(&network, dna.clone(), agent, None, None)
                             .await
                             .unwrap()
                     }

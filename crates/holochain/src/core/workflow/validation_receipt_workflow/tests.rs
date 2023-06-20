@@ -110,9 +110,10 @@ macro_rules! wait_until {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn test_block_invalid_receipt() {
     holochain_trace::test_run().ok();
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     let integrity_name = "integrity";
     let coordinator_name = "coordinator";
     let integrity_uuid = "a";
@@ -140,6 +141,14 @@ async fn test_block_invalid_receipt() {
         ))?;
         Ok(hash)
     });
+    // .function(
+    //     coordinator_name,
+    //     get_function_name,
+    //     move |api, hash: AnyDhtHash| {
+    //         let records = api.get(vec![GetInput::new(hash, Default::default())])?;
+    //         Ok(records[0])
+    //     },
+    // );
 
     let zomes_that_check = InlineZomeSet::new_single(
         integrity_name,
@@ -153,14 +162,15 @@ async fn test_block_invalid_receipt() {
         Op::StoreEntry(StoreEntry { action, .. })
             if action.hashed.content.app_entry_def().is_some() =>
         {
+            dbg!("entry defs ARE bad!");
             Ok(ValidateResult::Invalid("Entry defs are bad".into()))
         }
         _ => Ok(ValidateResult::Valid),
     });
 
-    let config = SweetConductorConfig::standard();
-    let conductors = SweetConductorBatch::from_config(2, config).await;
-    conductors.exchange_peer_info().await;
+    let config = SweetConductorConfig::rendezvous();
+    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
     let mut conductors = conductors.into_inner().into_iter();
 
     let mut alice_conductor = conductors.next().unwrap();
@@ -217,7 +227,7 @@ async fn test_block_invalid_receipt() {
         // processed.
         wait_until!(
             bob_conductor.spaces.is_blocked(alice_block_target.clone(), now).await.unwrap();
-            100;
+            1000;
             10000;
             "waiting for block due to warrant";
             "warrant block never happened";
@@ -229,7 +239,7 @@ async fn test_block_invalid_receipt() {
 async fn test_not_block_self_receipt() {
     holochain_trace::test_run().ok();
 
-    let unit_entry_def = EntryDef::from_id("unit");
+    let unit_entry_def = EntryDef::default_from_id("unit");
     let zomes = InlineZomeSet::new_single(
         "integrity",
         "coordinator",

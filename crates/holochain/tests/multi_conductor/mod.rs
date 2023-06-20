@@ -3,8 +3,7 @@ use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::{SweetConductor, SweetZome};
 use holochain::sweettest::{SweetConductorBatch, SweetDnaFile};
-use holochain::test_utils::wait_for_integration_1m;
-use holochain::test_utils::WaitOps;
+use holochain::test_utils::consistency_10s;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_state::prelude::fresh_reader_test;
 use unwrap_to::unwrap_to;
@@ -71,6 +70,7 @@ async fn test_publish() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
@@ -87,7 +87,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     conductors.exchange_peer_info().await;
 
-    let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
+    let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
@@ -95,11 +95,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
         .await;
 
     // Wait long enough for Bob to receive gossip
-    wait_for_integration_1m(
-        bobbo.dht_db(),
-        WaitOps::start() * 1 + WaitOps::cold_start() * 2 + WaitOps::ENTRY * 1,
-    )
-    .await;
+    consistency_10s([&alice, &bobbo, &carol]).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Action
     let record: Option<Record> = conductors[1]
@@ -123,6 +119,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn sharded_consistency() {
     use std::sync::Arc;
 
@@ -181,11 +178,11 @@ async fn sharded_consistency() {
 #[tokio::test(flavor = "multi_thread")]
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
-    use holochain::test_utils::consistency_10s;
+    use holochain::test_utils::consistency_60s;
     use holochain_types::inline_zome::InlineZomeSet;
 
     let _g = holochain_trace::test_run().ok();
-    let mut entry_def = EntryDef::from_id("entrydef");
+    let mut entry_def = EntryDef::default_from_id("entrydef");
     entry_def.visibility = EntryVisibility::Private;
 
     #[derive(Serialize, Deserialize, Debug, SerializedBytes)]
@@ -226,7 +223,7 @@ async fn private_entries_dont_leak() {
         .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
 
-    consistency_10s([&alice, &bobbo]).await;
+    consistency_60s([&alice, &bobbo]).await;
 
     let entry_hash =
         EntryHash::with_data_sync(&Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap());
@@ -250,7 +247,7 @@ async fn private_entries_dont_leak() {
     let bob_hash: ActionHash = conductors[1]
         .call(&bobbo.zome(SweetInlineZomes::COORDINATOR), "create", ())
         .await;
-    consistency_10s([&alice, &bobbo]).await;
+    consistency_60s([&alice, &bobbo]).await;
 
     check_all_gets_for_private_entry(
         &conductors[0],

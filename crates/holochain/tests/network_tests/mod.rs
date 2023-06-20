@@ -73,7 +73,7 @@ async fn get_updates_cache() {
 
     {
         // Construct the cascade with a network
-        let mut cascade = workspace.cascade(network);
+        let cascade = workspace.cascade(network);
 
         // Call fetch record
         cascade
@@ -119,7 +119,7 @@ async fn get_meta_updates_meta_cache() {
 
     let returned = {
         // Construct the cascade with a network
-        let mut cascade = workspace.cascade(network);
+        let cascade = workspace.cascade(network);
 
         // Create GetMetaOptions
         let options = GetMetaOptions::default();

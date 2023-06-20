@@ -17,6 +17,7 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
+        maybe_agent_info: Option<AgentInfoSigned>,
         initial_arc: Option<crate::dht_arc::DhtArc>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
@@ -109,6 +110,14 @@ impl HolochainP2pHandler for StubNetwork {
         link_key: WireLinkKey,
         options: actor::GetLinksOptions,
     ) -> HolochainP2pHandlerResult<Vec<WireLinkOps>> {
+        Err("stub".into())
+    }
+
+    fn handle_count_links(
+        &mut self,
+        dna_hash: DnaHash,
+        query: WireLinkQuery,
+    ) -> HolochainP2pHandlerResult<CountLinksResponse> {
         Err("stub".into())
     }
 
@@ -294,8 +303,8 @@ mod tests {
             }
         });
 
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         let zome_name: ZomeName = "".into();
         let fn_name: FunctionName = "".into();
@@ -376,8 +385,8 @@ mod tests {
             }
         });
 
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         p2p.send_validation_receipt(dna, a1, UnsafeBytes::from(b"receipt-test".to_vec()).into())
             .await
@@ -449,9 +458,9 @@ mod tests {
             }
         });
 
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a3.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a3.clone(), None, None).await.unwrap();
 
         let action_hash = holo_hash::OpBasis::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
@@ -550,9 +559,9 @@ mod tests {
         });
 
         tracing::info!("test - join1");
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
         tracing::info!("test - join2");
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
@@ -636,8 +645,8 @@ mod tests {
             }
         });
 
-        p2p.join(dna.clone(), a1.clone(), None).await.unwrap();
-        p2p.join(dna.clone(), a2.clone(), None).await.unwrap();
+        p2p.join(dna.clone(), a1.clone(), None, None).await.unwrap();
+        p2p.join(dna.clone(), a2.clone(), None, None).await.unwrap();
 
         let hash = holo_hash::EntryHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
