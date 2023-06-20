@@ -5,7 +5,7 @@
         "builtIn": 1,
         "datasource": {
           "type": "prometheus",
-          "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+          "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
         },
         "enable": true,
         "hide": true,
@@ -31,7 +31,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
       },
       "description": "",
       "fieldConfig": {
@@ -109,7 +109,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
           },
           "editorMode": "builder",
           "expr": "rate(run_count_total[5m])",
@@ -124,7 +124,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
       },
       "description": "",
       "fieldConfig": {
@@ -176,7 +176,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
           },
           "editorMode": "builder",
           "expr": "sum by(listen_port) (conn_count{designation=\"admin\"})",
@@ -193,7 +193,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
       },
       "description": "",
       "fieldConfig": {
@@ -245,7 +245,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
           },
           "editorMode": "builder",
           "expr": "sum by(listen_port) (conn_count{designation=\"app\"})",
@@ -262,7 +262,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
       },
       "description": "",
       "fieldConfig": {
@@ -342,10 +342,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(request_response_duration_sum{handler_name=\"ws_admin_request_response_duration\"}[5m])) * 1000) / sum(rate(request_response_duration_count{handler_name=\"ws_admin_request_response_duration\"}[5m]))",
+          "expr": "(sum(rate(request_response_duration_sum{handler_name=\"ws_admin_request_response_duration\"}[5m]))) / sum(rate(request_response_duration_count{handler_name=\"ws_admin_request_response_duration\"}[5m]))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -360,7 +360,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
       },
       "description": "",
       "fieldConfig": {
@@ -440,10 +440,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "a37ed3b7-b734-44b7-b9c2-bc0f700d96ce"
+            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(request_response_duration_sum{handler_name=\"ws_app_request_response_duration\"}[5m])) * 1000) / sum(rate(request_response_duration_count{handler_name=\"ws_app_request_response_duration\"}[5m]))",
+          "expr": "(sum(rate(request_response_duration_sum{handler_name=\"ws_app_request_response_duration\"}[5m]))) / sum(rate(request_response_duration_count{handler_name=\"ws_app_request_response_duration\"}[5m]))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -454,9 +454,92 @@
       ],
       "title": "App websocket request/response duration",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 31
+      },
+      "id": 6,
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "scheme",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "RdYlBu",
+          "steps": 100
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": false
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "reverse": false,
+          "unit": "ms"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(rate(request_response_duration_bucket{handler_name=\"ws_app_request_response_duration\"}[5m])) by (le)",
+          "format": "heatmap",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "{{ le }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "App websocket request/response duration heatmap",
+      "type": "heatmap"
     }
   ],
-  "refresh": "",
+  "refresh": false,
   "schemaVersion": 38,
   "style": "dark",
   "tags": [],
@@ -471,6 +554,6 @@
   "timezone": "",
   "title": "Holochain",
   "uid": "da55d77b-6578-452d-855d-aac0650db794",
-  "version": 4,
+  "version": 8,
   "weekStart": ""
 }
