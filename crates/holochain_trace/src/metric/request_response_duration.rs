@@ -5,7 +5,7 @@ use std::time::Duration;
 #[derive(Clone)]
 pub struct RequestResponseDurationMetric {
     attributes: Vec<KeyValue>,
-    hist: Histogram<f64>,
+    hist: Histogram<u64>,
 }
 
 impl RequestResponseDurationMetric {
@@ -15,7 +15,7 @@ impl RequestResponseDurationMetric {
         T: Into<StringValue>,
     {
         let meter = global::meter("holochain.request_response");
-        let histogram = meter.f64_histogram("request_response_duration").init();
+        let histogram = meter.u64_histogram("request_response_duration").init();
 
         RequestResponseDurationMetric {
             attributes: vec![KeyValue {
@@ -30,6 +30,6 @@ impl RequestResponseDurationMetric {
     pub fn record_duration(&self, duration: Duration) {
         let ctx = Context::current();
         self.hist
-            .record(&ctx, duration.as_secs_f64(), &self.attributes);
+            .record(&ctx, duration.as_millis() as u64, &self.attributes);
     }
 }
