@@ -48,6 +48,8 @@ members = [
 
 exclude = ["crates/release-automation"]
 
+resolver = "2"
+
 [profile.fast-test]
 inherits = "dev"
 debug = 1
