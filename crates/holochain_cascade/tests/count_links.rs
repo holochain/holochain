@@ -1,6 +1,6 @@
 use hdk::prelude::Timestamp;
 use holochain_cascade::test_utils::*;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::test_authored_db;
@@ -29,7 +29,7 @@ async fn count_links_not_authority() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
     let count = cascade
         .dht_count_links(td.link_query.clone())
@@ -69,7 +69,7 @@ async fn count_links_authority() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_network(mock, cache.to_db())
         .with_authored(vault.to_db().into());
 
@@ -123,7 +123,7 @@ async fn count_links_authoring() {
     let mock = MockNetwork::new(mock);
 
     // Cascade
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_network(mock.clone(), cache.to_db())
         .with_scratch(scratch.clone().into_sync());
 
@@ -142,7 +142,7 @@ async fn count_links_authoring() {
     )
     .unwrap();
 
-    let cascade = Cascade::empty()
+    let cascade = CascadeImpl::empty()
         .with_network(mock, cache.to_db())
         .with_scratch(scratch.into_sync());
 
@@ -172,7 +172,7 @@ async fn count_links_with_filters() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
     // Negative check for `after`
     let mut query = td.link_query.clone();
@@ -205,6 +205,6 @@ async fn count_links_with_filters() {
     assert_eq!(td.links.len(), execute_query(&cascade, query).await);
 }
 
-async fn execute_query(cascade: &Cascade<PassThroughNetwork>, query: WireLinkQuery) -> usize {
+async fn execute_query(cascade: &CascadeImpl<PassThroughNetwork>, query: WireLinkQuery) -> usize {
     cascade.dht_count_links(query).await.unwrap()
 }

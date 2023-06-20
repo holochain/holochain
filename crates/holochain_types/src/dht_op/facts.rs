@@ -22,11 +22,15 @@ pub fn valid_dht_op(
                 let h = action.entry_data();
                 let e = op.entry();
                 match (h, e) {
-                    (Some((_entry_hash, entry_type)), Some(_e)) => {
+                    (
+                        Some((_entry_hash, entry_type)),
+                        RecordEntry::Present(_) | RecordEntry::NotStored,
+                    ) => {
                         // Ensure that entries are public
                         !must_be_public || entry_type.visibility().is_public()
                     }
-                    (None, None) => true,
+                    (None, RecordEntry::Present(_)) => false,
+                    (None, _) => true,
                     _ => false,
                 }
             }
@@ -34,7 +38,7 @@ pub fn valid_dht_op(
         mapped(
             "If there is entry data, the action must point to it",
             |op: &DhtOp| {
-                if let Some(entry) = op.entry() {
+                if let Some(entry) = op.entry().into_option() {
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.
@@ -66,7 +70,7 @@ pub fn valid_dht_op(
 
 #[cfg(test)]
 mod tests {
-    use arbitrary::{Arbitrary, Unstructured};
+    use arbitrary::Arbitrary;
     use holochain_keystore::test_keystore::spawn_test_keystore;
 
     use super::*;
@@ -76,34 +80,45 @@ mod tests {
     async fn test_valid_dht_op() {
         // TODO: Must add constraint on dht op variant wrt action variant
 
+        let mut gg = Generator::from(unstructured_noise());
+        let g = &mut gg;
         let keystore = spawn_test_keystore().await.unwrap();
         let agent = AgentPubKey::new_random(&keystore).await.unwrap();
 
-        let e = Entry::arbitrary(&mut Unstructured::new(&NOISE).into()).unwrap();
+        let e = Entry::arbitrary(g).unwrap();
 
-        let mut hn =
-            not_(action_facts::is_new_entry_action()).build(&mut Unstructured::new(&NOISE).into());
-        *hn.author_mut() = agent.clone();
+        let mut a0 = action_facts::is_not_entry_action().build(g);
+        *a0.author_mut() = agent.clone();
 
-        let mut he =
-            action_facts::is_new_entry_action().build(&mut Unstructured::new(&NOISE).into());
-        *he.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
-        let mut he = Action::from(he);
-        *he.author_mut() = agent.clone();
+        let mut a1 = action_facts::is_new_entry_action().build(g);
+        *a1.entry_data_mut().unwrap().0 = EntryHash::with_data_sync(&e);
+        let mut a1 = Action::from(a1);
+        *a1.author_mut() = agent.clone();
 
-        let se = agent.sign(&keystore, &he).await.unwrap();
-        let sn = agent.sign(&keystore, &hn).await.unwrap();
+        let sn = agent.sign(&keystore, &a0).await.unwrap();
+        let se = agent.sign(&keystore, &a1).await.unwrap();
 
-        let op1 = DhtOp::StoreRecord(se.clone(), he.clone(), Some(Box::new(e.clone())));
-        let op2 = DhtOp::StoreRecord(se.clone(), he.clone(), None);
-        let op3 = DhtOp::StoreRecord(sn.clone(), hn.clone(), Some(Box::new(e.clone())));
-        let op4 = DhtOp::StoreRecord(sn.clone(), hn.clone(), None);
+        let op0a = DhtOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::Present(e.clone()));
+        let op0b = DhtOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::Hidden);
+        let op0c = DhtOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::NA);
+        let op0d = DhtOp::StoreRecord(sn.clone(), a0.clone(), RecordEntry::NotStored);
+
+        let op1a = DhtOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::Present(e.clone()));
+        let op1b = DhtOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::Hidden);
+        let op1c = DhtOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::NA);
+        let op1d = DhtOp::StoreRecord(se.clone(), a1.clone(), RecordEntry::NotStored);
+
         let fact = valid_dht_op(keystore, agent, false);
 
-        fact.check(&op1).unwrap();
-        assert!(fact.check(&op2).is_err());
-        assert!(fact.check(&op3).is_err());
-        fact.check(&op4).unwrap();
+        assert!(fact.check(&op0a).is_err());
+        fact.check(&op0b).unwrap();
+        fact.check(&op0c).unwrap();
+        fact.check(&op0d).unwrap();
+
+        fact.check(&op1a).unwrap();
+        assert!(fact.check(&op1b).is_err());
+        assert!(fact.check(&op1c).is_err());
+        fact.check(&op1d).unwrap();
     }
 }
 

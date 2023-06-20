@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -20,27 +20,26 @@ pub fn count_links<'a>(
         HostFnAccess {
             read_workspace: Permission::Allow,
             ..
-        } => {
-            tokio_helper::block_forever_on(async move {
-                let wire_query = WireLinkQuery {
-                    base: query.base,
-                    link_type: query.link_type,
-                    tag_prefix: query.tag_prefix,
-                    before: query.before,
-                    after: query.after,
-                    author: query.author,
-                };
+        } => tokio_helper::block_forever_on(async move {
+            let wire_query = WireLinkQuery {
+                base: query.base,
+                link_type: query.link_type,
+                tag_prefix: query.tag_prefix,
+                before: query.before,
+                after: query.after,
+                author: query.author,
+            };
 
-                Cascade::from_workspace_and_network(
-                    &call_context.host_context.workspace(),
-                    call_context.host_context.network().to_owned(),
-                )
-                    .dht_count_links(wire_query)
-                    .await.map_err(|cascade_error| {
-                    wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
-                })
+            CascadeImpl::from_workspace_and_network(
+                &call_context.host_context.workspace(),
+                call_context.host_context.network().to_owned(),
+            )
+            .dht_count_links(wire_query)
+            .await
+            .map_err(|cascade_error| {
+                wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
             })
-        }
+        }),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
@@ -49,7 +48,7 @@ pub fn count_links<'a>(
             )
             .to_string(),
         ))
-            .into()),
+        .into()),
     }
 }
 
@@ -64,26 +63,40 @@ pub mod tests {
     async fn count_links() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
-            conductor, alice, bob, ..
+            conductor,
+            alice,
+            bob,
+            ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
         // Create a link for Alice
-        let _: ActionHash = conductor
-            .call(&alice, "create_link", ())
-            .await;
+        let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
         let base: AnyLinkableHash = conductor.call(&alice, "get_count_base", ()).await;
 
-        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        let count: usize = conductor
+            .call(
+                &alice,
+                "get_count",
+                LinkQuery::new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                ),
+            )
+            .await;
         assert_eq!(1, count);
 
         // Create a link for Bob
-        let _: ActionHash = conductor
-            .call(&bob, "create_link", ())
-            .await;
+        let _: ActionHash = conductor.call(&bob, "create_link", ()).await;
 
         // Check that Alice can see her link and Bob's
-        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        let count: usize = conductor
+            .call(
+                &alice,
+                "get_count",
+                LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])),
+            )
+            .await;
         assert_eq!(2, count);
     }
 
@@ -91,34 +104,68 @@ pub mod tests {
     async fn count_links_filtered_by_author() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
-            conductor, alice, bob, ..
+            conductor,
+            alice,
+            bob,
+            ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
         // Create a link for Alice
-        let _: ActionHash = conductor
-            .call(&alice, "create_link", ())
-            .await;
+        let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
         let base: AnyLinkableHash = conductor.call(&alice, "get_count_base", ()).await;
 
-        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        let count: usize = conductor
+            .call(
+                &alice,
+                "get_count",
+                LinkQuery::new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                ),
+            )
+            .await;
         assert_eq!(1, count);
 
         // Create a link for Bob
-        let _: ActionHash = conductor
-            .call(&bob, "create_link", ())
-            .await;
+        let _: ActionHash = conductor.call(&bob, "create_link", ()).await;
 
         // Check that Alice can count her link and Bob's
-        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        let count: usize = conductor
+            .call(
+                &alice,
+                "get_count",
+                LinkQuery::new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                ),
+            )
+            .await;
         assert_eq!(2, count);
 
         // Only count Alice's links
-        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])).author(alice.cell_id().agent_pubkey().clone())).await;
+        let count: usize = conductor
+            .call(
+                &alice,
+                "get_count",
+                LinkQuery::new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                )
+                .author(alice.cell_id().agent_pubkey().clone()),
+            )
+            .await;
         assert_eq!(1, count);
 
         // Only count Bob's links
-        let count: usize = conductor.call(&bob, "get_count", LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])).author(bob.cell_id().agent_pubkey().clone())).await;
+        let count: usize = conductor
+            .call(
+                &bob,
+                "get_count",
+                LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))
+                    .author(bob.cell_id().agent_pubkey().clone()),
+            )
+            .await;
         assert_eq!(1, count);
     }
 
@@ -126,36 +173,70 @@ pub mod tests {
     async fn count_links_filtered_by_timestamp() {
         holochain_trace::test_run().ok();
         let RibosomeTestFixture {
-            conductor, alice, bob, ..
+            conductor,
+            alice,
+            bob,
+            ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
         // Create a link for Alice
-        let _: ActionHash = conductor
-            .call(&alice, "create_link", ())
-            .await;
+        let _: ActionHash = conductor.call(&alice, "create_link", ()).await;
 
         let base: AnyLinkableHash = conductor.call(&alice, "get_count_base", ()).await;
 
-        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        let count: usize = conductor
+            .call(
+                &alice,
+                "get_count",
+                LinkQuery::new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                ),
+            )
+            .await;
         assert_eq!(1, count);
 
         let mid_time = Timestamp::now();
 
         // Create a link for Bob
-        let _: ActionHash = conductor
-            .call(&bob, "create_link", ())
-            .await;
+        let _: ActionHash = conductor.call(&bob, "create_link", ()).await;
 
         // Check that Alice can count her link and Bob's
-        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))).await;
+        let count: usize = conductor
+            .call(
+                &alice,
+                "get_count",
+                LinkQuery::new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                ),
+            )
+            .await;
         assert_eq!(2, count);
 
         // Get links created before the mid-time (only Alice's)
-        let count: usize = conductor.call(&alice, "get_count", LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])).after(mid_time.clone())).await;
+        let count: usize = conductor
+            .call(
+                &alice,
+                "get_count",
+                LinkQuery::new(
+                    base.clone(),
+                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                )
+                .after(mid_time.clone()),
+            )
+            .await;
         assert_eq!(1, count);
 
         // Get links created after the mid-time (only Bob's)
-        let count: usize = conductor.call(&bob, "get_count", LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])).before(mid_time.clone())).await;
+        let count: usize = conductor
+            .call(
+                &bob,
+                "get_count",
+                LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))
+                    .before(mid_time.clone()),
+            )
+            .await;
         assert_eq!(1, count);
     }
 }

@@ -180,7 +180,7 @@ async fn private_entries_dont_leak() {
     use holochain_types::inline_zome::InlineZomeSet;
 
     let _g = holochain_trace::test_run().ok();
-    let mut entry_def = EntryDef::from_id("entrydef");
+    let mut entry_def = EntryDef::default_from_id("entrydef");
     entry_def.visibility = EntryVisibility::Private;
 
     #[derive(Serialize, Deserialize, Debug, SerializedBytes)]

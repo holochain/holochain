@@ -66,8 +66,8 @@ pub(crate) fn incoming_countersigning(
         // Must be a store entry op.
         if let DhtOp::StoreEntry(_, _, entry) = &op {
             // Must have a counter sign entry type.
-            if let Entry::CounterSign(session_data, _) = entry.as_ref() {
-                let entry_hash = EntryHash::with_data_sync(&**entry);
+            if let Entry::CounterSign(session_data, _) = entry {
+                let entry_hash = EntryHash::with_data_sync(entry);
                 // Get the required actions for this session.
                 let weight = weigh_placeholder();
                 let action_set = session_data.build_action_set(entry_hash, weight)?;
