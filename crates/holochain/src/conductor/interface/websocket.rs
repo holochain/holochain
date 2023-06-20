@@ -18,7 +18,6 @@ use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 use std::convert::TryFrom;
 
-use holochain_trace::metric::RequestResponseDurationMetric;
 use std::sync::atomic::AtomicIsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -174,7 +173,9 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(
 
     #[cfg(feature = "otel")]
     let request_response_duration_metric =
-        RequestResponseDurationMetric::new("ws_admin_request_response_duration");
+        holochain_trace::metric::RequestResponseDurationMetric::new(
+            "ws_admin_request_response_duration",
+        );
 
     rx_from_iface
         .for_each_concurrent(4096, move |msg| {
@@ -239,7 +240,9 @@ fn spawn_recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
 
     #[cfg(feature = "otel")]
     let request_response_duration_metric =
-        RequestResponseDurationMetric::new("ws_app_request_response_duration");
+        holochain_trace::metric::RequestResponseDurationMetric::new(
+            "ws_app_request_response_duration",
+        );
     tokio::task::spawn(rx_from_iface.for_each_concurrent(4096, move |msg| {
         #[cfg(feature = "otel")]
         let start = std::time::Instant::now();
