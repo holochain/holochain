@@ -47,9 +47,9 @@ impl ChainHeadCoordinator for ChcLocal {
             .last()
             .map(|r| (r.action.get_hash().clone(), r.action.seq()));
         let actions = request.iter().map(|r| &r.action);
-        validate_chain(actions, &head).map_err(|e| {
+        validate_chain(actions, &head).map_err(|_| {
             let (hash, seq) = head.unwrap();
-            ChcError::InvalidChain(seq, hash, e.to_string())
+            ChcError::InvalidChain(seq, hash)
         })?;
         m.records.extend(request);
         Ok(())
@@ -117,81 +117,6 @@ mod tests {
     use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
 
     use pretty_assertions::assert_eq;
-
-    #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "this test requires a remote service, so it should only be run manually"]
-    async fn test_add_records_remote() {
-        let keystore = test_keystore();
-        let agent = fake_agent_pubkey_1();
-        let cell_id = CellId::new(fixt!(DnaHash), agent.clone());
-        let chc = Arc::new(ChcRemote::new(
-            url::Url::parse("http://127.0.0.1:40845/v1/").unwrap(),
-            // url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
-            keystore.clone(),
-            &cell_id,
-        ));
-
-        let mut g = random_generator();
-
-        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
-        // let t0 = &chain[0..=0];
-        // let t1 = &chain[1..=1];
-        // let t2 = &chain[2..=2];
-        // dbg!(&t0, &t1, &t2);
-        let t0 = &chain[0..3];
-        let t1 = &chain[3..6];
-        let t2 = &chain[6..9];
-        let t11 = &chain[11..=11];
-
-        let hash = |i: usize| chain[i].action_address().clone();
-
-        // dbg!(&t0);
-        chc.clone().add_records(t0.to_vec()).await.unwrap();
-        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
-
-        // dbg!(&t1);
-        chc.clone().add_records(t1.to_vec()).await.unwrap();
-        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
-
-        // last_hash doesn't match
-        assert!(chc.clone().add_records(t0.to_vec()).await.is_err());
-        assert!(chc.clone().add_records(t1.to_vec()).await.is_err());
-        assert!(chc.clone().add_records(t11.to_vec()).await.is_err());
-        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
-
-        // dbg!(&t2);
-        chc.clone().add_records(t2.to_vec()).await.unwrap();
-        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(8));
-
-        assert_eq!(
-            chc.clone().get_record_data(None).await.unwrap(),
-            &chain[0..9]
-        );
-        assert_eq!(
-            chc.clone().get_record_data(Some(hash(0))).await.unwrap(),
-            &chain[1..9]
-        );
-        assert_eq!(
-            chc.clone().get_record_data(Some(hash(3))).await.unwrap(),
-            &chain[4..9]
-        );
-        assert_eq!(
-            chc.clone().get_record_data(Some(hash(7))).await.unwrap(),
-            &chain[8..9]
-        );
-        assert_eq!(
-            chc.clone().get_record_data(Some(hash(8))).await.unwrap(),
-            &[]
-        );
-        assert_eq!(
-            chc.clone().get_record_data(Some(hash(9))).await.unwrap(),
-            &[]
-        );
-        assert_eq!(
-            chc.clone().get_record_data(Some(hash(13))).await.unwrap(),
-            &[]
-        );
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_add_records_local() {
@@ -332,6 +257,7 @@ mod tests {
         use holochain::test_utils::inline_zomes::{simple_crud_zome, AppString};
 
         let mut config = ConductorConfig::default();
+        // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/v1/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
         let mut conductors =
             SweetConductorBatch::from_configs([config.clone(), config.clone(), config.clone()])
@@ -361,9 +287,13 @@ mod tests {
 
         dbg!(&install_result_1);
         dbg!(&install_result_2);
+
         regex::Regex::new(
-            r#".*ChcHeadMoved\("genesis", InvalidChain\(2, ActionHash\([a-zA-Z0-9-_]+\), "Action is not the first, so needs previous action"\)\).*"#
-        ).unwrap().captures(&format!("{:?}", install_result_1)).unwrap();
+            r#".*ChcHeadMoved\("genesis", InvalidChain\(2, ActionHash\([a-zA-Z0-9-_]+\)\)\).*"#,
+        )
+        .unwrap()
+        .captures(&format!("{:?}", install_result_1))
+        .unwrap();
         assert_eq!(
             format!("{:?}", install_result_1),
             format!("{:?}", install_result_2)
@@ -417,8 +347,10 @@ mod tests {
             )
             .await;
 
+        dbg!(&hash1);
+
         regex::Regex::new(
-            r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\(4, ActionHash\([a-zA-Z0-9-_]+\), "The previous action hash specified in an action doesn't match the actual previous action. Seq: 3".*"#
+            r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\(4, ActionHash\([a-zA-Z0-9-_]+\).*"#
         ).unwrap().captures(&format!("{:?}", hash1)).unwrap();
 
         // This should trigger a CHC sync
@@ -465,6 +397,81 @@ mod tests {
         assert_eq!(
             dump1.source_chain_dump.records,
             dump2.source_chain_dump.records
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "this test requires a remote service, so it should only be run manually"]
+    async fn test_add_records_remote() {
+        let keystore = test_keystore();
+        let agent = fake_agent_pubkey_1();
+        let cell_id = CellId::new(fixt!(DnaHash), agent.clone());
+        let chc = Arc::new(ChcRemote::new(
+            url::Url::parse("http://127.0.0.1:40845/v1/").unwrap(),
+            // url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
+            keystore.clone(),
+            &cell_id,
+        ));
+
+        let mut g = random_generator();
+
+        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
+        // let t0 = &chain[0..=0];
+        // let t1 = &chain[1..=1];
+        // let t2 = &chain[2..=2];
+        // dbg!(&t0, &t1, &t2);
+        let t0 = &chain[0..3];
+        let t1 = &chain[3..6];
+        let t2 = &chain[6..9];
+        let t11 = &chain[11..=11];
+
+        let hash = |i: usize| chain[i].action_address().clone();
+
+        // dbg!(&t0);
+        chc.clone().add_records(t0.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
+
+        // dbg!(&t1);
+        chc.clone().add_records(t1.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
+
+        // last_hash doesn't match
+        assert!(chc.clone().add_records(t0.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t1.to_vec()).await.is_err());
+        assert!(chc.clone().add_records(t11.to_vec()).await.is_err());
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
+
+        // dbg!(&t2);
+        chc.clone().add_records(t2.to_vec()).await.unwrap();
+        assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(8));
+
+        assert_eq!(
+            chc.clone().get_record_data(None).await.unwrap(),
+            &chain[0..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(0))).await.unwrap(),
+            &chain[1..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(3))).await.unwrap(),
+            &chain[4..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(7))).await.unwrap(),
+            &chain[8..9]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(8))).await.unwrap(),
+            &[]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(9))).await.unwrap(),
+            &[]
+        );
+        assert_eq!(
+            chc.clone().get_record_data(Some(hash(13))).await.unwrap(),
+            &[]
         );
     }
 }

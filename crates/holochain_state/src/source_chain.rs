@@ -320,8 +320,7 @@ impl SourceChain {
             )
             .await
             .map_err(SourceChainError::other)?;
-            if let Err(err @ ChcError::InvalidChain(_, _, _)) =
-                chc.add_records_request(payload).await
+            if let Err(err @ ChcError::InvalidChain(_, _)) = chc.add_records_request(payload).await
             {
                 return Err(SourceChainError::ChcHeadMoved(
                     "SourceChain::flush".into(),
@@ -1112,7 +1111,7 @@ pub async fn genesis(
         .await
         .map_err(SourceChainError::other)?;
         match chc.add_records_request(payload).await {
-            Err(e @ ChcError::InvalidChain(_, _, _)) => {
+            Err(e @ ChcError::InvalidChain(_, _)) => {
                 Err(SourceChainError::ChcHeadMoved("genesis".into(), e))
             }
             e => e.map_err(SourceChainError::other),

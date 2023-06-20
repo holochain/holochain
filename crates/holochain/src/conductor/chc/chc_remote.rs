@@ -29,12 +29,12 @@ impl ChainHeadCoordinator for ChcRemote {
         let response: reqwest::Response = self.client.post("add_records", body).await?;
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
-        dbg!(status, std::str::from_utf8(&bytes).unwrap());
+        // dbg!(status, std::str::from_utf8(&bytes).unwrap());
         match status {
             200 => Ok(()),
             409 => {
                 let (seq, hash): (u32, ActionHash) = serde_json::from_slice(&bytes)?;
-                Err(ChcError::InvalidChain(seq, hash, "".to_string()))
+                Err(ChcError::InvalidChain(seq, hash))
             }
             498 => {
                 let msg: String = serde_json::from_slice(&bytes)?;
@@ -58,7 +58,7 @@ impl ChainHeadCoordinator for ChcRemote {
         let response = self.client.post("get_record_data", body).await?;
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
-        dbg!(status, std::str::from_utf8(&bytes).unwrap());
+        // dbg!(status, std::str::from_utf8(&bytes).unwrap());
         match status {
             200 => Ok(serde_json::from_slice(&bytes)?),
             498 => {
