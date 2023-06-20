@@ -110,3 +110,10 @@ impl VerifySignature {
         }
     }
 }
+
+#[test]
+fn signature_roundtrip() {
+    let bytes = Signature::from([1u8; 64]);
+    let json = serde_json::to_string(&bytes).unwrap();
+    let _: Signature = serde_json::from_str(&json).unwrap();
+}

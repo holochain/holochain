@@ -56,8 +56,21 @@ impl ChainHeadCoordinator for ChcRemote {
             .map(|json| json.into_bytes())
             .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
         let response = self.client.post("get_record_data", body).await?;
-        match response.status() {
-            _ => todo!(),
+        let status = response.status().as_u16();
+        let bytes = response.bytes().await.map_err(extract_string)?;
+        dbg!(status, std::str::from_utf8(&bytes).unwrap());
+        match status {
+            200 => Ok(serde_json::from_slice(&bytes)?),
+            498 => {
+                // The since_hash was not found in the CHC,
+                // so we can interpret this as an empty list of records.
+                Ok(vec![])
+            }
+            code => {
+                let msg =
+                    std::str::from_utf8(&bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+                Err(ChcError::Other(format!("code: {code}, msg: {msg}")))
+            }
         }
     }
 }

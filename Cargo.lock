@@ -2829,11 +2829,13 @@ version = "0.3.0-beta-dev.2"
 dependencies = [
  "arbitrary",
  "holo_hash",
+ "holochain_integrity_types",
  "holochain_serialized_bytes",
  "kitsune_p2p_timestamp",
  "paste",
  "serde",
  "serde_bytes",
+ "serde_json",
  "subtle",
  "subtle-encoding",
  "tracing",

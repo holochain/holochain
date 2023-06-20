@@ -63,6 +63,7 @@ pub trait ChainHeadCoordinatorExt:
         let _ = getrandom::getrandom(&mut bytes);
         let nonce = Nonce256Bits::from(bytes);
         let payload = GetRecordsPayload { since_hash, nonce };
+        // TODO: real signature
         let signature = Signature::from([0; 64]);
         let this = self.clone();
         async move {

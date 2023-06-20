@@ -125,7 +125,8 @@ mod tests {
         let agent = fake_agent_pubkey_1();
         let cell_id = CellId::new(fixt!(DnaHash), agent.clone());
         let chc = Arc::new(ChcRemote::new(
-            url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
+            url::Url::parse("http://127.0.0.1:40845/v1/").unwrap(),
+            // url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
             keystore.clone(),
             &cell_id,
         ));
