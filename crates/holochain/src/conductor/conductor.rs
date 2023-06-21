@@ -2741,7 +2741,7 @@ async fn p2p_event_task(
                     >= NUM_PARALLEL_EVTS)
                     .then(std::time::Instant::now);
 
-                // This loop is critical, ensure that nothing in the dispatch kills it by blocking permantantly
+                // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently
                 tokio::select! {
                     r = handle.dispatch_holochain_p2p_event(evt) => {
                         match r {
