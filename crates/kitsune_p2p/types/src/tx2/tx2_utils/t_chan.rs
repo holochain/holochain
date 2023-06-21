@@ -46,7 +46,13 @@ impl<T: 'static + Send> TSender<T> {
             Err(_) => return async move { Err(t) }.boxed(),
             Ok(s) => s,
         };
-        async move { sender.send(t).await.map_err(|e| e.0) }.boxed()
+        async move {
+            sender
+                .send_timeout(t, std::time::Duration::from_secs(30))
+                .await
+                .map_err(|e| e.0)
+        }
+        .boxed()
     }
 
     /// Close this channel from the sender side.
