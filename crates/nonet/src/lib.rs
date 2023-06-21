@@ -1,8 +1,6 @@
-use anyhow::Result;
-
 #[tokio::test]
-pub async fn test_nonet() -> Result<()> {
-    match reqwest::get("https://www.rust-lang.org").await?.error_for_status() {
+pub async fn test_nonet() -> anyhow::Result<()> {
+    match reqwest::get("https://www.rust-lang.org").await.error_for_status() {
         Ok(_response) => {
             #[cfg(feature = "nonet")]
             panic!("Connected to the internet with nonet feature enabled.");
