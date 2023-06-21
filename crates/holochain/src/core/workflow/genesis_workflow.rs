@@ -7,6 +7,10 @@ use std::sync::Arc;
 
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckInvocationV1;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
+use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckInvocationV2;
 use crate::core::ribosome::guest_callback::genesis_self_check::{
     GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation, GenesisSelfCheckResult,
 };
@@ -75,20 +79,31 @@ where
         integrity_zomes,
         ..
     } = &ribosome.dna_def().content;
-    let dna_info = DnaInfo {
+    let dna_info = DnaInfoV1 {
         zome_names: integrity_zomes.iter().map(|(n, _)| n.clone()).collect(),
         name: name.clone(),
         hash: dna_hash,
         properties: properties.clone(),
     };
     let result = ribosome.run_genesis_self_check(
-        GenesisSelfCheckHostAccess,
+        GenesisSelfCheckHostAccess {
+            host_access_1: GenesisSelfCheckHostAccessV1,
+            host_access_2: GenesisSelfCheckHostAccessV2,
+        },
         GenesisSelfCheckInvocation {
-            payload: Arc::new(GenesisSelfCheckData {
-                dna_info,
-                membrane_proof: membrane_proof.clone(),
-                agent_key: agent_pubkey.clone(),
-            }),
+            invocation_1: GenesisSelfCheckInvocationV1 {
+                payload: Arc::new(GenesisSelfCheckDataV1 {
+                    dna_info,
+                    membrane_proof: membrane_proof.clone(),
+                    agent_key: agent_pubkey.clone(),
+                }),
+            },
+            invocation_2: GenesisSelfCheckInvocationV2 {
+                payload: Arc::new(GenesisSelfCheckDataV2 {
+                    membrane_proof: membrane_proof.clone(),
+                    agent_key: agent_pubkey.clone(),
+                }),
+            },
         },
     )?;
 
@@ -169,15 +184,15 @@ pub mod tests {
     use crate::core::ribosome::MockRibosomeT;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
+    use holochain_trace;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Action;
     use matches::assert_matches;
-    use observability;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
-        observability::test_run().unwrap();
+        holochain_trace::test_run().unwrap();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());

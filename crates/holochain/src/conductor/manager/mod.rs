@@ -148,7 +148,7 @@ pub fn spawn_task_outcome_handler(
                         .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
                         let cells_with_same_dna: Vec<_> = conductor
-                            .list_cell_ids(None)
+                            .running_cell_ids(None)
                             .into_iter()
                             .filter(|id| id.dna_hash() == dna_hash.as_ref())
                             .collect();
@@ -420,11 +420,11 @@ mod test {
     use super::*;
     use crate::conductor::{error::ConductorError, Conductor};
     use holochain_state::test_utils::test_db_dir;
-    use observability;
+    use holochain_trace;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn unrecoverable_error() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let db_dir = test_db_dir();
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let tm = handle.task_manager();
@@ -453,7 +453,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "panics in tokio break other tests, this test is here to confirm behavior but cannot be run on ci"]
     async fn unrecoverable_panic() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let db_dir = test_db_dir();
         let handle = Conductor::builder().test(db_dir.path(), &[]).await.unwrap();
         let tm = handle.task_manager();

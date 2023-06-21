@@ -94,6 +94,7 @@ use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::witness_nonce;
@@ -103,10 +104,12 @@ use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
-use holochain_types::prelude::{test_keystore, wasm, *};
+use holochain_types::prelude::{wasm, *};
 use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::KitsuneP2pError;
 use kitsune_p2p_types::config::JOIN_NETWORK_TIMEOUT;
 use rusqlite::Transaction;
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -120,12 +123,15 @@ use crate::core::queue_consumer::QueueTriggers;
 pub use holochain_types::share;
 
 mod builder;
+
 pub use builder::*;
 
 mod chc;
+
 pub use chc::*;
 
 mod conductor_services;
+
 pub use conductor_services::*;
 
 pub use accessor_impls::*;
@@ -149,6 +155,20 @@ pub type CellStartupErrors = Vec<(CellId, CellError)>;
 /// Cloneable reference to a Conductor
 pub type ConductorHandle = Arc<Conductor>;
 
+/// The reason why a cell is waiting to join the network.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PendingJoinReason {
+    /// The initial state, no attempt has been made to join the network yet.
+    Initial,
+
+    /// The join failed with an error that is safe to retry, such as not being connected to the internet.
+    Retry,
+
+    /// The network join failed and will not be retried. This will impact the status of the associated
+    /// app and require manual intervention from the user.
+    Failed,
+}
+
 /// The status of an installed Cell, which captures different phases of its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CellStatus {
@@ -159,7 +179,7 @@ pub enum CellStatus {
     /// but it is considered not to be fully running from the perspective of
     /// app status, i.e. if any app has a required Cell with this status,
     /// the app is considered to be in the Paused state.
-    PendingJoin,
+    PendingJoin(PendingJoinReason),
 
     /// The Cell is currently in the process of trying to join the network.
     Joining,
@@ -169,19 +189,10 @@ pub enum CellStatus {
 pub type CellStatusFilter = CellStatus;
 
 /// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
+#[derive(Debug, Clone)]
 struct CellItem {
     cell: Arc<Cell>,
     status: CellStatus,
-}
-
-impl CellItem {
-    pub fn is_running(&self) -> bool {
-        self.status == CellStatus::Joined
-    }
-
-    pub fn is_pending(&self) -> bool {
-        self.status == CellStatus::PendingJoin
-    }
 }
 
 #[allow(dead_code)]
@@ -364,7 +375,6 @@ mod startup_shutdown_impls {
 
 /// Methods related to conductor interfaces
 mod interface_impls {
-
     use super::*;
 
     impl Conductor {
@@ -496,7 +506,6 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
-
     use super::*;
 
     impl Conductor {
@@ -750,9 +759,14 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use holochain_conductor_api::NetworkInfo;
+    use holochain_conductor_api::{DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo};
     use holochain_p2p::HolochainP2pSender;
+    use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
+    use holochain_zome_types::block::BlockTargetId;
+    use kitsune_p2p::KitsuneAgent;
+    use kitsune_p2p::KitsuneBinType;
+    use rusqlite::params;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -804,13 +818,22 @@ mod network_impls {
         }
 
         /// Block some target.
-        pub async fn block(&self, input: Block) -> ConductorResult<()> {
-            Ok(self.spaces.block(input).await?)
+        pub async fn block(&self, input: Block) -> DatabaseResult<()> {
+            self.spaces.block(input).await
         }
 
         /// Unblock some target.
-        pub async fn unblock(&self, input: Block) -> ConductorResult<()> {
-            Ok(self.spaces.unblock(input).await?)
+        pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
+            self.spaces.unblock(input).await
+        }
+
+        /// Check if some target is blocked.
+        pub async fn is_blocked(
+            &self,
+            input: BlockTargetId,
+            timestamp: Timestamp,
+        ) -> DatabaseResult<bool> {
+            self.spaces.is_blocked(input, timestamp).await
         }
 
         pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
@@ -837,16 +860,187 @@ mod network_impls {
 
         pub(crate) async fn network_info(
             &self,
-            dnas: &[DnaHash],
+            payload: &NetworkInfoRequestPayload,
         ) -> ConductorResult<Vec<NetworkInfo>> {
+            use holochain_sqlite::sql::sql_cell::SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP;
+
+            let NetworkInfoRequestPayload {
+                agent_pub_key,
+                dnas,
+                last_time_queried,
+            } = payload;
+
             futures::future::join_all(dnas.iter().map(|dna| async move {
-                let d = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
-                let fetch_pool_info = d.fetch_pool.info([dna.to_kitsune()].into_iter().collect());
-                ConductorResult::Ok(NetworkInfo { fetch_pool_info })
+                let diagnostics = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
+                let fetch_pool_info = diagnostics
+                    .fetch_pool
+                    .info([dna.to_kitsune()].into_iter().collect());
+
+                // query number of agents from peer db
+                let db = { self.p2p_agents_db(dna) };
+                let permit = db.conn_permit().await;
+                let mut conn = db.with_permit(permit)?;
+                let current_number_of_peers = conn.p2p_count_agents()?;
+
+                // query arc size and extrapolated coverage and estimate total peers
+                let (arc_size, total_network_peers) = match conn
+                    .p2p_get_agent(&KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()))?
+                {
+                    None => (0.0, 0),
+                    Some(agent) => {
+                        let arc_size = agent.storage_arc.coverage();
+                        let agents_in_arc = conn.p2p_gossip_query_agents(
+                            u64::MIN,
+                            u64::MAX,
+                            agent.storage_arc.inner().into(),
+                        )?;
+                        let number_of_agents_in_arc = agents_in_arc.len();
+                        let total_network_peers = if number_of_agents_in_arc == 0 {
+                            0
+                        } else {
+                            (number_of_agents_in_arc as f64 / arc_size) as u32
+                        };
+                        (arc_size, total_network_peers)
+                    }
+                };
+
+                // get sum of bytes from dht and cache db since last time
+                // request was made or since the beginning of time
+                let last_time_queried = match last_time_queried {
+                    Some(timestamp) => *timestamp,
+                    None => Timestamp::ZERO,
+                };
+                let sum_of_bytes_row_fn = |row: &Row| {
+                    row.get(0)
+                        .map(|maybe_bytes_received: Option<u64>| maybe_bytes_received.unwrap_or(0))
+                        .map_err(DatabaseError::SqliteError)
+                };
+                let dht_db = self
+                    .get_or_create_dht_db(dna)
+                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
+                let dht_bytes_received = dht_db
+                    .async_reader({
+                        move |txn| {
+                            txn.query_row_and_then(
+                                SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
+                                params![last_time_queried.as_micros()],
+                                sum_of_bytes_row_fn,
+                            )
+                        }
+                    })
+                    .await?;
+
+                let cache_db = self
+                    .get_or_create_cache_db(dna)
+                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
+                let cache_bytes_received = cache_db
+                    .async_reader(move |txn| {
+                        txn.query_row_and_then(
+                            SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
+                            params![last_time_queried.as_micros()],
+                            sum_of_bytes_row_fn,
+                        )
+                    })
+                    .await?;
+                let bytes_since_last_time_queried = dht_bytes_received + cache_bytes_received;
+
+                // calculate open peer connections based on current gossip sessions
+                let completed_rounds_since_last_time_queried = diagnostics
+                    .metrics
+                    .read()
+                    .peer_node_histories()
+                    .iter()
+                    .flat_map(|(_, node_history)| node_history.completed_rounds.clone())
+                    .filter(|completed_round| {
+                        let now = tokio::time::Instant::now();
+                        let round_start_time_diff = now - completed_round.start_time;
+                        let round_start_timestamp =
+                            Timestamp::from_micros(round_start_time_diff.as_micros() as i64);
+                        round_start_timestamp > last_time_queried
+                    })
+                    .count() as u32;
+
+                ConductorResult::Ok(NetworkInfo {
+                    fetch_pool_info,
+                    current_number_of_peers,
+                    arc_size,
+                    total_network_peers,
+                    bytes_since_last_time_queried,
+                    completed_rounds_since_last_time_queried,
+                })
             }))
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
+        }
+
+        pub(crate) async fn storage_info(&self) -> ConductorResult<StorageInfo> {
+            let state = self.get_state().await?;
+
+            let all_dna: HashMap<DnaHash, Vec<InstalledAppId>> = HashMap::new();
+            let all_dna =
+                state
+                    .installed_apps()
+                    .iter()
+                    .fold(all_dna, |mut acc, (installed_app_id, app)| {
+                        for dna_hash in app.all_cells().map(|cell_id| cell_id.dna_hash()) {
+                            acc.entry(dna_hash.clone())
+                                .or_default()
+                                .push(installed_app_id.clone());
+                        }
+
+                        acc
+                    });
+
+            let app_data_blobs =
+                futures::future::join_all(all_dna.iter().map(|(dna_hash, used_by)| async {
+                    self.storage_info_for_dna(dna_hash, used_by).await
+                }))
+                .await
+                .into_iter()
+                .collect::<Result<Vec<StorageBlob>, ConductorError>>()?;
+
+            Ok(StorageInfo {
+                blobs: app_data_blobs,
+            })
+        }
+
+        async fn storage_info_for_dna(
+            &self,
+            dna_hash: &DnaHash,
+            used_by: &Vec<InstalledAppId>,
+        ) -> ConductorResult<StorageBlob> {
+            let authored_db = self.spaces.authored_db(dna_hash)?;
+            let dht_db = self.spaces.dht_db(dna_hash)?;
+            let cache_db = self.spaces.cache(dna_hash)?;
+
+            Ok(StorageBlob::Dna(DnaStorageInfo {
+                authored_data_size_on_disk: authored_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                authored_data_size: authored_db
+                    .async_reader(get_used_size)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                dht_data_size_on_disk: dht_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                dht_data_size: dht_db
+                    .async_reader(get_used_size)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                cache_data_size_on_disk: cache_db
+                    .async_reader(get_size_on_disk)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                cache_data_size: cache_db
+                    .async_reader(get_used_size)
+                    .map_err(ConductorError::DatabaseError)
+                    .await?,
+                used_by: used_by.clone(),
+            }))
         }
 
         #[instrument(skip(self))]
@@ -949,10 +1143,17 @@ mod network_impls {
                         .get_dna_def(&dna_hash)
                         .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))?
                         .topology(cutoff);
+                    let tuning = self.get_config().kitsune_tuning_params();
                     let db = { self.p2p_agents_db(&dna_hash) };
-                    let res = query_peer_density(db.into(), topo, kitsune_space, dht_arc)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    let res = query_peer_density(
+                        db.into(),
+                        topo,
+                        tuning.to_arq_strat().into(),
+                        kitsune_space,
+                        dht_arc,
+                    )
+                    .await
+                    .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 SignNetworkData {
@@ -969,12 +1170,13 @@ mod network_impls {
                 | Get { .. }
                 | GetMeta { .. }
                 | GetLinks { .. }
+                | CountLinks { .. }
                 | GetAgentActivity { .. }
                 | MustGetAgentActivity { .. }
                 | ValidationReceiptReceived { .. } => {
                     let cell_id =
                         CellId::new(event.dna_hash().clone(), event.target_agents().clone());
-                    let cell = self.cell_by_id(&cell_id)?;
+                    let cell = self.cell_by_id(&cell_id, true).await?;
                     cell.handle_holochain_p2p_event(event).await?;
                 }
                 Publish {
@@ -1040,9 +1242,14 @@ mod network_impls {
             Ok(())
         }
 
+        /// List all host functions provided by this conductor for wasms.
+        pub async fn list_wasm_host_functions(&self) -> ConductorApiResult<Vec<String>> {
+            Ok(RealRibosome::tooling_imports().await?)
+        }
+
         /// Invoke a zome function on a Cell
         pub async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-            let cell = self.cell_by_id(&call.cell_id)?;
+            let cell = self.cell_by_id(&call.cell_id, true).await?;
             Ok(cell.call_zome(call, None).await?)
         }
 
@@ -1052,7 +1259,7 @@ mod network_impls {
             workspace_lock: SourceChainWorkspace,
         ) -> ConductorApiResult<ZomeCallResult> {
             debug!(cell_id = ?call.cell_id);
-            let cell = self.cell_by_id(&call.cell_id)?;
+            let cell = self.cell_by_id(&call.cell_id, true).await?;
             Ok(cell.call_zome(call, Some(workspace_lock)).await?)
         }
 
@@ -1099,10 +1306,11 @@ mod network_impls {
 
 /// Methods related to app installation and management
 mod app_impls {
-
     use super::*;
+
     impl Conductor {
-        pub(crate) async fn install_app(
+        #[cfg(feature = "test_utils")]
+        pub(crate) async fn install_app_legacy(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
             cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
@@ -1149,10 +1357,16 @@ mod app_impls {
                 }
             };
 
+            let manifest = bundle.manifest().clone();
+
             let installed_app_id =
-                installed_app_id.unwrap_or_else(|| bundle.manifest().app_name().to_owned());
+                installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
+
+            let local_dnas = self
+                .ribosome_store()
+                .share_ref(|store| bundle.get_all_dnas_from_store(store));
             let ops = bundle
-                .resolve_cells(agent_key.clone(), DnaGamut::placeholder(), membrane_proofs)
+                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
                 .await?;
 
             let cells_to_create = ops.cells_to_create();
@@ -1180,7 +1394,7 @@ mod app_impls {
             crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await?;
 
             let roles = ops.role_assignments;
-            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles)?;
+            let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
 
             // Update the db
             let stopped_app = self.add_disabled_app_to_db(app).await?;
@@ -1319,33 +1533,47 @@ mod app_impls {
 /// Methods related to cell access
 mod cell_impls {
     use super::*;
+
     impl Conductor {
-        pub(crate) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
-            let cell = self
-                .running_cells
-                .share_ref(|c| c.get(cell_id).map(|i| i.cell.clone()))
-                .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
-            Ok(cell)
+        pub(crate) async fn cell_by_id(
+            &self,
+            cell_id: &CellId,
+            require_network_ready: bool,
+        ) -> ConductorResult<Arc<Cell>> {
+            // Can only get a cell from the running_cells list
+            if let Some(cell) = self.running_cells.share_ref(|c| c.get(cell_id).cloned()) {
+                if require_network_ready && cell.status != CellStatus::Joined {
+                    Err(ConductorError::CellNetworkNotReady(cell.status))
+                } else {
+                    Ok(cell.cell)
+                }
+            } else {
+                // If not in running_cells list, check if the cell id is registered at all,
+                // to give a different error message for disabled vs missing.
+                let present = self
+                    .get_state()
+                    .await?
+                    .installed_apps()
+                    .values()
+                    .flat_map(|app| app.all_cells())
+                    .any(|id| id == cell_id);
+                if present {
+                    Err(ConductorError::CellDisabled(cell_id.clone()))
+                } else {
+                    Err(ConductorError::CellMissing(cell_id.clone()))
+                }
+            }
         }
 
-        /// Iterator over only the cells which are fully running. Generally used
-        /// to handle conductor interface requests
-        pub fn running_cell_ids(&self) -> HashSet<CellId> {
-            self.running_cells.share_ref(|c| {
-                c.iter()
-                    .filter_map(|(id, item)| {
-                        if item.is_running() {
-                            Some(id.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            })
+        /// Iterator over only the cells which are fully "live", meaning they have been
+        /// fully initialized and are registered with the kitsune network layer.
+        /// Generally used to handle conductor interface requests.
+        pub fn live_cell_ids(&self) -> HashSet<CellId> {
+            self.running_cell_ids(Some(CellStatusFilter::Joined))
         }
 
         /// List CellIds for Cells which match a status filter
-        pub fn list_cell_ids(&self, filter: Option<CellStatusFilter>) -> Vec<CellId> {
+        pub fn running_cell_ids(&self, filter: Option<CellStatusFilter>) -> HashSet<CellId> {
             self.running_cells.share_ref(|cells| {
                 cells
                     .iter()
@@ -1370,7 +1598,6 @@ mod cell_impls {
 /// Methods related to clone cell management
 mod clone_cell_impls {
     use holochain_conductor_api::ClonedCell;
-    use itertools::Itertools;
 
     use super::*;
 
@@ -1397,22 +1624,6 @@ mod clone_cell_impls {
                         .to_string(),
                 ));
             }
-            let state = self.get_state().await?;
-            let app = state.get_app(&app_id)?;
-
-            app.provisioned_cells()
-                .find(|(app_role_name, _)| **app_role_name == role_name)
-                .ok_or_else(|| {
-                    let role_names = app
-                        .provisioned_cells()
-                        .map(|(role_name, _)| format!("'{}'", role_name))
-                        .join(", ");
-
-                    ConductorError::CloneCellError(format!(
-                        "no base cell found for provided role name. Available role names are: ({})",
-                        role_names
-                    ))
-                })?;
 
             // add cell to app
             let clone_cell = self
@@ -1680,31 +1891,37 @@ mod app_status_impls {
             use holochain_p2p::AgentPubKeyExt;
 
             let tasks = self
-            .mark_pending_cells_as_joining()
-            .into_iter()
-            .map(|(cell_id, cell)| async move {
-                let p2p_agents_db = cell.p2p_agents_db().clone();
-                let kagent = cell_id.agent_pubkey().to_kitsune();
-                let agent_info = match p2p_agents_db.async_reader(move |tx| {
-                    tx.p2p_get_agent(&kagent)
-                }).await {
-                    Ok(maybe_info) => maybe_info,
-                    _ => None,
-                };
-                let maybe_initial_arc = agent_info.map(|i| i.storage_arc);
-                let network = cell.holochain_p2p_dna().clone();
-                match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_initial_arc)).await {
-                    Ok(Err(e)) => {
-                        tracing::info!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
-                        Err(cell_id)
+                .mark_pending_cells_as_joining()
+                .into_iter()
+                .map(|(cell_id, cell)| async move {
+                    let p2p_agents_db = cell.p2p_agents_db().clone();
+                    let kagent = cell_id.agent_pubkey().to_kitsune();
+                    let maybe_agent_info = match p2p_agents_db.async_reader(move |tx| {
+                        tx.p2p_get_agent(&kagent)
+                    }).await {
+                        Ok(maybe_info) => maybe_info,
+                        _ => None,
+                    };
+                    let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
+                    let network = cell.holochain_p2p_dna().clone();
+                    match tokio::time::timeout(JOIN_NETWORK_TIMEOUT, network.join(cell_id.agent_pubkey().clone(), maybe_agent_info, maybe_initial_arc)).await {
+                        Ok(Err(e)) => {
+                            tracing::error!(error = ?e, cell_id = ?cell_id, "Error while trying to join the network");
+
+                            if Self::is_p2p_join_error_retryable(&e) {
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Retry)))
+                            }
+                            else {
+                                Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
+                            }
+                        }
+                        Err(_) => {
+                            tracing::error!(cell_id = ?cell_id, "Timed out trying to join the network");
+                            Err((cell_id, CellStatus::PendingJoin(PendingJoinReason::Failed)))
+                        }
+                        Ok(Ok(_)) => Ok(cell_id),
                     }
-                    Err(_) => {
-                        tracing::info!(cell_id = ?cell_id, "Timed out trying to join the network");
-                        Err(cell_id)
-                    }
-                    Ok(Ok(_)) => Ok(cell_id),
-                }
-            });
+                });
 
             let maybes: Vec<_> = futures::stream::iter(tasks)
                 .buffer_unordered(100)
@@ -1716,13 +1933,13 @@ mod app_status_impls {
 
             // These unwraps are both safe because of the partition.
             let cell_ids: Vec<_> = cell_ids.into_iter().map(Result::unwrap).collect();
-            let failed_joins: Vec<_> = failed_joins.into_iter().map(Result::unwrap_err).collect();
+            let failed_joins = failed_joins.into_iter().map(Result::unwrap_err);
 
             // Update the status of the cells which were able to join the network
             // (may or may not be all cells which were added)
-            self.update_cell_status(cell_ids.as_slice(), CellStatus::Joined);
+            self.update_cell_status(cell_ids.iter().map(|c| (c, CellStatus::Joined)));
 
-            self.update_cell_status(failed_joins.as_slice(), CellStatus::PendingJoin);
+            self.update_cell_status(failed_joins);
 
             cell_ids
         }
@@ -1741,7 +1958,21 @@ mod app_status_impls {
             use AppStatus::*;
             use AppStatusTransition::*;
 
-            let running_cells: HashSet<CellId> = self.running_cell_ids();
+            // NOTE: this is checking all *live* cells, meaning all cells
+            // which have fully joined the network. This could lead to a race condition
+            // when an app is first starting up, it checks its cell status, and if
+            // all cells haven't joined the network yet, the app will get disabled again.
+            //
+            // How this *should* be handled is that join retrying should be more frequent,
+            // and should be sure to update app state on every newly joined cell, so that
+            // the app will be enabled as soon as all cells are fully live. For now though,
+            // we might consider relaxing this check so that this race condition isn't
+            // possible, and let ourselves be optimistic that all cells will join soon after
+            // the app starts.
+            let cell_ids: HashSet<CellId> = self.live_cell_ids();
+            let retry_cell_ids = self.running_cell_ids(Some(CellStatusFilter::PendingJoin(
+                PendingJoinReason::Retry,
+            )));
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -1759,21 +1990,27 @@ mod app_status_impls {
                                     // If not all required cells are running, pause the app
                                     let missing: Vec<_> = app
                                         .required_cells()
-                                        .filter(|id| !running_cells.contains(id))
+                                        .filter(|id| !cell_ids.contains(id))
                                         .collect();
                                     if !missing.is_empty() {
-                                        let reason = PausedAppReason::Error(format!(
-                                            "Some cells are missing / not able to run: {:#?}",
-                                            missing
-                                        ));
-                                        app.status.transition(Pause(reason))
+                                        if missing.iter().any(|c| retry_cell_ids.contains(c)) {
+                                            // The spin up needs to be tried again for this app
+                                            warn!(msg = "Some cells did not start", ?app, ?missing);
+                                            AppStatusFx::SpinUp
+                                        } else {
+                                            let reason = PausedAppReason::Error(format!(
+                                                "Some cells are missing / not able to run: {:#?}",
+                                                missing
+                                            ));
+                                            app.status.transition(Pause(reason))
+                                        }
                                     } else {
                                         AppStatusFx::NoChange
                                     }
                                 }
                                 Paused(_) => {
                                     // If all required cells are now running, restart the app
-                                    if app.required_cells().all(|id| running_cells.contains(id)) {
+                                    if app.required_cells().all(|id| cell_ids.contains(id)) {
                                         app.status.transition(Start)
                                     } else {
                                         AppStatusFx::NoChange
@@ -1794,13 +2031,27 @@ mod app_status_impls {
 
         /// Change the CellStatus of the given Cells in the Conductor.
         /// Silently ignores Cells that don't exist.
-        pub(crate) fn update_cell_status(&self, cell_ids: &[CellId], status: CellStatus) {
-            for cell_id in cell_ids {
+        pub(crate) fn update_cell_status<I, C>(&self, cell_ids: I)
+        where
+            I: Iterator<Item = (C, CellStatus)>,
+            C: Borrow<CellId>,
+        {
+            for (cell_id, status) in cell_ids {
                 self.running_cells.share_mut(|cells| {
-                    if let Some(mut cell) = cells.get_mut(cell_id) {
-                        cell.status = status.clone();
+                    if let Some(mut cell) = cells.get_mut(cell_id.borrow()) {
+                        cell.status = status;
                     }
                 });
+            }
+        }
+
+        fn is_p2p_join_error_retryable(e: &HolochainP2pError) -> bool {
+            match e {
+                // TODO this is brittle because some other network access could fail first if Kitune changes.
+                HolochainP2pError::OtherKitsuneP2pError(KitsuneP2pError::Reqwest(e)) => {
+                    e.is_connect()
+                }
+                _ => false,
             }
         }
     }
@@ -1860,18 +2111,11 @@ mod scheduler_impls {
         /// So ideally this would be called ONCE per conductor lifecyle ONLY.
         pub(crate) async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
             // Clear all ephemeral cruft in all cells before starting a scheduler.
-            let cell_arcs = {
-                let mut cell_arcs = vec![];
-                for cell_id in self.running_cell_ids() {
-                    if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
-                        cell_arcs.push(cell_arc);
-                    }
-                }
-                cell_arcs
-            };
-            let tasks = cell_arcs
-                .into_iter()
-                .map(|cell_arc| cell_arc.delete_all_ephemeral_scheduled_fns());
+            let tasks = self.spaces.get_from_spaces(|space| {
+                let db = space.authored_db.clone();
+                async move { db.async_commit(delete_all_ephemeral_scheduled_fns).await }
+            });
+
             futures::future::join_all(tasks).await;
 
             let scheduler_handle = self.clone();
@@ -1891,8 +2135,8 @@ mod scheduler_impls {
         pub(crate) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
             let cell_arcs = {
                 let mut cell_arcs = vec![];
-                for cell_id in self.running_cell_ids() {
-                    if let Ok(cell_arc) = self.cell_by_id(&cell_id) {
+                for cell_id in self.live_cell_ids() {
+                    if let Ok(cell_arc) = self.cell_by_id(&cell_id, false).await {
                         cell_arcs.push(cell_arc);
                     }
                 }
@@ -1922,9 +2166,10 @@ mod misc_impls {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
             let source_chain = SourceChain::new(
-                self.get_authored_db(cell_id.dna_hash())?,
-                self.get_dht_db(cell_id.dna_hash())?,
-                self.get_dht_db_cache(cell_id.dna_hash())?,
+                self.get_or_create_authored_db(cell_id.dna_hash())?,
+                self.get_or_create_dht_db(cell_id.dna_hash())?,
+                self.get_or_create_space(cell_id.dna_hash())?
+                    .dht_query_cache,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
             )
@@ -1945,7 +2190,7 @@ mod misc_impls {
                 )
                 .await?;
 
-            let cell = self.cell_by_id(&cell_id)?;
+            let cell = self.cell_by_id(&cell_id, false).await?;
             source_chain.flush(cell.holochain_p2p_dna()).await?;
 
             Ok(())
@@ -1953,7 +2198,7 @@ mod misc_impls {
 
         /// Create a JSON dump of the cell's state
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
-            let cell = self.cell_by_id(cell_id)?;
+            let cell = self.cell_by_id(cell_id, false).await?;
             let authored_db = cell.authored_db();
             let dht_db = cell.dht_db();
             let space = cell_id.dna_hash();
@@ -2011,6 +2256,15 @@ mod misc_impls {
             use holochain_p2p::HolochainP2pSender;
             self.holochain_p2p()
                 .dump_network_metrics(dna_hash)
+                .await
+                .map_err(crate::conductor::api::error::ConductorApiError::other)
+        }
+
+        /// JSON dump of backend network stats
+        pub async fn dump_network_stats(&self) -> ConductorApiResult<String> {
+            use holochain_p2p::HolochainP2pSender;
+            self.holochain_p2p()
+                .dump_network_stats()
                 .await
                 .map_err(crate::conductor::api::error::ConductorApiError::other)
         }
@@ -2121,22 +2375,29 @@ mod accessor_impls {
         }
 
         /// Get a dna space or create it if one doesn't exist.
-        pub(crate) fn get_or_create_space(&self, dna_hash: &DnaHash) -> ConductorResult<Space> {
+        pub(crate) fn get_or_create_space(&self, dna_hash: &DnaHash) -> DatabaseResult<Space> {
             self.spaces.get_or_create_space(dna_hash)
         }
 
         pub(crate) fn get_or_create_authored_db(
             &self,
             dna_hash: &DnaHash,
-        ) -> ConductorResult<DbWrite<DbKindAuthored>> {
+        ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
             self.spaces.authored_db(dna_hash)
         }
 
         pub(crate) fn get_or_create_dht_db(
             &self,
             dna_hash: &DnaHash,
-        ) -> ConductorResult<DbWrite<DbKindDht>> {
+        ) -> DatabaseResult<DbWrite<DbKindDht>> {
             self.spaces.dht_db(dna_hash)
+        }
+
+        pub(crate) fn get_or_create_cache_db(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> DatabaseResult<DbWrite<DbKindCache>> {
+            self.spaces.cache(dna_hash)
         }
 
         pub(crate) fn p2p_agents_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pAgents> {
@@ -2154,6 +2415,7 @@ mod accessor_impls {
                 .expect("failed to get p2p_batch_sender")
         }
 
+        #[cfg(feature = "test_utils")]
         pub(crate) fn p2p_metrics_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
             self.spaces
                 .p2p_metrics_db(hash)
@@ -2196,7 +2458,7 @@ impl Conductor {
                     cell_id,
                     CellItem {
                         cell: Arc::new(cell),
-                        status: CellStatus::PendingJoin,
+                        status: CellStatus::PendingJoin(PendingJoinReason::Initial),
                     },
                 );
             }
@@ -2215,13 +2477,12 @@ impl Conductor {
         self.running_cells.share_mut(|cells| {
             cells
                 .iter_mut()
-                .filter_map(|(id, item)| {
-                    if item.is_pending() {
+                .filter_map(|(id, item)| match item.status {
+                    CellStatus::PendingJoin(_) => {
                         item.status = CellStatus::Joining;
                         Some((id.clone(), item.cell.clone()))
-                    } else {
-                        None
                     }
+                    _ => None,
                 })
                 .collect()
         })
@@ -2364,7 +2625,7 @@ impl Conductor {
 
                 let space = handle
                     .get_or_create_space(cell_id.dna_hash())
-                    .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()))
+                    .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))
                     .map_err(|err| (cell_id.clone(), err))?;
 
                 Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell)
@@ -2580,8 +2841,11 @@ mod test_utils_impls {
             Ok(self.get_or_create_space(dna_hash)?.dht_query_cache)
         }
 
-        pub fn get_cache_db(&self, cell_id: &CellId) -> ConductorApiResult<DbWrite<DbKindCache>> {
-            let cell = self.cell_by_id(cell_id)?;
+        pub async fn get_cache_db(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<DbWrite<DbKindCache>> {
+            let cell = self.cell_by_id(cell_id, false).await?;
             Ok(cell.cache().clone())
         }
 
@@ -2597,8 +2861,11 @@ mod test_utils_impls {
             self.spaces.clone()
         }
 
-        pub fn get_cell_triggers(&self, cell_id: &CellId) -> ConductorApiResult<QueueTriggers> {
-            let cell = self.cell_by_id(cell_id)?;
+        pub async fn get_cell_triggers(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<QueueTriggers> {
+            let cell = self.cell_by_id(cell_id, false).await?;
             Ok(cell.triggers().clone())
         }
     }
@@ -2616,7 +2883,7 @@ pub(crate) async fn genesis_cells(
     let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
         let space = conductor
             .get_or_create_space(cell_id.dna_hash())
-            .map_err(|e| CellError::FailedToCreateDnaSpace(e.into()));
+            .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()));
         async {
             let space = space?;
             let authored_db = space.authored_db;
@@ -2684,10 +2951,10 @@ pub async fn integration_dump(
                 |row| row.get(0),
             )?;
             let integration_limbo = txn.query_row(
-            "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
-            [],
-            |row| row.get(0),
-        )?;
+                "SELECT count(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_stage = 3",
+                [],
+                |row| row.get(0),
+            )?;
             let validation_limbo = txn.query_row(
                 "
                 SELECT count(hash) FROM DhtOp
@@ -2817,7 +3084,7 @@ async fn p2p_event_task(
                 }
                 num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             }
-            .in_current_span()
+                .in_current_span()
         })
         .await;
 

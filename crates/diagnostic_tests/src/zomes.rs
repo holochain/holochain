@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use holochain_diagnostics::{dht::test_utils::seeded_rng, holochain::prelude::*, random_bytes};
 
 pub fn basic_zome() -> InlineIntegrityZome {
-    InlineIntegrityZome::new_unique([EntryDef::from_id("a")], 1)
+    InlineIntegrityZome::new_unique([EntryDef::default_from_id("a")], 1)
         .function(
             "create",
             |api, (base, bytes): (AnyLinkableHash, Vec<u8>)| {
@@ -66,7 +66,11 @@ pub fn basic_zome() -> InlineIntegrityZome {
                     let gets = links
                         .iter()
                         .map(|l| {
-                            let target = l.target.clone().retype(holo_hash::hash_type::Action);
+                            let target = l
+                                .target
+                                .clone()
+                                .into_action_hash()
+                                .expect("must be an action hash");
                             GetInput::new(target.into(), Default::default())
                         })
                         .collect();
@@ -88,7 +92,7 @@ pub fn basic_zome() -> InlineIntegrityZome {
 }
 
 pub fn syn_zome() -> InlineIntegrityZome {
-    InlineIntegrityZome::new_unique([EntryDef::from_id("a")], 0)
+    InlineIntegrityZome::new_unique([EntryDef::default_from_id("a")], 0)
         .function("commit", |api, bytes: Vec<u8>| {
             let entry: SerializedBytes = UnsafeBytes::from(bytes).try_into().unwrap();
             api.create(CreateInput::new(

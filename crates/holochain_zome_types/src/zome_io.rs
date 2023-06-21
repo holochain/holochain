@@ -46,8 +46,9 @@ wasm_io_types! {
     // Block some agent on the same DNA.
     fn block_agent (zt::block::BlockAgentInput) -> ();
 
-    // @todo
-    fn dna_info (()) -> zt::info::DnaInfo;
+    // Info about the current DNA.
+    fn dna_info_1 (()) -> zt::info::DnaInfoV1;
+    fn dna_info_2 (()) -> zt::info::DnaInfoV2;
 
     // @todo
     fn call_info (()) -> zt::info::CallInfo;
@@ -93,6 +94,8 @@ wasm_io_types! {
 
     // Get links by entry hash from the cascade.
     fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
+
+    fn count_links(zt::query::LinkQuery) -> usize;
 
     // Attempt to get a live entry from the cascade.
     fn get (Vec<zt::entry::GetInput>) -> Vec<Option<zt::record::Record>>;
@@ -194,6 +197,7 @@ pub enum ZomeCallAuthorization {
     BadSignature,
     BadCapGrant,
     BadNonce(String),
+    BlockedProvenance,
 }
 
 impl std::fmt::Display for ZomeCallAuthorization {

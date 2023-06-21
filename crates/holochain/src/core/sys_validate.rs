@@ -2,14 +2,12 @@
 //! This module contains all the checks we run for sys validation
 
 use super::queue_consumer::TriggerSender;
-use super::ribosome::RibosomeT;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
-use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::space::Space;
-use crate::conductor::Conductor;
+use holochain_cascade::Cascade;
+use holochain_cascade::CascadeSource;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::HolochainP2pDna;
 use holochain_types::prelude::*;
 use holochain_zome_types::countersigning::CounterSigningSessionData;
 use std::convert::TryInto;
@@ -184,15 +182,13 @@ pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
 }
 
 /// Check that Dna actions are only added to empty source chains
-pub async fn check_valid_if_dna(
-    action: &Action,
-    workspace: &SysValidationWorkspace,
-) -> SysValidationResult<()> {
+pub fn check_valid_if_dna(action: &Action, dna_def: &DnaDefHashed) -> SysValidationResult<()> {
     match action {
-        Action::Dna(_) => {
-            if !workspace.is_chain_empty(action.author()).await? {
-                Err(PrevActionError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
-            } else if action.timestamp() < workspace.dna_def().modifiers.origin_time {
+        Action::Dna(a) => {
+            let dna_hash = dna_def.as_hash();
+            if a.hash != *dna_hash {
+                Err(ValidationOutcome::WrongDna(a.hash.clone(), dna_hash.clone()).into())
+            } else if action.timestamp() < dna_def.modifiers.origin_time {
                 // If the Dna timestamp is ahead of the origin time, every other action
                 // will be inductively so also due to the prev_action check
                 Err(PrevActionError::InvalidRootOriginTime)
@@ -234,38 +230,32 @@ pub async fn check_spam(_action: &Action) -> SysValidationResult<()> {
     Ok(())
 }
 
-/// Check previous action type is valid
-pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+/// Check that created agents are always paired with an AgentValidationPkg and vice versa
+pub fn check_agent_validation_pkg_predecessor(
+    action: &Action,
+    prev_action: &Action,
+) -> SysValidationResult<()> {
     let maybe_error = match (prev_action, action) {
         (
-            Action::AgentValidationPkg(AgentValidationPkg {
-                author: author1, ..
-            }),
-            Action::Create(Create {
-                author: author2,
-                entry_type: EntryType::AgentPubKey,
-                ..
-            }),
-        ) => {
-            if author1 != author2 {
-                Some("author of agent validation package must match succeeding agent")
-            } else {
-                None
-            }
-        }
-
-        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => {
-            Some("Every AgentValidationPkg must be followed by a Create for an AgentPubKey")
-        }
-
+            Action::AgentValidationPkg(AgentValidationPkg { .. }),
+            Action::Create(Create { .. }) | Action::Update(Update { .. }),
+        ) => None,
+        (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => Some(
+            "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey",
+        ),
         (
             _,
             Action::Create(Create {
                 entry_type: EntryType::AgentPubKey,
                 ..
+            })
+            | Action::Update(Update {
+                entry_type: EntryType::AgentPubKey,
+                ..
             }),
-        ) => Some("Every Create for an AgentPubKey must be preceded by an AgentValidationPkg"),
-
+        ) => Some(
+            "Every Create or Update for an AgentPubKey must be preceded by an AgentValidationPkg",
+        ),
         _ => None,
     };
 
@@ -277,6 +267,37 @@ pub fn check_prev_type(action: &Action, prev_action: &Action) -> SysValidationRe
         .map_err(|e| ValidationOutcome::from(e).into())
     } else {
         Ok(())
+    }
+}
+
+/// Check that the author didn't change between actions
+pub fn check_prev_author(action: &Action, prev_action: &Action) -> SysValidationResult<()> {
+    // Agent updates will be valid when DPKI support lands
+    let a1: AgentPubKey = if let Action::Update(
+        u @ Update {
+            entry_type: EntryType::AgentPubKey,
+            ..
+        },
+    ) = prev_action
+    {
+        #[cfg(feature = "dpki")]
+        {
+            u.entry_hash.clone().into()
+        }
+
+        #[cfg(not(feature = "dpki"))]
+        {
+            u.author.clone()
+        }
+    } else {
+        prev_action.author().clone()
+    };
+
+    let a2 = action.author();
+    if a1 == *a2 {
+        Ok(())
+    } else {
+        Err(PrevActionError::Author(a1, a2.clone())).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
@@ -305,57 +326,47 @@ pub fn check_prev_seq(action: &Action, prev_action: &Action) -> SysValidationRes
 
 /// Check the entry variant matches the variant in the actions entry type
 pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationResult<()> {
-    match (entry_type, entry) {
-        (EntryType::AgentPubKey, Entry::Agent(_)) => Ok(()),
-        (EntryType::App(_), Entry::App(_)) => Ok(()),
-        (EntryType::App(_), Entry::CounterSign(_, _)) => Ok(()),
-        (EntryType::CapClaim, Entry::CapClaim(_)) => Ok(()),
-        (EntryType::CapGrant, Entry::CapGrant(_)) => Ok(()),
-        _ => Err(ValidationOutcome::EntryType.into()),
-    }
+    entry_type_matches(entry_type, entry)
+        .then_some(())
+        .ok_or_else(|| ValidationOutcome::EntryTypeMismatch.into())
 }
 
-/// Check the AppEntryDef is valid for the zome.
-/// Check the EntryDefId and ZomeIndex are in range.
-// TODO: MD: shouldn't this be part of App validation, since it invokes Wasm?
-pub async fn check_app_entry_def(
-    dna_hash: &DnaHash,
-    entry_type: &AppEntryDef,
-    conductor: &Conductor,
-) -> SysValidationResult<EntryDef> {
-    // We want to be careful about holding locks open to the conductor api
-    // so calls are made in blocks
-    let ribosome = conductor
-        .get_ribosome(dna_hash)
-        .map_err(|_| SysValidationError::DnaMissing(dna_hash.clone()))?;
+/// Check that the EntryVisibility is congruous with the presence or absence of entry data
+pub fn check_entry_visibility(op: &DhtOp) -> SysValidationResult<()> {
+    use EntryVisibility::*;
+    use RecordEntry::*;
 
-    // Check if the zome is found
-    let zome = ribosome
-        .get_integrity_zome(&entry_type.zome_index())
-        .ok_or_else(|| ValidationOutcome::ZomeIndex(entry_type.clone()))?
-        .into_inner()
-        .1;
+    let err = |reason: &str| {
+        Err(ValidationOutcome::MalformedDhtOp(
+            Box::new(op.action()),
+            op.get_type(),
+            reason.to_string(),
+        )
+        .into())
+    };
 
-    let entry_def = get_entry_def(entry_type.entry_index(), zome, dna_hash, conductor).await?;
+    match (op.action().entry_type().map(|t| t.visibility()), op.entry()) {
+        (Some(Public), Present(_)) => Ok(()),
+        (Some(Private), Hidden) => Ok(()),
+        (Some(Private), NotStored) => Ok(()),
 
-    // Check the visibility and return
-    match entry_def {
-        Some(entry_def) => {
-            if entry_def.visibility == *entry_type.visibility() {
-                Ok(entry_def)
+        (Some(Public), Hidden) => err("RecordEntry::Hidden is only for Private entry type"),
+        (Some(_), NA) => err("There is action entry data but the entry itself is N/A"),
+        (Some(Private), Present(_)) => Err(ValidationOutcome::PrivateEntryLeaked.into()),
+        (Some(Public), NotStored) => {
+            if op.get_type() == DhtOpType::RegisterAgentActivity
+                || op.action().entry_type() == Some(&EntryType::AgentPubKey)
+            {
+                // RegisterAgentActivity is a special case, where the entry data can be omitted.
+                // Agent entries are also a special case. The "entry data" is already present in
+                // the action as the entry hash, so no external entry data is needed.
+                Ok(())
             } else {
-                Err(ValidationOutcome::EntryVisibility(entry_type.clone()).into())
+                err("Op has public entry type but is missing its data")
             }
         }
-        None => Err(ValidationOutcome::EntryDefId(entry_type.clone()).into()),
-    }
-}
-
-/// Check the app entry type isn't private for store entry
-pub fn check_not_private(entry_def: &EntryDef) -> SysValidationResult<()> {
-    match entry_def.visibility {
-        EntryVisibility::Public => Ok(()),
-        EntryVisibility::Private => Err(ValidationOutcome::PrivateEntry.into()),
+        (None, NA) => Ok(()),
+        (None, _) => err("Entry must be N/A for action with no entry type"),
     }
 }
 
@@ -380,26 +391,28 @@ pub fn check_new_entry_action(action: &Action) -> SysValidationResult<()> {
 /// Check the entry size is under the MAX_ENTRY_SIZE
 pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
     match entry {
-        Entry::App(bytes) => {
+        Entry::App(bytes) | Entry::CounterSign(_, bytes) => {
             let size = std::mem::size_of_val(&bytes.bytes()[..]);
-            if size < MAX_ENTRY_SIZE {
+            if size <= MAX_ENTRY_SIZE {
                 Ok(())
             } else {
-                Err(ValidationOutcome::EntryTooLarge(size, MAX_ENTRY_SIZE).into())
+                Err(ValidationOutcome::EntryTooLarge(size).into())
             }
         }
-        // Other entry types are small
-        _ => Ok(()),
+        _ => {
+            // TODO: size checks on other types (cap grant and claim)
+            Ok(())
+        }
     }
 }
 
 /// Check the link tag size is under the MAX_TAG_SIZE
 pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     let size = std::mem::size_of_val(&tag.0[..]);
-    if size < MAX_TAG_SIZE {
+    if size <= MAX_TAG_SIZE {
         Ok(())
     } else {
-        Err(ValidationOutcome::TagTooLarge(size, MAX_TAG_SIZE).into())
+        Err(ValidationOutcome::TagTooLarge(size).into())
     }
 }
 
@@ -413,8 +426,8 @@ pub fn check_update_reference(
         Ok(())
     } else {
         Err(ValidationOutcome::UpdateTypeMismatch(
-            eu.entry_type.clone(),
             original_entry_action.entry_type().clone(),
+            eu.entry_type.clone(),
         )
         .into())
     }
@@ -488,15 +501,14 @@ fn check_prev_action_chain<A: ChainItem>(
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_add_link<F>(
     hash: &ActionHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -518,15 +530,14 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_register_agent_activity<F>(
     hash: &ActionHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -548,15 +559,14 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_entry<F>(
     hash: &ActionHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -581,15 +591,14 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_any_store_entry<F>(
     hash: &EntryHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -609,15 +618,14 @@ where
 /// run again if we weren't holding it.
 pub async fn check_and_hold_store_record<F>(
     hash: &ActionHash,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &impl Cascade,
     incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
     F: FnOnce(&Record) -> SysValidationResult<()>,
 {
-    let source = check_and_hold(hash, workspace, network).await?;
+    let source = check_and_hold(hash, cascade).await?;
     f(source.as_ref())?;
     if let (Some(incoming_dht_ops_sender), Source::Network(record)) =
         (incoming_dht_ops_sender, source)
@@ -704,25 +712,12 @@ impl AsRef<Record> for Source {
 /// it to the incoming ops.
 async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
     hash: &I,
-    workspace: &SysValidationWorkspace,
-    network: HolochainP2pDna,
+    cascade: &impl Cascade,
 ) -> SysValidationResult<Source> {
     let hash: AnyDhtHash = hash.clone().into();
-    // Create a workspace with just the local stores
-    let mut local_cascade = workspace.local_cascade();
-    if let Some(el) = local_cascade
-        .retrieve(hash.clone(), Default::default())
-        .await?
-    {
-        return Ok(Source::Local(el));
-    }
-    // Create a workspace with just the network
-    let mut network_only_cascade = workspace.full_cascade(network);
-    match network_only_cascade
-        .retrieve(hash.clone(), Default::default())
-        .await?
-    {
-        Some(el) => Ok(Source::Network(el.privatized().0)),
+    match cascade.retrieve(hash.clone(), Default::default()).await? {
+        Some((el, CascadeSource::Local)) => Ok(Source::Local(el)),
+        Some((el, CascadeSource::Network)) => Ok(Source::Network(el.privatized().0)),
         None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
     }
 }
@@ -740,11 +735,8 @@ fn make_store_record(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     let (action, signature) = shh.into_inner();
     let action = action.into_content();
 
-    // Check the entry
-    let maybe_entry_box = record_entry.into_option().map(Box::new);
-
     // Create the hash and op
-    let op = DhtOp::StoreRecord(signature, action, maybe_entry_box);
+    let op = DhtOp::StoreRecord(signature, action, record_entry);
     let hash = op.to_hash();
     Some((hash, op))
 }
@@ -762,7 +754,7 @@ fn make_store_entry(record: Record) -> Option<(DhtOpHash, DhtOp)> {
     let (action, signature) = shh.into_inner();
 
     // Check the entry and exit early if it's not there
-    let entry_box = record_entry.into_option()?.into();
+    let entry_box = record_entry.into_option()?;
     // If the action is the wrong type exit early
     let action = action.into_content().try_into().ok()?;
 

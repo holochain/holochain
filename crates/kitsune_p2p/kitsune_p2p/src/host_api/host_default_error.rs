@@ -29,6 +29,13 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
         box_fut(Ok(false))
     }
 
+    fn put_agent_info_signed(
+        &self,
+        _input: Vec<crate::types::agent_store::AgentInfoSigned>,
+    ) -> KitsuneHostResult<()> {
+        box_fut(Ok(()))
+    }
+
     fn get_agent_info_signed(
         &self,
         _input: GetAgentInfoSignedEvt,

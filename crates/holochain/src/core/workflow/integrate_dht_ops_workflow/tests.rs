@@ -8,12 +8,12 @@ use crate::here;
 use crate::test_utils::test_network;
 use ::fixt::prelude::*;
 use holochain_sqlite::db::WriteManager;
-use holochain_state::query::link::GetLinksQuery;
+use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 use holochain_state::workspace::WorkspaceError;
+use holochain_trace;
 use holochain_zome_types::ActionHashed;
 use holochain_zome_types::Entry;
 use holochain_zome_types::ValidationStatus;
-use observability;
 
 #[derive(Clone)]
 struct TestData {
@@ -307,6 +307,7 @@ impl Db {
                             link_add.base_address.clone(),
                             LinkTypeFilter::single_type(link_add.zome_index, link_add.link_type),
                             Some(link_add.tag.clone()),
+                            GetLinksFilter::default(),
                         );
                         let res = query.run(Txn::from(&txn)).unwrap();
                         assert_eq!(res.len(), 0, "{}", here);
@@ -405,12 +406,12 @@ fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
-        Some(a.original_entry.clone().into()),
+        a.original_entry.clone().into(),
     );
     let op = DhtOp::RegisterUpdatedRecord(
         a.signature.clone(),
         a.entry_update_action.clone(),
-        Some(a.new_entry.clone().into()),
+        a.new_entry.clone().into(),
     );
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
@@ -432,7 +433,7 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
     let op = DhtOp::RegisterUpdatedContent(
         a.signature.clone(),
         a.entry_update_entry.clone(),
-        Some(a.new_entry.clone().into()),
+        a.new_entry.clone().into(),
     );
     let pre_state = vec![Db::Integrated(original_op), Db::IntQueue(op.clone())];
     let expect = vec![
@@ -468,7 +469,7 @@ fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = DhtOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
-        Some(a.original_entry.clone().into()),
+        a.original_entry.clone().into(),
     );
     let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
     let pre_state = vec![Db::IntQueue(op.clone()), Db::Integrated(original_op)];
@@ -517,7 +518,7 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 // This runs the above tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
-    observability::test_run().ok();
+    holochain_trace::test_run().ok();
     let test_db = test_dht_db();
     let env = test_db.to_db();
 

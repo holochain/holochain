@@ -8,7 +8,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
     let mut fns = BTreeSet::new();
     fns.insert((zome_info()?.name, "accept_cap_claim".into()));
-    fns.insert((zome_info()?.name, "another_cap_claim".into()));
+    fns.insert((zome_info()?.name, "another_cap_grant".into()));
     let functions = GrantedFunctions::Listed(fns);
     create_cap_grant(CapGrantEntry {
         tag: "".into(),
@@ -23,6 +23,28 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 #[hdk_extern]
 pub fn cap_secret(_: ()) -> ExternResult<CapSecret> {
     CapSecret::try_from_random()
+}
+
+#[hdk_extern]
+pub fn block_agent(target: AgentPubKey) -> ExternResult<()> {
+    HDK.with(|h| {
+        h.borrow().block_agent(holochain_zome_types::block::BlockAgentInput {
+            target,
+            reason: vec![],
+            interval: InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX).unwrap()
+        })
+    })
+}
+
+#[hdk_extern]
+pub fn unblock_agent(target: AgentPubKey) -> ExternResult<()> {
+    HDK.with(|h| {
+        h.borrow().unblock_agent(holochain_zome_types::block::BlockAgentInput {
+            target,
+            reason: vec![],
+            interval: InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX).unwrap()
+        })
+    })
 }
 
 fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {

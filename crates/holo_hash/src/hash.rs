@@ -112,7 +112,7 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
-    pub fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
+    pub(crate) fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
         let prefix = hash_type.get_prefix();
         self.hash[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(&prefix[0..HOLO_HASH_PREFIX_LEN]);
         HoloHash {
@@ -160,12 +160,7 @@ impl<T: HashType> HoloHash<T> {
 
     /// Get the hex representation of the hash bytes
     pub fn to_hex(&self) -> String {
-        use std::fmt::Write;
-        let mut s = String::with_capacity(self.hash.len());
-        for b in &self.hash {
-            write!(&mut s, "{:02x}", b).ok();
-        }
-        s
+        bytes_to_hex(&self.hash, false)
     }
 }
 
@@ -174,14 +169,9 @@ impl<T: HashType> HoloHash<T> {
     /// Construct a HoloHash from a 32-byte hash.
     /// The 3 prefix bytes will be added based on the provided HashType,
     /// and the 4 location bytes will be computed.
-    ///
-    /// For convenience, 36 bytes can also be passed in, in which case
-    /// the location bytes will used as provided, not computed.
     pub fn from_raw_32_and_type(mut hash: Vec<u8>, hash_type: T) -> Self {
-        if hash.len() == HOLO_HASH_CORE_LEN {
-            hash.append(&mut encode::holo_dht_location_bytes(&hash));
-        }
-
+        assert_length!(HOLO_HASH_CORE_LEN, &hash);
+        hash.append(&mut encode::holo_dht_location_bytes(&hash));
         assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
 
         HoloHash::from_raw_36_and_type(hash, hash_type)
@@ -258,6 +248,22 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[1] as u32) << 8)
         + ((bytes[2] as u32) << 16)
         + ((bytes[3] as u32) << 24)
+}
+
+/// Get a hex string representation of two chars per byte
+pub fn bytes_to_hex(bytes: &[u8], caps: bool) -> String {
+    use std::fmt::Write;
+    let mut s = String::with_capacity(bytes.len() + 2);
+    if caps {
+        for b in bytes {
+            write!(&mut s, "{:02X}", b).ok();
+        }
+    } else {
+        for b in bytes {
+            write!(&mut s, "{:02x}", b).ok();
+        }
+    }
+    s
 }
 
 #[cfg(test)]

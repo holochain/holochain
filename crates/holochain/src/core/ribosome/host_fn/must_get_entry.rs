@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holochain_cascade::Cascade;
+use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -23,25 +23,26 @@ pub fn must_get_entry<'a>(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
-                let mut cascade = match call_context.host_context {
+                let cascade = match call_context.host_context {
                     HostContext::Validate(_) => {
-                        Cascade::from_workspace_stores(workspace.stores(), None)
+                        CascadeImpl::from_workspace_stores(workspace.stores(), None)
                     }
-                    _ => Cascade::from_workspace_and_network(
+                    _ => CascadeImpl::from_workspace_and_network(
                         &workspace,
                         call_context.host_context.network().clone(),
                     ),
                 };
-                let result: Result<_, RuntimeError> = match cascade
+                match cascade
                     .retrieve_entry(entry_hash.clone(), NetworkGetOptions::must_get_options())
                     .await
                     .map_err(|cascade_error| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(cascade_error.to_string())).into()
                     })? {
-                    Some(entry) => Ok(entry),
+                    Some((entry, _)) => Ok(entry),
                     None => match call_context.host_context {
                         HostContext::EntryDefs(_)
-                        | HostContext::GenesisSelfCheck(_)
+                        | HostContext::GenesisSelfCheckV1(_)
+                        | HostContext::GenesisSelfCheckV2(_)
                         | HostContext::MigrateAgent(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
@@ -75,8 +76,7 @@ pub fn must_get_entry<'a>(
                             .into())
                         }
                     },
-                };
-                result
+                }
             })
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(
@@ -109,7 +109,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_entry_test<'a>() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -140,20 +140,17 @@ pub mod test {
 
         let signature = record.signature().clone();
         let action = record.action().clone();
-        let maybe_entry_box: Option<Box<Entry>> = record
-            .entry()
-            .as_option()
-            .cloned()
-            .map(|entry| Box::new(entry));
+        let record_entry: RecordEntry = record.entry().clone();
+        let entry = record_entry.clone().into_option().unwrap();
         let entry_state = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
             NewEntryAction::try_from(action.clone()).unwrap(),
-            maybe_entry_box.clone().unwrap(),
+            entry.clone(),
         ));
         let record_state = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature,
             action.clone(),
-            maybe_entry_box,
+            record_entry,
         ));
         dht_db
             .conn()
@@ -170,7 +167,7 @@ pub mod test {
         let must_get_entry: EntryHashed = conductor
             .call(&bob, "must_get_entry", action.entry_hash().clone())
             .await;
-        assert_eq!(Entry::from(must_get_entry), entry,);
+        assert_eq!(Entry::from(must_get_entry), entry);
 
         // Must get action returns the action if it exists regardless of the
         // validation status.

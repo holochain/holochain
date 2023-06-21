@@ -42,6 +42,11 @@ impl SweetAgents {
         (fake_agent_pubkey_1(), fake_agent_pubkey_2())
     }
 
+    /// Return only alice.
+    pub fn alice() -> AgentPubKey {
+        fake_agent_pubkey_1()
+    }
+
     /// Get three AgentPubKeys
     pub async fn three(keystore: MetaLairClient) -> (AgentPubKey, AgentPubKey, AgentPubKey) {
         let mut agents = Self::get(keystore, 3).await;

@@ -3,7 +3,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::error::CascadeResult;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -37,7 +37,7 @@ pub fn delete_link<'a>(
                 tokio_helper::block_forever_on(async move {
                     let workspace = call_context_2.host_context.workspace();
                     CascadeResult::Ok(
-                        Cascade::from_workspace_and_network(&workspace, network)
+                        CascadeImpl::from_workspace_and_network(&workspace, network)
                             .dht_get(address_2.into(), GetOptions::content())
                             .await?
                             .map(|el| el.into_inner().0),
@@ -115,7 +115,7 @@ pub mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_delete_link_add_remove() {
-        observability::test_run().ok();
+        holochain_trace::test_run().ok();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;

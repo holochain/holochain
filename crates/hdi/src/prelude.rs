@@ -78,6 +78,7 @@ macro_rules! holochain_externs {
             verify_signature:1,
             zome_info:1,
             dna_info:1,
+            dna_info:2,
             must_get_entry:1,
             must_get_valid_record:1,
             must_get_action:1,

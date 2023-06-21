@@ -38,7 +38,7 @@ impl SweetConductorConfig {
             if n.bootstrap_service.is_some()
                 && n.bootstrap_service.as_ref().unwrap().to_string() == "rendezvous:"
             {
-                n.bootstrap_service = Some(url2::url2!("http://{}", rendezvous.bootstrap_addr()));
+                n.bootstrap_service = Some(url2::url2!("{}", rendezvous.bootstrap_addr()));
             }
 
             #[cfg(feature = "tx5")]
@@ -46,7 +46,7 @@ impl SweetConductorConfig {
                 for t in n.transport_pool.iter_mut() {
                     if let kitsune_p2p::TransportConfig::WebRTC { signal_url } = t {
                         if signal_url == "rendezvous:" {
-                            *signal_url = format!("ws://{}", rendezvous.sig_addr());
+                            *signal_url = rendezvous.sig_addr().to_string();
                         }
                     }
                 }
@@ -60,6 +60,11 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
+        KitsuneP2pConfig::default().into()
+    }
+
+    /// Rendezvous config for SweetConductors
+    pub fn rendezvous() -> Self {
         let mut tuning =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning.gossip_strategy = "sharded-gossip".to_string();
@@ -67,14 +72,14 @@ impl SweetConductorConfig {
         let mut network = KitsuneP2pConfig::default();
         network.bootstrap_service = Some(url2::url2!("rendezvous:"));
 
-        #[cfg(not(feature = "tx5"))]
+        /*#[cfg(not(feature = "tx5"))]
         {
             network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
                 bind_to: None,
                 override_host: None,
                 override_port: None,
             }];
-        }
+        }*/
 
         #[cfg(feature = "tx5")]
         {

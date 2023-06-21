@@ -3,6 +3,10 @@
     "Holochain is an open-source framework to develop peer-to-peer applications with high levels of security, reliability, and performance.";
 
   inputs = {
+    # empty repo that can be detected as such, used for the input override implementation
+    empty.url = "github:steveej/empty";
+    empty.flake = false;
+
     # nix packages pointing to the github repo
     nixpkgs.url = "nixpkgs/nixos-unstable";
 
@@ -37,18 +41,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    versions = {
-      url = "github:holochain/holochain?dir=versions/0_1";
-    };
+    versions.url = "github:holochain/holochain?dir=versions/0_1";
 
-    holochain.follows = "versions/holochain";
-    holochain.flake = false;
-    lair.follows = "versions/lair";
-    lair.flake = false;
-    launcher.follows = "versions/launcher";
-    launcher.flake = false;
-    scaffolding.follows = "versions/scaffolding";
-    scaffolding.flake = false;
+    holochain.follows = "empty";
+    lair.follows = "empty";
+    launcher.follows = "empty";
+    scaffolding.follows = "empty";
 
     cargo-chef = {
       url = "github:LukeMathWalker/cargo-chef/main";
