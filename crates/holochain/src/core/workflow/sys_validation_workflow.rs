@@ -141,7 +141,7 @@ async fn sys_validation_workflow_inner(
                 .await
                 .is_err()
             {
-                tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
+                tracing::warn!("sys validation task has failed to send ops. This is not a problem if the conductor is shutting down");
                 break;
             }
         }
