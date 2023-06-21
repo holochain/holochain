@@ -102,7 +102,7 @@ impl<E: Borrow<Entry>> RecordEntry<E> {
     /// Provides deserialized app entry if it exists
     ///
     /// same as as_option but handles deserialization
-    /// anything other tha RecordEntry::Present returns None
+    /// anything other than RecordEntry::Present returns None
     /// a present entry that fails to deserialize cleanly is an error
     /// a present entry that deserializes cleanly is returned as the provided type A
     pub fn to_app_option<A: TryFrom<SerializedBytes, Error = SerializedBytesError>>(

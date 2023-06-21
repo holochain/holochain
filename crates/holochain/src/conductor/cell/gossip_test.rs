@@ -41,14 +41,18 @@ async fn gossip_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn signature_smoke_test() {
     holochain_trace::test_run().ok();
+
+    let rendezvous = SweetLocalRendezvous::new().await;
+
     let mut network_config = KitsuneP2pConfig::default();
     network_config.transport_pool = vec![kitsune_p2p::TransportConfig::Mem {}];
-    // Hit an actual bootstrap service so it can blow up and return an error if we get our end of
+    // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.
-    network_config.bootstrap_service = Some(url2::url2!("{}", kitsune_p2p::BOOTSTRAP_SERVICE_DEV));
+    network_config.bootstrap_service = Some(url2::url2!("{}", rendezvous.bootstrap_addr()));
     let zomes = vec![TestWasm::Anchor];
     let mut conductor_test =
         ConductorTestData::with_network_config(zomes.clone(), false, network_config.clone()).await;
+    // TODO should check that the app is running otherwise we don't know if bootstrap was called
     conductor_test.shutdown_conductor().await;
 }
 
