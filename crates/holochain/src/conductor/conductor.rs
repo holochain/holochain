@@ -3054,7 +3054,7 @@ async fn p2p_event_task(
 ) {
     /// The number of events we allow to run in parallel before
     /// starting to await on the join handles.
-    const NUM_PARALLEL_EVTS: usize = 100;
+    const NUM_PARALLEL_EVTS: usize = 512;
     let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
     p2p_evt
