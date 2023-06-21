@@ -18,7 +18,7 @@ pub fn init_metrics() -> Result<(), MetricsError> {
         },
         Err(e) => match e {
             std::env::VarError::NotPresent => {
-                configure_stdout_exporter();
+                configure_otlp_exporter()?;
             }
             e => {
                 tracing::warn!("Could not configure metrics exporter {:?}", e);
@@ -40,7 +40,7 @@ fn configure_stdout_exporter() {
 
 fn configure_otlp_exporter() -> Result<(), MetricsError> {
     let export_config = ExportConfig {
-        endpoint: "http://localhost:4317".to_string(),
+        endpoint: "http://172.31.32.1:4317".to_string(),
         ..ExportConfig::default()
     };
     let meter = opentelemetry_otlp::new_pipeline()

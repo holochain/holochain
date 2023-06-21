@@ -1,7 +1,7 @@
 use opentelemetry::{global, metrics::Histogram, Context, Key, KeyValue, StringValue, Value};
 use std::time::Duration;
 
-/// Record run cycles for a Tokio task.
+/// Record request/response durations.
 #[derive(Clone)]
 pub struct RequestResponseDurationMetric {
     attributes: Vec<KeyValue>,
@@ -14,7 +14,7 @@ impl RequestResponseDurationMetric {
     where
         T: Into<StringValue>,
     {
-        let meter = global::meter("holochain.request_response");
+        let meter = global::meter("holochain.request_response_duration");
         let histogram = meter.u64_histogram("request_response_duration").init();
 
         RequestResponseDurationMetric {

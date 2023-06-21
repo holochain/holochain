@@ -220,6 +220,9 @@ pub struct Conductor {
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
+
+    #[cfg(feature = "otel")]
+    zome_call_duration_metric: holochain_trace::metric::ZomeCallDurationMetric,
 }
 
 impl Conductor {
@@ -280,6 +283,8 @@ mod startup_shutdown_impls {
                 keystore,
                 holochain_p2p,
                 post_commit,
+                #[cfg(feature = "otel")]
+                zome_call_duration_metric: holochain_trace::metric::ZomeCallDurationMetric::new(),
             }
         }
 
@@ -2725,21 +2730,39 @@ async fn p2p_event_task(
     #[cfg(feature = "otel")]
     let task_run = holochain_trace::metric::TaskRunMetric::new("dispatch_p2p_event");
 
+    #[cfg(feature = "otel")]
+    let queue_size = holochain_trace::metric::QueueSizeMetric::new("dispatch_p2p_event");
+
     /// The number of events we allow to run in parallel before
     /// starting to await on the join handles.
     const NUM_PARALLEL_EVTS: usize = 100;
     let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let incr_num_tasks = num_tasks.clone();
+    #[cfg(feature = "otel")]
+    let incr_queue_size = queue_size.clone();
     p2p_evt
-        .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
+        .map(move |evt| {
+            incr_num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+            #[cfg(feature = "otel")]
+            incr_queue_size.record_size(incr_num_tasks.load(std::sync::atomic::Ordering::Relaxed) as u64);
+
+            evt
+        })
+        .for_each_concurrent(NUM_PARALLEL_EVTS, move |evt| {
             #[cfg(feature = "otel")]
             task_run.record_start();
 
             let handle = handle.clone();
             let num_tasks = num_tasks.clone();
             let max_time = max_time.clone();
+
+            #[cfg(feature = "otel")]
+            let queue_size = queue_size.clone();
+
             async move {
-                let start = (num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
+                let start = (num_tasks.load(std::sync::atomic::Ordering::Relaxed) + 1
                     >= NUM_PARALLEL_EVTS)
                     .then(std::time::Instant::now);
 
@@ -2763,6 +2786,9 @@ async fn p2p_event_task(
                     None => max_time.store(0, std::sync::atomic::Ordering::Relaxed),
                 }
                 num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+
+                #[cfg(feature = "otel")]
+                queue_size.clone().record_size(num_tasks.load(std::sync::atomic::Ordering::Relaxed) as u64);
             }
                 .in_current_span()
         })

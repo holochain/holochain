@@ -31,7 +31,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+        "uid": "${Source}"
       },
       "description": "",
       "fieldConfig": {
@@ -109,11 +109,12 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+            "uid": "${Source}"
           },
           "editorMode": "builder",
-          "expr": "rate(run_count_total[5m])",
+          "expr": "rate(run_count_total{service_name=\"$Instance\"}[5m])",
           "instant": false,
+          "legendFormat": "{{ task_name }}",
           "range": true,
           "refId": "A"
         }
@@ -124,7 +125,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+        "uid": "${Source}"
       },
       "description": "",
       "fieldConfig": {
@@ -176,7 +177,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+            "uid": "${Source}"
           },
           "editorMode": "builder",
           "expr": "sum by(listen_port) (conn_count{designation=\"admin\"})",
@@ -193,7 +194,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+        "uid": "${Source}"
       },
       "description": "",
       "fieldConfig": {
@@ -245,7 +246,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+            "uid": "${Source}"
           },
           "editorMode": "builder",
           "expr": "sum by(listen_port) (conn_count{designation=\"app\"})",
@@ -262,7 +263,105 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+        "uid": "${Source}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 20
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Source}"
+          },
+          "editorMode": "code",
+          "expr": "(sum(rate(request_response_duration_sum{service_name = \"$Instance\", handler_name=\"ws_admin_request_response_duration\"}[5m]))) / sum(rate(request_response_duration_count{service_name = \"$Instance\", handler_name=\"ws_admin_request_response_duration\"}[5m]))",
+          "format": "time_series",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "duration",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Admin websocket request/response duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${Source}"
       },
       "description": "",
       "fieldConfig": {
@@ -322,105 +421,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 23
-      },
-      "id": 4,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
-          },
-          "editorMode": "code",
-          "expr": "(sum(rate(request_response_duration_sum{handler_name=\"ws_admin_request_response_duration\"}[5m]))) / sum(rate(request_response_duration_count{handler_name=\"ws_admin_request_response_duration\"}[5m]))",
-          "format": "time_series",
-          "instant": false,
-          "interval": "",
-          "legendFormat": "duration",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Admin websocket request/response duration",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 20
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 23
+        "y": 31
       },
       "id": 5,
       "options": {
@@ -440,10 +441,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+            "uid": "${Source}"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(request_response_duration_sum{handler_name=\"ws_app_request_response_duration\"}[5m]))) / sum(rate(request_response_duration_count{handler_name=\"ws_app_request_response_duration\"}[5m]))",
+          "expr": "(sum(rate(request_response_duration_sum{service_name = \"$Instance\", handler_name=\"ws_app_request_response_duration\"}[5m]))) / sum(rate(request_response_duration_count{service_name = \"$Instance\", handler_name=\"ws_app_request_response_duration\"}[5m]))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -458,7 +459,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+        "uid": "${Source}"
       },
       "description": "",
       "fieldConfig": {
@@ -522,11 +523,11 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+            "uid": "${Source}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(rate(request_response_duration_bucket{handler_name=\"ws_app_request_response_duration\"}[5m])) by (le)",
+          "expr": "sum(rate(request_response_duration_bucket{service_name = \"$Instance\", handler_name=\"ws_app_request_response_duration\"}[5m])) by (le)",
           "format": "heatmap",
           "instant": false,
           "interval": "",
@@ -537,14 +538,124 @@
       ],
       "title": "App websocket request/response duration heatmap",
       "type": "heatmap"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${Source}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 0,
+        "y": 39
+      },
+      "id": 7,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Source}"
+          },
+          "editorMode": "builder",
+          "expr": "sum(queue_size{queue_name=\"dispatch_p2p_event\"})",
+          "instant": false,
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Queue size: dispatch_p2p_event",
+      "type": "gauge"
     }
   ],
-  "refresh": false,
+  "refresh": "",
   "schemaVersion": 38,
   "style": "dark",
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Source",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "holochain",
+          "value": "holochain"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "e80ea9e6-0692-4ba9-801d-9455ace1b373"
+        },
+        "definition": "label_values(service_name)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Instance",
+        "options": [],
+        "query": {
+          "query": "label_values(service_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-1h",
@@ -554,6 +665,6 @@
   "timezone": "",
   "title": "Holochain",
   "uid": "da55d77b-6578-452d-855d-aac0650db794",
-  "version": 8,
+  "version": 14,
   "weekStart": ""
 }
