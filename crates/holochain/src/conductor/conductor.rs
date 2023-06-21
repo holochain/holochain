@@ -3068,19 +3068,15 @@ async fn p2p_event_task(
                     .then(std::time::Instant::now);
 
                 // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently
-                tokio::select! {
-                    r = handle.dispatch_holochain_p2p_event(evt) => {
-                        match r {
-                            Ok(_) => {}
-                            Err(e) => {
-                                tracing::error!(
-                                    message = "error dispatching network event",
-                                    error = ?e,
-                                );
-                            }
-                        }
+                match tokio::time::timeout(std::time::Duration::from_secs(30), handle.dispatch_holochain_p2p_event(evt)).await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => {
+                        tracing::error!(
+                                message = "error dispatching network event",
+                                error = ?e,
+                            );
                     }
-                    () = tokio::time::sleep(std::time::Duration::from_secs(30)) => {
+                    Err(_) => {
                         tracing::error!("timeout while dispatching network event");
                     }
                 }
