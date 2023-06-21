@@ -5,22 +5,22 @@ use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::info::DnaInfo;
+use holochain_zome_types::info::DnaInfoV2;
 use std::sync::Arc;
 
-pub fn dna_info(
+pub fn dna_info_2(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: (),
-) -> Result<DnaInfo, RuntimeError> {
+) -> Result<DnaInfoV2, RuntimeError> {
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             bindings_deterministic: Permission::Allow,
             ..
-        } => Ok(DnaInfo {
+        } => Ok(DnaInfoV2 {
             name: ribosome.dna_def().name.clone(),
             hash: ribosome.dna_def().as_hash().clone(),
-            properties: ribosome.dna_def().modifiers.properties.clone(),
+            modifiers: ribosome.dna_def().modifiers.clone(),
             zome_names: ribosome
                 .dna_def()
                 .integrity_zomes
@@ -78,7 +78,7 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn dna_info_test() {
+    async fn dna_info_test_2() {
         holochain_trace::test_run().ok();
         // let RibosomeTestFixture {
         //     conductor, alice, ..

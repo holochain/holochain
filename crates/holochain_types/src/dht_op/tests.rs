@@ -98,11 +98,7 @@ impl RecordTest {
         let action: Action = entry_create.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(
-                self.sig.clone(),
-                action.clone(),
-                Some(self.entry.clone().into()),
-            ),
+            DhtOp::StoreRecord(self.sig.clone(), action.clone(), self.entry.clone().into()),
             DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
             DhtOp::StoreEntry(
                 self.sig.clone(),
@@ -118,27 +114,19 @@ impl RecordTest {
         let action: Action = entry_update.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(
-                self.sig.clone(),
-                action.clone(),
-                Some(self.entry.clone().into()),
-            ),
+            DhtOp::StoreRecord(self.sig.clone(), action.clone(), self.entry.clone().into()),
             DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
             DhtOp::StoreEntry(
                 self.sig.clone(),
                 NewEntryAction::Update(entry_update.clone()),
-                self.entry.clone().into(),
+                self.entry.clone(),
             ),
             DhtOp::RegisterUpdatedContent(
                 self.sig.clone(),
                 entry_update.clone(),
-                Some(self.entry.clone().into()),
+                self.entry.clone().into(),
             ),
-            DhtOp::RegisterUpdatedRecord(
-                self.sig.clone(),
-                entry_update,
-                Some(self.entry.clone().into()),
-            ),
+            DhtOp::RegisterUpdatedRecord(self.sig.clone(), entry_update, self.entry.clone().into()),
         ];
         (record, ops)
     }
@@ -151,7 +139,7 @@ impl RecordTest {
         let action: Action = entry_delete.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(self.sig.clone(), action.clone(), None),
+            DhtOp::StoreRecord(self.sig.clone(), action.clone(), record.entry().clone()),
             DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
             DhtOp::RegisterDeletedBy(self.sig.clone(), entry_delete.clone()),
             DhtOp::RegisterDeletedEntryAction(self.sig.clone(), entry_delete),
@@ -164,7 +152,7 @@ impl RecordTest {
         let action: Action = self.link_add.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(self.sig.clone(), action.clone(), None),
+            DhtOp::StoreRecord(self.sig.clone(), action.clone(), RecordEntry::NA),
             DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
             DhtOp::RegisterAddLink(self.sig.clone(), self.link_add.clone()),
         ];
@@ -176,7 +164,7 @@ impl RecordTest {
         let action: Action = self.link_remove.clone().into();
 
         let ops = vec![
-            DhtOp::StoreRecord(self.sig.clone(), action.clone(), None),
+            DhtOp::StoreRecord(self.sig.clone(), action.clone(), RecordEntry::NA),
             DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
             DhtOp::RegisterRemoveLink(self.sig.clone(), self.link_remove.clone()),
         ];
@@ -195,7 +183,7 @@ impl RecordTest {
             let action: Action = record.action().clone();
 
             let ops = vec![
-                DhtOp::StoreRecord(self.sig.clone(), action.clone(), None),
+                DhtOp::StoreRecord(self.sig.clone(), action.clone(), RecordEntry::NA),
                 DhtOp::RegisterAgentActivity(self.sig.clone(), action.clone()),
             ];
             chain_records.push((record, ops));
@@ -254,11 +242,7 @@ async fn test_dht_basis() {
     entry_update.original_action_address = original_action_hash;
 
     // Create the op
-    let op = DhtOp::RegisterUpdatedContent(
-        fixt!(Signature),
-        entry_update,
-        Some(update_new_entry.into()),
-    );
+    let op = DhtOp::RegisterUpdatedContent(fixt!(Signature), entry_update, update_new_entry.into());
 
     // Get the basis
     let result = op.dht_basis();

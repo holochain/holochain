@@ -199,6 +199,18 @@ impl WrapEvtSender {
         )
     }
 
+    fn count_links(
+        &self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        query: WireLinkQuery,
+    ) -> impl Future<Output = HolochainP2pResult<CountLinksResponse>> + 'static + Send {
+        timing_trace!(
+            { self.0.count_links(dna_hash, to_agent, query) },
+            "(hp2p:handle) count_links"
+        )
+    }
+
     fn get_agent_activity(
         &self,
         dna_hash: DnaHash,
@@ -451,6 +463,23 @@ impl HolochainP2pActor {
             let res = evt_sender
                 .get_links(dna_hash, to_agent, link_key, options)
                 .await;
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
+                .map_err(kitsune_p2p::KitsuneP2pError::from)
+                .map(|res| UnsafeBytes::from(res).into())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_incoming_count_links(
+        &mut self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        query: WireLinkQuery,
+    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let res = evt_sender.count_links(dna_hash, to_agent, query).await;
             res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
                 .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
@@ -724,6 +753,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::GetLinks { link_key, options } => {
                 self.handle_incoming_get_links(space, to_agent, link_key, options)
             }
+            WireMessage::CountLinks { query } => {
+                self.handle_incoming_count_links(space, to_agent, query)
+            }
             crate::wire::WireMessage::GetAgentActivity {
                 agent,
                 query,
@@ -765,6 +797,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::Get { .. }
             | crate::wire::WireMessage::GetMeta { .. }
             | crate::wire::WireMessage::GetLinks { .. }
+            | crate::wire::WireMessage::CountLinks { .. }
             | crate::wire::WireMessage::GetAgentActivity { .. }
             | crate::wire::WireMessage::MustGetAgentActivity { .. }
             | crate::wire::WireMessage::ValidationReceipt { .. } => {
@@ -1250,6 +1283,37 @@ impl HolochainP2pHandler for HolochainP2pActor {
             }
 
             Ok(out)
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_count_links(
+        &mut self,
+        dna_hash: DnaHash,
+        query: WireLinkQuery,
+    ) -> HolochainP2pHandlerResult<CountLinksResponse> {
+        let space = dna_hash.into_kitsune();
+        let basis = query.base.to_kitsune();
+
+        let payload = WireMessage::count_links(query).encode()?;
+
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        let tuning_params = self.tuning_params.clone();
+        Ok(async move {
+            let mut input =
+                kitsune_p2p::actor::RpcMulti::new(&tuning_params, space, basis, payload);
+            input.max_remote_agent_count = 1;
+            let result = kitsune_p2p.rpc_multi(input).await?;
+
+            if let Some(result) = result.into_iter().next() {
+                let kitsune_p2p::actor::RpcMultiResponse { response, .. } = result;
+                Ok(SerializedBytes::from(UnsafeBytes::from(response)).try_into()?)
+            } else {
+                Err(HolochainP2pError::from(
+                    "Failed to fetch link count from a peer",
+                ))
+            }
         }
         .boxed()
         .into())

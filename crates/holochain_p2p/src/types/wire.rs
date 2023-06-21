@@ -64,6 +64,9 @@ pub enum WireMessage {
         link_key: WireLinkKey,
         options: event::GetLinksOptions,
     },
+    CountLinks {
+        query: WireLinkQuery,
+    },
     GetAgentActivity {
         agent: AgentPubKey,
         query: ChainQueryFilter,
@@ -164,6 +167,10 @@ impl WireMessage {
 
     pub fn get_links(link_key: WireLinkKey, options: event::GetLinksOptions) -> WireMessage {
         Self::GetLinks { link_key, options }
+    }
+
+    pub fn count_links(query: WireLinkQuery) -> WireMessage {
+        Self::CountLinks { query }
     }
 
     pub fn get_agent_activity(

@@ -101,13 +101,13 @@ impl LinkTestData {
         let base_op = DhtOp::StoreEntry(
             fixt!(Signature),
             NewEntryAction::Create(create_base.clone()),
-            Box::new(base.clone()),
+            base.clone(),
         );
 
         let target_op = DhtOp::StoreEntry(
             fixt!(Signature),
             NewEntryAction::Create(create_target.clone()),
-            Box::new(target.clone()),
+            target.clone(),
         );
 
         let link = Link {
@@ -135,6 +135,7 @@ impl LinkTestData {
             base_hash.clone().into(),
             LinkTypeFilter::single_dep(0.into()),
             Some(create_link.tag.clone()),
+            GetLinksFilter::default(),
         );
         let details_tag_query = GetLinkDetailsQuery::new(
             base_hash.clone().into(),
@@ -188,7 +189,7 @@ impl EntryTestData {
         let store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
             NewEntryAction::Create(create.clone()),
-            Box::new(entry.clone()),
+            entry.clone(),
         ));
 
         let action = SignedActionHashed::with_presigned(
@@ -205,7 +206,7 @@ impl EntryTestData {
         let update_store_entry_op = DhtOpHashed::from_content_sync(DhtOp::StoreEntry(
             signature.clone(),
             NewEntryAction::Update(update.clone()),
-            Box::new(entry.clone()),
+            entry.clone(),
         ));
 
         let update_action = SignedActionHashed::with_presigned(
@@ -247,7 +248,7 @@ impl RecordTestData {
         let store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature.clone(),
             Action::Create(create.clone()),
-            Some(Box::new(entry.clone())),
+            entry.clone().into(),
         ));
 
         let action = SignedActionHashed::with_presigned(
@@ -265,7 +266,7 @@ impl RecordTestData {
         let update_store_record_op = DhtOpHashed::from_content_sync(DhtOp::StoreRecord(
             signature.clone(),
             Action::Update(update.clone()),
-            Some(Box::new(entry.clone())),
+            entry.clone().into(),
         ));
 
         let update_action = SignedActionHashed::with_presigned(

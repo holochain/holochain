@@ -53,9 +53,6 @@ impl SweetLocalRendezvous {
         let mut addr = None;
 
         for iface in get_if_addrs::get_if_addrs().expect("failed to get_if_addrs") {
-            if iface.is_loopback() {
-                continue;
-            }
             if iface.ip().is_ipv6() {
                 continue;
             }
@@ -63,7 +60,7 @@ impl SweetLocalRendezvous {
             break;
         }
 
-        let addr = addr.expect("failed to get_if_addrs");
+        let addr = addr.expect("no matching network interfaces found");
 
         let (bs_driver, bs_addr, bs_shutdown) = kitsune_p2p_bootstrap::run((addr, 0), Vec::new())
             .await

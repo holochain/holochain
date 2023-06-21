@@ -140,11 +140,11 @@ mod tests {
         }
 
         let mk_op = |i: u8| {
-            let entry = Box::new(Entry::App(AppEntryBytes(
+            let entry = Entry::App(AppEntryBytes(
                 UnsafeBytes::from(vec![i % 10; 10_000_000])
                     .try_into()
                     .unwrap(),
-            )));
+            ));
             let sig = fixt::fixt!(Signature);
             let mut create = fixt::fixt!(Create);
             create.timestamp = Timestamp::now();

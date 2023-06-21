@@ -3,7 +3,7 @@ use std::sync::Arc;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_cascade::test_utils::*;
-use holochain_cascade::Cascade;
+use holochain_cascade::CascadeImpl;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::db::DbKindCache;
 use holochain_sqlite::db::DbKindDht;
@@ -50,7 +50,7 @@ async fn get_activity() {
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.to_db().clone().into()]);
 
     // Cascade
-    let cascade = Cascade::empty().with_network(network, cache.to_db());
+    let cascade = CascadeImpl::empty().with_network(network, cache.to_db());
 
     let r = cascade
         .get_agent_activity(td.agent.clone(), ChainQueryFilter::new(), options)
@@ -128,7 +128,7 @@ async fn test_must_get_agent_activity(
         None => None,
     };
     let network = PassThroughNetwork::authority_for_nothing(vec![authority.into()]);
-    let mut cascade = Cascade::empty()
+    let mut cascade = CascadeImpl::empty()
         .with_authored(authored.into())
         .with_network(network, cache);
     if let Some(sync_scratch) = sync_scratch {
