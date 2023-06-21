@@ -16,7 +16,7 @@ base64 = "0.13"
 bloomfilter = { version = "1.0.5", features = ["serde"] }
 derive_more = "0.99.11"
 futures = "0.3"
-ghost_actor = "=0.3.0-alpha.4"
+ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "patchy-patchy-0.3" }
 governor = "0.3.2"
 itertools = "0.10"
 kitsune_p2p_fetch = { version = "^0.1.3", path = "../fetch" }
@@ -50,7 +50,7 @@ arbitrary = { version = "1.0", features = ["derive"] }
 
 blake2b_simd = { version = "0.5.10", optional = true }
 maplit = { version = "1", optional = true }
-mockall = { version = "0.10.2", optional = true }
+mockall = { version = "0.11.3", optional = true }
 
 [dev-dependencies]
 # include self with test_utils feature, to allow integration tests to run properly
@@ -61,7 +61,7 @@ kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }
 kitsune_p2p_timestamp = { path = "../timestamp", features = ["now", "arbitrary"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
-mockall = "0.10.2"
+mockall = "0.11.3"
 pretty_assertions = "0.7"
 test-case = "1.0.0"
 tokio = { version = "1.11", features = ["full", "test-util"] }

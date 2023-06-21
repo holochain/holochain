@@ -2021,16 +2021,15 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.3.0-alpha.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ecc8c54b8ebb1e0347a75a2c1e54268c737313da693f99c0964643011e5406d"
+version = "0.3.0-alpha.5"
+source = "git+https://github.com/holochain/ghost_actor.git?branch=patchy-patchy-0.3#e52aa05a7b8f5eac5390a6812006c2e09adcbae1"
 dependencies = [
  "futures",
- "mockall 0.10.2",
+ "mockall 0.11.4",
  "must_future",
- "observability",
  "paste",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-futures",
 ]
@@ -2354,7 +2353,7 @@ dependencies = [
  "fixt",
  "futures",
  "getrandom 0.2.9",
- "ghost_actor 0.3.0-alpha.4",
+ "ghost_actor 0.3.0-alpha.5",
  "hdk",
  "holo_hash",
  "holochain",
@@ -2438,7 +2437,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.4",
+ "ghost_actor 0.3.0-alpha.5",
  "hdk",
  "hdk_derive",
  "holo_hash",
@@ -2610,7 +2609,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.4",
+ "ghost_actor 0.3.0-alpha.5",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes 0.0.51",
@@ -2826,7 +2825,7 @@ dependencies = [
  "observability",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3326,7 +3325,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.4",
+ "ghost_actor 0.3.0-alpha.5",
  "governor",
  "itertools 0.10.5",
  "kitsune_p2p",
@@ -3338,7 +3337,7 @@ dependencies = [
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "maplit",
- "mockall 0.10.2",
+ "mockall 0.11.4",
  "must_future",
  "nanoid 0.4.0",
  "num-traits",
@@ -3585,7 +3584,7 @@ dependencies = [
  "criterion",
  "derive_more",
  "futures",
- "ghost_actor 0.3.0-alpha.4",
+ "ghost_actor 0.3.0-alpha.5",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_types",
@@ -4800,9 +4799,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "1.0.5"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
+checksum = "9f746c4065a8fa3fe23974dd82f15431cc8d40779821001404d10d2e79ca7d79"
 
 [[package]]
 name = "pem"

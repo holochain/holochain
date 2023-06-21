@@ -735,6 +735,7 @@ mod dna_impls {
 mod network_impls {
     use holochain_conductor_api::NetworkInfo;
     use holochain_p2p::HolochainP2pSender;
+    use std::time::Duration;
 
     use super::*;
 
@@ -816,10 +817,13 @@ mod network_impls {
                     let sender = self.p2p_batch_sender(&dna_hash);
                     let (result_sender, response) = tokio::sync::oneshot::channel();
                     let _ = sender
-                        .send(P2pBatch {
-                            peer_data,
-                            result_sender,
-                        })
+                        .send_timeout(
+                            P2pBatch {
+                                peer_data,
+                                result_sender,
+                            },
+                            Duration::from_secs(10),
+                        )
                         .await;
                     let res = match response.await {
                         Ok(r) => r.map_err(holochain_p2p::HolochainP2pError::other),
@@ -2737,12 +2741,24 @@ async fn p2p_event_task(
                     >= NUM_PARALLEL_EVTS)
                     .then(std::time::Instant::now);
 
-                if let Err(e) = handle.dispatch_holochain_p2p_event(evt).await {
-                    tracing::error!(
-                        message = "error dispatching network event",
-                        error = ?e,
-                    );
+                // This loop is critical, ensure that nothing in the dispatch kills it by blocking permantantly
+                tokio::select! {
+                    r = handle.dispatch_holochain_p2p_event(evt).await => {
+                        match r {
+                            Ok(_) => {}
+                            Err(e) {
+                                tracing::error!(
+                                    message = "error dispatching network event",
+                                    error = ?e,
+                                );
+                            }
+                        }
+                    }
+                    () = tokio::time::sleep(std::time::Duration::from_secs(30)) => {
+                        tracing::error!("timeout while dispatching network event - {:?}", evt);
+                    }
                 }
+
                 match start {
                     Some(start) => {
                         let el = start.elapsed();
