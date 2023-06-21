@@ -14,6 +14,7 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::StateMutationResult;
 use holochain_state::prelude::StateQueryResult;
 use holochain_zome_types::CellId;
+use std::collections::HashSet;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -119,21 +120,24 @@ pub async fn get_single_agent_info(
         .await
 }
 
-/// Interconnect every provided pair of conductors via their peer store databases
+/// Share all current agent infos known to all provided peer dbs with each other.
 #[cfg(any(test, feature = "test_utils"))]
 pub async fn exchange_peer_info(envs: Vec<DbWrite<DbKindP2pAgents>>) {
-    for (i, a) in envs.iter().enumerate() {
-        let infos_a = all_agent_infos(a.clone().into()).await.unwrap();
+    let mut all_infos: HashSet<AgentInfoSigned> = HashSet::new();
 
-        for (j, b) in envs.iter().enumerate() {
-            if i == j {
-                continue;
-            }
-            let infos_b = all_agent_infos(b.clone().into()).await.unwrap();
+    for env in envs.iter() {
+        let infos: HashSet<AgentInfoSigned> = all_agent_infos(env.clone().into())
+            .await
+            .unwrap()
+            .into_iter()
+            .collect();
+        all_infos.extend(infos);
+    }
 
-            inject_agent_infos(a.clone(), infos_b.iter()).await.unwrap();
-            inject_agent_infos(b.clone(), infos_a.iter()).await.unwrap();
-        }
+    for env in envs.iter() {
+        inject_agent_infos(env.clone(), all_infos.iter())
+            .await
+            .unwrap();
     }
 }
 
