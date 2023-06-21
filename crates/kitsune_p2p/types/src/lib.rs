@@ -245,6 +245,10 @@ pub enum KitsuneErrorKind {
     #[error("This object is closed, calls on it are invalid.")]
     Closed,
 
+    /// The operation is unauthorized by the host.
+    #[error("Unauthorized")]
+    Unauthorized,
+
     /// Unspecified error.
     #[error(transparent)]
     Other(Box<dyn std::error::Error + Send + Sync>),

@@ -23,6 +23,7 @@ ghost_actor::ghost_chan! {
     }
 }
 
+#[derive(Debug)]
 pub struct HarnessHost;
 
 impl HarnessHost {
