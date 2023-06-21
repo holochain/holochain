@@ -2021,8 +2021,9 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.3.0-alpha.5"
-source = "git+https://github.com/holochain/ghost_actor.git?branch=patchy-patchy-0.3#e52aa05a7b8f5eac5390a6812006c2e09adcbae1"
+version = "0.3.0-alpha.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a34addaffa7d2c80637807444f171c646cad7549fcdac8019544034678f76d5"
 dependencies = [
  "futures",
  "mockall 0.11.4",
@@ -2353,7 +2354,7 @@ dependencies = [
  "fixt",
  "futures",
  "getrandom 0.2.9",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "hdk",
  "holo_hash",
  "holochain",
@@ -2437,7 +2438,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "hdk",
  "hdk_derive",
  "holo_hash",
@@ -2609,7 +2610,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes 0.0.51",
@@ -3325,7 +3326,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "governor",
  "itertools 0.10.5",
  "kitsune_p2p",
@@ -3584,7 +3585,7 @@ dependencies = [
  "criterion",
  "derive_more",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_types",

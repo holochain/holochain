@@ -14,7 +14,7 @@ either = "1.5"
 fallible-iterator = "0.2"
 fixt = { version = "^0.1.2", path = "../fixt" }
 futures = "0.3"
-ghost_actor = { git = "https://github.com/holochain/ghost_actor.git", branch = "patchy-patchy-0.3" }
+ghost_actor = "0.3.0-alpha.6"
 hdk = { version = "^0.1.3", path = "../hdk" }
 hdk_derive = { version = "^0.1.3", path = "../hdk_derive" }
 holo_hash = { version = "^0.1.3", path = "../holo_hash", features = ["full"] }
