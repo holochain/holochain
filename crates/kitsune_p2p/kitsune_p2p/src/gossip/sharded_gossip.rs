@@ -215,8 +215,11 @@ impl ShardedGossip {
                     .load(std::sync::atomic::Ordering::Relaxed)
                 {
                     tokio::time::sleep(GOSSIP_LOOP_INTERVAL).await;
-                    this.run_one_iteration(agent_list_by_local_agents.clone(), &all_agents)
-                        .await;
+                    this.run_one_iteration(
+                        agent_list_by_local_agents.clone(),
+                        all_agents.as_slice(),
+                    )
+                    .await;
                     this.stats(&mut stats);
 
                     if refresh_agent_list_timer.elapsed() > AGENT_LIST_FETCH_INTERVAL {
@@ -388,7 +391,7 @@ impl ShardedGossip {
     async fn run_one_iteration(
         &self,
         agent_list_by_local_agents: Vec<AgentInfoSigned>,
-        all_agents: &Vec<AgentInfoSigned>,
+        all_agents: &[AgentInfoSigned],
     ) {
         match self
             .gossip
