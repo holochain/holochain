@@ -102,6 +102,72 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
     }
 }
 
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+use std::collections::{hash_map, HashMap};
+
+static AI_CACHE: Lazy<Mutex<HashMap<String, HashMap<
+    Arc<KitsuneAgent>,
+    AgentInfoSigned,
+>>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+fn ai_cache_put(con: &Connection, agent_info: AgentInfoSigned) {
+    let id = con.path().unwrap().to_string();
+    match AI_CACHE.lock().entry(id) {
+        hash_map::Entry::Occupied(mut e) => {
+            if let Some(a) = e.get().get(&agent_info.agent) {
+                if a.signed_at_ms >= agent_info.signed_at_ms {
+                    return;
+                }
+            }
+            e.get_mut().insert(agent_info.agent.clone(), agent_info);
+        }
+        hash_map::Entry::Vacant(e) => {
+            let mut map = HashMap::new();
+            map.insert(agent_info.agent.clone(), agent_info);
+            e.insert(map);
+        }
+    }
+}
+
+fn ai_cache_prune(con: &Connection, now: u64, local_agents: &[Arc<KitsuneAgent>]) {
+    let id = con.path().unwrap().to_string();
+    if let Some(cache) = AI_CACHE.lock().get_mut(&id) {
+        cache.retain(|_, v| {
+            for l in local_agents {
+                if &v.agent == l {
+                    return true;
+                }
+            }
+            v.expires_at_ms > now
+        });
+    }
+}
+
+fn dist(a: &AgentInfoSigned, basis: u32) -> u32 {
+    basis.abs_diff(u32::from(a.storage_arc.start_loc()))
+}
+
+fn ai_cache_query_near_basis(con: &Connection, basis: u32, limit: u32) -> Vec<AgentInfoSigned> {
+    let id = con.path().unwrap().to_string();
+    let mut cache = AI_CACHE.lock();
+    let mut out = if let Some(cache) = cache.get_mut(&id) {
+        cache.values().filter_map(|v| {
+            if v.is_active() {
+                Some((dist(&v, basis), v))
+            } else {
+                None
+            }
+        }).collect()
+    } else {
+        Vec::new()
+    };
+    if out.len() > 1 {
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+    out.into_iter().map(|(_, v)| v.clone()).take(limit as usize).collect()
+}
+
 /// Put an AgentInfoSigned record into the p2p_store
 pub async fn p2p_put(
     db: &DbWrite<DbKindP2pAgents>,
@@ -117,10 +183,16 @@ pub async fn p2p_put_all(
     signed: impl Iterator<Item = &AgentInfoSigned>,
 ) -> DatabaseResult<()> {
     let mut records = Vec::new();
+    let mut ns = Vec::new();
     for s in signed {
+        ns.push(s.clone());
         records.push(P2pRecord::from_signed(s)?);
     }
     db.async_commit(move |txn| {
+        for s in ns {
+            ai_cache_put(&*txn, s);
+        }
+
         for record in records {
             tx_p2p_put(txn, record)?;
         }
@@ -131,6 +203,7 @@ pub async fn p2p_put_all(
 
 /// Insert a p2p record from within a write transaction.
 pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> DatabaseResult<()> {
+    ai_cache_put(&*txn, signed.clone());
     let record = P2pRecord::from_signed(signed)?;
     tx_p2p_put(txn, record)
 }
@@ -175,6 +248,8 @@ pub async fn p2p_prune(
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
+
+        ai_cache_prune(&*txn, now, &local_agents);
 
         txn.execute(
             sql_p2p_agent_store::PRUNE,
@@ -272,6 +347,8 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        Ok(ai_cache_query_near_basis(&*self, basis, limit))
+        /*
         let mut stmt = self
             .prepare(sql_p2p_agent_store::QUERY_NEAR_BASIS)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -288,6 +365,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
             out.push(r?);
         }
         Ok(out)
+        */
     }
 
     fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
@@ -374,7 +452,7 @@ impl P2pRecord {
 
         let storage_center_loc = arc.start_loc().into();
 
-        let is_active = !signed.url_list.is_empty();
+        let is_active = signed.is_active();
 
         let (storage_start_loc, storage_end_loc) = arc.to_primitive_bounds_detached();
 

@@ -88,6 +88,13 @@ pub struct AgentInfoInner {
     pub encoded_bytes: Box<[u8]>,
 }
 
+impl AgentInfoInner {
+    /// If this agent activity is considered active.
+    pub fn is_active(&self) -> bool {
+        !self.url_list.is_empty()
+    }
+}
+
 impl std::fmt::Debug for AgentInfoInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AgentInfoSigned")

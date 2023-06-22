@@ -46,6 +46,7 @@ pub async fn spawn_websocket_listener(
     )
     .await?;
     trace!("LISTENING AT: {}", listener.0.local_addr());
+    error!("LISTENING AT: {}", listener.0.local_addr());
     Ok(listener)
 }
 

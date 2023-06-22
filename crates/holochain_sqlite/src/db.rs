@@ -72,6 +72,24 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
     }
 }
 
+struct TimeTrace(&'static str, std::time::Instant);
+
+impl Drop for TimeTrace {
+    fn drop(&mut self) {
+        let tag = &self.0;
+        let elapsed_s = self.1.elapsed().as_secs_f64();
+        if elapsed_s > 1.0 {
+            tracing::error!(%tag, %elapsed_s, "DB_BLOCK");
+        }
+    }
+}
+
+impl TimeTrace {
+    pub fn new(tag: &'static str) -> Self {
+        Self(tag, std::time::Instant::now())
+    }
+}
+
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
     async fn async_reader<E, R, F>(&self, f: F) -> Result<R, E>
@@ -184,6 +202,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         self.num_readers
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         let mut conn = self.conn()?;
+        let _tt = TimeTrace::new("read");
         let r = tokio::task::spawn_blocking(move || conn.with_reader(f))
             .await
             .map_err(DatabaseError::from)?;
@@ -338,6 +357,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     {
         let _g = self.acquire_writer_permit().await;
         let mut conn = self.conn()?;
+        let _tt = TimeTrace::new("write");
         let r = task::spawn_blocking(move || conn.with_commit_sync(f))
             .await
             .map_err(DatabaseError::from)?;

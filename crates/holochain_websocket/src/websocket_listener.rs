@@ -233,6 +233,7 @@ async fn connect(
     socket: tokio::net::TcpStream,
     valve: Valve,
 ) -> WebsocketResult<Pair> {
+    tracing::error!("CONNECT WEBSOCKET");
     // TODO: find alternative to set the keepalive
     // socket.set_keepalive(Some(std::time::Duration::from_secs(
     //     config.tcp_keepalive_s as u64,

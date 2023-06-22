@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use tokio::runtime::Runtime;
 
-pub static TOKIO: Lazy<Runtime> = Lazy::new(|| new_runtime(None, None));
+pub static TOKIO: Lazy<Runtime> = Lazy::new(|| new_runtime(None, Some(4096)));
 
 /// Instantiate a new runtime.
 pub fn new_runtime(worker_threads: Option<usize>, max_blocking_threads: Option<usize>) -> Runtime {
@@ -48,11 +48,30 @@ where
     block_on_given(async { tokio::time::timeout(timeout, f).await }, &TOKIO)
 }
 
+struct TimeTrace(&'static str, std::time::Instant);
+
+impl Drop for TimeTrace {
+    fn drop(&mut self) {
+        let tag = &self.0;
+        let elapsed_s = self.1.elapsed().as_secs_f64();
+        if elapsed_s > 1.0 {
+            eprintln!("{tag} elapsed_s={elapsed_s}");
+        }
+    }
+}
+
+impl TimeTrace {
+    pub fn new(tag: &'static str) -> Self {
+        Self(tag, std::time::Instant::now())
+    }
+}
+
 /// Run a blocking thread on `TOKIO`.
 pub fn block_forever_on<F>(f: F) -> F::Output
 where
     F: futures::future::Future,
 {
+    let _tt = TimeTrace::new("BLOCK_FOREVER");
     block_on_given(f, &TOKIO)
 }
 

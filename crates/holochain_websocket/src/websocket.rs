@@ -119,6 +119,24 @@ impl Task {
     }
 }
 
+struct TimeTrace(&'static str, std::time::Instant);
+
+impl Drop for TimeTrace {
+    fn drop(&mut self) {
+        let tag = &self.0;
+        let elapsed_s = self.1.elapsed().as_secs_f64();
+        if elapsed_s > 1.0 {
+            tracing::error!(%tag, %elapsed_s, "WEBSOCKET");
+        }
+    }
+}
+
+impl TimeTrace {
+    pub fn new(tag: &'static str) -> Self {
+        Self(tag, std::time::Instant::now())
+    }
+}
+
 impl Websocket {
     #[instrument(skip(config, socket, listener_shutdown))]
     /// Create the ends of this websocket channel.
@@ -299,6 +317,8 @@ impl Websocket {
             &mut impl futures::sink::Sink<tungstenite::Message, Error = tungstenite::error::Error>,
         >,
     ) -> Loop<()> {
+        let _tt = TimeTrace::new("ConductorToWsClient");
+
         // Note that this task awaits on the outgoing messages
         // application stream and will close when that stream is closed.
         match msg {
@@ -416,6 +436,8 @@ impl Websocket {
         from_websocket: &mut TxFromWebsocket,
         send_response: &mut TxToWebsocket,
     ) -> Loop<()> {
+        let _tt = TimeTrace::new("WsClientToConductor");
+
         match msg {
             Some(Ok(msg)) => {
                 tracing::trace!(received_msg = ?msg);

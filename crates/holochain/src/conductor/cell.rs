@@ -80,6 +80,23 @@ impl PartialEq for Cell {
     }
 }
 
+struct TimeTrace(std::time::Instant);
+
+impl Drop for TimeTrace {
+    fn drop(&mut self) {
+        let elapsed_s = self.0.elapsed().as_secs_f64();
+        if elapsed_s > 1.0 {
+            tracing::error!(%elapsed_s, "CALL_ZOME");
+        }
+    }
+}
+
+impl TimeTrace {
+    pub fn new() -> Self {
+        Self(std::time::Instant::now())
+    }
+}
+
 /// A Cell is a grouping of the resources necessary to run workflows
 /// on behalf of an agent. It does not have a lifetime of its own aside
 /// from the lifetimes of the resources which it holds references to.
@@ -815,6 +832,8 @@ impl Cell {
         call: ZomeCall,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
+        let _tt = TimeTrace::new();
+
         // Only check if init has run if this call is not coming from
         // an already running init call.
         if workspace_lock

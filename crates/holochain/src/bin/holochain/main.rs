@@ -81,7 +81,9 @@ async fn async_main() {
     }
 
     observability::init_fmt(opt.structured.clone()).expect("Failed to start contextual logging");
+    //console_subscriber::init();
     debug!("observability initialized");
+    error!("RUNNING CUSTOM HOLOCHAIN");
 
     kitsune_p2p_types::metrics::init_sys_info_poll();
 
