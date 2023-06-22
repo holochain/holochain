@@ -18,7 +18,7 @@ impl ShardedGossipLocal {
         &self,
         arc_set: Arc<DhtArcSet>,
         local_agents: &HashSet<Arc<KitsuneAgent>>,
-        all_agents: &Vec<AgentInfoSigned>,
+        all_agents: &[AgentInfoSigned],
     ) -> KitsuneResult<Option<Node>> {
         let mut remote_nodes: HashMap<Arc<[u8; 32]>, Node> = HashMap::new();
 

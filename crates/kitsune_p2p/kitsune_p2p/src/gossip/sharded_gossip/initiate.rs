@@ -9,7 +9,7 @@ impl ShardedGossipLocal {
     pub(super) async fn try_initiate(
         &self,
         agent_list: Vec<AgentInfoSigned>,
-        all_agents: &Vec<AgentInfoSigned>,
+        all_agents: &[AgentInfoSigned],
     ) -> KitsuneResult<Option<Outgoing>> {
         // Get local agents
         let (has_target, local_agents) = self.inner.share_mut(|i, _| {
