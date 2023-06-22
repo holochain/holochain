@@ -11,6 +11,7 @@ async fn sharded_sanity_test() {
     let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
 
     let agents = agents_with_infos(2).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     let mut iter = agents.clone().into_iter();
     let alice_agent = iter.next().unwrap().0;
     let bob_agent = iter.next().unwrap().0;
@@ -23,8 +24,6 @@ async fn sharded_sanity_test() {
         agents.clone(),
     )
     .await;
-
-    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
 
     let bob = setup_standard_player(
         ShardedGossipLocalState {
@@ -535,6 +534,7 @@ async fn no_data_still_finishes() {
 /// initiate a round it is handled correctly.
 async fn double_initiate_is_handled() {
     let agents = agents_with_infos(2).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     // - Set up two players with themselves as local agents.
     let alice = setup_empty_player(
         ShardedGossipLocalState {
@@ -556,12 +556,18 @@ async fn double_initiate_is_handled() {
 
     // - Both players try to initiate and only have the other as a remote agent.
     let (bob_cert, _, alice_initiate) = alice
-        .try_initiate(alice.query_agents_by_local_agents().await.unwrap(), &vec![])
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap()
         .unwrap();
     let (alice_cert, _, bob_initiate) = bob
-        .try_initiate(bob.query_agents_by_local_agents().await.unwrap(), &vec![])
+        .try_initiate(
+            bob.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap()
         .unwrap();
@@ -585,6 +591,7 @@ async fn double_initiate_is_handled() {
 /// a node is already in progress does not initiate a new round.
 async fn initiate_after_target_is_set() {
     let agents = agents_with_infos(2).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     let alice = setup_empty_player(
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[0].0.clone()),
@@ -605,7 +612,10 @@ async fn initiate_after_target_is_set() {
 
     // - Alice successfully initiates a round with bob.
     let (cert, _, alice_initiate) = alice
-        .try_initiate(alice.query_agents_by_local_agents().await.unwrap(), &vec![])
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap()
         .unwrap();
@@ -627,7 +637,10 @@ async fn initiate_after_target_is_set() {
         .unwrap();
     // - Bob tries to initiate a round with alice.
     let bob_initiate = bob
-        .try_initiate(bob.query_agents_by_local_agents().await.unwrap(), &vec![])
+        .try_initiate(
+            bob.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap();
     bob.inner
@@ -646,6 +659,7 @@ async fn initiate_after_target_is_set() {
 /// Test the initiates timeout after the round timeout has elapsed.
 async fn initiate_times_out() {
     let agents = agents_with_infos(3).await;
+    let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
     let alice_cert = cert_from_info(agents[0].1.clone());
     let alice = setup_empty_player(
         ShardedGossipLocalState {
@@ -666,7 +680,10 @@ async fn initiate_times_out() {
 
     // Trying to initiate a round should succeed.
     let (tgt_cert, _, _) = alice
-        .try_initiate(alice.query_agents_by_local_agents().await.unwrap(), &vec![])
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -678,7 +695,10 @@ async fn initiate_times_out() {
         })
         .unwrap();
     let r = alice
-        .try_initiate(alice.query_agents_by_local_agents().await.unwrap(), &vec![])
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap();
 
@@ -696,7 +716,10 @@ async fn initiate_times_out() {
     tokio::time::sleep(ROUND_TIMEOUT + std::time::Duration::from_millis(1)).await;
 
     let (tgt2_cert, _, alice_initiate) = alice
-        .try_initiate(alice.query_agents_by_local_agents().await.unwrap(), &vec![])
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap()
         .expect("Failed to initiate");
@@ -752,7 +775,10 @@ async fn initiate_times_out() {
     // Check that initiating again doesn't do anything.
 
     let r = alice
-        .try_initiate(alice.query_agents_by_local_agents().await.unwrap(), &vec![])
+        .try_initiate(
+            alice.query_agents_by_local_agents().await.unwrap(),
+            &all_agents,
+        )
         .await
         .unwrap();
     // Doesn't re-initiate.
