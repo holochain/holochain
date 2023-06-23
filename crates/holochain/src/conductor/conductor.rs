@@ -1097,7 +1097,7 @@ mod network_impls {
                 } => {
                     use holochain_sqlite::db::AsP2pAgentStoreConExt;
                     let db = { self.p2p_agents_db(&dna_hash) };
-                    let permit = db.conn_permit().await;
+                    let permit = db.conn_permit().await?;
                     let res = tokio::task::spawn_blocking(move || {
                         let mut conn = db.with_permit(permit)?;
                         conn.p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
