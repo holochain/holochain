@@ -300,6 +300,32 @@ impl DhtArcRange<DhtLocation> {
         matches!(self, Self::Bounded(_, _))
     }
 
+    /// Get the min distance to a location.
+    /// Zero if Full, u32::MAX if Empty.
+    pub fn dist(&self, tgt: u32) -> u32 {
+        match self {
+            DhtArcRange::Empty => u32::MAX,
+            DhtArcRange::Full => 0,
+            DhtArcRange::Bounded(start, end) => {
+                let start = u32::from(*start);
+                let end = u32::from(*end);
+                if start < end {
+                    if tgt >= start && tgt <= end {
+                        0
+                    } else if tgt < start {
+                        std::cmp::min(start - tgt, (u32::MAX - end) + tgt)
+                    } else {
+                        std::cmp::min(tgt - end, (u32::MAX - tgt) + start)
+                    }
+                } else if tgt <= end || tgt >= start {
+                    0
+                } else {
+                    std::cmp::min(tgt - end, start - tgt)
+                }
+            }
+        }
+    }
+
     /// Check if arcs overlap
     pub fn overlaps(&self, other: &Self) -> bool {
         let a = DhtArcSet::from(self);

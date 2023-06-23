@@ -194,7 +194,7 @@ fn ai_cache_query_near_basis(
         .values()
         .filter_map(|v| {
             if v.is_active() {
-                Some((basis.abs_diff(u32::from(v.storage_arc.start_loc())), v))
+                Some((v.storage_arc.dist(basis), v))
             } else {
                 None
             }
