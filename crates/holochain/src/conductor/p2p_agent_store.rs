@@ -188,7 +188,7 @@ where
     R: Send + 'static,
     F: FnOnce(PConnGuard) -> ConductorResult<R> + Send + 'static,
 {
-    let permit = db.conn_permit().await;
+    let permit = db.conn_permit::<DatabaseError>().await?;
     let r = tokio::task::spawn_blocking(move || {
         let conn = db.with_permit(permit)?;
         f(conn)
