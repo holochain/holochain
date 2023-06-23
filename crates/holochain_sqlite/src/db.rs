@@ -211,7 +211,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         E: From<DatabaseError> + Send + 'static,
     {
         match tokio::time::timeout(
-            std::time::Duration::from_secs(2),
+            std::time::Duration::from_secs(10),
             self.read_semaphore.clone().acquire_owned(),
         )
         .await
