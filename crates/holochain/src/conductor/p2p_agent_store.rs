@@ -353,7 +353,7 @@ mod tests {
         p2p_put(&db, &agent_info_signed).await.unwrap();
 
         let ret = db
-            .with_permit(db.conn_permit().await)
+            .with_permit(db.conn_permit::<DatabaseError>().await.unwrap())
             .unwrap()
             .p2p_get_agent(&agent_info_signed.agent)
             .unwrap();
@@ -369,7 +369,7 @@ mod tests {
 
         // - Check no data in the store to start
         let count = db
-            .with_permit(db.conn_permit().await)
+            .with_permit(db.conn_permit::<DatabaseError>().await.unwrap())
             .unwrap()
             .p2p_list_agents()
             .unwrap()
