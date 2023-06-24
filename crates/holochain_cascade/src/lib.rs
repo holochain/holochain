@@ -564,18 +564,23 @@ where
     }
 
     /// Get all available databases.
-    async fn get_databases(&self) -> Vec<(PConnPermit, Box<dyn PermittedConn + Send>)> {
+    async fn get_databases(
+        &self,
+    ) -> CascadeResult<Vec<(PConnPermit, Box<dyn PermittedConn + Send>)>> {
         let mut conns: Vec<(_, Box<dyn PermittedConn + Send>)> = Vec::with_capacity(3);
         if let Some(cache) = self.cache.clone() {
-            conns.push((cache.conn_permit().await, Box::new(cache)));
+            conns.push((cache.conn_permit::<DatabaseError>().await?, Box::new(cache)));
         }
         if let Some(dht) = self.dht.clone() {
-            conns.push((dht.conn_permit().await, Box::new(dht)));
+            conns.push((dht.conn_permit::<DatabaseError>().await?, Box::new(dht)));
         }
         if let Some(authored) = self.authored.clone() {
-            conns.push((authored.conn_permit().await, Box::new(authored)));
+            conns.push((
+                authored.conn_permit::<DatabaseError>().await?,
+                Box::new(authored),
+            ));
         }
-        conns
+        Ok(conns)
     }
 
     async fn cascading<Q>(&self, query: Q) -> CascadeResult<Q::Output>
@@ -583,7 +588,7 @@ where
         Q: Query<Item = Judged<SignedActionHashed>> + Send + 'static,
         <Q as holochain_state::prelude::Query>::Output: Send + 'static,
     {
-        let conns = self.get_databases().await;
+        let conns = self.get_databases().await?;
         let scratch = self.scratch.clone();
         let results = tokio::task::spawn_blocking(move || {
             let mut conns = conns
@@ -624,7 +629,7 @@ where
             .await?
         };
         if let Some(cache) = self.cache.clone() {
-            let permit = cache.conn_permit().await;
+            let permit = cache.conn_permit::<DatabaseError>().await?;
             let (r, f1) = find(permit, Box::new(cache), f).await?;
             f = f1;
 
@@ -633,7 +638,7 @@ where
             }
         }
         if let Some(dht) = self.dht.clone() {
-            let permit = dht.conn_permit().await;
+            let permit = dht.conn_permit::<DatabaseError>().await?;
             let (r, f1) = find(permit, Box::new(dht), f).await?;
             f = f1;
             if r.is_some() {
@@ -641,7 +646,7 @@ where
             }
         }
         if let Some(authored) = self.authored.clone() {
-            let permit = authored.conn_permit().await;
+            let permit = authored.conn_permit::<DatabaseError>().await?;
             let (r, f1) = find(permit, Box::new(authored), f).await?;
             f = f1;
             if r.is_some() {
@@ -952,7 +957,7 @@ where
         filter: ChainFilter,
     ) -> CascadeResult<MustGetAgentActivityResponse> {
         // Get the available databases.
-        let conns = self.get_databases().await;
+        let conns = self.get_databases().await?;
         let scratch = self.scratch.clone();
 
         // For each store try to get the bounded activity.
