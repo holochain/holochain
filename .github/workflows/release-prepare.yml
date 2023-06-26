@@ -104,7 +104,6 @@ jobs:
 
       - name: Merge source branch (${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}) into target branch (${{ inputs.HOLOCHAIN_TARGET_BRANCH }})
         env:
-          HRA_GITHUB_TOKEN: ${{ secrets.HRA_GITHUB_TOKEN }}
           HOLOCHAIN_REPO: ${{ inputs.HOLOCHAIN_REPO }}
           HOLOCHAIN_SOURCE_BRANCH: ${{ inputs.HOLOCHAIN_SOURCE_BRANCH }}
           HOLOCHAIN_TARGET_BRANCH: ${{ inputs.HOLOCHAIN_TARGET_BRANCH }}
@@ -121,6 +120,7 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           if ! git status; then
+            echo "Setting up the repo from scratch!!!"
             git init
             git remote add origin "${HOLOCHAIN_URL}"
           else
@@ -268,6 +268,8 @@ jobs:
           # clean the repo before adding it to the store
           git clean -ffdx
           export STORE_PATH=$(nix store add-path --name holochain_repo .)
+
+          echo "The store path is - $STORE_PATH"
 
           echo "latest_holochain_tag=${LATEST_HOLOCHAIN_TAG}" >> $GITHUB_OUTPUT
           echo "latest_holochain_version=${LATEST_HOLOCHAIN_VERSION}" >> $GITHUB_OUTPUT
