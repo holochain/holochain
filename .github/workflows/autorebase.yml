@@ -18,6 +18,7 @@ on:
 jobs:
     auto-rebase:
         env:
+            # Repository secrets aren't available when building from a fork so the job needs to skip in that case
             hra_github_token: ${{ secrets.HRA_GITHUB_TOKEN }}
         name: AutoRebase
         runs-on: ubuntu-latest
