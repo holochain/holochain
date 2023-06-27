@@ -90,7 +90,7 @@ async fn test_p2p_agent_store_extrapolated_coverage() {
         rand_insert(&db, &space, &example_agent, true).await;
     }
 
-    let permit = db.conn_permit().await;
+    let permit = db.conn_permit::<DatabaseError>().await.unwrap();
     let mut con = db.with_permit(permit).unwrap();
 
     let res = con.p2p_extrapolated_coverage(DhtArcSet::Full).unwrap();
@@ -134,7 +134,7 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
         }
     }
 
-    let permit = db.conn_permit().await;
+    let permit = db.conn_permit::<DatabaseError>().await.unwrap();
     let mut con = db.with_permit(permit).unwrap();
 
     // check that we only get 20 results

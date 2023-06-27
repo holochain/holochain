@@ -401,7 +401,7 @@ impl ShardedGossip {
             let _ = self.gossip.inner.share_mut(|i, _| {
                     let s = tracing::trace_span!("gossip_metrics", gossip_type = %self.gossip.gossip_type);
                     s.in_scope(|| tracing::trace!(
-                        "{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}", 
+                        "{}\nStats over last 5s:\n\tAverage processing time {:?}\n\tIteration count: {}\n\tMax gossip processing time: {:?}\n\t{}",
                         i.metrics,
                         stats.avg_processing_time,
                         stats.count,

@@ -306,15 +306,15 @@ impl KitsuneP2pActor {
                                     )
                                     .await
                                     {
-                                        MetaNetEvtAuth::UnauthorizedIgnore => {}
-                                        MetaNetEvtAuth::UnauthorizedDisconnect => {
+                                        MetaNetAuth::UnauthorizedIgnore => {}
+                                        MetaNetAuth::UnauthorizedDisconnect => {
                                             con.close(
                                                 UNAUTHORIZED_DISCONNECT_CODE,
                                                 UNAUTHORIZED_DISCONNECT_REASON,
                                             )
                                             .await;
                                         }
-                                        MetaNetEvtAuth::Authorized => {
+                                        MetaNetAuth::Authorized => {
                                             match data {
                                                 wire::Wire::Call(wire::Call {
                                                     space,
@@ -397,15 +397,15 @@ impl KitsuneP2pActor {
                                     )
                                     .await
                                     {
-                                        MetaNetEvtAuth::UnauthorizedIgnore => {}
-                                        MetaNetEvtAuth::UnauthorizedDisconnect => {
+                                        MetaNetAuth::UnauthorizedIgnore => {}
+                                        MetaNetAuth::UnauthorizedDisconnect => {
                                             con.close(
                                                 UNAUTHORIZED_DISCONNECT_CODE,
                                                 UNAUTHORIZED_DISCONNECT_REASON,
                                             )
                                             .await;
                                         }
-                                        MetaNetEvtAuth::Authorized => {
+                                        MetaNetAuth::Authorized => {
                                             match data {
                                                 wire::Wire::DelegateBroadcast(
                                                     wire::DelegateBroadcast {
@@ -715,8 +715,8 @@ impl KitsuneP2pActor {
                     .await;
 
                 tracing::error!(
-                    "KitsuneP2p: networking poll shutdown. Networking will no longer work! 
-                You can ignore this is if it happened during node shutdown. 
+                    "KitsuneP2p: networking poll shutdown. Networking will no longer work!
+                You can ignore this is if it happened during node shutdown.
                 Otherwise please restart your node and report this error."
                 )
             }
