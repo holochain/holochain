@@ -4,7 +4,6 @@ use crate::{
     conn::{new_connection_pool, ConnectionPool, DbSyncLevel, PConn, DATABASE_HANDLES},
     prelude::*,
 };
-use anyhow::anyhow;
 use derive_more::Into;
 use futures::Future;
 use holo_hash::DnaHash;

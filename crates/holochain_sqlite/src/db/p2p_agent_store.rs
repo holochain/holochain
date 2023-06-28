@@ -117,99 +117,127 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::collections::{hash_map, HashMap};
 
-#[allow(clippy::type_complexity)]
-static AI_CACHE: Lazy<Mutex<HashMap<String, HashMap<Arc<KitsuneAgent>, AgentInfoSigned>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+struct AgentStore(Mutex<HashMap<Arc<KitsuneAgent>, AgentInfoSigned>>);
 
-fn ai_cache_load(con: &Connection) -> DatabaseResult<HashMap<Arc<KitsuneAgent>, AgentInfoSigned>> {
-    let mut stmt = con
-        .prepare(sql_p2p_agent_store::SELECT_ALL)
-        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-    let mut out = HashMap::new();
-    for r in stmt.query_map([], |r| {
-        let r = r.get_ref(0)?;
-        let r = r.as_blob()?;
-        let signed = AgentInfoSigned::decode(r)
+impl AgentStore {
+    fn new(con: &Connection) -> DatabaseResult<Self> {
+        let mut stmt = con
+            .prepare(sql_p2p_agent_store::SELECT_ALL)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+        let mut map = HashMap::new();
+        for r in stmt.query_map([], |r| {
+            let r = r.get_ref(0)?;
+            let r = r.as_blob()?;
+            let signed = AgentInfoSigned::decode(r)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
 
-        Ok(signed)
-    })? {
-        let r = r?;
-        out.insert(r.agent.clone(), r);
+            Ok(signed)
+        })? {
+            let r = r?;
+            map.insert(r.agent.clone(), r);
+        }
+        Ok(Self(Mutex::new(map)))
     }
-    Ok(out)
+
+    fn prune(&self, now: u64, local_agents: &[Arc<KitsuneAgent>]) -> DatabaseResult<()> {
+        let mut lock = self.0.lock();
+
+        lock.retain(|_, v| {
+            for l in local_agents {
+                if &v.agent == l {
+                    return true;
+                }
+            }
+            v.expires_at_ms > now
+        });
+
+        Ok(())
+    }
+
+    fn put(&self, agent_info: AgentInfoSigned) -> DatabaseResult<()> {
+        let mut lock = self.0.lock();
+
+        if let Some(a) = lock.get(&agent_info.agent) {
+            if a.signed_at_ms >= agent_info.signed_at_ms {
+                return Ok(());
+            }
+        }
+
+        lock.insert(agent_info.agent.clone(), agent_info);
+
+        Ok(())
+    }
+
+    fn remove(&self, agent: &KitsuneAgent) -> DatabaseResult<()> {
+        let _ = self.0.lock().remove(agent);
+        Ok(())
+    }
+
+    fn get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
+        Ok(self.0.lock().get(agent).cloned())
+    }
+
+    fn get_all(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        Ok(self.0.lock().values().cloned().collect())
+    }
+
+    fn count(&self) -> DatabaseResult<u32> {
+        Ok(self.0.lock().len() as u32)
+    }
+
+    fn query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        let lock = self.0.lock();
+
+        let mut out: Vec<(u32, &AgentInfoSigned)> = lock
+            .values()
+            .filter_map(|v| {
+                if v.is_active() {
+                    Some((v.storage_arc.dist(basis), v))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if out.len() > 1 {
+            out.sort_by(|a, b| a.0.cmp(&b.0));
+        }
+
+        Ok(out
+            .into_iter()
+            .map(|(_, v)| v.clone())
+            .take(limit as usize)
+            .collect())
+    }
 }
 
-macro_rules! ai_cache_lock {
-    ($c:ident, $con:ident) => {
-        let mut $c = AI_CACHE.lock();
-        let $c = match $c.entry($con.path().unwrap().to_string()) {
-            hash_map::Entry::Occupied(e) => e.into_mut(),
-            hash_map::Entry::Vacant(e) => e.insert(ai_cache_load($con)?),
-        };
-    };
+struct AgentStoreByPath {
+    map: Mutex<HashMap<String, Arc<AgentStore>>>,
 }
 
-fn ai_cache_put(con: &Connection, agent_info: AgentInfoSigned) -> DatabaseResult<()> {
-    ai_cache_lock!(cache, con);
-
-    if let Some(a) = cache.get(&agent_info.agent) {
-        if a.signed_at_ms >= agent_info.signed_at_ms {
-            return Ok(());
+impl AgentStoreByPath {
+    fn new() -> Self {
+        Self {
+            map: Mutex::new(HashMap::new()),
         }
     }
 
-    cache.insert(agent_info.agent.clone(), agent_info);
-
-    Ok(())
-}
-
-fn ai_cache_prune(
-    con: &Connection,
-    now: u64,
-    local_agents: &[Arc<KitsuneAgent>],
-) -> DatabaseResult<()> {
-    ai_cache_lock!(cache, con);
-
-    cache.retain(|_, v| {
-        for l in local_agents {
-            if &v.agent == l {
-                return true;
+    fn get(&self, con: &Connection) -> DatabaseResult<Arc<AgentStore>> {
+        match self.map.lock().entry(con.path().unwrap().to_string()) {
+            hash_map::Entry::Occupied(e) => Ok(e.get().clone()),
+            hash_map::Entry::Vacant(e) => {
+                let agent_store = Arc::new(AgentStore::new(con)?);
+                e.insert(agent_store.clone());
+                Ok(agent_store)
             }
         }
-        v.expires_at_ms > now
-    });
-
-    Ok(())
+    }
 }
 
-fn ai_cache_query_near_basis(
-    con: &Connection,
-    basis: u32,
-    limit: u32,
-) -> DatabaseResult<Vec<AgentInfoSigned>> {
-    ai_cache_lock!(cache, con);
+static AI_CACHE: Lazy<AgentStoreByPath> = Lazy::new(AgentStoreByPath::new);
 
-    let mut out: Vec<(u32, &AgentInfoSigned)> = cache
-        .values()
-        .filter_map(|v| {
-            if v.is_active() {
-                Some((v.storage_arc.dist(basis), v))
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    if out.len() > 1 {
-        out.sort_by(|a, b| a.0.cmp(&b.0));
-    }
-
-    Ok(out
-        .into_iter()
-        .map(|(_, v)| v.clone())
-        .take(limit as usize)
-        .collect())
+fn ai_cache(con: &Connection) -> DatabaseResult<Arc<AgentStore>> {
+    AI_CACHE.get(con)
 }
 
 /// Put an AgentInfoSigned record into the p2p_store
@@ -234,7 +262,7 @@ pub async fn p2p_put_all(
     }
     db.async_commit(move |txn| {
         for s in ns {
-            ai_cache_put(&*txn, s)?;
+            ai_cache(&*txn)?.put(s)?;
         }
 
         for record in records {
@@ -247,7 +275,7 @@ pub async fn p2p_put_all(
 
 /// Insert a p2p record from within a write transaction.
 pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> DatabaseResult<()> {
-    ai_cache_put(&*txn, signed.clone())?;
+    ai_cache(&*txn)?.put(signed.clone())?;
     let record = P2pRecord::from_signed(signed)?;
     tx_p2p_put(txn, record)
 }
@@ -293,7 +321,7 @@ pub async fn p2p_prune(
             .unwrap()
             .as_millis() as u64;
 
-        ai_cache_prune(&*txn, now, &local_agents)?;
+        ai_cache(&*txn)?.prune(now, &local_agents)?;
 
         txn.execute(
             sql_p2p_agent_store::PRUNE,
@@ -311,6 +339,8 @@ pub async fn p2p_prune(
 
 impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
+        ai_cache(self)?.get(agent)
+        /*
         let mut stmt = self
             .prepare(sql_p2p_agent_store::SELECT)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -324,9 +354,12 @@ impl AsP2pStateTxExt for Transaction<'_> {
                 Ok(signed)
             })
             .optional()?)
+        */
     }
 
     fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
+        ai_cache(self)?.remove(agent)?;
+
         let mut stmt = self
             .prepare(sql_p2p_agent_store::DELETE)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -335,6 +368,8 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 
     fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        ai_cache(self)?.get_all()
+        /*
         let mut stmt = self
             .prepare(sql_p2p_agent_store::SELECT_ALL)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -349,11 +384,15 @@ impl AsP2pStateTxExt for Transaction<'_> {
             out.push(r?);
         }
         Ok(out)
+        */
     }
 
     fn p2p_count_agents(&self) -> DatabaseResult<u32> {
+        ai_cache(self)?.count()
+        /*
         let count = self.query_row_and_then(sql_p2p_agent_store::COUNT, [], |row| row.get(0))?;
         Ok(count)
+        */
     }
 
     fn p2p_gossip_query_agents(
@@ -395,7 +434,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        ai_cache_query_near_basis(self, basis, limit)
+        ai_cache(self)?.query_near_basis(basis, limit)
         /*
         let mut stmt = self
             .prepare(sql_p2p_agent_store::QUERY_NEAR_BASIS)
