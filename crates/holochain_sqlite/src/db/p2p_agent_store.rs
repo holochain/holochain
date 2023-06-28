@@ -418,7 +418,7 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 
     fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
-        // TODO - rewrite this to use the ai_cache memcached info
+        // TODO - rewrite this to use the "ai_cache" memory cached info
         //        it will run a lot faster than the database query
 
         let mut stmt = self
