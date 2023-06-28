@@ -313,9 +313,9 @@ impl DhtArcRange<DhtLocation> {
                     if tgt >= start && tgt <= end {
                         0
                     } else if tgt < start {
-                        std::cmp::min(start - tgt, (u32::MAX - end) + tgt)
+                        std::cmp::min(start - tgt, (u32::MAX - end) + tgt + 1)
                     } else {
-                        std::cmp::min(tgt - end, (u32::MAX - tgt) + start)
+                        std::cmp::min(tgt - end, (u32::MAX - tgt) + start + 1)
                     }
                 } else if tgt <= end || tgt >= start {
                     0
