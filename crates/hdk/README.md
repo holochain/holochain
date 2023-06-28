@@ -101,7 +101,7 @@ Using the HDK, hApp developers can focus on their application's logic. [Learn mo
 
 To extend a Rust function so that it can be called by the host, add the [`hdk_extern!`](macro@crate::prelude::hdk_extern) attribute.
 
-- The function must take _one_ argument that implements `serde::Deserialize + std::fmt::Debug`
+- The function must take _one_ argument that implements `serde::Serialize + std::fmt::Debug`
 - The function must return an `ExternResult` where the success value implements `serde::Serialize + std::fmt::Debug`
 - The function must have a unique name across all externs as they share a global namespace in WASM
 - Everything inside the function is Rust-as-usual including `?` to interact with `ExternResult` that fails as `WasmError`
