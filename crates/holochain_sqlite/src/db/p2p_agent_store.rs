@@ -278,10 +278,10 @@ impl AgentStoreByPath {
     }
 }
 
-static AI_CACHE: Lazy<AgentStoreByPath> = Lazy::new(AgentStoreByPath::new);
+static CACHE: Lazy<AgentStoreByPath> = Lazy::new(AgentStoreByPath::new);
 
-fn ai_cache(con: &Connection) -> DatabaseResult<Arc<AgentStore>> {
-    AI_CACHE.get(con)
+fn cache_get(con: &Connection) -> DatabaseResult<Arc<AgentStore>> {
+    CACHE.get(con)
 }
 
 /// Put an AgentInfoSigned record into the p2p_store
@@ -306,7 +306,7 @@ pub async fn p2p_put_all(
     }
     db.async_commit(move |txn| {
         for s in ns {
-            ai_cache(&*txn)?.put(s)?;
+            cache_get(&*txn)?.put(s)?;
         }
 
         for record in records {
@@ -319,7 +319,7 @@ pub async fn p2p_put_all(
 
 /// Insert a p2p record from within a write transaction.
 pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> DatabaseResult<()> {
-    ai_cache(&*txn)?.put(signed.clone())?;
+    cache_get(&*txn)?.put(signed.clone())?;
     let record = P2pRecord::from_signed(signed)?;
     tx_p2p_put(txn, record)
 }
@@ -365,7 +365,7 @@ pub async fn p2p_prune(
             .unwrap()
             .as_millis() as u64;
 
-        ai_cache(&*txn)?.prune(now, &local_agents)?;
+        cache_get(&*txn)?.prune(now, &local_agents)?;
 
         txn.execute(
             sql_p2p_agent_store::PRUNE,
@@ -383,11 +383,11 @@ pub async fn p2p_prune(
 
 impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
-        ai_cache(self)?.get(agent)
+        cache_get(self)?.get(agent)
     }
 
     fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
-        ai_cache(self)?.remove(agent)?;
+        cache_get(self)?.remove(agent)?;
 
         let mut stmt = self
             .prepare(sql_p2p_agent_store::DELETE)
@@ -397,11 +397,11 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 
     fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        ai_cache(self)?.get_all()
+        cache_get(self)?.get_all()
     }
 
     fn p2p_count_agents(&self) -> DatabaseResult<u32> {
-        ai_cache(self)?.count()
+        cache_get(self)?.count()
     }
 
     fn p2p_gossip_query_agents(
@@ -410,15 +410,15 @@ impl AsP2pStateTxExt for Transaction<'_> {
         until_ms: u64,
         arcset: DhtArcSet,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        ai_cache(self)?.query_agents(since_ms, until_ms, arcset)
+        cache_get(self)?.query_agents(since_ms, until_ms, arcset)
     }
 
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        ai_cache(self)?.query_near_basis(basis, limit)
+        cache_get(self)?.query_near_basis(basis, limit)
     }
 
     fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
-        // TODO - rewrite this to use the "ai_cache" memory cached info
+        // TODO - rewrite this to use the "cache_get" memory cached info
         //        it will run a lot faster than the database query
 
         let mut stmt = self
