@@ -214,10 +214,10 @@ async fn test_p2p_agent_store_gossip_query_sanity() {
                         dist = 0;
                     } else if tgt < start {
                         deb = "one-span-before";
-                        dist = std::cmp::min(start - tgt, (u32::MAX - end) + tgt);
+                        dist = std::cmp::min(start - tgt, (u32::MAX - end) + tgt + 1);
                     } else {
                         deb = "one-span-after";
-                        dist = std::cmp::min(tgt - end, (u32::MAX - tgt) + start);
+                        dist = std::cmp::min(tgt - end, (u32::MAX - tgt) + start + 1);
                     }
                 } else {
                     if tgt <= end || tgt >= start {
