@@ -767,6 +767,7 @@ mod network_impls {
     use kitsune_p2p::KitsuneAgent;
     use kitsune_p2p::KitsuneBinType;
     use rusqlite::params;
+    use std::time::Duration;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -1058,10 +1059,13 @@ mod network_impls {
                     let sender = self.p2p_batch_sender(&dna_hash);
                     let (result_sender, response) = tokio::sync::oneshot::channel();
                     let _ = sender
-                        .send(P2pBatch {
-                            peer_data,
-                            result_sender,
-                        })
+                        .send_timeout(
+                            P2pBatch {
+                                peer_data,
+                                result_sender,
+                            },
+                            Duration::from_secs(10),
+                        )
                         .await;
                     let res = match response.await {
                         Ok(r) => r.map_err(holochain_p2p::HolochainP2pError::other),
@@ -3050,7 +3054,7 @@ async fn p2p_event_task(
 ) {
     /// The number of events we allow to run in parallel before
     /// starting to await on the join handles.
-    const NUM_PARALLEL_EVTS: usize = 100;
+    const NUM_PARALLEL_EVTS: usize = 512;
     let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
     p2p_evt
@@ -3063,12 +3067,20 @@ async fn p2p_event_task(
                     >= NUM_PARALLEL_EVTS)
                     .then(std::time::Instant::now);
 
-                if let Err(e) = handle.dispatch_holochain_p2p_event(evt).await {
-                    tracing::error!(
-                        message = "error dispatching network event",
-                        error = ?e,
-                    );
+                // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently
+                match tokio::time::timeout(std::time::Duration::from_secs(30), handle.dispatch_holochain_p2p_event(evt)).await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => {
+                        tracing::error!(
+                                message = "error dispatching network event",
+                                error = ?e,
+                            );
+                    }
+                    Err(_) => {
+                        tracing::error!("timeout while dispatching network event");
+                    }
                 }
+
                 match start {
                     Some(start) => {
                         let el = start.elapsed();
