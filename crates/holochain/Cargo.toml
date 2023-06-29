@@ -98,6 +98,10 @@ tx5-signal-srv = { version = "=0.0.1-alpha.9", optional = true }
 bytes = { version = "1", optional = true }
 reqwest = { version = "0.11.2", optional = true }
 
+# fact deps
+contrafact = { version = "0.2.0-dev.3", optional = true }
+petgraph = { version = "0.6.0", features = ["quickcheck", "stable_graph"] }
+
 [target.'cfg(unix)'.dependencies]
 sd-notify = "0.3.0"
 
@@ -166,7 +170,8 @@ test_utils = [
   "matches",
   "itertools",
   "holochain_test_wasm_common",
-  "unwrap_to"
+  "unwrap_to",
+  "contrafact",
 ]
 
 # Wasm ribosome tests take > 60 seconds - let's only run them in CI

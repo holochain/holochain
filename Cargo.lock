@@ -949,8 +949,7 @@ checksum = "13418e745008f7349ec7e449155f419a61b92b58a99cc3616942b926825ec76b"
 [[package]]
 name = "contrafact"
 version = "0.2.0-dev.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40d694ba695770cd8a7af00d141a96c633960844ef9ccbf15e0bcabe25861301"
+source = "git+https://github.com/maackle/contrafact-rs.git?branch=2023-06-27-generate-usize-range#5d4626a9e38eb7b337269ed1285ecc5a78d2dacf"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -1913,6 +1912,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fixedbitset"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+
+[[package]]
 name = "fixt"
 version = "0.2.0"
 dependencies = [
@@ -2619,6 +2624,7 @@ dependencies = [
  "once_cell",
  "one_err",
  "parking_lot 0.10.2",
+ "petgraph",
  "predicates 1.0.8",
  "pretty_assertions 0.6.1",
  "rand 0.7.3",
@@ -3095,7 +3101,7 @@ dependencies = [
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -5111,6 +5117,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "petgraph"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dd7d28ee937e54fe3080c91faa1c3a46c06de6252988a7f4592ba2310ef22a4"
+dependencies = [
+ "fixedbitset",
+ "indexmap",
+ "quickcheck",
+]
+
+[[package]]
 name = "phf"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5454,6 +5471,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f50b1c63b38611e7d4d7f68b82d3ad0cc71a2ad2e7f61fc10f1328d917c93cd"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "quickcheck"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c35d9c36a562f37eca96e79f66d5fd56eefbc22560dacc4a864cabd2d277456"
+dependencies = [
+ "rand 0.6.5",
+ "rand_core 0.4.2",
 ]
 
 [[package]]

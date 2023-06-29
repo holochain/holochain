@@ -23,6 +23,7 @@ mod sweet_conductor_handle;
 pub mod sweet_consistency;
 mod sweet_dna;
 mod sweet_network;
+mod sweet_topos;
 mod sweet_zome;
 
 pub use sweet_agents::*;
@@ -36,4 +37,5 @@ pub use sweet_conductor_handle::*;
 pub use sweet_consistency::*;
 pub use sweet_dna::*;
 pub use sweet_network::*;
+pub use sweet_topos::*;
 pub use sweet_zome::*;
