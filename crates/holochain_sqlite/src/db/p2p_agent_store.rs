@@ -113,6 +113,177 @@ impl AsP2pAgentStoreConExt for crate::db::PConnGuard {
     }
 }
 
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+use std::collections::{hash_map, HashMap};
+
+struct AgentStore(Mutex<HashMap<Arc<KitsuneAgent>, AgentInfoSigned>>);
+
+impl AgentStore {
+    fn new(con: &Connection) -> DatabaseResult<Self> {
+        let mut stmt = con
+            .prepare(sql_p2p_agent_store::SELECT_ALL)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+        let mut map = HashMap::new();
+        for r in stmt.query_map([], |r| {
+            let r = r.get_ref(0)?;
+            let r = r.as_blob()?;
+            let signed = AgentInfoSigned::decode(r)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+
+            Ok(signed)
+        })? {
+            let r = r?;
+            map.insert(r.agent.clone(), r);
+        }
+        Ok(Self(Mutex::new(map)))
+    }
+
+    fn prune(&self, now: u64, local_agents: &[Arc<KitsuneAgent>]) -> DatabaseResult<()> {
+        let mut lock = self.0.lock();
+
+        lock.retain(|_, v| {
+            for l in local_agents {
+                if &v.agent == l {
+                    return true;
+                }
+            }
+            v.expires_at_ms > now
+        });
+
+        Ok(())
+    }
+
+    fn put(&self, agent_info: AgentInfoSigned) -> DatabaseResult<()> {
+        let mut lock = self.0.lock();
+
+        if let Some(a) = lock.get(&agent_info.agent) {
+            if a.signed_at_ms >= agent_info.signed_at_ms {
+                return Ok(());
+            }
+        }
+
+        lock.insert(agent_info.agent.clone(), agent_info);
+
+        Ok(())
+    }
+
+    fn remove(&self, agent: &KitsuneAgent) -> DatabaseResult<()> {
+        let _ = self.0.lock().remove(agent);
+        Ok(())
+    }
+
+    fn get(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
+        Ok(self.0.lock().get(agent).cloned())
+    }
+
+    fn get_all(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        Ok(self
+            .0
+            .lock()
+            .values()
+            .filter_map(|info| {
+                if !info.is_active() {
+                    return None;
+                }
+
+                Some(info.clone())
+            })
+            .collect())
+    }
+
+    fn count(&self) -> DatabaseResult<u32> {
+        Ok(self.0.lock().len() as u32)
+    }
+
+    fn query_agents(
+        &self,
+        since_ms: u64,
+        until_ms: u64,
+        arcset: DhtArcSet,
+    ) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        Ok(self
+            .0
+            .lock()
+            .values()
+            .filter_map(|info| {
+                if !info.is_active() {
+                    return None;
+                }
+
+                if info.signed_at_ms < since_ms {
+                    return None;
+                }
+
+                if info.signed_at_ms > until_ms {
+                    return None;
+                }
+
+                let interval = DhtArcRange::from(info.storage_arc);
+                if !arcset.overlap(&interval.into()) {
+                    return None;
+                }
+
+                Some(info.clone())
+            })
+            .collect())
+    }
+
+    fn query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
+        let lock = self.0.lock();
+
+        let mut out: Vec<(u32, &AgentInfoSigned)> = lock
+            .values()
+            .filter_map(|v| {
+                if v.is_active() {
+                    Some((v.storage_arc.dist(basis), v))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if out.len() > 1 {
+            out.sort_by(|a, b| a.0.cmp(&b.0));
+        }
+
+        Ok(out
+            .into_iter()
+            .take(limit as usize)
+            .map(|(_, v)| v.clone())
+            .collect())
+    }
+}
+
+struct AgentStoreByPath {
+    map: Mutex<HashMap<String, Arc<AgentStore>>>,
+}
+
+impl AgentStoreByPath {
+    fn new() -> Self {
+        Self {
+            map: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn get(&self, con: &Connection) -> DatabaseResult<Arc<AgentStore>> {
+        match self.map.lock().entry(con.path().unwrap().to_string()) {
+            hash_map::Entry::Occupied(e) => Ok(e.get().clone()),
+            hash_map::Entry::Vacant(e) => {
+                let agent_store = Arc::new(AgentStore::new(con)?);
+                e.insert(agent_store.clone());
+                Ok(agent_store)
+            }
+        }
+    }
+}
+
+static CACHE: Lazy<AgentStoreByPath> = Lazy::new(AgentStoreByPath::new);
+
+fn cache_get(con: &Connection) -> DatabaseResult<Arc<AgentStore>> {
+    CACHE.get(con)
+}
+
 /// Put an AgentInfoSigned record into the p2p_store
 pub async fn p2p_put(
     db: &DbWrite<DbKindP2pAgents>,
@@ -128,10 +299,16 @@ pub async fn p2p_put_all(
     signed: impl Iterator<Item = &AgentInfoSigned>,
 ) -> DatabaseResult<()> {
     let mut records = Vec::new();
+    let mut ns = Vec::new();
     for s in signed {
+        ns.push(s.clone());
         records.push(P2pRecord::from_signed(s)?);
     }
     db.async_commit(move |txn| {
+        for s in ns {
+            cache_get(&*txn)?.put(s)?;
+        }
+
         for record in records {
             tx_p2p_put(txn, record)?;
         }
@@ -142,6 +319,7 @@ pub async fn p2p_put_all(
 
 /// Insert a p2p record from within a write transaction.
 pub fn p2p_put_single(txn: &mut Transaction<'_>, signed: &AgentInfoSigned) -> DatabaseResult<()> {
+    cache_get(&*txn)?.put(signed.clone())?;
     let record = P2pRecord::from_signed(signed)?;
     tx_p2p_put(txn, record)
 }
@@ -187,6 +365,8 @@ pub async fn p2p_prune(
             .unwrap()
             .as_millis() as u64;
 
+        cache_get(&*txn)?.prune(now, &local_agents)?;
+
         txn.execute(
             sql_p2p_agent_store::PRUNE,
             named_params! {
@@ -203,22 +383,12 @@ pub async fn p2p_prune(
 
 impl AsP2pStateTxExt for Transaction<'_> {
     fn p2p_get_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<Option<AgentInfoSigned>> {
-        let mut stmt = self
-            .prepare(sql_p2p_agent_store::SELECT)
-            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-
-        Ok(stmt
-            .query_row(named_params! { ":agent": &agent.0 }, |r| {
-                let r = r.get_ref(0)?;
-                let r = r.as_blob()?;
-                let signed = AgentInfoSigned::decode(r)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-                Ok(signed)
-            })
-            .optional()?)
+        cache_get(self)?.get(agent)
     }
 
     fn p2p_remove_agent(&self, agent: &KitsuneAgent) -> DatabaseResult<bool> {
+        cache_get(self)?.remove(agent)?;
+
         let mut stmt = self
             .prepare(sql_p2p_agent_store::DELETE)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -227,25 +397,11 @@ impl AsP2pStateTxExt for Transaction<'_> {
     }
 
     fn p2p_list_agents(&self) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        let mut stmt = self
-            .prepare(sql_p2p_agent_store::SELECT_ALL)
-            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-        let mut out = Vec::new();
-        for r in stmt.query_map([], |r| {
-            let r = r.get_ref(0)?;
-            let r = r.as_blob()?;
-            let signed = AgentInfoSigned::decode(r)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-            Ok(signed)
-        })? {
-            out.push(r?);
-        }
-        Ok(out)
+        cache_get(self)?.get_all()
     }
 
     fn p2p_count_agents(&self) -> DatabaseResult<u32> {
-        let count = self.query_row_and_then(sql_p2p_agent_store::COUNT, [], |row| row.get(0))?;
-        Ok(count)
+        cache_get(self)?.count()
     }
 
     fn p2p_gossip_query_agents(
@@ -254,58 +410,17 @@ impl AsP2pStateTxExt for Transaction<'_> {
         until_ms: u64,
         arcset: DhtArcSet,
     ) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        let mut stmt = self
-            .prepare(sql_p2p_agent_store::GOSSIP_QUERY)
-            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-        let mut out = Vec::new();
-        for r in stmt.query_map(
-            named_params! {
-                // TODO: just take i64 so we don't need to clamp (probably
-                //       should just do more Timestamp refactor)
-                ":since_ms": clamp64(since_ms),
-                ":until_ms": clamp64(until_ms),
-                // we filter by arc in memory, not in the db query
-                ":storage_start_loc": Some(u32::MIN),
-                ":storage_end_loc": Some(u32::MAX),
-            },
-            |r| {
-                let r = r.get_ref(0)?;
-                let r = r.as_blob()?;
-                let signed = AgentInfoSigned::decode(r)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-
-                Ok(signed)
-            },
-        )? {
-            let info = r?;
-            let interval = DhtArcRange::from(info.storage_arc);
-            if arcset.overlap(&interval.into()) {
-                out.push(info);
-            }
-        }
-        Ok(out)
+        cache_get(self)?.query_agents(since_ms, until_ms, arcset)
     }
 
     fn p2p_query_near_basis(&self, basis: u32, limit: u32) -> DatabaseResult<Vec<AgentInfoSigned>> {
-        let mut stmt = self
-            .prepare(sql_p2p_agent_store::QUERY_NEAR_BASIS)
-            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-
-        let mut out = Vec::new();
-        for r in stmt.query_map(named_params! { ":basis": basis, ":limit": limit }, |r| {
-            let r = r.get_ref(0)?;
-            let r = r.as_blob()?;
-            let signed = AgentInfoSigned::decode(r)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-
-            Ok(signed)
-        })? {
-            out.push(r?);
-        }
-        Ok(out)
+        cache_get(self)?.query_near_basis(basis, limit)
     }
 
     fn p2p_extrapolated_coverage(&self, dht_arc_set: DhtArcSet) -> DatabaseResult<Vec<f64>> {
+        // TODO - rewrite this to use the "cache_get" memory cached info
+        //        it will run a lot faster than the database query
+
         let mut stmt = self
             .prepare(sql_p2p_agent_store::EXTRAPOLATED_COVERAGE)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -388,7 +503,7 @@ impl P2pRecord {
 
         let storage_center_loc = arc.start_loc().into();
 
-        let is_active = !signed.url_list.is_empty();
+        let is_active = signed.is_active();
 
         let (storage_start_loc, storage_end_loc) = arc.to_primitive_bounds_detached();
 
