@@ -9,9 +9,11 @@ use derive_more::Into;
 use futures::Future;
 use holo_hash::DnaHash;
 use kitsune_p2p::KitsuneSpace;
+#[cfg(not(feature = "concurrency_tests"))]
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
+#[cfg(not(feature = "concurrency_tests"))]
 use std::sync::Arc;
 use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
@@ -19,6 +21,9 @@ use tokio::{
     sync::{OwnedSemaphorePermit, Semaphore},
     task,
 };
+
+#[cfg(feature = "concurrency_tests")]
+use shuttle::sync::{Arc, Mutex};
 
 mod p2p_agent_store;
 pub use p2p_agent_store::*;
@@ -96,6 +101,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
         &self.kind
     }
 }
+
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
@@ -144,6 +150,7 @@ impl<Kind: DbKindT> PermittedConn for DbWrite<Kind> {
 
 impl<Kind: DbKindT> DbRead<Kind> {
     // TODO should not be public, it is only used internally and by tests
+    //      calling this can completely consume the connection pool leaving no space for writers
     pub fn conn(&self) -> DatabaseResult<PConn> {
         self.connection_pooled()
     }
@@ -330,8 +337,10 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     fn get_write_semaphore(kind: DbKind) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
-        MAP.lock()
-            .entry(kind)
+        let mut lock = MAP.lock();
+        #[cfg(feature = "concurrency_tests")]
+        let mut lock = lock.expect("Could not get a lock");
+        lock.entry(kind)
             .or_insert_with(|| Arc::new(Semaphore::new(1)))
             .clone()
     }
@@ -339,8 +348,10 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     fn get_read_semaphore(kind: DbKind) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
-        MAP.lock()
-            .entry(kind)
+        let mut lock = MAP.lock();
+        #[cfg(feature = "concurrency_tests")]
+        let mut lock = lock.expect("Could not get a lock");
+        lock.entry(kind)
             .or_insert_with(|| Arc::new(Semaphore::new(num_read_threads())))
             .clone()
     }
@@ -427,6 +438,7 @@ pub enum DbKind {
     /// Metrics for peers on p2p network (one per space).
     P2pMetrics(Arc<KitsuneSpace>),
 }
+
 pub trait DbKindT: Clone + std::fmt::Debug + Send + Sync + 'static {
     fn kind(&self) -> DbKind;
     /// Constuct a partial Path based on the kind
