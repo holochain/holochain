@@ -6,6 +6,94 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+# 20230628.004801
+
+## [holochain\_cli-0.3.0-beta-dev.6](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.6)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.6](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.6)
+
+## [holochain\_cli\_run\_local\_services-0.3.0-beta-dev.4](crates/holochain_cli_run_local_services/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.5](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [holochain-0.3.0-beta-dev.6](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.6)
+
+## [holochain\_websocket-0.3.0-beta-dev.2](crates/holochain_websocket/CHANGELOG.md#0.3.0-beta-dev.2)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.6](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.6)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.5](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [holochain\_cascade-0.3.0-beta-dev.6](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.6)
+
+## [holochain\_state-0.3.0-beta-dev.5](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [holochain\_p2p-0.3.0-beta-dev.5](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [kitsune\_p2p\_bootstrap-0.2.0-beta-dev.4](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.2.0-beta-dev.4)
+
+## [holochain\_types-0.3.0-beta-dev.5](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [holochain\_sqlite-0.3.0-beta-dev.5](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [kitsune\_p2p-0.3.0-beta-dev.5](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [kitsune\_p2p\_proxy-0.3.0-beta-dev.4](crates/kitsune_p2p_proxy/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [kitsune\_p2p\_transport\_quic-0.3.0-beta-dev.4](crates/kitsune_p2p_transport_quic/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [kitsune\_p2p\_fetch-0.3.0-beta-dev.4](crates/kitsune_p2p_fetch/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_keystore-0.3.0-beta-dev.5](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [kitsune\_p2p\_types-0.3.0-beta-dev.4](crates/kitsune_p2p_types/CHANGELOG.md#0.3.0-beta-dev.4)
+
+# 20230621.004233
+
+## [holochain\_cli-0.3.0-beta-dev.5](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [holochain\_cli\_sandbox-0.3.0-beta-dev.5](crates/holochain_cli_sandbox/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [holochain\_cli\_bundle-0.3.0-beta-dev.4](crates/holochain_cli_bundle/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain-0.3.0-beta-dev.5](crates/holochain/CHANGELOG.md#0.3.0-beta-dev.5)
+
+- **BREAKING CHANGE**: The DhtOp validation rules have been significantly expanded upon, and some logic around what ops are produced when has been altered. Your existing app may experience rejected ops due to these more strict rules.
+
+## [holochain\_test\_wasm\_common-0.3.0-beta-dev.5](crates/holochain_test_wasm_common/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [holochain\_conductor\_api-0.3.0-beta-dev.5](crates/holochain_conductor_api/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [holochain\_wasm\_test\_utils-0.3.0-beta-dev.4](crates/holochain_wasm_test_utils/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_cascade-0.3.0-beta-dev.5](crates/holochain_cascade/CHANGELOG.md#0.3.0-beta-dev.5)
+
+## [holochain\_state-0.3.0-beta-dev.4](crates/holochain_state/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_p2p-0.3.0-beta-dev.4](crates/holochain_p2p/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_types-0.3.0-beta-dev.4](crates/holochain_types/CHANGELOG.md#0.3.0-beta-dev.4)
+
+- **BREAKING CHANGE**: `DhtOp` now uses a `RecordEntry` instead of `Option<Box<Entry>>` to denote the reason why an Entry was not included, if there is no entry included. You can get an `Option<Entry>` via `RecordEntry::as_option()` or `RecordEntry::into_option()`. `Op` and `FlatOp` (used for validation) are unchanged.
+
+## [holochain\_sqlite-0.3.0-beta-dev.4](crates/holochain_sqlite/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [kitsune\_p2p-0.3.0-beta-dev.4](crates/kitsune_p2p/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_keystore-0.3.0-beta-dev.4](crates/holochain_keystore/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [hdk-0.3.0-beta-dev.5](crates/hdk/CHANGELOG.md#0.3.0-beta-dev.5)
+
+- New v2 of dna info returns full modifiers not just properties. Removed from genesis self check in favour of hdk call. [\#2366](https://github.com/holochain/holochain/pull/2366).
+
+## [holochain\_zome\_types-0.3.0-beta-dev.4](crates/holochain_zome_types/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [hdi-0.4.0-beta-dev.4](crates/hdi/CHANGELOG.md#0.4.0-beta-dev.4)
+
+## [hdk\_derive-0.3.0-beta-dev.4](crates/hdk_derive/CHANGELOG.md#0.3.0-beta-dev.4)
+
+## [holochain\_integrity\_types-0.3.0-beta-dev.4](crates/holochain_integrity_types/CHANGELOG.md#0.3.0-beta-dev.4)
+
 # 20230614.004108
 
 ## [holochain\_cli-0.3.0-beta-dev.4](crates/holochain_cli/CHANGELOG.md#0.3.0-beta-dev.4)

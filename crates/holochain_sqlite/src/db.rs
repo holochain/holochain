@@ -142,13 +142,17 @@ impl<Kind: DbKindT> PermittedConn for DbWrite<Kind> {
 }
 
 impl<Kind: DbKindT> DbRead<Kind> {
+    // TODO should not be public, it is only used internally and by tests
     pub fn conn(&self) -> DatabaseResult<PConn> {
         self.connection_pooled()
     }
 
-    pub async fn conn_permit(&self) -> PConnPermit {
-        let g = self.acquire_reader_permit().await;
-        PConnPermit(g)
+    pub async fn conn_permit<E>(&self) -> Result<PConnPermit, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+    {
+        let g = self.acquire_reader_permit::<E>().await?;
+        Ok(PConnPermit(g))
     }
 
     /// Accessor for the [DbKindT] of the DbWrite
@@ -191,7 +195,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
                 )
             });
         }
-        let _g = self.acquire_reader_permit().await;
+        let _g = self.acquire_reader_permit().await?;
         self.num_readers
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         let mut conn = self.conn()?;
@@ -201,12 +205,23 @@ impl<Kind: DbKindT> DbRead<Kind> {
         r
     }
 
-    async fn acquire_reader_permit(&self) -> OwnedSemaphorePermit {
-        self.read_semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("We don't ever close these semaphores")
+    async fn acquire_reader_permit<E>(&self) -> Result<OwnedSemaphorePermit, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+    {
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            self.read_semaphore.clone().acquire_owned(),
+        )
+        .await
+        {
+            Ok(Ok(s)) => Ok(s),
+            Ok(Err(e)) => {
+                tracing::error!("Semaphore should not be closed but got an error while acquiring a permit, {:?}", e);
+                Err(DatabaseError::Other(e.into()).into())
+            }
+            Err(e) => Err(DatabaseError::Timeout(e).into()),
+        }
     }
 }
 
