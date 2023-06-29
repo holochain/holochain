@@ -19,7 +19,7 @@ derive_more = "0.99.3"
 directories = "2.0.2"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
-fixt = { version = "^0.2.0-beta-rc.4", path = "../fixt" }
+fixt = { version = "^0.2.0", path = "../fixt" }
 futures = "0.3.1"
 getrandom = "0.2.7"
 get_if_addrs = "0.5.3"
@@ -43,7 +43,7 @@ kitsune_p2p_types = { version = "^0.3.0-beta-dev.4", path = "../kitsune_p2p/type
 kitsune_p2p_block = { version = "^0.3.0-beta-dev.3", path = "../kitsune_p2p/block" }
 lazy_static = "1.4.0"
 mockall = "0.11.3"
-mr_bundle = { version = "^0.2.0-beta-rc.4", path = "../mr_bundle" }
+mr_bundle = { version = "^0.2.0", path = "../mr_bundle" }
 must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"

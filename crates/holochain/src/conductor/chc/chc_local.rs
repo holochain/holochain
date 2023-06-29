@@ -88,17 +88,6 @@ impl ChainHeadCoordinatorExt for ChcLocal {
     }
 }
 
-// impl ChcLocal {
-//     /// Just get the top hash
-//     pub fn head(&self) -> Option<ActionHash> {
-//         self.inner
-//             .lock()
-//             .records
-//             .last()
-//             .map(|r| r.action.get_hash().clone())
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use holochain_conductor_api::conductor::ConductorConfig;
@@ -416,10 +405,7 @@ mod tests {
         let mut g = random_generator();
 
         let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
-        // let t0 = &chain[0..=0];
-        // let t1 = &chain[1..=1];
-        // let t2 = &chain[2..=2];
-        // dbg!(&t0, &t1, &t2);
+
         let t0 = &chain[0..3];
         let t1 = &chain[3..6];
         let t2 = &chain[6..9];
@@ -427,11 +413,9 @@ mod tests {
 
         let hash = |i: usize| chain[i].action_address().clone();
 
-        // dbg!(&t0);
         chc.clone().add_records(t0.to_vec()).await.unwrap();
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(2));
 
-        // dbg!(&t1);
         chc.clone().add_records(t1.to_vec()).await.unwrap();
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
 
@@ -441,7 +425,6 @@ mod tests {
         assert!(chc.clone().add_records(t11.to_vec()).await.is_err());
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(5));
 
-        // dbg!(&t2);
         chc.clone().add_records(t2.to_vec()).await.unwrap();
         assert_eq!(chc.clone().head().await.unwrap().unwrap(), hash(8));
 

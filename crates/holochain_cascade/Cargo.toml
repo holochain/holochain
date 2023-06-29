@@ -12,7 +12,7 @@ edition = "2021"
 derive_more = "0.99.3"
 either = "1.5"
 fallible-iterator = "0.2"
-fixt = { version = "^0.2.0-beta-rc.4", path = "../fixt" }
+fixt = { version = "^0.2.0", path = "../fixt" }
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.5"
 hdk = { version = "^0.3.0-beta-dev.5", path = "../hdk" }

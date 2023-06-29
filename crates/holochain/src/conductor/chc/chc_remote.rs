@@ -29,7 +29,6 @@ impl ChainHeadCoordinator for ChcRemote {
         let response: reqwest::Response = self.client.post("add_records", body).await?;
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
-        // dbg!(status, std::str::from_utf8(&bytes).unwrap());
         match status {
             200 => Ok(()),
             409 => {
@@ -58,7 +57,6 @@ impl ChainHeadCoordinator for ChcRemote {
         let response = self.client.post("get_record_data", body).await?;
         let status = response.status().as_u16();
         let bytes = response.bytes().await.map_err(extract_string)?;
-        // dbg!(status, std::str::from_utf8(&bytes).unwrap());
         match status {
             200 => Ok(serde_json::from_slice(&bytes)?),
             498 => {
@@ -111,10 +109,6 @@ impl ChcRemoteClient {
         assert!(path.chars().nth(0) != Some('/'));
         self.base_url.join(path).expect("invalid URL").to_string()
     }
-
-    // async fn get(&self, path: &str) -> ChcResult<reqwest::Response> {
-    //     reqwest::get(self.url(path)).await.map_err(extract_string)
-    // }
 
     async fn post(&self, path: &str, body: Vec<u8>) -> ChcResult<reqwest::Response> {
         let client = reqwest::Client::new();

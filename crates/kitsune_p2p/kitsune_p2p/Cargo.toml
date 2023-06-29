@@ -45,7 +45,7 @@ tracing = "0.1"
 tokio-stream = "0.1"
 tx5 = { version = "=0.0.1-alpha.18", optional = true }
 url2 = "0.0.6"
-fixt = { path = "../../fixt", version = "^0.2.0-beta-rc.4"}
+fixt = { path = "../../fixt", version = "^0.2.0"}
 
 # arbitrary could be made optional
 arbitrary = { version = "1.0", features = ["derive"] }

@@ -21,7 +21,7 @@ derive_more = "0.99.3"
 either = "1.5.0"
 fallible-iterator = "0.2.0"
 failure = "0.1.6"
-fixt = { version = "^0.2.0-beta-rc.4", path = "../fixt" }
+fixt = { version = "^0.2.0", path = "../fixt" }
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash", version = "^0.3.0-beta-dev.3"}
 holochain_serialized_bytes = "=0.0.51"
