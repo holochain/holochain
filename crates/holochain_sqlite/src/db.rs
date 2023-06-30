@@ -237,6 +237,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
     }
 
+    // TODO this isn't even used?
     pub async fn conn_write_permit(&self) -> PConnPermit {
         let g = self.acquire_writer_permit().await;
         PConnPermit(g)
@@ -380,6 +381,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             .expect("Database transaction failed")
     }
 
+    // TODO never used and has a warning that you need to be careful with it, remove?
     /// If possible prefer async_commit as this is slower and can starve chained futures.
     pub async fn async_commit_in_place<E, R, F>(&self, f: F) -> Result<R, E>
     where
@@ -426,6 +428,7 @@ pub enum DbKind {
     /// Metrics for peers on p2p network (one per space).
     P2pMetrics(Arc<KitsuneSpace>),
 }
+
 pub trait DbKindT: Clone + std::fmt::Debug + Send + Sync + 'static {
     fn kind(&self) -> DbKind;
     /// Constuct a partial Path based on the kind
@@ -685,6 +688,7 @@ impl<'e> WriteManager<'e> for PConn {
         let mut txn = self
             .transaction_with_behavior(TransactionBehavior::Exclusive)
             .map_err(DatabaseError::from)?;
+        // TODO does not offload blocking work
         let result = f(&mut txn)?;
         txn.commit().map_err(DatabaseError::from)?;
         Ok(result)
