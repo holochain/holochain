@@ -39,7 +39,7 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
         F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static;
 
-    /// Run an sync read transaction on a the current thread.
+    /// Run an sync read transaction on the current thread.
     fn sync_reader<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
@@ -86,6 +86,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
         DbRead::async_reader(self, f).await
     }
 
+    // TODO bypasses permit
     fn sync_reader<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError>,
@@ -98,6 +99,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
         &self.kind
     }
 }
+
 /// A read-only version of [DbWrite].
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
@@ -240,12 +242,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
     }
 
-    // TODO this isn't even used?
-    pub async fn conn_write_permit(&self) -> PConnPermit {
-        let g = self.acquire_writer_permit().await;
-        PConnPermit(g)
-    }
-
     pub fn open_with_sync_level(
         path_prefix: &Path,
         kind: Kind,
@@ -330,6 +326,35 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         }))
     }
 
+    pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
+        let _g = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            self.acquire_writer_permit(),
+        )
+        .await
+        .map_err(DatabaseError::from)?;
+
+        let mut conn = self.conn()?;
+        let r = task::spawn_blocking(move || conn.with_commit_sync(f))
+            .await
+            .map_err(DatabaseError::from)?;
+        r
+    }
+
+    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
+        self.0
+            .write_semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("We don't ever close these semaphores")
+    }
+
     fn get_write_semaphore(kind: DbKind) -> Arc<Semaphore> {
         static MAP: once_cell::sync::Lazy<Mutex<HashMap<DbKind, Arc<Semaphore>>>> =
             once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
@@ -360,20 +385,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Self::new(None, kind, DbSyncLevel::default())
     }
 
-    pub async fn async_commit<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
-        R: Send + 'static,
-    {
-        let _g = self.acquire_writer_permit().await;
-        let mut conn = self.conn()?;
-        let r = task::spawn_blocking(move || conn.with_commit_sync(f))
-            .await
-            .map_err(DatabaseError::from)?;
-        r
-    }
-
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test_commit<R, F>(&self, f: F) -> R
     where
@@ -382,28 +393,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         let mut conn = self.conn().expect("Failed to open connection");
         conn.with_commit_test(f)
             .expect("Database transaction failed")
-    }
-
-    // TODO never used and has a warning that you need to be careful with it, remove?
-    /// If possible prefer async_commit as this is slower and can starve chained futures.
-    pub async fn async_commit_in_place<E, R, F>(&self, f: F) -> Result<R, E>
-    where
-        E: From<DatabaseError>,
-        F: FnOnce(&mut Transaction) -> Result<R, E>,
-        R: Send,
-    {
-        let _g = self.acquire_writer_permit().await;
-        let mut conn = self.conn()?;
-        task::block_in_place(move || conn.with_commit_sync(f))
-    }
-
-    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
-        self.0
-            .write_semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("We don't ever close these semaphores")
     }
 }
 

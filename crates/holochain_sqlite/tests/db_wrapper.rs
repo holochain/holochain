@@ -279,115 +279,115 @@ async fn async_read_releases_permits() {
 
 // TODO this test shows that waiting for a write permit will block until another one is released, whether or not
 //      that is possible.
-#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test(flavor = "multi_thread")]
-async fn single_write_permit() {
-    holochain_trace::test_run().unwrap();
+// #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
+// #[tokio::test(flavor = "multi_thread")]
+// async fn single_write_permit() {
+//     holochain_trace::test_run().unwrap();
+//
+//     set_acquire_timeout(100);
+//     set_connection_timeout(300);
+//
+//     let tmp_dir = tempfile::TempDir::new().unwrap();
+//     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
+//
+//     let _hold_permit = db_handle.conn_write_permit().await;
+//
+//     // Bad, will never stop waiting!
+//     let result = tokio::time::timeout(
+//         std::time::Duration::from_millis(5),
+//         db_handle.conn_write_permit(),
+//     )
+//     .await;
+//
+//     assert!(result.is_err());
+//     // The inner cannot error so this is a timeout error
+//     assert!(result.err().is_some())
+// }
 
-    set_acquire_timeout(100);
-    set_connection_timeout(300);
-
-    let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
-
-    let _hold_permit = db_handle.conn_write_permit().await;
-
-    // Bad, will never stop waiting!
-    let result = tokio::time::timeout(
-        std::time::Duration::from_millis(5),
-        db_handle.conn_write_permit(),
-    )
-    .await;
-
-    assert!(result.is_err());
-    // The inner cannot error so this is a timeout error
-    assert!(result.err().is_some())
-}
-
-#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test(flavor = "multi_thread")]
-async fn write_permits_can_be_released() {
-    holochain_trace::test_run().unwrap();
-
-    set_acquire_timeout(100);
-    set_connection_timeout(300);
-
-    let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
-
-    let hold_permit = db_handle.conn_write_permit().await;
-
-    drop(hold_permit);
-
-    // Does not return a `Result` so we can't do much to check the given permit is valid. If the test exits instead of deadlocking then it passed...
-    // Until this either times out when a permit is not available or getting a permit guarantees you can actually get a conn (i.e. `conn` is made private)
-    // then it is really not that meaningful to be holding a permit.
-    db_handle.conn_write_permit().await;
-}
+// #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
+// #[tokio::test(flavor = "multi_thread")]
+// async fn write_permits_can_be_released() {
+//     holochain_trace::test_run().unwrap();
+//
+//     set_acquire_timeout(100);
+//     set_connection_timeout(300);
+//
+//     let tmp_dir = tempfile::TempDir::new().unwrap();
+//     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
+//
+//     let hold_permit = db_handle.conn_write_permit().await;
+//
+//     drop(hold_permit);
+//
+//     // Does not return a `Result` so we can't do much to check the given permit is valid. If the test exits instead of deadlocking then it passed...
+//     // Until this either times out when a permit is not available or getting a permit guarantees you can actually get a conn (i.e. `conn` is made private)
+//     // then it is really not that meaningful to be holding a permit.
+//     db_handle.conn_write_permit().await;
+// }
 
 // TODO The database wrapper is a leaky abstraction around the database pool. Being able to get a permit does NOT mean
 //      you can actually access the database.
-#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test(flavor = "multi_thread")]
-async fn can_get_a_write_permit_when_the_pool_is_exhausted() {
-    holochain_trace::test_run().unwrap();
-
-    set_acquire_timeout(100);
-    set_connection_timeout(300);
-
-    let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
-
-    let num_readers = num_read_threads() + 1;
-
-    let mut held_connections = Vec::with_capacity(num_readers);
-    for _ in 0..num_readers {
-        let c = db_handle.conn().unwrap();
-        held_connections.push(c)
-    }
-
-    let writer_permit = db_handle.conn_write_permit().await;
-
-    // Now we have a write permit but all connections are held? So although we're the only 'writer' we can't write
-    assert_eq!(num_readers, held_connections.len());
-
-    let result = db_handle.with_permit(writer_permit);
-
-    // and get an error trying to retrieve a connection using the permit
-    assert!(result.is_err());
-}
+// #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
+// #[tokio::test(flavor = "multi_thread")]
+// async fn can_get_a_write_permit_when_the_pool_is_exhausted() {
+//     holochain_trace::test_run().unwrap();
+//
+//     set_acquire_timeout(100);
+//     set_connection_timeout(300);
+//
+//     let tmp_dir = tempfile::TempDir::new().unwrap();
+//     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
+//
+//     let num_readers = num_read_threads() + 1;
+//
+//     let mut held_connections = Vec::with_capacity(num_readers);
+//     for _ in 0..num_readers {
+//         let c = db_handle.conn().unwrap();
+//         held_connections.push(c)
+//     }
+//
+//     let writer_permit = db_handle.conn_write_permit().await;
+//
+//     // Now we have a write permit but all connections are held? So although we're the only 'writer' we can't write
+//     assert_eq!(num_readers, held_connections.len());
+//
+//     let result = db_handle.with_permit(writer_permit);
+//
+//     // and get an error trying to retrieve a connection using the permit
+//     assert!(result.is_err());
+// }
 
 // TODO This is bad but really a consequence of being able to claim and hold write permits. Also because the attempt to
 //      get a write permit internally will never give up. The only remaining problem is if the query itself does something it shouldn't
 //      like waiting on a network call or anything else slow because we don't prevent the query itself from blocking for unreasonably long
-#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test(flavor = "multi_thread")]
-async fn async_commit_lock_if_writer_permit_is_held() {
-    holochain_trace::test_run().unwrap();
-
-    set_acquire_timeout(100);
-    set_connection_timeout(300);
-
-    let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
-
-    let _held_writer_permit = db_handle.conn_write_permit().await;
-
-    let commit_ran = Arc::new(AtomicBool::new(false));
-    let my_commit_ran = commit_ran.clone();
-    let exec = tokio::time::timeout(
-        std::time::Duration::from_millis(500),
-        db_handle.async_commit(move |_| -> Result<(), DatabaseError> {
-            my_commit_ran.store(true, Ordering::SeqCst);
-            Ok(())
-        }),
-    )
-    .await;
-
-    assert!(exec.is_err());
-    // The outer error is a timeout or none
-    assert!(exec.err().is_some());
-}
+// #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
+// #[tokio::test(flavor = "multi_thread")]
+// async fn async_commit_lock_if_writer_permit_is_held() {
+//     holochain_trace::test_run().unwrap();
+//
+//     set_acquire_timeout(100);
+//     set_connection_timeout(300);
+//
+//     let tmp_dir = tempfile::TempDir::new().unwrap();
+//     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
+//
+//     let _held_writer_permit = db_handle.conn_write_permit().await;
+//
+//     let commit_ran = Arc::new(AtomicBool::new(false));
+//     let my_commit_ran = commit_ran.clone();
+//     let exec = tokio::time::timeout(
+//         std::time::Duration::from_millis(500),
+//         db_handle.async_commit(move |_| -> Result<(), DatabaseError> {
+//             my_commit_ran.store(true, Ordering::SeqCst);
+//             Ok(())
+//         }),
+//     )
+//     .await;
+//
+//     assert!(exec.is_err());
+//     // The outer error is a timeout or none
+//     assert!(exec.err().is_some());
+// }
 
 // TODO This is two problems in one,
 //      1. You can use the permit that has been leaked out of the implementation to write
