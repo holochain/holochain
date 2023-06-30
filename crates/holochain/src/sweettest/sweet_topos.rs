@@ -73,7 +73,19 @@ impl PartialEq for NetworkTopologyGraph {
 }
 
 struct SizedNetworkFact {
-    nodes: RangeInclusive<usize>,
+    nodes: usize,
+}
+
+impl SizedNetworkFact {
+    pub fn new(nodes: usize) -> Self {
+        Self { nodes }
+    }
+
+    pub fn from_range(g: &mut Generator, nodes: RangeInclusive<usize>) -> Mutation<Self> {
+        Ok(Self {
+            nodes: g.int_in_range(nodes, "Couldn't build a fact in the range.")?,
+        })
+    }
 }
 
 impl<'a> Fact<'a, NetworkTopologyGraph> for SizedNetworkFact {
@@ -84,19 +96,15 @@ impl<'a> Fact<'a, NetworkTopologyGraph> for SizedNetworkFact {
     ) -> Mutation<NetworkTopologyGraph> {
         dbg!("mutate");
         dbg!(&graph);
-        let desired_node_count = g.int_in_range(
-            self.nodes.clone(),
-            "could not calculate a desired node count",
-        )?;
         let mut node_count = graph.node_count();
-        while node_count < desired_node_count {
+        while node_count < self.nodes {
             dbg!("add");
             dbg!(node_count);
             dbg!(g.len());
             graph.add_node(NetworkTopologyNode);
             node_count = graph.node_count();
         }
-        while node_count > desired_node_count {
+        while node_count > self.nodes {
             dbg!("remove");
             dbg!(node_count);
             dbg!(g.len());
@@ -158,7 +166,7 @@ pub mod test {
     #[test]
     fn test_sweet_topos_sized_network_zero_nodes() {
         let mut g = unstructured_noise().into();
-        let mut fact = SizedNetworkFact { nodes: 0..=0 };
+        let mut fact = SizedNetworkFact { nodes: 0 };
         let graph = fact.build_fallible(&mut g).unwrap();
         assert_eq!(graph.node_count(), 0);
     }
@@ -167,18 +175,28 @@ pub mod test {
     #[test]
     fn test_sweet_topos_sized_network_single_node() {
         let mut g = unstructured_noise().into();
-        let mut fact = SizedNetworkFact { nodes: 1..=1 };
+        let mut fact = SizedNetworkFact { nodes: 1 };
         let graph = fact.build_fallible(&mut g).unwrap();
         assert_eq!(graph.node_count(), 1);
+    }
+
+    /// Test that we can build a network with a dozen nodes.
+    #[test]
+    fn test_sweet_topos_sized_network_dozen_nodes() {
+        let mut g = unstructured_noise().into();
+        let mut fact = SizedNetworkFact { nodes: 12 };
+        let graph = fact.build_fallible(&mut g).unwrap();
+        assert_eq!(graph.node_count(), 12);
     }
 
     /// Test that we can build a network with a number of nodes within a range.
     #[test]
     fn test_sweet_topos_sized_network_range() {
         let mut g = unstructured_noise().into();
-        let mut fact = SizedNetworkFact { nodes: 1..=10 };
+        let mut fact = SizedNetworkFact::from_range(&mut g, 1..=10).unwrap();
         let graph = fact.build_fallible(&mut g).unwrap();
         assert!(graph.node_count() >= 1);
         assert!(graph.node_count() <= 10);
+        assert_eq!(graph.node_count(), fact.nodes);
     }
 }
