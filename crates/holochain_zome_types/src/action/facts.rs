@@ -16,7 +16,7 @@ use holo_hash::*;
 /// - constrain seq num
 /// - constrain prev_hashes
 /// ...but, this does it all in one Fact
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ValidChainFact {
     hash: Option<ActionHash>,
     seq: u32,
@@ -24,7 +24,7 @@ struct ValidChainFact {
 }
 
 impl<'a> Fact<'a, Action> for ValidChainFact {
-    fn mutate(&self, mut action: Action, g: &mut Generator<'a>) -> Mutation<Action> {
+    fn mutate(&mut self, g: &mut Generator<'a>, mut action: Action) -> Mutation<Action> {
         match (self.hash.as_ref(), action.prev_action_mut()) {
             (Some(stored), Some(prev)) => {
                 g.set(
@@ -42,7 +42,7 @@ impl<'a> Fact<'a, Action> for ValidChainFact {
                     ),
                     |a: &Action| a.action_type() != ActionType::Dna,
                 )
-                .mutate(action, g)?;
+                .mutate(g, action)?;
             }
             (None, Some(_)) => {
                 let err = format!(
@@ -68,22 +68,20 @@ impl<'a> Fact<'a, Action> for ValidChainFact {
 
         g.set(action.author_mut(), &self.author, "Author must be the same")?;
 
-        Ok(action)
-    }
-
-    fn advance(&mut self, action: &Action) {
-        self.hash = Some(ActionHash::with_data_sync(action));
+        self.hash = Some(ActionHash::with_data_sync(&action));
         self.seq += 1;
+
+        Ok(action)
     }
 }
 
-pub fn is_of_type(action_type: ActionType) -> Facts<Action> {
+pub fn is_of_type(action_type: ActionType) -> impl Fact<'static, Action> {
     facts![brute("action is of type", move |h: &Action| h
         .action_type()
         == action_type)]
 }
 
-pub fn is_new_entry_action<'a>() -> FactsRef<'a, Action> {
+pub fn is_new_entry_action<'a>() -> impl Fact<'a, Action> {
     let et_fact = brute("is NewEntryAction", move |et: &EntryType| {
         matches!(et, EntryType::App(_))
     });
@@ -100,19 +98,22 @@ pub fn is_new_entry_action<'a>() -> FactsRef<'a, Action> {
     ]
 }
 
-pub fn is_not_entry_action<'a>() -> FactsRef<'a, Action> {
+pub fn is_not_entry_action<'a>() -> impl Fact<'a, Action> {
     facts![brute("is not NewEntryAction", move |a: &Action| a
         .entry_type()
         .is_none())]
 }
 
 /// WIP: Fact: The actions form a valid SourceChain
-pub fn valid_chain(author: AgentPubKey) -> Facts<Action> {
-    facts![ValidChainFact {
-        hash: None,
-        seq: 0,
-        author
-    },]
+pub fn valid_chain(len: usize, author: AgentPubKey) -> impl Fact<'static, Vec<Action>> {
+    sized_seq(
+        len,
+        ValidChainFact {
+            hash: None,
+            seq: 0,
+            author,
+        },
+    )
 }
 
 #[cfg(test)]
@@ -124,9 +125,9 @@ mod tests {
     fn test_valid_chain_fact() {
         let mut g = unstructured_noise().into();
         let author = ::fixt::fixt!(AgentPubKey);
-
-        let chain = build_seq(&mut g, 5, valid_chain(author.clone()));
-        check_seq(chain.as_slice(), valid_chain(author)).unwrap();
+        let fact = valid_chain(5, author.clone());
+        let chain = fact.clone().build(&mut g);
+        fact.check(&chain).unwrap();
 
         let hashes: Vec<_> = chain
             .iter()

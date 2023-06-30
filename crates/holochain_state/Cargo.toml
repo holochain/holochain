@@ -47,7 +47,7 @@ base64 = { version = "0.13", optional = true }
 nanoid = { version = "0.3", optional = true }
 
 # contrafact
-contrafact = { version = "0.2.0-dev.3", optional = true }
+contrafact = { version = "0.2.0-dev.4", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.26"

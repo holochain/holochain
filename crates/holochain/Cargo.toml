@@ -107,7 +107,7 @@ holochain = { path = ".", features = ["test_utils"] }
 
 anyhow = "1.0.26"
 assert_cmd = "1.0.1"
-contrafact = "0.2.0-dev.3"
+contrafact = "0.2.0-dev.4"
 criterion = { version = "0.3", features = [ "async_tokio" ] }
 ed25519-dalek = "1"
 isotest = "0"

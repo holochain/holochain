@@ -22,7 +22,7 @@ type Pair = (Action, RecordEntry);
 // At least we can use this as a reference to write the same logic for DhtOp and Record,
 // which require the same sort of checks.
 
-pub fn action_and_entry_match(must_be_public: bool) -> Facts<Pair> {
+pub fn action_and_entry_match(must_be_public: bool) -> impl Fact<'static, Pair> {
     facts![
         brute(
             "Action type matches Entry existence, and is public if exists",
@@ -49,13 +49,13 @@ pub fn action_and_entry_match(must_be_public: bool) -> Facts<Pair> {
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.
-                    facts![prism(
+                    contrafact::either::Either::Left(prism(
                         "action's entry hash",
                         |(action, _): &mut Pair| action.entry_data_mut().map(|(hash, _)| hash),
                         eq("hash of matching entry", EntryHash::with_data_sync(entry)),
-                    )]
+                    ))
                 } else {
-                    facts![always()]
+                    contrafact::either::Either::Right(always())
                 }
             }
         ),
@@ -89,10 +89,10 @@ mod tests {
 
             let fact = action_and_entry_match(false);
 
-            fact.check(&pair1).unwrap();
-            assert!(fact.check(&pair2).is_err());
-            assert!(fact.check(&pair3).is_err());
-            fact.check(&pair4).unwrap();
+            fact.clone().check(&pair1).unwrap();
+            assert!(fact.clone().check(&pair2).is_err());
+            assert!(fact.clone().check(&pair3).is_err());
+            fact.clone().check(&pair4).unwrap();
         }
     }
 }

@@ -13,7 +13,7 @@ pub fn valid_dht_op(
     keystore: MetaLairClient,
     author: AgentPubKey,
     must_be_public: bool,
-) -> Facts<DhtOp> {
+) -> impl Fact<'static, DhtOp> {
     facts![
         brute(
             "Action type matches Entry existence, and is public if exists",
@@ -42,13 +42,13 @@ pub fn valid_dht_op(
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.
-                    facts![prism(
+                    either::Either::Left(prism(
                         "action's entry hash",
                         |op: &mut DhtOp| op.action_entry_data_mut().map(|(hash, _)| hash),
                         eq("hash of matching entry", EntryHash::with_data_sync(entry)),
-                    )]
+                    ))
                 } else {
-                    facts![always()]
+                    either::Either::Right(always())
                 }
             }
         ),
@@ -110,15 +110,15 @@ mod tests {
 
         let fact = valid_dht_op(keystore, agent, false);
 
-        assert!(fact.check(&op0a).is_err());
-        fact.check(&op0b).unwrap();
-        fact.check(&op0c).unwrap();
-        fact.check(&op0d).unwrap();
+        assert!(fact.clone().check(&op0a).is_err());
+        fact.clone().check(&op0b).unwrap();
+        fact.clone().check(&op0c).unwrap();
+        fact.clone().check(&op0d).unwrap();
 
-        fact.check(&op1a).unwrap();
-        assert!(fact.check(&op1b).is_err());
-        assert!(fact.check(&op1c).is_err());
-        fact.check(&op1d).unwrap();
+        fact.clone().check(&op1a).unwrap();
+        assert!(fact.clone().check(&op1b).is_err());
+        assert!(fact.clone().check(&op1c).is_err());
+        fact.clone().check(&op1d).unwrap();
     }
 }
 
