@@ -35,35 +35,36 @@ pub fn valid_dht_op(
                 }
             }
         ),
-        mapped(
+        lambda_unit(
             "If there is entry data, the action must point to it",
-            |op: &DhtOp| {
+            |g, op: DhtOp| {
                 if let Some(entry) = op.entry().into_option() {
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.
-                    either::Either::Left(prism(
+                    prism(
                         "action's entry hash",
                         |op: &mut DhtOp| op.action_entry_data_mut().map(|(hash, _)| hash),
-                        eq("hash of matching entry", EntryHash::with_data_sync(entry)),
-                    ))
+                        eq(EntryHash::with_data_sync(entry)),
+                    )
+                    .mutate(g, op)
                 } else {
-                    either::Either::Right(always())
+                    Ok(op)
                 }
             }
         ),
-        lens(
+        lens1(
             "The author is the one specified",
             DhtOp::author_mut,
-            eq_(author)
+            eq(author)
         ),
-        mapped("The Signature matches the Action", move |op: &DhtOp| {
+        lambda_unit("The Signature matches the Action", move |g, op: DhtOp| {
             use holochain_keystore::AgentPubKeyExt;
             let action = op.action();
             let agent = action.author();
             let actual = tokio_helper::block_forever_on(agent.sign(&keystore, &action))
                 .expect("Can sign the action");
-            facts![lens("signature", DhtOp::signature_mut, eq_(actual))]
+            lens1("signature", DhtOp::signature_mut, eq(actual)).mutate(g, op)
         })
     ]
 }

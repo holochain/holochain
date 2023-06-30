@@ -42,20 +42,21 @@ pub fn action_and_entry_match(must_be_public: bool) -> impl Fact<'static, Pair> 
                 }
             }
         ),
-        mapped(
+        lambda_unit(
             "If there is entry data, the action must point to it",
-            |(_, entry): &Pair| {
-                if let Some(entry) = entry.as_option() {
+            |g, pair: Pair| {
+                if let Some(entry) = pair.1.as_option() {
                     // NOTE: this could be a `lens` if the previous check were short-circuiting,
                     // but it is possible that this check will run even if the previous check fails,
                     // so use a prism instead.
-                    contrafact::either::Either::Left(prism(
+                    prism(
                         "action's entry hash",
                         |(action, _): &mut Pair| action.entry_data_mut().map(|(hash, _)| hash),
-                        eq("hash of matching entry", EntryHash::with_data_sync(entry)),
-                    ))
+                        eq(EntryHash::with_data_sync(entry)),
+                    )
+                    .mutate(g, pair)
                 } else {
-                    contrafact::either::Either::Right(always())
+                    Ok(pair)
                 }
             }
         ),

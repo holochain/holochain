@@ -969,10 +969,10 @@ async fn valid_chain_fact_test() {
 
     let fact = contrafact::facts![
         holochain_zome_types::record::facts::action_and_entry_match(false),
-        contrafact::lens(
+        contrafact::lens1(
             "action is valid",
             |(a, _)| a,
-            holochain_zome_types::action::facts::valid_chain(author),
+            holochain_zome_types::action::facts::valid_chain_action(author),
         ),
     ];
 
