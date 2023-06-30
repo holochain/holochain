@@ -116,7 +116,7 @@ impl SweetConductorConfig {
     ) -> Self {
         self.0
             .network
-            .as_mut()
+            .clone()
             .expect("failed to tune network")
             .tuning_params = Arc::new(tuning_params);
         self
