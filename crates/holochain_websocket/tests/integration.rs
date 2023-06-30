@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use futures::StreamExt;
 use holochain_serialized_bytes::prelude::*;
+use holochain_websocket::connect;
 use holochain_websocket::ListenerHandle;
 use holochain_websocket::ListenerItem;
 use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketError;
 use holochain_websocket::WebsocketListener;
-use holochain_websocket::{connect, Pair};
 use stream_cancel::Tripwire;
 use tracing::Instrument;
 use url2::url2;
