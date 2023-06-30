@@ -427,6 +427,8 @@ pub enum DbKind {
     P2pAgentStore(Arc<KitsuneSpace>),
     /// Metrics for peers on p2p network (one per space).
     P2pMetrics(Arc<KitsuneSpace>),
+    #[cfg(feature = "test_utils")]
+    Test(String),
 }
 
 pub trait DbKindT: Clone + std::fmt::Debug + Send + Sync + 'static {

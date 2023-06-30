@@ -1,40 +1,15 @@
+use common::TestDatabaseKind;
 use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::db::{num_read_threads, DbKind, DbKindT, PermittedConn, WriteManager};
+use holochain_sqlite::db::{num_read_threads, PermittedConn, WriteManager};
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseError::{DbConnectionPoolError, Timeout};
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
-struct TestDatabaseKind {
-    pub name: String,
-}
+#[cfg(feature = "test_utils")]
+mod common;
 
-impl TestDatabaseKind {
-    fn new() -> Self {
-        Self {
-            name: nanoid::nanoid!(),
-        }
-    }
-}
-
-impl DbKindT for TestDatabaseKind {
-    fn kind(&self) -> DbKind {
-        // Really doesn't matter
-        DbKind::Conductor
-    }
-
-    fn filename_inner(&self) -> PathBuf {
-        PathBuf::from(self.name.as_str())
-    }
-
-    fn if_corrupt_wipe(&self) -> bool {
-        false
-    }
-}
-
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[test]
 fn get_connections_from_pool() {
     holochain_trace::test_run().unwrap();
@@ -70,7 +45,7 @@ fn get_connections_from_pool() {
     )
 }
 
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[test]
 fn pool_size_is_limited() {
     holochain_trace::test_run().unwrap();
@@ -109,7 +84,7 @@ fn pool_size_is_limited() {
     assert_eq!(3, failed_count);
 }
 
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test]
 async fn reader_permits_are_limited() {
     holochain_trace::test_run().unwrap();
@@ -146,7 +121,7 @@ async fn reader_permits_are_limited() {
     assert_eq!(3, failed_count);
 }
 
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test]
 async fn reader_permits_can_be_released() {
     holochain_trace::test_run().unwrap();
@@ -187,7 +162,7 @@ async fn reader_permits_can_be_released() {
     let _p2 = db_handle.conn_permit::<DatabaseError>().await.unwrap();
 }
 
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test]
 async fn async_read_respects_reader_permit_limits() {
     holochain_trace::test_run().unwrap();
@@ -251,7 +226,7 @@ async fn async_read_respects_reader_permit_limits() {
     assert_eq!(3, failed_count.load(Ordering::SeqCst));
 }
 
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test]
 async fn async_read_releases_permits() {
     holochain_trace::test_run().unwrap();
@@ -284,7 +259,7 @@ async fn async_read_releases_permits() {
 
 // TODO this test shows that waiting for a write permit will block until another one is released, whether or not
 //      that is possible.
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test]
 async fn single_write_permit() {
     holochain_trace::test_run().unwrap();
@@ -306,7 +281,7 @@ async fn single_write_permit() {
     assert!(result.err().is_some())
 }
 
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test]
 async fn write_permits_can_be_released() {
     holochain_trace::test_run().unwrap();
@@ -324,7 +299,7 @@ async fn write_permits_can_be_released() {
 
 // TODO The database wrapper is a leaky abstraction around the database pool. Being able to get a permit does NOT mean
 //      you can actually access the database.
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test]
 async fn can_get_a_write_permit_when_the_pool_is_exhausted() {
     holochain_trace::test_run().unwrap();
@@ -353,7 +328,7 @@ async fn can_get_a_write_permit_when_the_pool_is_exhausted() {
 
 // TODO This is bad but really a consequence of being able to claim and hold write permits. Also because the attempt to
 //      get a write permit internally will never give up. The only remaining problem is if the
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test]
 async fn async_commit_lock_if_writer_permit_is_held() {
     holochain_trace::test_run().unwrap();
@@ -383,7 +358,7 @@ async fn async_commit_lock_if_writer_permit_is_held() {
 //      1. You can use the permit that has been leaked out of the implementation to write
 //      which breaks the guarantee of only having one writer at a time.
 //      2. You can call a function which is `test_utils` without needing test_utils
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test]
 async fn can_write_on_a_read_permit() {
     holochain_trace::test_run().unwrap();
