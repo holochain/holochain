@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use holochain_keystore::MetaLairClient;
@@ -102,10 +103,12 @@ pub async fn validation_receipt_workflow(
     // FIXME: Test this query.
     let receipts = pending_receipts(&vault, validators.clone()).await?;
 
+    let validators: HashSet<_> = validators.into_iter().collect();
+
     // Send the validation receipts
     for (receipt, author, _) in &receipts {
         // Don't send receipt to self. Don't block self.
-        if validators.iter().any(|validator| validator == author) {
+        if validators.contains(author) {
             continue;
         }
 

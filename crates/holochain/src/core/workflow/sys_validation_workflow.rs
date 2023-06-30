@@ -120,8 +120,12 @@ async fn sys_validation_workflow_inner(
     let jh = tokio::spawn(async move {
         // Send the result to task that will commit to the database.
         while let Some(op) = iter.next().await {
-            if tx.send(op).await.is_err() {
-                tracing::warn!("app validation task has failed to send ops. This is not a problem if the conductor is shutting down");
+            if tx
+                .send_timeout(op, std::time::Duration::from_secs(10))
+                .await
+                .is_err()
+            {
+                tracing::warn!("sys validation task has failed to send ops. This is not a problem if the conductor is shutting down");
                 break;
             }
         }

@@ -137,7 +137,7 @@ async fn transitive_peer_gossip() {
     });
 
     // let gossip do its thing
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(3500)).await;
 
     let mut agent_locs: Vec<_> = vec![a1.clone(), a2.clone(), a3.clone(), a4.clone()]
         .into_iter()
@@ -159,7 +159,7 @@ async fn transitive_peer_gossip() {
         sb.add_ops_now(&n3, true, [11]);
     });
 
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(3000)).await;
 
     sb.share(|sb| {
         sb.print_peer_lists();
