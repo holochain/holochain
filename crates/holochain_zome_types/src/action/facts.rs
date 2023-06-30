@@ -106,7 +106,7 @@ pub fn is_not_entry_action<'a>() -> impl Fact<'a, Action> {
 
 /// WIP: Fact: The actions form a valid SourceChain
 pub fn valid_chain(len: usize, author: AgentPubKey) -> impl Fact<'static, Vec<Action>> {
-    sized_seq(
+    vec_of_length(
         len,
         ValidChainFact {
             hash: None,

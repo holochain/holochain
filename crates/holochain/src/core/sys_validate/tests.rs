@@ -978,9 +978,11 @@ async fn valid_chain_fact_test() {
 
     let mut g = random_generator();
 
-    let mut chain: Vec<Record> =
-        futures::future::join_all(contrafact::build_seq(&mut g, n, fact).into_iter().map(
-            |(a, entry)| {
+    let mut chain: Vec<Record> = futures::future::join_all(
+        contrafact::vec_of_length(n, fact)
+            .build(&mut g)
+            .into_iter()
+            .map(|(a, entry)| {
                 let keystore = keystore.clone();
                 async move {
                     Record::new(
@@ -990,9 +992,9 @@ async fn valid_chain_fact_test() {
                         entry.into_option(),
                     )
                 }
-            },
-        ))
-        .await;
+            }),
+    )
+    .await;
 
     validate_chain(chain.iter().map(|r| r.signed_action()), &None).unwrap();
 
