@@ -94,7 +94,7 @@ fn server_recv_multi(
                 .instrument(tracing::debug_span!("next_server_connection"))
                 .await
                 .unwrap()
-                .unwrap() as Pair;
+                .unwrap() as holochain_websocket::Pair;
 
             let _ = tokio::task::spawn(async move {
                 while let Some((msg, _)) = receiver

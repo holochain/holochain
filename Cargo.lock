@@ -1690,12 +1690,6 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
 name = "downcast"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
-
-[[package]]
-name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
@@ -2005,15 +1999,6 @@ dependencies = [
 
 [[package]]
 name = "fragile"
-version = "1.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7464c5c4a3f014d9b2ec4073650e5c06596f385060af740fc45ad5a19f959e8"
-dependencies = [
- "fragile 2.0.0",
-]
-
-[[package]]
-name = "fragile"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c2141d6d6c8512188a7891b4b01590a45f6dac67afb4f255c4124dbb86d4eaa"
@@ -2225,15 +2210,16 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.3.0-alpha.5"
+version = "0.3.0-alpha.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0f758b0048e5f55f4d927932a32eb4ab8a850c4b9a7951b259ba6c8792d5c38"
+checksum = "8a34addaffa7d2c80637807444f171c646cad7549fcdac8019544034678f76d5"
 dependencies = [
  "futures",
- "mockall 0.11.4",
+ "mockall",
  "must_future",
  "paste",
  "thiserror",
+ "tokio",
  "tracing",
  "tracing-futures",
 ]
@@ -2417,7 +2403,7 @@ dependencies = [
  "holo_hash",
  "holochain_integrity_types",
  "holochain_wasmer_guest",
- "mockall 0.11.4",
+ "mockall",
  "paste",
  "serde",
  "serde_bytes",
@@ -2438,7 +2424,7 @@ dependencies = [
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
- "mockall 0.11.4",
+ "mockall",
  "paste",
  "serde",
  "serde_bytes",
@@ -2581,7 +2567,7 @@ dependencies = [
  "futures",
  "get_if_addrs",
  "getrandom 0.2.10",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "hdk",
  "holo_hash",
  "holochain",
@@ -2611,7 +2597,7 @@ dependencies = [
  "lazy_static",
  "maplit",
  "matches",
- "mockall 0.11.4",
+ "mockall",
  "mr_bundle",
  "must_future",
  "nanoid 0.3.0",
@@ -2668,7 +2654,7 @@ dependencies = [
  "fallible-iterator",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "hdk",
  "hdk_derive",
  "holo_hash",
@@ -2682,7 +2668,7 @@ dependencies = [
  "isotest",
  "kitsune_p2p",
  "matches",
- "mockall 0.11.4",
+ "mockall",
  "pretty_assertions 0.7.2",
  "serde",
  "serde_derive",
@@ -2870,7 +2856,7 @@ name = "holochain_mock_hdi"
 version = "0.0.1"
 dependencies = [
  "hdi",
- "mockall 0.11.4",
+ "mockall",
 ]
 
 [[package]]
@@ -2881,7 +2867,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "holo_hash",
  "holochain_keystore",
  "holochain_serialized_bytes",
@@ -2891,7 +2877,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune_p2p",
  "kitsune_p2p_types",
- "mockall 0.11.4",
+ "mockall",
  "rand 0.8.5",
  "serde",
  "serde_bytes",
@@ -3009,7 +2995,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune_p2p",
  "matches",
- "mockall 0.11.4",
+ "mockall",
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
@@ -3089,13 +3075,13 @@ dependencies = [
  "lazy_static",
  "maplit",
  "matches",
- "mockall 0.11.4",
+ "mockall",
  "mr_bundle",
  "must_future",
  "nanoid 0.3.0",
  "one_err",
  "parking_lot 0.10.2",
- "pretty_assertions 0.6.1",
+ "pretty_assertions 0.7.2",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3651,7 +3637,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "governor",
  "holochain_trace",
  "itertools 0.10.5",
@@ -3665,8 +3651,7 @@ dependencies = [
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "maplit",
- "mockall 0.10.2",
- "mockall 0.11.4",
+ "mockall",
  "must_future",
  "nanoid 0.4.0",
  "num-traits",
@@ -3885,7 +3870,7 @@ dependencies = [
  "criterion",
  "derive_more",
  "futures",
- "ghost_actor 0.3.0-alpha.5",
+ "ghost_actor 0.3.0-alpha.6",
  "holochain_trace",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
@@ -3894,7 +3879,7 @@ dependencies = [
  "kitsune_p2p_types",
  "lair_keystore_api",
  "lru 0.8.1",
- "mockall 0.11.4",
+ "mockall",
  "nanoid 0.3.0",
  "once_cell",
  "parking_lot 0.11.2",
@@ -4361,44 +4346,17 @@ dependencies = [
 
 [[package]]
 name = "mockall"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ab571328afa78ae322493cacca3efac6a0f2e0a67305b4df31fd439ef129ac0"
-dependencies = [
- "cfg-if 1.0.0",
- "downcast 0.10.0",
- "fragile 1.2.2",
- "lazy_static",
- "mockall_derive 0.10.2",
- "predicates 1.0.8",
- "predicates-tree",
-]
-
-[[package]]
-name = "mockall"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c84490118f2ee2d74570d114f3d0493cbf02790df303d2707606c3e14e07c96"
 dependencies = [
  "cfg-if 1.0.0",
- "downcast 0.11.0",
- "fragile 2.0.0",
+ "downcast",
+ "fragile",
  "lazy_static",
- "mockall_derive 0.11.4",
+ "mockall_derive",
  "predicates 2.1.5",
  "predicates-tree",
-]
-
-[[package]]
-name = "mockall_derive"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7e25b214433f669161f414959594216d8e6ba83b6679d3db96899c0b4639033"
-dependencies = [
- "cfg-if 1.0.0",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
