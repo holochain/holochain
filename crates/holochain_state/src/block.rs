@@ -10,6 +10,8 @@ use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 
 pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
+    tracing::warn!(?input, "blocking node!");
+
     db.async_commit(move |txn| mutations::insert_block(txn, input))
         .await
 }

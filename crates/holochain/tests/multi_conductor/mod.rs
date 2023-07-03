@@ -129,12 +129,10 @@ async fn sharded_consistency() {
     const NUM_CONDUCTORS: usize = 3;
     const NUM_CELLS: usize = 5;
 
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.gossip_strategy = "sharded-gossip".to_string();
-    tuning.gossip_dynamic_arcs = true;
-
-    let config = SweetConductorConfig::standard().set_tuning_params(tuning);
+    let config = SweetConductorConfig::standard().tune(|tuning| {
+        tuning.gossip_strategy = "sharded-gossip".to_string();
+        tuning.gossip_dynamic_arcs = true;
+    });
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
