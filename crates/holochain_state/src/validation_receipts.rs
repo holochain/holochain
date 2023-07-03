@@ -188,28 +188,29 @@ mod tests {
             fixt!(Action),
         ));
         let test_op_hash = op.as_hash().clone();
-        env.conn()
-            .unwrap()
-            .with_commit_sync(|txn| mutations::insert_op(txn, &op))
+        env.write_async(move |txn| mutations::insert_op(txn, &op))
+            .await
             .unwrap();
 
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 
         {
-            env.conn().unwrap().with_commit_sync(|txn| {
-                add_if_unique(txn, vr1.clone())?;
-                add_if_unique(txn, vr1.clone())?;
-                add_if_unique(txn, vr2.clone())
-            })?;
+            let put_vr1 = vr1.clone();
+            let put_vr2 = vr2.clone();
+            env.write_async(move |txn| {
+                add_if_unique(txn, put_vr1.clone())?;
+                add_if_unique(txn, put_vr1.clone())?;
+                add_if_unique(txn, put_vr2.clone())
+            })
+            .await?;
 
-            env.conn()
-                .unwrap()
-                .with_commit_sync(|txn| add_if_unique(txn, vr1.clone()))?;
+            let put_vr1 = vr1.clone();
+            env.write_async(move |txn| add_if_unique(txn, put_vr1))
+                .await?;
         }
 
-        let mut g = env.conn().unwrap();
-        g.with_reader_test(|reader| {
+        env.read_async(move |reader| -> DatabaseResult<()> {
             assert_eq!(2, count_valid(&reader, &test_op_hash).unwrap());
 
             let mut list = list_receipts(&reader, &test_op_hash).unwrap();
@@ -227,7 +228,11 @@ mod tests {
             });
 
             assert_eq!(expects, list);
-        });
+
+            Ok(())
+        })
+        .await
+        .unwrap();
         Ok(())
     }
 

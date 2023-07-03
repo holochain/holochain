@@ -82,6 +82,7 @@ pub struct DbRead<Kind: DbKindT> {
     connection_pool: ConnectionPool,
     write_semaphore: Arc<Semaphore>,
     read_semaphore: Arc<Semaphore>,
+    statement_trace_fn: Option<fn(&str)>,
     max_readers: usize,
     num_readers: Arc<AtomicUsize>,
 }
@@ -103,10 +104,10 @@ pub struct PConnGuard(#[shrinkwrap(main_field)] pub PConn, OwnedSemaphorePermit)
 
 pub struct PConnPermit(OwnedSemaphorePermit);
 
-#[deprecated(
-    since = "0.3.0-beta-dev.5",
-    note = "Use `read_async` or `write_async` instead"
-)]
+// #[deprecated(
+//     since = "0.3.0-beta-dev.5",
+//     note = "Use `read_async` or `write_async` instead"
+// )]
 pub trait PermittedConn {
     fn with_permit(&self, permit: PConnPermit) -> DatabaseResult<PConnGuard>;
 }
@@ -125,20 +126,20 @@ impl<Kind: DbKindT> PermittedConn for DbWrite<Kind> {
 
 impl<Kind: DbKindT> DbRead<Kind> {
     // TODO should not be public, it is only used internally and by tests. Tests should just move to use the read/write trait methods.
-    #[deprecated(
-        since = "0.3.0-beta-dev.5",
-        note = "Use `read_async` or `write_async` instead"
-    )]
+    // #[deprecated(
+    //     since = "0.3.0-beta-dev.5",
+    //     note = "Use `read_async` or `write_async` instead"
+    // )]
     #[cfg(feature = "test_utils")]
     pub fn conn(&self) -> DatabaseResult<PConn> {
         self.get_connection_from_pool()
     }
 
     // TODO don't get a permit directly because it must not be held for too long, use the read/write trait methods.
-    #[deprecated(
-        since = "0.3.0-beta-dev.5",
-        note = "Use `read_async` or `write_async` instead"
-    )]
+    // #[deprecated(
+    //     since = "0.3.0-beta-dev.5",
+    //     note = "Use `read_async` or `write_async` instead"
+    // )]
     pub async fn conn_permit<E>(&self) -> Result<PConnPermit, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -180,6 +181,9 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
 
         let mut conn = self.get_connection_from_pool()?;
+        if self.statement_trace_fn.is_some() {
+            conn.trace(self.statement_trace_fn);
+        }
         let r = tokio::task::spawn_blocking(move || conn.execute_in_read_txn(f))
             .await
             .map_err(DatabaseError::from)?;
@@ -236,7 +240,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         sync_level: DbSyncLevel,
     ) -> DatabaseResult<Self> {
         DATABASE_HANDLES.get_or_insert(&kind, path_prefix, |kind| {
-            Self::new(Some(path_prefix), kind, sync_level)
+            Self::new(Some(path_prefix), kind, sync_level, None)
         })
     }
 
@@ -244,6 +248,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         path_prefix: Option<&Path>,
         kind: Kind,
         sync_level: DbSyncLevel,
+        statement_trace_fn: Option<fn(&str)>,
     ) -> DatabaseResult<Self> {
         let path = match path_prefix {
             Some(path_prefix) => {
@@ -311,6 +316,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             kind,
             path: path.unwrap_or_default(),
             connection_pool: pool,
+            statement_trace_fn,
         }))
     }
 
@@ -373,12 +379,12 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test(path: &Path, kind: Kind) -> DatabaseResult<Self> {
-        Self::new(Some(path), kind, DbSyncLevel::default())
+        Self::new(Some(path), kind, DbSyncLevel::default(), None)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test_in_mem(kind: Kind) -> DatabaseResult<Self> {
-        Self::new(None, kind, DbSyncLevel::default())
+        Self::new(None, kind, DbSyncLevel::default(), None)
     }
 
     #[cfg(any(test, feature = "test_utils"))]

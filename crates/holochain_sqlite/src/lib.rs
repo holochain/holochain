@@ -19,8 +19,5 @@ pub mod swansong;
 
 mod table;
 
-#[cfg(any(test, feature = "test_utils"))]
-pub mod test_utils;
-
 // Re-export rusqlite for use with `impl_to_sql_via_as_ref!` macro
 pub use ::rusqlite;

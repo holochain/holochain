@@ -1233,13 +1233,14 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     action_builder: B,
     maybe_entry: Option<Entry>,
 ) -> SourceChainResult<ActionHash> {
+    let query_author = author.clone();
     let HeadInfo {
         action: prev_action,
         seq: last_action_seq,
         ..
-    } = fresh_reader_test!(vault, |txn| {
-        chain_head_db_nonempty(&txn, author.clone())
-    })?;
+    } = vault
+        .read_async(move |txn| chain_head_db_nonempty(&txn, query_author.clone()))
+        .await?;
     let action_seq = last_action_seq + 1;
 
     let common = ActionBuilderCommon {
@@ -1256,27 +1257,31 @@ async fn _put_db<H: holochain_zome_types::ActionUnweighed, B: ActionBuilder<H>>(
     let (action, entry) = record.into_inner();
     let entry = entry.into_option();
     let hash = action.as_hash().clone();
-    vault.conn()?.with_commit_sync(|txn: &mut Transaction| {
-        let head_info = chain_head_db_nonempty(txn, author.clone())?;
-        if head_info.action != prev_action {
-            let entries = match (entry, action.action().entry_hash()) {
-                (Some(e), Some(entry_hash)) => {
-                    vec![holochain_types::EntryHashed::with_pre_hashed(
-                        e,
-                        entry_hash.clone(),
-                    )]
+    vault
+        .write_async(
+            move |txn: &mut Transaction| -> SourceChainResult<Vec<DhtOpHash>> {
+                let head_info = chain_head_db_nonempty(txn, author.clone())?;
+                if head_info.action != prev_action {
+                    let entries = match (entry, action.action().entry_hash()) {
+                        (Some(e), Some(entry_hash)) => {
+                            vec![holochain_types::EntryHashed::with_pre_hashed(
+                                e,
+                                entry_hash.clone(),
+                            )]
+                        }
+                        _ => vec![],
+                    };
+                    return Err(SourceChainError::HeadMoved(
+                        vec![action],
+                        entries,
+                        Some(prev_action),
+                        Some(head_info),
+                    ));
                 }
-                _ => vec![],
-            };
-            return Err(SourceChainError::HeadMoved(
-                vec![action],
-                entries,
-                Some(prev_action),
-                Some(head_info),
-            ));
-        }
-        SourceChainResult::Ok(put_raw(txn, action, ops, entry)?)
-    })?;
+                Ok(put_raw(txn, action, ops, entry)?)
+            },
+        )
+        .await?;
     Ok(hash)
 }
 
@@ -1580,7 +1585,7 @@ pub mod tests {
         assert_ne!(head.action, old_h2);
         assert_eq!(head.seq, 4);
 
-        fresh_reader_test!(db, |txn| {
+        db.read_async(move |txn| -> DatabaseResult<()> {
             // get the full record
             let store = Txn::from(&txn);
             let h1_record_entry_fetched = store
@@ -1597,7 +1602,10 @@ pub mod tests {
                 .1;
             assert_eq!(RecordEntry::Present(entry_1), h1_record_entry_fetched);
             assert_eq!(RecordEntry::Present(entry_2), h2_record_entry_fetched);
-        });
+
+            Ok(())
+        })
+        .await?;
 
         Ok(())
     }
@@ -1974,9 +1982,15 @@ pub mod tests {
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
-        fresh_reader_test!(vault, |txn| {
-            assert_matches!(chain_head_db(&txn, author.clone()), Ok(None));
-        });
+        let query_author = author.clone();
+        vault
+            .read_async(move |txn| -> DatabaseResult<()> {
+                assert_matches!(chain_head_db(&txn, query_author.clone()), Ok(None));
+
+                Ok(())
+            })
+            .await
+            .unwrap();
         genesis(
             vault.clone().into(),
             dht_db.to_db(),
@@ -2019,24 +2033,34 @@ pub mod tests {
             .unwrap();
         source_chain.flush(&mock).await.unwrap();
 
-        fresh_reader_test!(vault, |txn| {
-            assert_eq!(
-                chain_head_db_nonempty(&txn, author.clone()).unwrap().action,
-                h2
-            );
-            // get the full record
-            let store = Txn::from(&txn);
-            let h1_record_fetched = store
-                .get_record(&h1.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found");
-            let h2_record_fetched = store
-                .get_record(&h2.clone().into())
-                .expect("error retrieving")
-                .expect("entry not found");
-            assert_eq!(h1, *h1_record_fetched.action_address());
-            assert_eq!(h2, *h2_record_fetched.action_address());
-        });
+        let check_h1 = h1.clone();
+        let check_h2 = h2.clone();
+        let check_author = author.clone();
+        vault
+            .read_async(move |txn| -> DatabaseResult<()> {
+                assert_eq!(
+                    chain_head_db_nonempty(&txn, check_author.clone())
+                        .unwrap()
+                        .action,
+                    check_h2
+                );
+                // get the full record
+                let store = Txn::from(&txn);
+                let h1_record_fetched = store
+                    .get_record(&check_h1.clone().into())
+                    .expect("error retrieving")
+                    .expect("entry not found");
+                let h2_record_fetched = store
+                    .get_record(&check_h2.clone().into())
+                    .expect("error retrieving")
+                    .expect("entry not found");
+                assert_eq!(check_h1, *h1_record_fetched.action_address());
+                assert_eq!(check_h2, *h2_record_fetched.action_address());
+
+                Ok(())
+            })
+            .await
+            .unwrap();
 
         // check that you can iterate on the chain
         let source_chain = SourceChain::new(
