@@ -3,6 +3,7 @@ use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use scheduled_thread_pool::ScheduledThreadPool;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     any::Any,
     collections::HashMap,
@@ -10,6 +11,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+
+static CONNECTION_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -122,6 +125,9 @@ pub(crate) fn new_connection_pool(
         .min_idle(Some(0))
         // Close connections after 30-60 seconds of idle time
         .idle_timeout(Some(Duration::from_secs(30)))
+        .connection_timeout(Duration::from_millis(
+            CONNECTION_TIMEOUT_MS.load(Ordering::Acquire),
+        ))
         .thread_pool(R2D2_THREADPOOL.clone())
         .connection_customizer(customizer)
         .build(manager)
@@ -243,4 +249,9 @@ impl PConn {
     pub(crate) fn new(inner: PConnInner) -> Self {
         Self { inner }
     }
+}
+
+#[cfg(feature = "test_utils")]
+pub fn set_connection_timeout(timeout_ms: u64) {
+    CONNECTION_TIMEOUT_MS.store(timeout_ms, Ordering::Relaxed);
 }
