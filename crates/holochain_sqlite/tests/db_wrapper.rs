@@ -356,7 +356,8 @@ async fn can_get_a_write_permit_when_the_pool_is_exhausted() {
 }
 
 // TODO This is bad but really a consequence of being able to claim and hold write permits. Also because the attempt to
-//      get a write permit internally will never give up. The only remaining problem is if the
+//      get a write permit internally will never give up. The only remaining problem is if the query itself does something it shouldn't
+//      like waiting on a network call or anything else slow because we don't prevent the query itself from blocking for unreasonably long
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn async_commit_lock_if_writer_permit_is_held() {
