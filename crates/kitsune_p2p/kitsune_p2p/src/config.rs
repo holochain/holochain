@@ -104,8 +104,9 @@ impl KitsuneP2pConfig {
         }
     }
 
+    /// This config is making use of tx5 transport
     #[allow(dead_code)] // because of feature flipping
-    pub(crate) fn is_tx5(&self) -> bool {
+    pub fn is_tx5(&self) -> bool {
         #[cfg(feature = "tx5")]
         {
             if let Some(t) = self.transport_pool.get(0) {
