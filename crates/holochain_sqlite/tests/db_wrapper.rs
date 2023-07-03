@@ -319,7 +319,9 @@ async fn write_permits_can_be_released() {
 
     drop(hold_permit);
 
-    // Does not return a result so we can't do much to check the given permit is valid. If the test exits instead of deadlocking then it passed...
+    // Does not return a `Result` so we can't do much to check the given permit is valid. If the test exits instead of deadlocking then it passed...
+    // Until this either times out when a permit is not available or getting a permit guarantees you can actually get a conn (i.e. `conn` is made private)
+    // then it is really not that meaningful to be holding a permit.
     db_handle.conn_write_permit().await;
 }
 
