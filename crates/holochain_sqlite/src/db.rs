@@ -11,6 +11,7 @@ use kitsune_p2p::KitsuneSpace;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
@@ -24,6 +25,8 @@ pub use p2p_agent_store::*;
 
 mod p2p_metrics;
 pub use p2p_metrics::*;
+
+static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
@@ -210,7 +213,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         E: From<DatabaseError> + Send + 'static,
     {
         match tokio::time::timeout(
-            std::time::Duration::from_secs(10),
+            std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
             self.read_semaphore.clone().acquire_owned(),
         )
         .await
@@ -237,6 +240,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
     }
 
+    // TODO this isn't even used?
     pub async fn conn_write_permit(&self) -> PConnPermit {
         let g = self.acquire_writer_permit().await;
         PConnPermit(g)
@@ -380,6 +384,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             .expect("Database transaction failed")
     }
 
+    // TODO never used and has a warning that you need to be careful with it, remove?
     /// If possible prefer async_commit as this is slower and can starve chained futures.
     pub async fn async_commit_in_place<E, R, F>(&self, f: F) -> Result<R, E>
     where
@@ -425,7 +430,10 @@ pub enum DbKind {
     P2pAgentStore(Arc<KitsuneSpace>),
     /// Metrics for peers on p2p network (one per space).
     P2pMetrics(Arc<KitsuneSpace>),
+    #[cfg(feature = "test_utils")]
+    Test(String),
 }
+
 pub trait DbKindT: Clone + std::fmt::Debug + Send + Sync + 'static {
     fn kind(&self) -> DbKind;
     /// Constuct a partial Path based on the kind
@@ -685,6 +693,7 @@ impl<'e> WriteManager<'e> for PConn {
         let mut txn = self
             .transaction_with_behavior(TransactionBehavior::Exclusive)
             .map_err(DatabaseError::from)?;
+        // TODO does not offload blocking work
         let result = f(&mut txn)?;
         txn.commit().map_err(DatabaseError::from)?;
         Ok(result)
@@ -738,4 +747,9 @@ where
         }
         tokio::time::sleep(RETRY_INTERVAL).await;
     }
+}
+
+#[cfg(feature = "test_utils")]
+pub fn set_acquire_timeout(timeout_ms: u64) {
+    ACQUIRE_TIMEOUT_MS.store(timeout_ms, Ordering::Relaxed);
 }
