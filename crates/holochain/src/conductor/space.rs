@@ -182,7 +182,7 @@ impl Spaces {
             // @todo join_all for these awaits
             agent_lists.push(
                 self.p2p_agents_db(&dna)?
-                    .async_reader(|txn| txn.p2p_list_agents())
+                    .read_async(|txn| txn.p2p_list_agents())
                     .await?,
             );
         }
@@ -241,7 +241,7 @@ impl Spaces {
         }
 
         self.conductor_db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 Ok(
                     // If the target_id is directly blocked then we always return true.
                     holochain_state::block::query_is_blocked(&txn, target_id, timestamp)?
@@ -267,7 +267,7 @@ impl Spaces {
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
         let state = self
             .conductor_db
-            .async_reader(|txn| {
+            .read_async(|txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -308,7 +308,7 @@ impl Spaces {
     {
         let output = self
             .conductor_db
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 let state = txn
                     .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
                         row.get("blob")
@@ -457,7 +457,7 @@ impl Spaces {
             )
         };
         let results = db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut stmt = txn.prepare_cached(&sql)?;
                 let hashes = stmt
                     .query_map(
@@ -524,7 +524,7 @@ impl Spaces {
         let sql = holochain_sqlite::sql::sql_cell::FETCH_OPS_BY_REGION;
         Ok(self
             .dht_db(dna_hash)?
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
                 let results = regions
                     .into_iter()
@@ -587,7 +587,7 @@ impl Spaces {
 
         let db = self.dht_db(dna_hash)?;
         let results = db
-            .async_reader(move |txn| {
+            .read_async(move |txn| {
                 let mut out = Vec::with_capacity(op_hashes.len());
                 for hash in op_hashes {
                     let mut stmt = txn.prepare_cached(&sql)?;

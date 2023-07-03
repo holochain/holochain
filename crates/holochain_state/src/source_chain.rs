@@ -130,7 +130,7 @@ impl SourceChain {
     pub async fn unlock_chain(&self) -> SourceChainResult<()> {
         let author = self.author.clone();
         self.vault
-            .async_commit(move |txn| unlock_chain(txn, &author))
+            .write_async(move |txn| unlock_chain(txn, &author))
             .await?;
         Ok(())
     }
@@ -153,7 +153,7 @@ impl SourceChain {
 
         let countersigning_agent_state = self
             .vault
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 if is_chain_locked(txn, &hashed_preflight_request, author.as_ref())? {
                     return Err(SourceChainError::ChainLocked);
                 }
@@ -346,7 +346,7 @@ impl SourceChain {
         let persisted_head = self.head_info.as_ref().map(|h| h.action.clone());
         match self
             .vault
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
@@ -471,7 +471,7 @@ where
         let author = Arc::new(author);
         let head_info = Some(
             vault
-                .async_reader({
+                .read_async({
                     let author = author.clone();
                     move |txn| chain_head_db_nonempty(&txn, author)
                 })
@@ -504,7 +504,7 @@ where
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
         let head_info = vault
-            .async_reader({
+            .read_async({
                 let author = author.clone();
                 move |txn| chain_head_db(&txn, author)
             })
@@ -639,7 +639,7 @@ where
         // remote caller
         let maybe_cap_grant: Option<CapGrant> = self
             .vault
-            .async_reader({
+            .read_async({
                 let agent_pubkey = self.agent_pubkey().clone();
                 move |txn| -> Result<_, DatabaseError> {
                     // closure to process resulting rows from query
@@ -733,7 +733,7 @@ where
         let public_only = self.public_only;
         let mut records = self
             .vault
-            .async_reader({
+            .read_async({
                 let query = query.clone();
                 move |txn| {
                     let mut sql = "
@@ -913,7 +913,7 @@ where
         let author = self.author.clone();
         Ok(self
             .vault
-            .async_reader(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
+            .read_async(move |txn| is_chain_locked(&txn, &lock, author.as_ref()))
             .await?)
     }
 
@@ -1117,7 +1117,7 @@ pub async fn genesis(
     }
 
     let ops_to_integrate = authored
-        .async_commit(move |txn| {
+        .write_async(move |txn| {
             ops_to_integrate.extend(source_chain::put_raw(txn, dna_action, dna_ops, None)?);
             ops_to_integrate.extend(source_chain::put_raw(
                 txn,
@@ -1286,7 +1286,7 @@ pub async fn dump_state(
     author: AgentPubKey,
 ) -> Result<SourceChainJsonDump, SourceChainError> {
     Ok(vault
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let records = txn
                 .prepare(
                     "
@@ -1439,7 +1439,7 @@ pub mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1450,7 +1450,7 @@ pub mod tests {
         ));
         let author_2 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_2))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1458,7 +1458,7 @@ pub mod tests {
         chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_3))
             .await?
             .seq;
         assert_eq!(seq, 4);
@@ -1558,7 +1558,7 @@ pub mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .async_commit(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
+            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(&txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1571,7 +1571,7 @@ pub mod tests {
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
         let head = db
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 chain_head_db_nonempty(&txn, author_2.clone())
             })
             .await?;

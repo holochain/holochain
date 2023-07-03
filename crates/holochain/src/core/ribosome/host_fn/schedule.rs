@@ -66,7 +66,7 @@ pub mod tests {
 
         alice_host_fn_caller
             .authored_db
-            .async_commit(move |txn: &mut Transaction| {
+            .write_async(move |txn: &mut Transaction| {
                 let now = Timestamp::now();
                 let the_past = (now - std::time::Duration::from_millis(1)).unwrap();
                 let the_future = (now + std::time::Duration::from_millis(1000)).unwrap();
@@ -225,7 +225,7 @@ pub mod tests {
             let alice_pubkey = alice_pubkey.clone();
             !alice_host_fn_caller
                 .authored_db
-                .async_commit(move |txn: &mut Transaction| {
+                .write_async(move |txn: &mut Transaction| {
                     let persisted_scheduled_fn = ScheduledFn::new(
                         TestWasm::Schedule.into(),
                         "cron_scheduled_fn_init".into(),
@@ -319,7 +319,7 @@ pub mod tests {
             let bob_pubkey = bob_pubkey.clone();
             bob_host_fn_caller
                 .authored_db
-                .async_commit(move |txn: &mut Transaction| {
+                .write_async(move |txn: &mut Transaction| {
                     let persisted_scheduled_fn =
                         ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
 
@@ -340,7 +340,7 @@ pub mod tests {
             let bob_pubkey = bob_pubkey.clone();
             bob_host_fn_caller
                 .authored_db
-                .async_commit(move |txn: &mut Transaction| {
+                .write_async(move |txn: &mut Transaction| {
                     let persisted_scheduled_fn =
                         ScheduledFn::new(TestWasm::Schedule.into(), "scheduled_fn".into());
 

@@ -426,7 +426,7 @@ where
     async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
-            .async_commit(|txn| {
+            .write_async(|txn| {
                 for response in responses {
                     let ops = response.render()?;
                     Self::insert_rendered_ops(txn, &ops)?;
@@ -444,7 +444,7 @@ where
     ) -> CascadeResult<()> {
         let cache = some_or_return!(self.cache.as_ref());
         cache
-            .async_commit(move |txn| {
+            .write_async(move |txn| {
                 for response in responses {
                     let ops = response.render(&key)?;
                     Self::insert_rendered_ops(txn, &ops)?;
@@ -489,7 +489,7 @@ where
             Some(MustGetAgentActivityResponse::Activity(activity)) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
-                    .async_commit({
+                    .write_async({
                         let activity = activity.clone();
                         move |txn| {
                             Self::insert_activity(txn, activity)?;

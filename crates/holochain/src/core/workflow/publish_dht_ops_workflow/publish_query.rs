@@ -40,7 +40,7 @@ where
         .unwrap_or(0);
 
     let results = db
-        .async_reader(move |txn| {
+        .read_async(move |txn| {
             let mut stmt = txn.prepare(
                 "
             SELECT

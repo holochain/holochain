@@ -810,7 +810,7 @@ pub async fn force_publish_dht_ops(
     publish_trigger: &mut TriggerSender,
 ) -> DatabaseResult<()> {
     vault
-        .async_commit(|txn| {
+        .write_async(|txn| {
             DatabaseResult::Ok(txn.execute(
                 "UPDATE DhtOp SET last_publish_time = NULL WHERE receipts_complete IS NULL",
                 [],

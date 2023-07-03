@@ -2,7 +2,7 @@ use common::TestDatabaseKind;
 use holochain_sqlite::conn::set_connection_timeout;
 use holochain_sqlite::db::set_acquire_timeout;
 use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::db::{num_read_threads, PermittedConn, WriteManager};
+use holochain_sqlite::db::{num_read_threads, PermittedConn};
 use holochain_sqlite::error::DatabaseError;
 use holochain_sqlite::error::DatabaseError::{DbConnectionPoolError, Timeout};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -196,7 +196,7 @@ async fn async_read_respects_reader_permit_limits() {
         let mut reader_tasks = Vec::with_capacity(num_readers);
         for _ in 0..num_readers {
             let my_spawn_task_readers_spawned = spawn_task_readers_spawned.clone();
-            let c = my_db_handle.async_reader(move |_| -> Result<(), DatabaseError> {
+            let c = my_db_handle.read_async(move |_| -> Result<(), DatabaseError> {
                 my_spawn_task_readers_spawned.fetch_add(1, Ordering::SeqCst);
                 std::thread::sleep(std::time::Duration::from_secs(2));
                 Ok(())
@@ -259,7 +259,7 @@ async fn async_read_releases_permits() {
     // Run 'read' operations using the connection pool
     for _ in 0..10 {
         db_handle
-            .async_reader(move |_| -> Result<(), DatabaseError> {
+            .read_async(move |_| -> Result<(), DatabaseError> {
                 std::thread::sleep(std::time::Duration::from_millis(1));
                 Ok(())
             })
@@ -393,29 +393,29 @@ async fn async_read_releases_permits() {
 //      1. You can use the permit that has been leaked out of the implementation to write
 //      which breaks the guarantee of only having one writer at a time.
 //      2. You can call a function which is `test_utils` without needing test_utils
-#[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test(flavor = "multi_thread")]
-async fn can_write_on_a_read_permit() {
-    holochain_trace::test_run().unwrap();
-
-    set_acquire_timeout(100);
-    set_connection_timeout(300);
-
-    let tmp_dir = tempfile::TempDir::new().unwrap();
-    let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
-
-    let read_permit = db_handle.conn_permit::<DatabaseError>().await.unwrap();
-
-    let mut permitted_conn = db_handle.with_permit(read_permit).unwrap();
-
-    let commit_ran = Arc::new(AtomicBool::new(false));
-    let my_commit_ran = commit_ran.clone();
-    permitted_conn
-        .with_commit_sync(move |_| -> Result<(), DatabaseError> {
-            my_commit_ran.store(true, Ordering::SeqCst);
-            Ok(())
-        })
-        .unwrap();
-
-    assert!(commit_ran.load(Ordering::SeqCst));
-}
+// #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
+// #[tokio::test(flavor = "multi_thread")]
+// async fn can_write_on_a_read_permit() {
+//     holochain_trace::test_run().unwrap();
+//
+//     set_acquire_timeout(100);
+//     set_connection_timeout(300);
+//
+//     let tmp_dir = tempfile::TempDir::new().unwrap();
+//     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
+//
+//     let read_permit = db_handle.conn_permit::<DatabaseError>().await.unwrap();
+//
+//     let mut permitted_conn = db_handle.with_permit(read_permit).unwrap();
+//
+//     let commit_ran = Arc::new(AtomicBool::new(false));
+//     let my_commit_ran = commit_ran.clone();
+//     permitted_conn
+//         .with_commit_sync(move |_| -> Result<(), DatabaseError> {
+//             my_commit_ran.store(true, Ordering::SeqCst);
+//             Ok(())
+//         })
+//         .unwrap();
+//
+//     assert!(commit_ran.load(Ordering::SeqCst));
+// }

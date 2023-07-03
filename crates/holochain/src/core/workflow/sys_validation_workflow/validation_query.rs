@@ -79,7 +79,7 @@ async fn get_ops_to_validate(
         LIMIT 10000
         ",
     );
-    db.async_reader(move |txn| {
+    db.read_async(move |txn| {
         let mut stmt = txn.prepare(&sql)?;
         let r = stmt.query_and_then([], |row| {
             let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
@@ -232,7 +232,7 @@ mod tests {
             Action::arbitrary(&mut u).unwrap(),
         ));
 
-        db.async_commit(move |txn| {
+        db.write_async(move |txn| {
             insert_op(txn, &op)?;
             StateMutationResult::Ok(())
         })

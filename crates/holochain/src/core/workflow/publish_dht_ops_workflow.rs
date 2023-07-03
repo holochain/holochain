@@ -76,7 +76,7 @@ pub async fn publish_dht_ops_workflow(
     tracing::info!("published {} ops", success.len());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
     let continue_publish = db
-        .async_commit(move |writer| {
+        .write_async(move |writer| {
             for hash in success {
                 use holochain_p2p::DhtOpHashExt;
                 let hash = DhtOpHash::from_kitsune(hash.data_ref());

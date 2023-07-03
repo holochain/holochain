@@ -34,7 +34,7 @@ pub async fn must_get_agent_activity(
     filter: ChainFilter,
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
     let result = env
-        .async_reader(move |mut txn| get_bounded_activity(&mut txn, None, &author, filter))
+        .read_async(move |mut txn| get_bounded_activity(&mut txn, None, &author, filter))
         .await?;
     filter_then_check(result)
 }
