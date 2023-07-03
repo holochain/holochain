@@ -116,7 +116,6 @@ pub async fn validation_receipt_workflow(
         if matches!(receipt.validation_status, ValidationStatus::Rejected) {
             // Block BEFORE we integrate the outcome because this is not atomic
             // and if something goes wrong we know the integration will retry.
-            dbg!("block!");
             conductor
                 .block(Block::new(
                     BlockTarget::Cell(
