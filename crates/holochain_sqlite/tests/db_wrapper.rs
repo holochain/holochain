@@ -1,4 +1,6 @@
 use common::TestDatabaseKind;
+use holochain_sqlite::conn::set_connection_timeout;
+use holochain_sqlite::db::set_acquire_timeout;
 use holochain_sqlite::db::DbWrite;
 use holochain_sqlite::db::{num_read_threads, PermittedConn, WriteManager};
 use holochain_sqlite::error::DatabaseError;
@@ -13,6 +15,9 @@ mod common;
 #[test]
 fn get_connections_from_pool() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -30,7 +35,7 @@ fn get_connections_from_pool() {
                 let _ = my_handle.conn().unwrap();
                 my_number_of_connections_received.fetch_add(1, Ordering::SeqCst);
 
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                std::thread::sleep(std::time::Duration::from_millis(5));
             }
         }));
     }
@@ -49,6 +54,9 @@ fn get_connections_from_pool() {
 #[test]
 fn pool_size_is_limited() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -70,7 +78,7 @@ fn pool_size_is_limited() {
             Err(DbConnectionPoolError(_)) => {
                 // Could not get a connection, this is the desired outcome. Sleep and try again
                 failed_count += 1;
-                std::thread::sleep(std::time::Duration::from_millis(10));
+                std::thread::sleep(std::time::Duration::from_millis(5));
             }
             Err(e) => {
                 panic!("Got an unexpected error - {:?}", e);
@@ -85,9 +93,12 @@ fn pool_size_is_limited() {
 }
 
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn reader_permits_are_limited() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -122,9 +133,12 @@ async fn reader_permits_are_limited() {
 }
 
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn reader_permits_can_be_released() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -163,9 +177,12 @@ async fn reader_permits_can_be_released() {
 }
 
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn async_read_respects_reader_permit_limits() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -181,7 +198,7 @@ async fn async_read_respects_reader_permit_limits() {
             let my_spawn_task_readers_spawned = spawn_task_readers_spawned.clone();
             let c = my_db_handle.async_reader(move |_| -> Result<(), DatabaseError> {
                 my_spawn_task_readers_spawned.fetch_add(1, Ordering::SeqCst);
-                std::thread::sleep(std::time::Duration::from_secs(35));
+                std::thread::sleep(std::time::Duration::from_secs(2));
                 Ok(())
             });
             reader_tasks.push(c)
@@ -195,7 +212,7 @@ async fn async_read_respects_reader_permit_limits() {
     let my_db_handle = db_handle.clone();
     let check_task = tokio::spawn(async move {
         // Ensure all `async_reader` tasks have actually started
-        tokio::time::timeout(std::time::Duration::from_secs(5), async move {
+        tokio::time::timeout(std::time::Duration::from_secs(1), async move {
             while readers_spawned.load(Ordering::SeqCst) < num_readers {
                 tokio::time::sleep(std::time::Duration::from_millis(5)).await;
             }
@@ -227,9 +244,12 @@ async fn async_read_respects_reader_permit_limits() {
 }
 
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn async_read_releases_permits() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -240,7 +260,7 @@ async fn async_read_releases_permits() {
     for _ in 0..10 {
         db_handle
             .async_reader(move |_| -> Result<(), DatabaseError> {
-                std::thread::sleep(std::time::Duration::from_secs(1));
+                std::thread::sleep(std::time::Duration::from_millis(1));
                 Ok(())
             })
             .await
@@ -260,9 +280,12 @@ async fn async_read_releases_permits() {
 // TODO this test shows that waiting for a write permit will block until another one is released, whether or not
 //      that is possible.
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn single_write_permit() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -271,7 +294,7 @@ async fn single_write_permit() {
 
     // Bad, will never stop waiting!
     let result = tokio::time::timeout(
-        std::time::Duration::from_secs(35),
+        std::time::Duration::from_millis(5),
         db_handle.conn_write_permit(),
     )
     .await;
@@ -282,9 +305,12 @@ async fn single_write_permit() {
 }
 
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn write_permits_can_be_released() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -300,9 +326,12 @@ async fn write_permits_can_be_released() {
 // TODO The database wrapper is a leaky abstraction around the database pool. Being able to get a permit does NOT mean
 //      you can actually access the database.
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn can_get_a_write_permit_when_the_pool_is_exhausted() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -329,9 +358,12 @@ async fn can_get_a_write_permit_when_the_pool_is_exhausted() {
 // TODO This is bad but really a consequence of being able to claim and hold write permits. Also because the attempt to
 //      get a write permit internally will never give up. The only remaining problem is if the
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn async_commit_lock_if_writer_permit_is_held() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();
@@ -341,7 +373,7 @@ async fn async_commit_lock_if_writer_permit_is_held() {
     let commit_ran = Arc::new(AtomicBool::new(false));
     let my_commit_ran = commit_ran.clone();
     let exec = tokio::time::timeout(
-        std::time::Duration::from_secs(11),
+        std::time::Duration::from_millis(500),
         db_handle.async_commit(move |_| -> Result<(), DatabaseError> {
             my_commit_ran.store(true, Ordering::SeqCst);
             Ok(())
@@ -359,9 +391,12 @@ async fn async_commit_lock_if_writer_permit_is_held() {
 //      which breaks the guarantee of only having one writer at a time.
 //      2. You can call a function which is `test_utils` without needing test_utils
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn can_write_on_a_read_permit() {
     holochain_trace::test_run().unwrap();
+
+    set_acquire_timeout(100);
+    set_connection_timeout(300);
 
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let db_handle = DbWrite::open(&tmp_dir.into_path(), TestDatabaseKind::new()).unwrap();

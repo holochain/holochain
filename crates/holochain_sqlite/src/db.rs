@@ -11,6 +11,7 @@ use kitsune_p2p::KitsuneSpace;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
@@ -24,6 +25,8 @@ pub use p2p_agent_store::*;
 
 mod p2p_metrics;
 pub use p2p_metrics::*;
+
+static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
@@ -210,7 +213,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         E: From<DatabaseError> + Send + 'static,
     {
         match tokio::time::timeout(
-            std::time::Duration::from_secs(10),
+            std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
             self.read_semaphore.clone().acquire_owned(),
         )
         .await
@@ -744,4 +747,9 @@ where
         }
         tokio::time::sleep(RETRY_INTERVAL).await;
     }
+}
+
+#[cfg(feature = "test_utils")]
+pub fn set_acquire_timeout(timeout_ms: u64) {
+    ACQUIRE_TIMEOUT_MS.store(timeout_ms, Ordering::Relaxed);
 }
