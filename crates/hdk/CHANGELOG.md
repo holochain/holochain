@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.3.0-beta-dev.6
+
 ## 0.3.0-beta-dev.5
 
 - New v2 of dna info returns full modifiers not just properties. Removed from genesis self check in favour of hdk call. [\#2366](https://github.com/holochain/holochain/pull/2366).
