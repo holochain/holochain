@@ -334,6 +334,14 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         r
     }
 
+    pub fn available_writer_count(&self) -> usize {
+        self.write_semaphore.available_permits()
+    }
+
+    pub fn available_reader_count(&self) -> usize {
+        self.read_semaphore.available_permits()
+    }
+
     async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
         self.0
             .write_semaphore
