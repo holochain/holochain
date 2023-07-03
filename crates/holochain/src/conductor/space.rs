@@ -233,6 +233,13 @@ impl Spaces {
             }
         };
 
+        // If node_agents_in_spaces is not yet initialized, we can't know anything about
+        // which cells are blocked, so avoid the race condition by returning false
+        if cell_ids.is_empty() {
+            tracing::warn!(?target_id, "is_blocked(): No agents were found for the target. This indicates that preflight agent exchange may not be working properly.");
+            return Ok(false);
+        }
+
         self.conductor_db
             .async_reader(move |txn| {
                 Ok(
