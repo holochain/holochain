@@ -216,7 +216,7 @@ async fn bob_links_in_a_legit_way(
     let target = Post("Potassium is radioactive".into());
     let base_entry_hash = Entry::try_from(base.clone()).unwrap().to_hash();
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
-    let link_tag = fixt!(LinkTag);
+    let link_tag = LinkTag::from(vec![0; 256]);
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
