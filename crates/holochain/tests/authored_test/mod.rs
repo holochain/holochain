@@ -54,16 +54,17 @@ async fn authored_test() {
     triggers.publish_dht_ops.trigger(&"");
 
     // Alice commits the entry
+    let basis: AnyDhtHash = entry_hash.clone().into();
+    let alice_pk = alice_call_data.cell_id.agent_pubkey().clone();
     alice_call_data
         .authored_db
         .read_async(move |txn| -> DatabaseResult<()> {
-            let basis: AnyDhtHash = entry_hash.clone().into();
             let has_authored_entry: bool = txn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
                     WHERE basis_hash = :hash AND Action.author = :author)",
                 named_params! {
                     ":hash": basis,
-                    ":author": alice_call_data.cell_id.agent_pubkey(),
+                    ":author": alice_pk,
                 },
                 |row| row.get(0),
             )?;
@@ -88,16 +89,17 @@ async fn authored_test() {
     )
     .await;
 
+    let basis: AnyDhtHash = entry_hash.clone().into();
+    let bob_pk = bob_call_data.cell_id.agent_pubkey().clone();
     bob_call_data
         .authored_db
         .read_async(move |txn| -> DatabaseResult<()> {
-            let basis: AnyDhtHash = entry_hash.clone().into();
             let has_authored_entry: bool = txn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
                     WHERE basis_hash = :hash AND Action.author = :author)",
                 named_params! {
                     ":hash": basis,
-                    ":author": bob_call_data.cell_id.agent_pubkey(),
+                    ":author": bob_pk,
                 },
                 |row| row.get(0),
             )?;
@@ -109,10 +111,10 @@ async fn authored_test() {
         .await
         .unwrap();
 
+    let basis: AnyDhtHash = entry_hash.clone().into();
     bob_call_data
         .dht_db
         .read_async(move |txn| -> DatabaseResult<()> {
-            let basis: AnyDhtHash = entry_hash.clone().into();
             let has_integrated_entry: bool = txn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE basis_hash = :hash)",
                 named_params! {
@@ -145,16 +147,17 @@ async fn authored_test() {
         .unwrap();
     triggers.publish_dht_ops.trigger(&"");
 
+    let basis: AnyDhtHash = entry_hash.clone().into();
+    let bob_pk = bob_call_data.cell_id.agent_pubkey().clone();
     bob_call_data
         .authored_db
         .read_async(move |txn| -> DatabaseResult<()> {
-            let basis: AnyDhtHash = entry_hash.clone().into();
             let has_authored_entry: bool = txn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM DhtOp JOIN Action ON DhtOp.action_hash = Action.hash
                     WHERE basis_hash = :hash AND Action.author = :author)",
                 named_params! {
                     ":hash": basis,
-                    ":author": bob_call_data.cell_id.agent_pubkey(),
+                    ":author": bob_pk,
                 },
                 |row| row.get(0),
             )?;

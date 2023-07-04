@@ -275,10 +275,10 @@ async fn private_entries_dont_leak() {
     )
     .await;
 
-    check_for_private_entries(alice.dht_db().clone());
-    check_for_private_entries(conductors[0].get_cache_db(alice.cell_id()).await.unwrap());
-    check_for_private_entries(bobbo.dht_db().clone());
-    check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap());
+    check_for_private_entries(alice.dht_db().clone()).await;
+    check_for_private_entries(conductors[0].get_cache_db(alice.cell_id()).await.unwrap()).await;
+    check_for_private_entries(bobbo.dht_db().clone()).await;
+    check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap()).await;
 }
 
 async fn check_for_private_entries<Kind: DbKindT>(env: DbWrite<Kind>) {
