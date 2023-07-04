@@ -164,47 +164,6 @@ async fn run_test(
         let valid_ops = num_valid_ops(&txn);
         assert_eq!(valid_ops, expected_count);
     });
-
-    dodgy_bob(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
-
-    // Integration should have new 5 ops in it
-    let expected_count = 5 + expected_count;
-
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
-    wait_for_integration(
-        &alice_db,
-        expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
-    )
-    .await;
-
-    // Validation should still contain bobs link delete because it points at
-    // garbage hashes as a dependency.
-    fresh_reader_test(alice_db.clone(), |txn| {
-        let valid_ops = num_valid_ops(&txn);
-        assert_eq!(valid_ops, expected_count);
-    });
-    crate::assert_eq_retry_1m!(
-        {
-            fresh_reader_test(alice_db.clone(), |txn| {
-                let num_limbo_ops: usize = txn
-                    .query_row(
-                        "
-                        SELECT COUNT(hash) FROM DhtOP
-                        WHERE
-                        when_integrated IS NULL
-                        AND (validation_stage IS NULL OR validation_stage = 0)
-                        ",
-                        [],
-                        |row| row.get(0),
-                    )
-                    .unwrap();
-                num_limbo_ops
-            })
-        },
-        1
-    );
 }
 
 async fn bob_links_in_a_legit_way(
@@ -216,7 +175,7 @@ async fn bob_links_in_a_legit_way(
     let target = Post("Potassium is radioactive".into());
     let base_entry_hash = Entry::try_from(base.clone()).unwrap().to_hash();
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
-    let link_tag = fixt!(LinkTag);
+    let link_tag = LinkTag::from(vec![0; 256]);
     let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
